@@ -1,4 +1,4 @@
-use glam::{Quat, Vec2, Vec3, Vec3A, Vec4};
+use glam::{Quat, Vec2, Vec3, Vec3A};
 
 pub struct MeshHandle(pub(crate) usize);
 pub struct TextureHandle(pub(crate) usize);
