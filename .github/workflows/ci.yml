@@ -10,7 +10,7 @@ jobs:
 
     strategy:
       matrix:
-        rust_version: [stable, "1.41.0"]
+        rust_version: [stable]
         os: [windows-latest, macos-latest, ubuntu-latest]
       fail-fast: false
     runs-on: ${{ matrix.os }}
@@ -27,16 +27,6 @@ jobs:
       run: |
         cargo build --verbose
         cargo test --verbose
-
-    - name: Build and test (all features)
-      run: |
-        cargo build --verbose --all-features
-        cargo test --verbose --all-features
-
-    - name: Build and test (no features)
-      run: |
-        cargo build --verbose --no-default-features
-        cargo test --verbose --no-default-features
 
     - name: Clippy
       run: |

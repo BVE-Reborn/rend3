@@ -9,3 +9,13 @@ repository = "https://github.com/cwfitzgerald/capstone"
 license = "MPL-2.0"
 keywords = []
 categories = []
+
+[dependencies]
+bytemuck = "1.4"
+glam = "0.9"
+imgui-wgpu = "0.9"
+shaderc = "0.6"
+smallvec = "1"
+wgpu = "0.6"
+wgpu-conveyor = "0.1"
+wgpu-subscriber = "0.1"
