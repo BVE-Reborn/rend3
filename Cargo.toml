@@ -1,0 +1,6 @@
+[workspace]
+members = ["renderer"]
+
+[profile.release]
+debug = false
+lto = "thin"

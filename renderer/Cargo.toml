@@ -1,0 +1,11 @@
+[package]
+name = "capstone-renderer"
+version = "0.1.0"
+authors = ["Connor Fitzgerald <connorwadefitzgerald@gmail.com>"]
+edition = "2018"
+description = "Asynchronous renderer made for capstone"
+readme = "README.md"
+repository = "https://github.com/cwfitzgerald/capstone"
+license = "MPL-2.0"
+keywords = []
+categories = []

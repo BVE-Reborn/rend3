@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    timeout-minutes: 5
+
+    strategy:
+      matrix:
+        rust_version: [stable, "1.41.0"]
+        os: [windows-latest, macos-latest, ubuntu-latest]
+      fail-fast: false
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Set up Rust toolchain
+      run: |
+        rustup default ${{ matrix.rust_version }}
+        rustup component add clippy
+
+    - name: Build and test
+      run: |
+        cargo build --verbose
+        cargo test --verbose
+
+    - name: Build and test (all features)
+      run: |
+        cargo build --verbose --all-features
+        cargo test --verbose --all-features
+
+    - name: Build and test (no features)
+      run: |
+        cargo build --verbose --no-default-features
+        cargo test --verbose --no-default-features
+
+    - name: Clippy
+      run: |
+        cargo clippy -- -D warnings
+      if: matrix.rust_version == 'stable'
+
+  cargo-fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up Rust toolchain
+        run: |
+          rustup default nightly
+          rustup component add rustfmt
+
+      - name: Rustfmt
+        run: |
+          cargo fmt -- --check
+
+  cargo-deny:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: EmbarkStudios/cargo-deny-action@v1
+        with:
+          log-level: warn
+          command: check
+          arguments: --all-features
