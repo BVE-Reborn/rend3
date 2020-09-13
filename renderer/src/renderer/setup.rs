@@ -1,4 +1,6 @@
+use crate::renderer::mesh::MeshManager;
 use crate::{
+    instruction::InstructionStreamPair,
     renderer::{
         limits::{check_features, check_limits},
         options::RendererOptions,
@@ -45,14 +47,18 @@ pub async fn create_renderer<W: HasRawWindowHandle>(
         .map_err(|_| RendererInitializationError::RequestDeviceFailed)?;
 
     let global_resources = RendererGlobalResources::new(&device, &surface, &options);
+    let mesh_manager = MeshManager::new(&device);
 
     let imgui_renderer = imgui_wgpu::Renderer::new(imgui, &device, &queue, SWAPCHAIN_FORMAT);
 
     Ok(Arc::new(Renderer {
+        instructions: InstructionStreamPair::new(),
+
         adapter_info,
         surface,
 
         global_resources,
+        mesh_manager,
 
         imgui_renderer,
 

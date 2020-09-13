@@ -1,9 +1,19 @@
 use glam::{Quat, Vec2, Vec3, Vec3A};
 
-pub struct MeshHandle(pub(crate) usize);
-pub struct TextureHandle(pub(crate) usize);
-pub struct MaterialHandle(pub(crate) usize);
-pub struct ObjectHandle(pub(crate) usize);
+macro_rules! declare_handle {
+    ($($name:ident),*) => {$(
+        #[derive(Debug, Copy, Clone, PartialEq, Eq)]
+        pub struct $name(pub(crate) usize);
+
+        impl $name {
+            pub fn get(&self) -> usize {
+                self.0
+            }
+        }
+    )*};
+}
+
+declare_handle!(MeshHandle, TextureHandle, MaterialHandle, ObjectHandle);
 
 // Consider:
 //
