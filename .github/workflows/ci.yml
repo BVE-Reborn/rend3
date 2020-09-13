@@ -29,10 +29,10 @@ jobs:
         cargo build --verbose
         cargo test --verbose
 
-    - name: Clippy
-      run: |
-        cargo clippy -- -D warnings
-      if: matrix.rust_version == 'stable'
+#    - name: Clippy
+#      run: |
+#        cargo clippy -- -D warnings
+#      if: matrix.rust_version == 'stable'
 
   cargo-fmt:
     runs-on: ubuntu-latest
