@@ -57,4 +57,12 @@ impl Renderer {
 
         handle
     }
+
+    pub fn remove_mesh(&self, handle: MeshHandle) {
+        self.instructions
+            .producer
+            .scene_change
+            .write()
+            .push(SceneChangeInstruction::RemoveMesh { mesh: handle });
+    }
 }

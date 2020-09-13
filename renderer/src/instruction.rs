@@ -14,7 +14,7 @@ pub enum SceneChangeInstruction {
         // TODO: Bones/joints/animation
     },
     RemoveMesh {
-        object: ObjectHandle,
+        mesh: MeshHandle,
     },
     AddTexture {
         handle: TextureHandle,

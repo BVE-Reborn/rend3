@@ -112,4 +112,11 @@ impl MeshManager {
 
         self.registry.insert(handle.0, mesh);
     }
+
+    pub fn remove(&mut self, handle: MeshHandle) {
+        let mesh = self.registry.remove(handle.0);
+
+        self.vertex_alloc.free_range(mesh.vertex_range);
+        self.index_alloc.free_range(mesh.index_range);
+    }
 }

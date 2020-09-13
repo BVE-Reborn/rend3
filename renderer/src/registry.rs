@@ -21,7 +21,7 @@ impl<T> ResourceRegistry<T> {
         self.mapping.insert(handle, data);
     }
 
-    pub fn remove(&mut self, handle: usize) {
-        self.mapping.remove(&handle);
+    pub fn remove(&mut self, handle: usize) -> T {
+        self.mapping.remove(&handle).expect("Invalid handle")
     }
 }
