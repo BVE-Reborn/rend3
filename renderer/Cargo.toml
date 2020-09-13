@@ -11,11 +11,15 @@ keywords = []
 categories = []
 
 [dependencies]
-bytemuck = "1.4"
+bitflags = "1"
+bytemuck = "1"
 glam = "0.9"
+imgui = "0.4"
 imgui-wgpu = "0.9"
+raw-window-handle = "0.3"
 shaderc = "0.6"
 smallvec = "1"
+thiserror = "1"
 wgpu = "0.6"
 wgpu-conveyor = "0.1"
 wgpu-subscriber = "0.1"
