@@ -1,8 +1,7 @@
-use crate::renderer::mesh::MeshManager;
 use crate::{
     datatypes::{MeshHandle, ModelVertex},
     instruction::{InstructionStreamPair, SceneChangeInstruction},
-    renderer::{options::RendererOptions, resources::RendererGlobalResources},
+    renderer::{mesh::MeshManager, options::RendererOptions, resources::RendererGlobalResources},
     RendererInitializationError,
 };
 use raw_window_handle::HasRawWindowHandle;
@@ -15,6 +14,7 @@ mod mesh;
 pub mod options;
 mod resources;
 mod setup;
+mod texture;
 mod util;
 
 const SWAPCHAIN_FORMAT: TextureFormat = TextureFormat::Bgra8UnormSrgb;

@@ -17,11 +17,16 @@ impl<T> ResourceRegistry<T> {
         self.current_idx.fetch_add(1, Ordering::Relaxed)
     }
 
-    pub fn insert(&mut self, handle: usize, data: T) {
-        self.mapping.insert(handle, data);
+    pub fn insert(&mut self, handle: usize, data: T) -> usize {
+        self.mapping.insert_full(handle, data).0
     }
 
-    pub fn remove(&mut self, handle: usize) -> T {
-        self.mapping.remove(&handle).expect("Invalid handle")
+    pub fn remove(&mut self, handle: usize) -> (usize, T) {
+        let (index, _key, value) = self.mapping.swap_remove_full(&handle).expect("Invalid handle");
+        (index, value)
+    }
+
+    pub fn count(&self) -> usize {
+        self.mapping.len()
     }
 }

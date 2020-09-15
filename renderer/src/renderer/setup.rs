@@ -1,8 +1,8 @@
-use crate::renderer::mesh::MeshManager;
 use crate::{
     instruction::InstructionStreamPair,
     renderer::{
         limits::{check_features, check_limits},
+        mesh::MeshManager,
         options::RendererOptions,
         resources::RendererGlobalResources,
         Renderer, SWAPCHAIN_FORMAT,
