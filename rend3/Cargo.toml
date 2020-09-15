@@ -1,5 +1,5 @@
 [package]
-name = "capstone-renderer"
+name = "rend3"
 version = "0.1.0"
 authors = ["Connor Fitzgerald <connorwadefitzgerald@gmail.com>"]
 edition = "2018"
