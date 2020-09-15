@@ -1,4 +1,3 @@
-use crate::renderer::texture::TextureManager;
 use crate::{
     instruction::InstructionStreamPair,
     renderer::{
@@ -6,6 +5,7 @@ use crate::{
         mesh::MeshManager,
         options::RendererOptions,
         resources::RendererGlobalResources,
+        texture::TextureManager,
         Renderer, SWAPCHAIN_FORMAT,
     },
     RendererInitializationError,

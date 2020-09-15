@@ -1,9 +1,9 @@
-use crate::datatypes::{RendererTextureFormat, TextureHandle};
-use crate::renderer::texture::TextureManager;
 use crate::{
-    datatypes::{MeshHandle, ModelVertex},
+    datatypes::{MeshHandle, ModelVertex, RendererTextureFormat, TextureHandle},
     instruction::{InstructionStreamPair, SceneChangeInstruction},
-    renderer::{mesh::MeshManager, options::RendererOptions, resources::RendererGlobalResources},
+    renderer::{
+        mesh::MeshManager, options::RendererOptions, resources::RendererGlobalResources, texture::TextureManager,
+    },
     RendererInitializationError,
 };
 use raw_window_handle::HasRawWindowHandle;
