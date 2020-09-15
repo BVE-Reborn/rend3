@@ -1,3 +1,4 @@
+use crate::renderer::texture::TextureManager;
 use crate::{
     instruction::InstructionStreamPair,
     renderer::{
@@ -48,6 +49,7 @@ pub async fn create_renderer<W: HasRawWindowHandle>(
 
     let global_resources = RendererGlobalResources::new(&device, &surface, &options);
     let mesh_manager = MeshManager::new(&device);
+    let texture_manager = TextureManager::new(&device);
 
     let imgui_renderer = imgui_wgpu::Renderer::new(imgui, &device, &queue, SWAPCHAIN_FORMAT);
 
@@ -59,6 +61,7 @@ pub async fn create_renderer<W: HasRawWindowHandle>(
 
         global_resources,
         mesh_manager,
+        texture_manager,
 
         imgui_renderer,
 

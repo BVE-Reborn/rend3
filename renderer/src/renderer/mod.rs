@@ -1,3 +1,5 @@
+use crate::datatypes::{RendererTextureFormat, TextureHandle};
+use crate::renderer::texture::TextureManager;
 use crate::{
     datatypes::{MeshHandle, ModelVertex},
     instruction::{InstructionStreamPair, SceneChangeInstruction},
@@ -27,6 +29,7 @@ pub struct Renderer {
 
     global_resources: RendererGlobalResources,
     mesh_manager: MeshManager,
+    texture_manager: TextureManager,
 
     imgui_renderer: imgui_wgpu::Renderer,
 
@@ -64,5 +67,29 @@ impl Renderer {
             .scene_change
             .write()
             .push(SceneChangeInstruction::RemoveMesh { mesh: handle });
+    }
+
+    pub fn add_texture(&self, data: Vec<u8>, format: RendererTextureFormat, width: u32, height: u32) -> TextureHandle {
+        let handle = self.texture_manager.allocate();
+        self.instructions
+            .producer
+            .scene_change
+            .write()
+            .push(SceneChangeInstruction::AddTexture {
+                handle,
+                data,
+                format,
+                width,
+                height,
+            });
+        handle
+    }
+
+    pub fn remove_texture(&self, handle: TextureHandle) {
+        self.instructions
+            .producer
+            .scene_change
+            .write()
+            .push(SceneChangeInstruction::RemoveTexture { texture: handle })
     }
 }

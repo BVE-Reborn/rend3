@@ -49,7 +49,7 @@ pub struct AffineTransform {
 unsafe impl bytemuck::Zeroable for AffineTransform {}
 unsafe impl bytemuck::Pod for AffineTransform {}
 
-pub enum TextureFormat {
+pub enum RendererTextureFormat {
     Rgba8Srgb,
     Rgba8Linear,
 }

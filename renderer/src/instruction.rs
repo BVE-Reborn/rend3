@@ -1,5 +1,5 @@
 use crate::datatypes::{
-    AffineTransform, MaterialHandle, MeshHandle, ModelVertex, ObjectHandle, TextureFormat, TextureHandle,
+    AffineTransform, MaterialHandle, MeshHandle, ModelVertex, ObjectHandle, RendererTextureFormat, TextureHandle,
 };
 use parking_lot::RwLock;
 use smallvec::SmallVec;
@@ -19,7 +19,7 @@ pub enum SceneChangeInstruction {
     AddTexture {
         handle: TextureHandle,
         data: Vec<u8>,
-        format: TextureFormat,
+        format: RendererTextureFormat,
         width: u32,
         height: u32,
     },
