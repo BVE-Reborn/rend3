@@ -26,6 +26,10 @@ impl<T> ResourceRegistry<T> {
         (index, value)
     }
 
+    pub fn get_index_of(&self, handle: usize) -> usize {
+        self.mapping.get_index_of(handle).unwrap()
+    }
+
     pub fn count(&self) -> usize {
         self.mapping.len()
     }

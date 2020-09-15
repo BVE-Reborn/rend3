@@ -79,6 +79,10 @@ impl TextureManager {
         self.views[active_count] = self.null_tex_man.get();
     }
 
+    pub fn internal_index(&mut self, handle: TextureHandle) -> usize {
+        self.registry.get_index_of(handle.0)
+    }
+
     pub fn ready(&mut self, device: &Device) -> (Option<&BindGroupLayout>, &BindGroup) {
         let layout = if self.layout_dirty {
             self.layout = create_bind_group_layout(device, self.views.len() as u32);
