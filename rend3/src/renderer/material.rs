@@ -51,10 +51,14 @@ impl MaterialManager {
         self.registry.remove(handle.0);
     }
 
+    pub fn internal_index(&self, handle: MaterialHandle) -> usize {
+        self.registry.get_index_of(handle.0)
+    }
+
     pub fn ready(&mut self, device: &Device, encoder: &mut CommandEncoder, texture_manager: &TextureManager) {
         let registry = &self.registry;
         self.buffer
-            .write_to_buffer(device, encoder, MAX_UNIFORM_BUFFER_BINDING_SIZE, |slice| {
+            .write_to_buffer(device, encoder, MAX_UNIFORM_BUFFER_BINDING_SIZE, move |_, slice| {
                 let typed_slice: &mut [ShaderMaterial] = bytemuck::cast_slice_mut(slice);
 
                 let translate_texture = |v: TextureHandle| unsafe {

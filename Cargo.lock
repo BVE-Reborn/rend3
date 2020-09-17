@@ -1504,8 +1504,7 @@ dependencies = [
 [[package]]
 name = "wgpu-conveyor"
 version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ebe24fa60a8fe92fe8429b40306b11b579de81615d653d31949c7161d4c89fc4"
+source = "git+https://github.com/BVE-Reborn/wgpu-conveyor.git?rev=380d8bc8a74abc684b8c0a21a7987fe505c84d19#380d8bc8a74abc684b8c0a21a7987fe505c84d19"
 dependencies = [
  "arrayvec",
  "bitflags",

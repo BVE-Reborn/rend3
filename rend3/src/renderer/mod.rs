@@ -1,10 +1,12 @@
-use crate::datatypes::{Material, MaterialHandle, Mesh, Texture};
-use crate::renderer::material::MaterialManager;
 use crate::{
-    datatypes::{MeshHandle, ModelVertex, RendererTextureFormat, TextureHandle},
+    datatypes::{
+        AffineTransform, Material, MaterialHandle, Mesh, MeshHandle, ModelVertex, Object, ObjectHandle,
+        RendererTextureFormat, Texture, TextureHandle,
+    },
     instruction::{InstructionStreamPair, SceneChangeInstruction},
     renderer::{
-        mesh::MeshManager, options::RendererOptions, resources::RendererGlobalResources, texture::TextureManager,
+        material::MaterialManager, mesh::MeshManager, object::ObjectManager, options::RendererOptions,
+        resources::RendererGlobalResources, texture::TextureManager,
     },
     RendererInitializationError,
 };
@@ -37,6 +39,7 @@ pub struct Renderer {
     mesh_manager: MeshManager,
     texture_manager: TextureManager,
     material_manager: MaterialManager,
+    object_manager: ObjectManager,
 
     imgui_renderer: imgui_wgpu::Renderer,
 
@@ -105,5 +108,34 @@ impl Renderer {
             .scene_change
             .write()
             .push(SceneChangeInstruction::RemoveMaterial { material: handle });
+    }
+
+    pub fn add_object(&self, object: Object) -> ObjectHandle {
+        let handle = self.object_manager.allocate();
+        self.instructions
+            .producer
+            .scene_change
+            .write()
+            .push(SceneChangeInstruction::AddObject { handle, object });
+        handle
+    }
+
+    pub fn set_object_transform(&self, handle: ObjectHandle, transform: AffineTransform) {
+        self.instructions
+            .producer
+            .scene_change
+            .write()
+            .push(SceneChangeInstruction::SetObjectTransform {
+                object: handle,
+                transform,
+            });
+    }
+
+    pub fn remove_object(&self, handle: ObjectHandle) {
+        self.instructions
+            .producer
+            .scene_change
+            .write()
+            .push(SceneChangeInstruction::RemoveObject { object: handle })
     }
 }
