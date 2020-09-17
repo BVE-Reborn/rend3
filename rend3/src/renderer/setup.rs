@@ -1,3 +1,4 @@
+use crate::renderer::object::ObjectManager;
 use crate::{
     instruction::InstructionStreamPair,
     renderer::{
@@ -13,14 +14,16 @@ use crate::{
 };
 use raw_window_handle::HasRawWindowHandle;
 use std::sync::Arc;
+use switchyard::Switchyard;
 use wgpu::{BackendBit, DeviceDescriptor, Instance, PowerPreference, RequestAdapterOptions};
 use wgpu_conveyor::{AutomatedBufferManager, UploadStyle};
 
-pub async fn create_renderer<W: HasRawWindowHandle>(
+pub async fn create_renderer<W: HasRawWindowHandle, TLD>(
     window: &W,
+    yard: Arc<Switchyard<TLD>>,
     imgui: &mut imgui::Context,
     options: RendererOptions,
-) -> Result<Arc<Renderer>, RendererInitializationError> {
+) -> Result<Arc<Renderer<TLD>>, RendererInitializationError> {
     let instance = Instance::new(BackendBit::PRIMARY);
 
     let surface = unsafe { instance.create_surface(window) };
@@ -54,10 +57,12 @@ pub async fn create_renderer<W: HasRawWindowHandle>(
     let mesh_manager = MeshManager::new(&device);
     let texture_manager = TextureManager::new(&device);
     let material_manager = MaterialManager::new(&device, &mut buffer_manager);
+    let object_manager = ObjectManager::new(&device, &mut buffer_manager);
 
     let imgui_renderer = imgui_wgpu::Renderer::new(imgui, &device, &queue, SWAPCHAIN_FORMAT);
 
     Ok(Arc::new(Renderer {
+        yard,
         instructions: InstructionStreamPair::new(),
 
         adapter_info,
@@ -68,6 +73,7 @@ pub async fn create_renderer<W: HasRawWindowHandle>(
         mesh_manager,
         texture_manager,
         material_manager,
+        object_manager,
 
         imgui_renderer,
 

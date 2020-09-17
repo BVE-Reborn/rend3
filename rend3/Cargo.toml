@@ -18,11 +18,13 @@ imgui = "0.4"
 imgui-wgpu = "0.9"
 indexmap = "1"
 fnv = "1"
-parking_lot = "0.11"
+futures-intrusive = "0.3"
+parking_lot = { version = "0.11", features = ["send_guard"] }
 raw-window-handle = "0.3"
 range-alloc = "0.1"
 shaderc = "0.6"
 smallvec = "1"
+switchyard = { version = "0.1", git = "https://github.com/BVE-Reborn/switchyard.git", rev = "5190d15689dfcb9896880087384c0a01c7f18290" }
 thiserror = "1"
 wgpu = "0.6"
 wgpu-conveyor = { version = "0.1", git = "https://github.com/BVE-Reborn/wgpu-conveyor.git", rev = "380d8bc8a74abc684b8c0a21a7987fe505c84d19" }

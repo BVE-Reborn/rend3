@@ -1,12 +1,11 @@
 use crate::datatypes::{
-    AffineTransform, Material, MaterialHandle, Mesh, MeshHandle, ModelVertex, Object, ObjectHandle,
-    RendererTextureFormat, Texture, TextureHandle,
+    AffineTransform, Material, MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, Texture, TextureHandle,
 };
-use parking_lot::RwLock;
-use smallvec::SmallVec;
+use crate::renderer::options::RendererOptions;
+use parking_lot::Mutex;
 use std::mem;
 
-pub enum SceneChangeInstruction {
+pub enum Instruction {
     AddMesh {
         handle: MeshHandle,
         mesh: Mesh,
@@ -39,46 +38,27 @@ pub enum SceneChangeInstruction {
     RemoveObject {
         object: ObjectHandle,
     },
-}
-
-pub enum GeneralInstruction {}
-
-pub struct InstructionStream {
-    pub scene_change: RwLock<Vec<SceneChangeInstruction>>,
-    pub general: RwLock<Vec<SceneChangeInstruction>>,
-}
-impl InstructionStream {
-    pub fn new() -> Self {
-        Self {
-            scene_change: RwLock::new(Vec::new()),
-            general: RwLock::new(Vec::new()),
-        }
-    }
+    SetOptions {
+        options: RendererOptions,
+    },
 }
 
 pub struct InstructionStreamPair {
-    pub producer: InstructionStream,
-    pub consumer: InstructionStream,
+    pub producer: Mutex<Vec<Instruction>>,
+    pub consumer: Mutex<Vec<Instruction>>,
 }
 impl InstructionStreamPair {
     pub fn new() -> Self {
         Self {
-            producer: InstructionStream::new(),
-            consumer: InstructionStream::new(),
+            producer: Mutex::new(Vec::new()),
+            consumer: Mutex::new(Vec::new()),
         }
     }
 
     pub fn swap(&self) {
-        let mut scene_produce = self.producer.scene_change.write();
-        let mut scene_consume = self.consumer.scene_change.write();
+        let mut produce = self.producer.lock();
+        let mut consume = self.consumer.lock();
 
-        let mut general_produce = self.producer.general.write();
-        let mut general_consume = self.consumer.general.write();
-
-        scene_produce.clear();
-        general_produce.clear();
-
-        mem::swap(&mut *scene_produce, &mut *scene_consume);
-        mem::swap(&mut *general_produce, &mut *general_consume);
+        mem::swap(&mut *produce, &mut *consume);
     }
 }
