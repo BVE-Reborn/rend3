@@ -1,3 +1,4 @@
+use crate::renderer::material::MaterialManager;
 use crate::{
     instruction::InstructionStreamPair,
     renderer::{
@@ -13,6 +14,7 @@ use crate::{
 use raw_window_handle::HasRawWindowHandle;
 use std::sync::Arc;
 use wgpu::{BackendBit, DeviceDescriptor, Instance, PowerPreference, RequestAdapterOptions};
+use wgpu_conveyor::{AutomatedBufferManager, UploadStyle};
 
 pub async fn create_renderer<W: HasRawWindowHandle>(
     window: &W,
@@ -47,9 +49,11 @@ pub async fn create_renderer<W: HasRawWindowHandle>(
         .await
         .map_err(|_| RendererInitializationError::RequestDeviceFailed)?;
 
+    let mut buffer_manager = AutomatedBufferManager::new(UploadStyle::from_device_type(&adapter_info.device_type));
     let global_resources = RendererGlobalResources::new(&device, &surface, &options);
     let mesh_manager = MeshManager::new(&device);
     let texture_manager = TextureManager::new(&device);
+    let material_manager = MaterialManager::new(&device, &mut buffer_manager);
 
     let imgui_renderer = imgui_wgpu::Renderer::new(imgui, &device, &queue, SWAPCHAIN_FORMAT);
 
@@ -59,9 +63,11 @@ pub async fn create_renderer<W: HasRawWindowHandle>(
         adapter_info,
         surface,
 
+        buffer_manager,
         global_resources,
         mesh_manager,
         texture_manager,
+        material_manager,
 
         imgui_renderer,
 

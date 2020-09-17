@@ -12,10 +12,10 @@ const INDEX_SIZE: usize = size_of::<u32>();
 const STARTING_VERTICES: usize = 1 << 16;
 const STARTING_INDICES: usize = 1 << 18;
 
-struct Mesh {
-    vertex_range: Range<usize>,
-    index_range: Range<usize>,
-    material_count: u32,
+pub struct InternalMesh {
+    pub vertex_range: Range<usize>,
+    pub index_range: Range<usize>,
+    pub material_count: u32,
 }
 
 pub struct MeshManager {
@@ -27,7 +27,7 @@ pub struct MeshManager {
     index_count: usize,
     index_alloc: RangeAllocator<usize>,
 
-    registry: ResourceRegistry<Mesh>,
+    registry: ResourceRegistry<InternalMesh>,
 }
 
 impl MeshManager {
@@ -89,9 +89,7 @@ impl MeshManager {
             .allocate_range(indices.len())
             .unwrap_or_else(|_| todo!("Deal with resizing buffers"));
 
-        // Adjust indices based on vertex range
         let vertex_base = vertex_range.start;
-        indices.iter_mut().for_each(|i| *i += vertex_base as u32);
 
         queue.write_buffer(
             &self.vertex_buffer,
@@ -104,7 +102,7 @@ impl MeshManager {
             bytemuck::cast_slice(&indices),
         );
 
-        let mesh = Mesh {
+        let mesh = InternalMesh {
             vertex_range,
             index_range,
             material_count,
@@ -118,5 +116,9 @@ impl MeshManager {
 
         self.vertex_alloc.free_range(mesh.vertex_range);
         self.index_alloc.free_range(mesh.index_range);
+    }
+
+    pub fn internal_data(&self, handle: MeshHandle) -> &InternalMesh {
+        self.registry.get(handle.0)
     }
 }

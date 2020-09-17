@@ -1,14 +1,15 @@
+use fnv::FnvBuildHasher;
 use indexmap::map::IndexMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 pub struct ResourceRegistry<T> {
-    mapping: IndexMap<usize, T>,
+    mapping: IndexMap<usize, T, FnvBuildHasher>,
     current_idx: AtomicUsize,
 }
 impl<T> ResourceRegistry<T> {
     pub fn new() -> Self {
         Self {
-            mapping: IndexMap::new(),
+            mapping: IndexMap::with_hasher(FnvBuildHasher::default()),
             current_idx: AtomicUsize::new(0),
         }
     }
@@ -28,6 +29,10 @@ impl<T> ResourceRegistry<T> {
 
     pub fn values(&self) -> impl Iterator<Item = &T> {
         self.mapping.values()
+    }
+
+    pub fn get(&self, handle: usize) -> &T {
+        &self.mapping[handle]
     }
 
     pub fn get_index_of(&self, handle: usize) -> usize {

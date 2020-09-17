@@ -1,4 +1,5 @@
 use glam::{Quat, Vec2, Vec3, Vec3A};
+use smallvec::SmallVec;
 
 macro_rules! declare_handle {
     ($($name:ident),*) => {$(
@@ -54,6 +55,20 @@ pub enum RendererTextureFormat {
     Rgba8Linear,
 }
 
+pub struct Mesh {
+    vertices: Vec<ModelVertex>,
+    indices: Vec<u32>,
+    material_count: u32,
+    // TODO: Bones/joints/animation
+}
+
+pub struct Texture {
+    pub data: Vec<u8>,
+    pub format: RendererTextureFormat,
+    pub width: u32,
+    pub height: u32,
+}
+
 // Consider:
 //
 // - albedo and opacity
@@ -69,4 +84,10 @@ pub struct Material {
     pub normal: Option<TextureHandle>,
     pub roughness: Option<TextureHandle>,
     pub specular: Option<TextureHandle>,
+}
+
+pub struct Object {
+    pub mesh: MeshHandle,
+    pub materials: SmallVec<[MaterialHandle; 4]>,
+    pub transform: AffineTransform,
 }

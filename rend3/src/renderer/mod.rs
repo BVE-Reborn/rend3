@@ -1,3 +1,5 @@
+use crate::datatypes::{Material, MaterialHandle, Mesh, Texture};
+use crate::renderer::material::MaterialManager;
 use crate::{
     datatypes::{MeshHandle, ModelVertex, RendererTextureFormat, TextureHandle},
     instruction::{InstructionStreamPair, SceneChangeInstruction},
@@ -9,11 +11,13 @@ use crate::{
 use raw_window_handle::HasRawWindowHandle;
 use std::{future::Future, sync::Arc};
 use wgpu::{AdapterInfo, Surface, TextureFormat};
+use wgpu_conveyor::AutomatedBufferManager;
 
 pub mod error;
 pub mod limits;
 mod material;
 mod mesh;
+mod object;
 pub mod options;
 mod resources;
 mod setup;
@@ -28,9 +32,11 @@ pub struct Renderer {
     adapter_info: AdapterInfo,
     surface: Surface,
 
+    buffer_manager: AutomatedBufferManager,
     global_resources: RendererGlobalResources,
     mesh_manager: MeshManager,
     texture_manager: TextureManager,
+    material_manager: MaterialManager,
 
     imgui_renderer: imgui_wgpu::Renderer,
 
@@ -45,19 +51,14 @@ impl Renderer {
         setup::create_renderer(window, context, options)
     }
 
-    pub fn add_mesh(&self, vertices: Vec<ModelVertex>, indices: Vec<u32>, material_count: u32) -> MeshHandle {
+    pub fn add_mesh(&self, mesh: Mesh) -> MeshHandle {
         let handle = self.mesh_manager.allocate();
 
         self.instructions
             .producer
             .scene_change
             .write()
-            .push(SceneChangeInstruction::AddMesh {
-                handle,
-                vertices,
-                indices,
-                material_count,
-            });
+            .push(SceneChangeInstruction::AddMesh { handle, mesh });
 
         handle
     }
@@ -70,19 +71,13 @@ impl Renderer {
             .push(SceneChangeInstruction::RemoveMesh { mesh: handle });
     }
 
-    pub fn add_texture(&self, data: Vec<u8>, format: RendererTextureFormat, width: u32, height: u32) -> TextureHandle {
+    pub fn add_texture(&self, texture: Texture) -> TextureHandle {
         let handle = self.texture_manager.allocate();
         self.instructions
             .producer
             .scene_change
             .write()
-            .push(SceneChangeInstruction::AddTexture {
-                handle,
-                data,
-                format,
-                width,
-                height,
-            });
+            .push(SceneChangeInstruction::AddTexture { handle, texture });
         handle
     }
 
@@ -92,5 +87,23 @@ impl Renderer {
             .scene_change
             .write()
             .push(SceneChangeInstruction::RemoveTexture { texture: handle })
+    }
+
+    pub fn add_material(&self, material: Material) -> MaterialHandle {
+        let handle = self.material_manager.allocate();
+        self.instructions
+            .producer
+            .scene_change
+            .write()
+            .push(SceneChangeInstruction::AddMaterial { handle, material });
+        handle
+    }
+
+    pub fn remove_material(&self, handle: MaterialHandle) {
+        self.instructions
+            .producer
+            .scene_change
+            .write()
+            .push(SceneChangeInstruction::RemoveMaterial { material: handle });
     }
 }

@@ -1,6 +1,6 @@
 use crate::datatypes::{
-    AffineTransform, Material, MaterialHandle, MeshHandle, ModelVertex, ObjectHandle, RendererTextureFormat,
-    TextureHandle,
+    AffineTransform, Material, MaterialHandle, Mesh, MeshHandle, ModelVertex, Object, ObjectHandle,
+    RendererTextureFormat, Texture, TextureHandle,
 };
 use parking_lot::RwLock;
 use smallvec::SmallVec;
@@ -9,20 +9,14 @@ use std::mem;
 pub enum SceneChangeInstruction {
     AddMesh {
         handle: MeshHandle,
-        vertices: Vec<ModelVertex>,
-        indices: Vec<u32>,
-        material_count: u32,
-        // TODO: Bones/joints/animation
+        mesh: Mesh,
     },
     RemoveMesh {
         mesh: MeshHandle,
     },
     AddTexture {
         handle: TextureHandle,
-        data: Vec<u8>,
-        format: RendererTextureFormat,
-        width: u32,
-        height: u32,
+        texture: Texture,
     },
     RemoveTexture {
         texture: TextureHandle,
@@ -36,9 +30,7 @@ pub enum SceneChangeInstruction {
     },
     AddObject {
         handle: ObjectHandle,
-        mesh: MeshHandle,
-        materials: SmallVec<[MaterialHandle; 4]>,
-        transform: AffineTransform,
+        object: Object,
     },
     SetObjectTransform {
         object: ObjectHandle,
