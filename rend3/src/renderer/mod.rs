@@ -1,4 +1,3 @@
-use crate::statistics::RendererStatistics;
 use crate::{
     datatypes::{
         AffineTransform, Material, MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, Texture, TextureHandle,
@@ -8,6 +7,7 @@ use crate::{
         material::MaterialManager, mesh::MeshManager, object::ObjectManager, options::RendererOptions,
         resources::RendererGlobalResources, texture::TextureManager,
     },
+    statistics::RendererStatistics,
     RendererInitializationError,
 };
 use raw_window_handle::HasRawWindowHandle;

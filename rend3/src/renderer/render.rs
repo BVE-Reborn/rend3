@@ -1,8 +1,5 @@
-use crate::instruction::Instruction;
-use crate::statistics::RendererStatistics;
-use crate::Renderer;
-use std::future::Future;
-use std::sync::Arc;
+use crate::{instruction::Instruction, statistics::RendererStatistics, Renderer};
+use std::{future::Future, sync::Arc};
 
 pub fn render_loop<TLD>(renderer: Arc<Renderer<TLD>>) -> impl Future<Output = RendererStatistics> {
     // blocks, do it before we async

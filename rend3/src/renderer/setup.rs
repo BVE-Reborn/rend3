@@ -1,10 +1,10 @@
-use crate::renderer::object::ObjectManager;
 use crate::{
     instruction::InstructionStreamPair,
     renderer::{
         limits::{check_features, check_limits},
         material::MaterialManager,
         mesh::MeshManager,
+        object::ObjectManager,
         options::RendererOptions,
         resources::RendererGlobalResources,
         texture::TextureManager,
