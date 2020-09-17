@@ -79,7 +79,7 @@ impl TextureManager {
         self.views[active_count] = self.null_tex_man.get();
     }
 
-    pub fn internal_index(&mut self, handle: TextureHandle) -> usize {
+    pub fn internal_index(&self, handle: TextureHandle) -> usize {
         self.registry.get_index_of(handle.0)
     }
 

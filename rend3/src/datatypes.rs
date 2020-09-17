@@ -28,11 +28,11 @@ declare_handle!(MeshHandle, TextureHandle, MaterialHandle, ObjectHandle);
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct ModelVertex {
-    position: Vec3, // 00..12
-    normal: Vec3,   // 12..24
-    uv: Vec2,       // 24..32
-    color: [u8; 4], // 32..36
-    material: u32,  // 36..40
+    pub position: Vec3, // 00..12
+    pub normal: Vec3,   // 12..24
+    pub uv: Vec2,       // 24..32
+    pub color: [u8; 4], // 32..36
+    pub material: u32,  // 36..40
 }
 
 unsafe impl bytemuck::Zeroable for ModelVertex {}
@@ -41,9 +41,9 @@ unsafe impl bytemuck::Pod for ModelVertex {}
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct AffineTransform {
-    transform: Vec3A,
-    rotation: Quat,
-    scale: Vec3A,
+    pub transform: Vec3A,
+    pub rotation: Quat,
+    pub scale: Vec3A,
 }
 
 unsafe impl bytemuck::Zeroable for AffineTransform {}
@@ -52,4 +52,21 @@ unsafe impl bytemuck::Pod for AffineTransform {}
 pub enum RendererTextureFormat {
     Rgba8Srgb,
     Rgba8Linear,
+}
+
+// Consider:
+//
+// - albedo and opacity
+// - normal
+// - roughness
+// - specular color
+// - thiccness for leaves
+// - porosity, so I can do things like make things wet when it rains
+// - Maybe subsurface scattering radii? Or some kind of transmission value
+// - Index of Refraction for transparent things
+pub struct Material {
+    pub color: Option<TextureHandle>,
+    pub normal: Option<TextureHandle>,
+    pub roughness: Option<TextureHandle>,
+    pub specular: Option<TextureHandle>,
 }

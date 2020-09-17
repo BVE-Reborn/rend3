@@ -26,6 +26,10 @@ impl<T> ResourceRegistry<T> {
         (index, value)
     }
 
+    pub fn values(&self) -> impl Iterator<Item = &T> {
+        self.mapping.values()
+    }
+
     pub fn get_index_of(&self, handle: usize) -> usize {
         self.mapping.get_index_of(&handle).unwrap()
     }

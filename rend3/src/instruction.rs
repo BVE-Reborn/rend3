@@ -1,5 +1,6 @@
 use crate::datatypes::{
-    AffineTransform, MaterialHandle, MeshHandle, ModelVertex, ObjectHandle, RendererTextureFormat, TextureHandle,
+    AffineTransform, Material, MaterialHandle, MeshHandle, ModelVertex, ObjectHandle, RendererTextureFormat,
+    TextureHandle,
 };
 use parking_lot::RwLock;
 use smallvec::SmallVec;
@@ -27,21 +28,8 @@ pub enum SceneChangeInstruction {
         texture: TextureHandle,
     },
     AddMaterial {
-        // Consider:
-        //
-        // - albedo and opacity
-        // - normal
-        // - roughness
-        // - specular color
-        // - thiccness for leaves
-        // - porosity, so I can do things like make things wet when it rains
-        // - Maybe subsurface scattering radii? Or some kind of transmission value
-        // - Index of Refraction for transparent things
         handle: MaterialHandle,
-        color: Option<TextureHandle>,
-        normal: Option<TextureHandle>,
-        roughness: Option<TextureHandle>,
-        specular: Option<TextureHandle>,
+        material: Material,
     },
     RemoveMaterial {
         material: MaterialHandle,

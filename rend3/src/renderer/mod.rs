@@ -12,6 +12,7 @@ use wgpu::{AdapterInfo, Surface, TextureFormat};
 
 pub mod error;
 pub mod limits;
+mod material;
 mod mesh;
 pub mod options;
 mod resources;
