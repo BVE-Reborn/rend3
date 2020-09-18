@@ -5,15 +5,15 @@ use crate::{
     instruction::{Instruction, InstructionStreamPair},
     renderer::{
         material::MaterialManager, mesh::MeshManager, object::ObjectManager, options::RendererOptions,
-        resources::RendererGlobalResources, texture::TextureManager,
+        resources::RendererGlobalResources, shaders::ShaderManager, texture::TextureManager,
     },
     statistics::RendererStatistics,
-    RendererInitializationError,
+    RendererInitializationError, TLS,
 };
 use raw_window_handle::HasRawWindowHandle;
-use std::{future::Future, sync::Arc};
+use std::{cell::RefCell, future::Future, sync::Arc};
 use switchyard::{JoinHandle, Switchyard};
-use wgpu::{AdapterInfo, Surface, TextureFormat};
+use wgpu::{AdapterInfo, Device, Surface, TextureFormat};
 use wgpu_conveyor::AutomatedBufferManager;
 
 pub mod error;
@@ -25,25 +25,31 @@ pub mod options;
 mod render;
 mod resources;
 mod setup;
+mod shaders;
 mod texture;
 mod util;
 
-const MAIN_TASK_PRIORITY: u32 = 16;
+const COMPUTE_POOL: u8 = 0;
+
+const SHADER_COMPILE_PRIORITY: u32 = 0;
+const MAIN_TASK_PRIORITY: u32 = 1;
 
 const SWAPCHAIN_FORMAT: TextureFormat = TextureFormat::Bgra8UnormSrgb;
 
-pub struct Renderer<TLD = ()>
+pub struct Renderer<TLD = TLS>
 where
-    TLD: 'static,
+    TLD: AsMut<TLS> + 'static,
 {
-    yard: Arc<Switchyard<TLD>>,
+    yard: Arc<Switchyard<RefCell<TLD>>>,
     instructions: InstructionStreamPair,
 
     adapter_info: AdapterInfo,
+    device: Device,
     surface: Surface,
 
     buffer_manager: AutomatedBufferManager,
     global_resources: RendererGlobalResources,
+    shader_manager: ShaderManager,
     mesh_manager: MeshManager,
     texture_manager: TextureManager,
     material_manager: MaterialManager,
@@ -53,10 +59,13 @@ where
 
     options: RendererOptions,
 }
-impl<TLD> Renderer<TLD> {
+impl<TLD> Renderer<TLD>
+where
+    TLD: AsMut<TLS> + 'static,
+{
     pub fn new<'a, W: HasRawWindowHandle>(
         window: &'a W,
-        yard: Arc<Switchyard<TLD>>,
+        yard: Arc<Switchyard<RefCell<TLD>>>,
         context: &'a mut imgui::Context,
         options: RendererOptions,
     ) -> impl Future<Output = Result<Arc<Self>, RendererInitializationError>> + 'a {

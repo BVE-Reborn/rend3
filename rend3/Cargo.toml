@@ -18,6 +18,7 @@ imgui = "0.4"
 imgui-wgpu = "0.9"
 indexmap = "1"
 fnv = "1"
+futures = { version = "0.3", default-features = false }
 futures-intrusive = "0.3"
 parking_lot = { version = "0.11", features = ["send_guard"] }
 raw-window-handle = "0.3"

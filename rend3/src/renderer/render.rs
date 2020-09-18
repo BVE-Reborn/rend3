@@ -1,7 +1,10 @@
-use crate::{instruction::Instruction, statistics::RendererStatistics, Renderer};
+use crate::{instruction::Instruction, statistics::RendererStatistics, Renderer, TLS};
 use std::{future::Future, sync::Arc};
 
-pub fn render_loop<TLD>(renderer: Arc<Renderer<TLD>>) -> impl Future<Output = RendererStatistics> {
+pub fn render_loop<TLD>(renderer: Arc<Renderer<TLD>>) -> impl Future<Output = RendererStatistics>
+where
+    TLD: AsMut<TLS> + 'static,
+{
     // blocks, do it before we async
     renderer.instructions.swap();
 

@@ -7,23 +7,27 @@ use crate::{
         object::ObjectManager,
         options::RendererOptions,
         resources::RendererGlobalResources,
+        shaders::ShaderManager,
         texture::TextureManager,
         Renderer, SWAPCHAIN_FORMAT,
     },
-    RendererInitializationError,
+    RendererInitializationError, TLS,
 };
 use raw_window_handle::HasRawWindowHandle;
-use std::sync::Arc;
+use std::{cell::RefCell, sync::Arc};
 use switchyard::Switchyard;
 use wgpu::{BackendBit, DeviceDescriptor, Instance, PowerPreference, RequestAdapterOptions};
 use wgpu_conveyor::{AutomatedBufferManager, UploadStyle};
 
 pub async fn create_renderer<W: HasRawWindowHandle, TLD>(
     window: &W,
-    yard: Arc<Switchyard<TLD>>,
+    yard: Arc<Switchyard<RefCell<TLD>>>,
     imgui: &mut imgui::Context,
     options: RendererOptions,
-) -> Result<Arc<Renderer<TLD>>, RendererInitializationError> {
+) -> Result<Arc<Renderer<TLD>>, RendererInitializationError>
+where
+    TLD: AsMut<TLS> + 'static,
+{
     let instance = Instance::new(BackendBit::PRIMARY);
 
     let surface = unsafe { instance.create_surface(window) };
@@ -54,6 +58,7 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD>(
 
     let mut buffer_manager = AutomatedBufferManager::new(UploadStyle::from_device_type(&adapter_info.device_type));
     let global_resources = RendererGlobalResources::new(&device, &surface, &options);
+    let shader_manager = ShaderManager::new();
     let mesh_manager = MeshManager::new(&device);
     let texture_manager = TextureManager::new(&device);
     let material_manager = MaterialManager::new(&device, &mut buffer_manager);
@@ -66,10 +71,12 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD>(
         instructions: InstructionStreamPair::new(),
 
         adapter_info,
+        device,
         surface,
 
         buffer_manager,
         global_resources,
+        shader_manager,
         mesh_manager,
         texture_manager,
         material_manager,
