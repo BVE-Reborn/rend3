@@ -10,10 +10,11 @@ use crate::{
     statistics::RendererStatistics,
     RendererInitializationError, TLS,
 };
+use parking_lot::RwLock;
 use raw_window_handle::HasRawWindowHandle;
 use std::{cell::RefCell, future::Future, sync::Arc};
 use switchyard::{JoinHandle, Switchyard};
-use wgpu::{AdapterInfo, Device, Surface, TextureFormat};
+use wgpu::{AdapterInfo, Device, Queue, Surface, TextureFormat};
 use wgpu_conveyor::AutomatedBufferManager;
 
 pub mod error;
@@ -44,11 +45,12 @@ where
     instructions: InstructionStreamPair,
 
     adapter_info: AdapterInfo,
+    queue: Queue,
     device: Device,
     surface: Surface,
 
     buffer_manager: AutomatedBufferManager,
-    global_resources: RendererGlobalResources,
+    global_resources: RwLock<RendererGlobalResources>,
     shader_manager: ShaderManager,
     mesh_manager: MeshManager,
     texture_manager: TextureManager,

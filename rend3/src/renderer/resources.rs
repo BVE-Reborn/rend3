@@ -2,7 +2,7 @@ use crate::renderer::{options::RendererOptions, util};
 use wgpu::{Device, Surface, SwapChain};
 
 pub struct RendererGlobalResources {
-    swapchain: SwapChain,
+    pub swapchain: SwapChain,
 }
 impl RendererGlobalResources {
     pub fn new(device: &Device, surface: &Surface, options: &RendererOptions) -> Self {

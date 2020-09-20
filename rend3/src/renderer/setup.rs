@@ -13,6 +13,7 @@ use crate::{
     },
     RendererInitializationError, TLS,
 };
+use parking_lot::RwLock;
 use raw_window_handle::HasRawWindowHandle;
 use std::{cell::RefCell, sync::Arc};
 use switchyard::Switchyard;
@@ -57,7 +58,7 @@ where
         .map_err(|_| RendererInitializationError::RequestDeviceFailed)?;
 
     let mut buffer_manager = AutomatedBufferManager::new(UploadStyle::from_device_type(&adapter_info.device_type));
-    let global_resources = RendererGlobalResources::new(&device, &surface, &options);
+    let global_resources = RwLock::new(RendererGlobalResources::new(&device, &surface, &options));
     let shader_manager = ShaderManager::new();
     let mesh_manager = MeshManager::new(&device);
     let texture_manager = TextureManager::new(&device);
@@ -71,6 +72,7 @@ where
         instructions: InstructionStreamPair::new(),
 
         adapter_info,
+        queue,
         device,
         surface,
 

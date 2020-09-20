@@ -77,7 +77,7 @@ impl MeshManager {
         queue: &Queue,
         handle: MeshHandle,
         vertices: Vec<ModelVertex>,
-        mut indices: Vec<u32>,
+        indices: Vec<u32>,
         material_count: u32,
     ) {
         let vertex_range = self

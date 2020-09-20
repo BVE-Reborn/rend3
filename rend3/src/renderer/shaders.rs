@@ -8,15 +8,13 @@ use parking_lot::Mutex;
 use shaderc::{CompileOptions, OptimizationLevel, ShaderKind, SourceLanguage, TargetEnv};
 use std::{
     borrow::Cow,
-    cell::RefCell,
     collections::HashMap,
     future::Future,
     hash::{Hash, Hasher},
     mem::discriminant,
     sync::Arc,
 };
-use switchyard::Switchyard;
-use wgpu::{Device, ShaderModule, ShaderModuleSource};
+use wgpu::{ShaderModule, ShaderModuleSource};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ShaderArguments {
