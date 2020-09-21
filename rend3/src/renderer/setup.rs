@@ -5,13 +5,12 @@ use crate::{
         material::MaterialManager,
         mesh::MeshManager,
         object::ObjectManager,
-        options::RendererOptions,
         resources::RendererGlobalResources,
         shaders::ShaderManager,
         texture::TextureManager,
         Renderer, SWAPCHAIN_FORMAT,
     },
-    RendererInitializationError, TLS,
+    RendererInitializationError, RendererOptions, TLS,
 };
 use parking_lot::RwLock;
 use raw_window_handle::HasRawWindowHandle;

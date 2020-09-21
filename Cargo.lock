@@ -672,6 +672,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "imgui-winit-support"
+version = "0.4.0"
+source = "git+https://github.com/BVE-Reborn/imgui-rs.git?rev=d95b63623ededc12b0536b7df7d80608b6a605a1#d95b63623ededc12b0536b7df7d80608b6a605a1"
+dependencies = [
+ "imgui",
+ "winit",
+]
+
+[[package]]
 name = "indexmap"
 version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1239,6 +1248,18 @@ name = "ryu"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "71d301d4193d031abdd79ff7e3dd721168a9572ef3fe51a1517aba235bd8f86e"
+
+[[package]]
+name = "scene-viewer"
+version = "0.1.0"
+dependencies = [
+ "futures",
+ "imgui",
+ "imgui-winit-support",
+ "rend3",
+ "switchyard",
+ "winit",
+]
 
 [[package]]
 name = "scopeguard"

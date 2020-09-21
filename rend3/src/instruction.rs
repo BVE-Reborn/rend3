@@ -2,7 +2,7 @@ use crate::{
     datatypes::{
         AffineTransform, Material, MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, Texture, TextureHandle,
     },
-    renderer::options::RendererOptions,
+    RendererOptions,
 };
 use parking_lot::Mutex;
 use std::mem;

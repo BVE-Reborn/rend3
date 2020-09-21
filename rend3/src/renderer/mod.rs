@@ -4,11 +4,11 @@ use crate::{
     },
     instruction::{Instruction, InstructionStreamPair},
     renderer::{
-        material::MaterialManager, mesh::MeshManager, object::ObjectManager, options::RendererOptions,
-        resources::RendererGlobalResources, shaders::ShaderManager, texture::TextureManager,
+        material::MaterialManager, mesh::MeshManager, object::ObjectManager, resources::RendererGlobalResources,
+        shaders::ShaderManager, texture::TextureManager,
     },
     statistics::RendererStatistics,
-    RendererInitializationError, TLS,
+    RendererInitializationError, RendererOptions, TLS,
 };
 use parking_lot::RwLock;
 use raw_window_handle::HasRawWindowHandle;
@@ -22,7 +22,6 @@ pub mod limits;
 mod material;
 mod mesh;
 mod object;
-pub mod options;
 mod render;
 mod resources;
 mod setup;
@@ -68,10 +67,10 @@ where
     pub fn new<'a, W: HasRawWindowHandle>(
         window: &'a W,
         yard: Arc<Switchyard<RefCell<TLD>>>,
-        context: &'a mut imgui::Context,
+        imgui_context: &'a mut imgui::Context,
         options: RendererOptions,
     ) -> impl Future<Output = Result<Arc<Self>, RendererInitializationError>> + 'a {
-        setup::create_renderer(window, yard, context, options)
+        setup::create_renderer(window, yard, imgui_context, options)
     }
 
     pub fn add_mesh(&self, mesh: Mesh) -> MeshHandle {

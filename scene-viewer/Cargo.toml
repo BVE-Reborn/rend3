@@ -1,0 +1,15 @@
+[package]
+name = "scene-viewer"
+version = "0.1.0"
+authors = ["Connor Fitzgerald <connorwadefitzgerald@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+futures = { version = "0.3", default-features = false, features = ["executor"] }
+imgui = "0.4"
+imgui-winit-support = { version = "0.4", git = "https://github.com/BVE-Reborn/imgui-rs.git", rev = "d95b63623ededc12b0536b7df7d80608b6a605a1" }
+rend3 = { path = "../rend3", version = "0.1.0" }
+switchyard = { version = "0.1", git = "https://github.com/BVE-Reborn/switchyard.git", rev = "5190d15689dfcb9896880087384c0a01c7f18290" }
+winit = { git = "https://github.com/rust-windowing/winit.git", rev = "c1ea0dde92e1de9e029e7fbb2485a454aa81b918",  default-features = false, features = ["x11"] }

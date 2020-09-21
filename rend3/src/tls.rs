@@ -1,13 +1,14 @@
 use shaderc::Compiler;
+use std::cell::RefCell;
 
 pub struct TLS {
     pub(crate) shader_compiler: Compiler,
 }
 impl TLS {
-    pub fn new() -> Option<Self> {
-        Some(Self {
+    pub fn new() -> Option<RefCell<Self>> {
+        Some(RefCell::new(Self {
             shader_compiler: Compiler::new()?,
-        })
+        }))
     }
 }
 

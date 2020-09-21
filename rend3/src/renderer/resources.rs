@@ -1,4 +1,4 @@
-use crate::renderer::{options::RendererOptions, util};
+use crate::{renderer::util, RendererOptions};
 use wgpu::{Device, Surface, SwapChain};
 
 pub struct RendererGlobalResources {

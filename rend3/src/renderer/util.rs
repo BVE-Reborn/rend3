@@ -1,4 +1,4 @@
-use crate::renderer::{options::VSyncMode, SWAPCHAIN_FORMAT};
+use crate::{renderer::SWAPCHAIN_FORMAT, VSyncMode};
 use wgpu::{Device, PresentMode, Surface, SwapChain, SwapChainDescriptor, TextureUsage};
 use winit::dpi::PhysicalSize;
 
