@@ -13,32 +13,32 @@ pub enum Instruction {
         mesh: Mesh,
     },
     RemoveMesh {
-        mesh: MeshHandle,
+        handle: MeshHandle,
     },
     AddTexture {
         handle: TextureHandle,
         texture: Texture,
     },
     RemoveTexture {
-        texture: TextureHandle,
+        handle: TextureHandle,
     },
     AddMaterial {
         handle: MaterialHandle,
         material: Material,
     },
     RemoveMaterial {
-        material: MaterialHandle,
+        handle: MaterialHandle,
     },
     AddObject {
         handle: ObjectHandle,
         object: Object,
     },
     SetObjectTransform {
-        object: ObjectHandle,
+        handle: ObjectHandle,
         transform: AffineTransform,
     },
     RemoveObject {
-        object: ObjectHandle,
+        handle: ObjectHandle,
     },
     SetOptions {
         options: RendererOptions,

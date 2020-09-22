@@ -145,8 +145,8 @@ impl NullTextureManager {
         let null_tex = device.create_texture(&TextureDescriptor {
             label: Some("null texture"),
             size: Extent3d::default(),
-            mip_level_count: 0,
-            sample_count: 0,
+            mip_level_count: 1,
+            sample_count: 1,
             dimension: TextureDimension::D2,
             format: TextureFormat::Rgba8Unorm,
             usage: TextureUsage::SAMPLED,

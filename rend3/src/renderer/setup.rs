@@ -12,7 +12,7 @@ use crate::{
     },
     RendererInitializationError, RendererOptions, TLS,
 };
-use parking_lot::RwLock;
+use parking_lot::{Mutex, RwLock};
 use raw_window_handle::HasRawWindowHandle;
 use std::{cell::RefCell, sync::Arc};
 use switchyard::Switchyard;
@@ -56,13 +56,15 @@ where
         .await
         .map_err(|_| RendererInitializationError::RequestDeviceFailed)?;
 
-    let mut buffer_manager = AutomatedBufferManager::new(UploadStyle::from_device_type(&adapter_info.device_type));
+    let mut buffer_manager = Mutex::new(AutomatedBufferManager::new(UploadStyle::from_device_type(
+        &adapter_info.device_type,
+    )));
     let global_resources = RwLock::new(RendererGlobalResources::new(&device, &surface, &options));
     let shader_manager = ShaderManager::new();
-    let mesh_manager = MeshManager::new(&device);
-    let texture_manager = TextureManager::new(&device);
-    let material_manager = MaterialManager::new(&device, &mut buffer_manager);
-    let object_manager = ObjectManager::new(&device, &mut buffer_manager);
+    let mesh_manager = RwLock::new(MeshManager::new(&device));
+    let texture_manager = RwLock::new(TextureManager::new(&device));
+    let material_manager = RwLock::new(MaterialManager::new(&device, buffer_manager.get_mut()));
+    let object_manager = RwLock::new(ObjectManager::new(&device, buffer_manager.get_mut()));
 
     let imgui_renderer = imgui_wgpu::Renderer::new(imgui, &device, &queue, SWAPCHAIN_FORMAT);
 

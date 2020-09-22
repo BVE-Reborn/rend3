@@ -1,5 +1,6 @@
 use glam::{Quat, Vec2, Vec3, Vec3A};
 use smallvec::SmallVec;
+use wgpu::TextureFormat;
 
 macro_rules! declare_handle {
     ($($name:ident),*) => {$(
@@ -50,15 +51,31 @@ pub struct AffineTransform {
 unsafe impl bytemuck::Zeroable for AffineTransform {}
 unsafe impl bytemuck::Pod for AffineTransform {}
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum RendererTextureFormat {
     Rgba8Srgb,
     Rgba8Linear,
 }
 
+impl RendererTextureFormat {
+    pub fn bytes_per_pixel(&self) -> u32 {
+        4
+    }
+}
+
+impl From<RendererTextureFormat> for wgpu::TextureFormat {
+    fn from(other: RendererTextureFormat) -> Self {
+        match other {
+            RendererTextureFormat::Rgba8Srgb => TextureFormat::Rgba8UnormSrgb,
+            RendererTextureFormat::Rgba8Linear => TextureFormat::Rgba8Unorm,
+        }
+    }
+}
+
 pub struct Mesh {
-    vertices: Vec<ModelVertex>,
-    indices: Vec<u32>,
-    material_count: u32,
+    pub vertices: Vec<ModelVertex>,
+    pub indices: Vec<u32>,
+    pub material_count: u32,
     // TODO: Bones/joints/animation
 }
 
@@ -67,6 +84,7 @@ pub struct Texture {
     pub format: RendererTextureFormat,
     pub width: u32,
     pub height: u32,
+    pub label: Option<String>,
 }
 
 // Consider:

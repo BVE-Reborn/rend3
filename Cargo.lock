@@ -1237,9 +1237,10 @@ dependencies = [
  "smallvec",
  "switchyard",
  "thiserror",
+ "tracing",
+ "tracing-futures",
  "wgpu",
  "wgpu-conveyor",
- "wgpu-subscriber",
  "winit",
 ]
 
@@ -1258,6 +1259,8 @@ dependencies = [
  "imgui-winit-support",
  "rend3",
  "switchyard",
+ "tracing",
+ "wgpu-subscriber",
  "winit",
 ]
 
@@ -1465,6 +1468,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5bcf46c1f1f06aeea2d6b81f3c863d0930a596c86ad1920d4e5bad6dd1d7119a"
 dependencies = [
  "lazy_static",
+]
+
+[[package]]
+name = "tracing-futures"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ab7bb6f14721aa00656086e9335d363c5c8747bae02ebe32ea2c7dece5689b4c"
+dependencies = [
+ "pin-project",
+ "tracing",
 ]
 
 [[package]]

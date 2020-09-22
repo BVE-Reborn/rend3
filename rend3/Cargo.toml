@@ -26,8 +26,9 @@ range-alloc = "0.1"
 shaderc = "0.6"
 smallvec = "1"
 switchyard = { version = "0.1", git = "https://github.com/BVE-Reborn/switchyard.git", rev = "5190d15689dfcb9896880087384c0a01c7f18290" }
+tracing = { version = "0.1", default-features = false, features = ["std"] }
+tracing-futures = "0.2"
 thiserror = "1"
 wgpu = "0.6"
 wgpu-conveyor = { version = "0.1", git = "https://github.com/BVE-Reborn/wgpu-conveyor.git", rev = "380d8bc8a74abc684b8c0a21a7987fe505c84d19" }
-wgpu-subscriber = "0.1"
 winit = { git = "https://github.com/rust-windowing/winit.git", rev = "c1ea0dde92e1de9e029e7fbb2485a454aa81b918",  default-features = false, features = ["x11"] }

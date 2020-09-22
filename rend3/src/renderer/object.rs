@@ -140,6 +140,10 @@ impl ObjectManager {
         );
     }
 
+    pub fn set_object_transform(&mut self, handle: ObjectHandle, transform: AffineTransform) {
+        self.registry.get_mut(handle.0).transform = transform;
+    }
+
     pub fn current_buffers(&self) -> (&AutomatedBuffer, &AutomatedBuffer) {
         (&self.object_info_buffer, &self.material_translation_buffer)
     }

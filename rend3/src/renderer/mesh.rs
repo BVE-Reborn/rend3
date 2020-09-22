@@ -1,5 +1,5 @@
 use crate::{
-    datatypes::{MeshHandle, ModelVertex},
+    datatypes::{Mesh, MeshHandle, ModelVertex},
     registry::ResourceRegistry,
 };
 use range_alloc::RangeAllocator;
@@ -72,21 +72,14 @@ impl MeshManager {
         MeshHandle(self.registry.allocate())
     }
 
-    pub fn fill(
-        &mut self,
-        queue: &Queue,
-        handle: MeshHandle,
-        vertices: Vec<ModelVertex>,
-        indices: Vec<u32>,
-        material_count: u32,
-    ) {
+    pub fn fill(&mut self, queue: &Queue, handle: MeshHandle, mesh: Mesh) {
         let vertex_range = self
             .vertex_alloc
-            .allocate_range(vertices.len())
+            .allocate_range(mesh.vertices.len())
             .unwrap_or_else(|_| todo!("Deal with resizing buffers"));
         let index_range = self
             .index_alloc
-            .allocate_range(indices.len())
+            .allocate_range(mesh.indices.len())
             .unwrap_or_else(|_| todo!("Deal with resizing buffers"));
 
         let vertex_base = vertex_range.start;
@@ -94,18 +87,18 @@ impl MeshManager {
         queue.write_buffer(
             &self.vertex_buffer,
             (vertex_base * VERTEX_SIZE) as BufferAddress,
-            bytemuck::cast_slice(&vertices),
+            bytemuck::cast_slice(&mesh.vertices),
         );
         queue.write_buffer(
             &self.index_buffer,
             (index_range.start * INDEX_SIZE) as BufferAddress,
-            bytemuck::cast_slice(&indices),
+            bytemuck::cast_slice(&mesh.indices),
         );
 
         let mesh = InternalMesh {
             vertex_range,
             index_range,
-            material_count,
+            material_count: mesh.material_count,
         };
 
         self.registry.insert(handle.0, mesh);

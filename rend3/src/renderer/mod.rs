@@ -10,7 +10,7 @@ use crate::{
     statistics::RendererStatistics,
     RendererInitializationError, RendererOptions, TLS,
 };
-use parking_lot::RwLock;
+use parking_lot::{Mutex, RwLock};
 use raw_window_handle::HasRawWindowHandle;
 use std::{cell::RefCell, future::Future, sync::Arc};
 use switchyard::{JoinHandle, Switchyard};
@@ -32,7 +32,8 @@ mod util;
 const COMPUTE_POOL: u8 = 0;
 
 const SHADER_COMPILE_PRIORITY: u32 = 0;
-const MAIN_TASK_PRIORITY: u32 = 1;
+const BUFFER_RECALL_PRIORITY: u32 = 1;
+const MAIN_TASK_PRIORITY: u32 = 2;
 
 const SWAPCHAIN_FORMAT: TextureFormat = TextureFormat::Bgra8UnormSrgb;
 
@@ -48,13 +49,13 @@ where
     device: Device,
     surface: Surface,
 
-    buffer_manager: AutomatedBufferManager,
+    buffer_manager: Mutex<AutomatedBufferManager>,
     global_resources: RwLock<RendererGlobalResources>,
     shader_manager: ShaderManager,
-    mesh_manager: MeshManager,
-    texture_manager: TextureManager,
-    material_manager: MaterialManager,
-    object_manager: ObjectManager,
+    mesh_manager: RwLock<MeshManager>,
+    texture_manager: RwLock<TextureManager>,
+    material_manager: RwLock<MaterialManager>,
+    object_manager: RwLock<ObjectManager>,
 
     imgui_renderer: imgui_wgpu::Renderer,
 
@@ -74,7 +75,7 @@ where
     }
 
     pub fn add_mesh(&self, mesh: Mesh) -> MeshHandle {
-        let handle = self.mesh_manager.allocate();
+        let handle = self.mesh_manager.read().allocate();
 
         self.instructions
             .producer
@@ -88,11 +89,11 @@ where
         self.instructions
             .producer
             .lock()
-            .push(Instruction::RemoveMesh { mesh: handle });
+            .push(Instruction::RemoveMesh { handle });
     }
 
     pub fn add_texture(&self, texture: Texture) -> TextureHandle {
-        let handle = self.texture_manager.allocate();
+        let handle = self.texture_manager.read().allocate();
         self.instructions
             .producer
             .lock()
@@ -104,11 +105,11 @@ where
         self.instructions
             .producer
             .lock()
-            .push(Instruction::RemoveTexture { texture: handle })
+            .push(Instruction::RemoveTexture { handle })
     }
 
     pub fn add_material(&self, material: Material) -> MaterialHandle {
-        let handle = self.material_manager.allocate();
+        let handle = self.material_manager.read().allocate();
         self.instructions
             .producer
             .lock()
@@ -120,11 +121,11 @@ where
         self.instructions
             .producer
             .lock()
-            .push(Instruction::RemoveMaterial { material: handle });
+            .push(Instruction::RemoveMaterial { handle });
     }
 
     pub fn add_object(&self, object: Object) -> ObjectHandle {
-        let handle = self.object_manager.allocate();
+        let handle = self.object_manager.read().allocate();
         self.instructions
             .producer
             .lock()
@@ -133,17 +134,17 @@ where
     }
 
     pub fn set_object_transform(&self, handle: ObjectHandle, transform: AffineTransform) {
-        self.instructions.producer.lock().push(Instruction::SetObjectTransform {
-            object: handle,
-            transform,
-        });
+        self.instructions
+            .producer
+            .lock()
+            .push(Instruction::SetObjectTransform { handle, transform });
     }
 
     pub fn remove_object(&self, handle: ObjectHandle) {
         self.instructions
             .producer
             .lock()
-            .push(Instruction::RemoveObject { object: handle })
+            .push(Instruction::RemoveObject { handle })
     }
 
     pub fn set_options(&self, options: RendererOptions) {

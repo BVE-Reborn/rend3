@@ -35,6 +35,10 @@ impl<T> ResourceRegistry<T> {
         &self.mapping[handle]
     }
 
+    pub fn get_mut(&mut self, handle: usize) -> &mut T {
+        &mut self.mapping[handle]
+    }
+
     pub fn get_index_of(&self, handle: usize) -> usize {
         self.mapping.get_index_of(&handle).unwrap()
     }
