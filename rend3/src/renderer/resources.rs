@@ -1,14 +1,26 @@
 use crate::{renderer::util, RendererOptions};
-use wgpu::{Device, Surface, SwapChain};
+use wgpu::{BindGroupLayout, Device, Surface, SwapChain};
 
 pub struct RendererGlobalResources {
     pub swapchain: SwapChain,
+    pub object_input_bgl: BindGroupLayout,
+    pub object_output_bgl: BindGroupLayout,
+    pub uniform_bgl: BindGroupLayout,
 }
 impl RendererGlobalResources {
     pub fn new(device: &Device, surface: &Surface, options: &RendererOptions) -> Self {
         let swapchain = util::create_swapchain(device, surface, options.size, options.vsync);
 
-        Self { swapchain }
+        let object_input_bgl = util::create_object_input_bgl(device);
+        let object_output_bgl = util::create_object_output_bgl(device);
+        let uniform_bgl = util::create_uniform_bgl(device);
+
+        Self {
+            swapchain,
+            object_input_bgl,
+            object_output_bgl,
+            uniform_bgl,
+        }
     }
 
     pub fn update(

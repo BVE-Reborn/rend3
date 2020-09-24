@@ -23,6 +23,7 @@ pub mod limits;
 mod material;
 mod mesh;
 mod object;
+mod passes;
 mod render;
 mod resources;
 mod setup;
@@ -57,6 +58,8 @@ where
     texture_manager: RwLock<TextureManager>,
     material_manager: RwLock<MaterialManager>,
     object_manager: RwLock<ObjectManager>,
+
+    culling_pass: passes::CullingPass,
 
     imgui_renderer: imgui_wgpu::Renderer,
 

@@ -3,7 +3,7 @@ use crate::{
     ShaderError, TLS,
 };
 use fnv::FnvBuildHasher;
-use futures::future::{ready, Either};
+use futures::future::{ready, Either, Ready};
 use parking_lot::Mutex;
 use shaderc::{CompileOptions, OptimizationLevel, ResolvedInclude, ShaderKind, SourceLanguage, TargetEnv};
 use std::{
@@ -16,7 +16,7 @@ use std::{
     path::Path,
     sync::Arc,
 };
-use switchyard::Switchyard;
+use switchyard::{JoinHandle, Switchyard};
 use tracing_futures::Instrument;
 use wgpu::{Device, ShaderModule, ShaderModuleSource};
 
@@ -43,6 +43,8 @@ impl Hash for ShaderArguments {
     }
 }
 
+pub type ShaderCompileResult = Result<Arc<ShaderModule>, ShaderError>;
+
 pub struct ShaderManager {
     cache: Mutex<HashMap<ShaderArguments, Arc<ShaderModule>, FnvBuildHasher>>,
 }
@@ -58,7 +60,7 @@ impl ShaderManager {
         yard: &Switchyard<RefCell<TLD>>,
         device: Arc<Device>,
         args: ShaderArguments,
-    ) -> impl Future<Output = Result<Arc<ShaderModule>, ShaderError>>
+    ) -> impl Future<Output = ShaderCompileResult>
     where
         TLD: AsMut<TLS> + 'static,
     {

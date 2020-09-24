@@ -6,6 +6,7 @@ use crate::{
         material::MaterialManager,
         mesh::MeshManager,
         object::ObjectManager,
+        passes,
         resources::RendererGlobalResources,
         shaders::{ShaderArguments, ShaderManager},
         texture::TextureManager,
@@ -61,47 +62,30 @@ where
     let device = Arc::new(device);
 
     let shader_manager = ShaderManager::new();
-    let shader_one = shader_manager.compile_shader(
+    let mut global_resources = RwLock::new(RendererGlobalResources::new(&device, &surface, &options));
+    let global_resource_guard = global_resources.get_mut();
+
+    let culling_pass = passes::CullingPass::new(
+        &device,
         &yard,
-        Arc::clone(&device),
-        ShaderArguments {
-            file: String::from("rend3/shaders/cull.comp"),
-            defines: vec![(
-                String::from("WARP_SIZE"),
-                Some(adapter_info.subgroup_size().to_string()),
-            )],
-            kind: ShaderKind::Compute,
-            debug: true,
-        },
+        &shader_manager,
+        &global_resource_guard.object_input_bgl,
+        &global_resource_guard.object_output_bgl,
+        &global_resource_guard.uniform_bgl,
+        adapter_info.subgroup_size(),
     );
 
-    let shader_two = shader_manager.compile_shader(
-        &yard,
-        Arc::clone(&device),
-        ShaderArguments {
-            file: String::from("rend3/shaders/cull.comp"),
-            defines: vec![(
-                String::from("WARP_SIZE"),
-                Some(adapter_info.subgroup_size().to_string()),
-            )],
-            kind: ShaderKind::Compute,
-            debug: true,
-        },
-    );
+    let (culling_pass,) = futures::join!(culling_pass);
 
     let mut buffer_manager = Mutex::new(AutomatedBufferManager::new(UploadStyle::from_device_type(
         &adapter_info.device_type,
     )));
-    let global_resources = RwLock::new(RendererGlobalResources::new(&device, &surface, &options));
     let mesh_manager = RwLock::new(MeshManager::new(&device));
     let texture_manager = RwLock::new(TextureManager::new(&device));
     let material_manager = RwLock::new(MaterialManager::new(&device, buffer_manager.get_mut()));
     let object_manager = RwLock::new(ObjectManager::new(&device, buffer_manager.get_mut()));
 
     let imgui_renderer = imgui_wgpu::Renderer::new(imgui, &device, &queue, SWAPCHAIN_FORMAT);
-
-    let shader_one = shader_one.await.unwrap_or_else(|v| panic!("{}", v));
-    let shader_two = shader_two.await.unwrap_or_else(|v| panic!("{}", v));
 
     Ok(Arc::new(Renderer {
         yard,
@@ -119,6 +103,8 @@ where
         texture_manager,
         material_manager,
         object_manager,
+
+        culling_pass,
 
         imgui_renderer,
 
