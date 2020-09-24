@@ -8,7 +8,11 @@ edition = "2018"
 
 [dependencies]
 futures = { version = "0.3", default-features = false, features = ["executor"] }
+obj = { version = "0.10", git = "https://github.com/cwfitzgerald/obj.git", branch = "map_ns" }
 imgui = "0.4"
+image = { version = "0.23", default-features = false, features = ["png", "jpeg", "tiff"]}
+glam = "0.9"
+smallvec = "1"
 imgui-winit-support = { version = "0.4", git = "https://github.com/BVE-Reborn/imgui-rs.git", rev = "d95b63623ededc12b0536b7df7d80608b6a605a1" }
 rend3 = { path = "../rend3", version = "0.1.0" }
 switchyard = { version = "0.1", git = "https://github.com/BVE-Reborn/switchyard.git", rev = "5190d15689dfcb9896880087384c0a01c7f18290" }

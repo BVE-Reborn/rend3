@@ -1,12 +1,143 @@
+use glam::{f32::Vec3A, Quat, Vec2, Vec3};
 use imgui::FontSource;
-use rend3::{RendererOptions, VSyncMode};
-use std::{path::Path, sync::Arc};
+use obj::{IndexTuple, Obj, ObjMaterial};
+use rend3::{
+    datatypes::{AffineTransform, Material, Mesh, ModelVertex, Object, RendererTextureFormat, Texture, TextureHandle},
+    Renderer, RendererOptions, VSyncMode,
+};
+use smallvec::SmallVec;
+use std::{collections::HashMap, path::Path, sync::Arc};
 use switchyard::{threads, Switchyard};
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
     window::WindowBuilder,
 };
+
+fn load_texture(
+    renderer: &Renderer,
+    cache: &mut HashMap<String, TextureHandle>,
+    texture: &Option<String>,
+) -> Option<TextureHandle> {
+    rend3::span!(_guard, INFO, "Loading Texture", name = ?texture);
+    if let Some(name) = texture {
+        if let Some(handle) = cache.get(name) {
+            Some(*handle)
+        } else {
+            let img = image::open(name).unwrap();
+            let rgba = img.into_rgba();
+            let handle = renderer.add_texture(Texture {
+                format: RendererTextureFormat::Rgba8Srgb,
+                width: rgba.width(),
+                height: rgba.height(),
+                data: rgba.into_vec(),
+                label: Some(name.clone()),
+            });
+
+            cache.insert(name.clone(), handle);
+
+            Some(handle)
+        }
+    } else {
+        None
+    }
+}
+
+fn load_resources(renderer: &Renderer) {
+    rend3::span!(_guard, INFO, "Loading Resources");
+
+    rend3::span!(obj_guard, INFO, "Loading Obj");
+
+    let mut object = Obj::load("tmp/suzanne.obj").unwrap();
+    object.load_mtls().unwrap();
+
+    drop(obj_guard);
+
+    let mut textures = HashMap::new();
+    let mut material_index_map = HashMap::new();
+    let mut materials = SmallVec::new();
+
+    for lib in object.data.material_libs {
+        for material in lib.materials {
+            let albedo = &material.map_kd;
+            let normal = &material.map_bump;
+            let roughness = &material.map_ns;
+
+            let albedo_handle = load_texture(renderer, &mut textures, albedo);
+            let normal_handle = load_texture(renderer, &mut textures, normal);
+            let roughness_handle = load_texture(renderer, &mut textures, roughness);
+
+            material_index_map.insert(material.name.clone(), materials.len() as u32);
+
+            let handle = renderer.add_material(Material {
+                color: albedo_handle,
+                normal: normal_handle,
+                roughness: roughness_handle,
+                specular: None,
+            });
+
+            materials.push(handle);
+        }
+    }
+
+    rend3::span!(_guard, INFO, "Converting Mesh");
+
+    let mut mesh = Mesh {
+        vertices: vec![],
+        indices: vec![],
+        material_count: materials.len() as u32,
+    };
+
+    let mut translation: HashMap<(usize, Option<usize>, Option<usize>), u32> = HashMap::new();
+    let mut vert_count = 0_u32;
+    for group in &object.data.objects[0].groups {
+        let material_name = if let ObjMaterial::Mtl(mtl) = group.material.as_ref().unwrap() {
+            &mtl.name
+        } else {
+            unreachable!()
+        };
+        for polygon in &group.polys {
+            for &IndexTuple(position_idx, texture_idx, normal_idx) in &polygon.0 {
+                let vert_idx = if let Some(&vert_idx) = translation.get(&(position_idx, normal_idx, texture_idx)) {
+                    vert_idx
+                } else {
+                    let this_vert = vert_count;
+                    vert_count += 1;
+
+                    let position = object.data.position[position_idx];
+                    let normal = object.data.normal[normal_idx.unwrap()];
+                    let texture_coords = object.data.texture[texture_idx.unwrap()];
+
+                    mesh.vertices.push(ModelVertex {
+                        position: Vec3::from(position),
+                        normal: Vec3::from(normal),
+                        uv: Vec2::from(texture_coords),
+                        color: [0; 4],
+                        material: *material_index_map.get(material_name).unwrap(),
+                    });
+
+                    translation.insert((position_idx, texture_idx, normal_idx), this_vert);
+
+                    this_vert
+                };
+
+                mesh.indices.push(vert_idx);
+            }
+        }
+    }
+
+    let mesh_handle = renderer.add_mesh(mesh);
+
+    renderer.add_object(Object {
+        mesh: mesh_handle,
+        materials,
+        transform: AffineTransform {
+            transform: Vec3A::default(),
+            rotation: Quat::default(),
+            scale: Vec3A::default(),
+        },
+    });
+}
 
 fn main() {
     wgpu_subscriber::initialize_default_subscriber(Some(Path::new("target/profile.json")));
@@ -67,6 +198,9 @@ fn main() {
     ))
     .unwrap();
     drop(renderer_guard);
+
+    load_resources(&renderer);
+
     drop(main_thread_guard);
 
     let mut handle = None;

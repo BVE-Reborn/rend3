@@ -82,11 +82,9 @@ impl MeshManager {
             .allocate_range(mesh.indices.len())
             .unwrap_or_else(|_| todo!("Deal with resizing buffers"));
 
-        let vertex_base = vertex_range.start;
-
         queue.write_buffer(
             &self.vertex_buffer,
-            (vertex_base * VERTEX_SIZE) as BufferAddress,
+            (vertex_range.start * VERTEX_SIZE) as BufferAddress,
             bytemuck::cast_slice(&mesh.vertices),
         );
         queue.write_buffer(
