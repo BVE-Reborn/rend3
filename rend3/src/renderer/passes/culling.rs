@@ -24,7 +24,7 @@ pub struct CullingPassData {
 pub struct CullingPass {
     pipeline: ComputePipeline,
     shader: Arc<ShaderModule>,
-    subgroup_size: usize,
+    subgroup_size: u32,
 }
 impl CullingPass {
     pub async fn new<TLD>(
@@ -34,7 +34,7 @@ impl CullingPass {
         input_bgl: &BindGroupLayout,
         output_bgl: &BindGroupLayout,
         uniform_bgl: &BindGroupLayout,
-        subgroup_size: usize,
+        subgroup_size: u32,
     ) -> Self
     where
         TLD: AsMut<TLS> + 'static,
@@ -46,7 +46,7 @@ impl CullingPass {
                 file: String::from("rend3/shaders/cull.comp"),
                 defines: vec![(String::from("WARP_SIZE"), Some(subgroup_size.to_string()))],
                 kind: ShaderKind::Compute,
-                debug: false,
+                debug: true,
             },
         );
 
@@ -80,7 +80,7 @@ impl CullingPass {
     pub fn prepare(
         &self,
         device: &Device,
-        output_bgl: BindGroupLayout,
+        output_bgl: &BindGroupLayout,
         object_count: u32,
         name: String,
     ) -> CullingPassData {
@@ -102,12 +102,18 @@ impl CullingPass {
             label: Some(&*format!("count buffer for {}", &name)),
             size: SIZE_OF_INDIRECT_COUNT,
             usage: BufferUsage::STORAGE | BufferUsage::INDIRECT,
-            mapped_at_creation: false,
+            mapped_at_creation: true,
         });
+
+        count_buffer
+            .slice(..)
+            .get_mapped_range_mut()
+            .copy_from_slice(bytemuck::bytes_of(&0));
+        count_buffer.unmap();
 
         let bind_group = device.create_bind_group(&BindGroupDescriptor {
             label: Some(&*format!("output bind group for {}", &name)),
-            layout: &output_bgl,
+            layout: output_bgl,
             entries: &[
                 BindGroupEntry {
                     binding: 0,
@@ -143,6 +149,6 @@ impl CullingPass {
         compute_pass.set_bind_group(0, input_bg, &[]);
         compute_pass.set_bind_group(1, &data.bind_group, &[]);
         compute_pass.set_bind_group(2, uniform_bg, &[]);
-        compute_pass.dispatch(data.object_count / self.subgroup_size as u32, 1, 1);
+        compute_pass.dispatch((data.object_count + self.subgroup_size - 1) / self.subgroup_size, 1, 1);
     }
 }

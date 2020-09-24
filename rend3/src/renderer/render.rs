@@ -108,12 +108,17 @@ where
 
         texture_manager.ready(&renderer.device);
         material_manager.ready(&renderer.device, &mut encoder, &texture_manager);
-        object_manager.ready(&renderer.device, &mut encoder, &material_manager);
+        let object_bind_group_key = object_manager.ready(
+            &renderer.device,
+            &mut encoder,
+            &material_manager,
+            &renderer.global_resources.read().object_input_bgl,
+        );
 
         drop((mesh_manager, texture_manager, material_manager, object_manager));
 
         drop(event_guard);
-        span!(global_resource_guard, INFO, "Update global resources");
+        span!(global_resource_update_guard, INFO, "Update resources");
 
         if let Some(ref new_opt) = new_options {
             renderer
@@ -121,8 +126,33 @@ where
                 .write()
                 .update(&renderer.device, &renderer.surface, &renderer.options, new_opt);
         }
+        let global_resources_guard = renderer.global_resources.read();
+        global_resources_guard
+            .uniforms
+            .upload(&renderer.queue, &global_resources_guard.camera);
 
-        drop(global_resource_guard);
+        let culling_pass_data = renderer.culling_pass.prepare(
+            &renderer.device,
+            &global_resources_guard.object_output_bgl,
+            renderer.object_manager.read().object_count() as u32,
+            String::from("primary render"),
+        );
+
+        drop(global_resource_update_guard);
+        span!(computepass_guard, INFO, "Primary ComputePass");
+
+        let object_manager = renderer.object_manager.read();
+
+        let mut cpass = encoder.begin_compute_pass();
+        renderer.culling_pass.run(
+            &mut cpass,
+            object_manager.bind_group(&object_bind_group_key),
+            &global_resources_guard.uniforms.uniform_bg,
+            &culling_pass_data,
+        );
+        drop(cpass);
+        drop(computepass_guard);
+        drop(global_resources_guard);
         span!(renderpass_guard, INFO, "Primary Renderpass");
 
         let frame = renderer.global_resources.write().swapchain.get_current_frame().unwrap();

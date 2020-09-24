@@ -17,6 +17,7 @@ use switchyard::{JoinHandle, Switchyard};
 use wgpu::{Device, Queue, Surface, TextureFormat};
 use wgpu_conveyor::AutomatedBufferManager;
 
+mod camera;
 pub mod error;
 mod info;
 pub mod limits;
@@ -29,6 +30,7 @@ mod resources;
 mod setup;
 mod shaders;
 mod texture;
+mod uniforms;
 mod util;
 
 const COMPUTE_POOL: u8 = 0;

@@ -38,7 +38,7 @@ impl From<AdapterInfo> for ExtendedAdapterInfo {
     }
 }
 impl ExtendedAdapterInfo {
-    pub fn subgroup_size(&self) -> usize {
+    pub fn subgroup_size(&self) -> u32 {
         match self.vendor {
             Vendor::Intel | Vendor::NV => 32,
             Vendor::AMD | Vendor::Unknown(_) => 64,

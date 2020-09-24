@@ -5,8 +5,11 @@ use crate::{
 };
 use smallvec::SmallVec;
 use std::mem::size_of;
-use wgpu::{BufferAddress, BufferUsage, CommandEncoder, Device};
-use wgpu_conveyor::{write_to_buffer2, AutomatedBuffer, AutomatedBufferManager};
+use wgpu::{
+    BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindingResource, BufferAddress, BufferUsage,
+    CommandEncoder, Device,
+};
+use wgpu_conveyor::{write_to_buffer2, AutomatedBuffer, AutomatedBufferManager, BindGroupCache, BufferCache2};
 
 #[derive(Debug, Clone)]
 struct InternalObject {
@@ -38,6 +41,8 @@ pub struct ObjectManager {
     material_translation_buffer: AutomatedBuffer,
     material_translation_count: usize,
 
+    bind_group_cache: BindGroupCache<BufferCache2>,
+
     registry: ResourceRegistry<InternalObject>,
 }
 impl ObjectManager {
@@ -47,12 +52,15 @@ impl ObjectManager {
         let material_translation_buffer =
             buffer_manager.create_new_buffer(device, 0, BufferUsage::STORAGE, Some("material translation buffer"));
 
+        let bind_group_cache = BindGroupCache::new();
+
         let registry = ResourceRegistry::new();
 
         Self {
             object_info_buffer,
             material_translation_buffer,
             material_translation_count: 0,
+            bind_group_cache,
             registry,
         }
     }
@@ -90,7 +98,13 @@ impl ObjectManager {
         self.material_translation_count -= object.materials.len();
     }
 
-    pub fn ready(&mut self, device: &Device, encoder: &mut CommandEncoder, material_manager: &MaterialManager) {
+    pub fn ready(
+        &mut self,
+        device: &Device,
+        encoder: &mut CommandEncoder,
+        material_manager: &MaterialManager,
+        input_bgl: &BindGroupLayout,
+    ) -> BufferCache2 {
         let obj_buffer = &mut self.object_info_buffer;
         let mat_buffer = &mut self.material_translation_buffer;
         let registry = &self.registry;
@@ -140,13 +154,38 @@ impl ObjectManager {
                 }
             },
         );
+
+        self.bind_group_cache.create_bind_group(
+            (&self.object_info_buffer, &self.material_translation_buffer),
+            true,
+            |(object_info_buffer, material_translation_buffer)| {
+                device.create_bind_group(&BindGroupDescriptor {
+                    label: Some("object input bind group"),
+                    layout: &input_bgl,
+                    entries: &[
+                        BindGroupEntry {
+                            binding: 0,
+                            resource: BindingResource::Buffer(object_info_buffer.inner.slice(..)),
+                        },
+                        BindGroupEntry {
+                            binding: 1,
+                            resource: BindingResource::Buffer(material_translation_buffer.inner.slice(..)),
+                        },
+                    ],
+                })
+            },
+        )
     }
 
     pub fn set_object_transform(&mut self, handle: ObjectHandle, transform: AffineTransform) {
         self.registry.get_mut(handle.0).transform = transform;
     }
 
-    pub fn current_buffers(&self) -> (&AutomatedBuffer, &AutomatedBuffer) {
-        (&self.object_info_buffer, &self.material_translation_buffer)
+    pub fn object_count(&self) -> usize {
+        self.registry.count()
+    }
+
+    pub fn bind_group(&self, key: &BufferCache2) -> &BindGroup {
+        self.bind_group_cache.get(key).unwrap()
     }
 }

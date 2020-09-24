@@ -24,16 +24,28 @@ pub fn create_swapchain(device: &Device, surface: &Surface, size: PhysicalSize<u
 pub fn create_object_input_bgl(device: &Device) -> BindGroupLayout {
     device.create_bind_group_layout(&BindGroupLayoutDescriptor {
         label: Some("object input bgl"),
-        entries: &[BindGroupLayoutEntry {
-            binding: 0,
-            visibility: ShaderStage::COMPUTE,
-            ty: BindingType::StorageBuffer {
-                dynamic: false,
-                min_binding_size: None,
-                readonly: true,
+        entries: &[
+            BindGroupLayoutEntry {
+                binding: 0,
+                visibility: ShaderStage::COMPUTE,
+                ty: BindingType::StorageBuffer {
+                    dynamic: false,
+                    min_binding_size: None,
+                    readonly: true,
+                },
+                count: None,
             },
-            count: None,
-        }],
+            BindGroupLayoutEntry {
+                binding: 1,
+                visibility: ShaderStage::COMPUTE,
+                ty: BindingType::StorageBuffer {
+                    dynamic: false,
+                    min_binding_size: None,
+                    readonly: true,
+                },
+                count: None,
+            },
+        ],
     })
 }
 
