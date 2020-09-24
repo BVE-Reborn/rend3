@@ -1,4 +1,4 @@
-use glam::{f32::Vec3A, Quat, Vec2, Vec3};
+use glam::{Mat4, Vec2, Vec3};
 use imgui::FontSource;
 use obj::{IndexTuple, Obj, ObjMaterial};
 use rend3::{
@@ -132,9 +132,7 @@ fn load_resources(renderer: &Renderer) {
         mesh: mesh_handle,
         materials,
         transform: AffineTransform {
-            transform: Vec3A::default(),
-            rotation: Quat::default(),
-            scale: Vec3A::default(),
+            transform: Mat4::identity(),
         },
     });
 }

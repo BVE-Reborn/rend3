@@ -1,4 +1,4 @@
-use glam::{Quat, Vec2, Vec3, Vec3A};
+use glam::{Mat4, Vec2, Vec3};
 use smallvec::SmallVec;
 use wgpu::TextureFormat;
 
@@ -43,9 +43,7 @@ unsafe impl bytemuck::Pod for ModelVertex {}
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct AffineTransform {
-    pub transform: Vec3A,
-    pub rotation: Quat,
-    pub scale: Vec3A,
+    pub transform: Mat4,
 }
 
 unsafe impl bytemuck::Zeroable for AffineTransform {}

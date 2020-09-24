@@ -8,6 +8,7 @@ allow = [
     "MPL-2.0",
     "Unlicense",
 ]
+copyleft = "allow"
 
 [bans]
 multiple-versions = "deny"

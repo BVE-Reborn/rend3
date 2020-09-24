@@ -46,12 +46,12 @@ where
 
     adapter_info: AdapterInfo,
     queue: Queue,
-    device: Device,
+    device: Arc<Device>,
     surface: Surface,
 
     buffer_manager: Mutex<AutomatedBufferManager>,
     global_resources: RwLock<RendererGlobalResources>,
-    shader_manager: ShaderManager,
+    shader_manager: Arc<ShaderManager>,
     mesh_manager: RwLock<MeshManager>,
     texture_manager: RwLock<TextureManager>,
     material_manager: RwLock<MaterialManager>,

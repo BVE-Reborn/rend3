@@ -6,7 +6,7 @@ use crate::{
         mesh::MeshManager,
         object::ObjectManager,
         resources::RendererGlobalResources,
-        shaders::ShaderManager,
+        shaders::{ShaderArguments, ShaderManager},
         texture::TextureManager,
         Renderer, SWAPCHAIN_FORMAT,
     },
@@ -14,6 +14,7 @@ use crate::{
 };
 use parking_lot::{Mutex, RwLock};
 use raw_window_handle::HasRawWindowHandle;
+use shaderc::ShaderKind;
 use std::{cell::RefCell, sync::Arc};
 use switchyard::Switchyard;
 use wgpu::{BackendBit, DeviceDescriptor, Instance, PowerPreference, RequestAdapterOptions};
@@ -56,17 +57,44 @@ where
         .await
         .map_err(|_| RendererInitializationError::RequestDeviceFailed)?;
 
+    let device = Arc::new(device);
+
+    let shader_manager = ShaderManager::new();
+    let shader_one = shader_manager.compile_shader(
+        &yard,
+        Arc::clone(&device),
+        ShaderArguments {
+            file: String::from("rend3/shaders/cull.comp"),
+            defines: vec![(String::from("WARP_SIZE"), Some(String::from("64")))],
+            kind: ShaderKind::Compute,
+            debug: true,
+        },
+    );
+
+    let shader_two = shader_manager.compile_shader(
+        &yard,
+        Arc::clone(&device),
+        ShaderArguments {
+            file: String::from("rend3/shaders/cull.comp"),
+            defines: vec![(String::from("WARP_SIZE"), Some(String::from("32")))],
+            kind: ShaderKind::Compute,
+            debug: true,
+        },
+    );
+
     let mut buffer_manager = Mutex::new(AutomatedBufferManager::new(UploadStyle::from_device_type(
         &adapter_info.device_type,
     )));
     let global_resources = RwLock::new(RendererGlobalResources::new(&device, &surface, &options));
-    let shader_manager = ShaderManager::new();
     let mesh_manager = RwLock::new(MeshManager::new(&device));
     let texture_manager = RwLock::new(TextureManager::new(&device));
     let material_manager = RwLock::new(MaterialManager::new(&device, buffer_manager.get_mut()));
     let object_manager = RwLock::new(ObjectManager::new(&device, buffer_manager.get_mut()));
 
     let imgui_renderer = imgui_wgpu::Renderer::new(imgui, &device, &queue, SWAPCHAIN_FORMAT);
+
+    let shader_one = shader_one.await.unwrap_or_else(|v| panic!("{}", v));
+    let shader_two = shader_two.await.unwrap_or_else(|v| panic!("{}", v));
 
     Ok(Arc::new(Renderer {
         yard,

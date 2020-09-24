@@ -1,3 +1,5 @@
+use crate::renderer::shaders::ShaderArguments;
+use std::io;
 use thiserror::Error;
 use wgpu::Features;
 
@@ -34,4 +36,12 @@ pub enum RendererInitializationError {
     MissingDeviceFeatures { features: Features },
     #[error("Requesting a device failed")]
     RequestDeviceFailed,
+}
+
+#[derive(Error, Debug)]
+pub enum ShaderError {
+    #[error("IO error while loading shader {1:?}: {0}")]
+    FileError(#[source] io::Error, ShaderArguments),
+    #[error("Compilation error with shader args: {1:?}: {0}")]
+    CompileError(#[source] shaderc::Error, ShaderArguments),
 }

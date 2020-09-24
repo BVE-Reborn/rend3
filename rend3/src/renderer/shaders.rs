@@ -1,6 +1,6 @@
 use crate::{
     renderer::{COMPUTE_POOL, SHADER_COMPILE_PRIORITY},
-    Renderer, TLS,
+    ShaderError, TLS,
 };
 use fnv::FnvBuildHasher;
 use futures::future::{ready, Either};
@@ -8,20 +8,23 @@ use parking_lot::Mutex;
 use shaderc::{CompileOptions, OptimizationLevel, ShaderKind, SourceLanguage, TargetEnv};
 use std::{
     borrow::Cow,
+    cell::RefCell,
     collections::HashMap,
     future::Future,
     hash::{Hash, Hasher},
     mem::discriminant,
     sync::Arc,
 };
-use wgpu::{ShaderModule, ShaderModuleSource};
+use switchyard::Switchyard;
+use tracing_futures::Instrument;
+use wgpu::{Device, ShaderModule, ShaderModuleSource};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ShaderArguments {
-    file: String,
-    defines: Vec<(String, Option<String>)>,
-    kind: ShaderKind,
-    debug: bool,
+    pub file: String,
+    pub defines: Vec<(String, Option<String>)>,
+    pub kind: ShaderKind,
+    pub debug: bool,
 }
 
 impl Hash for ShaderArguments {
@@ -43,76 +46,76 @@ pub struct ShaderManager {
     cache: Mutex<HashMap<ShaderArguments, Arc<ShaderModule>, FnvBuildHasher>>,
 }
 impl ShaderManager {
-    pub fn new() -> Self {
+    pub fn new() -> Arc<Self> {
         let cache = Mutex::new(HashMap::with_hasher(FnvBuildHasher::default()));
 
-        Self { cache }
+        Arc::new(Self { cache })
     }
 
     pub fn compile_shader<TLD>(
-        &self,
-        renderer: &Arc<Renderer<TLD>>,
+        self: &Arc<Self>,
+        yard: &Switchyard<RefCell<TLD>>,
+        device: Arc<Device>,
         args: ShaderArguments,
-    ) -> impl Future<Output = Arc<ShaderModule>>
+    ) -> impl Future<Output = Result<Arc<ShaderModule>, ShaderError>>
     where
         TLD: AsMut<TLS> + 'static,
     {
-        let renderer_clone = renderer.clone();
-
         if let Some(module) = self.cache.lock().get(&args) {
-            return Either::Left(ready(Arc::clone(module)));
+            return Either::Left(ready(Ok(Arc::clone(module))));
         }
 
-        Either::Right(
-            renderer
-                .yard
-                .spawn_local(COMPUTE_POOL, SHADER_COMPILE_PRIORITY, move |tls| async move {
-                    // TODO: make fallible
-                    let contents = std::fs::read_to_string(&args.file).expect("Could not read file");
+        let span = tracing::warn_span!("Compiling Shader", ?args);
 
-                    let mut options = CompileOptions::new().unwrap();
-                    options.set_generate_debug_info();
-                    options.set_source_language(SourceLanguage::GLSL);
-                    options.set_target_env(TargetEnv::Vulkan, 0);
-                    options.set_optimization_level(match args.debug {
-                        true => OptimizationLevel::Performance,
-                        false => OptimizationLevel::Zero,
-                    });
-                    for (key, value) in &args.defines {
-                        options.add_macro_definition(&key, value.as_deref());
-                    }
+        let this = Arc::clone(self);
 
-                    let mut tls_borrow = tls.borrow_mut();
-                    let tls = tls_borrow.as_mut();
+        Either::Right(yard.spawn_local(COMPUTE_POOL, SHADER_COMPILE_PRIORITY, move |tls| {
+            async move {
+                span!(file_guard, WARN, "Loading File");
 
-                    let result = tls.shader_compiler.compile_into_spirv(
-                        &contents,
-                        args.kind,
-                        &args.file,
-                        "main",
-                        Some(&options),
-                    );
+                let contents =
+                    std::fs::read_to_string(&args.file).map_err(|e| ShaderError::FileError(e, args.clone()))?;
 
-                    drop(tls_borrow);
+                drop(file_guard);
+                span!(compile_guard, WARN, "Shader Compilationc");
 
-                    let binary = result.unwrap_or_else(|e| panic!("error compiling shader: {}", e));
+                let mut options = CompileOptions::new().unwrap();
+                options.set_generate_debug_info();
+                options.set_source_language(SourceLanguage::GLSL);
+                options.set_target_env(TargetEnv::Vulkan, 0);
+                options.set_optimization_level(match args.debug {
+                    true => OptimizationLevel::Performance,
+                    false => OptimizationLevel::Zero,
+                });
+                for (key, value) in &args.defines {
+                    options.add_macro_definition(&key, value.as_deref());
+                }
 
-                    let bytes = binary.as_binary();
+                let mut tls_borrow = tls.borrow_mut();
+                let tls = tls_borrow.as_mut();
 
-                    let module = Arc::new(
-                        renderer_clone
-                            .device
-                            .create_shader_module(ShaderModuleSource::SpirV(Cow::Borrowed(bytes))),
-                    );
+                let binary = tls
+                    .shader_compiler
+                    .compile_into_spirv(&contents, args.kind, &args.file, "main", Some(&options))
+                    .map_err(|e| ShaderError::CompileError(e, args.clone()))?;
 
-                    renderer_clone
-                        .shader_manager
-                        .cache
-                        .lock()
-                        .insert(args, Arc::clone(&module));
+                drop(tls_borrow);
 
-                    module
-                }),
-        )
+                let bytes = binary.as_binary();
+
+                drop(compile_guard);
+
+                let module = Arc::new(device.create_shader_module(ShaderModuleSource::SpirV(Cow::Borrowed(bytes))));
+
+                span!(cache_guard, WARN, "Add to cache");
+
+                this.cache.lock().insert(args, Arc::clone(&module));
+
+                drop(cache_guard);
+
+                Ok(module)
+            }
+            .instrument(span)
+        }))
     }
 }

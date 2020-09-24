@@ -24,6 +24,7 @@ struct ShaderObject {
     count: u32,
     vertex_offset: u32,
     material_translation_idx: u32,
+    transform: AffineTransform,
 }
 
 unsafe impl bytemuck::Zeroable for ShaderObject {}
@@ -130,6 +131,7 @@ impl ObjectManager {
                         count: object.count,
                         vertex_offset: object.vertex_offset,
                         material_translation_idx: mat_start_offset as u32,
+                        transform: object.transform,
                     };
 
                     // Prepare for next iteration
