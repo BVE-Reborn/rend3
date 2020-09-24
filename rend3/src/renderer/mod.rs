@@ -4,8 +4,8 @@ use crate::{
     },
     instruction::{Instruction, InstructionStreamPair},
     renderer::{
-        material::MaterialManager, mesh::MeshManager, object::ObjectManager, resources::RendererGlobalResources,
-        shaders::ShaderManager, texture::TextureManager,
+        info::ExtendedAdapterInfo, material::MaterialManager, mesh::MeshManager, object::ObjectManager,
+        resources::RendererGlobalResources, shaders::ShaderManager, texture::TextureManager,
     },
     statistics::RendererStatistics,
     RendererInitializationError, RendererOptions, TLS,
@@ -14,10 +14,11 @@ use parking_lot::{Mutex, RwLock};
 use raw_window_handle::HasRawWindowHandle;
 use std::{cell::RefCell, future::Future, sync::Arc};
 use switchyard::{JoinHandle, Switchyard};
-use wgpu::{AdapterInfo, Device, Queue, Surface, TextureFormat};
+use wgpu::{Device, Queue, Surface, TextureFormat};
 use wgpu_conveyor::AutomatedBufferManager;
 
 pub mod error;
+mod info;
 pub mod limits;
 mod material;
 mod mesh;
@@ -44,7 +45,7 @@ where
     yard: Arc<Switchyard<RefCell<TLD>>>,
     instructions: InstructionStreamPair,
 
-    adapter_info: AdapterInfo,
+    adapter_info: ExtendedAdapterInfo,
     queue: Queue,
     device: Arc<Device>,
     surface: Surface,

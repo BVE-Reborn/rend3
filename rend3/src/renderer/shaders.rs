@@ -5,7 +5,7 @@ use crate::{
 use fnv::FnvBuildHasher;
 use futures::future::{ready, Either};
 use parking_lot::Mutex;
-use shaderc::{CompileOptions, OptimizationLevel, ShaderKind, SourceLanguage, TargetEnv};
+use shaderc::{CompileOptions, OptimizationLevel, ResolvedInclude, ShaderKind, SourceLanguage, TargetEnv};
 use std::{
     borrow::Cow,
     cell::RefCell,
@@ -13,6 +13,7 @@ use std::{
     future::Future,
     hash::{Hash, Hasher},
     mem::discriminant,
+    path::Path,
     sync::Arc,
 };
 use switchyard::Switchyard;
@@ -77,19 +78,40 @@ impl ShaderManager {
                     std::fs::read_to_string(&args.file).map_err(|e| ShaderError::FileError(e, args.clone()))?;
 
                 drop(file_guard);
-                span!(compile_guard, WARN, "Shader Compilationc");
+                span!(compile_guard, WARN, "Shader Compilation");
 
                 let mut options = CompileOptions::new().unwrap();
                 options.set_generate_debug_info();
                 options.set_source_language(SourceLanguage::GLSL);
                 options.set_target_env(TargetEnv::Vulkan, 0);
                 options.set_optimization_level(match args.debug {
-                    true => OptimizationLevel::Performance,
-                    false => OptimizationLevel::Zero,
+                    true => OptimizationLevel::Zero,
+                    false => OptimizationLevel::Performance,
                 });
                 for (key, value) in &args.defines {
                     options.add_macro_definition(&key, value.as_deref());
                 }
+                options.set_include_callback(|include, _ty, src, _depth| {
+                    let path = Path::new(src)
+                        .parent()
+                        .ok_or_else(|| {
+                            format!(
+                                "Cannot find include <{}> relative to file {} as there is no parent directory",
+                                include, src
+                            )
+                        })?
+                        .join(Path::new(include))
+                        .canonicalize()
+                        .map_err(|_| {
+                            format!("Failed to canonicalize include <{}> relative to file {}", include, src)
+                        })?;
+                    let contents = std::fs::read_to_string(&path)
+                        .map_err(|e| format!("Error while loading include <{}> from file {}: {}", include, src, e))?;
+                    Ok(ResolvedInclude {
+                        resolved_name: path.to_string_lossy().to_string(),
+                        content: contents,
+                    })
+                });
 
                 let mut tls_borrow = tls.borrow_mut();
                 let tls = tls_borrow.as_mut();

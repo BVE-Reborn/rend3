@@ -14,7 +14,7 @@ struct InternalObject {
     transform: AffineTransform,
     start_idx: u32,
     count: u32,
-    vertex_offset: u32,
+    vertex_offset: i32,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -22,7 +22,7 @@ struct InternalObject {
 struct ShaderObject {
     start_idx: u32,
     count: u32,
-    vertex_offset: u32,
+    vertex_offset: i32,
     material_translation_idx: u32,
     transform: AffineTransform,
 }
@@ -79,7 +79,7 @@ impl ObjectManager {
             transform: object.transform,
             start_idx: mesh.index_range.start as u32,
             count: (mesh.index_range.end - mesh.index_range.start) as u32,
-            vertex_offset: mesh.vertex_range.start as u32,
+            vertex_offset: mesh.vertex_range.start as i32,
         };
 
         self.registry.insert(handle.0, shader_object);

@@ -1,6 +1,7 @@
 use crate::{
     instruction::InstructionStreamPair,
     renderer::{
+        info::ExtendedAdapterInfo,
         limits::{check_features, check_limits},
         material::MaterialManager,
         mesh::MeshManager,
@@ -41,7 +42,7 @@ where
         .await
         .ok_or(RendererInitializationError::MissingAdapter)?;
 
-    let adapter_info = adapter.get_info();
+    let adapter_info = ExtendedAdapterInfo::from(adapter.get_info());
     let features = check_features(adapter.features())?;
     let limits = check_limits(adapter.limits())?;
 
@@ -65,7 +66,10 @@ where
         Arc::clone(&device),
         ShaderArguments {
             file: String::from("rend3/shaders/cull.comp"),
-            defines: vec![(String::from("WARP_SIZE"), Some(String::from("64")))],
+            defines: vec![(
+                String::from("WARP_SIZE"),
+                Some(adapter_info.subgroup_size().to_string()),
+            )],
             kind: ShaderKind::Compute,
             debug: true,
         },
@@ -76,7 +80,10 @@ where
         Arc::clone(&device),
         ShaderArguments {
             file: String::from("rend3/shaders/cull.comp"),
-            defines: vec![(String::from("WARP_SIZE"), Some(String::from("32")))],
+            defines: vec![(
+                String::from("WARP_SIZE"),
+                Some(adapter_info.subgroup_size().to_string()),
+            )],
             kind: ShaderKind::Compute,
             debug: true,
         },

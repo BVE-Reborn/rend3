@@ -5,7 +5,7 @@ layout(local_size_x = WARP_SIZE) in;
 struct ObjectInputData {
     uint start_idx;
     uint count;
-    uint vertex_offset;
+    int vertex_offset;
     uint material_translation_idx;
     mat4 transform;
 };
@@ -36,9 +36,35 @@ layout(set = 1, binding = 2, std430) restrict buffer IndirectCountBuffer {
     uint indirect_counter;
 };
 layout(set = 2, binding = 0) uniform CullUniformBuffer {
+    mat4 view;
     mat4 view_proj;
+};
+layout(push_constant) uniform PushConstants {
+    uint object_count;
 };
 
 void main() {
+    uint input_idx = gl_GlobalInvocationID.x;
 
+    if (input_idx >= object_count) {
+        return;
+    }
+
+    ObjectInputData in_data = object_input[input_idx];
+
+    ObjectOutputData out_data;
+    out_data.model_view_proj = view_proj * in_data.transform;
+    out_data.inv_trans_model_view = inverse(transpose(mat3(view * in_data.transform)));
+
+    uint output_idx = atomicAdd(indirect_counter, 1);
+
+    object_output[output_idx] = out_data;
+
+    IndirectCall call;
+    call.vertex_count = in_data.count;
+    call.instance_count = 1;
+    call.base_index = in_data.start_idx;
+    call.vertex_offset = in_data.vertex_offset;
+    call.base_instance = 0;
+    indirect_call[output_idx] = call;
 }
