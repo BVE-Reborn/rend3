@@ -1,6 +1,7 @@
-use crate::renderer::camera::Camera;
-use crate::renderer::uniforms::UniformManager;
-use crate::{renderer::util, RendererOptions};
+use crate::{
+    renderer::{camera::Camera, uniforms::UniformManager, util},
+    RendererOptions,
+};
 use wgpu::{BindGroupLayout, Device, Surface, SwapChain};
 
 pub struct RendererGlobalResources {
