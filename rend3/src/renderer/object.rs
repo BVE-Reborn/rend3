@@ -104,7 +104,7 @@ impl ObjectManager {
         encoder: &mut CommandEncoder,
         material_manager: &MaterialManager,
         input_bgl: &BindGroupLayout,
-    ) -> BufferCache2 {
+    ) -> (BufferCache2, usize) {
         let obj_buffer = &mut self.object_info_buffer;
         let mat_buffer = &mut self.material_translation_buffer;
         let registry = &self.registry;
@@ -155,7 +155,7 @@ impl ObjectManager {
             },
         );
 
-        self.bind_group_cache.create_bind_group(
+        let bind_group_key = self.bind_group_cache.create_bind_group(
             (&self.object_info_buffer, &self.material_translation_buffer),
             true,
             |(object_info_buffer, material_translation_buffer)| {
@@ -174,7 +174,9 @@ impl ObjectManager {
                     ],
                 })
             },
-        )
+        );
+
+        (bind_group_key, object_count)
     }
 
     pub fn set_object_transform(&mut self, handle: ObjectHandle, transform: AffineTransform) {

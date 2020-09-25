@@ -74,13 +74,12 @@ impl ShaderManager {
 
         Either::Right(yard.spawn_local(COMPUTE_POOL, SHADER_COMPILE_PRIORITY, move |tls| {
             async move {
-                span!(file_guard, WARN, "Loading File");
+                span_transfer!(_ -> file_span, WARN, "Loading File");
 
                 let contents =
                     std::fs::read_to_string(&args.file).map_err(|e| ShaderError::FileError(e, args.clone()))?;
 
-                drop(file_guard);
-                span!(compile_guard, WARN, "Shader Compilation");
+                span_transfer!(file_span -> compile_span, WARN, "Shader Compilation");
 
                 let mut options = CompileOptions::new().unwrap();
                 options.set_generate_debug_info();
@@ -127,15 +126,13 @@ impl ShaderManager {
 
                 let bytes = binary.as_binary();
 
-                drop(compile_guard);
+                span_transfer!(compile_span -> module_create_span, WARN, "Create Shader Module");
 
                 let module = Arc::new(device.create_shader_module(ShaderModuleSource::SpirV(Cow::Borrowed(bytes))));
 
-                span!(cache_guard, WARN, "Add to cache");
+                span_transfer!(module_create_span -> cache_guard, WARN, "Add to cache");
 
                 this.cache.lock().insert(args, Arc::clone(&module));
-
-                drop(cache_guard);
 
                 Ok(module)
             }

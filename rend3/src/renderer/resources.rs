@@ -1,5 +1,5 @@
 use crate::{
-    renderer::{camera::Camera, uniforms::UniformManager, util},
+    renderer::{camera::Camera, util},
     RendererOptions,
 };
 use wgpu::{BindGroupLayout, Device, Surface, SwapChain};
@@ -8,7 +8,6 @@ pub struct RendererGlobalResources {
     pub swapchain: SwapChain,
 
     pub camera: Camera,
-    pub uniforms: UniformManager,
 
     pub object_input_bgl: BindGroupLayout,
     pub object_output_bgl: BindGroupLayout,
@@ -24,12 +23,9 @@ impl RendererGlobalResources {
         let object_output_bgl = util::create_object_output_bgl(device);
         let uniform_bgl = util::create_uniform_bgl(device);
 
-        let uniforms = UniformManager::new(device, &uniform_bgl);
-
         Self {
             swapchain,
             camera,
-            uniforms,
             object_input_bgl,
             object_output_bgl,
             uniform_bgl,

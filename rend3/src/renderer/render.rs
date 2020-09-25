@@ -16,8 +16,7 @@ pub fn render_loop<TLD>(renderer: Arc<Renderer<TLD>>) -> impl Future<Output = Re
 where
     TLD: AsMut<TLS> + 'static,
 {
-    let span = tracing::debug_span!("Render Loop Creation");
-    let _guard = span.enter();
+    span_transfer!(_ -> render_create_span, INFO, "Render Loop Creation");
 
     // blocks, do it before we async
     renderer.instructions.swap();
@@ -108,7 +107,7 @@ where
 
         texture_manager.ready(&renderer.device);
         material_manager.ready(&renderer.device, &mut encoder, &texture_manager);
-        let object_bind_group_key = object_manager.ready(
+        let (object_bind_group_key, object_count) = object_manager.ready(
             &renderer.device,
             &mut encoder,
             &material_manager,
@@ -125,31 +124,30 @@ where
                 .write()
                 .update(&renderer.device, &renderer.surface, &renderer.options, new_opt);
         }
-        let global_resources_guard = renderer.global_resources.read();
-        global_resources_guard
-            .uniforms
-            .upload(&renderer.queue, &global_resources_guard.camera);
 
-        let culling_pass_data = renderer.culling_pass.prepare(
-            &renderer.device,
-            &global_resources_guard.object_output_bgl,
-            renderer.object_manager.read().object_count() as u32,
-            String::from("primary render"),
+        let global_resources_guard = renderer.global_resources.read();
+
+        let forward_pass_data = renderer.forward_pass_set.prepare(
+            &renderer,
+            &global_resources_guard,
+            &global_resources_guard.camera,
+            object_count,
         );
+
+        drop(global_resources_guard);
 
         span_transfer!(resource_update_span -> compute_pass_span, INFO, "Primary ComputePass");
 
         let object_manager = renderer.object_manager.read();
+        let input_bind_group = object_manager.bind_group(&object_bind_group_key);
 
         let mut cpass = encoder.begin_compute_pass();
-        renderer.culling_pass.run(
-            &mut cpass,
-            object_manager.bind_group(&object_bind_group_key),
-            &global_resources_guard.uniforms.uniform_bg,
-            &culling_pass_data,
-        );
+        renderer
+            .forward_pass_set
+            .compute(&renderer, &mut cpass, input_bind_group, &forward_pass_data);
         drop(cpass);
-        drop(global_resources_guard);
+
+        drop(object_manager);
 
         span_transfer!(compute_pass_span -> render_pass_span, INFO, "Primary Renderpass");
 

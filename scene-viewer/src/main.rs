@@ -44,8 +44,6 @@ fn load_texture(
 }
 
 fn load_resources(renderer: &Renderer) {
-    rend3::span!(_guard, INFO, "Loading Resources");
-
     rend3::span!(obj_guard, INFO, "Loading Obj");
 
     let mut object = Obj::load("tmp/suzanne.obj").unwrap();
@@ -140,19 +138,20 @@ fn load_resources(renderer: &Renderer) {
 fn main() {
     wgpu_subscriber::initialize_default_subscriber(Some(Path::new("target/profile.json")));
 
-    rend3::span!(main_thread_guard, INFO, "Main Thread Setup");
+    rend3::span_transfer!(_ -> main_thread_span, INFO, "Main Thread Setup");
+    rend3::span_transfer!(_ -> event_loop_span, INFO, "Building Event Loop");
 
     let event_loop = EventLoop::new();
 
-    let window = {
-        rend3::span!(_guard, INFO, "Building Window");
+    rend3::span_transfer!(event_loop_span -> window_span, INFO, "Building Window");
 
+    let window = {
         let mut builder = WindowBuilder::new();
         builder = builder.with_title("scene-viewer");
         builder.build(&event_loop).expect("Could not build window")
     };
 
-    rend3::span!(imgui_guard, INFO, "Building Imgui");
+    rend3::span_transfer!(window_span -> imgui_span, INFO, "Building imgui");
 
     let mut imgui = imgui::Context::create();
     let mut platform = imgui_winit_support::WinitPlatform::init(&mut imgui);
@@ -168,8 +167,7 @@ fn main() {
         }),
     }]);
 
-    drop(imgui_guard);
-    rend3::span!(switchyard_guard, INFO, "Building Switchyard");
+    rend3::span_transfer!(imgui_span -> switchyard_span, INFO, "Building Switchyard");
 
     let yard = Arc::new(
         Switchyard::new(
@@ -180,8 +178,7 @@ fn main() {
         .unwrap(),
     );
 
-    drop(switchyard_guard);
-    rend3::span!(renderer_guard, INFO, "Building Renderer");
+    rend3::span_transfer!(switchyard_span -> renderer_span, INFO, "Building Renderer");
 
     let mut options = RendererOptions {
         vsync: VSyncMode::On,
@@ -195,18 +192,20 @@ fn main() {
         options.clone(),
     ))
     .unwrap();
-    drop(renderer_guard);
+
+    rend3::span_transfer!(renderer_span -> loading_span, INFO, "Loading resources");
 
     load_resources(&renderer);
 
-    drop(main_thread_guard);
+    rend3::span_transfer!(loading_span -> _);
+    rend3::span_transfer!(main_thread_span -> _);
 
     let mut handle = None;
 
     event_loop.run(move |event, window_target, control| match event {
         Event::MainEventsCleared => {
             if let Some(handle) = handle.take() {
-                rend3::span!(_guard, INFO, "Waiting for render");
+                rend3::span_transfer!(_ -> render_wait_span, INFO, "Waiting for render");
                 futures::executor::block_on(handle);
             }
 
@@ -225,7 +224,8 @@ fn main() {
             *control = ControlFlow::Exit;
         }
         Event::RedrawRequested(_) => {
-            rend3::span!(_guard, INFO, "Redraw");
+            rend3::span_transfer!(_ -> redraw_span, INFO, "Redraw");
+
             renderer.set_options(options.clone());
             handle = Some(yard.spawn(0, 1, renderer.render()))
         }

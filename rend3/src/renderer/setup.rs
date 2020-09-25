@@ -7,6 +7,7 @@ use crate::{
         mesh::MeshManager,
         object::ObjectManager,
         passes,
+        passes::ForwardPassSet,
         resources::RendererGlobalResources,
         shaders::{ShaderArguments, ShaderManager},
         texture::TextureManager,
@@ -77,6 +78,12 @@ where
 
     let (culling_pass,) = futures::join!(culling_pass);
 
+    let forward_pass_set = ForwardPassSet::new(
+        &device,
+        &global_resource_guard.uniform_bgl,
+        String::from("Forward Pass"),
+    );
+
     let mut buffer_manager = Mutex::new(AutomatedBufferManager::new(UploadStyle::from_device_type(
         &adapter_info.device_type,
     )));
@@ -103,6 +110,8 @@ where
         texture_manager,
         material_manager,
         object_manager,
+
+        forward_pass_set,
 
         culling_pass,
 

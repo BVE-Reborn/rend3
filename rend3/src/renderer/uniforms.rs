@@ -16,12 +16,14 @@ pub struct ShaderCommonUniform {
 unsafe impl bytemuck::Zeroable for ShaderCommonUniform {}
 unsafe impl bytemuck::Pod for ShaderCommonUniform {}
 
-pub struct UniformManager {
+pub struct WrappedUniform {
     buffer: Buffer,
     pub uniform_bg: BindGroup,
 }
-impl UniformManager {
+impl WrappedUniform {
     pub fn new(device: &Device, uniform_bgl: &BindGroupLayout) -> Self {
+        span_transfer!(_ -> new_span, WARN, "Creating WrappedUniform");
+
         let buffer = device.create_buffer(&BufferDescriptor {
             label: Some("uniform buffer"),
             size: size_of::<ShaderCommonUniform>() as BufferAddress,
@@ -42,6 +44,8 @@ impl UniformManager {
     }
 
     pub fn upload(&self, queue: &Queue, camera: &Camera) {
+        span_transfer!(_ -> upload_span, WARN, "Uploading WrappedUniform");
+
         let uniforms = ShaderCommonUniform {
             view: camera.view(),
             view_proj: camera.view_proj(),

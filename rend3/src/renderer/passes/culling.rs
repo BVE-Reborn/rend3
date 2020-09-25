@@ -3,8 +3,9 @@ use crate::{
     TLS,
 };
 use shaderc::ShaderKind;
-use std::{cell::RefCell, sync::Arc};
+use std::{cell::RefCell, future::Future, sync::Arc};
 use switchyard::Switchyard;
+use tracing_futures::Instrument;
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindingResource, Buffer, BufferAddress,
     BufferDescriptor, BufferUsage, ComputePass, ComputePipeline, ComputePipelineDescriptor, Device,
@@ -27,18 +28,21 @@ pub struct CullingPass {
     subgroup_size: u32,
 }
 impl CullingPass {
-    pub async fn new<TLD>(
-        device: &Arc<Device>,
+    pub fn new<'a, TLD>(
+        device: &'a Arc<Device>,
         yard: &Switchyard<RefCell<TLD>>,
         shader_manager: &Arc<ShaderManager>,
         input_bgl: &BindGroupLayout,
         output_bgl: &BindGroupLayout,
         uniform_bgl: &BindGroupLayout,
         subgroup_size: u32,
-    ) -> Self
+    ) -> impl Future<Output = Self> + 'a
     where
         TLD: AsMut<TLS> + 'static,
     {
+        let new_span = tracing::warn_span!("Creating CullingPass");
+        let new_span_guard = new_span.enter();
+
         let shader = shader_manager.compile_shader(
             &yard,
             Arc::clone(device),
@@ -59,22 +63,27 @@ impl CullingPass {
             }],
         });
 
-        let shader = shader.await.unwrap();
+        drop(new_span_guard);
 
-        let pipeline = device.create_compute_pipeline(&ComputePipelineDescriptor {
-            label: Some("culling pipeline"),
-            layout: Some(&pipeline_layout),
-            compute_stage: ProgrammableStageDescriptor {
-                module: &shader,
-                entry_point: "main",
-            },
-        });
+        async move {
+            let shader = shader.await.unwrap();
 
-        Self {
-            pipeline,
-            shader,
-            subgroup_size,
+            let pipeline = device.create_compute_pipeline(&ComputePipelineDescriptor {
+                label: Some("culling pipeline"),
+                layout: Some(&pipeline_layout),
+                compute_stage: ProgrammableStageDescriptor {
+                    module: &shader,
+                    entry_point: "main",
+                },
+            });
+
+            Self {
+                pipeline,
+                shader,
+                subgroup_size,
+            }
         }
+        .instrument(new_span)
     }
 
     pub fn prepare(
@@ -84,6 +93,8 @@ impl CullingPass {
         object_count: u32,
         name: String,
     ) -> CullingPassData {
+        span_transfer!(_ -> prepare_span, WARN, "Preparing CullingPass");
+
         let output_buffer = device.create_buffer(&BufferDescriptor {
             label: Some(&*format!("object output buffer for {}", &name)),
             size: SIZE_OF_OUTPUT_DATA * object_count as BufferAddress,
@@ -144,6 +155,7 @@ impl CullingPass {
         uniform_bg: &'a BindGroup,
         data: &'a CullingPassData,
     ) {
+        span_transfer!(_ -> run_span, WARN, "Running CullingPass");
         compute_pass.set_pipeline(&self.pipeline);
         compute_pass.set_push_constants(0, &[data.object_count]);
         compute_pass.set_bind_group(0, input_bg, &[]);

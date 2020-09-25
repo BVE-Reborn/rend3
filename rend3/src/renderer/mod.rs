@@ -5,7 +5,7 @@ use crate::{
     instruction::{Instruction, InstructionStreamPair},
     renderer::{
         info::ExtendedAdapterInfo, material::MaterialManager, mesh::MeshManager, object::ObjectManager,
-        resources::RendererGlobalResources, shaders::ShaderManager, texture::TextureManager,
+        passes::ForwardPassSet, resources::RendererGlobalResources, shaders::ShaderManager, texture::TextureManager,
     },
     statistics::RendererStatistics,
     RendererInitializationError, RendererOptions, TLS,
@@ -60,6 +60,8 @@ where
     texture_manager: RwLock<TextureManager>,
     material_manager: RwLock<MaterialManager>,
     object_manager: RwLock<ObjectManager>,
+
+    forward_pass_set: ForwardPassSet,
 
     culling_pass: passes::CullingPass,
 
