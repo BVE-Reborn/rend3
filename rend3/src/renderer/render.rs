@@ -30,7 +30,7 @@ where
             label: Some("primary encoder"),
         });
 
-        span!(event_guard, INFO, "Process events");
+        span_transfer!(_ -> event_span, INFO, "Process events");
 
         let mut new_options = None;
 
@@ -117,8 +117,7 @@ where
 
         drop((mesh_manager, texture_manager, material_manager, object_manager));
 
-        drop(event_guard);
-        span!(global_resource_update_guard, INFO, "Update resources");
+        span_transfer!(event_span -> resource_update_span, INFO, "Update resources");
 
         if let Some(ref new_opt) = new_options {
             renderer
@@ -138,8 +137,7 @@ where
             String::from("primary render"),
         );
 
-        drop(global_resource_update_guard);
-        span!(computepass_guard, INFO, "Primary ComputePass");
+        span_transfer!(resource_update_span -> compute_pass_span, INFO, "Primary ComputePass");
 
         let object_manager = renderer.object_manager.read();
 
@@ -151,9 +149,9 @@ where
             &culling_pass_data,
         );
         drop(cpass);
-        drop(computepass_guard);
         drop(global_resources_guard);
-        span!(renderpass_guard, INFO, "Primary Renderpass");
+
+        span_transfer!(compute_pass_span -> render_pass_span, INFO, "Primary Renderpass");
 
         let frame = renderer.global_resources.write().swapchain.get_current_frame().unwrap();
 
@@ -170,11 +168,12 @@ where
         });
 
         drop(rpass);
-        drop(renderpass_guard);
+
+        span_transfer!(render_pass_span -> queue_submit_span, INFO, "Submitting to Queue");
 
         renderer.queue.submit(std::iter::once(encoder.finish()));
 
-        span!(buffer_pump_guard, INFO, "Pumping Buffers");
+        span_transfer!(queue_submit_span -> buffer_pump_span, INFO, "Pumping Buffers");
 
         let futures = renderer.buffer_manager.lock().pump();
         for future in futures {
@@ -183,9 +182,12 @@ where
                 .yard
                 .spawn(COMPUTE_POOL, BUFFER_RECALL_PRIORITY, future.instrument(span));
         }
-        drop(buffer_pump_guard);
 
-        drop(frame); // present
+        span_transfer!(buffer_pump_span -> present_span, INFO, "Presenting");
+
+        drop(frame); //
+
+        span_transfer!(present_span -> drop_span, INFO, "Dropping loop data");
 
         RendererStatistics {}
     }
