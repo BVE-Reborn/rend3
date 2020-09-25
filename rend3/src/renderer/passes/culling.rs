@@ -7,9 +7,9 @@ use std::{cell::RefCell, future::Future, sync::Arc};
 use switchyard::Switchyard;
 use tracing_futures::Instrument;
 use wgpu::{
-    BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindingResource, Buffer, BufferAddress,
-    BufferDescriptor, BufferUsage, ComputePass, ComputePipeline, ComputePipelineDescriptor, Device,
-    PipelineLayoutDescriptor, ProgrammableStageDescriptor, PushConstantRange, ShaderModule, ShaderStage,
+    BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindingResource, BufferAddress, BufferDescriptor,
+    BufferUsage, ComputePass, ComputePipeline, ComputePipelineDescriptor, Device, PipelineLayoutDescriptor,
+    ProgrammableStageDescriptor, PushConstantRange, ShaderModule, ShaderStage,
 };
 
 const SIZE_OF_OUTPUT_DATA: BufferAddress = 7 * 16;

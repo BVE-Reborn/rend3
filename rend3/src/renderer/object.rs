@@ -47,6 +47,8 @@ pub struct ObjectManager {
 }
 impl ObjectManager {
     pub fn new(device: &Device, buffer_manager: &mut AutomatedBufferManager) -> Self {
+        span_transfer!(_ -> new_span, INFO, "Creating Object Manager");
+
         let object_info_buffer =
             buffer_manager.create_new_buffer(device, 0, BufferUsage::STORAGE, Some("object info buffer"));
         let material_translation_buffer =
@@ -70,6 +72,8 @@ impl ObjectManager {
     }
 
     pub fn fill(&mut self, handle: ObjectHandle, object: Object, mesh_manager: &MeshManager) {
+        span_transfer!(_ -> fill_span, INFO, "Object Manager Fill");
+
         let mesh = mesh_manager.internal_data(object.mesh);
 
         let material_count = object.materials.len();
@@ -105,6 +109,8 @@ impl ObjectManager {
         material_manager: &MaterialManager,
         input_bgl: &BindGroupLayout,
     ) -> (BufferCache2, usize) {
+        span_transfer!(_ -> ready_span, INFO, "Object Manager Ready");
+
         let obj_buffer = &mut self.object_info_buffer;
         let mat_buffer = &mut self.material_translation_buffer;
         let registry = &self.registry;
@@ -181,10 +187,6 @@ impl ObjectManager {
 
     pub fn set_object_transform(&mut self, handle: ObjectHandle, transform: AffineTransform) {
         self.registry.get_mut(handle.0).transform = transform;
-    }
-
-    pub fn object_count(&self) -> usize {
-        self.registry.count()
     }
 
     pub fn bind_group(&self, key: &BufferCache2) -> &BindGroup {

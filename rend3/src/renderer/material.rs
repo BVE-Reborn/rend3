@@ -4,10 +4,13 @@ use crate::{
     renderer::{limits::MAX_UNIFORM_BUFFER_BINDING_SIZE, texture::TextureManager},
 };
 use std::{mem::size_of, num::NonZeroU32};
-use wgpu::{BufferUsage, CommandEncoder, Device};
-use wgpu_conveyor::{AutomatedBuffer, AutomatedBufferManager};
+use wgpu::{
+    BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindingResource, BufferUsage, CommandEncoder,
+    Device,
+};
+use wgpu_conveyor::{AutomatedBuffer, AutomatedBufferManager, BindGroupCache, BufferCache1};
 
-const MAX_MATERIALS: usize = MAX_UNIFORM_BUFFER_BINDING_SIZE as usize / size_of::<ShaderMaterial>();
+pub const MAX_MATERIALS: usize = MAX_UNIFORM_BUFFER_BINDING_SIZE as usize / size_of::<ShaderMaterial>();
 
 #[repr(C, align(16))]
 #[derive(Debug, Copy, Clone)]
@@ -24,19 +27,29 @@ unsafe impl bytemuck::Pod for ShaderMaterial {}
 pub struct MaterialManager {
     buffer: AutomatedBuffer,
 
+    bind_group_cache: BindGroupCache<BufferCache1>,
+
     registry: ResourceRegistry<Material>,
 }
+
 impl MaterialManager {
     pub fn new(device: &Device, manager: &mut AutomatedBufferManager) -> Self {
+        span_transfer!(_ -> new_span, INFO, "Creating Material Manager");
+
         let buffer = manager.create_new_buffer(
             device,
             MAX_UNIFORM_BUFFER_BINDING_SIZE,
             BufferUsage::UNIFORM,
             Some("material buffer"),
         );
+        let bind_group_cache = BindGroupCache::new();
         let registry = ResourceRegistry::new();
 
-        Self { buffer, registry }
+        Self {
+            buffer,
+            bind_group_cache,
+            registry,
+        }
     }
 
     pub fn allocate(&self) -> MaterialHandle {
@@ -44,6 +57,8 @@ impl MaterialManager {
     }
 
     pub fn fill(&mut self, handle: MaterialHandle, material: Material) {
+        span_transfer!(_ -> fill_span, INFO, "Material Manager Fill");
+
         self.registry.insert(handle.0, material);
     }
 
@@ -55,7 +70,15 @@ impl MaterialManager {
         self.registry.get_index_of(handle.0)
     }
 
-    pub fn ready(&mut self, device: &Device, encoder: &mut CommandEncoder, texture_manager: &TextureManager) {
+    pub fn ready(
+        &mut self,
+        device: &Device,
+        encoder: &mut CommandEncoder,
+        texture_manager: &TextureManager,
+        material_bgl: &BindGroupLayout,
+    ) -> BufferCache1 {
+        span_transfer!(_ -> ready_span, INFO, "Material Manager Ready");
+
         let registry = &self.registry;
         self.buffer
             .write_to_buffer(device, encoder, MAX_UNIFORM_BUFFER_BINDING_SIZE, move |_, slice| {
@@ -74,9 +97,20 @@ impl MaterialManager {
                     }
                 }
             });
+
+        self.bind_group_cache.create_bind_group(&self.buffer, true, |buffer| {
+            device.create_bind_group(&BindGroupDescriptor {
+                label: Some("material bind group"),
+                layout: &material_bgl,
+                entries: &[BindGroupEntry {
+                    binding: 0,
+                    resource: BindingResource::Buffer(buffer.inner.slice(..)),
+                }],
+            })
+        })
     }
 
-    pub fn current_buffer(&self) -> &AutomatedBuffer {
-        &self.buffer
+    pub fn bind_group(&self, key: &BufferCache1) -> &BindGroup {
+        self.bind_group_cache.get(key).unwrap()
     }
 }

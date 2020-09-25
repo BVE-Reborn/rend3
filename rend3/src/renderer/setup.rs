@@ -9,7 +9,7 @@ use crate::{
         passes,
         passes::ForwardPassSet,
         resources::RendererGlobalResources,
-        shaders::{ShaderArguments, ShaderManager},
+        shaders::ShaderManager,
         texture::TextureManager,
         Renderer, SWAPCHAIN_FORMAT,
     },
@@ -17,7 +17,6 @@ use crate::{
 };
 use parking_lot::{Mutex, RwLock};
 use raw_window_handle::HasRawWindowHandle;
-use shaderc::ShaderKind;
 use std::{cell::RefCell, sync::Arc};
 use switchyard::Switchyard;
 use wgpu::{BackendBit, DeviceDescriptor, Instance, PowerPreference, RequestAdapterOptions};
@@ -76,7 +75,19 @@ where
         adapter_info.subgroup_size(),
     );
 
-    let (culling_pass,) = futures::join!(culling_pass);
+    let mut texture_manager = RwLock::new(TextureManager::new(&device, &global_resource_guard.sampler));
+    let texture_manager_guard = texture_manager.get_mut();
+
+    let depth_pass = passes::DepthPass::new(
+        &device,
+        &yard,
+        &shader_manager,
+        &global_resource_guard.object_input_bgl,
+        &global_resource_guard.object_output_bgl,
+        &global_resource_guard.material_bgl,
+        &texture_manager_guard.bind_group_layout(),
+        &global_resource_guard.uniform_bgl,
+    );
 
     let forward_pass_set = ForwardPassSet::new(
         &device,
@@ -88,11 +99,16 @@ where
         &adapter_info.device_type,
     )));
     let mesh_manager = RwLock::new(MeshManager::new(&device));
-    let texture_manager = RwLock::new(TextureManager::new(&device));
     let material_manager = RwLock::new(MaterialManager::new(&device, buffer_manager.get_mut()));
     let object_manager = RwLock::new(ObjectManager::new(&device, buffer_manager.get_mut()));
 
+    span_transfer!(_ -> imgui_guard, INFO, "Creating Imgui Renderer");
+
     let imgui_renderer = imgui_wgpu::Renderer::new(imgui, &device, &queue, SWAPCHAIN_FORMAT);
+
+    span_transfer!(imgui_guard -> _);
+
+    let (culling_pass, depth_pass) = futures::join!(culling_pass, depth_pass);
 
     Ok(Arc::new(Renderer {
         yard,
@@ -114,6 +130,7 @@ where
         forward_pass_set,
 
         culling_pass,
+        depth_pass,
 
         imgui_renderer,
 

@@ -14,10 +14,12 @@ macro_rules! span {
 macro_rules! span_transfer {
     (_ -> $guard_name:tt, $level:ident, $name:expr, $($fields:tt)*) => {
         let span = tracing::span!(tracing::Level::$level, $name, $($fields)*);
+        #[allow(unused_variables)]
         let $guard_name = span.enter();
     };
     (_ -> $guard_name:tt, $level:ident, $name:expr) => {
         let span = tracing::span!(tracing::Level::$level, $name);
+        #[allow(unused_variables)]
         let $guard_name = span.enter();
     };
     ($old_guard:tt -> _) => {
@@ -25,12 +27,14 @@ macro_rules! span_transfer {
     };
     ($old_guard:tt -> $guard_name:tt, $level:ident, $name:expr, $($fields:tt)*) => {
         drop($old_guard);
-        let span = tracing::span!(tracing::Level::$level, $name, $($fields)*);
+        let span = tracing::span!(tracing::Level::$level, $name, $($fields)*)
+        #[allow(unused_variables)]
         let $guard_name = span.enter();
     };
     ($old_guard:tt -> $guard_name:tt, $level:ident, $name:expr) => {
         drop($old_guard);
         let span = tracing::span!(tracing::Level::$level, $name);
+        #[allow(unused_variables)]
         let $guard_name = span.enter();
     };
 }

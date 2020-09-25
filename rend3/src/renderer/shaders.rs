@@ -3,7 +3,7 @@ use crate::{
     ShaderError, TLS,
 };
 use fnv::FnvBuildHasher;
-use futures::future::{ready, Either, Ready};
+use futures::future::{ready, Either};
 use parking_lot::Mutex;
 use shaderc::{CompileOptions, OptimizationLevel, ResolvedInclude, ShaderKind, SourceLanguage, TargetEnv};
 use std::{
@@ -16,7 +16,7 @@ use std::{
     path::Path,
     sync::Arc,
 };
-use switchyard::{JoinHandle, Switchyard};
+use switchyard::Switchyard;
 use tracing_futures::Instrument;
 use wgpu::{Device, ShaderModule, ShaderModuleSource};
 

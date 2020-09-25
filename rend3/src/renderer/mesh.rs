@@ -32,6 +32,8 @@ pub struct MeshManager {
 
 impl MeshManager {
     pub fn new(device: &Device) -> Self {
+        span_transfer!(_ -> new_span, INFO, "Creating Mesh Manager");
+
         let vertex_bytes = STARTING_VERTICES * VERTEX_SIZE;
         let index_bytes = STARTING_INDICES * INDEX_SIZE;
 
@@ -73,6 +75,8 @@ impl MeshManager {
     }
 
     pub fn fill(&mut self, queue: &Queue, handle: MeshHandle, mesh: Mesh) {
+        span_transfer!(_ -> fill_span, INFO, "Mesh Manager Fill");
+
         let vertex_range = self
             .vertex_alloc
             .allocate_range(mesh.vertices.len())

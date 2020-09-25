@@ -2,8 +2,9 @@ use crate::{datatypes::TextureHandle, registry::ResourceRegistry};
 use std::{mem, num::NonZeroU32};
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
-    BindingResource, BindingType, Device, Extent3d, ShaderStage, Texture, TextureComponentType, TextureDescriptor,
-    TextureDimension, TextureFormat, TextureUsage, TextureView, TextureViewDescriptor, TextureViewDimension,
+    BindingResource, BindingType, Device, Extent3d, Sampler, ShaderStage, Texture, TextureComponentType,
+    TextureDescriptor, TextureDimension, TextureFormat, TextureUsage, TextureView, TextureViewDescriptor,
+    TextureViewDimension,
 };
 
 const STARTING_TEXTURES: usize = 1 << 8;
@@ -21,7 +22,9 @@ pub struct TextureManager {
     registry: ResourceRegistry<()>,
 }
 impl TextureManager {
-    pub fn new(device: &Device) -> Self {
+    pub fn new(device: &Device, sampler: &Sampler) -> Self {
+        span_transfer!(_ -> new_span, INFO, "Creating Texture Manager");
+
         let mut null_tex_man = NullTextureManager::new(device);
 
         let view_count = STARTING_TEXTURES;
@@ -30,7 +33,7 @@ impl TextureManager {
         fill_to_size(&mut null_tex_man, &mut views, view_count);
 
         let layout = create_bind_group_layout(device, view_count as u32);
-        let group = create_bind_group(device, &layout, &views);
+        let group = create_bind_group(device, &layout, &views, sampler);
 
         let registry = ResourceRegistry::new();
 
@@ -50,6 +53,8 @@ impl TextureManager {
     }
 
     pub fn fill(&mut self, handle: TextureHandle, texture: TextureView) {
+        span_transfer!(_ -> fill_span, INFO, "Texture Manager Fill");
+
         self.group_dirty = true;
 
         let index = self.registry.insert(handle.0, ());
@@ -67,6 +72,8 @@ impl TextureManager {
     }
 
     pub fn remove(&mut self, handle: TextureHandle) {
+        span_transfer!(_ -> remove_span, INFO, "Material Manager Remove");
+
         let (index, _) = self.registry.remove(handle.0);
 
         let active_count = self.registry.count();
@@ -83,7 +90,9 @@ impl TextureManager {
         self.registry.get_index_of(handle.0)
     }
 
-    pub fn ready(&mut self, device: &Device) -> (Option<&BindGroupLayout>, &BindGroup) {
+    pub fn ready(&mut self, device: &Device, sampler: &Sampler) -> (Option<&BindGroupLayout>, &BindGroup) {
+        span_transfer!(_ -> ready_span, INFO, "Material Manager Ready");
+
         let layout = if self.layout_dirty {
             self.layout = create_bind_group_layout(device, self.views.len() as u32);
             self.layout_dirty = false;
@@ -93,15 +102,21 @@ impl TextureManager {
         };
 
         if self.group_dirty {
-            self.group = create_bind_group(device, &self.layout, &self.views);
+            self.group = create_bind_group(device, &self.layout, &self.views, sampler);
             self.group_dirty = false;
         }
 
         (layout, &self.group)
     }
+
+    pub fn bind_group_layout(&self) -> &BindGroupLayout {
+        &self.layout
+    }
 }
 
 fn fill_to_size(null_tex_man: &mut NullTextureManager, views: &mut Vec<TextureView>, size: usize) {
+    span_transfer!(_ -> fill_span, INFO, "fill to size");
+
     let to_add = size.saturating_sub(views.len());
 
     for _ in 0..to_add {
@@ -112,27 +127,41 @@ fn fill_to_size(null_tex_man: &mut NullTextureManager, views: &mut Vec<TextureVi
 fn create_bind_group_layout(device: &Device, count: u32) -> BindGroupLayout {
     device.create_bind_group_layout(&BindGroupLayoutDescriptor {
         label: Some("texture bindings layout"),
-        entries: &[BindGroupLayoutEntry {
-            binding: 0,
-            visibility: ShaderStage::FRAGMENT,
-            ty: BindingType::SampledTexture {
-                dimension: TextureViewDimension::D2,
-                component_type: TextureComponentType::Float,
-                multisampled: false,
+        entries: &[
+            BindGroupLayoutEntry {
+                binding: 0,
+                visibility: ShaderStage::FRAGMENT,
+                ty: BindingType::SampledTexture {
+                    dimension: TextureViewDimension::D2,
+                    component_type: TextureComponentType::Float,
+                    multisampled: false,
+                },
+                count: NonZeroU32::new(count),
             },
-            count: NonZeroU32::new(count),
-        }],
+            BindGroupLayoutEntry {
+                binding: 1,
+                visibility: ShaderStage::FRAGMENT,
+                ty: BindingType::Sampler { comparison: false },
+                count: None,
+            },
+        ],
     })
 }
 
-fn create_bind_group(device: &Device, layout: &BindGroupLayout, views: &[TextureView]) -> BindGroup {
+fn create_bind_group(device: &Device, layout: &BindGroupLayout, views: &[TextureView], sampler: &Sampler) -> BindGroup {
     device.create_bind_group(&BindGroupDescriptor {
         label: Some("texture binding"),
         layout: &layout,
-        entries: &[BindGroupEntry {
-            binding: 0,
-            resource: BindingResource::TextureViewArray(views),
-        }],
+        entries: &[
+            BindGroupEntry {
+                binding: 0,
+                resource: BindingResource::TextureViewArray(views),
+            },
+            BindGroupEntry {
+                binding: 1,
+                resource: BindingResource::Sampler(sampler),
+            },
+        ],
     })
 }
 
@@ -142,6 +171,8 @@ struct NullTextureManager {
 }
 impl NullTextureManager {
     pub fn new(device: &Device) -> Self {
+        span_transfer!(_ -> new_span, INFO, "Material Manager Ready");
+
         let null_tex = device.create_texture(&TextureDescriptor {
             label: Some("null texture"),
             size: Extent3d::default(),
@@ -159,6 +190,8 @@ impl NullTextureManager {
     }
 
     pub fn get(&mut self) -> TextureView {
+        span_transfer!(_ -> get_span, INFO, "Null Texture Manager Get");
+
         self.inner
             .pop()
             .unwrap_or_else(|| self.null_tex.create_view(&TextureViewDescriptor::default()))

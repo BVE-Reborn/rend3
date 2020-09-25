@@ -17,6 +17,9 @@ use switchyard::{JoinHandle, Switchyard};
 use wgpu::{Device, Queue, Surface, TextureFormat};
 use wgpu_conveyor::AutomatedBufferManager;
 
+#[macro_use]
+mod util;
+
 mod camera;
 pub mod error;
 mod info;
@@ -31,7 +34,6 @@ mod setup;
 mod shaders;
 mod texture;
 mod uniforms;
-mod util;
 
 const COMPUTE_POOL: u8 = 0;
 
@@ -39,6 +41,8 @@ const SHADER_COMPILE_PRIORITY: u32 = 0;
 const BUFFER_RECALL_PRIORITY: u32 = 1;
 const MAIN_TASK_PRIORITY: u32 = 2;
 
+const INTERNAL_RENDERBUFFER_FORMAT: TextureFormat = TextureFormat::Rgba16Float;
+const INTERNAL_RENDERBUFFER_DEPTH_FORMAT: TextureFormat = TextureFormat::Depth32Float;
 const SWAPCHAIN_FORMAT: TextureFormat = TextureFormat::Bgra8UnormSrgb;
 
 pub struct Renderer<TLD = TLS>
@@ -64,6 +68,7 @@ where
     forward_pass_set: ForwardPassSet,
 
     culling_pass: passes::CullingPass,
+    depth_pass: passes::DepthPass,
 
     imgui_renderer: imgui_wgpu::Renderer,
 

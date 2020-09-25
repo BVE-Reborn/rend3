@@ -105,16 +105,29 @@ where
             }
         }
 
-        texture_manager.ready(&renderer.device);
-        material_manager.ready(&renderer.device, &mut encoder, &texture_manager);
-        let (object_bind_group_key, object_count) = object_manager.ready(
+        let global_resources = renderer.global_resources.read();
+
+        texture_manager.ready(&renderer.device, &global_resources.sampler);
+        let material_bgk = material_manager.ready(
+            &renderer.device,
+            &mut encoder,
+            &texture_manager,
+            &global_resources.material_bgl,
+        );
+        let (object_bgk, object_count) = object_manager.ready(
             &renderer.device,
             &mut encoder,
             &material_manager,
-            &renderer.global_resources.read().object_input_bgl,
+            &global_resources.object_input_bgl,
         );
 
-        drop((mesh_manager, texture_manager, material_manager, object_manager));
+        drop((
+            global_resources,
+            mesh_manager,
+            texture_manager,
+            material_manager,
+            object_manager,
+        ));
 
         span_transfer!(event_span -> resource_update_span, INFO, "Update resources");
 
@@ -138,13 +151,15 @@ where
 
         span_transfer!(resource_update_span -> compute_pass_span, INFO, "Primary ComputePass");
 
+        let material_manager = renderer.material_manager.read();
+        let material_bg = material_manager.bind_group(&material_bgk);
         let object_manager = renderer.object_manager.read();
-        let input_bind_group = object_manager.bind_group(&object_bind_group_key);
+        let input_bg = object_manager.bind_group(&object_bgk);
 
         let mut cpass = encoder.begin_compute_pass();
         renderer
             .forward_pass_set
-            .compute(&renderer, &mut cpass, input_bind_group, &forward_pass_data);
+            .compute(&renderer, &mut cpass, input_bg, &forward_pass_data);
         drop(cpass);
 
         drop(object_manager);
