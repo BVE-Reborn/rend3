@@ -1,7 +1,5 @@
-use crate::datatypes::ModelVertex;
-use crate::{renderer::SWAPCHAIN_FORMAT, VSyncMode};
-use std::mem::size_of;
-use std::num::NonZeroU8;
+use crate::{datatypes::ModelVertex, renderer::SWAPCHAIN_FORMAT, VSyncMode};
+use std::{mem::size_of, num::NonZeroU8};
 use wgpu::{
     AddressMode, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, Device, FilterMode,
     InputStepMode, PresentMode, Sampler, SamplerDescriptor, ShaderStage, Surface, SwapChain, SwapChainDescriptor,

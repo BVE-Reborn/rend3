@@ -1,7 +1,9 @@
-use crate::renderer::material::MAX_MATERIALS;
-use crate::renderer::util;
 use crate::{
-    renderer::shaders::{ShaderArguments, ShaderManager},
+    renderer::{
+        material::MAX_MATERIALS,
+        shaders::{ShaderArguments, ShaderManager},
+        util,
+    },
     TLS,
 };
 use shaderc::ShaderKind;
