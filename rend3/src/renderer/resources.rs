@@ -2,15 +2,19 @@ use crate::{
     renderer::{camera::Camera, util},
     RendererOptions,
 };
-use wgpu::{BindGroupLayout, Device, Sampler, Surface, SwapChain};
+use wgpu::{BindGroupLayout, Device, Sampler, Surface, SwapChain, Texture, TextureView};
 
 pub struct RendererGlobalResources {
     pub swapchain: SwapChain,
+
+    pub depth_texture: Texture,
+    pub depth_texture_view: TextureView,
 
     pub camera: Camera,
 
     pub object_input_bgl: BindGroupLayout,
     pub object_output_bgl: BindGroupLayout,
+    pub object_output_noindirect_bgl: BindGroupLayout,
     pub material_bgl: BindGroupLayout,
     pub uniform_bgl: BindGroupLayout,
 
@@ -20,10 +24,13 @@ impl RendererGlobalResources {
     pub fn new(device: &Device, surface: &Surface, options: &RendererOptions) -> Self {
         let swapchain = util::create_swapchain(device, surface, options.size, options.vsync);
 
+        let (depth_texture, depth_texture_view) = util::create_depth_texture(device, options.size);
+
         let camera = Camera::new(options.size.width as f32 / options.size.height as f32);
 
         let object_input_bgl = util::create_object_input_bgl(device);
         let object_output_bgl = util::create_object_output_bgl(device);
+        let object_output_noindirect_bgl = util::create_object_output_noindirect_bgl(device);
         let material_bgl = util::create_material_bgl(device);
         let uniform_bgl = util::create_uniform_bgl(device);
 
@@ -31,9 +38,12 @@ impl RendererGlobalResources {
 
         Self {
             swapchain,
+            depth_texture,
+            depth_texture_view,
             camera,
             object_input_bgl,
             object_output_bgl,
+            object_output_noindirect_bgl,
             material_bgl,
             uniform_bgl,
             sampler,
@@ -56,6 +66,12 @@ impl RendererGlobalResources {
             self.camera
                 .set_aspect_ratio(new_options.size.width as f32 / new_options.size.height as f32);
         }
+        if dirty.contains(DirtyResources::DEPTH) {
+            let (depth_texture, depth_texture_view) = util::create_depth_texture(device, new_options.size);
+
+            self.depth_texture = depth_texture;
+            self.depth_texture_view = depth_texture_view;
+        }
     }
 }
 
@@ -63,6 +79,7 @@ bitflags::bitflags! {
     struct DirtyResources: u8 {
         const SWAPCHAIN = 0x01;
         const CAMERA = 0x02;
+        const DEPTH = 0x04;
     }
 }
 
@@ -72,6 +89,7 @@ fn determine_dirty(current: &RendererOptions, new: &RendererOptions) -> DirtyRes
     if current.size != new.size {
         dirty |= DirtyResources::SWAPCHAIN;
         dirty |= DirtyResources::CAMERA;
+        dirty |= DirtyResources::DEPTH;
     }
 
     if current.vsync != current.vsync {

@@ -1,9 +1,10 @@
+use crate::renderer::passes;
 use crate::{
     renderer::{camera::Camera, passes::CullingPassData, resources::RendererGlobalResources, uniforms::WrappedUniform},
     Renderer, TLS,
 };
 use std::sync::Arc;
-use wgpu::{BindGroup, BindGroupLayout, ComputePass, Device};
+use wgpu::{BindGroup, BindGroupLayout, Buffer, ComputePass, Device, RenderPass};
 
 pub struct ForwardPassSetData {
     culling_pass_data: CullingPassData,
@@ -39,6 +40,7 @@ impl ForwardPassSet {
         let culling_pass_data = renderer.culling_pass.prepare(
             &renderer.device,
             &global_resources.object_output_bgl,
+            &global_resources.object_output_noindirect_bgl,
             object_count as u32,
             self.name.clone(),
         );
@@ -46,22 +48,43 @@ impl ForwardPassSet {
         ForwardPassSetData { culling_pass_data }
     }
 
-    pub fn compute<'a, TLD>(
+    pub fn compute<'a>(
         &'a self,
-        renderer: &'a Arc<Renderer<TLD>>,
-        compute_pass: &mut ComputePass<'a>,
+        culling_pass: &'a passes::CullingPass,
+        cpass: &mut ComputePass<'a>,
         input_bg: &'a BindGroup,
         data: &'a ForwardPassSetData,
-    ) where
-        TLD: AsMut<TLS> + 'static,
-    {
+    ) {
         span_transfer!(_ -> compute_span, WARN, "Running ForwardPassSet Compute");
 
-        renderer.culling_pass.run(
-            compute_pass,
+        culling_pass.run(cpass, input_bg, &self.uniform.uniform_bg, &data.culling_pass_data);
+    }
+
+    pub fn depth<'a>(
+        &'a self,
+        depth_pass: &'a passes::DepthPass,
+        rpass: &mut RenderPass<'a>,
+        vertex_buffer: &'a Buffer,
+        index_buffer: &'a Buffer,
+        input_bg: &'a BindGroup,
+        material_bg: &'a BindGroup,
+        texture_bg: &'a BindGroup,
+        data: &'a ForwardPassSetData,
+    ) {
+        span_transfer!(_ -> compute_span, WARN, "Running ForwardPassSet Depth");
+
+        depth_pass.run(
+            rpass,
+            vertex_buffer,
+            index_buffer,
+            &data.culling_pass_data.indirect_buffer,
+            &data.culling_pass_data.count_buffer,
             input_bg,
+            &data.culling_pass_data.output_noindirect_bg,
+            material_bg,
+            texture_bg,
             &self.uniform.uniform_bg,
-            &data.culling_pass_data,
+            data.culling_pass_data.object_count,
         );
     }
 }

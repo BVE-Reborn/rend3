@@ -8,8 +8,8 @@ use std::{future::Future, sync::Arc};
 use tracing_futures::Instrument;
 use wgpu::{
     Color, CommandEncoderDescriptor, Extent3d, LoadOp, Operations, Origin3d, RenderPassColorAttachmentDescriptor,
-    RenderPassDescriptor, TextureCopyView, TextureDataLayout, TextureDescriptor, TextureDimension, TextureUsage,
-    TextureViewDescriptor,
+    RenderPassDepthStencilAttachmentDescriptor, RenderPassDescriptor, TextureCopyView, TextureDataLayout,
+    TextureDescriptor, TextureDimension, TextureUsage, TextureViewDescriptor,
 };
 
 pub fn render_loop<TLD>(renderer: Arc<Renderer<TLD>>) -> impl Future<Output = RendererStatistics>
@@ -107,7 +107,7 @@ where
 
         let global_resources = renderer.global_resources.read();
 
-        texture_manager.ready(&renderer.device, &global_resources.sampler);
+        let (texture_bgl, texture_bg) = texture_manager.ready(&renderer.device, &global_resources.sampler);
         let material_bgk = material_manager.ready(
             &renderer.device,
             &mut encoder,
@@ -138,19 +138,28 @@ where
                 .update(&renderer.device, &renderer.surface, &renderer.options, new_opt);
         }
 
-        let global_resources_guard = renderer.global_resources.read();
+        let global_resources = renderer.global_resources.read();
 
-        let forward_pass_data = renderer.forward_pass_set.prepare(
-            &renderer,
-            &global_resources_guard,
-            &global_resources_guard.camera,
-            object_count,
-        );
+        if let Some(texture_bgl) = texture_bgl {
+            renderer.depth_pass.write().update_pipeline(
+                &renderer.device,
+                &global_resources.object_input_bgl,
+                &global_resources.object_output_bgl,
+                &global_resources.material_bgl,
+                &texture_bgl,
+                &global_resources.uniform_bgl,
+            );
+        }
 
-        drop(global_resources_guard);
+        let forward_pass_data =
+            renderer
+                .forward_pass_set
+                .prepare(&renderer, &global_resources, &global_resources.camera, object_count);
 
         span_transfer!(resource_update_span -> compute_pass_span, INFO, "Primary ComputePass");
 
+        let mesh_manager = renderer.mesh_manager.read();
+        let (vertex_buffer, index_buffer) = mesh_manager.buffers();
         let material_manager = renderer.material_manager.read();
         let material_bg = material_manager.bind_group(&material_bgk);
         let object_manager = renderer.object_manager.read();
@@ -159,16 +168,19 @@ where
         let mut cpass = encoder.begin_compute_pass();
         renderer
             .forward_pass_set
-            .compute(&renderer, &mut cpass, input_bg, &forward_pass_data);
+            .compute(&renderer.culling_pass, &mut cpass, input_bg, &forward_pass_data);
         drop(cpass);
-
-        drop(object_manager);
 
         span_transfer!(compute_pass_span -> render_pass_span, INFO, "Primary Renderpass");
 
+        drop(global_resources);
+
         let frame = renderer.global_resources.write().swapchain.get_current_frame().unwrap();
 
-        let rpass = encoder.begin_render_pass(&RenderPassDescriptor {
+        let global_resources = renderer.global_resources.read();
+        let depth_pass = renderer.depth_pass.read();
+
+        let mut rpass = encoder.begin_render_pass(&RenderPassDescriptor {
             color_attachments: &[RenderPassColorAttachmentDescriptor {
                 attachment: &frame.output.view,
                 ops: Operations {
@@ -177,10 +189,36 @@ where
                 },
                 resolve_target: None,
             }],
-            depth_stencil_attachment: None,
+            depth_stencil_attachment: Some(RenderPassDepthStencilAttachmentDescriptor {
+                attachment: &global_resources.depth_texture_view,
+                depth_ops: Some(Operations {
+                    load: LoadOp::Clear(0.0),
+                    store: true,
+                }),
+                stencil_ops: None,
+            }),
         });
 
+        renderer.forward_pass_set.depth(
+            &depth_pass,
+            &mut rpass,
+            vertex_buffer,
+            index_buffer,
+            &input_bg,
+            &material_bg,
+            &texture_bg,
+            &forward_pass_data,
+        );
+
         drop(rpass);
+
+        drop((
+            depth_pass,
+            object_manager,
+            material_manager,
+            mesh_manager,
+            global_resources,
+        ));
 
         span_transfer!(render_pass_span -> queue_submit_span, INFO, "Submitting to Queue");
 

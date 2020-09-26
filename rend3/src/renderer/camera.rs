@@ -20,10 +20,6 @@ impl Camera {
         self.view
     }
 
-    pub fn proj(&self) -> Mat4 {
-        self.proj
-    }
-
     pub fn view_proj(&self) -> Mat4 {
         self.proj * self.view
     }

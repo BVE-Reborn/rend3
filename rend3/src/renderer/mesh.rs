@@ -20,11 +20,11 @@ pub struct InternalMesh {
 
 pub struct MeshManager {
     vertex_buffer: Buffer,
-    vertex_count: usize,
+    _vertex_count: usize,
     vertex_alloc: RangeAllocator<usize>,
 
     index_buffer: Buffer,
-    index_count: usize,
+    _index_count: usize,
     index_alloc: RangeAllocator<usize>,
 
     registry: ResourceRegistry<InternalMesh>,
@@ -61,10 +61,10 @@ impl MeshManager {
 
         Self {
             vertex_buffer,
-            vertex_count,
+            _vertex_count: vertex_count,
             vertex_alloc,
             index_buffer,
-            index_count,
+            _index_count: index_count,
             index_alloc,
             registry,
         }
@@ -111,6 +111,10 @@ impl MeshManager {
 
         self.vertex_alloc.free_range(mesh.vertex_range);
         self.index_alloc.free_range(mesh.index_range);
+    }
+
+    pub fn buffers(&self) -> (&Buffer, &Buffer) {
+        (&self.vertex_buffer, &self.index_buffer)
     }
 
     pub fn internal_data(&self, handle: MeshHandle) -> &InternalMesh {

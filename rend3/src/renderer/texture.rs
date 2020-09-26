@@ -1,5 +1,5 @@
 use crate::{datatypes::TextureHandle, registry::ResourceRegistry};
-use std::{mem, num::NonZeroU32};
+use std::{mem, num::NonZeroU32, sync::Arc};
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
     BindingResource, BindingType, Device, Extent3d, Sampler, ShaderStage, Texture, TextureComponentType,
@@ -10,10 +10,10 @@ use wgpu::{
 const STARTING_TEXTURES: usize = 1 << 8;
 
 pub struct TextureManager {
-    layout: BindGroupLayout,
+    layout: Arc<BindGroupLayout>,
     layout_dirty: bool,
 
-    group: BindGroup,
+    group: Arc<BindGroup>,
     group_dirty: bool,
 
     null_tex_man: NullTextureManager,
@@ -90,13 +90,13 @@ impl TextureManager {
         self.registry.get_index_of(handle.0)
     }
 
-    pub fn ready(&mut self, device: &Device, sampler: &Sampler) -> (Option<&BindGroupLayout>, &BindGroup) {
+    pub fn ready(&mut self, device: &Device, sampler: &Sampler) -> (Option<Arc<BindGroupLayout>>, Arc<BindGroup>) {
         span_transfer!(_ -> ready_span, INFO, "Material Manager Ready");
 
         let layout = if self.layout_dirty {
             self.layout = create_bind_group_layout(device, self.views.len() as u32);
             self.layout_dirty = false;
-            Some(&self.layout)
+            Some(Arc::clone(&self.layout))
         } else {
             None
         };
@@ -106,7 +106,7 @@ impl TextureManager {
             self.group_dirty = false;
         }
 
-        (layout, &self.group)
+        (layout, Arc::clone(&self.group))
     }
 
     pub fn bind_group_layout(&self) -> &BindGroupLayout {
@@ -124,8 +124,8 @@ fn fill_to_size(null_tex_man: &mut NullTextureManager, views: &mut Vec<TextureVi
     }
 }
 
-fn create_bind_group_layout(device: &Device, count: u32) -> BindGroupLayout {
-    device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+fn create_bind_group_layout(device: &Device, count: u32) -> Arc<BindGroupLayout> {
+    Arc::new(device.create_bind_group_layout(&BindGroupLayoutDescriptor {
         label: Some("texture bindings layout"),
         entries: &[
             BindGroupLayoutEntry {
@@ -145,11 +145,16 @@ fn create_bind_group_layout(device: &Device, count: u32) -> BindGroupLayout {
                 count: None,
             },
         ],
-    })
+    }))
 }
 
-fn create_bind_group(device: &Device, layout: &BindGroupLayout, views: &[TextureView], sampler: &Sampler) -> BindGroup {
-    device.create_bind_group(&BindGroupDescriptor {
+fn create_bind_group(
+    device: &Device,
+    layout: &BindGroupLayout,
+    views: &[TextureView],
+    sampler: &Sampler,
+) -> Arc<BindGroup> {
+    Arc::new(device.create_bind_group(&BindGroupDescriptor {
         label: Some("texture binding"),
         layout: &layout,
         entries: &[
@@ -162,7 +167,7 @@ fn create_bind_group(device: &Device, layout: &BindGroupLayout, views: &[Texture
                 resource: BindingResource::Sampler(sampler),
             },
         ],
-    })
+    }))
 }
 
 struct NullTextureManager {

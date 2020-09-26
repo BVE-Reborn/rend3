@@ -83,7 +83,7 @@ where
         &yard,
         &shader_manager,
         &global_resource_guard.object_input_bgl,
-        &global_resource_guard.object_output_bgl,
+        &global_resource_guard.object_output_noindirect_bgl,
         &global_resource_guard.material_bgl,
         &texture_manager_guard.bind_group_layout(),
         &global_resource_guard.uniform_bgl,
@@ -109,19 +109,20 @@ where
     span_transfer!(imgui_guard -> _);
 
     let (culling_pass, depth_pass) = futures::join!(culling_pass, depth_pass);
+    let depth_pass = RwLock::new(depth_pass);
 
     Ok(Arc::new(Renderer {
         yard,
         instructions: InstructionStreamPair::new(),
 
-        adapter_info,
+        _adapter_info: adapter_info,
         queue,
         device,
         surface,
 
         buffer_manager,
         global_resources,
-        shader_manager,
+        _shader_manager: shader_manager,
         mesh_manager,
         texture_manager,
         material_manager,
@@ -132,7 +133,7 @@ where
         culling_pass,
         depth_pass,
 
-        imgui_renderer,
+        _imgui_renderer: imgui_renderer,
 
         options,
     }))

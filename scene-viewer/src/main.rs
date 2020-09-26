@@ -202,7 +202,7 @@ fn main() {
 
     let mut handle = None;
 
-    event_loop.run(move |event, window_target, control| match event {
+    event_loop.run(move |event, _window_target, control| match event {
         Event::MainEventsCleared => {
             if let Some(handle) = handle.take() {
                 rend3::span_transfer!(_ -> render_wait_span, INFO, "Waiting for render");

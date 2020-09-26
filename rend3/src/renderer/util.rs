@@ -1,9 +1,10 @@
-use crate::{datatypes::ModelVertex, renderer::SWAPCHAIN_FORMAT, VSyncMode};
-use std::{mem::size_of, num::NonZeroU8};
+use crate::renderer::INTERNAL_RENDERBUFFER_DEPTH_FORMAT;
+use crate::{renderer::SWAPCHAIN_FORMAT, VSyncMode};
+use std::num::NonZeroU8;
 use wgpu::{
-    AddressMode, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, Device, FilterMode,
-    InputStepMode, PresentMode, Sampler, SamplerDescriptor, ShaderStage, Surface, SwapChain, SwapChainDescriptor,
-    TextureUsage, VertexBufferDescriptor,
+    AddressMode, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, Device, Extent3d,
+    FilterMode, PresentMode, Sampler, SamplerDescriptor, ShaderStage, Surface, SwapChain, SwapChainDescriptor, Texture,
+    TextureDescriptor, TextureDimension, TextureUsage, TextureView, TextureViewDescriptor,
 };
 use winit::dpi::PhysicalSize;
 
@@ -75,6 +76,22 @@ pub fn create_object_output_bgl(device: &Device) -> BindGroupLayout {
         ],
     })
 }
+pub fn create_object_output_noindirect_bgl(device: &Device) -> BindGroupLayout {
+    device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+        label: Some("object output bgl"),
+        entries: &[BindGroupLayoutEntry {
+            binding: 0,
+            visibility: ShaderStage::VERTEX | ShaderStage::FRAGMENT | ShaderStage::COMPUTE,
+            ty: BindingType::StorageBuffer {
+                dynamic: false,
+                min_binding_size: None,
+                readonly: false,
+            },
+            count: None,
+        }],
+    })
+}
+
 pub fn create_material_bgl(device: &Device) -> BindGroupLayout {
     device.create_bind_group_layout(&BindGroupLayoutDescriptor {
         label: Some("material bgl"),
@@ -119,6 +136,26 @@ pub fn create_sampler(device: &Device) -> Sampler {
         compare: None,
         anisotropy_clamp: NonZeroU8::new(16),
     })
+}
+
+pub fn create_depth_texture(device: &Device, size: PhysicalSize<u32>) -> (Texture, TextureView) {
+    let texture = device.create_texture(&TextureDescriptor {
+        label: Some("RenderBuffer Depth Texture"),
+        size: Extent3d {
+            width: size.width,
+            height: size.height,
+            depth: 1,
+        },
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: TextureDimension::D2,
+        format: INTERNAL_RENDERBUFFER_DEPTH_FORMAT,
+        usage: TextureUsage::OUTPUT_ATTACHMENT,
+    });
+
+    let view = texture.create_view(&TextureViewDescriptor::default());
+
+    (texture, view)
 }
 
 macro_rules! create_vertex_buffer_descriptor {

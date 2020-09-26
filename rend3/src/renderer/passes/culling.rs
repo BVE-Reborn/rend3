@@ -7,9 +7,9 @@ use std::{cell::RefCell, future::Future, sync::Arc};
 use switchyard::Switchyard;
 use tracing_futures::Instrument;
 use wgpu::{
-    BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindingResource, BufferAddress, BufferDescriptor,
-    BufferUsage, ComputePass, ComputePipeline, ComputePipelineDescriptor, Device, PipelineLayoutDescriptor,
-    ProgrammableStageDescriptor, PushConstantRange, ShaderModule, ShaderStage,
+    BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindingResource, Buffer, BufferAddress,
+    BufferDescriptor, BufferUsage, ComputePass, ComputePipeline, ComputePipelineDescriptor, Device,
+    PipelineLayoutDescriptor, ProgrammableStageDescriptor, PushConstantRange, ShaderStage,
 };
 
 const SIZE_OF_OUTPUT_DATA: BufferAddress = 7 * 16;
@@ -17,14 +17,16 @@ const SIZE_OF_INDIRECT_CALL: BufferAddress = 5 * 4;
 const SIZE_OF_INDIRECT_COUNT: BufferAddress = 4;
 
 pub struct CullingPassData {
-    name: String,
-    bind_group: BindGroup,
-    object_count: u32,
+    pub name: String,
+    pub output_bg: BindGroup,
+    pub output_noindirect_bg: BindGroup,
+    pub indirect_buffer: Buffer,
+    pub count_buffer: Buffer,
+    pub object_count: u32,
 }
 
 pub struct CullingPass {
     pipeline: ComputePipeline,
-    shader: Arc<ShaderModule>,
     subgroup_size: u32,
 }
 impl CullingPass {
@@ -50,7 +52,7 @@ impl CullingPass {
                 file: String::from("rend3/shaders/cull.comp"),
                 defines: vec![(String::from("WARP_SIZE"), Some(subgroup_size.to_string()))],
                 kind: ShaderKind::Compute,
-                debug: true,
+                debug: cfg!(debug_assertions),
             },
         );
 
@@ -79,7 +81,6 @@ impl CullingPass {
 
             Self {
                 pipeline,
-                shader,
                 subgroup_size,
             }
         }
@@ -90,6 +91,7 @@ impl CullingPass {
         &self,
         device: &Device,
         output_bgl: &BindGroupLayout,
+        output_noindirect_bgl: &BindGroupLayout,
         object_count: u32,
         name: String,
     ) -> CullingPassData {
@@ -122,7 +124,7 @@ impl CullingPass {
             .copy_from_slice(bytemuck::bytes_of(&0));
         count_buffer.unmap();
 
-        let bind_group = device.create_bind_group(&BindGroupDescriptor {
+        let output_bg = device.create_bind_group(&BindGroupDescriptor {
             label: Some(&*format!("output bind group for {}", &name)),
             layout: output_bgl,
             entries: &[
@@ -141,26 +143,38 @@ impl CullingPass {
             ],
         });
 
+        let output_noindirect_bg = device.create_bind_group(&BindGroupDescriptor {
+            label: Some(&*format!("noindirect output bind group for {}", &name)),
+            layout: output_noindirect_bgl,
+            entries: &[BindGroupEntry {
+                binding: 0,
+                resource: BindingResource::Buffer(output_buffer.slice(..)),
+            }],
+        });
+
         CullingPassData {
             name,
-            bind_group,
+            output_bg,
+            output_noindirect_bg,
+            indirect_buffer,
+            count_buffer,
             object_count,
         }
     }
 
     pub fn run<'a>(
         &'a self,
-        compute_pass: &mut ComputePass<'a>,
+        cpass: &mut ComputePass<'a>,
         input_bg: &'a BindGroup,
         uniform_bg: &'a BindGroup,
         data: &'a CullingPassData,
     ) {
         span_transfer!(_ -> run_span, WARN, "Running CullingPass");
-        compute_pass.set_pipeline(&self.pipeline);
-        compute_pass.set_push_constants(0, &[data.object_count]);
-        compute_pass.set_bind_group(0, input_bg, &[]);
-        compute_pass.set_bind_group(1, &data.bind_group, &[]);
-        compute_pass.set_bind_group(2, uniform_bg, &[]);
-        compute_pass.dispatch((data.object_count + self.subgroup_size - 1) / self.subgroup_size, 1, 1);
+        cpass.set_pipeline(&self.pipeline);
+        cpass.set_push_constants(0, &[data.object_count]);
+        cpass.set_bind_group(0, input_bg, &[]);
+        cpass.set_bind_group(1, &data.output_bg, &[]);
+        cpass.set_bind_group(2, uniform_bg, &[]);
+        cpass.dispatch((data.object_count + self.subgroup_size - 1) / self.subgroup_size, 1, 1);
     }
 }

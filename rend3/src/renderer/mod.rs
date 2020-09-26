@@ -41,7 +41,8 @@ const SHADER_COMPILE_PRIORITY: u32 = 0;
 const BUFFER_RECALL_PRIORITY: u32 = 1;
 const MAIN_TASK_PRIORITY: u32 = 2;
 
-const INTERNAL_RENDERBUFFER_FORMAT: TextureFormat = TextureFormat::Rgba16Float;
+const INTERNAL_RENDERBUFFER_FORMAT: TextureFormat = SWAPCHAIN_FORMAT;
+// const INTERNAL_RENDERBUFFER_FORMAT: TextureFormat = TextureFormat::Rgba16Float;
 const INTERNAL_RENDERBUFFER_DEPTH_FORMAT: TextureFormat = TextureFormat::Depth32Float;
 const SWAPCHAIN_FORMAT: TextureFormat = TextureFormat::Bgra8UnormSrgb;
 
@@ -52,14 +53,14 @@ where
     yard: Arc<Switchyard<RefCell<TLD>>>,
     instructions: InstructionStreamPair,
 
-    adapter_info: ExtendedAdapterInfo,
+    _adapter_info: ExtendedAdapterInfo,
     queue: Queue,
     device: Arc<Device>,
     surface: Surface,
 
     buffer_manager: Mutex<AutomatedBufferManager>,
     global_resources: RwLock<RendererGlobalResources>,
-    shader_manager: Arc<ShaderManager>,
+    _shader_manager: Arc<ShaderManager>,
     mesh_manager: RwLock<MeshManager>,
     texture_manager: RwLock<TextureManager>,
     material_manager: RwLock<MaterialManager>,
@@ -68,9 +69,9 @@ where
     forward_pass_set: ForwardPassSet,
 
     culling_pass: passes::CullingPass,
-    depth_pass: passes::DepthPass,
+    depth_pass: RwLock<passes::DepthPass>,
 
-    imgui_renderer: imgui_wgpu::Renderer,
+    _imgui_renderer: imgui_wgpu::Renderer,
 
     options: RendererOptions,
 }
