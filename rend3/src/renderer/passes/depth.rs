@@ -1,9 +1,8 @@
-use crate::renderer::INTERNAL_RENDERBUFFER_FORMAT;
 use crate::{
     renderer::{
         material::MAX_MATERIALS,
         shaders::{ShaderArguments, ShaderManager},
-        INTERNAL_RENDERBUFFER_DEPTH_FORMAT,
+        INTERNAL_RENDERBUFFER_DEPTH_FORMAT, INTERNAL_RENDERBUFFER_FORMAT,
     },
     TLS,
 };

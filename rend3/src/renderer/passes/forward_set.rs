@@ -1,6 +1,7 @@
-use crate::renderer::passes;
 use crate::{
-    renderer::{camera::Camera, passes::CullingPassData, resources::RendererGlobalResources, uniforms::WrappedUniform},
+    renderer::{
+        camera::Camera, passes, passes::CullingPassData, resources::RendererGlobalResources, uniforms::WrappedUniform,
+    },
     Renderer, TLS,
 };
 use std::sync::Arc;

@@ -41,8 +41,7 @@ const SHADER_COMPILE_PRIORITY: u32 = 0;
 const BUFFER_RECALL_PRIORITY: u32 = 1;
 const MAIN_TASK_PRIORITY: u32 = 2;
 
-const INTERNAL_RENDERBUFFER_FORMAT: TextureFormat = SWAPCHAIN_FORMAT;
-// const INTERNAL_RENDERBUFFER_FORMAT: TextureFormat = TextureFormat::Rgba16Float;
+const INTERNAL_RENDERBUFFER_FORMAT: TextureFormat = TextureFormat::Rgba16Float;
 const INTERNAL_RENDERBUFFER_DEPTH_FORMAT: TextureFormat = TextureFormat::Depth32Float;
 const SWAPCHAIN_FORMAT: TextureFormat = TextureFormat::Bgra8UnormSrgb;
 
@@ -68,6 +67,7 @@ where
 
     forward_pass_set: ForwardPassSet,
 
+    swapchain_blit_pass: passes::BlitPass,
     culling_pass: passes::CullingPass,
     depth_pass: RwLock<passes::DepthPass>,
 

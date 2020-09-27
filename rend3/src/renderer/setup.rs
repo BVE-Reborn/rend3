@@ -75,6 +75,14 @@ where
         adapter_info.subgroup_size(),
     );
 
+    let swapchain_blit_pass = passes::BlitPass::new(
+        &device,
+        &yard,
+        &shader_manager,
+        &global_resource_guard.blit_bgl,
+        SWAPCHAIN_FORMAT,
+    );
+
     let mut texture_manager = RwLock::new(TextureManager::new(&device, &global_resource_guard.sampler));
     let texture_manager_guard = texture_manager.get_mut();
 
@@ -108,7 +116,7 @@ where
 
     span_transfer!(imgui_guard -> _);
 
-    let (culling_pass, depth_pass) = futures::join!(culling_pass, depth_pass);
+    let (culling_pass, depth_pass, swapchain_blit_pass) = futures::join!(culling_pass, depth_pass, swapchain_blit_pass);
     let depth_pass = RwLock::new(depth_pass);
 
     Ok(Arc::new(Renderer {
@@ -130,6 +138,7 @@ where
 
         forward_pass_set,
 
+        swapchain_blit_pass,
         culling_pass,
         depth_pass,
 

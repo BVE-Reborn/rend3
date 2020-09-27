@@ -182,9 +182,9 @@ where
 
         let mut rpass = encoder.begin_render_pass(&RenderPassDescriptor {
             color_attachments: &[RenderPassColorAttachmentDescriptor {
-                attachment: &frame.output.view,
+                attachment: &global_resources.color_texture_view,
                 ops: Operations {
-                    load: LoadOp::Clear(Color::BLACK),
+                    load: LoadOp::Clear(Color::GREEN),
                     store: true,
                 },
                 resolve_target: None,
@@ -212,15 +212,29 @@ where
 
         drop(rpass);
 
-        drop((
-            depth_pass,
-            object_manager,
-            material_manager,
-            mesh_manager,
-            global_resources,
-        ));
+        drop((depth_pass, object_manager, material_manager, mesh_manager));
 
-        span_transfer!(render_pass_span -> queue_submit_span, INFO, "Submitting to Queue");
+        span_transfer!(render_pass_span -> blit_span, INFO, "Blit to Swapchain");
+
+        let mut rpass = encoder.begin_render_pass(&RenderPassDescriptor {
+            color_attachments: &[RenderPassColorAttachmentDescriptor {
+                attachment: &frame.output.view,
+                ops: Operations {
+                    load: LoadOp::Clear(Color::BLACK),
+                    store: true,
+                },
+                resolve_target: None,
+            }],
+            depth_stencil_attachment: None,
+        });
+
+        renderer.swapchain_blit_pass.run(&mut rpass, &global_resources.color_bg);
+
+        drop(rpass);
+
+        drop(global_resources);
+
+        span_transfer!(blit_span -> queue_submit_span, INFO, "Submitting to Queue");
 
         renderer.queue.submit(std::iter::once(encoder.finish()));
 

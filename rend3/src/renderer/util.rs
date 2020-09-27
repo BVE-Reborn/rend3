@@ -1,10 +1,13 @@
-use crate::renderer::INTERNAL_RENDERBUFFER_DEPTH_FORMAT;
-use crate::{renderer::SWAPCHAIN_FORMAT, VSyncMode};
+use crate::{
+    renderer::{INTERNAL_RENDERBUFFER_DEPTH_FORMAT, INTERNAL_RENDERBUFFER_FORMAT, SWAPCHAIN_FORMAT},
+    VSyncMode,
+};
 use std::num::NonZeroU8;
 use wgpu::{
-    AddressMode, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, Device, Extent3d,
-    FilterMode, PresentMode, Sampler, SamplerDescriptor, ShaderStage, Surface, SwapChain, SwapChainDescriptor, Texture,
-    TextureDescriptor, TextureDimension, TextureUsage, TextureView, TextureViewDescriptor,
+    AddressMode, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor,
+    BindGroupLayoutEntry, BindingResource, BindingType, Device, Extent3d, FilterMode, PresentMode, Sampler,
+    SamplerDescriptor, ShaderStage, Surface, SwapChain, SwapChainDescriptor, Texture, TextureComponentType,
+    TextureDescriptor, TextureDimension, TextureUsage, TextureView, TextureViewDescriptor, TextureViewDimension,
 };
 use winit::dpi::PhysicalSize;
 
@@ -22,6 +25,52 @@ pub fn create_swapchain(device: &Device, surface: &Surface, size: PhysicalSize<u
             },
         },
     )
+}
+
+pub fn create_blit_bgl(device: &Device) -> BindGroupLayout {
+    device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+        label: Some("blit bgl"),
+        entries: &[
+            BindGroupLayoutEntry {
+                binding: 0,
+                visibility: ShaderStage::FRAGMENT,
+                ty: BindingType::SampledTexture {
+                    dimension: TextureViewDimension::D2,
+                    component_type: TextureComponentType::Float,
+                    multisampled: false,
+                },
+                count: None,
+            },
+            BindGroupLayoutEntry {
+                binding: 1,
+                visibility: ShaderStage::FRAGMENT,
+                ty: BindingType::Sampler { comparison: false },
+                count: None,
+            },
+        ],
+    })
+}
+
+pub fn create_blit_bg(
+    device: &Device,
+    blit_bgl: &BindGroupLayout,
+    source_image: &TextureView,
+    sampler: &Sampler,
+) -> BindGroup {
+    device.create_bind_group(&BindGroupDescriptor {
+        label: Some("blit bgl"),
+        layout: blit_bgl,
+        entries: &[
+            BindGroupEntry {
+                binding: 0,
+                resource: BindingResource::TextureView(source_image),
+            },
+            BindGroupEntry {
+                binding: 1,
+                resource: BindingResource::Sampler(sampler),
+            },
+        ],
+    })
 }
 
 pub fn create_object_input_bgl(device: &Device) -> BindGroupLayout {
@@ -138,7 +187,17 @@ pub fn create_sampler(device: &Device) -> Sampler {
     })
 }
 
-pub fn create_depth_texture(device: &Device, size: PhysicalSize<u32>) -> (Texture, TextureView) {
+#[derive(Debug, Copy, Clone)]
+pub enum FramebufferTextureKind {
+    Color,
+    Depth,
+}
+
+pub fn create_framebuffer_texture(
+    device: &Device,
+    size: PhysicalSize<u32>,
+    kind: FramebufferTextureKind,
+) -> (Texture, TextureView) {
     let texture = device.create_texture(&TextureDescriptor {
         label: Some("RenderBuffer Depth Texture"),
         size: Extent3d {
@@ -149,8 +208,11 @@ pub fn create_depth_texture(device: &Device, size: PhysicalSize<u32>) -> (Textur
         mip_level_count: 1,
         sample_count: 1,
         dimension: TextureDimension::D2,
-        format: INTERNAL_RENDERBUFFER_DEPTH_FORMAT,
-        usage: TextureUsage::OUTPUT_ATTACHMENT,
+        format: match kind {
+            FramebufferTextureKind::Color => INTERNAL_RENDERBUFFER_FORMAT,
+            FramebufferTextureKind::Depth => INTERNAL_RENDERBUFFER_DEPTH_FORMAT,
+        },
+        usage: TextureUsage::SAMPLED | TextureUsage::OUTPUT_ATTACHMENT,
     });
 
     let view = texture.create_view(&TextureViewDescriptor::default());
