@@ -70,6 +70,7 @@ where
     swapchain_blit_pass: passes::BlitPass,
     culling_pass: passes::CullingPass,
     depth_pass: RwLock<passes::DepthPass>,
+    opaque_pass: RwLock<passes::OpaquePass>,
 
     _imgui_renderer: imgui_wgpu::Renderer,
 

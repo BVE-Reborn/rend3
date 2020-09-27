@@ -144,7 +144,15 @@ where
             renderer.depth_pass.write().update_pipeline(
                 &renderer.device,
                 &global_resources.object_input_bgl,
-                &global_resources.object_output_bgl,
+                &global_resources.object_output_noindirect_bgl,
+                &global_resources.material_bgl,
+                &texture_bgl,
+                &global_resources.uniform_bgl,
+            );
+            renderer.opaque_pass.write().update_pipeline(
+                &renderer.device,
+                &global_resources.object_input_bgl,
+                &global_resources.object_output_noindirect_bgl,
                 &global_resources.material_bgl,
                 &texture_bgl,
                 &global_resources.uniform_bgl,
@@ -179,6 +187,7 @@ where
 
         let global_resources = renderer.global_resources.read();
         let depth_pass = renderer.depth_pass.read();
+        let opaque_pass = renderer.opaque_pass.read();
 
         let mut rpass = encoder.begin_render_pass(&RenderPassDescriptor {
             color_attachments: &[RenderPassColorAttachmentDescriptor {
@@ -209,10 +218,13 @@ where
             &texture_bg,
             &forward_pass_data,
         );
+        renderer
+            .forward_pass_set
+            .opaque(&opaque_pass, &mut rpass, &forward_pass_data);
 
         drop(rpass);
 
-        drop((depth_pass, object_manager, material_manager, mesh_manager));
+        drop((opaque_pass, depth_pass, object_manager, material_manager, mesh_manager));
 
         span_transfer!(render_pass_span -> blit_span, INFO, "Blit to Swapchain");
 

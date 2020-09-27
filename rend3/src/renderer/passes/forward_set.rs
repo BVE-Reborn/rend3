@@ -88,4 +88,20 @@ impl ForwardPassSet {
             data.culling_pass_data.object_count,
         );
     }
+
+    pub fn opaque<'a>(
+        &'a self,
+        opaque_pass: &'a passes::OpaquePass,
+        rpass: &mut RenderPass<'a>,
+        data: &'a ForwardPassSetData,
+    ) {
+        span_transfer!(_ -> compute_span, WARN, "Running ForwardPassSet Depth");
+
+        opaque_pass.run(
+            rpass,
+            &data.culling_pass_data.indirect_buffer,
+            &data.culling_pass_data.count_buffer,
+            data.culling_pass_data.object_count,
+        );
+    }
 }

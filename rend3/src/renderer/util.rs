@@ -5,9 +5,13 @@ use crate::{
 use std::num::NonZeroU8;
 use wgpu::{
     AddressMode, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor,
-    BindGroupLayoutEntry, BindingResource, BindingType, Device, Extent3d, FilterMode, PresentMode, Sampler,
-    SamplerDescriptor, ShaderStage, Surface, SwapChain, SwapChainDescriptor, Texture, TextureComponentType,
+    BindGroupLayoutEntry, BindingResource, BindingType, BlendDescriptor, ColorStateDescriptor, ColorWrite,
+    CompareFunction, CullMode, DepthStencilStateDescriptor, Device, Extent3d, FilterMode, FrontFace, IndexFormat,
+    PipelineLayout, PipelineLayoutDescriptor, PresentMode, PrimitiveTopology, ProgrammableStageDescriptor,
+    RasterizationStateDescriptor, RenderPipeline, RenderPipelineDescriptor, Sampler, SamplerDescriptor, ShaderModule,
+    ShaderStage, StencilStateDescriptor, Surface, SwapChain, SwapChainDescriptor, Texture, TextureComponentType,
     TextureDescriptor, TextureDimension, TextureUsage, TextureView, TextureViewDescriptor, TextureViewDimension,
+    VertexStateDescriptor,
 };
 use winit::dpi::PhysicalSize;
 
@@ -228,4 +232,86 @@ macro_rules! create_vertex_buffer_descriptor {
             attributes: &wgpu::vertex_attr_array![0 => Float3, 1 => Float3, 2 => Float2, 3 => Uchar4Norm, 4 => Uint],
         }
     };
+}
+
+pub enum RenderPipelineType {
+    Depth,
+    Opaque,
+}
+
+pub fn create_render_pipeline_layout(
+    device: &Device,
+    input_bgl: &BindGroupLayout,
+    output_noindirect_bgl: &BindGroupLayout,
+    material_bgl: &BindGroupLayout,
+    texture_bgl: &BindGroupLayout,
+    uniform_bgl: &BindGroupLayout,
+    ty: RenderPipelineType,
+) -> PipelineLayout {
+    device.create_pipeline_layout(&PipelineLayoutDescriptor {
+        label: Some(match ty {
+            RenderPipelineType::Depth => "depth pipeline layout",
+            RenderPipelineType::Opaque => "opaque pipeline layout",
+        }),
+        bind_group_layouts: &[input_bgl, output_noindirect_bgl, material_bgl, texture_bgl, uniform_bgl],
+        push_constant_ranges: &[],
+    })
+}
+
+pub fn create_render_pipeline(
+    device: &Device,
+    layout: &PipelineLayout,
+    vertex: &ShaderModule,
+    fragment: &ShaderModule,
+    ty: RenderPipelineType,
+) -> RenderPipeline {
+    device.create_render_pipeline(&RenderPipelineDescriptor {
+        label: Some(match ty {
+            RenderPipelineType::Depth => "depth pipeline",
+            RenderPipelineType::Opaque => "opaque pipeline",
+        }),
+        layout: Some(&layout),
+        vertex_stage: ProgrammableStageDescriptor {
+            module: &vertex,
+            entry_point: "main",
+        },
+        fragment_stage: Some(ProgrammableStageDescriptor {
+            module: &fragment,
+            entry_point: "main",
+        }),
+        rasterization_state: Some(RasterizationStateDescriptor {
+            front_face: FrontFace::Ccw,
+            cull_mode: CullMode::Back,
+            clamp_depth: false,
+            depth_bias: 0,
+            depth_bias_slope_scale: 0.0,
+            depth_bias_clamp: 0.0,
+        }),
+        primitive_topology: PrimitiveTopology::TriangleList,
+        color_states: &[ColorStateDescriptor {
+            format: INTERNAL_RENDERBUFFER_FORMAT,
+            alpha_blend: BlendDescriptor::REPLACE,
+            color_blend: BlendDescriptor::REPLACE,
+            write_mask: match ty {
+                RenderPipelineType::Depth => ColorWrite::empty(),
+                RenderPipelineType::Opaque => ColorWrite::ALL,
+            },
+        }],
+        depth_stencil_state: Some(DepthStencilStateDescriptor {
+            format: INTERNAL_RENDERBUFFER_DEPTH_FORMAT,
+            depth_write_enabled: true,
+            depth_compare: match ty {
+                RenderPipelineType::Depth => CompareFunction::Greater,
+                RenderPipelineType::Opaque => CompareFunction::Equal,
+            },
+            stencil: StencilStateDescriptor::default(),
+        }),
+        vertex_state: VertexStateDescriptor {
+            index_format: IndexFormat::Uint32,
+            vertex_buffers: &[create_vertex_buffer_descriptor!()],
+        },
+        sample_count: 1,
+        sample_mask: !0,
+        alpha_to_coverage_enabled: false,
+    })
 }

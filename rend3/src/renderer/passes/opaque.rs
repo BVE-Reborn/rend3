@@ -18,12 +18,12 @@ use wgpu::{
     RenderPipelineDescriptor, ShaderModule, StencilStateDescriptor, VertexStateDescriptor,
 };
 
-pub struct DepthPass {
+pub struct OpaquePass {
     pipeline: RenderPipeline,
     vertex: Arc<ShaderModule>,
     fragment: Arc<ShaderModule>,
 }
-impl DepthPass {
+impl OpaquePass {
     pub fn new<'a, TLD>(
         device: &'a Arc<Device>,
         yard: &Switchyard<RefCell<TLD>>,
@@ -37,14 +37,14 @@ impl DepthPass {
     where
         TLD: AsMut<TLS> + 'static,
     {
-        let new_span = tracing::warn_span!("Creating DepthPass");
+        let new_span = tracing::warn_span!("Creating OpaquePass");
         let new_span_guard = new_span.enter();
 
         let vertex = shader_manager.compile_shader(
             &yard,
             Arc::clone(device),
             ShaderArguments {
-                file: String::from("rend3/shaders/depth.vert"),
+                file: String::from("rend3/shaders/opaque.vert"),
                 defines: vec![],
                 kind: ShaderKind::Vertex,
                 debug: cfg!(debug_assertions),
@@ -55,7 +55,7 @@ impl DepthPass {
             &yard,
             Arc::clone(device),
             ShaderArguments {
-                file: String::from("rend3/shaders/depth.frag"),
+                file: String::from("rend3/shaders/opaque.frag"),
                 defines: vec![(String::from("MATERIAL_COUNT"), Some(MAX_MATERIALS.to_string()))],
                 kind: ShaderKind::Fragment,
                 debug: cfg!(debug_assertions),
@@ -69,7 +69,7 @@ impl DepthPass {
             material_bgl,
             texture_bgl,
             uniform_bgl,
-            util::RenderPipelineType::Depth,
+            util::RenderPipelineType::Opaque,
         );
 
         drop(new_span_guard);
@@ -79,7 +79,7 @@ impl DepthPass {
             let fragment = fragment.await.unwrap();
 
             let pipeline =
-                util::create_render_pipeline(device, &layout, &vertex, &fragment, util::RenderPipelineType::Depth);
+                util::create_render_pipeline(device, &layout, &vertex, &fragment, util::RenderPipelineType::Opaque);
 
             Self {
                 pipeline,
@@ -99,7 +99,7 @@ impl DepthPass {
         texture_bgl: &BindGroupLayout,
         uniform_bgl: &BindGroupLayout,
     ) {
-        span_transfer!(_ -> update_pipeline_span, INFO, "Depth Pass Update Pipeline");
+        span_transfer!(_ -> update_pipeline_span, INFO, "Opaque Pass Update Pipeline");
         let layout = util::create_render_pipeline_layout(
             device,
             input_bgl,
@@ -107,14 +107,14 @@ impl DepthPass {
             material_bgl,
             texture_bgl,
             uniform_bgl,
-            util::RenderPipelineType::Depth,
+            util::RenderPipelineType::Opaque,
         );
         let pipeline = util::create_render_pipeline(
             device,
             &layout,
             &self.vertex,
             &self.fragment,
-            util::RenderPipelineType::Depth,
+            util::RenderPipelineType::Opaque,
         );
         self.pipeline = pipeline;
     }
@@ -122,25 +122,11 @@ impl DepthPass {
     pub fn run<'a>(
         &'a self,
         rpass: &mut RenderPass<'a>,
-        vertex_buffer: &'a Buffer,
-        index_buffer: &'a Buffer,
         indirect_buffer: &'a Buffer,
         count_buffer: &'a Buffer,
-        input_bg: &'a BindGroup,
-        output_noindirect_bg: &'a BindGroup,
-        material_bg: &'a BindGroup,
-        texture_bg: &'a BindGroup,
-        uniform_bg: &'a BindGroup,
         object_count: u32,
     ) {
         rpass.set_pipeline(&self.pipeline);
-        rpass.set_vertex_buffer(0, vertex_buffer.slice(..));
-        rpass.set_index_buffer(index_buffer.slice(..));
-        rpass.set_bind_group(0, &input_bg, &[]);
-        rpass.set_bind_group(1, &output_noindirect_bg, &[]);
-        rpass.set_bind_group(2, &material_bg, &[]);
-        rpass.set_bind_group(3, &texture_bg, &[]);
-        rpass.set_bind_group(4, &uniform_bg, &[]);
         rpass.multi_draw_indexed_indirect_count(indirect_buffer, 0, count_buffer, 0, object_count);
     }
 }

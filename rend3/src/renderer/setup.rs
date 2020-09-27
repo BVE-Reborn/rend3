@@ -97,6 +97,17 @@ where
         &global_resource_guard.uniform_bgl,
     );
 
+    let opaque_pass = passes::OpaquePass::new(
+        &device,
+        &yard,
+        &shader_manager,
+        &global_resource_guard.object_input_bgl,
+        &global_resource_guard.object_output_noindirect_bgl,
+        &global_resource_guard.material_bgl,
+        &texture_manager_guard.bind_group_layout(),
+        &global_resource_guard.uniform_bgl,
+    );
+
     let forward_pass_set = ForwardPassSet::new(
         &device,
         &global_resource_guard.uniform_bgl,
@@ -116,8 +127,10 @@ where
 
     span_transfer!(imgui_guard -> _);
 
-    let (culling_pass, depth_pass, swapchain_blit_pass) = futures::join!(culling_pass, depth_pass, swapchain_blit_pass);
+    let (culling_pass, depth_pass, opaque_pass, swapchain_blit_pass) =
+        futures::join!(culling_pass, depth_pass, opaque_pass, swapchain_blit_pass);
     let depth_pass = RwLock::new(depth_pass);
+    let opaque_pass = RwLock::new(opaque_pass);
 
     Ok(Arc::new(Renderer {
         yard,
@@ -141,6 +154,7 @@ where
         swapchain_blit_pass,
         culling_pass,
         depth_pass,
+        opaque_pass,
 
         _imgui_renderer: imgui_renderer,
 

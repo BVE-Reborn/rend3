@@ -110,7 +110,7 @@ fn load_resources(renderer: &Renderer) {
                         position: Vec3::from(position),
                         normal: Vec3::from(normal),
                         uv: Vec2::from(texture_coords),
-                        color: [0; 4],
+                        color: [255; 4],
                         material: *material_index_map.get(material_name).unwrap(),
                     });
 
@@ -181,7 +181,7 @@ fn main() {
     rend3::span_transfer!(switchyard_span -> renderer_span, INFO, "Building Renderer");
 
     let mut options = RendererOptions {
-        vsync: VSyncMode::On,
+        vsync: VSyncMode::Off,
         size: window.inner_size(),
     };
 
