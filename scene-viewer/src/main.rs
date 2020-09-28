@@ -6,6 +6,7 @@ use rend3::{
     Renderer, RendererOptions, VSyncMode,
 };
 use smallvec::SmallVec;
+use std::time::{Duration, Instant};
 use std::{collections::HashMap, path::Path, sync::Arc};
 use switchyard::{threads, Switchyard};
 use winit::{
@@ -201,12 +202,28 @@ fn main() {
     rend3::span_transfer!(main_thread_span -> _);
 
     let mut handle = None;
+    let mut timestamp = Instant::now();
+    let mut frames = 0_usize;
 
     event_loop.run(move |event, _window_target, control| match event {
         Event::MainEventsCleared => {
             if let Some(handle) = handle.take() {
                 rend3::span_transfer!(_ -> render_wait_span, INFO, "Waiting for render");
                 futures::executor::block_on(handle);
+            }
+
+            frames += 1;
+            let now = Instant::now();
+            let elapsed = now - timestamp;
+            if elapsed > Duration::from_secs(1) {
+                println!(
+                    "{} frames over {:.3}s: {:.3}ms/frame",
+                    frames,
+                    elapsed.as_secs_f32(),
+                    elapsed.as_secs_f64() * 1000.0 / frames as f64
+                );
+                timestamp = now;
+                frames = 0;
             }
 
             window.request_redraw();
@@ -227,7 +244,7 @@ fn main() {
             rend3::span_transfer!(_ -> redraw_span, INFO, "Redraw");
 
             renderer.set_options(options.clone());
-            handle = Some(yard.spawn(0, 1, renderer.render()))
+            handle = Some(renderer.render())
         }
         _ => {}
     })

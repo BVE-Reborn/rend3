@@ -158,6 +158,6 @@ where
 
         _imgui_renderer: imgui_renderer,
 
-        options,
+        options: RwLock::new(options),
     }))
 }

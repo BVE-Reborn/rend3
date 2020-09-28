@@ -74,7 +74,7 @@ where
 
     _imgui_renderer: imgui_wgpu::Renderer,
 
-    options: RendererOptions,
+    options: RwLock<RendererOptions>,
 }
 impl<TLD> Renderer<TLD>
 where

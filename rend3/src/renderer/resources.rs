@@ -68,10 +68,10 @@ impl RendererGlobalResources {
         &mut self,
         device: &Device,
         surface: &Surface,
-        old_options: &RendererOptions,
-        new_options: &RendererOptions,
+        old_options: &mut RendererOptions,
+        new_options: RendererOptions,
     ) {
-        let dirty = determine_dirty(old_options, new_options);
+        let dirty = determine_dirty(old_options, &new_options);
 
         if dirty.contains(DirtyResources::SWAPCHAIN) {
             self.swapchain = util::create_swapchain(device, surface, new_options.size, new_options.vsync);
@@ -91,6 +91,8 @@ impl RendererGlobalResources {
             self.depth_texture = depth_texture;
             self.depth_texture_view = depth_texture_view;
         }
+
+        *old_options = new_options
     }
 }
 

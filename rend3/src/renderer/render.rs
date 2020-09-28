@@ -131,11 +131,13 @@ where
 
         span_transfer!(event_span -> resource_update_span, INFO, "Update resources");
 
-        if let Some(ref new_opt) = new_options {
-            renderer
-                .global_resources
-                .write()
-                .update(&renderer.device, &renderer.surface, &renderer.options, new_opt);
+        if let Some(new_opt) = new_options {
+            renderer.global_resources.write().update(
+                &renderer.device,
+                &renderer.surface,
+                &mut renderer.options.write(),
+                new_opt,
+            );
         }
 
         let global_resources = renderer.global_resources.read();
