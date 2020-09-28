@@ -85,11 +85,13 @@ impl RendererGlobalResources {
                 util::create_framebuffer_texture(device, new_options.size, util::FramebufferTextureKind::Color);
             let (depth_texture, depth_texture_view) =
                 util::create_framebuffer_texture(device, new_options.size, util::FramebufferTextureKind::Depth);
+            let color_bg = util::create_blit_bg(device, &self.blit_bgl, &color_texture_view, &self.sampler);
 
             self.color_texture = color_texture;
             self.color_texture_view = color_texture_view;
             self.depth_texture = depth_texture;
             self.depth_texture_view = depth_texture_view;
+            self.color_bg = color_bg;
         }
 
         *old_options = new_options

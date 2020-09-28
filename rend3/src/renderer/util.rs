@@ -203,7 +203,10 @@ pub fn create_framebuffer_texture(
     kind: FramebufferTextureKind,
 ) -> (Texture, TextureView) {
     let texture = device.create_texture(&TextureDescriptor {
-        label: Some("RenderBuffer Depth Texture"),
+        label: Some(match kind {
+            FramebufferTextureKind::Color => "RenderBuffer Color Texture",
+            FramebufferTextureKind::Depth => "RenderBuffer Depth Texture",
+        }),
         size: Extent3d {
             width: size.width,
             height: size.height,
