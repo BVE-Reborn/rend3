@@ -6,8 +6,12 @@ use rend3::{
     Renderer, RendererOptions, VSyncMode,
 };
 use smallvec::SmallVec;
-use std::time::{Duration, Instant};
-use std::{collections::HashMap, path::Path, sync::Arc};
+use std::{
+    collections::HashMap,
+    path::Path,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 use switchyard::{threads, Switchyard};
 use winit::{
     event::{Event, WindowEvent},

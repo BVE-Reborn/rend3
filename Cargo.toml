@@ -2,5 +2,5 @@
 members = ["scene-viewer", "rend3"]
 
 [profile.release]
-debug = false
+debug = true
 lto = "thin"

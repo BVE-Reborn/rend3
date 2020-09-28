@@ -1,9 +1,8 @@
-use crate::renderer::util;
 use crate::{
     renderer::{
         material::MAX_MATERIALS,
         shaders::{ShaderArguments, ShaderManager},
-        INTERNAL_RENDERBUFFER_DEPTH_FORMAT, INTERNAL_RENDERBUFFER_FORMAT,
+        util,
     },
     TLS,
 };
@@ -11,12 +10,7 @@ use shaderc::ShaderKind;
 use std::{cell::RefCell, future::Future, sync::Arc};
 use switchyard::Switchyard;
 use tracing_futures::Instrument;
-use wgpu::{
-    BindGroup, BindGroupLayout, BlendDescriptor, Buffer, ColorStateDescriptor, ColorWrite, CompareFunction, CullMode,
-    DepthStencilStateDescriptor, Device, FrontFace, IndexFormat, PipelineLayout, PipelineLayoutDescriptor,
-    PrimitiveTopology, ProgrammableStageDescriptor, RasterizationStateDescriptor, RenderPass, RenderPipeline,
-    RenderPipelineDescriptor, ShaderModule, StencilStateDescriptor, VertexStateDescriptor,
-};
+use wgpu::{BindGroupLayout, Buffer, Device, RenderPass, RenderPipeline, ShaderModule};
 
 pub struct OpaquePass {
     pipeline: RenderPipeline,
