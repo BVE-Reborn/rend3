@@ -9,6 +9,8 @@ pub struct RendererGlobalResources {
 
     pub color_texture: Texture,
     pub color_texture_view: TextureView,
+    pub normal_texture: Texture,
+    pub normal_texture_view: TextureView,
     pub depth_texture: Texture,
     pub depth_texture_view: TextureView,
     pub color_bg: BindGroup,
@@ -30,6 +32,8 @@ impl RendererGlobalResources {
 
         let (color_texture, color_texture_view) =
             util::create_framebuffer_texture(device, options.size, util::FramebufferTextureKind::Color);
+        let (normal_texture, normal_texture_view) =
+            util::create_framebuffer_texture(device, options.size, util::FramebufferTextureKind::Normal);
         let (depth_texture, depth_texture_view) =
             util::create_framebuffer_texture(device, options.size, util::FramebufferTextureKind::Depth);
 
@@ -50,6 +54,8 @@ impl RendererGlobalResources {
             swapchain,
             color_texture,
             color_texture_view,
+            normal_texture,
+            normal_texture_view,
             depth_texture,
             depth_texture_view,
             color_bg,
@@ -83,12 +89,16 @@ impl RendererGlobalResources {
         if dirty.contains(DirtyResources::FRAMEBUFFER) {
             let (color_texture, color_texture_view) =
                 util::create_framebuffer_texture(device, new_options.size, util::FramebufferTextureKind::Color);
+            let (normal_texture, normal_texture_view) =
+                util::create_framebuffer_texture(device, new_options.size, util::FramebufferTextureKind::Normal);
             let (depth_texture, depth_texture_view) =
                 util::create_framebuffer_texture(device, new_options.size, util::FramebufferTextureKind::Depth);
             let color_bg = util::create_blit_bg(device, &self.blit_bgl, &color_texture_view, &self.sampler);
 
             self.color_texture = color_texture;
             self.color_texture_view = color_texture_view;
+            self.normal_texture = normal_texture;
+            self.normal_texture_view = normal_texture_view;
             self.depth_texture = depth_texture;
             self.depth_texture_view = depth_texture_view;
             self.color_bg = color_bg;

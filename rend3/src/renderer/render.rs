@@ -192,14 +192,24 @@ where
         let opaque_pass = renderer.opaque_pass.read();
 
         let mut rpass = encoder.begin_render_pass(&RenderPassDescriptor {
-            color_attachments: &[RenderPassColorAttachmentDescriptor {
-                attachment: &global_resources.color_texture_view,
-                ops: Operations {
-                    load: LoadOp::Clear(Color::GREEN),
-                    store: true,
+            color_attachments: &[
+                RenderPassColorAttachmentDescriptor {
+                    attachment: &global_resources.color_texture_view,
+                    ops: Operations {
+                        load: LoadOp::Clear(Color::BLACK),
+                        store: true,
+                    },
+                    resolve_target: None,
                 },
-                resolve_target: None,
-            }],
+                RenderPassColorAttachmentDescriptor {
+                    attachment: &global_resources.normal_texture_view,
+                    ops: Operations {
+                        load: LoadOp::Clear(Color::BLACK),
+                        store: true,
+                    },
+                    resolve_target: None,
+                },
+            ],
             depth_stencil_attachment: Some(RenderPassDepthStencilAttachmentDescriptor {
                 attachment: &global_resources.depth_texture_view,
                 depth_ops: Some(Operations {

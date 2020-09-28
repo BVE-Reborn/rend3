@@ -42,6 +42,7 @@ const BUFFER_RECALL_PRIORITY: u32 = 1;
 const MAIN_TASK_PRIORITY: u32 = 2;
 
 const INTERNAL_RENDERBUFFER_FORMAT: TextureFormat = TextureFormat::Rgba16Float;
+const INTERNAL_RENDERBUFFER_NORMAL_FORMAT: TextureFormat = TextureFormat::Rgba16Float;
 const INTERNAL_RENDERBUFFER_DEPTH_FORMAT: TextureFormat = TextureFormat::Depth32Float;
 const SWAPCHAIN_FORMAT: TextureFormat = TextureFormat::Bgra8UnormSrgb;
 

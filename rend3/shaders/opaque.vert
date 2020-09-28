@@ -11,9 +11,10 @@ layout(location = 3) in vec4 i_color;
 layout(location = 4) in uint i_material;
 
 layout(location = 0) out vec4 o_position;
-layout(location = 1) out vec2 o_coords;
-layout(location = 2) out vec4 o_color;
-layout(location = 3) flat out uint o_material;
+layout(location = 1) out vec3 o_normal;
+layout(location = 2) out vec2 o_coords;
+layout(location = 3) out vec4 o_color;
+layout(location = 4) flat out uint o_material;
 
 layout(set = 0, binding = 1, std430) restrict readonly buffer MaterialTranslationbuffer {
     uint material_translation[];
@@ -36,6 +37,8 @@ void main() {
 
     uint material = material_translation[data.material_translation_idx + i_material];
     o_material = material;
+
+    o_normal = data.inv_trans_model_view * i_normal;
 
     o_color = i_color;
 

@@ -1,5 +1,8 @@
 use crate::{
-    renderer::{INTERNAL_RENDERBUFFER_DEPTH_FORMAT, INTERNAL_RENDERBUFFER_FORMAT, SWAPCHAIN_FORMAT},
+    renderer::{
+        INTERNAL_RENDERBUFFER_DEPTH_FORMAT, INTERNAL_RENDERBUFFER_FORMAT, INTERNAL_RENDERBUFFER_NORMAL_FORMAT,
+        SWAPCHAIN_FORMAT,
+    },
     VSyncMode,
 };
 use std::num::NonZeroU8;
@@ -195,6 +198,7 @@ pub fn create_sampler(device: &Device) -> Sampler {
 pub enum FramebufferTextureKind {
     Color,
     Depth,
+    Normal,
 }
 
 pub fn create_framebuffer_texture(
@@ -206,6 +210,7 @@ pub fn create_framebuffer_texture(
         label: Some(match kind {
             FramebufferTextureKind::Color => "RenderBuffer Color Texture",
             FramebufferTextureKind::Depth => "RenderBuffer Depth Texture",
+            FramebufferTextureKind::Normal => "RenderBuffer Normal Texture",
         }),
         size: Extent3d {
             width: size.width,
@@ -217,6 +222,7 @@ pub fn create_framebuffer_texture(
         dimension: TextureDimension::D2,
         format: match kind {
             FramebufferTextureKind::Color => INTERNAL_RENDERBUFFER_FORMAT,
+            FramebufferTextureKind::Normal => INTERNAL_RENDERBUFFER_NORMAL_FORMAT,
             FramebufferTextureKind::Depth => INTERNAL_RENDERBUFFER_DEPTH_FORMAT,
         },
         usage: TextureUsage::SAMPLED | TextureUsage::OUTPUT_ATTACHMENT,
@@ -283,7 +289,7 @@ pub fn create_render_pipeline(
             entry_point: "main",
         }),
         rasterization_state: Some(RasterizationStateDescriptor {
-            front_face: FrontFace::Ccw,
+            front_face: FrontFace::Cw,
             cull_mode: CullMode::Back,
             clamp_depth: false,
             depth_bias: 0,
@@ -291,15 +297,26 @@ pub fn create_render_pipeline(
             depth_bias_clamp: 0.0,
         }),
         primitive_topology: PrimitiveTopology::TriangleList,
-        color_states: &[ColorStateDescriptor {
-            format: INTERNAL_RENDERBUFFER_FORMAT,
-            alpha_blend: BlendDescriptor::REPLACE,
-            color_blend: BlendDescriptor::REPLACE,
-            write_mask: match ty {
-                RenderPipelineType::Depth => ColorWrite::empty(),
-                RenderPipelineType::Opaque => ColorWrite::ALL,
+        color_states: &[
+            ColorStateDescriptor {
+                format: INTERNAL_RENDERBUFFER_FORMAT,
+                alpha_blend: BlendDescriptor::REPLACE,
+                color_blend: BlendDescriptor::REPLACE,
+                write_mask: match ty {
+                    RenderPipelineType::Depth => ColorWrite::empty(),
+                    RenderPipelineType::Opaque => ColorWrite::ALL,
+                },
             },
-        }],
+            ColorStateDescriptor {
+                format: INTERNAL_RENDERBUFFER_NORMAL_FORMAT,
+                alpha_blend: BlendDescriptor::REPLACE,
+                color_blend: BlendDescriptor::REPLACE,
+                write_mask: match ty {
+                    RenderPipelineType::Depth => ColorWrite::empty(),
+                    RenderPipelineType::Opaque => ColorWrite::ALL,
+                },
+            },
+        ],
         depth_stencil_state: Some(DepthStencilStateDescriptor {
             format: INTERNAL_RENDERBUFFER_DEPTH_FORMAT,
             depth_write_enabled: true,
