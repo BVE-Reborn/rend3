@@ -41,7 +41,7 @@ unsafe impl bytemuck::Zeroable for ModelVertex {}
 unsafe impl bytemuck::Pod for ModelVertex {}
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct AffineTransform {
     pub transform: Mat4,
 }
@@ -70,6 +70,7 @@ impl From<RendererTextureFormat> for wgpu::TextureFormat {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Mesh {
     pub vertices: Vec<ModelVertex>,
     pub indices: Vec<u32>,
@@ -77,6 +78,7 @@ pub struct Mesh {
     // TODO: Bones/joints/animation
 }
 
+#[derive(Debug, Clone)]
 pub struct Texture {
     pub data: Vec<u8>,
     pub format: RendererTextureFormat,
@@ -95,6 +97,7 @@ pub struct Texture {
 // - porosity, so I can do things like make things wet when it rains
 // - Maybe subsurface scattering radii? Or some kind of transmission value
 // - Index of Refraction for transparent things
+#[derive(Debug, Clone)]
 pub struct Material {
     pub color: Option<TextureHandle>,
     pub normal: Option<TextureHandle>,
@@ -102,6 +105,7 @@ pub struct Material {
     pub specular: Option<TextureHandle>,
 }
 
+#[derive(Debug, Clone)]
 pub struct Object {
     pub mesh: MeshHandle,
     pub materials: SmallVec<[MaterialHandle; 4]>,

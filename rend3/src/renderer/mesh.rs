@@ -9,8 +9,8 @@ use wgpu::{Buffer, BufferAddress, BufferDescriptor, BufferUsage, Device, Queue};
 const VERTEX_SIZE: usize = size_of::<ModelVertex>();
 const INDEX_SIZE: usize = size_of::<u32>();
 
-const STARTING_VERTICES: usize = 1 << 16;
-const STARTING_INDICES: usize = 1 << 18;
+const STARTING_VERTICES: usize = 1 << 20;
+const STARTING_INDICES: usize = 1 << 20;
 
 pub struct InternalMesh {
     pub vertex_range: Range<usize>,

@@ -129,15 +129,21 @@ fn load_resources(renderer: &Renderer) {
         }
     }
 
-    let mesh_handle = renderer.add_mesh(mesh);
+    let mesh_handle = renderer.add_mesh(mesh.clone());
 
-    renderer.add_object(Object {
-        mesh: mesh_handle,
-        materials,
-        transform: AffineTransform {
-            transform: Mat4::identity(),
-        },
-    });
+    for x in (-11..=11).step_by(4) {
+        for y in (-11..=11).step_by(4) {
+            for z in (0..=100).step_by(10) {
+                renderer.add_object(Object {
+                    mesh: mesh_handle,
+                    materials: materials.clone(),
+                    transform: AffineTransform {
+                        transform: Mat4::from_translation(Vec3::new(x as f32, y as f32, z as f32)),
+                    },
+                });
+            }
+        }
+    }
 }
 
 fn main() {
