@@ -184,7 +184,7 @@ fn main() {
         Switchyard::new(
             2,
             threads::double_pool_two_to_one(threads::thread_info(), Some("scene-viewer")),
-            || rend3::TLS::new().unwrap(),
+            || (),
         )
         .unwrap(),
     );
@@ -211,17 +211,11 @@ fn main() {
     rend3::span_transfer!(loading_span -> _);
     rend3::span_transfer!(main_thread_span -> _);
 
-    let mut handle = None;
     let mut timestamp = Instant::now();
     let mut frames = 0_usize;
 
     event_loop.run(move |event, _window_target, control| match event {
         Event::MainEventsCleared => {
-            if let Some(handle) = handle.take() {
-                rend3::span_transfer!(_ -> render_wait_span, INFO, "Waiting for render");
-                futures::executor::block_on(handle);
-            }
-
             frames += 1;
             let now = Instant::now();
             let elapsed = now - timestamp;
@@ -254,7 +248,10 @@ fn main() {
             rend3::span_transfer!(_ -> redraw_span, INFO, "Redraw");
 
             renderer.set_options(options.clone());
-            handle = Some(renderer.render())
+            let handle = renderer.render();
+
+            rend3::span_transfer!(redraw_span -> render_wait_span, INFO, "Waiting for render");
+            futures::executor::block_on(handle);
         }
         _ => {}
     })

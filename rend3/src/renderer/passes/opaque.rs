@@ -1,14 +1,10 @@
-use crate::{
-    renderer::{
-        material::MAX_MATERIALS,
-        shaders::{ShaderArguments, ShaderManager},
-        util,
-    },
-    TLS,
+use crate::renderer::{
+    material::MAX_MATERIALS,
+    shaders::{ShaderArguments, ShaderManager},
+    util,
 };
 use shaderc::ShaderKind;
-use std::{cell::RefCell, future::Future, sync::Arc};
-use switchyard::Switchyard;
+use std::{future::Future, sync::Arc};
 use tracing_futures::Instrument;
 use wgpu::{BindGroupLayout, Buffer, Device, RenderPass, RenderPipeline, ShaderModule};
 
@@ -18,43 +14,31 @@ pub struct OpaquePass {
     fragment: Arc<ShaderModule>,
 }
 impl OpaquePass {
-    pub fn new<'a, TLD>(
-        device: &'a Arc<Device>,
-        yard: &Switchyard<RefCell<TLD>>,
-        shader_manager: &Arc<ShaderManager>,
+    pub fn new<'a>(
+        device: &'a Device,
+        shader_manager: &ShaderManager,
         input_bgl: &BindGroupLayout,
         output_noindirect_bgl: &BindGroupLayout,
         material_bgl: &BindGroupLayout,
         texture_bgl: &BindGroupLayout,
         uniform_bgl: &BindGroupLayout,
-    ) -> impl Future<Output = Self> + 'a
-    where
-        TLD: AsMut<TLS> + 'static,
-    {
+    ) -> impl Future<Output = Self> + 'a {
         let new_span = tracing::warn_span!("Creating OpaquePass");
         let new_span_guard = new_span.enter();
 
-        let vertex = shader_manager.compile_shader(
-            &yard,
-            Arc::clone(device),
-            ShaderArguments {
-                file: String::from("rend3/shaders/opaque.vert"),
-                defines: vec![],
-                kind: ShaderKind::Vertex,
-                debug: cfg!(debug_assertions),
-            },
-        );
+        let vertex = shader_manager.compile_shader(ShaderArguments {
+            file: String::from("rend3/shaders/opaque.vert"),
+            defines: vec![],
+            kind: ShaderKind::Vertex,
+            debug: cfg!(debug_assertions),
+        });
 
-        let fragment = shader_manager.compile_shader(
-            &yard,
-            Arc::clone(device),
-            ShaderArguments {
-                file: String::from("rend3/shaders/opaque.frag"),
-                defines: vec![(String::from("MATERIAL_COUNT"), Some(MAX_MATERIALS.to_string()))],
-                kind: ShaderKind::Fragment,
-                debug: cfg!(debug_assertions),
-            },
-        );
+        let fragment = shader_manager.compile_shader(ShaderArguments {
+            file: String::from("rend3/shaders/opaque.frag"),
+            defines: vec![(String::from("MATERIAL_COUNT"), Some(MAX_MATERIALS.to_string()))],
+            kind: ShaderKind::Fragment,
+            debug: cfg!(debug_assertions),
+        });
 
         let layout = util::create_render_pipeline_layout(
             device,

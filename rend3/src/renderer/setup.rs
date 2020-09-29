@@ -13,25 +13,22 @@ use crate::{
         texture::TextureManager,
         Renderer, SWAPCHAIN_FORMAT,
     },
-    RendererInitializationError, RendererOptions, TLS,
+    RendererInitializationError, RendererOptions,
 };
 use parking_lot::{Mutex, RwLock};
 use raw_window_handle::HasRawWindowHandle;
-use std::{cell::RefCell, sync::Arc};
+use std::sync::Arc;
 use switchyard::Switchyard;
 use wgpu::{BackendBit, DeviceDescriptor, Instance, PowerPreference, RequestAdapterOptions};
 use wgpu_conveyor::{AutomatedBufferManager, UploadStyle};
 
-pub async fn create_renderer<W: HasRawWindowHandle, TLD>(
+pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
     window: &W,
-    yard: Arc<Switchyard<RefCell<TLD>>>,
+    yard: Arc<Switchyard<TLD>>,
     imgui: &mut imgui::Context,
     options: RendererOptions,
-) -> Result<Arc<Renderer<TLD>>, RendererInitializationError>
-where
-    TLD: AsMut<TLS> + 'static,
-{
-    let instance = Instance::new(BackendBit::PRIMARY);
+) -> Result<Arc<Renderer<TLD>>, RendererInitializationError> {
+    let instance = Instance::new(BackendBit::VULKAN);
 
     let surface = unsafe { instance.create_surface(window) };
 
@@ -61,13 +58,12 @@ where
 
     let device = Arc::new(device);
 
-    let shader_manager = ShaderManager::new();
+    let shader_manager = ShaderManager::new(Arc::clone(&device));
     let mut global_resources = RwLock::new(RendererGlobalResources::new(&device, &surface, &options));
     let global_resource_guard = global_resources.get_mut();
 
     let culling_pass = passes::CullingPass::new(
         &device,
-        &yard,
         &shader_manager,
         &global_resource_guard.object_input_bgl,
         &global_resource_guard.object_output_bgl,
@@ -77,7 +73,6 @@ where
 
     let swapchain_blit_pass = passes::BlitPass::new(
         &device,
-        &yard,
         &shader_manager,
         &global_resource_guard.blit_bgl,
         SWAPCHAIN_FORMAT,
@@ -88,7 +83,6 @@ where
 
     let depth_pass = passes::DepthPass::new(
         &device,
-        &yard,
         &shader_manager,
         &global_resource_guard.object_input_bgl,
         &global_resource_guard.object_output_noindirect_bgl,
@@ -99,7 +93,6 @@ where
 
     let opaque_pass = passes::OpaquePass::new(
         &device,
-        &yard,
         &shader_manager,
         &global_resource_guard.object_input_bgl,
         &global_resource_guard.object_output_noindirect_bgl,

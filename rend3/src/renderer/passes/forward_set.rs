@@ -2,7 +2,7 @@ use crate::{
     renderer::{
         camera::Camera, passes, passes::CullingPassData, resources::RendererGlobalResources, uniforms::WrappedUniform,
     },
-    Renderer, TLS,
+    Renderer,
 };
 use std::sync::Arc;
 use wgpu::{BindGroup, BindGroupLayout, Buffer, ComputePass, Device, RenderPass};
@@ -24,16 +24,13 @@ impl ForwardPassSet {
         ForwardPassSet { uniform, name }
     }
 
-    pub fn prepare<TLD>(
+    pub fn prepare<TLD: 'static>(
         &self,
         renderer: &Arc<Renderer<TLD>>,
         global_resources: &RendererGlobalResources,
         camera: &Camera,
         object_count: usize,
-    ) -> ForwardPassSetData
-    where
-        TLD: AsMut<TLS> + 'static,
-    {
+    ) -> ForwardPassSetData {
         span_transfer!(_ -> prepare_span, WARN, "Preparing ForwardPassSet");
 
         self.uniform.upload(&renderer.queue, &camera);

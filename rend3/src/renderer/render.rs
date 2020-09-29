@@ -2,7 +2,7 @@ use crate::{
     instruction::Instruction,
     renderer::{BUFFER_RECALL_PRIORITY, COMPUTE_POOL},
     statistics::RendererStatistics,
-    Renderer, TLS,
+    Renderer,
 };
 use std::{future::Future, sync::Arc};
 use tracing_futures::Instrument;
@@ -12,10 +12,7 @@ use wgpu::{
     TextureDescriptor, TextureDimension, TextureUsage, TextureViewDescriptor,
 };
 
-pub fn render_loop<TLD>(renderer: Arc<Renderer<TLD>>) -> impl Future<Output = RendererStatistics>
-where
-    TLD: AsMut<TLS> + 'static,
-{
+pub fn render_loop<TLD: 'static>(renderer: Arc<Renderer<TLD>>) -> impl Future<Output = RendererStatistics> {
     span_transfer!(_ -> render_create_span, INFO, "Render Loop Creation");
 
     // blocks, do it before we async

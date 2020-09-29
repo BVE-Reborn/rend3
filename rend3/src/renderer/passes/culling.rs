@@ -1,10 +1,6 @@
-use crate::{
-    renderer::shaders::{ShaderArguments, ShaderManager},
-    TLS,
-};
+use crate::renderer::shaders::{ShaderArguments, ShaderManager};
 use shaderc::ShaderKind;
-use std::{cell::RefCell, future::Future, sync::Arc};
-use switchyard::Switchyard;
+use std::future::Future;
 use tracing_futures::Instrument;
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindingResource, Buffer, BufferAddress,
@@ -30,31 +26,23 @@ pub struct CullingPass {
     subgroup_size: u32,
 }
 impl CullingPass {
-    pub fn new<'a, TLD>(
-        device: &'a Arc<Device>,
-        yard: &Switchyard<RefCell<TLD>>,
-        shader_manager: &Arc<ShaderManager>,
+    pub fn new<'a>(
+        device: &'a Device,
+        shader_manager: &ShaderManager,
         input_bgl: &BindGroupLayout,
         output_bgl: &BindGroupLayout,
         uniform_bgl: &BindGroupLayout,
         subgroup_size: u32,
-    ) -> impl Future<Output = Self> + 'a
-    where
-        TLD: AsMut<TLS> + 'static,
-    {
+    ) -> impl Future<Output = Self> + 'a {
         let new_span = tracing::warn_span!("Creating CullingPass");
         let new_span_guard = new_span.enter();
 
-        let shader = shader_manager.compile_shader(
-            &yard,
-            Arc::clone(device),
-            ShaderArguments {
-                file: String::from("rend3/shaders/cull.comp"),
-                defines: vec![(String::from("WARP_SIZE"), Some(subgroup_size.to_string()))],
-                kind: ShaderKind::Compute,
-                debug: cfg!(debug_assertions),
-            },
-        );
+        let shader = shader_manager.compile_shader(ShaderArguments {
+            file: String::from("rend3/shaders/cull.comp"),
+            defines: vec![(String::from("WARP_SIZE"), Some(subgroup_size.to_string()))],
+            kind: ShaderKind::Compute,
+            debug: cfg!(debug_assertions),
+        });
 
         let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: Some("culling pipeline layout"),

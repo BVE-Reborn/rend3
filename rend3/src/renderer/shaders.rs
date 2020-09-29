@@ -1,23 +1,17 @@
-use crate::{
-    renderer::{COMPUTE_POOL, SHADER_COMPILE_PRIORITY},
-    ShaderError, TLS,
-};
+use crate::ShaderError;
 use fnv::FnvBuildHasher;
-use futures::future::{ready, Either};
-use parking_lot::Mutex;
-use shaderc::{CompileOptions, OptimizationLevel, ResolvedInclude, ShaderKind, SourceLanguage, TargetEnv};
+use shaderc::{CompileOptions, Compiler, OptimizationLevel, ResolvedInclude, ShaderKind, SourceLanguage, TargetEnv};
+use std::thread::JoinHandle;
 use std::{
     borrow::Cow,
-    cell::RefCell,
     collections::HashMap,
     future::Future,
     hash::{Hash, Hasher},
     mem::discriminant,
     path::Path,
     sync::Arc,
+    thread,
 };
-use switchyard::Switchyard;
-use tracing_futures::Instrument;
 use wgpu::{Device, ShaderModule, ShaderModuleSource};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -46,97 +40,116 @@ impl Hash for ShaderArguments {
 pub type ShaderCompileResult = Result<Arc<ShaderModule>, ShaderError>;
 
 pub struct ShaderManager {
-    cache: Mutex<HashMap<ShaderArguments, Arc<ShaderModule>, FnvBuildHasher>>,
+    shader_thread: Option<JoinHandle<()>>,
+    sender: flume::Sender<CompileCommand>,
 }
 impl ShaderManager {
-    pub fn new() -> Arc<Self> {
-        let cache = Mutex::new(HashMap::with_hasher(FnvBuildHasher::default()));
+    pub fn new(device: Arc<Device>) -> Self {
+        let (sender, receiver) = flume::unbounded();
 
-        Arc::new(Self { cache })
+        let shader_thread = Some(
+            thread::Builder::new()
+                .name("rend3 shader-compilation".into())
+                .spawn(move || compile_shader_loop(device, receiver))
+                .unwrap(),
+        );
+
+        Self { shader_thread, sender }
     }
 
-    pub fn compile_shader<TLD>(
-        self: &Arc<Self>,
-        yard: &Switchyard<RefCell<TLD>>,
-        device: Arc<Device>,
-        args: ShaderArguments,
-    ) -> impl Future<Output = ShaderCompileResult>
-    where
-        TLD: AsMut<TLS> + 'static,
-    {
-        if let Some(module) = self.cache.lock().get(&args) {
-            return Either::Left(ready(Ok(Arc::clone(module))));
-        }
+    pub fn compile_shader(&self, args: ShaderArguments) -> impl Future<Output = ShaderCompileResult> {
+        let (sender, receiver) = flume::bounded(1);
 
-        let span = tracing::warn_span!("Compiling Shader", ?args);
+        self.sender.send(CompileCommand::Compile(args, sender)).unwrap();
 
-        let this = Arc::clone(self);
+        async move { receiver.recv_async().await.unwrap() }
+    }
+}
 
-        Either::Right(yard.spawn_local(COMPUTE_POOL, SHADER_COMPILE_PRIORITY, move |tls| {
-            async move {
-                span_transfer!(_ -> file_span, WARN, "Loading File");
+impl Drop for ShaderManager {
+    fn drop(&mut self) {
+        self.sender.send(CompileCommand::Stop).unwrap();
+        self.shader_thread.take().unwrap().join().unwrap();
+    }
+}
 
-                let contents =
-                    std::fs::read_to_string(&args.file).map_err(|e| ShaderError::FileError(e, args.clone()))?;
+#[derive(Debug, Clone)]
+enum CompileCommand {
+    Compile(ShaderArguments, flume::Sender<ShaderCompileResult>),
+    Stop,
+}
 
-                span_transfer!(file_span -> compile_span, WARN, "Shader Compilation");
+fn compile_shader_loop(device: Arc<Device>, receiver: flume::Receiver<CompileCommand>) {
+    let mut compiler = shaderc::Compiler::new().unwrap();
+    let mut cache = HashMap::with_hasher(FnvBuildHasher::default());
 
-                let mut options = CompileOptions::new().unwrap();
-                options.set_generate_debug_info();
-                options.set_source_language(SourceLanguage::GLSL);
-                options.set_target_env(TargetEnv::Vulkan, 0);
-                options.set_optimization_level(match args.debug {
-                    true => OptimizationLevel::Zero,
-                    false => OptimizationLevel::Performance,
-                });
-                for (key, value) in &args.defines {
-                    options.add_macro_definition(&key, value.as_deref());
-                }
-                options.set_include_callback(|include, _ty, src, _depth| {
-                    let path = Path::new(src)
-                        .parent()
-                        .ok_or_else(|| {
-                            format!(
-                                "Cannot find include <{}> relative to file {} as there is no parent directory",
-                                include, src
-                            )
-                        })?
-                        .join(Path::new(include))
-                        .canonicalize()
-                        .map_err(|_| {
-                            format!("Failed to canonicalize include <{}> relative to file {}", include, src)
-                        })?;
-                    let contents = std::fs::read_to_string(&path)
-                        .map_err(|e| format!("Error while loading include <{}> from file {}: {}", include, src, e))?;
-                    Ok(ResolvedInclude {
-                        resolved_name: path.to_string_lossy().to_string(),
-                        content: contents,
-                    })
-                });
+    while let Ok(command) = receiver.recv() {
+        match command {
+            CompileCommand::Compile(args, sender) => {
+                let result = if let Some(module) = cache.get(&args) {
+                    Ok(Arc::clone(module))
+                } else {
+                    let result = compile_shader(&mut compiler, &device, &args);
+                    if let Ok(ref module) = result {
+                        cache.insert(args, Arc::clone(module));
+                    }
+                    result
+                };
 
-                let mut tls_borrow = tls.borrow_mut();
-                let tls = tls_borrow.as_mut();
-
-                let binary = tls
-                    .shader_compiler
-                    .compile_into_spirv(&contents, args.kind, &args.file, "main", Some(&options))
-                    .map_err(|e| ShaderError::CompileError(e, args.clone()))?;
-
-                drop(tls_borrow);
-
-                let bytes = binary.as_binary();
-
-                span_transfer!(compile_span -> module_create_span, WARN, "Create Shader Module");
-
-                let module = Arc::new(device.create_shader_module(ShaderModuleSource::SpirV(Cow::Borrowed(bytes))));
-
-                span_transfer!(module_create_span -> cache_guard, WARN, "Add to cache");
-
-                this.cache.lock().insert(args, Arc::clone(&module));
-
-                Ok(module)
+                sender.send(result).unwrap();
             }
-            .instrument(span)
-        }))
+            CompileCommand::Stop => return,
+        }
     }
+}
+
+fn compile_shader(compiler: &mut Compiler, device: &Device, args: &ShaderArguments) -> ShaderCompileResult {
+    span_transfer!(_ -> file_span, WARN, "Loading File");
+
+    let contents = std::fs::read_to_string(&args.file).map_err(|e| ShaderError::FileError(e, args.clone()))?;
+
+    span_transfer!(file_span -> compile_span, WARN, "Shader Compilation");
+
+    let mut options = CompileOptions::new().unwrap();
+    options.set_generate_debug_info();
+    options.set_source_language(SourceLanguage::GLSL);
+    options.set_target_env(TargetEnv::Vulkan, 0);
+    options.set_optimization_level(match args.debug {
+        true => OptimizationLevel::Zero,
+        false => OptimizationLevel::Performance,
+    });
+    for (key, value) in &args.defines {
+        options.add_macro_definition(&key, value.as_deref());
+    }
+    options.set_include_callback(|include, _ty, src, _depth| {
+        let path = Path::new(src)
+            .parent()
+            .ok_or_else(|| {
+                format!(
+                    "Cannot find include <{}> relative to file {} as there is no parent directory",
+                    include, src
+                )
+            })?
+            .join(Path::new(include))
+            .canonicalize()
+            .map_err(|_| format!("Failed to canonicalize include <{}> relative to file {}", include, src))?;
+        let contents = std::fs::read_to_string(&path)
+            .map_err(|e| format!("Error while loading include <{}> from file {}: {}", include, src, e))?;
+        Ok(ResolvedInclude {
+            resolved_name: path.to_string_lossy().to_string(),
+            content: contents,
+        })
+    });
+
+    let binary = compiler
+        .compile_into_spirv(&contents, args.kind, &args.file, "main", Some(&options))
+        .map_err(|e| ShaderError::CompileError(e, args.clone()))?;
+
+    let bytes = binary.as_binary();
+
+    span_transfer!(compile_span -> module_create_span, WARN, "Create Shader Module");
+
+    let module = Arc::new(device.create_shader_module(ShaderModuleSource::SpirV(Cow::Borrowed(bytes))));
+
+    Ok(module)
 }

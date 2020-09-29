@@ -8,11 +8,11 @@ use crate::{
         passes::ForwardPassSet, resources::RendererGlobalResources, shaders::ShaderManager, texture::TextureManager,
     },
     statistics::RendererStatistics,
-    RendererInitializationError, RendererOptions, TLS,
+    RendererInitializationError, RendererOptions,
 };
 use parking_lot::{Mutex, RwLock};
 use raw_window_handle::HasRawWindowHandle;
-use std::{cell::RefCell, future::Future, sync::Arc};
+use std::{future::Future, sync::Arc};
 use switchyard::{JoinHandle, Switchyard};
 use wgpu::{Device, Queue, Surface, TextureFormat};
 use wgpu_conveyor::AutomatedBufferManager;
@@ -37,20 +37,19 @@ mod uniforms;
 
 const COMPUTE_POOL: u8 = 0;
 
-const SHADER_COMPILE_PRIORITY: u32 = 0;
-const BUFFER_RECALL_PRIORITY: u32 = 1;
-const MAIN_TASK_PRIORITY: u32 = 2;
+const BUFFER_RECALL_PRIORITY: u32 = 0;
+const MAIN_TASK_PRIORITY: u32 = 1;
 
 const INTERNAL_RENDERBUFFER_FORMAT: TextureFormat = TextureFormat::Rgba16Float;
 const INTERNAL_RENDERBUFFER_NORMAL_FORMAT: TextureFormat = TextureFormat::Rgba16Float;
 const INTERNAL_RENDERBUFFER_DEPTH_FORMAT: TextureFormat = TextureFormat::Depth32Float;
 const SWAPCHAIN_FORMAT: TextureFormat = TextureFormat::Bgra8UnormSrgb;
 
-pub struct Renderer<TLD = TLS>
+pub struct Renderer<TLD = ()>
 where
-    TLD: AsMut<TLS> + 'static,
+    TLD: 'static,
 {
-    yard: Arc<Switchyard<RefCell<TLD>>>,
+    yard: Arc<Switchyard<TLD>>,
     instructions: InstructionStreamPair,
 
     _adapter_info: ExtendedAdapterInfo,
@@ -60,7 +59,7 @@ where
 
     buffer_manager: Mutex<AutomatedBufferManager>,
     global_resources: RwLock<RendererGlobalResources>,
-    _shader_manager: Arc<ShaderManager>,
+    _shader_manager: ShaderManager,
     mesh_manager: RwLock<MeshManager>,
     texture_manager: RwLock<TextureManager>,
     material_manager: RwLock<MaterialManager>,
@@ -77,13 +76,10 @@ where
 
     options: RwLock<RendererOptions>,
 }
-impl<TLD> Renderer<TLD>
-where
-    TLD: AsMut<TLS> + 'static,
-{
+impl<TLD: 'static> Renderer<TLD> {
     pub fn new<'a, W: HasRawWindowHandle>(
         window: &'a W,
-        yard: Arc<Switchyard<RefCell<TLD>>>,
+        yard: Arc<Switchyard<TLD>>,
         imgui_context: &'a mut imgui::Context,
         options: RendererOptions,
     ) -> impl Future<Output = Result<Arc<Self>, RendererInitializationError>> + 'a {
