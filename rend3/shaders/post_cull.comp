@@ -7,13 +7,19 @@ layout(local_size_x = WARP_SIZE) in;
 layout(set = 0, binding = 0, std430) restrict readonly buffer ObjectInputDataBuffer {
     ObjectInputData object_input[];
 };
-layout(set = 1, binding = 0, std430) restrict writeonly buffer ObjectOutputDataBuffer {
+layout(set = 1, binding = 0, std430) restrict readonly buffer IndexBuffer {
+    uint object_index[];
+};
+layout(set = 1, binding = 1, std430) restrict readonly buffer StatusBuffer {
+    bool status[];
+};
+layout(set = 1, binding = 2, std430) restrict writeonly buffer ObjectOutputDataBuffer {
     ObjectOutputData object_output[];
 };
-layout(set = 1, binding = 1, std430) restrict writeonly buffer IndirectBuffer {
+layout(set = 1, binding = 3, std430) restrict writeonly buffer IndirectBuffer {
     IndirectCall indirect_call[];
 };
-layout(set = 1, binding = 2, std430) restrict buffer IndirectCountBuffer {
+layout(set = 1, binding = 4, std430) restrict buffer IndirectCountBuffer {
     uint indirect_counter;
 };
 layout(set = 2, binding = 0) uniform UniformBuffer {
@@ -30,14 +36,23 @@ void main() {
         return;
     }
 
+    uint output_idx = object_index[input_idx];
+
+    if (input_idx == object_count - 1) {
+        indirect_counter = output_idx;
+    }
+
+    if (!status[input_idx]) {
+        return;
+    }
+
     ObjectInputData in_data = object_input[input_idx];
 
     ObjectOutputData out_data;
+
     out_data.model_view_proj = uniforms.view_proj * in_data.transform;
     out_data.inv_trans_model_view = inverse(transpose(mat3(uniforms.view * in_data.transform)));
     out_data.material_translation_idx = in_data.material_translation_idx;
-
-    uint output_idx = atomicAdd(indirect_counter, 1);
 
     object_output[output_idx] = out_data;
 

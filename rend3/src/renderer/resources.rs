@@ -18,6 +18,8 @@ pub struct RendererGlobalResources {
     pub camera: Camera,
 
     pub blit_bgl: BindGroupLayout,
+    pub prefix_sum_bgl: BindGroupLayout,
+    pub pre_cull_bgl: BindGroupLayout,
     pub object_input_bgl: BindGroupLayout,
     pub object_output_bgl: BindGroupLayout,
     pub object_output_noindirect_bgl: BindGroupLayout,
@@ -40,6 +42,8 @@ impl RendererGlobalResources {
         let camera = Camera::new(options.size.width as f32 / options.size.height as f32);
 
         let blit_bgl = util::create_blit_bgl(device);
+        let prefix_sum_bgl = util::create_prefix_sum_bgl(device);
+        let pre_cull_bgl = util::create_pre_cull_bgl(device);
         let object_input_bgl = util::create_object_input_bgl(device);
         let object_output_bgl = util::create_object_output_bgl(device);
         let object_output_noindirect_bgl = util::create_object_output_noindirect_bgl(device);
@@ -61,6 +65,8 @@ impl RendererGlobalResources {
             color_bg,
             camera,
             blit_bgl,
+            prefix_sum_bgl,
+            pre_cull_bgl,
             object_input_bgl,
             object_output_bgl,
             object_output_noindirect_bgl,

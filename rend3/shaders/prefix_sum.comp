@@ -1,0 +1,33 @@
+#version 450
+
+#include "structures.glsl"
+
+layout(local_size_x = WARP_SIZE) in;
+
+layout(set = 0, binding = 0, std430) restrict readonly buffer Input {
+    uint input_values[];
+};
+layout(set = 0, binding = 1, std430) restrict writeonly buffer Output {
+    uint output_values[];
+};
+layout(push_constant) uniform Uniforms {
+    uint stride;
+    uint max_objects;
+};
+
+void main() {
+    uint my_idx = gl_GlobalInvocationID.x;
+
+    if ( my_idx >= max_objects) {
+        return;
+    }
+
+    if (my_idx < stride) {
+        output_values[my_idx] = input_values[my_idx];
+        return;
+    }
+
+    uint other_idx = my_idx - stride;
+
+    output_values[my_idx] = input_values[my_idx] + input_values[other_idx];
+}

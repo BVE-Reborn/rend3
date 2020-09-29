@@ -11,6 +11,7 @@ struct ObjectOutputData {
     mat4 model_view_proj;
     mat3 inv_trans_model_view;
     uint material_translation_idx;
+    bool activ;
 };
 
 struct IndirectCall {

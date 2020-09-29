@@ -65,6 +65,8 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
     let culling_pass = passes::CullingPass::new(
         &device,
         &shader_manager,
+        &global_resource_guard.prefix_sum_bgl,
+        &global_resource_guard.pre_cull_bgl,
         &global_resource_guard.object_input_bgl,
         &global_resource_guard.object_output_bgl,
         &global_resource_guard.uniform_bgl,

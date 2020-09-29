@@ -1,0 +1,32 @@
+#version 450
+
+#include "structures.glsl"
+
+layout(local_size_x = WARP_SIZE) in;
+
+layout(set = 0, binding = 0, std430) restrict readonly buffer ObjectInputDataBuffer {
+    ObjectInputData object_input[];
+};
+layout(set = 1, binding = 0, std430) restrict writeonly buffer IndexBuffer {
+    uint object_index[];
+};
+layout(set = 1, binding = 1, std430) restrict writeonly buffer StatusBuffer {
+    bool status[];
+};
+layout(push_constant) uniform PushConstants {
+    uint object_count;
+};
+
+void main() {
+    uint input_idx = gl_GlobalInvocationID.x;
+
+    if (input_idx >= object_count) {
+        return;
+    }
+
+    // TODO: Cull
+
+    uint add_value = input_idx == 0 ? 0 : 1;
+    object_index[input_idx] = add_value;
+    status[input_idx] = true;
+}

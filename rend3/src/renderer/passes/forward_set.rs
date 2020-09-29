@@ -37,6 +37,8 @@ impl ForwardPassSet {
 
         let culling_pass_data = renderer.culling_pass.prepare(
             &renderer.device,
+            &global_resources.prefix_sum_bgl,
+            &global_resources.pre_cull_bgl,
             &global_resources.object_output_bgl,
             &global_resources.object_output_noindirect_bgl,
             object_count as u32,

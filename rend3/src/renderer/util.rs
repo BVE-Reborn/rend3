@@ -34,6 +34,34 @@ pub fn create_swapchain(device: &Device, surface: &Surface, size: PhysicalSize<u
     )
 }
 
+pub fn create_prefix_sum_bgl(device: &Device) -> BindGroupLayout {
+    device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+        label: Some("prefix sum bgl"),
+        entries: &[
+            BindGroupLayoutEntry {
+                binding: 0,
+                visibility: ShaderStage::COMPUTE,
+                ty: BindingType::StorageBuffer {
+                    dynamic: false,
+                    min_binding_size: None,
+                    readonly: true,
+                },
+                count: None,
+            },
+            BindGroupLayoutEntry {
+                binding: 1,
+                visibility: ShaderStage::COMPUTE,
+                ty: BindingType::StorageBuffer {
+                    dynamic: false,
+                    min_binding_size: None,
+                    readonly: false,
+                },
+                count: None,
+            },
+        ],
+    })
+}
+
 pub fn create_blit_bgl(device: &Device) -> BindGroupLayout {
     device.create_bind_group_layout(&BindGroupLayoutDescriptor {
         label: Some("blit bgl"),
@@ -80,6 +108,24 @@ pub fn create_blit_bg(
     })
 }
 
+pub fn create_pre_cull_bgl(device: &Device) -> BindGroupLayout {
+    let entry = BindGroupLayoutEntry {
+        binding: 0,
+        visibility: ShaderStage::COMPUTE,
+        ty: BindingType::StorageBuffer {
+            dynamic: false,
+            min_binding_size: None,
+            readonly: false,
+        },
+        count: None,
+    };
+
+    device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+        label: Some("pre-cull bgl"),
+        entries: &[entry.clone(), BindGroupLayoutEntry { binding: 1, ..entry }],
+    })
+}
+
 pub fn create_object_input_bgl(device: &Device) -> BindGroupLayout {
     device.create_bind_group_layout(&BindGroupLayoutDescriptor {
         label: Some("object input bgl"),
@@ -111,11 +157,11 @@ pub fn create_object_input_bgl(device: &Device) -> BindGroupLayout {
 pub fn create_object_output_bgl(device: &Device) -> BindGroupLayout {
     let entry = BindGroupLayoutEntry {
         binding: 0,
-        visibility: ShaderStage::VERTEX | ShaderStage::COMPUTE,
+        visibility: ShaderStage::COMPUTE,
         ty: BindingType::StorageBuffer {
             dynamic: false,
             min_binding_size: None,
-            readonly: false,
+            readonly: true,
         },
         count: None,
     };
@@ -128,7 +174,15 @@ pub fn create_object_output_bgl(device: &Device) -> BindGroupLayout {
                 binding: 1,
                 ..entry.clone()
             },
-            BindGroupLayoutEntry { binding: 2, ..entry },
+            BindGroupLayoutEntry {
+                binding: 2,
+                ..entry.clone()
+            },
+            BindGroupLayoutEntry {
+                binding: 3,
+                ..entry.clone()
+            },
+            BindGroupLayoutEntry { binding: 4, ..entry },
         ],
     })
 }

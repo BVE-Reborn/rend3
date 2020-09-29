@@ -33,7 +33,7 @@ const REQUIRED_LIMITS: Limits = Limits {
     max_dynamic_storage_buffers_per_pipeline_layout: 0,
     max_sampled_textures_per_shader_stage: 128,
     max_samplers_per_shader_stage: 1,
-    max_storage_buffers_per_shader_stage: 3,
+    max_storage_buffers_per_shader_stage: 5,
     max_storage_textures_per_shader_stage: 0,
     max_uniform_buffers_per_shader_stage: 1,
     max_uniform_buffer_binding_size: MAX_UNIFORM_BUFFER_BINDING_SIZE as u32,
