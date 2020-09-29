@@ -6,6 +6,7 @@ struct ObjectInputData {
     mat4 transform;
 };
 
+/// If you change this struct, change the object output size in culling.rs
 struct ObjectOutputData {
     mat4 model_view_proj;
     mat3 inv_trans_model_view;

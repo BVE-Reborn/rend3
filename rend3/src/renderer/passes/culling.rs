@@ -12,7 +12,7 @@ use wgpu::{
     PipelineLayoutDescriptor, ProgrammableStageDescriptor, PushConstantRange, ShaderStage,
 };
 
-const SIZE_OF_OUTPUT_DATA: BufferAddress = 7 * 16;
+const SIZE_OF_OUTPUT_DATA: BufferAddress = 8 * 16;
 const SIZE_OF_INDIRECT_CALL: BufferAddress = 5 * 4;
 const SIZE_OF_INDIRECT_COUNT: BufferAddress = 4;
 
