@@ -1,9 +1,24 @@
+struct Plane {
+    vec4 inner;
+};
+
+struct Frustum {
+    Plane left;
+    Plane right;
+    Plane top;
+    Plane bottom;
+// No far plane
+    Plane near;
+};
+
 struct ObjectInputData {
     uint start_idx;
     uint count;
     int vertex_offset;
     uint material_translation_idx;
     mat4 transform;
+    // xyz position; w radius
+    vec4 bounding_sphere;
 };
 
 /// If you change this struct, change the object output size in culling.rs
@@ -32,5 +47,6 @@ struct MaterialData {
 struct UniformData {
     mat4 view;
     mat4 view_proj;
+    Frustum frustum;
 };
 

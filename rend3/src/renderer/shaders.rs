@@ -1,7 +1,6 @@
 use crate::ShaderError;
 use fnv::FnvBuildHasher;
 use shaderc::{CompileOptions, Compiler, OptimizationLevel, ResolvedInclude, ShaderKind, SourceLanguage, TargetEnv};
-use std::thread::JoinHandle;
 use std::{
     borrow::Cow,
     collections::HashMap,
@@ -11,6 +10,7 @@ use std::{
     path::Path,
     sync::Arc,
     thread,
+    thread::JoinHandle,
 };
 use wgpu::{Device, ShaderModule, ShaderModuleSource};
 

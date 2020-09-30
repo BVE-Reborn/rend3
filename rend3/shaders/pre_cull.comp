@@ -13,9 +13,29 @@ layout(set = 1, binding = 0, std430) restrict writeonly buffer IndexBuffer {
 layout(set = 1, binding = 1, std430) restrict writeonly buffer StatusBuffer {
     bool status[];
 };
+layout(set = 2, binding = 0) uniform UniformBuffer {
+    UniformData uniforms;
+};
 layout(push_constant) uniform PushConstants {
     uint object_count;
 };
+
+float plane_distance(Plane plane, vec3 location) {
+    return dot(plane.inner.xyz, location) + plane.inner.w;
+}
+
+bool frustum_contains_sphere(Frustum frustum, vec4 sphere) {
+    vec3 location = sphere.xyz;
+    float neg_radius = -sphere.w;
+
+    bool left = plane_distance(frustum.left, location) >= neg_radius;
+    bool right = plane_distance(frustum.right, location) >= neg_radius;
+    bool top = plane_distance(frustum.top, location) >= neg_radius;
+    bool bottom = plane_distance(frustum.bottom, location) >= neg_radius;
+    bool near = plane_distance(frustum.near, location) >= neg_radius;
+
+    return left && right && top && bottom && near;
+}
 
 void main() {
     uint input_idx = gl_GlobalInvocationID.x;
@@ -24,9 +44,16 @@ void main() {
         return;
     }
 
-    // TODO: Cull
+    ObjectInputData data = object_input[input_idx];
 
-    uint add_value = input_idx == 0 ? 0 : 1;
+    mat4 model_view = uniforms.view * data.transform;
+    /// TODO: Deal with scale
+    vec3 mesh_center = (model_view * vec4(data.bounding_sphere.xyz, 1.0)).xyz;
+    float mesh_radius = data.bounding_sphere.w;
+
+    bool visible = frustum_contains_sphere(uniforms.frustum, vec4(mesh_center, mesh_radius));
+
+    uint add_value = input_idx == 0 ? 0 : uint(visible);
     object_index[input_idx] = add_value;
-    status[input_idx] = true;
+    status[input_idx] = visible;
 }

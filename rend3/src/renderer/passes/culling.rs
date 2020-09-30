@@ -69,7 +69,7 @@ impl CullingPass {
 
         let pre_cull_pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: Some("pre-cull pipeline layout"),
-            bind_group_layouts: &[input_bgl, pre_cull_bgl],
+            bind_group_layouts: &[input_bgl, pre_cull_bgl, uniform_bgl],
             push_constant_ranges: &[PushConstantRange {
                 range: 0..4,
                 stages: ShaderStage::COMPUTE,
@@ -310,6 +310,7 @@ impl CullingPass {
         cpass.set_push_constants(0, &[data.object_count]);
         cpass.set_bind_group(0, input_bg, &[]);
         cpass.set_bind_group(1, &data.pre_cull_bg, &[]);
+        cpass.set_bind_group(2, uniform_bg, &[]);
         cpass.dispatch(dispatch_count, 1, 1);
 
         cpass.set_pipeline(&self.prefix_sum_pipeline);

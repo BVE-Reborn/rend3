@@ -1,7 +1,7 @@
 use crate::{
     datatypes::{AffineTransform, MaterialHandle, Object, ObjectHandle},
     registry::ResourceRegistry,
-    renderer::{material::MaterialManager, mesh::MeshManager},
+    renderer::{frustum::BoundingSphere, material::MaterialManager, mesh::MeshManager},
 };
 use smallvec::SmallVec;
 use std::mem::size_of;
@@ -15,6 +15,7 @@ use wgpu_conveyor::{write_to_buffer2, AutomatedBuffer, AutomatedBufferManager, B
 struct InternalObject {
     materials: SmallVec<[MaterialHandle; 4]>,
     transform: AffineTransform,
+    sphere: BoundingSphere,
     start_idx: u32,
     count: u32,
     vertex_offset: i32,
@@ -28,6 +29,7 @@ struct ShaderObject {
     vertex_offset: i32,
     material_translation_idx: u32,
     transform: AffineTransform,
+    sphere: BoundingSphere,
 }
 
 unsafe impl bytemuck::Zeroable for ShaderObject {}
@@ -89,6 +91,7 @@ impl ObjectManager {
         let shader_object = InternalObject {
             materials: object.materials,
             transform: object.transform,
+            sphere: mesh.bounding_sphere,
             start_idx: mesh.index_range.start as u32,
             count: (mesh.index_range.end - mesh.index_range.start) as u32,
             vertex_offset: mesh.vertex_range.start as i32,
@@ -152,6 +155,7 @@ impl ObjectManager {
                         vertex_offset: object.vertex_offset,
                         material_translation_idx: mat_start_offset as u32,
                         transform: object.transform,
+                        sphere: object.sphere,
                     };
 
                     // Prepare for next iteration

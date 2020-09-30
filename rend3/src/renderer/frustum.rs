@@ -1,0 +1,133 @@
+use crate::datatypes::ModelVertex;
+use glam::{Mat4, Vec3, Vec3A};
+
+#[derive(Debug, Clone, Copy)]
+#[repr(C, align(16))]
+pub struct BoundingSphere {
+    pub center: Vec3,
+    pub radius: f32,
+}
+impl BoundingSphere {
+    pub fn from_mesh(mesh: &[ModelVertex]) -> Self {
+        let center = find_mesh_center(mesh);
+        let radius = find_mesh_bounding_sphere_radius(center, mesh);
+
+        Self {
+            center: Vec3::from(center),
+            radius,
+        }
+    }
+}
+
+fn find_mesh_center(mesh: &[ModelVertex]) -> Vec3A {
+    let first = if let Some(first) = mesh.first() {
+        *first
+    } else {
+        return Vec3A::zero();
+    };
+    // Bounding box time baby!
+    let mut max = Vec3A::from(first.position);
+    let mut min = Vec3A::from(first.position);
+
+    for vert in mesh.iter().skip(1) {
+        let pos = Vec3A::from(vert.position);
+        max = max.max(pos);
+        min = min.min(pos);
+    }
+
+    (max + min) / 2.0
+}
+
+fn find_mesh_bounding_sphere_radius(mesh_center: Vec3A, mesh: &[ModelVertex]) -> f32 {
+    mesh.iter().fold(0.0, |distance, vert| {
+        distance.max((Vec3A::from(vert.position) - mesh_center).length())
+    })
+}
+
+#[derive(Debug, Copy, Clone)]
+#[repr(C, align(16))]
+pub struct ShaderPlane {
+    pub abc: Vec3,
+    pub d: f32,
+}
+
+impl ShaderPlane {
+    pub fn new(a: f32, b: f32, c: f32, d: f32) -> Self {
+        Self {
+            abc: Vec3::new(a, b, c),
+            d,
+        }
+    }
+
+    pub fn normalize(mut self) -> Self {
+        let mag = self.abc.length();
+
+        self.abc /= mag;
+        self.d /= mag;
+
+        self
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+#[repr(C, align(16))]
+pub struct ShaderFrustum {
+    left: ShaderPlane,
+    right: ShaderPlane,
+    top: ShaderPlane,
+    bottom: ShaderPlane,
+    near: ShaderPlane,
+}
+
+impl ShaderFrustum {
+    pub fn from_matrix(matrix: Mat4) -> Self {
+        let mat_arr = matrix.to_cols_array_2d();
+
+        let left = ShaderPlane::new(
+            mat_arr[0][3] + mat_arr[0][0],
+            mat_arr[1][3] + mat_arr[1][0],
+            mat_arr[2][3] + mat_arr[2][0],
+            mat_arr[3][3] + mat_arr[3][0],
+        );
+
+        let right = ShaderPlane::new(
+            mat_arr[0][3] - mat_arr[0][0],
+            mat_arr[1][3] - mat_arr[1][0],
+            mat_arr[2][3] - mat_arr[2][0],
+            mat_arr[3][3] - mat_arr[3][0],
+        );
+
+        let top = ShaderPlane::new(
+            mat_arr[0][3] - mat_arr[0][1],
+            mat_arr[1][3] - mat_arr[1][1],
+            mat_arr[2][3] - mat_arr[2][1],
+            mat_arr[3][3] - mat_arr[3][1],
+        );
+
+        let bottom = ShaderPlane::new(
+            mat_arr[0][3] + mat_arr[0][1],
+            mat_arr[1][3] + mat_arr[1][1],
+            mat_arr[2][3] + mat_arr[2][1],
+            mat_arr[3][3] + mat_arr[3][1],
+        );
+
+        // no far plane as we have infinite depth
+
+        // this is the far plane in the algorithm, but we're using inverse Z, so near and far
+        // get flipped.
+        let near = ShaderPlane::new(
+            mat_arr[0][3] - mat_arr[0][2],
+            mat_arr[1][3] - mat_arr[1][2],
+            mat_arr[2][3] - mat_arr[2][2],
+            mat_arr[3][3] - mat_arr[3][2],
+        );
+
+        Self {
+            left: left.normalize(),
+            right: right.normalize(),
+            top: top.normalize(),
+            bottom: bottom.normalize(),
+            near: near.normalize(),
+        }
+    }
+}

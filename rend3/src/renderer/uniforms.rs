@@ -1,4 +1,4 @@
-use crate::renderer::camera::Camera;
+use crate::renderer::{camera::Camera, frustum::ShaderFrustum};
 use glam::Mat4;
 use std::mem::size_of;
 use wgpu::{
@@ -11,6 +11,7 @@ use wgpu::{
 pub struct ShaderCommonUniform {
     view: Mat4,
     view_proj: Mat4,
+    frustum: ShaderFrustum,
 }
 
 unsafe impl bytemuck::Zeroable for ShaderCommonUniform {}
@@ -49,6 +50,7 @@ impl WrappedUniform {
         let uniforms = ShaderCommonUniform {
             view: camera.view(),
             view_proj: camera.view_proj(),
+            frustum: ShaderFrustum::from_matrix(camera.proj()),
         };
 
         queue.write_buffer(&self.buffer, 0, bytemuck::bytes_of(&uniforms));

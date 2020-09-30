@@ -22,6 +22,7 @@ mod util;
 
 mod camera;
 pub mod error;
+mod frustum;
 mod info;
 pub mod limits;
 mod material;

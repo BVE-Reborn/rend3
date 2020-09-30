@@ -1,6 +1,7 @@
 use crate::{
     datatypes::{Mesh, MeshHandle, ModelVertex},
     registry::ResourceRegistry,
+    renderer::frustum::BoundingSphere,
 };
 use range_alloc::RangeAllocator;
 use std::{mem::size_of, ops::Range};
@@ -16,6 +17,7 @@ pub struct InternalMesh {
     pub vertex_range: Range<usize>,
     pub index_range: Range<usize>,
     pub material_count: u32,
+    pub bounding_sphere: BoundingSphere,
 }
 
 pub struct MeshManager {
@@ -97,10 +99,13 @@ impl MeshManager {
             bytemuck::cast_slice(&mesh.indices),
         );
 
+        let bounding_sphere = BoundingSphere::from_mesh(&mesh.vertices);
+
         let mesh = InternalMesh {
             vertex_range,
             index_range,
             material_count: mesh.material_count,
+            bounding_sphere,
         };
 
         self.registry.insert(handle.0, mesh);
