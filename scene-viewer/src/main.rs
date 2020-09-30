@@ -1,23 +1,30 @@
+use fnv::FnvBuildHasher;
 use glam::{Mat4, Vec2, Vec3};
 use imgui::FontSource;
 use obj::{IndexTuple, Obj, ObjMaterial};
 use rend3::{
-    datatypes::{AffineTransform, Material, Mesh, ModelVertex, Object, RendererTextureFormat, Texture, TextureHandle},
+    datatypes::{
+        AffineTransform, CameraLocation, Material, Mesh, ModelVertex, Object, RendererTextureFormat, Texture,
+        TextureHandle,
+    },
     Renderer, RendererOptions, VSyncMode,
 };
 use smallvec::SmallVec;
 use std::{
     collections::HashMap,
+    hash::BuildHasher,
     path::Path,
     sync::Arc,
     time::{Duration, Instant},
 };
 use switchyard::{threads, Switchyard};
 use winit::{
-    event::{Event, WindowEvent},
+    event::{DeviceEvent, ElementState, Event, KeyboardInput, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
     window::WindowBuilder,
 };
+
+mod platform;
 
 fn load_texture(
     renderer: &Renderer,
@@ -146,6 +153,10 @@ fn load_resources(renderer: &Renderer) {
     }
 }
 
+fn button_pressed<Hash: BuildHasher>(map: &HashMap<u32, bool, Hash>, key: u32) -> bool {
+    map.get(&key).map_or(false, |b| *b)
+}
+
 fn main() {
     wgpu_subscriber::initialize_default_subscriber(Some(Path::new("target/profile.json")));
 
@@ -211,6 +222,10 @@ fn main() {
     rend3::span_transfer!(loading_span -> _);
     rend3::span_transfer!(main_thread_span -> _);
 
+    let mut scancode_status = HashMap::with_hasher(FnvBuildHasher::default());
+
+    let mut camera_location = CameraLocation::default();
+
     let mut timestamp = Instant::now();
     let mut frames = 0_usize;
 
@@ -230,7 +245,51 @@ fn main() {
                 frames = 0;
             }
 
+            if button_pressed(&scancode_status, platform::Scancodes::W) {
+                //..
+            }
+
             window.request_redraw();
+        }
+        Event::WindowEvent {
+            event:
+                WindowEvent::KeyboardInput {
+                    input: KeyboardInput { scancode, state, .. },
+                    ..
+                },
+            ..
+        } => {
+            scancode_status.insert(
+                scancode,
+                match state {
+                    ElementState::Pressed => true,
+                    ElementState::Released => false,
+                },
+            );
+        }
+        Event::DeviceEvent {
+            event:
+                DeviceEvent::MouseMotion {
+                    delta: (delta_x, delta_y),
+                    ..
+                },
+            ..
+        } => {
+            const TAU: f32 = std::f32::consts::PI * 2.0;
+
+            camera_location.yaw += (delta_x / 1000.0) as f32;
+            camera_location.pitch += (delta_y / 1000.0) as f32;
+            if camera_location.yaw < 0.0 {
+                camera_location.yaw += TAU;
+            } else if camera_location.yaw >= TAU {
+                camera_location.yaw -= TAU;
+            }
+            camera_location.pitch = camera_location
+                .pitch
+                .max(-std::f32::consts::FRAC_PI_2 + 0.0001)
+                .min(std::f32::consts::FRAC_PI_2 - 0.0001);
+
+            renderer.set_camera_location(camera_location);
         }
         Event::WindowEvent {
             event: WindowEvent::Resized(size),

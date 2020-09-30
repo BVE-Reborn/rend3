@@ -1,4 +1,4 @@
-use glam::{Mat4, Vec2, Vec3};
+use glam::{f32::Vec3A, Mat4, Vec2, Vec3};
 use smallvec::SmallVec;
 use wgpu::TextureFormat;
 
@@ -110,4 +110,11 @@ pub struct Object {
     pub mesh: MeshHandle,
     pub materials: SmallVec<[MaterialHandle; 4]>,
     pub transform: AffineTransform,
+}
+
+#[derive(Debug, Default, Copy, Clone)]
+pub struct CameraLocation {
+    pub location: Vec3A,
+    pub pitch: f32,
+    pub yaw: f32,
 }

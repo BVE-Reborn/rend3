@@ -34,6 +34,7 @@ pub fn render_loop<TLD: 'static>(renderer: Arc<Renderer<TLD>>) -> impl Future<Ou
         let mut texture_manager = renderer.texture_manager.write();
         let mut material_manager = renderer.material_manager.write();
         let mut object_manager = renderer.object_manager.write();
+        let mut global_resources = renderer.global_resources.write();
 
         for cmd in instructions.drain(..) {
             match cmd {
@@ -99,10 +100,11 @@ pub fn render_loop<TLD: 'static>(renderer: Arc<Renderer<TLD>>) -> impl Future<Ou
                     object_manager.remove(handle);
                 }
                 Instruction::SetOptions { options } => new_options = Some(options),
+                Instruction::SetCameraLocation { location } => {
+                    global_resources.camera.set_location(location);
+                }
             }
         }
-
-        let global_resources = renderer.global_resources.read();
 
         let (texture_bgl, texture_bg) = texture_manager.ready(&renderer.device, &global_resources.sampler);
         let material_bgk = material_manager.ready(

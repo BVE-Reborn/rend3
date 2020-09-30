@@ -36,7 +36,8 @@ void main() {
         return;
     }
 
-    uint output_idx = object_index[input_idx];
+    // Prefix sum is inclusive, so all values will be 1 too high
+    uint output_idx = object_index[input_idx] - 1;
 
     if (input_idx == object_count - 1) {
         indirect_counter = output_idx;

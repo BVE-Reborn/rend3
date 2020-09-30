@@ -53,7 +53,7 @@ void main() {
 
     bool visible = frustum_contains_sphere(uniforms.frustum, vec4(mesh_center, mesh_radius));
 
-    uint add_value = input_idx == 0 ? 0 : uint(visible);
+    uint add_value = uint(visible);
     object_index[input_idx] = add_value;
     status[input_idx] = visible;
 }

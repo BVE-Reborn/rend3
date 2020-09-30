@@ -1,6 +1,7 @@
 use crate::{
     datatypes::{
-        AffineTransform, Material, MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, Texture, TextureHandle,
+        AffineTransform, CameraLocation, Material, MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, Texture,
+        TextureHandle,
     },
     instruction::{Instruction, InstructionStreamPair},
     renderer::{
@@ -165,6 +166,13 @@ impl<TLD: 'static> Renderer<TLD> {
             .producer
             .lock()
             .push(Instruction::SetOptions { options })
+    }
+
+    pub fn set_camera_location(&self, location: CameraLocation) {
+        self.instructions
+            .producer
+            .lock()
+            .push(Instruction::SetCameraLocation { location })
     }
 
     pub fn render(self: &Arc<Self>) -> JoinHandle<RendererStatistics> {

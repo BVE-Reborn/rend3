@@ -1,6 +1,7 @@
 use crate::{
     datatypes::{
-        AffineTransform, Material, MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, Texture, TextureHandle,
+        AffineTransform, CameraLocation, Material, MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, Texture,
+        TextureHandle,
     },
     RendererOptions,
 };
@@ -42,6 +43,9 @@ pub enum Instruction {
     },
     SetOptions {
         options: RendererOptions,
+    },
+    SetCameraLocation {
+        location: CameraLocation,
     },
 }
 
