@@ -222,7 +222,7 @@ pub fn create_uniform_bgl(device: &Device) -> BindGroupLayout {
         label: Some("uniform bgl"),
         entries: &[BindGroupLayoutEntry {
             binding: 0,
-            visibility: ShaderStage::COMPUTE,
+            visibility: ShaderStage::COMPUTE | ShaderStage::FRAGMENT,
             ty: BindingType::UniformBuffer {
                 dynamic: false,
                 min_binding_size: None,
@@ -297,7 +297,7 @@ macro_rules! create_vertex_buffer_descriptor {
     };
 }
 
-pub enum RenderPipelineType {
+pub enum RenderPipelineLayoutType {
     Depth,
     Opaque,
 }
@@ -309,16 +309,22 @@ pub fn create_render_pipeline_layout(
     material_bgl: &BindGroupLayout,
     texture_bgl: &BindGroupLayout,
     uniform_bgl: &BindGroupLayout,
-    ty: RenderPipelineType,
+    ty: RenderPipelineLayoutType,
 ) -> PipelineLayout {
     device.create_pipeline_layout(&PipelineLayoutDescriptor {
         label: Some(match ty {
-            RenderPipelineType::Depth => "depth pipeline layout",
-            RenderPipelineType::Opaque => "opaque pipeline layout",
+            RenderPipelineLayoutType::Depth => "depth pipeline layout",
+            RenderPipelineLayoutType::Opaque => "opaque pipeline layout",
         }),
         bind_group_layouts: &[input_bgl, output_noindirect_bgl, material_bgl, texture_bgl, uniform_bgl],
         push_constant_ranges: &[],
     })
+}
+
+pub enum RenderPipelineType {
+    Depth,
+    Opaque,
+    Skybox,
 }
 
 pub fn create_render_pipeline(
@@ -328,10 +334,13 @@ pub fn create_render_pipeline(
     fragment: &ShaderModule,
     ty: RenderPipelineType,
 ) -> RenderPipeline {
+    let vertex_buffers = [create_vertex_buffer_descriptor!()];
+
     device.create_render_pipeline(&RenderPipelineDescriptor {
         label: Some(match ty {
             RenderPipelineType::Depth => "depth pipeline",
             RenderPipelineType::Opaque => "opaque pipeline",
+            RenderPipelineType::Skybox => "skybox pipeline",
         }),
         layout: Some(&layout),
         vertex_stage: ProgrammableStageDescriptor {
@@ -344,7 +353,10 @@ pub fn create_render_pipeline(
         }),
         rasterization_state: Some(RasterizationStateDescriptor {
             front_face: FrontFace::Cw,
-            cull_mode: CullMode::Back,
+            cull_mode: match ty {
+                RenderPipelineType::Opaque | RenderPipelineType::Depth => CullMode::Back,
+                RenderPipelineType::Skybox => CullMode::None,
+            },
             clamp_depth: false,
             depth_bias: 0,
             depth_bias_slope_scale: 0.0,
@@ -358,7 +370,7 @@ pub fn create_render_pipeline(
                 color_blend: BlendDescriptor::REPLACE,
                 write_mask: match ty {
                     RenderPipelineType::Depth => ColorWrite::empty(),
-                    RenderPipelineType::Opaque => ColorWrite::ALL,
+                    RenderPipelineType::Opaque | RenderPipelineType::Skybox => ColorWrite::ALL,
                 },
             },
             ColorStateDescriptor {
@@ -366,7 +378,7 @@ pub fn create_render_pipeline(
                 alpha_blend: BlendDescriptor::REPLACE,
                 color_blend: BlendDescriptor::REPLACE,
                 write_mask: match ty {
-                    RenderPipelineType::Depth => ColorWrite::empty(),
+                    RenderPipelineType::Depth | RenderPipelineType::Skybox => ColorWrite::empty(),
                     RenderPipelineType::Opaque => ColorWrite::ALL,
                 },
             },
@@ -376,13 +388,16 @@ pub fn create_render_pipeline(
             depth_write_enabled: true,
             depth_compare: match ty {
                 RenderPipelineType::Depth => CompareFunction::Greater,
-                RenderPipelineType::Opaque => CompareFunction::Equal,
+                RenderPipelineType::Opaque | RenderPipelineType::Skybox => CompareFunction::Equal,
             },
             stencil: StencilStateDescriptor::default(),
         }),
         vertex_state: VertexStateDescriptor {
             index_format: IndexFormat::Uint32,
-            vertex_buffers: &[create_vertex_buffer_descriptor!()],
+            vertex_buffers: match ty {
+                RenderPipelineType::Opaque | RenderPipelineType::Depth => &vertex_buffers,
+                RenderPipelineType::Skybox => &[],
+            },
         },
         sample_count: 1,
         sample_mask: !0,

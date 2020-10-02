@@ -6,7 +6,7 @@ use crate::renderer::{
 use shaderc::ShaderKind;
 use std::{future::Future, sync::Arc};
 use tracing_futures::Instrument;
-use wgpu::{BindGroupLayout, Buffer, Device, RenderPass, RenderPipeline, ShaderModule};
+use wgpu::{BindGroup, BindGroupLayout, Buffer, Device, RenderPass, RenderPipeline, ShaderModule};
 
 pub struct OpaquePass {
     pipeline: RenderPipeline,
@@ -20,7 +20,7 @@ impl OpaquePass {
         input_bgl: &BindGroupLayout,
         output_noindirect_bgl: &BindGroupLayout,
         material_bgl: &BindGroupLayout,
-        texture_bgl: &BindGroupLayout,
+        texture_2d_bgl: &BindGroupLayout,
         uniform_bgl: &BindGroupLayout,
     ) -> impl Future<Output = Self> + 'a {
         let new_span = tracing::warn_span!("Creating OpaquePass");
@@ -45,9 +45,9 @@ impl OpaquePass {
             input_bgl,
             output_noindirect_bgl,
             material_bgl,
-            texture_bgl,
+            texture_2d_bgl,
             uniform_bgl,
-            util::RenderPipelineType::Opaque,
+            util::RenderPipelineLayoutType::Opaque,
         );
 
         drop(new_span_guard);
@@ -74,7 +74,7 @@ impl OpaquePass {
         input_bgl: &BindGroupLayout,
         output_noindirect_bgl: &BindGroupLayout,
         material_bgl: &BindGroupLayout,
-        texture_bgl: &BindGroupLayout,
+        texture_2d_bgl: &BindGroupLayout,
         uniform_bgl: &BindGroupLayout,
     ) {
         span_transfer!(_ -> update_pipeline_span, INFO, "Opaque Pass Update Pipeline");
@@ -83,9 +83,9 @@ impl OpaquePass {
             input_bgl,
             output_noindirect_bgl,
             material_bgl,
-            texture_bgl,
+            texture_2d_bgl,
             uniform_bgl,
-            util::RenderPipelineType::Opaque,
+            util::RenderPipelineLayoutType::Opaque,
         );
         let pipeline = util::create_render_pipeline(
             device,
@@ -100,11 +100,25 @@ impl OpaquePass {
     pub fn run<'a>(
         &'a self,
         rpass: &mut RenderPass<'a>,
+        vertex_buffer: &'a Buffer,
+        index_buffer: &'a Buffer,
         indirect_buffer: &'a Buffer,
         count_buffer: &'a Buffer,
+        input_bg: &'a BindGroup,
+        output_noindirect_bg: &'a BindGroup,
+        material_bg: &'a BindGroup,
+        texture_2d_bg: &'a BindGroup,
+        uniform_bg: &'a BindGroup,
         object_count: u32,
     ) {
         rpass.set_pipeline(&self.pipeline);
+        rpass.set_vertex_buffer(0, vertex_buffer.slice(..));
+        rpass.set_index_buffer(index_buffer.slice(..));
+        rpass.set_bind_group(0, &input_bg, &[]);
+        rpass.set_bind_group(1, &output_noindirect_bg, &[]);
+        rpass.set_bind_group(2, &material_bg, &[]);
+        rpass.set_bind_group(3, &texture_2d_bg, &[]);
+        rpass.set_bind_group(4, &uniform_bg, &[]);
         rpass.multi_draw_indexed_indirect_count(indirect_buffer, 0, count_buffer, 0, object_count);
     }
 }

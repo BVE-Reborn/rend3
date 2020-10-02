@@ -47,6 +47,7 @@ struct MaterialData {
 struct UniformData {
     mat4 view;
     mat4 view_proj;
+    mat4 inv_view_proj;
     Frustum frustum;
 };
 

@@ -63,7 +63,8 @@ where
     global_resources: RwLock<RendererGlobalResources>,
     _shader_manager: ShaderManager,
     mesh_manager: RwLock<MeshManager>,
-    texture_manager: RwLock<TextureManager>,
+    texture_manager_2d: RwLock<TextureManager>,
+    texture_manager_cube: RwLock<TextureManager>,
     material_manager: RwLock<MaterialManager>,
     object_manager: RwLock<ObjectManager>,
 
@@ -71,6 +72,7 @@ where
 
     swapchain_blit_pass: passes::BlitPass,
     culling_pass: passes::CullingPass,
+    skybox_pass: RwLock<passes::SkyboxPass>,
     depth_pass: RwLock<passes::DepthPass>,
     opaque_pass: RwLock<passes::OpaquePass>,
 
@@ -106,20 +108,36 @@ impl<TLD: 'static> Renderer<TLD> {
             .push(Instruction::RemoveMesh { handle });
     }
 
-    pub fn add_texture(&self, texture: Texture) -> TextureHandle {
-        let handle = self.texture_manager.read().allocate();
+    pub fn add_texture_2d(&self, texture: Texture) -> TextureHandle {
+        let handle = self.texture_manager_2d.read().allocate();
         self.instructions
             .producer
             .lock()
-            .push(Instruction::AddTexture { handle, texture });
+            .push(Instruction::AddTexture2D { handle, texture });
         handle
     }
 
-    pub fn remove_texture(&self, handle: TextureHandle) {
+    pub fn remove_texture_2d(&self, handle: TextureHandle) {
         self.instructions
             .producer
             .lock()
-            .push(Instruction::RemoveTexture { handle })
+            .push(Instruction::RemoveTexture2D { handle })
+    }
+
+    pub fn add_texture_cube(&self, texture: Texture) -> TextureHandle {
+        let handle = self.texture_manager_cube.read().allocate();
+        self.instructions
+            .producer
+            .lock()
+            .push(Instruction::AddTextureCube { handle, texture });
+        handle
+    }
+
+    pub fn remove_texture_dube(&self, handle: TextureHandle) {
+        self.instructions
+            .producer
+            .lock()
+            .push(Instruction::RemoveTextureCube { handle })
     }
 
     pub fn add_material(&self, material: Material) -> MaterialHandle {
@@ -173,6 +191,20 @@ impl<TLD: 'static> Renderer<TLD> {
             .producer
             .lock()
             .push(Instruction::SetCameraLocation { location })
+    }
+
+    pub fn set_background_texture(&self, handle: TextureHandle) {
+        self.instructions
+            .producer
+            .lock()
+            .push(Instruction::SetBackgroundTexture { handle })
+    }
+
+    pub fn clear_background_texture(&self) {
+        self.instructions
+            .producer
+            .lock()
+            .push(Instruction::ClearBackgroundTexture)
     }
 
     pub fn render(self: &Arc<Self>) -> JoinHandle<RendererStatistics> {

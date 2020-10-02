@@ -1,4 +1,5 @@
 use crate::{
+    datatypes::TextureHandle,
     renderer::{camera::Camera, util},
     RendererOptions,
 };
@@ -16,6 +17,7 @@ pub struct RendererGlobalResources {
     pub color_bg: BindGroup,
 
     pub camera: Camera,
+    pub background_texture: Option<TextureHandle>,
 
     pub blit_bgl: BindGroupLayout,
     pub prefix_sum_bgl: BindGroupLayout,
@@ -64,6 +66,7 @@ impl RendererGlobalResources {
             depth_texture_view,
             color_bg,
             camera,
+            background_texture: None,
             blit_bgl,
             prefix_sum_bgl,
             pre_cull_bgl,

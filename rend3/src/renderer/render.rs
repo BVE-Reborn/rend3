@@ -8,8 +8,8 @@ use std::{future::Future, sync::Arc};
 use tracing_futures::Instrument;
 use wgpu::{
     Color, CommandEncoderDescriptor, Extent3d, LoadOp, Operations, Origin3d, RenderPassColorAttachmentDescriptor,
-    RenderPassDepthStencilAttachmentDescriptor, RenderPassDescriptor, TextureCopyView, TextureDataLayout,
-    TextureDescriptor, TextureDimension, TextureUsage, TextureViewDescriptor,
+    RenderPassDepthStencilAttachmentDescriptor, RenderPassDescriptor, TextureAspect, TextureCopyView,
+    TextureDataLayout, TextureDescriptor, TextureDimension, TextureUsage, TextureViewDescriptor, TextureViewDimension,
 };
 
 pub fn render_loop<TLD: 'static>(renderer: Arc<Renderer<TLD>>) -> impl Future<Output = RendererStatistics> {
@@ -31,7 +31,8 @@ pub fn render_loop<TLD: 'static>(renderer: Arc<Renderer<TLD>>) -> impl Future<Ou
         let mut new_options = None;
 
         let mut mesh_manager = renderer.mesh_manager.write();
-        let mut texture_manager = renderer.texture_manager.write();
+        let mut texture_manager_2d = renderer.texture_manager_2d.write();
+        let mut texture_manager_cube = renderer.texture_manager_cube.write();
         let mut material_manager = renderer.material_manager.write();
         let mut object_manager = renderer.object_manager.write();
         let mut global_resources = renderer.global_resources.write();
@@ -44,7 +45,7 @@ pub fn render_loop<TLD: 'static>(renderer: Arc<Renderer<TLD>>) -> impl Future<Ou
                 Instruction::RemoveMesh { handle } => {
                     mesh_manager.remove(handle);
                 }
-                Instruction::AddTexture { handle, texture } => {
+                Instruction::AddTexture2D { handle, texture } => {
                     let size = Extent3d {
                         width: texture.width,
                         height: texture.height,
@@ -76,10 +77,70 @@ pub fn render_loop<TLD: 'static>(renderer: Arc<Renderer<TLD>>) -> impl Future<Ou
                         size,
                     );
 
-                    texture_manager.fill(handle, uploaded_tex.create_view(&TextureViewDescriptor::default()));
+                    texture_manager_2d.fill(handle, uploaded_tex.create_view(&TextureViewDescriptor::default()));
                 }
-                Instruction::RemoveTexture { handle } => {
-                    texture_manager.remove(handle);
+                Instruction::RemoveTexture2D { handle } => {
+                    texture_manager_2d.remove(handle);
+                }
+                Instruction::AddTextureCube { handle, texture } => {
+                    let size = Extent3d {
+                        width: texture.width,
+                        height: texture.height,
+                        depth: 6,
+                    };
+
+                    let uploaded_tex = renderer.device.create_texture(&TextureDescriptor {
+                        label: None,
+                        size,
+                        mip_level_count: 1,
+                        sample_count: 1,
+                        dimension: TextureDimension::D2,
+                        format: texture.format.into(),
+                        usage: TextureUsage::SAMPLED | TextureUsage::COPY_DST,
+                    });
+
+                    let bytes_per_image = (texture.width * texture.height * texture.format.bytes_per_pixel()) as usize;
+                    for i in 0..6 {
+                        renderer.queue.write_texture(
+                            TextureCopyView {
+                                texture: &uploaded_tex,
+                                origin: Origin3d {
+                                    x: 0,
+                                    y: 0,
+                                    z: i as u32,
+                                },
+                                mip_level: 0,
+                            },
+                            &texture.data[(i * bytes_per_image)..((i + 1) * bytes_per_image)],
+                            TextureDataLayout {
+                                offset: 0,
+                                bytes_per_row: texture.format.bytes_per_pixel() * texture.width,
+                                rows_per_image: 0,
+                            },
+                            Extent3d {
+                                width: texture.width,
+                                height: texture.height,
+                                depth: 1,
+                            },
+                        );
+                    }
+
+                    texture_manager_cube.fill(
+                        handle,
+                        uploaded_tex.create_view(&TextureViewDescriptor {
+                            label: None,
+                            format: Some(texture.format.into()),
+                            dimension: Some(TextureViewDimension::Cube),
+                            aspect: TextureAspect::All,
+                            base_mip_level: 0,
+                            level_count: None,
+                            base_array_layer: 0,
+                            array_layer_count: None,
+                        }),
+                    );
+                }
+                Instruction::RemoveTextureCube { handle } => {
+                    texture_manager_cube.remove(handle);
                 }
                 Instruction::AddMaterial { handle, material } => {
                     material_manager.fill(handle, material);
@@ -103,14 +164,22 @@ pub fn render_loop<TLD: 'static>(renderer: Arc<Renderer<TLD>>) -> impl Future<Ou
                 Instruction::SetCameraLocation { location } => {
                     global_resources.camera.set_location(location);
                 }
+                Instruction::SetBackgroundTexture { handle } => {
+                    global_resources.background_texture = Some(handle);
+                }
+                Instruction::ClearBackgroundTexture => {
+                    global_resources.background_texture = None;
+                }
             }
         }
 
-        let (texture_bgl, texture_bg) = texture_manager.ready(&renderer.device, &global_resources.sampler);
+        let (texture_2d_bgl, texture_2d_bg) = texture_manager_2d.ready(&renderer.device, &global_resources.sampler);
+        let (texture_cube_bgl, texture_cube_bg) =
+            texture_manager_cube.ready(&renderer.device, &global_resources.sampler);
         let material_bgk = material_manager.ready(
             &renderer.device,
             &mut encoder,
-            &texture_manager,
+            &texture_manager_2d,
             &global_resources.material_bgl,
         );
         let (object_bgk, object_count) = object_manager.ready(
@@ -123,7 +192,8 @@ pub fn render_loop<TLD: 'static>(renderer: Arc<Renderer<TLD>>) -> impl Future<Ou
         drop((
             global_resources,
             mesh_manager,
-            texture_manager,
+            texture_manager_2d,
+            texture_manager_cube,
             material_manager,
             object_manager,
         ));
@@ -141,13 +211,13 @@ pub fn render_loop<TLD: 'static>(renderer: Arc<Renderer<TLD>>) -> impl Future<Ou
 
         let global_resources = renderer.global_resources.read();
 
-        if let Some(texture_bgl) = texture_bgl {
+        if let Some(texture_2d_bgl) = texture_2d_bgl {
             renderer.depth_pass.write().update_pipeline(
                 &renderer.device,
                 &global_resources.object_input_bgl,
                 &global_resources.object_output_noindirect_bgl,
                 &global_resources.material_bgl,
-                &texture_bgl,
+                &texture_2d_bgl,
                 &global_resources.uniform_bgl,
             );
             renderer.opaque_pass.write().update_pipeline(
@@ -155,7 +225,15 @@ pub fn render_loop<TLD: 'static>(renderer: Arc<Renderer<TLD>>) -> impl Future<Ou
                 &global_resources.object_input_bgl,
                 &global_resources.object_output_noindirect_bgl,
                 &global_resources.material_bgl,
-                &texture_bgl,
+                &texture_2d_bgl,
+                &global_resources.uniform_bgl,
+            );
+        }
+
+        if let Some(texture_cube_bgl) = texture_cube_bgl {
+            renderer.skybox_pass.write().update_pipeline(
+                &renderer.device,
+                &texture_cube_bgl,
                 &global_resources.uniform_bgl,
             );
         }
@@ -187,8 +265,16 @@ pub fn render_loop<TLD: 'static>(renderer: Arc<Renderer<TLD>>) -> impl Future<Ou
         let frame = renderer.global_resources.write().swapchain.get_current_frame().unwrap();
 
         let global_resources = renderer.global_resources.read();
+        let texture_manager_cube = renderer.texture_manager_cube.read();
         let depth_pass = renderer.depth_pass.read();
+        let skybox_pass = renderer.skybox_pass.read();
         let opaque_pass = renderer.opaque_pass.read();
+
+        let background_texture = global_resources
+            .background_texture
+            .map(|handle| texture_manager_cube.internal_index(handle) as u32);
+
+        drop(texture_manager_cube);
 
         let mut rpass = encoder.begin_render_pass(&RenderPassDescriptor {
             color_attachments: &[
@@ -219,19 +305,20 @@ pub fn render_loop<TLD: 'static>(renderer: Arc<Renderer<TLD>>) -> impl Future<Ou
             }),
         });
 
-        renderer.forward_pass_set.depth(
+        renderer.forward_pass_set.render(
             &depth_pass,
+            &skybox_pass,
+            &opaque_pass,
             &mut rpass,
             vertex_buffer,
             index_buffer,
             &input_bg,
             &material_bg,
-            &texture_bg,
+            &texture_2d_bg,
+            &texture_cube_bg,
             &forward_pass_data,
+            background_texture,
         );
-        renderer
-            .forward_pass_set
-            .opaque(&opaque_pass, &mut rpass, &forward_pass_data);
 
         drop(rpass);
 

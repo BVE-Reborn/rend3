@@ -16,11 +16,18 @@ pub enum Instruction {
     RemoveMesh {
         handle: MeshHandle,
     },
-    AddTexture {
+    AddTexture2D {
         handle: TextureHandle,
         texture: Texture,
     },
-    RemoveTexture {
+    RemoveTexture2D {
+        handle: TextureHandle,
+    },
+    AddTextureCube {
+        handle: TextureHandle,
+        texture: Texture,
+    },
+    RemoveTextureCube {
         handle: TextureHandle,
     },
     AddMaterial {
@@ -47,6 +54,10 @@ pub enum Instruction {
     SetCameraLocation {
         location: CameraLocation,
     },
+    SetBackgroundTexture {
+        handle: TextureHandle,
+    },
+    ClearBackgroundTexture,
 }
 
 pub struct InstructionStreamPair {

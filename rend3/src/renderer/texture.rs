@@ -7,7 +7,8 @@ use wgpu::{
     TextureViewDimension,
 };
 
-const STARTING_TEXTURES: usize = 1 << 8;
+pub const STARTING_2D_TEXTURES: usize = 1 << 8;
+pub const STARTING_CUBE_TEXTURES: usize = 1 << 3;
 
 pub struct TextureManager {
     layout: Arc<BindGroupLayout>,
@@ -20,20 +21,22 @@ pub struct TextureManager {
 
     views: Vec<TextureView>,
     registry: ResourceRegistry<()>,
+
+    dimension: TextureViewDimension,
 }
 impl TextureManager {
-    pub fn new(device: &Device, sampler: &Sampler) -> Self {
+    pub fn new(device: &Device, sampler: &Sampler, starting_textures: usize, dimension: TextureViewDimension) -> Self {
         span_transfer!(_ -> new_span, INFO, "Creating Texture Manager");
 
-        let mut null_tex_man = NullTextureManager::new(device);
+        let mut null_tex_man = NullTextureManager::new(device, dimension);
 
-        let view_count = STARTING_TEXTURES;
+        let view_count = starting_textures;
 
         let mut views = Vec::with_capacity(view_count);
         fill_to_size(&mut null_tex_man, &mut views, view_count);
 
-        let layout = create_bind_group_layout(device, view_count as u32);
-        let group = create_bind_group(device, &layout, &views, sampler);
+        let layout = create_bind_group_layout(device, view_count as u32, dimension);
+        let group = create_bind_group(device, &layout, &views, sampler, dimension);
 
         let registry = ResourceRegistry::new();
 
@@ -45,6 +48,7 @@ impl TextureManager {
             null_tex_man,
             views,
             registry,
+            dimension,
         }
     }
 
@@ -94,7 +98,7 @@ impl TextureManager {
         span_transfer!(_ -> ready_span, INFO, "Material Manager Ready");
 
         let layout = if self.layout_dirty {
-            self.layout = create_bind_group_layout(device, self.views.len() as u32);
+            self.layout = create_bind_group_layout(device, self.views.len() as u32, self.dimension);
             self.layout_dirty = false;
             Some(Arc::clone(&self.layout))
         } else {
@@ -102,7 +106,7 @@ impl TextureManager {
         };
 
         if self.group_dirty {
-            self.group = create_bind_group(device, &self.layout, &self.views, sampler);
+            self.group = create_bind_group(device, &self.layout, &self.views, sampler, self.dimension);
             self.group_dirty = false;
         }
 
@@ -124,15 +128,15 @@ fn fill_to_size(null_tex_man: &mut NullTextureManager, views: &mut Vec<TextureVi
     }
 }
 
-fn create_bind_group_layout(device: &Device, count: u32) -> Arc<BindGroupLayout> {
+fn create_bind_group_layout(device: &Device, count: u32, dimension: TextureViewDimension) -> Arc<BindGroupLayout> {
     Arc::new(device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-        label: Some("texture bindings layout"),
+        label: Some(&*format!("{:?} texture bgl", dimension)),
         entries: &[
             BindGroupLayoutEntry {
                 binding: 0,
                 visibility: ShaderStage::FRAGMENT,
                 ty: BindingType::SampledTexture {
-                    dimension: TextureViewDimension::D2,
+                    dimension,
                     component_type: TextureComponentType::Float,
                     multisampled: false,
                 },
@@ -153,9 +157,10 @@ fn create_bind_group(
     layout: &BindGroupLayout,
     views: &[TextureView],
     sampler: &Sampler,
+    dimension: TextureViewDimension,
 ) -> Arc<BindGroup> {
     Arc::new(device.create_bind_group(&BindGroupDescriptor {
-        label: Some("texture binding"),
+        label: Some(&*format!("{:?} texture bg", dimension)),
         layout: &layout,
         entries: &[
             BindGroupEntry {
@@ -175,15 +180,29 @@ struct NullTextureManager {
     inner: Vec<TextureView>,
 }
 impl NullTextureManager {
-    pub fn new(device: &Device) -> Self {
+    pub fn new(device: &Device, dimension: TextureViewDimension) -> Self {
         span_transfer!(_ -> new_span, INFO, "Material Manager Ready");
 
         let null_tex = device.create_texture(&TextureDescriptor {
-            label: Some("null texture"),
-            size: Extent3d::default(),
+            label: Some(&*format!("null {:?} texture", dimension)),
+            size: Extent3d {
+                width: 1,
+                height: 1,
+                depth: match dimension {
+                    TextureViewDimension::Cube | TextureViewDimension::CubeArray => 6,
+                    _ => 1,
+                },
+            },
             mip_level_count: 1,
             sample_count: 1,
-            dimension: TextureDimension::D2,
+            dimension: match dimension {
+                TextureViewDimension::D1 => TextureDimension::D1,
+                TextureViewDimension::D2 => TextureDimension::D2,
+                TextureViewDimension::D2Array
+                | TextureViewDimension::Cube
+                | TextureViewDimension::CubeArray
+                | TextureViewDimension::D3 => TextureDimension::D3,
+            },
             format: TextureFormat::Rgba8Unorm,
             usage: TextureUsage::SAMPLED,
         });

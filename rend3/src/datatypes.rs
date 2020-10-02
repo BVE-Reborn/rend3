@@ -57,7 +57,9 @@ pub enum RendererTextureFormat {
 
 impl RendererTextureFormat {
     pub fn bytes_per_pixel(&self) -> u32 {
-        4
+        match self {
+            RendererTextureFormat::Rgba8Srgb | RendererTextureFormat::Rgba8Linear => 4,
+        }
     }
 }
 

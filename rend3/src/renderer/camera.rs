@@ -4,6 +4,7 @@ use glam::{Mat3, Mat4, Vec3, Vec3A};
 const CAMERA_VFOV: f32 = 60.0;
 
 pub struct Camera {
+    orig_view: Mat4,
     view: Mat4,
     proj: Mat4,
 }
@@ -11,12 +12,14 @@ impl Camera {
     pub fn new(aspect_ratio: f32) -> Self {
         let proj = Mat4::perspective_infinite_reverse_lh(CAMERA_VFOV.to_radians(), aspect_ratio, 0.1);
         let view = compute_view_matrix(CameraLocation::default());
+        let orig_view = compute_origin_matrix(CameraLocation::default());
 
-        Self { view, proj }
+        Self { orig_view, view, proj }
     }
 
     pub fn set_location(&mut self, location: CameraLocation) {
         self.view = compute_view_matrix(location);
+        self.orig_view = compute_origin_matrix(location);
     }
 
     pub fn set_aspect_ratio(&mut self, aspect_ratio: f32) {
@@ -29,6 +32,10 @@ impl Camera {
 
     pub fn view_proj(&self) -> Mat4 {
         self.proj * self.view
+    }
+
+    pub fn origin_view_proj(&self) -> Mat4 {
+        self.proj * self.orig_view
     }
 
     pub fn proj(&self) -> Mat4 {
@@ -49,4 +56,11 @@ fn compute_view_matrix(location: CameraLocation) -> Mat4 {
         Vec3::from(location.location + look_offset),
         Vec3::unit_y(),
     )
+}
+
+// This is horribly inefficient but is called like once a frame.
+pub fn compute_origin_matrix(location: CameraLocation) -> Mat4 {
+    let look_offset = compute_look_offset(location);
+
+    Mat4::look_at_lh(Vec3::zero(), Vec3::from(look_offset), Vec3::unit_y())
 }

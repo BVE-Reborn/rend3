@@ -38,7 +38,7 @@ fn load_texture(
         } else {
             let img = image::open(name).unwrap();
             let rgba = img.into_rgba();
-            let handle = renderer.add_texture(Texture {
+            let handle = renderer.add_texture_2d(Texture {
                 format: RendererTextureFormat::Rgba8Srgb,
                 width: rgba.width(),
                 height: rgba.height(),
@@ -53,6 +53,28 @@ fn load_texture(
     } else {
         None
     }
+}
+
+fn load_skybox(renderer: &Renderer) {
+    let original = image::open("tmp/skybox/right.jpg").unwrap().into_rgba();
+    let width = original.width();
+    let height = original.height();
+
+    let mut data = original.into_raw();
+    data.extend_from_slice(&image::open("tmp/skybox/left.jpg").unwrap().into_rgba());
+    data.extend_from_slice(&image::open("tmp/skybox/top.jpg").unwrap().into_rgba());
+    data.extend_from_slice(&image::open("tmp/skybox/bottom.jpg").unwrap().into_rgba());
+    data.extend_from_slice(&image::open("tmp/skybox/front.jpg").unwrap().into_rgba());
+    data.extend_from_slice(&image::open("tmp/skybox/back.jpg").unwrap().into_rgba());
+
+    let handle = renderer.add_texture_cube(Texture {
+        data,
+        format: RendererTextureFormat::Rgba8Srgb,
+        width,
+        height,
+        label: Some("background".into()),
+    });
+    renderer.set_background_texture(handle);
 }
 
 fn load_resources(renderer: &Renderer) {
@@ -194,7 +216,8 @@ fn main() {
     let yard = Arc::new(
         Switchyard::new(
             2,
-            threads::double_pool_two_to_one(threads::thread_info(), Some("scene-viewer")),
+            threads::single_pool_single_thread(Some("scene-viewer".into()), None),
+            // threads::double_pool_two_to_one(threads::thread_info(), Some("scene-viewer")),
             || (),
         )
         .unwrap(),
@@ -218,6 +241,7 @@ fn main() {
     rend3::span_transfer!(renderer_span -> loading_span, INFO, "Loading resources");
 
     load_resources(&renderer);
+    load_skybox(&renderer);
 
     rend3::span_transfer!(loading_span -> _);
     rend3::span_transfer!(main_thread_span -> _);

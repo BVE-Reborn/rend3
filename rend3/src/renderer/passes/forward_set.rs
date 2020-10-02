@@ -60,18 +60,22 @@ impl ForwardPassSet {
         culling_pass.run(cpass, input_bg, &self.uniform.uniform_bg, &data.culling_pass_data);
     }
 
-    pub fn depth<'a>(
+    pub fn render<'a>(
         &'a self,
         depth_pass: &'a passes::DepthPass,
+        skybox_pass: &'a passes::SkyboxPass,
+        opaque_pass: &'a passes::OpaquePass,
         rpass: &mut RenderPass<'a>,
         vertex_buffer: &'a Buffer,
         index_buffer: &'a Buffer,
         input_bg: &'a BindGroup,
         material_bg: &'a BindGroup,
-        texture_bg: &'a BindGroup,
+        texture_2d_bg: &'a BindGroup,
+        texture_cube_bg: &'a BindGroup,
         data: &'a ForwardPassSetData,
+        background_texture: Option<u32>,
     ) {
-        span_transfer!(_ -> compute_span, WARN, "Running ForwardPassSet Depth");
+        span_transfer!(_ -> compute_span, WARN, "Running ForwardPassSet Render");
 
         depth_pass.run(
             rpass,
@@ -82,24 +86,26 @@ impl ForwardPassSet {
             input_bg,
             &data.culling_pass_data.output_noindirect_bg,
             material_bg,
-            texture_bg,
+            texture_2d_bg,
             &self.uniform.uniform_bg,
             data.culling_pass_data.object_count,
         );
-    }
 
-    pub fn opaque<'a>(
-        &'a self,
-        opaque_pass: &'a passes::OpaquePass,
-        rpass: &mut RenderPass<'a>,
-        data: &'a ForwardPassSetData,
-    ) {
-        span_transfer!(_ -> compute_span, WARN, "Running ForwardPassSet Depth");
+        if let Some(background_texture) = background_texture {
+            skybox_pass.run(rpass, texture_cube_bg, &self.uniform.uniform_bg, background_texture);
+        }
 
         opaque_pass.run(
             rpass,
+            vertex_buffer,
+            index_buffer,
             &data.culling_pass_data.indirect_buffer,
             &data.culling_pass_data.count_buffer,
+            input_bg,
+            &data.culling_pass_data.output_noindirect_bg,
+            material_bg,
+            texture_2d_bg,
+            &self.uniform.uniform_bg,
             data.culling_pass_data.object_count,
         );
     }

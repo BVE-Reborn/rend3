@@ -10,7 +10,7 @@ use crate::{
         passes::ForwardPassSet,
         resources::RendererGlobalResources,
         shaders::ShaderManager,
-        texture::TextureManager,
+        texture::{TextureManager, STARTING_2D_TEXTURES, STARTING_CUBE_TEXTURES},
         Renderer, SWAPCHAIN_FORMAT,
     },
     RendererInitializationError, RendererOptions,
@@ -19,7 +19,7 @@ use parking_lot::{Mutex, RwLock};
 use raw_window_handle::HasRawWindowHandle;
 use std::sync::Arc;
 use switchyard::Switchyard;
-use wgpu::{BackendBit, DeviceDescriptor, Instance, PowerPreference, RequestAdapterOptions};
+use wgpu::{BackendBit, DeviceDescriptor, Instance, PowerPreference, RequestAdapterOptions, TextureViewDimension};
 use wgpu_conveyor::{AutomatedBufferManager, UploadStyle};
 
 pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
@@ -80,8 +80,13 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
         SWAPCHAIN_FORMAT,
     );
 
-    let mut texture_manager = RwLock::new(TextureManager::new(&device, &global_resource_guard.sampler));
-    let texture_manager_guard = texture_manager.get_mut();
+    let mut texture_manager_2d = RwLock::new(TextureManager::new(
+        &device,
+        &global_resource_guard.sampler,
+        STARTING_2D_TEXTURES,
+        TextureViewDimension::D2,
+    ));
+    let texture_manager_2d_guard = texture_manager_2d.get_mut();
 
     let depth_pass = passes::DepthPass::new(
         &device,
@@ -89,7 +94,7 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
         &global_resource_guard.object_input_bgl,
         &global_resource_guard.object_output_noindirect_bgl,
         &global_resource_guard.material_bgl,
-        &texture_manager_guard.bind_group_layout(),
+        &texture_manager_2d_guard.bind_group_layout(),
         &global_resource_guard.uniform_bgl,
     );
 
@@ -99,7 +104,22 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
         &global_resource_guard.object_input_bgl,
         &global_resource_guard.object_output_noindirect_bgl,
         &global_resource_guard.material_bgl,
-        &texture_manager_guard.bind_group_layout(),
+        &texture_manager_2d_guard.bind_group_layout(),
+        &global_resource_guard.uniform_bgl,
+    );
+
+    let mut texture_manager_cube = RwLock::new(TextureManager::new(
+        &device,
+        &global_resource_guard.sampler,
+        STARTING_CUBE_TEXTURES,
+        TextureViewDimension::Cube,
+    ));
+    let texture_manager_cube_guard = texture_manager_cube.get_mut();
+
+    let skybox_pass = passes::SkyboxPass::new(
+        &device,
+        &shader_manager,
+        &texture_manager_cube_guard.bind_group_layout(),
         &global_resource_guard.uniform_bgl,
     );
 
@@ -122,9 +142,10 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
 
     span_transfer!(imgui_guard -> _);
 
-    let (culling_pass, depth_pass, opaque_pass, swapchain_blit_pass) =
-        futures::join!(culling_pass, depth_pass, opaque_pass, swapchain_blit_pass);
+    let (culling_pass, depth_pass, opaque_pass, swapchain_blit_pass, skybox_pass) =
+        futures::join!(culling_pass, depth_pass, opaque_pass, swapchain_blit_pass, skybox_pass);
     let depth_pass = RwLock::new(depth_pass);
+    let skybox_pass = RwLock::new(skybox_pass);
     let opaque_pass = RwLock::new(opaque_pass);
 
     Ok(Arc::new(Renderer {
@@ -140,7 +161,8 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
         global_resources,
         _shader_manager: shader_manager,
         mesh_manager,
-        texture_manager,
+        texture_manager_2d,
+        texture_manager_cube,
         material_manager,
         object_manager,
 
@@ -148,6 +170,7 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
 
         swapchain_blit_pass,
         culling_pass,
+        skybox_pass,
         depth_pass,
         opaque_pass,
 
