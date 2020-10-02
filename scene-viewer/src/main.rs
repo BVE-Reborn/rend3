@@ -226,27 +226,39 @@ fn main() {
 
     let mut camera_location = CameraLocation::default();
 
-    let mut timestamp = Instant::now();
+    let mut timestamp_last_second = Instant::now();
+    let mut timestamp_last_frame = Instant::now();
     let mut frames = 0_usize;
 
     event_loop.run(move |event, _window_target, control| match event {
         Event::MainEventsCleared => {
             frames += 1;
             let now = Instant::now();
-            let elapsed = now - timestamp;
-            if elapsed > Duration::from_secs(1) {
+            let elapsed_since_second = now - timestamp_last_second;
+            if elapsed_since_second > Duration::from_secs(1) {
                 println!(
                     "{} frames over {:.3}s: {:.3}ms/frame",
                     frames,
-                    elapsed.as_secs_f32(),
-                    elapsed.as_secs_f64() * 1000.0 / frames as f64
+                    elapsed_since_second.as_secs_f32(),
+                    elapsed_since_second.as_secs_f64() * 1000.0 / frames as f64
                 );
-                timestamp = now;
+                timestamp_last_second = now;
                 frames = 0;
             }
+            let delta_time = now - timestamp_last_frame;
+            timestamp_last_frame = now;
 
             if button_pressed(&scancode_status, platform::Scancodes::W) {
-                //..
+                *camera_location.location.z_mut() += 1.0 * delta_time.as_secs_f32();
+            }
+            if button_pressed(&scancode_status, platform::Scancodes::A) {
+                *camera_location.location.x_mut() -= 1.0 * delta_time.as_secs_f32();
+            }
+            if button_pressed(&scancode_status, platform::Scancodes::S) {
+                *camera_location.location.z_mut() -= 1.0 * delta_time.as_secs_f32();
+            }
+            if button_pressed(&scancode_status, platform::Scancodes::D) {
+                *camera_location.location.x_mut() += 1.0 * delta_time.as_secs_f32();
             }
 
             window.request_redraw();
