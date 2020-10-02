@@ -26,6 +26,8 @@ skip = [
     { name = "cloudabi", version = "0.0.3" },
     # hecs & lru
     { name = "hashbrown", version = "0.8.2" },
+    # wasi
+    { name = "wasi", version = "0.9.0+wasi-snapshot-preview1" }
 ]
 
 [advisories]
