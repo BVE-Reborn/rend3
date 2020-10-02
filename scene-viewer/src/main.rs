@@ -248,17 +248,28 @@ fn main() {
             let delta_time = now - timestamp_last_frame;
             timestamp_last_frame = now;
 
+            let velocity = if button_pressed(&scancode_status, platform::Scancodes::SHIFT) {
+                10.0
+            } else {
+                1.0
+            };
             if button_pressed(&scancode_status, platform::Scancodes::W) {
-                *camera_location.location.z_mut() += 1.0 * delta_time.as_secs_f32();
-            }
-            if button_pressed(&scancode_status, platform::Scancodes::A) {
-                *camera_location.location.x_mut() -= 1.0 * delta_time.as_secs_f32();
+                *camera_location.location.z_mut() += velocity * delta_time.as_secs_f32();
             }
             if button_pressed(&scancode_status, platform::Scancodes::S) {
-                *camera_location.location.z_mut() -= 1.0 * delta_time.as_secs_f32();
+                *camera_location.location.z_mut() -= velocity * delta_time.as_secs_f32();
+            }
+            if button_pressed(&scancode_status, platform::Scancodes::A) {
+                *camera_location.location.x_mut() -= velocity * delta_time.as_secs_f32();
             }
             if button_pressed(&scancode_status, platform::Scancodes::D) {
-                *camera_location.location.x_mut() += 1.0 * delta_time.as_secs_f32();
+                *camera_location.location.x_mut() += velocity * delta_time.as_secs_f32();
+            }
+            if button_pressed(&scancode_status, platform::Scancodes::Q) {
+                *camera_location.location.y_mut() += velocity * delta_time.as_secs_f32();
+            }
+            if button_pressed(&scancode_status, platform::Scancodes::Z) {
+                *camera_location.location.y_mut() -= velocity * delta_time.as_secs_f32();
             }
 
             window.request_redraw();
@@ -300,8 +311,6 @@ fn main() {
                 .pitch
                 .max(-std::f32::consts::FRAC_PI_2 + 0.0001)
                 .min(std::f32::consts::FRAC_PI_2 - 0.0001);
-
-            renderer.set_camera_location(camera_location);
         }
         Event::WindowEvent {
             event: WindowEvent::Resized(size),
@@ -318,6 +327,7 @@ fn main() {
         Event::RedrawRequested(_) => {
             rend3::span_transfer!(_ -> redraw_span, INFO, "Redraw");
 
+            renderer.set_camera_location(camera_location);
             renderer.set_options(options.clone());
             let handle = renderer.render();
 
