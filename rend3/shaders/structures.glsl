@@ -41,10 +41,10 @@ struct IndirectCall {
     uint base_instance;
 };
 
-#define FLAGS_ALBEDO_ACTIVE      0x01;
-#define FLAGS_ALBEDO_BLEND       0x02;
-#define FLAGS_ALBEDO_VERTEX_SRGB 0x04;
-#define FLAGS_ALPHA_CUTOUT      0x08;
+#define FLAGS_ALBEDO_ACTIVE      0x01
+#define FLAGS_ALBEDO_BLEND       0x02
+#define FLAGS_ALBEDO_VERTEX_SRGB 0x04
+#define FLAGS_ALPHA_CUTOUT       0x08
 
 struct MaterialData {
     vec4 albedo;

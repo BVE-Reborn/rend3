@@ -123,7 +123,7 @@ fn compile_shader(compiler: &mut Compiler, device: &Device, args: &ShaderArgumen
         options.add_macro_definition(&key, value.as_deref());
     }
     options.set_include_callback(|include, _ty, src, _depth| {
-        let path = Path::new(src)
+        let joined = Path::new(src)
             .parent()
             .ok_or_else(|| {
                 format!(
@@ -131,13 +131,11 @@ fn compile_shader(compiler: &mut Compiler, device: &Device, args: &ShaderArgumen
                     include, src
                 )
             })?
-            .join(Path::new(include))
-            .canonicalize()
-            .map_err(|_| format!("Failed to canonicalize include <{}> relative to file {}", include, src))?;
-        let contents = std::fs::read_to_string(&path)
+            .join(Path::new(include));
+        let contents = std::fs::read_to_string(&joined)
             .map_err(|e| format!("Error while loading include <{}> from file {}: {}", include, src, e))?;
         Ok(ResolvedInclude {
-            resolved_name: path.to_string_lossy().to_string(),
+            resolved_name: joined.to_string_lossy().to_string(),
             content: contents,
         })
     });

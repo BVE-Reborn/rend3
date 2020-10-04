@@ -3,7 +3,6 @@
 #extension GL_EXT_nonuniform_qualifier : require
 
 #include "structures.glsl"
-#include "lighting.glsl"
 
 layout(location = 0) in vec4 i_view_position;
 layout(location = 1) in vec3 i_normal;
@@ -26,26 +25,18 @@ layout(set = 4, binding = 0) uniform UniformBuffer {
     UniformData uniforms;
 };
 
+#include "lighting/surface.glsl"
+
 void main() {
     MaterialData material = materials[i_material];
 
-    bool has_albedo = material.albedo_tex != 0;
+    PixelData pixel = get_per_pixel_data(material);
 
-    vec4 res = i_color;
-    if (has_albedo) {
-        uint albedo_idx = material.albedo_tex - 1;
-        vec4 albedo_color = texture(sampler2D(textures[nonuniformEXT(albedo_idx)], samplr), i_coords);
+    vec3 v = -normalize(i_view_position.xyz);
+    vec3 l = normalize(mat3(uniforms.view) * vec3(1.0, 1.0, 0.0));
 
-        vec3 f0 = vec3(0.5, 0.5, 0.5);
-        vec3 n = i_normal;
-        vec3 v = -normalize(i_view_position.xyz);
-        vec3 l = normalize(mat3(uniforms.view) * vec3(1.0, 1.0, 0.0));
+    vec3 color = surface_shading(pixel, v, l, 1.0);
 
-        vec3 color = surface_shading(albedo_color.rgb, n, v, l, f0, 0.0, 1.0);
-
-        res *= vec4(color, 1.0);
-    }
-
-    o_color = res;
-    o_normal = vec4(i_normal, 0.0);
+    o_color =  vec4(color, 1.0);
+    o_normal = vec4(pixel.normal, 0.0);
 }

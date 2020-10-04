@@ -52,8 +52,6 @@ impl MaterialManager {
     pub fn new(device: &Device, manager: &mut AutomatedBufferManager) -> Self {
         span_transfer!(_ -> new_span, INFO, "Creating Material Manager");
 
-        dbg!(MATERIALS_SIZE, MAX_MATERIALS, size_of::<ShaderMaterial>());
-
         let buffer = manager.create_new_buffer(
             device,
             MAX_UNIFORM_BUFFER_BINDING_SIZE,
