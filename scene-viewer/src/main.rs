@@ -30,6 +30,7 @@ fn load_texture(
     renderer: &Renderer,
     cache: &mut HashMap<String, TextureHandle>,
     texture: &Option<String>,
+    srgb: bool,
 ) -> Option<TextureHandle> {
     rend3::span!(_guard, INFO, "Loading Texture", name = ?texture);
     if let Some(name) = texture {
@@ -39,7 +40,10 @@ fn load_texture(
             let img = image::open(name).unwrap();
             let rgba = img.into_rgba();
             let handle = renderer.add_texture_2d(Texture {
-                format: RendererTextureFormat::Rgba8Srgb,
+                format: match srgb {
+                    true => RendererTextureFormat::Rgba8Srgb,
+                    false => RendererTextureFormat::Rgba8Linear,
+                },
                 width: rgba.width(),
                 height: rgba.height(),
                 data: rgba.into_vec(),
@@ -95,13 +99,13 @@ fn load_resources(renderer: &Renderer) {
             let normal = &material.map_bump;
             let roughness = &material.map_ns;
 
-            let albedo_handle = load_texture(renderer, &mut textures, albedo);
-            let normal_handle = load_texture(renderer, &mut textures, normal);
-            let roughness_handle = load_texture(renderer, &mut textures, roughness);
+            let albedo_handle = load_texture(renderer, &mut textures, albedo, true);
+            let normal_handle = load_texture(renderer, &mut textures, normal, false);
+            let roughness_handle = load_texture(renderer, &mut textures, roughness, false);
 
             material_index_map.insert(material.name.clone(), materials.len() as u32);
 
-            let handle = renderer.add_material(Material {
+            let handle = renderer.add_material(dbg!(Material {
                 albedo: match albedo_handle {
                     None => AlbedoComponent::Vertex { srgb: false },
                     Some(handle) => AlbedoComponent::Texture(handle),
@@ -112,7 +116,7 @@ fn load_resources(renderer: &Renderer) {
                     Some(handle) => MaterialComponent::Texture(handle),
                 },
                 ..Material::default()
-            });
+            }));
 
             materials.push(handle);
         }

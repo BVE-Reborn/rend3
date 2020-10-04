@@ -116,7 +116,7 @@ impl MaterialManager {
                         alpha_cutout: material.alpha_cutout.unwrap_or(0.0),
                         albedo_tex: material.albedo.to_texture(translate_texture),
                         normal_tex: material.normal.map(translate_texture),
-                        roughness_tex: material.reflectance.to_texture(translate_texture),
+                        roughness_tex: material.roughness.to_texture(translate_texture),
                         metallic_tex: material.metallic.to_texture(translate_texture),
                         reflectance_tex: material.reflectance.to_texture(translate_texture),
                         clear_coat_tex: material.clear_coat.to_texture(translate_texture),
