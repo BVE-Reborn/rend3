@@ -4,8 +4,8 @@ use imgui::FontSource;
 use obj::{IndexTuple, Obj, ObjMaterial};
 use rend3::{
     datatypes::{
-        AffineTransform, CameraLocation, Material, Mesh, ModelVertex, Object, RendererTextureFormat, Texture,
-        TextureHandle,
+        AffineTransform, AlbedoComponent, CameraLocation, Material, MaterialComponent, Mesh, ModelVertex, Object,
+        RendererTextureFormat, Texture, TextureHandle,
     },
     Renderer, RendererOptions, VSyncMode,
 };
@@ -102,10 +102,16 @@ fn load_resources(renderer: &Renderer) {
             material_index_map.insert(material.name.clone(), materials.len() as u32);
 
             let handle = renderer.add_material(Material {
-                color: albedo_handle,
+                albedo: match albedo_handle {
+                    None => AlbedoComponent::Vertex { srgb: false },
+                    Some(handle) => AlbedoComponent::Texture(handle),
+                },
                 normal: normal_handle,
-                roughness: roughness_handle,
-                specular: None,
+                roughness: match roughness_handle {
+                    None => MaterialComponent::None,
+                    Some(handle) => MaterialComponent::Texture(handle),
+                },
+                ..Material::default()
             });
 
             materials.push(handle);

@@ -24,13 +24,13 @@ layout(set = 4, binding = 0) uniform UniformBuffer {
 void main() {
     MaterialData material = materials[i_material];
 
-    bool has_color = material.color != 0;
+    bool has_albedo = material.albedo_tex != 0;
 
-    if (has_color) {
-        uint color_idx = material.color - 1;
-        vec4 color = texture(sampler2D(textures[nonuniformEXT(color_idx)], samplr), i_coords);
+    if (has_albedo) {
+        uint albedo_idx = material.albedo_tex - 1;
+        vec4 albedo = texture(sampler2D(textures[nonuniformEXT(albedo_idx)], samplr), i_coords);
 
-        if (color.a <= 0.5) {
+        if (albedo.a <= 0.5) {
             discard;
         }
     }

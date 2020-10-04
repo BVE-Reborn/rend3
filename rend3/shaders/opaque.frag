@@ -29,19 +29,19 @@ layout(set = 4, binding = 0) uniform UniformBuffer {
 void main() {
     MaterialData material = materials[i_material];
 
-    bool has_color = material.color != 0;
+    bool has_albedo = material.albedo_tex != 0;
 
     vec4 res = i_color;
-    if (has_color) {
-        uint color_idx = material.color - 1;
-        vec4 diffuse_color = texture(sampler2D(textures[nonuniformEXT(color_idx)], samplr), i_coords);
+    if (has_albedo) {
+        uint albedo_idx = material.albedo_tex - 1;
+        vec4 albedo_color = texture(sampler2D(textures[nonuniformEXT(albedo_idx)], samplr), i_coords);
 
         vec3 f0 = vec3(0.5, 0.5, 0.5);
         vec3 n = i_normal;
         vec3 v = -normalize(i_view_position.xyz);
         vec3 l = normalize(mat3(uniforms.view) * vec3(1.0, 1.0, 0.0));
 
-        vec3 color = surface_shading(diffuse_color.rgb, n, v, l, f0, 0.0, 1.0);
+        vec3 color = surface_shading(albedo_color.rgb, n, v, l, f0, 0.0, 1.0);
 
         res *= vec4(color, 1.0);
     }
