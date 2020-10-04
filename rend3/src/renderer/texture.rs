@@ -33,7 +33,7 @@ impl TextureManager {
         let view_count = starting_textures;
 
         let mut views = Vec::with_capacity(view_count);
-        fill_to_size(&mut null_tex_man, &mut views, view_count);
+        fill_to_size(&mut null_tex_man, &mut views, dimension, view_count);
 
         let layout = create_bind_group_layout(device, view_count as u32, dimension);
         let group = create_bind_group(device, &layout, &views, sampler, dimension);
@@ -67,7 +67,7 @@ impl TextureManager {
             self.layout_dirty = true;
 
             let new_size = self.views.len() * 2;
-            fill_to_size(&mut self.null_tex_man, &mut self.views, new_size);
+            fill_to_size(&mut self.null_tex_man, &mut self.views, self.dimension, new_size);
         }
 
         let old_null = mem::replace(&mut self.views[index], texture);
@@ -87,7 +87,7 @@ impl TextureManager {
             self.views.swap(index, active_count);
         }
         // Overwrite the last item with the null tex
-        self.views[active_count] = self.null_tex_man.get();
+        self.views[active_count] = self.null_tex_man.get(self.dimension);
     }
 
     pub fn internal_index(&self, handle: TextureHandle) -> usize {
@@ -118,13 +118,18 @@ impl TextureManager {
     }
 }
 
-fn fill_to_size(null_tex_man: &mut NullTextureManager, views: &mut Vec<TextureView>, size: usize) {
+fn fill_to_size(
+    null_tex_man: &mut NullTextureManager,
+    views: &mut Vec<TextureView>,
+    dimension: TextureViewDimension,
+    size: usize,
+) {
     span_transfer!(_ -> fill_span, INFO, "fill to size");
 
     let to_add = size.saturating_sub(views.len());
 
     for _ in 0..to_add {
-        views.push(null_tex_man.get())
+        views.push(null_tex_man.get(dimension))
     }
 }
 
@@ -197,11 +202,11 @@ impl NullTextureManager {
             sample_count: 1,
             dimension: match dimension {
                 TextureViewDimension::D1 => TextureDimension::D1,
-                TextureViewDimension::D2 => TextureDimension::D2,
-                TextureViewDimension::D2Array
+                TextureViewDimension::D2
+                | TextureViewDimension::D2Array
                 | TextureViewDimension::Cube
-                | TextureViewDimension::CubeArray
-                | TextureViewDimension::D3 => TextureDimension::D3,
+                | TextureViewDimension::CubeArray => TextureDimension::D2,
+                TextureViewDimension::D3 => TextureDimension::D3,
             },
             format: TextureFormat::Rgba8Unorm,
             usage: TextureUsage::SAMPLED,
@@ -213,12 +218,15 @@ impl NullTextureManager {
         }
     }
 
-    pub fn get(&mut self) -> TextureView {
+    pub fn get(&mut self, dimension: TextureViewDimension) -> TextureView {
         span_transfer!(_ -> get_span, INFO, "Null Texture Manager Get");
 
-        self.inner
-            .pop()
-            .unwrap_or_else(|| self.null_tex.create_view(&TextureViewDescriptor::default()))
+        self.inner.pop().unwrap_or_else(|| {
+            self.null_tex.create_view(&TextureViewDescriptor {
+                dimension: Some(dimension),
+                ..TextureViewDescriptor::default()
+            })
+        })
     }
 
     pub fn put(&mut self, view: TextureView) {

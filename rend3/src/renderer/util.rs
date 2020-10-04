@@ -385,7 +385,10 @@ pub fn create_render_pipeline(
         ],
         depth_stencil_state: Some(DepthStencilStateDescriptor {
             format: INTERNAL_RENDERBUFFER_DEPTH_FORMAT,
-            depth_write_enabled: true,
+            depth_write_enabled: match ty {
+                RenderPipelineType::Depth => true,
+                RenderPipelineType::Opaque | RenderPipelineType::Skybox => false,
+            },
             depth_compare: match ty {
                 RenderPipelineType::Depth => CompareFunction::Greater,
                 RenderPipelineType::Opaque | RenderPipelineType::Skybox => CompareFunction::Equal,

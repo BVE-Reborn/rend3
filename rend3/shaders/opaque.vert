@@ -10,7 +10,7 @@ layout(location = 2) in vec2 i_coords;
 layout(location = 3) in vec4 i_color;
 layout(location = 4) in uint i_material;
 
-layout(location = 0) out vec4 o_position;
+layout(location = 0) out vec4 o_view_position;
 layout(location = 1) out vec3 o_normal;
 layout(location = 2) out vec2 o_coords;
 layout(location = 3) out vec4 o_color;
@@ -31,12 +31,12 @@ void main() {
 
     ObjectOutputData data = object_output[object_idx];
 
-    vec4 position = data.model_view_proj * vec4(i_position, 1.0);
-    o_position = position;
-    gl_Position = position;
+    gl_Position = data.model_view_proj * vec4(i_position, 1.0);
 
     uint material = material_translation[data.material_translation_idx + i_material];
     o_material = material;
+
+    o_view_position = data.model_view * vec4(i_position, 1.0);
 
     o_normal = data.inv_trans_model_view * i_normal;
 

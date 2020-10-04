@@ -1,3 +1,6 @@
+#ifndef SHADER_STRUCTURES_GLSL
+#define SHADER_STRUCTURES_GLSL
+
 struct Plane {
     vec4 inner;
 };
@@ -23,6 +26,7 @@ struct ObjectInputData {
 
 /// If you change this struct, change the object output size in culling.rs
 struct ObjectOutputData {
+    mat4 model_view;
     mat4 model_view_proj;
     mat3 inv_trans_model_view;
     uint material_translation_idx;
@@ -51,3 +55,4 @@ struct UniformData {
     Frustum frustum;
 };
 
+#endif

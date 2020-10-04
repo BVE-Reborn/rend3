@@ -10,7 +10,7 @@ use wgpu::{
 
 const SIZE_OF_STATUS: BufferAddress = 4;
 const SIZE_OF_INDEX: BufferAddress = 4;
-const SIZE_OF_OUTPUT_DATA: BufferAddress = 8 * 16;
+const SIZE_OF_OUTPUT_DATA: BufferAddress = 12 * 16;
 const SIZE_OF_INDIRECT_CALL: BufferAddress = 5 * 4;
 const SIZE_OF_INDIRECT_COUNT: BufferAddress = 4;
 
