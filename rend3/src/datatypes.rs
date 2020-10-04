@@ -94,11 +94,11 @@ pub struct Texture {
 }
 
 bitflags::bitflags! {
-    pub(crate) struct AlbedoFlags : u32 {
-        const ACTIVE = 0b001;
-        const BLEND = 0b010;
-        const VERT_SRGB = 0b100;
-        const BLEND_SRGB = Self::BLEND.bits | Self::VERT_SRGB.bits;
+    pub(crate) struct MaterialFlags : u32 {
+        const ALBEDO_ACTIVE = 0b001;
+        const ALBEDO_BLEND = 0b010;
+        const ALBEDO_VERTEX_SRGB = 0b100;
+        const ALPHA_CUTOUT = 0b1000;
     }
 }
 
@@ -145,16 +145,16 @@ impl AlbedoComponent {
         }
     }
 
-    pub(crate) fn to_flags(&self) -> AlbedoFlags {
+    pub(crate) fn to_flags(&self) -> MaterialFlags {
         match *self {
-            Self::None => AlbedoFlags::empty(),
-            Self::Vertex { srgb: false } => AlbedoFlags::ACTIVE | AlbedoFlags::VERT_SRGB,
-            Self::Vertex { srgb: true } | Self::Value(_) | Self::Texture(_) => AlbedoFlags::ACTIVE,
+            Self::None => MaterialFlags::empty(),
+            Self::Vertex { srgb: false } => MaterialFlags::ALBEDO_ACTIVE | MaterialFlags::ALBEDO_VERTEX_SRGB,
+            Self::Vertex { srgb: true } | Self::Value(_) | Self::Texture(_) => MaterialFlags::ALBEDO_ACTIVE,
             Self::ValueVertex { srgb: false, .. } | Self::TextureVertex { srgb: false, .. } => {
-                AlbedoFlags::ACTIVE | AlbedoFlags::BLEND
+                MaterialFlags::ALBEDO_ACTIVE | MaterialFlags::ALBEDO_BLEND
             }
             Self::ValueVertex { srgb: true, .. } | Self::TextureVertex { srgb: true, .. } => {
-                AlbedoFlags::ACTIVE | AlbedoFlags::BLEND_SRGB
+                MaterialFlags::ALBEDO_ACTIVE | MaterialFlags::ALBEDO_BLEND | MaterialFlags::ALBEDO_VERTEX_SRGB
             }
         }
     }
@@ -215,6 +215,7 @@ pub struct Material {
     pub clear_coat: MaterialComponent<f32>,
     pub clear_coat_roughness: MaterialComponent<f32>,
     pub anisotropy: MaterialComponent<f32>,
+    pub alpha_cutout: Option<f32>,
 }
 
 #[derive(Debug, Clone)]

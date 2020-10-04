@@ -41,9 +41,10 @@ struct IndirectCall {
     uint base_instance;
 };
 
-#define ALBEDO_ACTIVE    0x01;
-#define ALBEDO_BLEND     0x02;
-#define ALBEDO_VERT_SRGB 0x04;
+#define FLAGS_ALBEDO_ACTIVE      0x01;
+#define FLAGS_ALBEDO_BLEND       0x02;
+#define FLAGS_ALBEDO_VERTEX_SRGB 0x04;
+#define FLAGS_ALPHA_CUTOUT      0x08;
 
 struct MaterialData {
     vec4 albedo;
@@ -53,6 +54,7 @@ struct MaterialData {
     float clear_coat;
     float clear_coat_roughness;
     float anisotropy;
+    float alpha_cutout;
 
     uint albedo_tex;
     uint normal_tex;
@@ -62,7 +64,7 @@ struct MaterialData {
     uint clear_coat_tex;
     uint clear_coat_roughness_tex;
     uint anisotropy_tex;
-    uint albedo_flags;
+    uint material_flags;
 };
 
 struct UniformData {

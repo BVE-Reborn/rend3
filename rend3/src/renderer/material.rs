@@ -1,5 +1,5 @@
 use crate::{
-    datatypes::{AlbedoFlags, Material, MaterialHandle, TextureHandle},
+    datatypes::{Material, MaterialFlags, MaterialHandle, TextureHandle},
     registry::ResourceRegistry,
     renderer::{limits::MAX_UNIFORM_BUFFER_BINDING_SIZE, texture::TextureManager},
 };
@@ -24,6 +24,7 @@ struct ShaderMaterial {
     clear_coat: f32,
     clear_coat_roughness: f32,
     anisotropy: f32,
+    alpha_cutout: f32,
 
     albedo_tex: Option<NonZeroU32>,
     normal_tex: Option<NonZeroU32>,
@@ -33,7 +34,7 @@ struct ShaderMaterial {
     clear_coat_tex: Option<NonZeroU32>,
     clear_coat_roughness_tex: Option<NonZeroU32>,
     anisotropy_tex: Option<NonZeroU32>,
-    albedo_flags: AlbedoFlags,
+    material_flags: MaterialFlags,
 }
 
 unsafe impl bytemuck::Zeroable for ShaderMaterial {}
@@ -50,6 +51,8 @@ pub struct MaterialManager {
 impl MaterialManager {
     pub fn new(device: &Device, manager: &mut AutomatedBufferManager) -> Self {
         span_transfer!(_ -> new_span, INFO, "Creating Material Manager");
+
+        dbg!(MATERIALS_SIZE, MAX_MATERIALS, size_of::<ShaderMaterial>());
 
         let buffer = manager.create_new_buffer(
             device,
@@ -112,6 +115,7 @@ impl MaterialManager {
                         clear_coat: material.clear_coat.to_value(0.0),
                         clear_coat_roughness: material.clear_coat.to_value(0.0),
                         anisotropy: material.anisotropy.to_value(0.0),
+                        alpha_cutout: material.alpha_cutout.unwrap_or(0.0),
                         albedo_tex: material.albedo.to_texture(translate_texture),
                         normal_tex: material.normal.map(translate_texture),
                         roughness_tex: material.reflectance.to_texture(translate_texture),
@@ -120,7 +124,11 @@ impl MaterialManager {
                         clear_coat_tex: material.clear_coat.to_texture(translate_texture),
                         clear_coat_roughness_tex: material.clear_coat_roughness.to_texture(translate_texture),
                         anisotropy_tex: material.anisotropy.to_texture(translate_texture),
-                        albedo_flags: material.albedo.to_flags(),
+                        material_flags: {
+                            let mut flags = material.albedo.to_flags();
+                            flags.set(MaterialFlags::ALPHA_CUTOUT, material.alpha_cutout.is_some());
+                            flags
+                        },
                     }
                 }
             });

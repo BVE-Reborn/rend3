@@ -134,7 +134,7 @@ fn determine_dirty(current: &RendererOptions, new: &RendererOptions) -> DirtyRes
         dirty |= DirtyResources::FRAMEBUFFER;
     }
 
-    if current.vsync != current.vsync {
+    if current.vsync != new.vsync {
         dirty |= DirtyResources::SWAPCHAIN;
     }
 

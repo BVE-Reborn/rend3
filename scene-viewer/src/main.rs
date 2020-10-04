@@ -164,7 +164,7 @@ fn load_resources(renderer: &Renderer) {
         }
     }
 
-    let mesh_handle = renderer.add_mesh(mesh.clone());
+    let mesh_handle = renderer.add_mesh(mesh);
 
     for x in (-11..=11).step_by(4) {
         for y in (-11..=11).step_by(4) {

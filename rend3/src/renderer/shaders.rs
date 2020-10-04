@@ -22,6 +22,7 @@ pub struct ShaderArguments {
     pub debug: bool,
 }
 
+#[allow(clippy::derive_hash_xor_eq)]
 impl Hash for ShaderArguments {
     fn hash<H: Hasher>(&self, state: &mut H) {
         state.write(self.file.as_bytes());
@@ -29,7 +30,7 @@ impl Hash for ShaderArguments {
         state.write_u8(self.kind as u8);
         for (key, value) in &self.defines {
             state.write(key.as_bytes());
-            discriminant(&value).hash(state);
+            discriminant(value).hash(state);
             if let Some(ref value) = value {
                 state.write(value.as_bytes())
             }

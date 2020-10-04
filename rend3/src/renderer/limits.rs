@@ -65,7 +65,6 @@ fn check_limit_unlimited(d: u32, r: u32, ty: LimitType) -> Result<u32, RendererI
     }
 }
 
-#[must_use]
 pub fn check_limits(device_limits: Limits) -> Result<Limits, RendererInitializationError> {
     let required_limits = REQUIRED_LIMITS;
     Ok(Limits {
