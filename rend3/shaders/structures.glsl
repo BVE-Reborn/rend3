@@ -54,6 +54,7 @@ struct MaterialData {
     float clear_coat;
     float clear_coat_roughness;
     float anisotropy;
+    float ambient_occlusion;
     float alpha_cutout;
 
     uint albedo_tex;
@@ -64,6 +65,7 @@ struct MaterialData {
     uint clear_coat_tex;
     uint clear_coat_roughness_tex;
     uint anisotropy_tex;
+    uint ambient_occlusion_tex;
     uint material_flags;
 };
 

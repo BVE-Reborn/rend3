@@ -215,6 +215,7 @@ pub struct Material {
     pub clear_coat: MaterialComponent<f32>,
     pub clear_coat_roughness: MaterialComponent<f32>,
     pub anisotropy: MaterialComponent<f32>,
+    pub ambient_occlusion: MaterialComponent<f32>,
     pub alpha_cutout: Option<f32>,
 }
 

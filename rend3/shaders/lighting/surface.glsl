@@ -6,6 +6,13 @@
 #include "brdf.glsl"
 #include "pixel.glsl"
 
+float compute_micro_shadowing(float NoL, float visibility) {
+    // Chan 2018, "Material Advances in Call of Duty: WWII"
+    float aperture = inversesqrt(1.0 - visibility);
+    float micro_shadow = saturate(NoL * aperture);
+    return micro_shadow * micro_shadow;
+}
+
 vec3 surface_shading(PixelData pixel, vec3 v, vec3 l, float occlusion) {
     vec3 n = pixel.normal;
     vec3 h = normalize(v + l);
@@ -35,7 +42,7 @@ vec3 surface_shading(PixelData pixel, vec3 v, vec3 l, float occlusion) {
     vec4 light_color_intensity = vec4(vec3(10.0), 1.0);
     float light_attenuation = 1.0;
 
-    return (color * light_color_intensity.rgb) * (light_color_intensity.a * light_attenuation * NoL * occlusion);
+    return (color * light_color_intensity.rgb) * (light_color_intensity.a * light_attenuation * NoL * compute_micro_shadowing(NoL, occlusion));
 }
 
 #endif

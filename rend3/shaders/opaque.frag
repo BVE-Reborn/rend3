@@ -35,7 +35,7 @@ void main() {
     vec3 v = -normalize(i_view_position.xyz);
     vec3 l = normalize(mat3(uniforms.view) * vec3(1.0, 1.0, 0.0));
 
-    vec3 color = surface_shading(pixel, v, l, 1.0);
+    vec3 color = surface_shading(pixel, v, l, pixel.ambient_occlusion);
 
     o_color =  vec4(color, 1.0);
     o_normal = vec4(pixel.normal, 0.0);

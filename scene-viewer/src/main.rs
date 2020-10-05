@@ -98,10 +98,12 @@ fn load_resources(renderer: &Renderer) {
             let albedo = &material.map_kd;
             let normal = &material.map_bump;
             let roughness = &material.map_ns;
+            let ao = &material.map_d;
 
             let albedo_handle = load_texture(renderer, &mut textures, albedo, true);
             let normal_handle = load_texture(renderer, &mut textures, normal, false);
             let roughness_handle = load_texture(renderer, &mut textures, roughness, false);
+            let ao_handle = load_texture(renderer, &mut textures, ao, false);
 
             material_index_map.insert(material.name.clone(), materials.len() as u32);
 
@@ -112,6 +114,10 @@ fn load_resources(renderer: &Renderer) {
                 },
                 normal: normal_handle,
                 roughness: match roughness_handle {
+                    None => MaterialComponent::None,
+                    Some(handle) => MaterialComponent::Texture(handle),
+                },
+                ambient_occlusion: match ao_handle {
                     None => MaterialComponent::None,
                     Some(handle) => MaterialComponent::Texture(handle),
                 },

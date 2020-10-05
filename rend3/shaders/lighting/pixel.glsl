@@ -37,6 +37,7 @@ struct PixelData {
     float clear_coat_roughness;
     float clear_coat_perceptual_roughness;
     float anisotropy;
+    float ambient_occlusion;
     float alpha_cutout;
     uint material_flags;
 };
@@ -116,6 +117,12 @@ PixelData get_per_pixel_data(MaterialData material) {
         pixel.anisotropy = texture(sampler2D(textures[nonuniformEXT(material.anisotropy_tex - 1)], samplr), i_coords).r;
     } else {
         pixel.anisotropy = material.anisotropy;
+    }
+
+    if (has_texture(material.anisotropy_tex)) {
+        pixel.ambient_occlusion = texture(sampler2D(textures[nonuniformEXT(material.ambient_occlusion_tex - 1)], samplr), i_coords).r;
+    } else {
+        pixel.ambient_occlusion = material.ambient_occlusion;
     }
 
     pixel.alpha_cutout = material.alpha_cutout;
