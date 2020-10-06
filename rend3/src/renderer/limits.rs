@@ -14,6 +14,7 @@ macro_rules! REQUIRED_FEATURES {
             | wgpu::Features::SAMPLED_TEXTURE_ARRAY_DYNAMIC_INDEXING
             | wgpu::Features::SAMPLED_TEXTURE_ARRAY_NON_UNIFORM_INDEXING
             | wgpu::Features::UNSIZED_BINDING_ARRAY
+            | wgpu::Features::MULTI_DRAW_INDIRECT
             | wgpu::Features::MULTI_DRAW_INDIRECT_COUNT
     };
 }
