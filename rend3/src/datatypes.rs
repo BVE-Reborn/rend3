@@ -19,7 +19,13 @@ macro_rules! declare_handle {
     )*};
 }
 
-declare_handle!(MeshHandle, TextureHandle, MaterialHandle, ObjectHandle);
+declare_handle!(
+    MeshHandle,
+    TextureHandle,
+    MaterialHandle,
+    ObjectHandle,
+    DirectionalLightHandle
+);
 
 // Consider:
 //
@@ -74,6 +80,56 @@ impl From<RendererTextureFormat> for wgpu::TextureFormat {
             RendererTextureFormat::Rgba8Linear => TextureFormat::Rgba8Unorm,
         }
     }
+}
+
+macro_rules! changeable_struct {
+    ($(#[$outer:meta])* pub struct $name:ident <- nodefault $name_change:ident { $($field_vis:vis $field_name:ident : $field_type:ty),* $(,)? } ) => {
+        $(#[$outer])*
+        pub struct $name {
+            $(
+                $field_vis $field_name : $field_type
+            ),*
+        }
+        impl $name {
+            pub fn update_from_changes(&mut self, change: $name_change) {
+                $(
+                    if let Some(inner) = change.$field_name {
+                        self.$field_name = inner;
+                    }
+                );*
+            }
+        }
+        $(#[$outer])*
+        pub struct $name_change {
+            $(
+                $field_vis $field_name : Option<$field_type>
+            ),*
+        }
+    };
+    ($(#[$outer:meta])* pub struct $name:ident <- $name_change:ident { $($field_vis:vis $field_name:ident : $field_type:ty),* $(,)? } ) => {
+        $(#[$outer])*
+        pub struct $name {
+            $(
+                $field_vis $field_name : $field_type
+            ),*
+        }
+        impl $name {
+            pub fn update_from_changes(&mut self, change: $name_change) {
+                $(
+                    if let Some(inner) = change.$field_name {
+                        self.$field_name = inner;
+                    }
+                );*
+            }
+        }
+        $(#[$outer])*
+        #[derive(Default)]
+        pub struct $name_change {
+            $(
+                $field_vis $field_name : Option<$field_type>
+            ),*
+        }
+    };
 }
 
 #[derive(Debug, Clone)]
@@ -205,18 +261,20 @@ impl<T: Copy> MaterialComponent<T> {
 // Consider:
 //
 // - Green screen value
-#[derive(Debug, Default, Clone)]
-pub struct Material {
-    pub albedo: AlbedoComponent,
-    pub normal: Option<TextureHandle>,
-    pub roughness: MaterialComponent<f32>,
-    pub metallic: MaterialComponent<f32>,
-    pub reflectance: MaterialComponent<f32>,
-    pub clear_coat: MaterialComponent<f32>,
-    pub clear_coat_roughness: MaterialComponent<f32>,
-    pub anisotropy: MaterialComponent<f32>,
-    pub ambient_occlusion: MaterialComponent<f32>,
-    pub alpha_cutout: Option<f32>,
+changeable_struct! {
+    #[derive(Debug, Default, Clone)]
+    pub struct Material <- nodefault MaterialChange {
+        pub albedo: AlbedoComponent,
+        pub normal: Option<TextureHandle>,
+        pub roughness: MaterialComponent<f32>,
+        pub metallic: MaterialComponent<f32>,
+        pub reflectance: MaterialComponent<f32>,
+        pub clear_coat: MaterialComponent<f32>,
+        pub clear_coat_roughness: MaterialComponent<f32>,
+        pub anisotropy: MaterialComponent<f32>,
+        pub ambient_occlusion: MaterialComponent<f32>,
+        pub alpha_cutout: Option<f32>,
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -231,4 +289,13 @@ pub struct CameraLocation {
     pub location: Vec3A,
     pub pitch: f32,
     pub yaw: f32,
+}
+
+changeable_struct! {
+    pub struct DirectionalLight <- DirectionalLightChange {
+        pub color: Vec3,
+        pub intensity: f32,
+        pub direction: Vec3,
+        pub shadow_caster: bool,
+    }
 }

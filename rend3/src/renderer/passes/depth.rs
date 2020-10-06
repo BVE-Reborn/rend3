@@ -17,9 +17,8 @@ impl DepthPass {
     pub fn new<'a>(
         device: &'a Device,
         shader_manager: &ShaderManager,
-        input_bgl: &BindGroupLayout,
+        general_bgl: &BindGroupLayout,
         output_noindirect_bgl: &BindGroupLayout,
-        material_bgl: &BindGroupLayout,
         texture_2d_bgl: &BindGroupLayout,
         uniform_bgl: &BindGroupLayout,
     ) -> impl Future<Output = Self> + 'a {
@@ -42,9 +41,8 @@ impl DepthPass {
 
         let layout = util::create_render_pipeline_layout(
             device,
-            input_bgl,
+            general_bgl,
             output_noindirect_bgl,
-            material_bgl,
             texture_2d_bgl,
             uniform_bgl,
             util::RenderPipelineLayoutType::Depth,
@@ -71,18 +69,16 @@ impl DepthPass {
     pub fn update_pipeline(
         &mut self,
         device: &Device,
-        input_bgl: &BindGroupLayout,
+        general_bgl: &BindGroupLayout,
         output_noindirect_bgl: &BindGroupLayout,
-        material_bgl: &BindGroupLayout,
         texture_2d_bgl: &BindGroupLayout,
         uniform_bgl: &BindGroupLayout,
     ) {
         span_transfer!(_ -> update_pipeline_span, INFO, "Depth Pass Update Pipeline");
         let layout = util::create_render_pipeline_layout(
             device,
-            input_bgl,
+            general_bgl,
             output_noindirect_bgl,
-            material_bgl,
             texture_2d_bgl,
             uniform_bgl,
             util::RenderPipelineLayoutType::Depth,
@@ -104,9 +100,8 @@ impl DepthPass {
         index_buffer: &'a Buffer,
         indirect_buffer: &'a Buffer,
         count_buffer: &'a Buffer,
-        input_bg: &'a BindGroup,
+        general_bg: &'a BindGroup,
         output_noindirect_bg: &'a BindGroup,
-        material_bg: &'a BindGroup,
         texture_2d_bg: &'a BindGroup,
         uniform_bg: &'a BindGroup,
         object_count: u32,
@@ -114,11 +109,10 @@ impl DepthPass {
         rpass.set_pipeline(&self.pipeline);
         rpass.set_vertex_buffer(0, vertex_buffer.slice(..));
         rpass.set_index_buffer(index_buffer.slice(..));
-        rpass.set_bind_group(0, &input_bg, &[]);
+        rpass.set_bind_group(0, &general_bg, &[]);
         rpass.set_bind_group(1, &output_noindirect_bg, &[]);
-        rpass.set_bind_group(2, &material_bg, &[]);
-        rpass.set_bind_group(3, &texture_2d_bg, &[]);
-        rpass.set_bind_group(4, &uniform_bg, &[]);
+        rpass.set_bind_group(2, &texture_2d_bg, &[]);
+        rpass.set_bind_group(3, &uniform_bg, &[]);
         rpass.multi_draw_indexed_indirect_count(indirect_buffer, 0, count_buffer, 0, object_count);
     }
 }

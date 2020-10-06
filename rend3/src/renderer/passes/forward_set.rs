@@ -52,12 +52,12 @@ impl ForwardPassSet {
         &'a self,
         culling_pass: &'a passes::CullingPass,
         cpass: &mut ComputePass<'a>,
-        input_bg: &'a BindGroup,
+        general_bg: &'a BindGroup,
         data: &'a ForwardPassSetData,
     ) {
         span_transfer!(_ -> compute_span, WARN, "Running ForwardPassSet Compute");
 
-        culling_pass.run(cpass, input_bg, &self.uniform.uniform_bg, &data.culling_pass_data);
+        culling_pass.run(cpass, general_bg, &self.uniform.uniform_bg, &data.culling_pass_data);
     }
 
     pub fn render<'a>(
@@ -68,8 +68,7 @@ impl ForwardPassSet {
         rpass: &mut RenderPass<'a>,
         vertex_buffer: &'a Buffer,
         index_buffer: &'a Buffer,
-        input_bg: &'a BindGroup,
-        material_bg: &'a BindGroup,
+        general_bg: &'a BindGroup,
         texture_2d_bg: &'a BindGroup,
         texture_cube_bg: &'a BindGroup,
         data: &'a ForwardPassSetData,
@@ -83,9 +82,8 @@ impl ForwardPassSet {
             index_buffer,
             &data.culling_pass_data.indirect_buffer,
             &data.culling_pass_data.count_buffer,
-            input_bg,
+            general_bg,
             &data.culling_pass_data.output_noindirect_bg,
-            material_bg,
             texture_2d_bg,
             &self.uniform.uniform_bg,
             data.culling_pass_data.object_count,
@@ -101,9 +99,8 @@ impl ForwardPassSet {
             index_buffer,
             &data.culling_pass_data.indirect_buffer,
             &data.culling_pass_data.count_buffer,
-            input_bg,
+            general_bg,
             &data.culling_pass_data.output_noindirect_bg,
-            material_bg,
             texture_2d_bg,
             &self.uniform.uniform_bg,
             data.culling_pass_data.object_count,

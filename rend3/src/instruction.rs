@@ -1,3 +1,4 @@
+use crate::datatypes::MaterialChange;
 use crate::{
     datatypes::{
         AffineTransform, CameraLocation, Material, MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, Texture,
@@ -33,6 +34,10 @@ pub enum Instruction {
     AddMaterial {
         handle: MaterialHandle,
         material: Material,
+    },
+    ChangeMaterial {
+        handle: MaterialHandle,
+        change: MaterialChange,
     },
     RemoveMaterial {
         handle: MaterialHandle,

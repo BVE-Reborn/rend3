@@ -39,6 +39,7 @@ macro_rules! span_transfer {
     };
 }
 
+mod bind_merge;
 pub mod datatypes;
 mod instruction;
 mod options;

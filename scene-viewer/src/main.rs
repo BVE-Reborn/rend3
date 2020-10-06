@@ -1,7 +1,8 @@
 use fnv::FnvBuildHasher;
-use glam::{Mat4, Vec2, Vec3};
+use glam::{Mat4, Quat, Vec2, Vec3};
 use imgui::FontSource;
 use obj::{IndexTuple, Obj, ObjMaterial};
+use rend3::datatypes::{MaterialHandle, MeshHandle};
 use rend3::{
     datatypes::{
         AffineTransform, AlbedoComponent, CameraLocation, Material, MaterialComponent, Mesh, ModelVertex, Object,
@@ -81,10 +82,10 @@ fn load_skybox(renderer: &Renderer) {
     renderer.set_background_texture(handle);
 }
 
-fn load_resources(renderer: &Renderer) {
+fn load_obj(renderer: &Renderer, file: &str) -> (MeshHandle, SmallVec<[MaterialHandle; 4]>) {
     rend3::span!(obj_guard, INFO, "Loading Obj");
 
-    let mut object = Obj::load("tmp/suzanne.obj").unwrap();
+    let mut object = Obj::load(file).unwrap();
     object.load_mtls().unwrap();
 
     drop(obj_guard);
@@ -176,11 +177,29 @@ fn load_resources(renderer: &Renderer) {
 
     let mesh_handle = renderer.add_mesh(mesh);
 
+    (mesh_handle, materials)
+}
+
+fn single(renderer: &Renderer, mesh: MeshHandle, materials: SmallVec<[MaterialHandle; 4]>) {
+    renderer.add_object(Object {
+        mesh,
+        materials,
+        transform: AffineTransform {
+            transform: Mat4::from_scale_rotation_translation(
+                Vec3::new(1.0, 1.0, 1.0),
+                Quat::identity(),
+                Vec3::new(0.0, -10.0, 10.0),
+            ),
+        },
+    });
+}
+
+fn distribute(renderer: &Renderer, mesh: MeshHandle, materials: SmallVec<[MaterialHandle; 4]>) {
     for x in (-11..=11).step_by(4) {
         for y in (-11..=11).step_by(4) {
             for z in (0..=100).step_by(10) {
                 renderer.add_object(Object {
-                    mesh: mesh_handle,
+                    mesh,
                     materials: materials.clone(),
                     transform: AffineTransform {
                         transform: Mat4::from_translation(Vec3::new(x as f32, y as f32, z as f32)),
@@ -256,7 +275,10 @@ fn main() {
 
     rend3::span_transfer!(renderer_span -> loading_span, INFO, "Loading resources");
 
-    load_resources(&renderer);
+    let cube = load_obj(&renderer, "tmp/cube.obj");
+    single(&renderer, cube.0, cube.1);
+    let suzanne = load_obj(&renderer, "tmp/suzanne.obj");
+    distribute(&renderer, suzanne.0, suzanne.1);
     load_skybox(&renderer);
 
     rend3::span_transfer!(loading_span -> _);

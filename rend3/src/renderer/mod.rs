@@ -1,3 +1,5 @@
+use crate::bind_merge::BindGroupManager;
+use crate::datatypes::MaterialChange;
 use crate::{
     datatypes::{
         AffineTransform, CameraLocation, Material, MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, Texture,
@@ -25,6 +27,7 @@ mod camera;
 pub mod error;
 mod frustum;
 mod info;
+mod light;
 pub mod limits;
 mod material;
 mod mesh;
@@ -67,6 +70,8 @@ where
     texture_manager_cube: RwLock<TextureManager>,
     material_manager: RwLock<MaterialManager>,
     object_manager: RwLock<ObjectManager>,
+
+    general_bgm: Mutex<BindGroupManager>,
 
     forward_pass_set: ForwardPassSet,
 
@@ -147,6 +152,13 @@ impl<TLD: 'static> Renderer<TLD> {
             .lock()
             .push(Instruction::AddMaterial { handle, material });
         handle
+    }
+
+    pub fn update_material(&self, handle: MaterialHandle, change: MaterialChange) {
+        self.instructions
+            .producer
+            .lock()
+            .push(Instruction::ChangeMaterial { handle, change })
     }
 
     pub fn remove_material(&self, handle: MaterialHandle) {

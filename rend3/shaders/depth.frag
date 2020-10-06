@@ -9,15 +9,15 @@ layout(location = 1) in vec2 i_coords;
 layout(location = 2) in vec4 i_color;
 layout(location = 3) flat in uint i_material;
 
+layout(set = 0, binding = 2) uniform MaterialBuffer {
+    MaterialData materials[MATERIAL_COUNT];
+};
 layout(set = 1, binding = 0, std430) restrict readonly buffer ObjectOutputDataBuffer {
     ObjectOutputData object_output[];
 };
-layout(set = 2, binding = 0) uniform MaterialBuffer {
-    MaterialData materials[MATERIAL_COUNT];
-};
-layout(set = 3, binding = 0) uniform texture2D textures[];
-layout(set = 3, binding = 1) uniform sampler samplr;
-layout(set = 4, binding = 0) uniform UniformBuffer {
+layout(set = 2, binding = 0) uniform texture2D textures[];
+layout(set = 2, binding = 1) uniform sampler samplr;
+layout(set = 3, binding = 0) uniform UniformBuffer {
     UniformData uniforms;
 };
 

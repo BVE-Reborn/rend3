@@ -94,23 +94,22 @@ impl TextureManager {
         self.registry.get_index_of(handle.0)
     }
 
-    pub fn ready(&mut self, device: &Device, sampler: &Sampler) -> (Option<Arc<BindGroupLayout>>, Arc<BindGroup>) {
+    pub fn ready(&mut self, device: &Device, sampler: &Sampler) -> (Arc<BindGroupLayout>, Arc<BindGroup>, bool) {
         span_transfer!(_ -> ready_span, INFO, "Material Manager Ready");
 
-        let layout = if self.layout_dirty {
+        let layout_dirty = self.layout_dirty;
+
+        if self.layout_dirty {
             self.layout = create_bind_group_layout(device, self.views.len() as u32, self.dimension);
             self.layout_dirty = false;
-            Some(Arc::clone(&self.layout))
-        } else {
-            None
-        };
+        }
 
         if self.group_dirty {
             self.group = create_bind_group(device, &self.layout, &self.views, sampler, self.dimension);
             self.group_dirty = false;
         }
 
-        (layout, Arc::clone(&self.group))
+        (Arc::clone(&self.layout), Arc::clone(&self.group), layout_dirty)
     }
 
     pub fn bind_group_layout(&self) -> &BindGroupLayout {

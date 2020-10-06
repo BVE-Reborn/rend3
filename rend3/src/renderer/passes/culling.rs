@@ -38,7 +38,7 @@ impl CullingPass {
         shader_manager: &ShaderManager,
         prefix_sum_bgl: &BindGroupLayout,
         pre_cull_bgl: &BindGroupLayout,
-        input_bgl: &BindGroupLayout,
+        general_bgl: &BindGroupLayout,
         output_bgl: &BindGroupLayout,
         uniform_bgl: &BindGroupLayout,
         subgroup_size: u32,
@@ -69,7 +69,7 @@ impl CullingPass {
 
         let pre_cull_pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: Some("pre-cull pipeline layout"),
-            bind_group_layouts: &[input_bgl, pre_cull_bgl, uniform_bgl],
+            bind_group_layouts: &[general_bgl, pre_cull_bgl, uniform_bgl],
             push_constant_ranges: &[PushConstantRange {
                 range: 0..4,
                 stages: ShaderStage::COMPUTE,
@@ -87,7 +87,7 @@ impl CullingPass {
 
         let post_cull_pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: Some("post-cull pipeline layout"),
-            bind_group_layouts: &[input_bgl, output_bgl, uniform_bgl],
+            bind_group_layouts: &[general_bgl, output_bgl, uniform_bgl],
             push_constant_ranges: &[PushConstantRange {
                 range: 0..4,
                 stages: ShaderStage::COMPUTE,
@@ -299,7 +299,7 @@ impl CullingPass {
     pub fn run<'a>(
         &'a self,
         cpass: &mut ComputePass<'a>,
-        input_bg: &'a BindGroup,
+        general_bg: &'a BindGroup,
         uniform_bg: &'a BindGroup,
         data: &'a CullingPassData,
     ) {
@@ -308,7 +308,7 @@ impl CullingPass {
         span_transfer!(_ -> run_span, WARN, "Running CullingPass");
         cpass.set_pipeline(&self.pre_cull_pipeline);
         cpass.set_push_constants(0, &[data.object_count]);
-        cpass.set_bind_group(0, input_bg, &[]);
+        cpass.set_bind_group(0, general_bg, &[]);
         cpass.set_bind_group(1, &data.pre_cull_bg, &[]);
         cpass.set_bind_group(2, uniform_bg, &[]);
         cpass.dispatch(dispatch_count, 1, 1);
@@ -331,7 +331,7 @@ impl CullingPass {
 
         cpass.set_pipeline(&self.post_cull_pipeline);
         cpass.set_push_constants(0, &[data.object_count]);
-        cpass.set_bind_group(0, input_bg, &[]);
+        cpass.set_bind_group(0, general_bg, &[]);
         cpass.set_bind_group(1, &data.output_bg, &[]);
         cpass.set_bind_group(2, uniform_bg, &[]);
         cpass.dispatch(dispatch_count, 1, 1);

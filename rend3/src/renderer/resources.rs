@@ -22,10 +22,8 @@ pub struct RendererGlobalResources {
     pub blit_bgl: BindGroupLayout,
     pub prefix_sum_bgl: BindGroupLayout,
     pub pre_cull_bgl: BindGroupLayout,
-    pub object_input_bgl: BindGroupLayout,
     pub object_output_bgl: BindGroupLayout,
     pub object_output_noindirect_bgl: BindGroupLayout,
-    pub material_bgl: BindGroupLayout,
     pub uniform_bgl: BindGroupLayout,
 
     pub sampler: Sampler,
@@ -46,10 +44,8 @@ impl RendererGlobalResources {
         let blit_bgl = util::create_blit_bgl(device);
         let prefix_sum_bgl = util::create_prefix_sum_bgl(device);
         let pre_cull_bgl = util::create_pre_cull_bgl(device);
-        let object_input_bgl = util::create_object_input_bgl(device);
         let object_output_bgl = util::create_object_output_bgl(device);
         let object_output_noindirect_bgl = util::create_object_output_noindirect_bgl(device);
-        let material_bgl = util::create_material_bgl(device);
         let uniform_bgl = util::create_uniform_bgl(device);
 
         let sampler = util::create_sampler(device);
@@ -70,10 +66,8 @@ impl RendererGlobalResources {
             blit_bgl,
             prefix_sum_bgl,
             pre_cull_bgl,
-            object_input_bgl,
             object_output_bgl,
             object_output_noindirect_bgl,
-            material_bgl,
             uniform_bgl,
             sampler,
         }

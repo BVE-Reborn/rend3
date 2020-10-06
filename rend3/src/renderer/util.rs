@@ -126,32 +126,38 @@ pub fn create_pre_cull_bgl(device: &Device) -> BindGroupLayout {
     })
 }
 
-pub fn create_object_input_bgl(device: &Device) -> BindGroupLayout {
-    device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-        label: Some("object input bgl"),
-        entries: &[
-            BindGroupLayoutEntry {
-                binding: 0,
-                visibility: ShaderStage::COMPUTE,
-                ty: BindingType::StorageBuffer {
-                    dynamic: false,
-                    min_binding_size: None,
-                    readonly: true,
-                },
-                count: None,
+pub fn create_general_bind_group_entries() -> Vec<BindGroupLayoutEntry> {
+    vec![
+        BindGroupLayoutEntry {
+            binding: 0,
+            visibility: ShaderStage::COMPUTE,
+            ty: BindingType::StorageBuffer {
+                dynamic: false,
+                min_binding_size: None,
+                readonly: true,
             },
-            BindGroupLayoutEntry {
-                binding: 1,
-                visibility: ShaderStage::VERTEX,
-                ty: BindingType::StorageBuffer {
-                    dynamic: false,
-                    min_binding_size: None,
-                    readonly: true,
-                },
-                count: None,
+            count: None,
+        },
+        BindGroupLayoutEntry {
+            binding: 1,
+            visibility: ShaderStage::VERTEX,
+            ty: BindingType::StorageBuffer {
+                dynamic: false,
+                min_binding_size: None,
+                readonly: true,
             },
-        ],
-    })
+            count: None,
+        },
+        BindGroupLayoutEntry {
+            binding: 2,
+            visibility: ShaderStage::FRAGMENT,
+            ty: BindingType::UniformBuffer {
+                dynamic: false,
+                min_binding_size: None,
+            },
+            count: None,
+        },
+    ]
 }
 
 pub fn create_object_output_bgl(device: &Device) -> BindGroupLayout {
@@ -196,21 +202,6 @@ pub fn create_object_output_noindirect_bgl(device: &Device) -> BindGroupLayout {
                 dynamic: false,
                 min_binding_size: None,
                 readonly: false,
-            },
-            count: None,
-        }],
-    })
-}
-
-pub fn create_material_bgl(device: &Device) -> BindGroupLayout {
-    device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-        label: Some("material bgl"),
-        entries: &[BindGroupLayoutEntry {
-            binding: 0,
-            visibility: ShaderStage::FRAGMENT,
-            ty: BindingType::UniformBuffer {
-                dynamic: false,
-                min_binding_size: None,
             },
             count: None,
         }],
@@ -306,7 +297,6 @@ pub fn create_render_pipeline_layout(
     device: &Device,
     input_bgl: &BindGroupLayout,
     output_noindirect_bgl: &BindGroupLayout,
-    material_bgl: &BindGroupLayout,
     texture_bgl: &BindGroupLayout,
     uniform_bgl: &BindGroupLayout,
     ty: RenderPipelineLayoutType,
@@ -316,7 +306,7 @@ pub fn create_render_pipeline_layout(
             RenderPipelineLayoutType::Depth => "depth pipeline layout",
             RenderPipelineLayoutType::Opaque => "opaque pipeline layout",
         }),
-        bind_group_layouts: &[input_bgl, output_noindirect_bgl, material_bgl, texture_bgl, uniform_bgl],
+        bind_group_layouts: &[input_bgl, output_noindirect_bgl, texture_bgl, uniform_bgl],
         push_constant_ranges: &[],
     })
 }

@@ -19,7 +19,6 @@ impl OpaquePass {
         shader_manager: &ShaderManager,
         input_bgl: &BindGroupLayout,
         output_noindirect_bgl: &BindGroupLayout,
-        material_bgl: &BindGroupLayout,
         texture_2d_bgl: &BindGroupLayout,
         uniform_bgl: &BindGroupLayout,
     ) -> impl Future<Output = Self> + 'a {
@@ -44,7 +43,6 @@ impl OpaquePass {
             device,
             input_bgl,
             output_noindirect_bgl,
-            material_bgl,
             texture_2d_bgl,
             uniform_bgl,
             util::RenderPipelineLayoutType::Opaque,
@@ -73,7 +71,6 @@ impl OpaquePass {
         device: &Device,
         input_bgl: &BindGroupLayout,
         output_noindirect_bgl: &BindGroupLayout,
-        material_bgl: &BindGroupLayout,
         texture_2d_bgl: &BindGroupLayout,
         uniform_bgl: &BindGroupLayout,
     ) {
@@ -82,7 +79,6 @@ impl OpaquePass {
             device,
             input_bgl,
             output_noindirect_bgl,
-            material_bgl,
             texture_2d_bgl,
             uniform_bgl,
             util::RenderPipelineLayoutType::Opaque,
@@ -106,7 +102,6 @@ impl OpaquePass {
         count_buffer: &'a Buffer,
         input_bg: &'a BindGroup,
         output_noindirect_bg: &'a BindGroup,
-        material_bg: &'a BindGroup,
         texture_2d_bg: &'a BindGroup,
         uniform_bg: &'a BindGroup,
         object_count: u32,
@@ -116,9 +111,8 @@ impl OpaquePass {
         rpass.set_index_buffer(index_buffer.slice(..));
         rpass.set_bind_group(0, &input_bg, &[]);
         rpass.set_bind_group(1, &output_noindirect_bg, &[]);
-        rpass.set_bind_group(2, &material_bg, &[]);
-        rpass.set_bind_group(3, &texture_2d_bg, &[]);
-        rpass.set_bind_group(4, &uniform_bg, &[]);
+        rpass.set_bind_group(2, &texture_2d_bg, &[]);
+        rpass.set_bind_group(3, &uniform_bg, &[]);
         rpass.multi_draw_indexed_indirect_count(indirect_buffer, 0, count_buffer, 0, object_count);
     }
 }

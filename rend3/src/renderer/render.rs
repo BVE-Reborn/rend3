@@ -145,6 +145,9 @@ pub fn render_loop<TLD: 'static>(renderer: Arc<Renderer<TLD>>) -> impl Future<Ou
                 Instruction::AddMaterial { handle, material } => {
                     material_manager.fill(handle, material);
                 }
+                Instruction::ChangeMaterial { handle, change } => {
+                    material_manager.get_mut(handle).update_from_changes(change)
+                }
                 Instruction::RemoveMaterial { handle } => {
                     material_manager.remove(handle);
                 }
@@ -173,23 +176,23 @@ pub fn render_loop<TLD: 'static>(renderer: Arc<Renderer<TLD>>) -> impl Future<Ou
             }
         }
 
-        let (texture_2d_bgl, texture_2d_bg) = texture_manager_2d.ready(&renderer.device, &global_resources.sampler);
-        let (texture_cube_bgl, texture_cube_bg) =
+        let mut general_bgm = renderer.general_bgm.lock();
+        let mut general_bgb = general_bgm.builder();
+
+        let (texture_2d_bgl, texture_2d_bg, texture_2d_bgl_dirty) =
+            texture_manager_2d.ready(&renderer.device, &global_resources.sampler);
+        let (texture_cube_bgl, texture_cube_bg, texture_cube_bgl_dirty) =
             texture_manager_cube.ready(&renderer.device, &global_resources.sampler);
-        let material_bgk = material_manager.ready(
-            &renderer.device,
-            &mut encoder,
-            &texture_manager_2d,
-            &global_resources.material_bgl,
-        );
-        let (object_bgk, object_count) = object_manager.ready(
-            &renderer.device,
-            &mut encoder,
-            &material_manager,
-            &global_resources.object_input_bgl,
-        );
+        material_manager.ready(&renderer.device, &mut encoder, &texture_manager_2d);
+        let object_count = object_manager.ready(&renderer.device, &mut encoder, &material_manager);
+
+        object_manager.append_to_bgb(&mut general_bgb);
+        material_manager.append_to_bgb(&mut general_bgb);
+
+        let (general_bgl, general_bg, general_bgl_dirty) = general_bgb.build(&renderer.device);
 
         drop((
+            general_bgm,
             global_resources,
             mesh_manager,
             texture_manager_2d,
@@ -211,26 +214,29 @@ pub fn render_loop<TLD: 'static>(renderer: Arc<Renderer<TLD>>) -> impl Future<Ou
 
         let global_resources = renderer.global_resources.read();
 
-        if let Some(texture_2d_bgl) = texture_2d_bgl {
+        let forward_pass_data =
+            renderer
+                .forward_pass_set
+                .prepare(&renderer, &global_resources, &global_resources.camera, object_count);
+
+        if texture_2d_bgl_dirty || general_bgl_dirty {
             renderer.depth_pass.write().update_pipeline(
                 &renderer.device,
-                &global_resources.object_input_bgl,
+                &general_bgl,
                 &global_resources.object_output_noindirect_bgl,
-                &global_resources.material_bgl,
                 &texture_2d_bgl,
                 &global_resources.uniform_bgl,
             );
             renderer.opaque_pass.write().update_pipeline(
                 &renderer.device,
-                &global_resources.object_input_bgl,
+                &general_bgl,
                 &global_resources.object_output_noindirect_bgl,
-                &global_resources.material_bgl,
                 &texture_2d_bgl,
                 &global_resources.uniform_bgl,
             );
         }
 
-        if let Some(texture_cube_bgl) = texture_cube_bgl {
+        if texture_cube_bgl_dirty {
             renderer.skybox_pass.write().update_pipeline(
                 &renderer.device,
                 &texture_cube_bgl,
@@ -238,24 +244,16 @@ pub fn render_loop<TLD: 'static>(renderer: Arc<Renderer<TLD>>) -> impl Future<Ou
             );
         }
 
-        let forward_pass_data =
-            renderer
-                .forward_pass_set
-                .prepare(&renderer, &global_resources, &global_resources.camera, object_count);
-
         span_transfer!(resource_update_span -> compute_pass_span, INFO, "Primary ComputePass");
 
         let mesh_manager = renderer.mesh_manager.read();
         let (vertex_buffer, index_buffer) = mesh_manager.buffers();
-        let material_manager = renderer.material_manager.read();
-        let material_bg = material_manager.bind_group(&material_bgk);
         let object_manager = renderer.object_manager.read();
-        let input_bg = object_manager.bind_group(&object_bgk);
 
         let mut cpass = encoder.begin_compute_pass();
         renderer
             .forward_pass_set
-            .compute(&renderer.culling_pass, &mut cpass, input_bg, &forward_pass_data);
+            .compute(&renderer.culling_pass, &mut cpass, &general_bg, &forward_pass_data);
         drop(cpass);
 
         span_transfer!(compute_pass_span -> render_pass_span, INFO, "Primary Renderpass");
@@ -266,6 +264,7 @@ pub fn render_loop<TLD: 'static>(renderer: Arc<Renderer<TLD>>) -> impl Future<Ou
 
         let global_resources = renderer.global_resources.read();
         let texture_manager_cube = renderer.texture_manager_cube.read();
+        let material_manager = renderer.material_manager.read();
         let depth_pass = renderer.depth_pass.read();
         let skybox_pass = renderer.skybox_pass.read();
         let opaque_pass = renderer.opaque_pass.read();
@@ -312,8 +311,7 @@ pub fn render_loop<TLD: 'static>(renderer: Arc<Renderer<TLD>>) -> impl Future<Ou
             &mut rpass,
             vertex_buffer,
             index_buffer,
-            &input_bg,
-            &material_bg,
+            &general_bg,
             &texture_2d_bg,
             &texture_cube_bg,
             &forward_pass_data,
