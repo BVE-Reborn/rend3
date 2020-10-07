@@ -1,6 +1,5 @@
-use crate::bind_merge::BindGroupManager;
-use crate::renderer::util;
 use crate::{
+    bind_merge::BindGroupManager,
     instruction::InstructionStreamPair,
     renderer::{
         info::ExtendedAdapterInfo,
@@ -13,7 +12,7 @@ use crate::{
         resources::RendererGlobalResources,
         shaders::ShaderManager,
         texture::{TextureManager, STARTING_2D_TEXTURES, STARTING_CUBE_TEXTURES},
-        Renderer, SWAPCHAIN_FORMAT,
+        util, Renderer, SWAPCHAIN_FORMAT,
     },
     RendererInitializationError, RendererOptions,
 };

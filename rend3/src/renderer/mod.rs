@@ -1,9 +1,8 @@
-use crate::bind_merge::BindGroupManager;
-use crate::datatypes::MaterialChange;
 use crate::{
+    bind_merge::BindGroupManager,
     datatypes::{
-        AffineTransform, CameraLocation, Material, MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, Texture,
-        TextureHandle,
+        AffineTransform, CameraLocation, Material, MaterialChange, MaterialHandle, Mesh, MeshHandle, Object,
+        ObjectHandle, Texture, TextureHandle,
     },
     instruction::{Instruction, InstructionStreamPair},
     renderer::{

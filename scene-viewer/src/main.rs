@@ -2,11 +2,10 @@ use fnv::FnvBuildHasher;
 use glam::{Mat4, Quat, Vec2, Vec3};
 use imgui::FontSource;
 use obj::{IndexTuple, Obj, ObjMaterial};
-use rend3::datatypes::{MaterialHandle, MeshHandle};
 use rend3::{
     datatypes::{
-        AffineTransform, AlbedoComponent, CameraLocation, Material, MaterialComponent, Mesh, ModelVertex, Object,
-        RendererTextureFormat, Texture, TextureHandle,
+        AffineTransform, AlbedoComponent, CameraLocation, Material, MaterialComponent, MaterialHandle, Mesh,
+        MeshHandle, ModelVertex, Object, RendererTextureFormat, Texture, TextureHandle,
     },
     Renderer, RendererOptions, VSyncMode,
 };

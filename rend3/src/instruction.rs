@@ -1,8 +1,7 @@
-use crate::datatypes::MaterialChange;
 use crate::{
     datatypes::{
-        AffineTransform, CameraLocation, Material, MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, Texture,
-        TextureHandle,
+        AffineTransform, CameraLocation, Material, MaterialChange, MaterialHandle, Mesh, MeshHandle, Object,
+        ObjectHandle, Texture, TextureHandle,
     },
     RendererOptions,
 };

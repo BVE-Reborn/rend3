@@ -119,7 +119,7 @@ PixelData get_per_pixel_data(MaterialData material) {
         pixel.anisotropy = material.anisotropy;
     }
 
-    if (has_texture(material.anisotropy_tex)) {
+    if (has_texture(material.ambient_occlusion_tex)) {
         pixel.ambient_occlusion = texture(sampler2D(textures[nonuniformEXT(material.ambient_occlusion_tex - 1)], samplr), i_coords).r;
     } else {
         pixel.ambient_occlusion = material.ambient_occlusion;

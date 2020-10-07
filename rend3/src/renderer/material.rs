@@ -1,12 +1,11 @@
-use crate::bind_merge::BindGroupBuilder;
 use crate::{
+    bind_merge::BindGroupBuilder,
     datatypes::{Material, MaterialFlags, MaterialHandle, TextureHandle},
     registry::ResourceRegistry,
     renderer::{limits::MAX_UNIFORM_BUFFER_BINDING_SIZE, texture::TextureManager},
 };
 use glam::f32::Vec4;
-use std::sync::Arc;
-use std::{mem::size_of, num::NonZeroU32};
+use std::{mem::size_of, num::NonZeroU32, sync::Arc};
 use wgpu::{BindGroupEntry, BindingResource, BufferAddress, BufferUsage, CommandEncoder, Device};
 use wgpu_conveyor::{AutomatedBuffer, AutomatedBufferManager, IdBuffer};
 

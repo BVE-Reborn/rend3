@@ -1,12 +1,11 @@
-use crate::bind_merge::BindGroupBuilder;
 use crate::{
+    bind_merge::BindGroupBuilder,
     datatypes::{AffineTransform, MaterialHandle, Object, ObjectHandle},
     registry::ResourceRegistry,
     renderer::{frustum::BoundingSphere, material::MaterialManager, mesh::MeshManager},
 };
 use smallvec::SmallVec;
-use std::mem::size_of;
-use std::sync::Arc;
+use std::{mem::size_of, sync::Arc};
 use wgpu::{BindGroupEntry, BindingResource, BufferAddress, BufferUsage, CommandEncoder, Device};
 use wgpu_conveyor::{write_to_buffer2, AutomatedBuffer, AutomatedBufferManager, IdBuffer};
 

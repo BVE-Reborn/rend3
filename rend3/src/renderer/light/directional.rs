@@ -1,5 +1,7 @@
-use crate::datatypes::{DirectionalLight, DirectionalLightHandle};
-use crate::registry::ResourceRegistry;
+use crate::{
+    datatypes::{DirectionalLight, DirectionalLightHandle},
+    registry::ResourceRegistry,
+};
 
 pub struct DirectionalLightManager {
     registry: ResourceRegistry<DirectionalLight>,
