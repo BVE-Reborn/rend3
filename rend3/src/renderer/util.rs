@@ -159,6 +159,12 @@ pub fn create_general_bind_group_layout(device: &Device) -> BindGroupLayout {
                 },
                 count: None,
             },
+            BindGroupLayoutEntry {
+                binding: 3,
+                visibility: ShaderStage::FRAGMENT,
+                ty: BindingType::Sampler { comparison: false },
+                count: None,
+            },
         ],
     })
 }
@@ -197,17 +203,28 @@ pub fn create_object_output_bgl(device: &Device) -> BindGroupLayout {
 }
 pub fn create_object_output_noindirect_bgl(device: &Device) -> BindGroupLayout {
     device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-        label: Some("object output bgl"),
-        entries: &[BindGroupLayoutEntry {
-            binding: 0,
-            visibility: ShaderStage::VERTEX | ShaderStage::FRAGMENT | ShaderStage::COMPUTE,
-            ty: BindingType::StorageBuffer {
-                dynamic: false,
-                min_binding_size: None,
-                readonly: false,
+        label: Some("object output noindirect bgl"),
+        entries: &[
+            BindGroupLayoutEntry {
+                binding: 0,
+                visibility: ShaderStage::VERTEX | ShaderStage::FRAGMENT | ShaderStage::COMPUTE,
+                ty: BindingType::StorageBuffer {
+                    dynamic: false,
+                    min_binding_size: None,
+                    readonly: false,
+                },
+                count: None,
             },
-            count: None,
-        }],
+            BindGroupLayoutEntry {
+                binding: 1,
+                visibility: ShaderStage::COMPUTE | ShaderStage::FRAGMENT,
+                ty: BindingType::UniformBuffer {
+                    dynamic: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            },
+        ],
     })
 }
 
@@ -301,7 +318,6 @@ pub fn create_render_pipeline_layout(
     input_bgl: &BindGroupLayout,
     output_noindirect_bgl: &BindGroupLayout,
     texture_bgl: &BindGroupLayout,
-    uniform_bgl: &BindGroupLayout,
     ty: RenderPipelineLayoutType,
 ) -> PipelineLayout {
     device.create_pipeline_layout(&PipelineLayoutDescriptor {
@@ -309,7 +325,7 @@ pub fn create_render_pipeline_layout(
             RenderPipelineLayoutType::Depth => "depth pipeline layout",
             RenderPipelineLayoutType::Opaque => "opaque pipeline layout",
         }),
-        bind_group_layouts: &[input_bgl, output_noindirect_bgl, texture_bgl, uniform_bgl],
+        bind_group_layouts: &[input_bgl, output_noindirect_bgl, texture_bgl],
         push_constant_ranges: &[],
     })
 }

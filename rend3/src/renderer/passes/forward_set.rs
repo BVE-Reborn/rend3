@@ -1,14 +1,16 @@
 use crate::{
+    bind_merge::BindGroupBuilder,
     renderer::{
         camera::Camera, passes, passes::CullingPassData, resources::RendererGlobalResources, uniforms::WrappedUniform,
     },
     Renderer,
 };
 use std::sync::Arc;
-use wgpu::{BindGroup, BindGroupLayout, Buffer, ComputePass, Device, RenderPass};
+use wgpu::{BindGroup, BindGroupEntry, BindGroupLayout, BindingResource, Buffer, ComputePass, Device, RenderPass};
 
 pub struct ForwardPassSetData {
     culling_pass_data: CullingPassData,
+    object_output_noindirect_bg: BindGroup,
 }
 
 pub struct ForwardPassSet {
@@ -33,19 +35,33 @@ impl ForwardPassSet {
     ) -> ForwardPassSetData {
         span_transfer!(_ -> prepare_span, WARN, "Preparing ForwardPassSet");
 
-        self.uniform.upload(&renderer.queue, &camera);
+        let mut object_output_noindirect_bgb =
+            BindGroupBuilder::new(Some(String::from("object output noindirect bgb")));
 
         let culling_pass_data = renderer.culling_pass.prepare(
             &renderer.device,
             &global_resources.prefix_sum_bgl,
             &global_resources.pre_cull_bgl,
             &global_resources.object_output_bgl,
-            &global_resources.object_output_noindirect_bgl,
             object_count as u32,
             self.name.clone(),
         );
 
-        ForwardPassSetData { culling_pass_data }
+        object_output_noindirect_bgb.append(BindGroupEntry {
+            binding: 0,
+            resource: BindingResource::Buffer(culling_pass_data.output_buffer.slice(..)),
+        });
+
+        self.uniform
+            .upload(&renderer.queue, &camera, &mut object_output_noindirect_bgb);
+
+        let object_output_noindirect_bg =
+            object_output_noindirect_bgb.build(&renderer.device, &global_resources.object_output_noindirect_bgl);
+
+        ForwardPassSetData {
+            culling_pass_data,
+            object_output_noindirect_bg,
+        }
     }
 
     pub fn compute<'a>(
@@ -83,14 +99,19 @@ impl ForwardPassSet {
             &data.culling_pass_data.indirect_buffer,
             &data.culling_pass_data.count_buffer,
             general_bg,
-            &data.culling_pass_data.output_noindirect_bg,
+            &data.object_output_noindirect_bg,
             texture_2d_bg,
-            &self.uniform.uniform_bg,
             data.culling_pass_data.object_count,
         );
 
         if let Some(background_texture) = background_texture {
-            skybox_pass.run(rpass, texture_cube_bg, &self.uniform.uniform_bg, background_texture);
+            skybox_pass.run(
+                rpass,
+                general_bg,
+                &data.object_output_noindirect_bg,
+                texture_cube_bg,
+                background_texture,
+            );
         }
 
         opaque_pass.run(
@@ -100,9 +121,8 @@ impl ForwardPassSet {
             &data.culling_pass_data.indirect_buffer,
             &data.culling_pass_data.count_buffer,
             general_bg,
-            &data.culling_pass_data.output_noindirect_bg,
+            &data.object_output_noindirect_bg,
             texture_2d_bg,
-            &self.uniform.uniform_bg,
             data.culling_pass_data.object_count,
         );
     }

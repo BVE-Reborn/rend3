@@ -12,14 +12,14 @@ layout(location = 3) flat in uint i_material;
 layout(set = 0, binding = 2) uniform MaterialBuffer {
     MaterialData materials[MATERIAL_COUNT];
 };
+layout(set = 0, binding = 3) uniform sampler samplr;
 layout(set = 1, binding = 0, std430) restrict readonly buffer ObjectOutputDataBuffer {
     ObjectOutputData object_output[];
 };
-layout(set = 2, binding = 0) uniform texture2D textures[];
-layout(set = 2, binding = 1) uniform sampler samplr;
-layout(set = 3, binding = 0) uniform UniformBuffer {
+layout(set = 1, binding = 1) uniform UniformBuffer {
     UniformData uniforms;
 };
+layout(set = 2, binding = 0) uniform texture2D textures[];
 
 void main() {
     MaterialData material = materials[i_material];

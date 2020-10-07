@@ -20,7 +20,7 @@ pub struct CullingPassData {
     pub prefix_sum_bg1: BindGroup,
     pub prefix_sum_bg2: BindGroup,
     pub output_bg: BindGroup,
-    pub output_noindirect_bg: BindGroup,
+    pub output_buffer: Buffer,
     pub indirect_buffer: Buffer,
     pub count_buffer: Buffer,
     pub object_count: u32,
@@ -138,13 +138,12 @@ impl CullingPass {
         .instrument(new_span)
     }
 
-    pub fn prepare(
-        &self,
+    pub fn prepare<'a>(
+        &'a self,
         device: &Device,
         prefix_sum_bgl: &BindGroupLayout,
         pre_cull_bgl: &BindGroupLayout,
         output_bgl: &BindGroupLayout,
-        output_noindirect_bgl: &BindGroupLayout,
         object_count: u32,
         name: String,
     ) -> CullingPassData {
@@ -274,22 +273,13 @@ impl CullingPass {
             ],
         });
 
-        let output_noindirect_bg = device.create_bind_group(&BindGroupDescriptor {
-            label: Some(&*format!("noindirect output bind group for {}", &name)),
-            layout: output_noindirect_bgl,
-            entries: &[BindGroupEntry {
-                binding: 0,
-                resource: BindingResource::Buffer(output_buffer.slice(..)),
-            }],
-        });
-
         CullingPassData {
             name,
             pre_cull_bg,
             prefix_sum_bg1,
             prefix_sum_bg2,
             output_bg,
-            output_noindirect_bg,
+            output_buffer,
             indirect_buffer,
             count_buffer,
             object_count,

@@ -22,7 +22,7 @@ layout(set = 0, binding = 1, std430) restrict readonly buffer MaterialTranslatio
 layout(set = 1, binding = 0, std430) restrict readonly buffer ObjectOutputDataBuffer {
     ObjectOutputData object_output[];
 };
-layout(set = 3, binding = 0) uniform UniformBuffer {
+layout(set = 1, binding = 1) uniform UniformBuffer {
     UniformData uniforms;
 };
 

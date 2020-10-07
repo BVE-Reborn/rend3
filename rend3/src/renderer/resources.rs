@@ -1,9 +1,13 @@
 use crate::{
+    bind_merge::BindGroupBuilder,
     datatypes::TextureHandle,
     renderer::{camera::Camera, util},
     RendererOptions,
 };
-use wgpu::{BindGroup, BindGroupLayout, Device, Sampler, Surface, SwapChain, Texture, TextureView};
+use wgpu::{
+    BindGroup, BindGroupEntry, BindGroupLayout, BindingResource, Device, Sampler, Surface, SwapChain, Texture,
+    TextureView,
+};
 
 pub struct RendererGlobalResources {
     pub swapchain: SwapChain,
@@ -111,6 +115,13 @@ impl RendererGlobalResources {
         }
 
         *old_options = new_options
+    }
+
+    pub fn append_to_bgb<'a>(&'a self, general_bgb: &mut BindGroupBuilder<'a>) {
+        general_bgb.append(BindGroupEntry {
+            binding: 0,
+            resource: BindingResource::Sampler(&self.sampler),
+        });
     }
 }
 

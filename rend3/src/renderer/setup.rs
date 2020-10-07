@@ -82,7 +82,6 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
 
     let mut texture_manager_2d = RwLock::new(TextureManager::new(
         &device,
-        &global_resource_guard.sampler,
         STARTING_2D_TEXTURES,
         TextureViewDimension::D2,
     ));
@@ -94,7 +93,6 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
         &global_resource_guard.general_bgl,
         &global_resource_guard.object_output_noindirect_bgl,
         &texture_manager_2d_guard.bind_group_layout(),
-        &global_resource_guard.uniform_bgl,
     );
 
     let opaque_pass = passes::OpaquePass::new(
@@ -103,12 +101,10 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
         &global_resource_guard.general_bgl,
         &global_resource_guard.object_output_noindirect_bgl,
         &texture_manager_2d_guard.bind_group_layout(),
-        &global_resource_guard.uniform_bgl,
     );
 
     let mut texture_manager_cube = RwLock::new(TextureManager::new(
         &device,
-        &global_resource_guard.sampler,
         STARTING_CUBE_TEXTURES,
         TextureViewDimension::Cube,
     ));
@@ -117,8 +113,9 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
     let skybox_pass = passes::SkyboxPass::new(
         &device,
         &shader_manager,
+        &global_resource_guard.general_bgl,
+        &global_resource_guard.object_output_noindirect_bgl,
         &texture_manager_cube_guard.bind_group_layout(),
-        &global_resource_guard.uniform_bgl,
     );
 
     let forward_pass_set = ForwardPassSet::new(

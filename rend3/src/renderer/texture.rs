@@ -2,9 +2,8 @@ use crate::{datatypes::TextureHandle, registry::ResourceRegistry};
 use std::{mem, num::NonZeroU32, sync::Arc};
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
-    BindingResource, BindingType, Device, Extent3d, Sampler, ShaderStage, Texture, TextureComponentType,
-    TextureDescriptor, TextureDimension, TextureFormat, TextureUsage, TextureView, TextureViewDescriptor,
-    TextureViewDimension,
+    BindingResource, BindingType, Device, Extent3d, ShaderStage, Texture, TextureComponentType, TextureDescriptor,
+    TextureDimension, TextureFormat, TextureUsage, TextureView, TextureViewDescriptor, TextureViewDimension,
 };
 
 pub const STARTING_2D_TEXTURES: usize = 1 << 8;
@@ -25,7 +24,7 @@ pub struct TextureManager {
     dimension: TextureViewDimension,
 }
 impl TextureManager {
-    pub fn new(device: &Device, sampler: &Sampler, starting_textures: usize, dimension: TextureViewDimension) -> Self {
+    pub fn new(device: &Device, starting_textures: usize, dimension: TextureViewDimension) -> Self {
         span_transfer!(_ -> new_span, INFO, "Creating Texture Manager");
 
         let mut null_tex_man = NullTextureManager::new(device, dimension);
@@ -36,7 +35,7 @@ impl TextureManager {
         fill_to_size(&mut null_tex_man, &mut views, dimension, view_count);
 
         let layout = create_bind_group_layout(device, view_count as u32, dimension);
-        let group = create_bind_group(device, &layout, &views, sampler, dimension);
+        let group = create_bind_group(device, &layout, &views, dimension);
 
         let registry = ResourceRegistry::new();
 
@@ -94,7 +93,7 @@ impl TextureManager {
         self.registry.get_index_of(handle.0)
     }
 
-    pub fn ready(&mut self, device: &Device, sampler: &Sampler) -> (Arc<BindGroupLayout>, Arc<BindGroup>, bool) {
+    pub fn ready(&mut self, device: &Device) -> (Arc<BindGroupLayout>, Arc<BindGroup>, bool) {
         span_transfer!(_ -> ready_span, INFO, "Material Manager Ready");
 
         let layout_dirty = self.layout_dirty;
@@ -105,7 +104,7 @@ impl TextureManager {
         }
 
         if self.group_dirty {
-            self.group = create_bind_group(device, &self.layout, &self.views, sampler, self.dimension);
+            self.group = create_bind_group(device, &self.layout, &self.views, self.dimension);
             self.group_dirty = false;
         }
 
@@ -135,24 +134,16 @@ fn fill_to_size(
 fn create_bind_group_layout(device: &Device, count: u32, dimension: TextureViewDimension) -> Arc<BindGroupLayout> {
     Arc::new(device.create_bind_group_layout(&BindGroupLayoutDescriptor {
         label: Some(&*format!("{:?} texture bgl", dimension)),
-        entries: &[
-            BindGroupLayoutEntry {
-                binding: 0,
-                visibility: ShaderStage::FRAGMENT,
-                ty: BindingType::SampledTexture {
-                    dimension,
-                    component_type: TextureComponentType::Float,
-                    multisampled: false,
-                },
-                count: NonZeroU32::new(count),
+        entries: &[BindGroupLayoutEntry {
+            binding: 0,
+            visibility: ShaderStage::FRAGMENT,
+            ty: BindingType::SampledTexture {
+                dimension,
+                component_type: TextureComponentType::Float,
+                multisampled: false,
             },
-            BindGroupLayoutEntry {
-                binding: 1,
-                visibility: ShaderStage::FRAGMENT,
-                ty: BindingType::Sampler { comparison: false },
-                count: None,
-            },
-        ],
+            count: NonZeroU32::new(count),
+        }],
     }))
 }
 
@@ -160,22 +151,15 @@ fn create_bind_group(
     device: &Device,
     layout: &BindGroupLayout,
     views: &[TextureView],
-    sampler: &Sampler,
     dimension: TextureViewDimension,
 ) -> Arc<BindGroup> {
     Arc::new(device.create_bind_group(&BindGroupDescriptor {
         label: Some(&*format!("{:?} texture bg", dimension)),
         layout: &layout,
-        entries: &[
-            BindGroupEntry {
-                binding: 0,
-                resource: BindingResource::TextureViewArray(views),
-            },
-            BindGroupEntry {
-                binding: 1,
-                resource: BindingResource::Sampler(sampler),
-            },
-        ],
+        entries: &[BindGroupEntry {
+            binding: 0,
+            resource: BindingResource::TextureViewArray(views),
+        }],
     }))
 }
 

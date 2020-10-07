@@ -1,5 +1,5 @@
-use crate::bind_merge::BindGroupBuilder;
 use crate::{
+    bind_merge::BindGroupBuilder,
     instruction::Instruction,
     renderer::{BUFFER_RECALL_PRIORITY, COMPUTE_POOL},
     statistics::RendererStatistics,
@@ -179,15 +179,14 @@ pub fn render_loop<TLD: 'static>(renderer: Arc<Renderer<TLD>>) -> impl Future<Ou
 
         let mut general_bgb = BindGroupBuilder::new(Some(String::from("general bg")));
 
-        let (texture_2d_bgl, texture_2d_bg, texture_2d_bgl_dirty) =
-            texture_manager_2d.ready(&renderer.device, &global_resources.sampler);
-        let (texture_cube_bgl, texture_cube_bg, texture_cube_bgl_dirty) =
-            texture_manager_cube.ready(&renderer.device, &global_resources.sampler);
+        let (texture_2d_bgl, texture_2d_bg, texture_2d_bgl_dirty) = texture_manager_2d.ready(&renderer.device);
+        let (texture_cube_bgl, texture_cube_bg, texture_cube_bgl_dirty) = texture_manager_cube.ready(&renderer.device);
         material_manager.ready(&renderer.device, &mut encoder, &texture_manager_2d);
         let object_count = object_manager.ready(&renderer.device, &mut encoder, &material_manager);
 
         object_manager.append_to_bgb(&mut general_bgb);
         material_manager.append_to_bgb(&mut general_bgb);
+        global_resources.append_to_bgb(&mut general_bgb);
 
         let general_bg = general_bgb.build(&renderer.device, &global_resources.general_bgl);
 
@@ -224,22 +223,21 @@ pub fn render_loop<TLD: 'static>(renderer: Arc<Renderer<TLD>>) -> impl Future<Ou
                 &global_resources.general_bgl,
                 &global_resources.object_output_noindirect_bgl,
                 &texture_2d_bgl,
-                &global_resources.uniform_bgl,
             );
             renderer.opaque_pass.write().update_pipeline(
                 &renderer.device,
                 &global_resources.general_bgl,
                 &global_resources.object_output_noindirect_bgl,
                 &texture_2d_bgl,
-                &global_resources.uniform_bgl,
             );
         }
 
         if texture_cube_bgl_dirty {
             renderer.skybox_pass.write().update_pipeline(
                 &renderer.device,
+                &global_resources.general_bgl,
+                &global_resources.object_output_noindirect_bgl,
                 &texture_cube_bgl,
-                &global_resources.uniform_bgl,
             );
         }
 

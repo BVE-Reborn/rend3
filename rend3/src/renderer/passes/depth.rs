@@ -20,7 +20,6 @@ impl DepthPass {
         general_bgl: &BindGroupLayout,
         output_noindirect_bgl: &BindGroupLayout,
         texture_2d_bgl: &BindGroupLayout,
-        uniform_bgl: &BindGroupLayout,
     ) -> impl Future<Output = Self> + 'a {
         let new_span = tracing::warn_span!("Creating DepthPass");
         let new_span_guard = new_span.enter();
@@ -44,7 +43,6 @@ impl DepthPass {
             general_bgl,
             output_noindirect_bgl,
             texture_2d_bgl,
-            uniform_bgl,
             util::RenderPipelineLayoutType::Depth,
         );
 
@@ -72,7 +70,6 @@ impl DepthPass {
         general_bgl: &BindGroupLayout,
         output_noindirect_bgl: &BindGroupLayout,
         texture_2d_bgl: &BindGroupLayout,
-        uniform_bgl: &BindGroupLayout,
     ) {
         span_transfer!(_ -> update_pipeline_span, INFO, "Depth Pass Update Pipeline");
         let layout = util::create_render_pipeline_layout(
@@ -80,7 +77,6 @@ impl DepthPass {
             general_bgl,
             output_noindirect_bgl,
             texture_2d_bgl,
-            uniform_bgl,
             util::RenderPipelineLayoutType::Depth,
         );
         let pipeline = util::create_render_pipeline(
@@ -103,7 +99,6 @@ impl DepthPass {
         general_bg: &'a BindGroup,
         output_noindirect_bg: &'a BindGroup,
         texture_2d_bg: &'a BindGroup,
-        uniform_bg: &'a BindGroup,
         object_count: u32,
     ) {
         rpass.set_pipeline(&self.pipeline);
@@ -112,7 +107,6 @@ impl DepthPass {
         rpass.set_bind_group(0, &general_bg, &[]);
         rpass.set_bind_group(1, &output_noindirect_bg, &[]);
         rpass.set_bind_group(2, &texture_2d_bg, &[]);
-        rpass.set_bind_group(3, &uniform_bg, &[]);
         rpass.multi_draw_indexed_indirect_count(indirect_buffer, 0, count_buffer, 0, object_count);
     }
 }
