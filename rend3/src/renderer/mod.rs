@@ -1,5 +1,4 @@
 use crate::{
-    bind_merge::BindGroupManager,
     datatypes::{
         AffineTransform, CameraLocation, Material, MaterialChange, MaterialHandle, Mesh, MeshHandle, Object,
         ObjectHandle, Texture, TextureHandle,
@@ -26,12 +25,30 @@ mod camera;
 pub mod error;
 mod frustum;
 mod info;
-mod light;
+mod light {
+    pub mod directional;
+
+    pub use directional::*;
+}
 pub mod limits;
 mod material;
 mod mesh;
 mod object;
-mod passes;
+mod passes {
+    mod blit;
+    mod culling;
+    mod depth;
+    mod forward_set;
+    mod opaque;
+    mod skybox;
+
+    pub use blit::*;
+    pub use culling::*;
+    pub use depth::*;
+    pub use forward_set::*;
+    pub use opaque::*;
+    pub use skybox::*;
+}
 mod render;
 mod resources;
 mod setup;
@@ -69,8 +86,6 @@ where
     texture_manager_cube: RwLock<TextureManager>,
     material_manager: RwLock<MaterialManager>,
     object_manager: RwLock<ObjectManager>,
-
-    general_bgm: Mutex<BindGroupManager>,
 
     forward_pass_set: ForwardPassSet,
 

@@ -126,38 +126,41 @@ pub fn create_pre_cull_bgl(device: &Device) -> BindGroupLayout {
     })
 }
 
-pub fn create_general_bind_group_entries() -> Vec<BindGroupLayoutEntry> {
-    vec![
-        BindGroupLayoutEntry {
-            binding: 0,
-            visibility: ShaderStage::COMPUTE,
-            ty: BindingType::StorageBuffer {
-                dynamic: false,
-                min_binding_size: None,
-                readonly: true,
+pub fn create_general_bind_group_layout(device: &Device) -> BindGroupLayout {
+    device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+        label: Some("general bind group"),
+        entries: &[
+            BindGroupLayoutEntry {
+                binding: 0,
+                visibility: ShaderStage::COMPUTE,
+                ty: BindingType::StorageBuffer {
+                    dynamic: false,
+                    min_binding_size: None,
+                    readonly: true,
+                },
+                count: None,
             },
-            count: None,
-        },
-        BindGroupLayoutEntry {
-            binding: 1,
-            visibility: ShaderStage::VERTEX,
-            ty: BindingType::StorageBuffer {
-                dynamic: false,
-                min_binding_size: None,
-                readonly: true,
+            BindGroupLayoutEntry {
+                binding: 1,
+                visibility: ShaderStage::VERTEX,
+                ty: BindingType::StorageBuffer {
+                    dynamic: false,
+                    min_binding_size: None,
+                    readonly: true,
+                },
+                count: None,
             },
-            count: None,
-        },
-        BindGroupLayoutEntry {
-            binding: 2,
-            visibility: ShaderStage::FRAGMENT,
-            ty: BindingType::UniformBuffer {
-                dynamic: false,
-                min_binding_size: None,
+            BindGroupLayoutEntry {
+                binding: 2,
+                visibility: ShaderStage::FRAGMENT,
+                ty: BindingType::UniformBuffer {
+                    dynamic: false,
+                    min_binding_size: None,
+                },
+                count: None,
             },
-            count: None,
-        },
-    ]
+        ],
+    })
 }
 
 pub fn create_object_output_bgl(device: &Device) -> BindGroupLayout {

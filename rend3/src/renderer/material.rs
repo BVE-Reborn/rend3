@@ -133,12 +133,9 @@ impl MaterialManager {
     }
 
     pub fn append_to_bgb<'a>(&'a self, general_bgb: &mut BindGroupBuilder<'a>) {
-        general_bgb.append(
-            None,
-            BindGroupEntry {
-                binding: 0,
-                resource: BindingResource::Buffer(self.buffer_storage.as_ref().unwrap().inner.slice(..)),
-            },
-        );
+        general_bgb.append(BindGroupEntry {
+            binding: 0,
+            resource: BindingResource::Buffer(self.buffer_storage.as_ref().unwrap().inner.slice(..)),
+        });
     }
 }

@@ -1,3 +1,4 @@
+use crate::bind_merge::BindGroupBuilder;
 use crate::{
     instruction::Instruction,
     renderer::{BUFFER_RECALL_PRIORITY, COMPUTE_POOL},
@@ -176,8 +177,7 @@ pub fn render_loop<TLD: 'static>(renderer: Arc<Renderer<TLD>>) -> impl Future<Ou
             }
         }
 
-        let mut general_bgm = renderer.general_bgm.lock();
-        let mut general_bgb = general_bgm.builder();
+        let mut general_bgb = BindGroupBuilder::new(Some(String::from("general bg")));
 
         let (texture_2d_bgl, texture_2d_bg, texture_2d_bgl_dirty) =
             texture_manager_2d.ready(&renderer.device, &global_resources.sampler);
@@ -189,10 +189,9 @@ pub fn render_loop<TLD: 'static>(renderer: Arc<Renderer<TLD>>) -> impl Future<Ou
         object_manager.append_to_bgb(&mut general_bgb);
         material_manager.append_to_bgb(&mut general_bgb);
 
-        let (general_bgl, general_bg, general_bgl_dirty) = general_bgb.build(&renderer.device);
+        let general_bg = general_bgb.build(&renderer.device, &global_resources.general_bgl);
 
         drop((
-            general_bgm,
             global_resources,
             mesh_manager,
             texture_manager_2d,
@@ -219,17 +218,17 @@ pub fn render_loop<TLD: 'static>(renderer: Arc<Renderer<TLD>>) -> impl Future<Ou
                 .forward_pass_set
                 .prepare(&renderer, &global_resources, &global_resources.camera, object_count);
 
-        if texture_2d_bgl_dirty || general_bgl_dirty {
+        if texture_2d_bgl_dirty {
             renderer.depth_pass.write().update_pipeline(
                 &renderer.device,
-                &general_bgl,
+                &global_resources.general_bgl,
                 &global_resources.object_output_noindirect_bgl,
                 &texture_2d_bgl,
                 &global_resources.uniform_bgl,
             );
             renderer.opaque_pass.write().update_pipeline(
                 &renderer.device,
-                &general_bgl,
+                &global_resources.general_bgl,
                 &global_resources.object_output_noindirect_bgl,
                 &texture_2d_bgl,
                 &global_resources.uniform_bgl,

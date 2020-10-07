@@ -1,5 +1,4 @@
 use crate::{
-    bind_merge::BindGroupManager,
     instruction::InstructionStreamPair,
     renderer::{
         info::ExtendedAdapterInfo,
@@ -12,7 +11,7 @@ use crate::{
         resources::RendererGlobalResources,
         shaders::ShaderManager,
         texture::{TextureManager, STARTING_2D_TEXTURES, STARTING_CUBE_TEXTURES},
-        util, Renderer, SWAPCHAIN_FORMAT,
+        Renderer, SWAPCHAIN_FORMAT,
     },
     RendererInitializationError, RendererOptions,
 };
@@ -63,18 +62,12 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
     let mut global_resources = RwLock::new(RendererGlobalResources::new(&device, &surface, &options));
     let global_resource_guard = global_resources.get_mut();
 
-    let mut general_bind_group = Mutex::new(BindGroupManager::new(
-        &device,
-        Some(util::create_general_bind_group_entries()),
-        Some("primary".into()),
-    ));
-
     let culling_pass = passes::CullingPass::new(
         &device,
         &shader_manager,
         &global_resource_guard.prefix_sum_bgl,
         &global_resource_guard.pre_cull_bgl,
-        general_bind_group.get_mut().layout(),
+        &global_resource_guard.general_bgl,
         &global_resource_guard.object_output_bgl,
         &global_resource_guard.uniform_bgl,
         adapter_info.subgroup_size(),
@@ -98,7 +91,7 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
     let depth_pass = passes::DepthPass::new(
         &device,
         &shader_manager,
-        general_bind_group.get_mut().layout(),
+        &global_resource_guard.general_bgl,
         &global_resource_guard.object_output_noindirect_bgl,
         &texture_manager_2d_guard.bind_group_layout(),
         &global_resource_guard.uniform_bgl,
@@ -107,7 +100,7 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
     let opaque_pass = passes::OpaquePass::new(
         &device,
         &shader_manager,
-        general_bind_group.get_mut().layout(),
+        &global_resource_guard.general_bgl,
         &global_resource_guard.object_output_noindirect_bgl,
         &texture_manager_2d_guard.bind_group_layout(),
         &global_resource_guard.uniform_bgl,
@@ -171,7 +164,6 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
         material_manager,
         object_manager,
 
-        general_bgm: general_bind_group,
         forward_pass_set,
 
         swapchain_blit_pass,
