@@ -18,7 +18,7 @@ use crate::{
 };
 use parking_lot::{Mutex, RwLock};
 use raw_window_handle::HasRawWindowHandle;
-use std::{path::Path, sync::Arc};
+use std::sync::Arc;
 use switchyard::Switchyard;
 use wgpu::{BackendBit, DeviceDescriptor, Instance, PowerPreference, RequestAdapterOptions, TextureViewDimension};
 use wgpu_conveyor::{AutomatedBufferManager, UploadStyle};
@@ -52,7 +52,7 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
                 limits,
                 shader_validation: true,
             },
-            Some(Path::new("tmp/trace")),
+            None,
         )
         .await
         .map_err(|_| RendererInitializationError::RequestDeviceFailed)?;

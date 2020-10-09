@@ -63,12 +63,46 @@ unsafe impl bytemuck::Pod for AffineTransform {}
 pub enum RendererTextureFormat {
     Rgba8Srgb,
     Rgba8Linear,
+    Bc1Linear,
+    Bc1Srgb,
+    Bc3Linear,
+    Bc3Srgb,
+    Bc4Linear,
+    Bc5Normal,
+    Bc6Signed,
+    Bc6Unsigned,
+    Bc7Linear,
+    Bc7Srgb,
 }
 
 impl RendererTextureFormat {
-    pub fn bytes_per_pixel(&self) -> u32 {
+    pub fn pixels_per_block(&self) -> u32 {
+        match self {
+            RendererTextureFormat::Rgba8Srgb | RendererTextureFormat::Rgba8Linear => 1,
+            RendererTextureFormat::Bc1Linear
+            | RendererTextureFormat::Bc1Srgb
+            | RendererTextureFormat::Bc3Linear
+            | RendererTextureFormat::Bc3Srgb
+            | RendererTextureFormat::Bc4Linear
+            | RendererTextureFormat::Bc5Normal
+            | RendererTextureFormat::Bc6Signed
+            | RendererTextureFormat::Bc6Unsigned
+            | RendererTextureFormat::Bc7Linear
+            | RendererTextureFormat::Bc7Srgb => 4,
+        }
+    }
+
+    pub fn bytes_per_block(&self) -> u32 {
         match self {
             RendererTextureFormat::Rgba8Srgb | RendererTextureFormat::Rgba8Linear => 4,
+            RendererTextureFormat::Bc1Linear | RendererTextureFormat::Bc1Srgb | RendererTextureFormat::Bc4Linear => 8,
+            RendererTextureFormat::Bc3Linear
+            | RendererTextureFormat::Bc3Srgb
+            | RendererTextureFormat::Bc5Normal
+            | RendererTextureFormat::Bc6Signed
+            | RendererTextureFormat::Bc6Unsigned
+            | RendererTextureFormat::Bc7Linear
+            | RendererTextureFormat::Bc7Srgb => 16,
         }
     }
 }
@@ -76,8 +110,18 @@ impl RendererTextureFormat {
 impl From<RendererTextureFormat> for wgpu::TextureFormat {
     fn from(other: RendererTextureFormat) -> Self {
         match other {
-            RendererTextureFormat::Rgba8Srgb => TextureFormat::Rgba8UnormSrgb,
             RendererTextureFormat::Rgba8Linear => TextureFormat::Rgba8Unorm,
+            RendererTextureFormat::Rgba8Srgb => TextureFormat::Rgba8UnormSrgb,
+            RendererTextureFormat::Bc1Linear => TextureFormat::Bc1RgbaUnorm,
+            RendererTextureFormat::Bc1Srgb => TextureFormat::Bc1RgbaUnormSrgb,
+            RendererTextureFormat::Bc3Linear => TextureFormat::Bc3RgbaUnorm,
+            RendererTextureFormat::Bc3Srgb => TextureFormat::Bc3RgbaUnormSrgb,
+            RendererTextureFormat::Bc4Linear => TextureFormat::Bc4RUnorm,
+            RendererTextureFormat::Bc5Normal => TextureFormat::Bc5RgUnorm,
+            RendererTextureFormat::Bc6Signed => TextureFormat::Bc6hRgbSfloat,
+            RendererTextureFormat::Bc6Unsigned => TextureFormat::Bc6hRgbUfloat,
+            RendererTextureFormat::Bc7Linear => TextureFormat::Bc7RgbaUnorm,
+            RendererTextureFormat::Bc7Srgb => TextureFormat::Bc7RgbaUnormSrgb,
         }
     }
 }
@@ -151,10 +195,11 @@ pub struct Texture {
 
 bitflags::bitflags! {
     pub(crate) struct MaterialFlags : u32 {
-        const ALBEDO_ACTIVE = 0b001;
-        const ALBEDO_BLEND = 0b010;
-        const ALBEDO_VERTEX_SRGB = 0b100;
-        const ALPHA_CUTOUT = 0b1000;
+        const ALBEDO_ACTIVE = 0b000_001;
+        const ALBEDO_BLEND = 0b000_010;
+        const ALBEDO_VERTEX_SRGB = 0b000_100;
+        const ALPHA_CUTOUT = 0b001_000;
+        const BICOMPONENT_NORMAL = 0b010_000;
     }
 }
 

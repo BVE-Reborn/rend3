@@ -74,13 +74,18 @@ pub fn render_loop<TLD: 'static>(renderer: Arc<Renderer<TLD>>) -> impl Future<Ou
                         &texture.data,
                         TextureDataLayout {
                             offset: 0,
-                            bytes_per_row: texture.format.bytes_per_pixel() * texture.width,
+                            bytes_per_row: texture.format.bytes_per_block()
+                                * (texture.width / texture.format.pixels_per_block()),
                             rows_per_image: 0,
                         },
                         size,
                     );
 
-                    texture_manager_2d.fill(handle, uploaded_tex.create_view(&TextureViewDescriptor::default()));
+                    texture_manager_2d.fill(
+                        handle,
+                        uploaded_tex.create_view(&TextureViewDescriptor::default()),
+                        Some(texture.format),
+                    );
                 }
                 Instruction::RemoveTexture2D { handle } => {
                     texture_manager_2d.remove(handle);
@@ -102,31 +107,25 @@ pub fn render_loop<TLD: 'static>(renderer: Arc<Renderer<TLD>>) -> impl Future<Ou
                         usage: TextureUsage::SAMPLED | TextureUsage::COPY_DST,
                     });
 
-                    let bytes_per_image = (texture.width * texture.height * texture.format.bytes_per_pixel()) as usize;
-                    for i in 0..6 {
-                        renderer.queue.write_texture(
-                            TextureCopyView {
-                                texture: &uploaded_tex,
-                                origin: Origin3d {
-                                    x: 0,
-                                    y: 0,
-                                    z: i as u32,
-                                },
-                                mip_level: 0,
-                            },
-                            &texture.data[(i * bytes_per_image)..((i + 1) * bytes_per_image)],
-                            TextureDataLayout {
-                                offset: 0,
-                                bytes_per_row: texture.format.bytes_per_pixel() * texture.width,
-                                rows_per_image: 0,
-                            },
-                            Extent3d {
-                                width: texture.width,
-                                height: texture.height,
-                                depth: 1,
-                            },
-                        );
-                    }
+                    renderer.queue.write_texture(
+                        TextureCopyView {
+                            texture: &uploaded_tex,
+                            origin: Origin3d { x: 0, y: 0, z: 0 },
+                            mip_level: 0,
+                        },
+                        &texture.data,
+                        TextureDataLayout {
+                            offset: 0,
+                            bytes_per_row: texture.format.bytes_per_block()
+                                * (texture.width / texture.format.pixels_per_block()),
+                            rows_per_image: texture.height,
+                        },
+                        Extent3d {
+                            width: texture.width,
+                            height: texture.height,
+                            depth: 6,
+                        },
+                    );
 
                     texture_manager_cube.fill(
                         handle,
@@ -140,6 +139,7 @@ pub fn render_loop<TLD: 'static>(renderer: Arc<Renderer<TLD>>) -> impl Future<Ou
                             base_array_layer: 0,
                             array_layer_count: None,
                         }),
+                        Some(texture.format),
                     );
                 }
                 Instruction::RemoveTextureCube { handle } => {
@@ -321,7 +321,7 @@ pub fn render_loop<TLD: 'static>(renderer: Arc<Renderer<TLD>>) -> impl Future<Ou
         let texture_manager_2d = renderer.texture_manager_2d.read();
 
         for (light, data) in directional_light_manager.values().zip(&shadow_passes_data) {
-            let attachment = texture_manager_internal.get(light.shadow_tex.unwrap());
+            let attachment = texture_manager_internal.get_view(light.shadow_tex.unwrap());
             let mut rpass = encoder.begin_render_pass(&RenderPassDescriptor {
                 color_attachments: &[],
                 depth_stencil_attachment: Some(RenderPassDepthStencilAttachmentDescriptor {

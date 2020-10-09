@@ -2,9 +2,7 @@ use crate::{
     bind_merge::BindGroupBuilder,
     datatypes::{DirectionalLight, DirectionalLightHandle, TextureHandle},
     registry::ResourceRegistry,
-    renderer::{
-        camera::Camera, passes, passes::ShadowPassSet, texture::TextureManager, INTERNAL_RENDERBUFFER_DEPTH_FORMAT,
-    },
+    renderer::{camera::Camera, passes, passes::ShadowPassSet, texture::TextureManager, INTERNAL_SHADOW_DEPTH_FORMAT},
 };
 use glam::{Mat4, Vec3};
 use std::{mem::size_of, num::NonZeroU32, sync::Arc};
@@ -87,12 +85,12 @@ impl DirectionalLightManager {
             mip_level_count: 1,
             sample_count: 1,
             dimension: TextureDimension::D2,
-            format: INTERNAL_RENDERBUFFER_DEPTH_FORMAT,
+            format: INTERNAL_SHADOW_DEPTH_FORMAT,
             usage: TextureUsage::OUTPUT_ATTACHMENT | TextureUsage::SAMPLED,
         });
         let view = texture.create_view(&TextureViewDescriptor::default());
 
-        texture_manager_internal.fill(texture_handle, view);
+        texture_manager_internal.fill(texture_handle, view, None);
 
         let shadow_pass_set = ShadowPassSet::new(device, uniform_bgl, String::from("directional light"));
 

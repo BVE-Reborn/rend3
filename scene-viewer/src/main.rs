@@ -12,7 +12,9 @@ use rend3::{
 use smallvec::SmallVec;
 use std::{
     collections::HashMap,
+    fs::File,
     hash::BuildHasher,
+    io::BufReader,
     path::Path,
     sync::Arc,
     time::{Duration, Instant},
@@ -30,23 +32,20 @@ fn load_texture(
     renderer: &Renderer,
     cache: &mut HashMap<String, TextureHandle>,
     texture: &Option<String>,
-    srgb: bool,
+    format: RendererTextureFormat,
 ) -> Option<TextureHandle> {
     rend3::span!(_guard, INFO, "Loading Texture", name = ?texture);
     if let Some(name) = texture {
         if let Some(handle) = cache.get(name) {
             Some(*handle)
         } else {
-            let img = image::open(name).unwrap();
-            let rgba = img.into_rgba();
+            let dds = ddsfile::Dds::read(&mut BufReader::new(File::open(name).unwrap())).unwrap();
+
             let handle = renderer.add_texture_2d(Texture {
-                format: match srgb {
-                    true => RendererTextureFormat::Rgba8Srgb,
-                    false => RendererTextureFormat::Rgba8Linear,
-                },
-                width: rgba.width(),
-                height: rgba.height(),
-                data: rgba.into_vec(),
+                format,
+                width: dds.get_width(),
+                height: dds.get_height(),
+                data: dds.data,
                 label: Some(name.clone()),
             });
 
@@ -60,22 +59,16 @@ fn load_texture(
 }
 
 fn load_skybox(renderer: &Renderer) {
-    let original = image::open("tmp/skybox/right.png").unwrap().into_rgba();
-    let width = original.width();
-    let height = original.height();
-
-    let mut data = original.into_raw();
-    data.extend_from_slice(&image::open("tmp/skybox/left.png").unwrap().into_rgba());
-    data.extend_from_slice(&image::open("tmp/skybox/top.png").unwrap().into_rgba());
-    data.extend_from_slice(&image::open("tmp/skybox/bottom.png").unwrap().into_rgba());
-    data.extend_from_slice(&image::open("tmp/skybox/front.png").unwrap().into_rgba());
-    data.extend_from_slice(&image::open("tmp/skybox/back.png").unwrap().into_rgba());
+    let dds = ddsfile::Dds::read(&mut BufReader::new(
+        File::open("tmp/skybox/skybox-compressed.dds").unwrap(),
+    ))
+    .unwrap();
 
     let handle = renderer.add_texture_cube(Texture {
-        data,
-        format: RendererTextureFormat::Rgba8Srgb,
-        width,
-        height,
+        format: RendererTextureFormat::Bc7Srgb,
+        width: dds.get_width(),
+        height: dds.get_height(),
+        data: dds.data,
         label: Some("background".into()),
     });
     renderer.set_background_texture(handle);
@@ -100,10 +93,10 @@ fn load_obj(renderer: &Renderer, file: &str) -> (MeshHandle, SmallVec<[MaterialH
             let roughness = &material.map_ns;
             let ao = &material.map_d;
 
-            let albedo_handle = load_texture(renderer, &mut textures, albedo, true);
-            let normal_handle = load_texture(renderer, &mut textures, normal, false);
-            let roughness_handle = load_texture(renderer, &mut textures, roughness, false);
-            let ao_handle = load_texture(renderer, &mut textures, ao, false);
+            let albedo_handle = load_texture(renderer, &mut textures, albedo, RendererTextureFormat::Bc7Srgb);
+            let normal_handle = load_texture(renderer, &mut textures, normal, RendererTextureFormat::Bc5Normal);
+            let roughness_handle = load_texture(renderer, &mut textures, roughness, RendererTextureFormat::Bc4Linear);
+            let ao_handle = load_texture(renderer, &mut textures, ao, RendererTextureFormat::Bc4Linear);
 
             material_index_map.insert(material.name.clone(), materials.len() as u32);
 
@@ -194,9 +187,9 @@ fn single(renderer: &Renderer, mesh: MeshHandle, materials: SmallVec<[MaterialHa
 }
 
 fn distribute(renderer: &Renderer, mesh: MeshHandle, materials: SmallVec<[MaterialHandle; 4]>) {
-    for x in (-11..=11).step_by(4) {
-        for y in (-11..=11).step_by(4) {
-            for z in (0..=100).step_by(10) {
+    for x in (-11..=11).step_by(8) {
+        for y in (-11..=11).step_by(8) {
+            for z in (0..=100).step_by(20) {
                 renderer.add_object(Object {
                     mesh,
                     materials: materials.clone(),

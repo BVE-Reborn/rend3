@@ -1,4 +1,7 @@
-use crate::{datatypes::TextureHandle, registry::ResourceRegistry};
+use crate::{
+    datatypes::{RendererTextureFormat, TextureHandle},
+    registry::ResourceRegistry,
+};
 use std::{mem, num::NonZeroU32, sync::Arc};
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
@@ -10,6 +13,10 @@ pub const STARTING_2D_TEXTURES: usize = 1 << 8;
 pub const STARTING_CUBE_TEXTURES: usize = 1 << 3;
 pub const STARTING_INTERNAL_TEXTURES: usize = 1 << 4;
 
+pub struct InternalTexture {
+    pub format: Option<RendererTextureFormat>,
+}
+
 pub struct TextureManager {
     layout: Arc<BindGroupLayout>,
     layout_dirty: bool,
@@ -20,7 +27,7 @@ pub struct TextureManager {
     null_tex_man: NullTextureManager,
 
     views: Vec<TextureView>,
-    registry: ResourceRegistry<()>,
+    registry: ResourceRegistry<InternalTexture>,
 
     dimension: TextureViewDimension,
 }
@@ -56,12 +63,12 @@ impl TextureManager {
         TextureHandle(self.registry.allocate())
     }
 
-    pub fn fill(&mut self, handle: TextureHandle, texture: TextureView) {
+    pub fn fill(&mut self, handle: TextureHandle, texture: TextureView, format: Option<RendererTextureFormat>) {
         span_transfer!(_ -> fill_span, INFO, "Texture Manager Fill");
 
         self.group_dirty = true;
 
-        let index = self.registry.insert(handle.0, ());
+        let index = self.registry.insert(handle.0, InternalTexture { format });
 
         if index > self.views.len() {
             self.layout_dirty = true;
@@ -112,7 +119,11 @@ impl TextureManager {
         (Arc::clone(&self.layout), Arc::clone(&self.group), layout_dirty)
     }
 
-    pub fn get(&self, handle: TextureHandle) -> &TextureView {
+    pub fn get(&self, handle: TextureHandle) -> &InternalTexture {
+        &self.registry.get(handle.0)
+    }
+
+    pub fn get_view(&self, handle: TextureHandle) -> &TextureView {
         &self.views[self.registry.get_index_of(handle.0)]
     }
 

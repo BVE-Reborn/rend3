@@ -1,6 +1,6 @@
 use crate::{
     bind_merge::BindGroupBuilder,
-    datatypes::{Material, MaterialFlags, MaterialHandle, TextureHandle},
+    datatypes::{Material, MaterialFlags, MaterialHandle, RendererTextureFormat},
     registry::ResourceRegistry,
     renderer::{limits::MAX_UNIFORM_BUFFER_BINDING_SIZE, texture::TextureManager},
 };
@@ -96,9 +96,7 @@ impl MaterialManager {
             .write_to_buffer(device, encoder, MATERIALS_SIZE, move |_, slice| {
                 let typed_slice: &mut [ShaderMaterial] = bytemuck::cast_slice_mut(slice);
 
-                let translate_texture = |v: TextureHandle| unsafe {
-                    NonZeroU32::new_unchecked(texture_manager.internal_index(v) as u32 + 1)
-                };
+                let translate_texture = texture_manager.translation_fn();
 
                 for (index, material) in registry.values().enumerate() {
                     typed_slice[index] = ShaderMaterial {
@@ -123,6 +121,14 @@ impl MaterialManager {
                         material_flags: {
                             let mut flags = material.albedo.to_flags();
                             flags.set(MaterialFlags::ALPHA_CUTOUT, material.alpha_cutout.is_some());
+                            flags.set(
+                                MaterialFlags::BICOMPONENT_NORMAL,
+                                material
+                                    .normal
+                                    .and_then(|handle| texture_manager.get(handle).format)
+                                    .map(|format| format == RendererTextureFormat::Bc5Normal)
+                                    .unwrap_or(false),
+                            );
                             flags
                         },
                     }

@@ -1,7 +1,7 @@
 use crate::{
     renderer::{
         INTERNAL_RENDERBUFFER_DEPTH_FORMAT, INTERNAL_RENDERBUFFER_FORMAT, INTERNAL_RENDERBUFFER_NORMAL_FORMAT,
-        SWAPCHAIN_FORMAT,
+        INTERNAL_SHADOW_DEPTH_FORMAT, SWAPCHAIN_FORMAT,
     },
     VSyncMode,
 };
@@ -389,7 +389,12 @@ pub fn create_render_pipeline(
         primitive_topology: PrimitiveTopology::TriangleList,
         color_states: &color_states,
         depth_stencil_state: Some(DepthStencilStateDescriptor {
-            format: INTERNAL_RENDERBUFFER_DEPTH_FORMAT,
+            format: match ty {
+                RenderPipelineType::Shadow => INTERNAL_SHADOW_DEPTH_FORMAT,
+                RenderPipelineType::Depth | RenderPipelineType::Opaque | RenderPipelineType::Skybox => {
+                    INTERNAL_RENDERBUFFER_DEPTH_FORMAT
+                }
+            },
             depth_write_enabled: match ty {
                 RenderPipelineType::Shadow | RenderPipelineType::Depth => true,
                 RenderPipelineType::Opaque | RenderPipelineType::Skybox => false,
