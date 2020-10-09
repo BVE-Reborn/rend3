@@ -8,6 +8,7 @@ use wgpu::{
 
 pub const STARTING_2D_TEXTURES: usize = 1 << 8;
 pub const STARTING_CUBE_TEXTURES: usize = 1 << 3;
+pub const STARTING_INTERNAL_TEXTURES: usize = 1 << 4;
 
 pub struct TextureManager {
     layout: Arc<BindGroupLayout>,
@@ -109,6 +110,10 @@ impl TextureManager {
         }
 
         (Arc::clone(&self.layout), Arc::clone(&self.group), layout_dirty)
+    }
+
+    pub fn get(&self, handle: TextureHandle) -> &TextureView {
+        &self.views[self.registry.get_index_of(handle.0)]
     }
 
     pub fn bind_group_layout(&self) -> &BindGroupLayout {

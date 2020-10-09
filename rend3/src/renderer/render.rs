@@ -34,6 +34,7 @@ pub fn render_loop<TLD: 'static>(renderer: Arc<Renderer<TLD>>) -> impl Future<Ou
         let mut mesh_manager = renderer.mesh_manager.write();
         let mut texture_manager_2d = renderer.texture_manager_2d.write();
         let mut texture_manager_cube = renderer.texture_manager_cube.write();
+        let mut texture_manager_internal = renderer.texture_manager_internal.write();
         let mut material_manager = renderer.material_manager.write();
         let mut object_manager = renderer.object_manager.write();
         let mut directional_light_manager = renderer.directional_light_manager.write();
@@ -166,12 +167,22 @@ pub fn render_loop<TLD: 'static>(renderer: Arc<Renderer<TLD>>) -> impl Future<Ou
                     object_manager.remove(handle);
                 }
                 Instruction::AddDirectionalLight { handle, light } => {
-                    directional_light_manager.fill(&renderer.device, &mut texture_manager_2d, handle, light);
+                    directional_light_manager.fill(
+                        &renderer.device,
+                        &mut texture_manager_internal,
+                        &global_resources.uniform_bgl,
+                        handle,
+                        light,
+                    );
                 }
-                Instruction::ChangeDirectionalLight { handle, change } => directional_light_manager
-                    .get_mut(handle)
-                    .inner
-                    .update_from_changes(change),
+                Instruction::ChangeDirectionalLight { handle, change } => {
+                    // TODO: Move these inside the managers
+                    let value = directional_light_manager.get_mut(handle);
+                    value.inner.update_from_changes(change);
+                    if let Some(direction) = change.direction {
+                        value.camera.set_orthographic_location(direction);
+                    }
+                }
                 Instruction::RemoveDirectionalLight { handle } => directional_light_manager.remove(handle),
                 Instruction::SetOptions { options } => new_options = Some(options),
                 Instruction::SetCameraLocation { location } => {
@@ -190,9 +201,11 @@ pub fn render_loop<TLD: 'static>(renderer: Arc<Renderer<TLD>>) -> impl Future<Ou
 
         let (texture_2d_bgl, texture_2d_bg, texture_2d_bgl_dirty) = texture_manager_2d.ready(&renderer.device);
         let (texture_cube_bgl, texture_cube_bg, texture_cube_bgl_dirty) = texture_manager_cube.ready(&renderer.device);
+        let (texture_internal_bgl, texture_internal_bg, texture_internal_bgl_dirty) =
+            texture_manager_internal.ready(&renderer.device);
         material_manager.ready(&renderer.device, &mut encoder, &texture_manager_2d);
         let object_count = object_manager.ready(&renderer.device, &mut encoder, &material_manager);
-        directional_light_manager.ready(&renderer.device, &mut encoder, &texture_manager_2d);
+        directional_light_manager.ready(&renderer.device, &mut encoder, &texture_manager_internal);
 
         object_manager.append_to_bgb(&mut general_bgb);
         material_manager.append_to_bgb(&mut general_bgb);
@@ -229,6 +242,17 @@ pub fn render_loop<TLD: 'static>(renderer: Arc<Renderer<TLD>>) -> impl Future<Ou
                 .forward_pass_set
                 .prepare(&renderer, &global_resources, &global_resources.camera, object_count);
 
+        let shadow_passes_data: Vec<_> = renderer
+            .directional_light_manager
+            .read()
+            .values()
+            .map(|light| {
+                light
+                    .shadow_pass_set
+                    .prepare(&renderer, &global_resources, &light.camera, object_count)
+            })
+            .collect();
+
         if texture_2d_bgl_dirty {
             renderer.depth_pass.write().update_pipeline(
                 &renderer.device,
@@ -236,11 +260,15 @@ pub fn render_loop<TLD: 'static>(renderer: Arc<Renderer<TLD>>) -> impl Future<Ou
                 &global_resources.object_output_noindirect_bgl,
                 &texture_2d_bgl,
             );
+        }
+
+        if texture_2d_bgl_dirty || texture_internal_bgl_dirty {
             renderer.opaque_pass.write().update_pipeline(
                 &renderer.device,
                 &global_resources.general_bgl,
                 &global_resources.object_output_noindirect_bgl,
                 &texture_2d_bgl,
+                &texture_internal_bgl,
             );
         }
 
@@ -258,11 +286,17 @@ pub fn render_loop<TLD: 'static>(renderer: Arc<Renderer<TLD>>) -> impl Future<Ou
         let mesh_manager = renderer.mesh_manager.read();
         let (vertex_buffer, index_buffer) = mesh_manager.buffers();
         let object_manager = renderer.object_manager.read();
+        let directional_light_manager = renderer.directional_light_manager.read();
 
         let mut cpass = encoder.begin_compute_pass();
         renderer
             .forward_pass_set
             .compute(&renderer.culling_pass, &mut cpass, &general_bg, &forward_pass_data);
+        for (light, data) in directional_light_manager.values().zip(&shadow_passes_data) {
+            light
+                .shadow_pass_set
+                .compute(&renderer.culling_pass, &mut cpass, &general_bg, data)
+        }
         drop(cpass);
 
         span_transfer!(compute_pass_span -> render_pass_span, INFO, "Primary Renderpass");
@@ -283,6 +317,37 @@ pub fn render_loop<TLD: 'static>(renderer: Arc<Renderer<TLD>>) -> impl Future<Ou
             .map(|handle| texture_manager_cube.internal_index(handle) as u32);
 
         drop(texture_manager_cube);
+
+        let texture_manager_2d = renderer.texture_manager_2d.read();
+
+        for (light, data) in directional_light_manager.values().zip(&shadow_passes_data) {
+            let attachment = texture_manager_internal.get(light.shadow_tex.unwrap());
+            let mut rpass = encoder.begin_render_pass(&RenderPassDescriptor {
+                color_attachments: &[],
+                depth_stencil_attachment: Some(RenderPassDepthStencilAttachmentDescriptor {
+                    attachment,
+                    depth_ops: Some(Operations {
+                        load: LoadOp::Clear(1.0),
+                        store: true,
+                    }),
+                    stencil_ops: None,
+                }),
+            });
+
+            light.shadow_pass_set.render(
+                &depth_pass,
+                &mut rpass,
+                vertex_buffer,
+                index_buffer,
+                &general_bg,
+                &texture_2d_bg,
+                data,
+            );
+
+            drop(rpass);
+        }
+
+        drop(texture_manager_2d);
 
         let mut rpass = encoder.begin_render_pass(&RenderPassDescriptor {
             color_attachments: &[
@@ -323,13 +388,21 @@ pub fn render_loop<TLD: 'static>(renderer: Arc<Renderer<TLD>>) -> impl Future<Ou
             &general_bg,
             &texture_2d_bg,
             &texture_cube_bg,
+            &texture_internal_bg,
             &forward_pass_data,
             background_texture,
         );
 
         drop(rpass);
 
-        drop((opaque_pass, depth_pass, object_manager, material_manager, mesh_manager));
+        drop((
+            opaque_pass,
+            depth_pass,
+            object_manager,
+            material_manager,
+            mesh_manager,
+            directional_light_manager,
+        ));
 
         span_transfer!(render_pass_span -> blit_span, INFO, "Blit to Swapchain");
 

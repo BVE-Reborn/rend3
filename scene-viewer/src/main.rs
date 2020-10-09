@@ -284,6 +284,11 @@ fn main() {
         intensity: 10.0,
         direction: Vec3::new(-1.0, -1.0, 0.0),
     });
+    renderer.add_directional_light(DirectionalLight {
+        color: Vec3::one(),
+        intensity: 2.0,
+        direction: Vec3::new(1.0, 0.0, 0.0),
+    });
 
     rend3::span_transfer!(loading_span -> _);
     rend3::span_transfer!(main_thread_span -> _);

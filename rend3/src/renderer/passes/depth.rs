@@ -6,10 +6,19 @@ use crate::renderer::{
 use shaderc::ShaderKind;
 use std::{future::Future, sync::Arc};
 use tracing_futures::Instrument;
-use wgpu::{BindGroup, BindGroupLayout, Buffer, Device, RenderPass, RenderPipeline, ShaderModule};
+use wgpu::{
+    BindGroup, BindGroupLayout, Buffer, Device, PipelineLayout, PipelineLayoutDescriptor, RenderPass, RenderPipeline,
+    ShaderModule,
+};
+
+pub enum DepthPassType {
+    Depth,
+    Shadow,
+}
 
 pub struct DepthPass {
-    pipeline: RenderPipeline,
+    depth_pipeline: RenderPipeline,
+    shadow_pipeline: RenderPipeline,
     vertex: Arc<ShaderModule>,
     fragment: Arc<ShaderModule>,
 }
@@ -38,13 +47,7 @@ impl DepthPass {
             debug: cfg!(debug_assertions),
         });
 
-        let layout = util::create_render_pipeline_layout(
-            device,
-            general_bgl,
-            output_noindirect_bgl,
-            texture_2d_bgl,
-            util::RenderPipelineLayoutType::Depth,
-        );
+        let layout = create_depth_pipeline_layout(device, general_bgl, output_noindirect_bgl, texture_2d_bgl);
 
         drop(new_span_guard);
 
@@ -52,11 +55,14 @@ impl DepthPass {
             let vertex = vertex.await.unwrap();
             let fragment = fragment.await.unwrap();
 
-            let pipeline =
+            let depth_pipeline =
                 util::create_render_pipeline(device, &layout, &vertex, &fragment, util::RenderPipelineType::Depth);
+            let shadow_pipeline =
+                util::create_render_pipeline(device, &layout, &vertex, &fragment, util::RenderPipelineType::Shadow);
 
             Self {
-                pipeline,
+                depth_pipeline,
+                shadow_pipeline,
                 vertex,
                 fragment,
             }
@@ -72,21 +78,23 @@ impl DepthPass {
         texture_2d_bgl: &BindGroupLayout,
     ) {
         span_transfer!(_ -> update_pipeline_span, INFO, "Depth Pass Update Pipeline");
-        let layout = util::create_render_pipeline_layout(
-            device,
-            general_bgl,
-            output_noindirect_bgl,
-            texture_2d_bgl,
-            util::RenderPipelineLayoutType::Depth,
-        );
-        let pipeline = util::create_render_pipeline(
+        let layout = create_depth_pipeline_layout(device, general_bgl, output_noindirect_bgl, texture_2d_bgl);
+        let depth_pipeline = util::create_render_pipeline(
             device,
             &layout,
             &self.vertex,
             &self.fragment,
             util::RenderPipelineType::Depth,
         );
-        self.pipeline = pipeline;
+        self.depth_pipeline = depth_pipeline;
+        let shadow_pipeline = util::create_render_pipeline(
+            device,
+            &layout,
+            &self.vertex,
+            &self.fragment,
+            util::RenderPipelineType::Shadow,
+        );
+        self.shadow_pipeline = shadow_pipeline;
     }
 
     pub fn run<'a>(
@@ -100,8 +108,12 @@ impl DepthPass {
         output_noindirect_bg: &'a BindGroup,
         texture_2d_bg: &'a BindGroup,
         object_count: u32,
+        shadow: DepthPassType,
     ) {
-        rpass.set_pipeline(&self.pipeline);
+        rpass.set_pipeline(match shadow {
+            DepthPassType::Shadow => &self.shadow_pipeline,
+            DepthPassType::Depth => &self.depth_pipeline,
+        });
         rpass.set_vertex_buffer(0, vertex_buffer.slice(..));
         rpass.set_index_buffer(index_buffer.slice(..));
         rpass.set_bind_group(0, &general_bg, &[]);
@@ -109,4 +121,17 @@ impl DepthPass {
         rpass.set_bind_group(2, &texture_2d_bg, &[]);
         rpass.multi_draw_indexed_indirect_count(indirect_buffer, 0, count_buffer, 0, object_count);
     }
+}
+
+pub fn create_depth_pipeline_layout(
+    device: &Device,
+    input_bgl: &BindGroupLayout,
+    output_noindirect_bgl: &BindGroupLayout,
+    texture_2d_bgl: &BindGroupLayout,
+) -> PipelineLayout {
+    device.create_pipeline_layout(&PipelineLayoutDescriptor {
+        label: Some("depth pipeline layout"),
+        bind_group_layouts: &[input_bgl, output_noindirect_bgl, texture_2d_bgl],
+        push_constant_ranges: &[],
+    })
 }

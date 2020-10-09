@@ -40,6 +40,7 @@ mod passes {
     mod depth;
     mod forward_set;
     mod opaque;
+    mod shadow_set;
     mod skybox;
 
     pub use blit::*;
@@ -47,6 +48,7 @@ mod passes {
     pub use depth::*;
     pub use forward_set::*;
     pub use opaque::*;
+    pub use shadow_set::*;
     pub use skybox::*;
 }
 mod render;
@@ -84,6 +86,7 @@ where
     mesh_manager: RwLock<MeshManager>,
     texture_manager_2d: RwLock<TextureManager>,
     texture_manager_cube: RwLock<TextureManager>,
+    texture_manager_internal: RwLock<TextureManager>,
     material_manager: RwLock<MaterialManager>,
     object_manager: RwLock<ObjectManager>,
     directional_light_manager: RwLock<light::DirectionalLightManager>,

@@ -44,7 +44,7 @@ impl RendererGlobalResources {
         let (depth_texture, depth_texture_view) =
             util::create_framebuffer_texture(device, options.size, util::FramebufferTextureKind::Depth);
 
-        let camera = Camera::new(options.size.width as f32 / options.size.height as f32);
+        let camera = Camera::new_projection(options.size.width as f32 / options.size.height as f32);
 
         let blit_bgl = util::create_blit_bgl(device);
         let prefix_sum_bgl = util::create_prefix_sum_bgl(device);

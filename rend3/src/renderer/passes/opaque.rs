@@ -6,7 +6,10 @@ use crate::renderer::{
 use shaderc::ShaderKind;
 use std::{future::Future, sync::Arc};
 use tracing_futures::Instrument;
-use wgpu::{BindGroup, BindGroupLayout, Buffer, Device, RenderPass, RenderPipeline, ShaderModule};
+use wgpu::{
+    BindGroup, BindGroupLayout, Buffer, Device, PipelineLayout, PipelineLayoutDescriptor, RenderPass, RenderPipeline,
+    ShaderModule,
+};
 
 pub struct OpaquePass {
     pipeline: RenderPipeline,
@@ -20,6 +23,7 @@ impl OpaquePass {
         input_bgl: &BindGroupLayout,
         output_noindirect_bgl: &BindGroupLayout,
         texture_2d_bgl: &BindGroupLayout,
+        texture_internal_bgl: &BindGroupLayout,
     ) -> impl Future<Output = Self> + 'a {
         let new_span = tracing::warn_span!("Creating OpaquePass");
         let new_span_guard = new_span.enter();
@@ -38,12 +42,12 @@ impl OpaquePass {
             debug: cfg!(debug_assertions),
         });
 
-        let layout = util::create_render_pipeline_layout(
+        let layout = create_opaque_pipeline_layout(
             device,
             input_bgl,
             output_noindirect_bgl,
             texture_2d_bgl,
-            util::RenderPipelineLayoutType::Opaque,
+            texture_internal_bgl,
         );
 
         drop(new_span_guard);
@@ -70,14 +74,15 @@ impl OpaquePass {
         input_bgl: &BindGroupLayout,
         output_noindirect_bgl: &BindGroupLayout,
         texture_2d_bgl: &BindGroupLayout,
+        texture_internal_bgl: &BindGroupLayout,
     ) {
         span_transfer!(_ -> update_pipeline_span, INFO, "Opaque Pass Update Pipeline");
-        let layout = util::create_render_pipeline_layout(
+        let layout = create_opaque_pipeline_layout(
             device,
             input_bgl,
             output_noindirect_bgl,
             texture_2d_bgl,
-            util::RenderPipelineLayoutType::Opaque,
+            texture_internal_bgl,
         );
         let pipeline = util::create_render_pipeline(
             device,
@@ -99,6 +104,7 @@ impl OpaquePass {
         input_bg: &'a BindGroup,
         output_noindirect_bg: &'a BindGroup,
         texture_2d_bg: &'a BindGroup,
+        texture_internal_bg: &'a BindGroup,
         object_count: u32,
     ) {
         rpass.set_pipeline(&self.pipeline);
@@ -107,6 +113,21 @@ impl OpaquePass {
         rpass.set_bind_group(0, &input_bg, &[]);
         rpass.set_bind_group(1, &output_noindirect_bg, &[]);
         rpass.set_bind_group(2, &texture_2d_bg, &[]);
+        rpass.set_bind_group(3, &texture_internal_bg, &[]);
         rpass.multi_draw_indexed_indirect_count(indirect_buffer, 0, count_buffer, 0, object_count);
     }
+}
+
+pub fn create_opaque_pipeline_layout(
+    device: &Device,
+    input_bgl: &BindGroupLayout,
+    output_noindirect_bgl: &BindGroupLayout,
+    texture_2d_bgl: &BindGroupLayout,
+    texture_internal_bgl: &BindGroupLayout,
+) -> PipelineLayout {
+    device.create_pipeline_layout(&PipelineLayoutDescriptor {
+        label: Some("opaque pipeline layout"),
+        bind_group_layouts: &[input_bgl, output_noindirect_bgl, texture_2d_bgl, texture_internal_bgl],
+        push_constant_ranges: &[],
+    })
 }

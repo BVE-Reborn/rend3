@@ -158,7 +158,7 @@ bitflags::bitflags! {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub enum AlbedoComponent {
     /// No albedo color
     None,
@@ -226,7 +226,7 @@ impl AlbedoComponent {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub enum MaterialComponent<T> {
     None,
     Value(T),
@@ -262,7 +262,7 @@ impl<T: Copy> MaterialComponent<T> {
 //
 // - Green screen value
 changeable_struct! {
-    #[derive(Debug, Default, Clone)]
+    #[derive(Debug, Default,Copy,  Clone)]
     pub struct Material <- nodefault MaterialChange {
         pub albedo: AlbedoComponent,
         pub normal: Option<TextureHandle>,
@@ -292,6 +292,7 @@ pub struct CameraLocation {
 }
 
 changeable_struct! {
+    #[derive(Debug, Copy, Clone)]
     pub struct DirectionalLight <- DirectionalLightChange {
         pub color: Vec3,
         pub intensity: f32,

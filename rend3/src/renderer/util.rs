@@ -5,16 +5,16 @@ use crate::{
     },
     VSyncMode,
 };
+use arrayvec::ArrayVec;
 use std::num::NonZeroU8;
 use wgpu::{
     AddressMode, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor,
     BindGroupLayoutEntry, BindingResource, BindingType, BlendDescriptor, ColorStateDescriptor, ColorWrite,
     CompareFunction, CullMode, DepthStencilStateDescriptor, Device, Extent3d, FilterMode, FrontFace, IndexFormat,
-    PipelineLayout, PipelineLayoutDescriptor, PresentMode, PrimitiveTopology, ProgrammableStageDescriptor,
-    RasterizationStateDescriptor, RenderPipeline, RenderPipelineDescriptor, Sampler, SamplerDescriptor, ShaderModule,
-    ShaderStage, StencilStateDescriptor, Surface, SwapChain, SwapChainDescriptor, Texture, TextureComponentType,
-    TextureDescriptor, TextureDimension, TextureUsage, TextureView, TextureViewDescriptor, TextureViewDimension,
-    VertexStateDescriptor,
+    PipelineLayout, PresentMode, PrimitiveTopology, ProgrammableStageDescriptor, RasterizationStateDescriptor,
+    RenderPipeline, RenderPipelineDescriptor, Sampler, SamplerDescriptor, ShaderModule, ShaderStage,
+    StencilStateDescriptor, Surface, SwapChain, SwapChainDescriptor, Texture, TextureComponentType, TextureDescriptor,
+    TextureDimension, TextureUsage, TextureView, TextureViewDescriptor, TextureViewDimension, VertexStateDescriptor,
 };
 use winit::dpi::PhysicalSize;
 
@@ -318,30 +318,10 @@ macro_rules! create_vertex_buffer_descriptor {
     };
 }
 
-pub enum RenderPipelineLayoutType {
-    Depth,
-    Opaque,
-}
-
-pub fn create_render_pipeline_layout(
-    device: &Device,
-    input_bgl: &BindGroupLayout,
-    output_noindirect_bgl: &BindGroupLayout,
-    texture_bgl: &BindGroupLayout,
-    ty: RenderPipelineLayoutType,
-) -> PipelineLayout {
-    device.create_pipeline_layout(&PipelineLayoutDescriptor {
-        label: Some(match ty {
-            RenderPipelineLayoutType::Depth => "depth pipeline layout",
-            RenderPipelineLayoutType::Opaque => "opaque pipeline layout",
-        }),
-        bind_group_layouts: &[input_bgl, output_noindirect_bgl, texture_bgl],
-        push_constant_ranges: &[],
-    })
-}
-
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum RenderPipelineType {
     Depth,
+    Shadow,
     Opaque,
     Skybox,
 }
@@ -355,9 +335,34 @@ pub fn create_render_pipeline(
 ) -> RenderPipeline {
     let vertex_buffers = [create_vertex_buffer_descriptor!()];
 
+    let mut color_states: ArrayVec<[ColorStateDescriptor; 2]> = ArrayVec::new();
+    if ty != RenderPipelineType::Shadow {
+        color_states.push(ColorStateDescriptor {
+            format: INTERNAL_RENDERBUFFER_FORMAT,
+            alpha_blend: BlendDescriptor::REPLACE,
+            color_blend: BlendDescriptor::REPLACE,
+            write_mask: match ty {
+                RenderPipelineType::Depth => ColorWrite::empty(),
+                RenderPipelineType::Opaque | RenderPipelineType::Skybox => ColorWrite::ALL,
+                RenderPipelineType::Shadow => unreachable!(),
+            },
+        });
+        color_states.push(ColorStateDescriptor {
+            format: INTERNAL_RENDERBUFFER_NORMAL_FORMAT,
+            alpha_blend: BlendDescriptor::REPLACE,
+            color_blend: BlendDescriptor::REPLACE,
+            write_mask: match ty {
+                RenderPipelineType::Depth | RenderPipelineType::Skybox => ColorWrite::empty(),
+                RenderPipelineType::Opaque => ColorWrite::ALL,
+                RenderPipelineType::Shadow => unreachable!(),
+            },
+        });
+    }
+
     device.create_render_pipeline(&RenderPipelineDescriptor {
         label: Some(match ty {
             RenderPipelineType::Depth => "depth pipeline",
+            RenderPipelineType::Shadow => "shadow pipeline",
             RenderPipelineType::Opaque => "opaque pipeline",
             RenderPipelineType::Skybox => "skybox pipeline",
         }),
@@ -373,7 +378,7 @@ pub fn create_render_pipeline(
         rasterization_state: Some(RasterizationStateDescriptor {
             front_face: FrontFace::Cw,
             cull_mode: match ty {
-                RenderPipelineType::Opaque | RenderPipelineType::Depth => CullMode::Back,
+                RenderPipelineType::Shadow | RenderPipelineType::Opaque | RenderPipelineType::Depth => CullMode::Back,
                 RenderPipelineType::Skybox => CullMode::None,
             },
             clamp_depth: false,
@@ -382,33 +387,15 @@ pub fn create_render_pipeline(
             depth_bias_clamp: 0.0,
         }),
         primitive_topology: PrimitiveTopology::TriangleList,
-        color_states: &[
-            ColorStateDescriptor {
-                format: INTERNAL_RENDERBUFFER_FORMAT,
-                alpha_blend: BlendDescriptor::REPLACE,
-                color_blend: BlendDescriptor::REPLACE,
-                write_mask: match ty {
-                    RenderPipelineType::Depth => ColorWrite::empty(),
-                    RenderPipelineType::Opaque | RenderPipelineType::Skybox => ColorWrite::ALL,
-                },
-            },
-            ColorStateDescriptor {
-                format: INTERNAL_RENDERBUFFER_NORMAL_FORMAT,
-                alpha_blend: BlendDescriptor::REPLACE,
-                color_blend: BlendDescriptor::REPLACE,
-                write_mask: match ty {
-                    RenderPipelineType::Depth | RenderPipelineType::Skybox => ColorWrite::empty(),
-                    RenderPipelineType::Opaque => ColorWrite::ALL,
-                },
-            },
-        ],
+        color_states: &color_states,
         depth_stencil_state: Some(DepthStencilStateDescriptor {
             format: INTERNAL_RENDERBUFFER_DEPTH_FORMAT,
             depth_write_enabled: match ty {
-                RenderPipelineType::Depth => true,
+                RenderPipelineType::Shadow | RenderPipelineType::Depth => true,
                 RenderPipelineType::Opaque | RenderPipelineType::Skybox => false,
             },
             depth_compare: match ty {
+                RenderPipelineType::Shadow => CompareFunction::LessEqual,
                 RenderPipelineType::Depth => CompareFunction::Greater,
                 RenderPipelineType::Opaque | RenderPipelineType::Skybox => CompareFunction::Equal,
             },
@@ -417,7 +404,7 @@ pub fn create_render_pipeline(
         vertex_state: VertexStateDescriptor {
             index_format: IndexFormat::Uint32,
             vertex_buffers: match ty {
-                RenderPipelineType::Opaque | RenderPipelineType::Depth => &vertex_buffers,
+                RenderPipelineType::Shadow | RenderPipelineType::Depth | RenderPipelineType::Opaque => &vertex_buffers,
                 RenderPipelineType::Skybox => &[],
             },
         },

@@ -2,19 +2,23 @@ use crate::{
     bind_merge::BindGroupBuilder,
     datatypes::{DirectionalLight, DirectionalLightHandle, TextureHandle},
     registry::ResourceRegistry,
-    renderer::texture::TextureManager,
+    renderer::{
+        camera::Camera, passes, passes::ShadowPassSet, texture::TextureManager, INTERNAL_RENDERBUFFER_DEPTH_FORMAT,
+    },
 };
-use glam::Vec3;
+use glam::{Mat4, Vec3};
 use std::{mem::size_of, num::NonZeroU32, sync::Arc};
 use wgpu::{
-    BindGroupEntry, BindingResource, BufferAddress, BufferUsage, CommandEncoder, Device, Extent3d, TextureDescriptor,
-    TextureDimension, TextureFormat, TextureUsage, TextureViewDescriptor,
+    BindGroupEntry, BindGroupLayout, BindingResource, BufferAddress, BufferUsage, CommandEncoder, Device, Extent3d,
+    TextureDescriptor, TextureDimension, TextureUsage, TextureViewDescriptor,
 };
 use wgpu_conveyor::{write_to_buffer1, AutomatedBuffer, AutomatedBufferManager, IdBuffer};
 
 pub struct InternalDirectionalLight {
     pub inner: DirectionalLight,
+    pub camera: Camera,
     pub shadow_tex: Option<TextureHandle>,
+    pub shadow_pass_set: passes::ShadowPassSet,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -29,6 +33,7 @@ unsafe impl bytemuck::Pod for ShaderDirectionalLightBufferHeader {}
 #[derive(Debug, Copy, Clone)]
 #[repr(C, align(16))]
 struct ShaderDirectionalLight {
+    pub inv_view_proj: Mat4,
     pub color: Vec3,
     pub shadow_tex: Option<NonZeroU32>,
     pub direction: Vec3,
@@ -63,11 +68,12 @@ impl DirectionalLightManager {
     pub fn fill(
         &mut self,
         device: &Device,
-        texture_manager_2d: &mut TextureManager,
+        texture_manager_internal: &mut TextureManager,
+        uniform_bgl: &BindGroupLayout,
         handle: DirectionalLightHandle,
         light: DirectionalLight,
     ) {
-        let texture_handle = texture_manager_2d.allocate();
+        let texture_handle = texture_manager_internal.allocate();
 
         let texture = device.create_texture(&TextureDescriptor {
             // TODO: label
@@ -81,18 +87,22 @@ impl DirectionalLightManager {
             mip_level_count: 1,
             sample_count: 1,
             dimension: TextureDimension::D2,
-            format: TextureFormat::Depth32Float,
+            format: INTERNAL_RENDERBUFFER_DEPTH_FORMAT,
             usage: TextureUsage::OUTPUT_ATTACHMENT | TextureUsage::SAMPLED,
         });
         let view = texture.create_view(&TextureViewDescriptor::default());
 
-        texture_manager_2d.fill(texture_handle, view);
+        texture_manager_internal.fill(texture_handle, view);
+
+        let shadow_pass_set = ShadowPassSet::new(device, uniform_bgl, String::from("directional light"));
 
         self.registry.insert(
             handle.0,
             InternalDirectionalLight {
                 inner: light,
+                camera: Camera::new_orthographic(light.direction),
                 shadow_tex: Some(texture_handle),
+                shadow_pass_set,
             },
         );
     }
@@ -128,6 +138,7 @@ impl DirectionalLightManager {
 
                 for (idx, light) in registry.values().enumerate() {
                     buffer_body[idx] = ShaderDirectionalLight {
+                        inv_view_proj: light.camera.view_proj().inverse(),
                         color: light.inner.color * light.inner.intensity,
                         direction: light.inner.direction,
                         shadow_tex: light.shadow_tex.map(translate_texture),
@@ -144,5 +155,9 @@ impl DirectionalLightManager {
             binding: 0,
             resource: BindingResource::Buffer(self.buffer_storage.as_ref().unwrap().inner.slice(..)),
         })
+    }
+
+    pub fn values(&self) -> impl Iterator<Item = &InternalDirectionalLight> {
+        self.registry.values()
     }
 }

@@ -9,7 +9,7 @@ pub struct Camera {
     proj: Mat4,
 }
 impl Camera {
-    pub fn new(aspect_ratio: f32) -> Self {
+    pub fn new_projection(aspect_ratio: f32) -> Self {
         let proj = Mat4::perspective_infinite_reverse_lh(CAMERA_VFOV.to_radians(), aspect_ratio, 0.1);
         let view = compute_view_matrix(CameraLocation::default());
         let orig_view = compute_origin_matrix(CameraLocation::default());
@@ -17,9 +17,25 @@ impl Camera {
         Self { orig_view, view, proj }
     }
 
+    pub fn new_orthographic(direction: Vec3) -> Self {
+        let proj = Mat4::orthographic_lh(-50.0, 50.0, -50.0, 50.0, -100.0, 100.0);
+        let view = Mat4::look_at_lh(Vec3::zero(), direction, Vec3::unit_y());
+
+        Self {
+            orig_view: view,
+            view,
+            proj,
+        }
+    }
+
     pub fn set_location(&mut self, location: CameraLocation) {
         self.view = compute_view_matrix(location);
         self.orig_view = compute_origin_matrix(location);
+    }
+
+    pub fn set_orthographic_location(&mut self, direction: Vec3) {
+        self.view = Mat4::look_at_lh(Vec3::zero(), direction, Vec3::unit_y());
+        self.orig_view = self.view;
     }
 
     pub fn set_aspect_ratio(&mut self, aspect_ratio: f32) {

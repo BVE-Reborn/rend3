@@ -11,14 +11,14 @@ use crate::{
         passes::ForwardPassSet,
         resources::RendererGlobalResources,
         shaders::ShaderManager,
-        texture::{TextureManager, STARTING_2D_TEXTURES, STARTING_CUBE_TEXTURES},
+        texture::{TextureManager, STARTING_2D_TEXTURES, STARTING_CUBE_TEXTURES, STARTING_INTERNAL_TEXTURES},
         Renderer, SWAPCHAIN_FORMAT,
     },
     RendererInitializationError, RendererOptions,
 };
 use parking_lot::{Mutex, RwLock};
 use raw_window_handle::HasRawWindowHandle;
-use std::sync::Arc;
+use std::{path::Path, sync::Arc};
 use switchyard::Switchyard;
 use wgpu::{BackendBit, DeviceDescriptor, Instance, PowerPreference, RequestAdapterOptions, TextureViewDimension};
 use wgpu_conveyor::{AutomatedBufferManager, UploadStyle};
@@ -52,7 +52,7 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
                 limits,
                 shader_validation: true,
             },
-            None,
+            Some(Path::new("tmp/trace")),
         )
         .await
         .map_err(|_| RendererInitializationError::RequestDeviceFailed)?;
@@ -96,12 +96,20 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
         &texture_manager_2d_guard.bind_group_layout(),
     );
 
+    let mut texture_manager_internal = RwLock::new(TextureManager::new(
+        &device,
+        STARTING_INTERNAL_TEXTURES,
+        TextureViewDimension::D2,
+    ));
+    let texture_manager_internal_guard = texture_manager_internal.get_mut();
+
     let opaque_pass = passes::OpaquePass::new(
         &device,
         &shader_manager,
         &global_resource_guard.general_bgl,
         &global_resource_guard.object_output_noindirect_bgl,
         &texture_manager_2d_guard.bind_group_layout(),
+        &texture_manager_internal_guard.bind_group_layout(),
     );
 
     let mut texture_manager_cube = RwLock::new(TextureManager::new(
@@ -160,6 +168,7 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
         mesh_manager,
         texture_manager_2d,
         texture_manager_cube,
+        texture_manager_internal,
         material_manager,
         object_manager,
         directional_light_manager,
