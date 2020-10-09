@@ -114,6 +114,13 @@ impl TextureManager {
     pub fn bind_group_layout(&self) -> &BindGroupLayout {
         &self.layout
     }
+
+    pub fn translation_fn(&self) -> impl Fn(TextureHandle) -> NonZeroU32 + Copy + '_ {
+        move |v: TextureHandle| unsafe {
+            // SAFETY: overflowing this number will panic
+            NonZeroU32::new_unchecked(self.internal_index(v) as u32 + 1)
+        }
+    }
 }
 
 fn fill_to_size(
@@ -191,7 +198,7 @@ impl NullTextureManager {
                 | TextureViewDimension::CubeArray => TextureDimension::D2,
                 TextureViewDimension::D3 => TextureDimension::D3,
             },
-            format: TextureFormat::Rgba8Unorm,
+            format: TextureFormat::R8Unorm,
             usage: TextureUsage::SAMPLED,
         });
 

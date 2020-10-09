@@ -36,6 +36,7 @@ pub fn render_loop<TLD: 'static>(renderer: Arc<Renderer<TLD>>) -> impl Future<Ou
         let mut texture_manager_cube = renderer.texture_manager_cube.write();
         let mut material_manager = renderer.material_manager.write();
         let mut object_manager = renderer.object_manager.write();
+        let mut directional_light_manager = renderer.directional_light_manager.write();
         let mut global_resources = renderer.global_resources.write();
 
         for cmd in instructions.drain(..) {
@@ -164,6 +165,14 @@ pub fn render_loop<TLD: 'static>(renderer: Arc<Renderer<TLD>>) -> impl Future<Ou
                 Instruction::RemoveObject { handle } => {
                     object_manager.remove(handle);
                 }
+                Instruction::AddDirectionalLight { handle, light } => {
+                    directional_light_manager.fill(&renderer.device, &mut texture_manager_2d, handle, light);
+                }
+                Instruction::ChangeDirectionalLight { handle, change } => directional_light_manager
+                    .get_mut(handle)
+                    .inner
+                    .update_from_changes(change),
+                Instruction::RemoveDirectionalLight { handle } => directional_light_manager.remove(handle),
                 Instruction::SetOptions { options } => new_options = Some(options),
                 Instruction::SetCameraLocation { location } => {
                     global_resources.camera.set_location(location);
@@ -183,10 +192,12 @@ pub fn render_loop<TLD: 'static>(renderer: Arc<Renderer<TLD>>) -> impl Future<Ou
         let (texture_cube_bgl, texture_cube_bg, texture_cube_bgl_dirty) = texture_manager_cube.ready(&renderer.device);
         material_manager.ready(&renderer.device, &mut encoder, &texture_manager_2d);
         let object_count = object_manager.ready(&renderer.device, &mut encoder, &material_manager);
+        directional_light_manager.ready(&renderer.device, &mut encoder, &texture_manager_2d);
 
         object_manager.append_to_bgb(&mut general_bgb);
         material_manager.append_to_bgb(&mut general_bgb);
         global_resources.append_to_bgb(&mut general_bgb);
+        directional_light_manager.append_to_bgb(&mut general_bgb);
 
         let general_bg = general_bgb.build(&renderer.device, &global_resources.general_bgl);
 
@@ -197,6 +208,7 @@ pub fn render_loop<TLD: 'static>(renderer: Arc<Renderer<TLD>>) -> impl Future<Ou
             texture_manager_cube,
             material_manager,
             object_manager,
+            directional_light_manager,
         ));
 
         span_transfer!(event_span -> resource_update_span, INFO, "Update resources");

@@ -6,7 +6,9 @@
 #include "brdf.glsl"
 #include "pixel.glsl"
 
-vec3 surface_shading(PixelData pixel, vec3 v, vec3 l, float occlusion) {
+vec3 surface_shading(DirectionalLight light, PixelData pixel, vec3 v, float occlusion) {
+    vec3 l = normalize(mat3(uniforms.view) * -light.direction);
+
     vec3 n = pixel.normal;
     vec3 h = normalize(v + l);
 
@@ -32,10 +34,9 @@ vec3 surface_shading(PixelData pixel, vec3 v, vec3 l, float occlusion) {
 
     vec3 color = Fd + Fr * energy_compensation;
 
-    vec4 light_color_intensity = vec4(vec3(10.0), 1.0);
     float light_attenuation = 1.0;
 
-    return (color * light_color_intensity.rgb) * (light_color_intensity.a * light_attenuation * NoL * occlusion);
+    return (color * light.color) * (light_attenuation * NoL * occlusion);
 }
 
 #endif

@@ -76,4 +76,14 @@ struct UniformData {
     Frustum frustum;
 };
 
+struct DirectionalLightBufferHeader {
+    uint total_lights;
+};
+
+struct DirectionalLight {
+    vec3 color;
+    uint shadow_tex;
+    vec3 direction;
+};
+
 #endif

@@ -1,7 +1,7 @@
 use crate::{
     datatypes::{
-        AffineTransform, CameraLocation, Material, MaterialChange, MaterialHandle, Mesh, MeshHandle, Object,
-        ObjectHandle, Texture, TextureHandle,
+        AffineTransform, CameraLocation, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Material,
+        MaterialChange, MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, Texture, TextureHandle,
     },
     instruction::{Instruction, InstructionStreamPair},
     renderer::{
@@ -86,6 +86,7 @@ where
     texture_manager_cube: RwLock<TextureManager>,
     material_manager: RwLock<MaterialManager>,
     object_manager: RwLock<ObjectManager>,
+    directional_light_manager: RwLock<light::DirectionalLightManager>,
 
     forward_pass_set: ForwardPassSet,
 
@@ -203,6 +204,31 @@ impl<TLD: 'static> Renderer<TLD> {
             .producer
             .lock()
             .push(Instruction::RemoveObject { handle })
+    }
+
+    pub fn add_directional_light(&self, light: DirectionalLight) -> DirectionalLightHandle {
+        let handle = self.directional_light_manager.read().allocate();
+
+        self.instructions
+            .producer
+            .lock()
+            .push(Instruction::AddDirectionalLight { handle, light });
+
+        handle
+    }
+
+    pub fn update_directional_light(&self, handle: DirectionalLightHandle, change: DirectionalLightChange) {
+        self.instructions
+            .producer
+            .lock()
+            .push(Instruction::ChangeDirectionalLight { handle, change })
+    }
+
+    pub fn remove_directional_light(&self, handle: DirectionalLightHandle) {
+        self.instructions
+            .producer
+            .lock()
+            .push(Instruction::RemoveDirectionalLight { handle })
     }
 
     pub fn set_options(&self, options: RendererOptions) {

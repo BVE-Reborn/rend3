@@ -1,7 +1,7 @@
 use crate::{
     datatypes::{
-        AffineTransform, CameraLocation, Material, MaterialChange, MaterialHandle, Mesh, MeshHandle, Object,
-        ObjectHandle, Texture, TextureHandle,
+        AffineTransform, CameraLocation, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Material,
+        MaterialChange, MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, Texture, TextureHandle,
     },
     RendererOptions,
 };
@@ -51,6 +51,17 @@ pub enum Instruction {
     },
     RemoveObject {
         handle: ObjectHandle,
+    },
+    AddDirectionalLight {
+        handle: DirectionalLightHandle,
+        light: DirectionalLight,
+    },
+    ChangeDirectionalLight {
+        handle: DirectionalLightHandle,
+        change: DirectionalLightChange,
+    },
+    RemoveDirectionalLight {
+        handle: DirectionalLightHandle,
     },
     SetOptions {
         options: RendererOptions,

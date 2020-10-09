@@ -2,6 +2,7 @@ use crate::{
     instruction::InstructionStreamPair,
     renderer::{
         info::ExtendedAdapterInfo,
+        light::DirectionalLightManager,
         limits::{check_features, check_limits},
         material::MaterialManager,
         mesh::MeshManager,
@@ -130,6 +131,7 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
     let mesh_manager = RwLock::new(MeshManager::new(&device));
     let material_manager = RwLock::new(MaterialManager::new(&device, buffer_manager.get_mut()));
     let object_manager = RwLock::new(ObjectManager::new(&device, buffer_manager.get_mut()));
+    let directional_light_manager = RwLock::new(DirectionalLightManager::new(&device, buffer_manager.get_mut()));
 
     span_transfer!(_ -> imgui_guard, INFO, "Creating Imgui Renderer");
 
@@ -160,6 +162,7 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
         texture_manager_cube,
         material_manager,
         object_manager,
+        directional_light_manager,
 
         forward_pass_set,
 

@@ -165,6 +165,16 @@ pub fn create_general_bind_group_layout(device: &Device) -> BindGroupLayout {
                 ty: BindingType::Sampler { comparison: false },
                 count: None,
             },
+            BindGroupLayoutEntry {
+                binding: 4,
+                visibility: ShaderStage::FRAGMENT,
+                ty: BindingType::StorageBuffer {
+                    dynamic: false,
+                    min_binding_size: None,
+                    readonly: true,
+                },
+                count: None,
+            },
         ],
     })
 }
