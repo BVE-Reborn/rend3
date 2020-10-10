@@ -279,7 +279,11 @@ pub fn create_sampler(device: &Device, ty: SamplerType) -> Sampler {
     };
 
     device.create_sampler(&SamplerDescriptor {
-        label: Some("linear sampler"),
+        label: Some(match ty {
+            SamplerType::Linear => "linear sampler",
+            SamplerType::Shadow => "shadow sampler",
+            SamplerType::Nearest => "nearest sampler",
+        }),
         address_mode_u: AddressMode::Repeat,
         address_mode_v: AddressMode::Repeat,
         address_mode_w: AddressMode::Repeat,
@@ -289,7 +293,10 @@ pub fn create_sampler(device: &Device, ty: SamplerType) -> Sampler {
         lod_min_clamp: -100.0,
         lod_max_clamp: 100.0,
         compare,
-        anisotropy_clamp: NonZeroU8::new(16),
+        anisotropy_clamp: match ty {
+            SamplerType::Linear => NonZeroU8::new(16),
+            SamplerType::Shadow | SamplerType::Nearest => None,
+        },
     })
 }
 
@@ -406,8 +413,14 @@ pub fn create_render_pipeline(
                 RenderPipelineType::Skybox => CullMode::None,
             },
             clamp_depth: false,
-            depth_bias: 0,
-            depth_bias_slope_scale: 0.0,
+            depth_bias: match ty {
+                RenderPipelineType::Shadow => 3,
+                RenderPipelineType::Skybox | RenderPipelineType::Opaque | RenderPipelineType::Depth => 0,
+            },
+            depth_bias_slope_scale: match ty {
+                RenderPipelineType::Shadow => 3.0,
+                RenderPipelineType::Skybox | RenderPipelineType::Opaque | RenderPipelineType::Depth => 0.0,
+            },
             depth_bias_clamp: 0.0,
         }),
         primitive_topology: PrimitiveTopology::TriangleList,
