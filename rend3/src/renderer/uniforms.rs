@@ -14,7 +14,8 @@ use wgpu::{
 pub struct ShaderCommonUniform {
     view: Mat4,
     view_proj: Mat4,
-    inv_view_proj: Mat4,
+    inv_view: Mat4,
+    inv_origin_view_proj: Mat4,
     frustum: ShaderFrustum,
 }
 
@@ -56,10 +57,13 @@ impl WrappedUniform {
     ) {
         span_transfer!(_ -> upload_span, WARN, "Uploading WrappedUniform");
 
+        let view = camera.view();
+
         let uniforms = ShaderCommonUniform {
-            view: camera.view(),
+            view,
             view_proj: camera.view_proj(),
-            inv_view_proj: camera.origin_view_proj().inverse(),
+            inv_view: view.inverse(),
+            inv_origin_view_proj: camera.origin_view_proj().inverse(),
             frustum: ShaderFrustum::from_matrix(camera.proj()),
         };
 

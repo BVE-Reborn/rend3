@@ -31,7 +31,7 @@ unsafe impl bytemuck::Pod for ShaderDirectionalLightBufferHeader {}
 #[derive(Debug, Copy, Clone)]
 #[repr(C, align(16))]
 struct ShaderDirectionalLight {
-    pub inv_view_proj: Mat4,
+    pub view_proj: Mat4,
     pub color: Vec3,
     pub shadow_tex: Option<NonZeroU32>,
     pub direction: Vec3,
@@ -136,7 +136,7 @@ impl DirectionalLightManager {
 
                 for (idx, light) in registry.values().enumerate() {
                     buffer_body[idx] = ShaderDirectionalLight {
-                        inv_view_proj: light.camera.view_proj().inverse(),
+                        view_proj: light.camera.view_proj(),
                         color: light.inner.color * light.inner.intensity,
                         direction: light.inner.direction,
                         shadow_tex: light.shadow_tex.map(translate_texture),

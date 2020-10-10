@@ -187,9 +187,9 @@ fn single(renderer: &Renderer, mesh: MeshHandle, materials: SmallVec<[MaterialHa
 }
 
 fn distribute(renderer: &Renderer, mesh: MeshHandle, materials: SmallVec<[MaterialHandle; 4]>) {
-    for x in (-11..=11).step_by(8) {
-        for y in (-11..=11).step_by(8) {
-            for z in (0..=100).step_by(20) {
+    for x in (-11..=11).step_by(4) {
+        for y in (-11..=11).step_by(4) {
+            for z in (0..=100).step_by(10) {
                 renderer.add_object(Object {
                     mesh,
                     materials: materials.clone(),

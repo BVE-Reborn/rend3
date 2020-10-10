@@ -168,6 +168,12 @@ pub fn create_general_bind_group_layout(device: &Device) -> BindGroupLayout {
             BindGroupLayoutEntry {
                 binding: 4,
                 visibility: ShaderStage::FRAGMENT,
+                ty: BindingType::Sampler { comparison: true },
+                count: None,
+            },
+            BindGroupLayoutEntry {
+                binding: 5,
+                visibility: ShaderStage::FRAGMENT,
                 ty: BindingType::StorageBuffer {
                     dynamic: false,
                     min_binding_size: None,
@@ -253,18 +259,36 @@ pub fn create_uniform_bgl(device: &Device) -> BindGroupLayout {
     })
 }
 
-pub fn create_sampler(device: &Device) -> Sampler {
+#[allow(dead_code)]
+pub enum SamplerType {
+    Nearest,
+    Linear,
+    Shadow,
+}
+
+pub fn create_sampler(device: &Device, ty: SamplerType) -> Sampler {
+    let filter = match ty {
+        SamplerType::Nearest => FilterMode::Nearest,
+        SamplerType::Linear => FilterMode::Linear,
+        SamplerType::Shadow => FilterMode::Linear,
+    };
+
+    let compare = match ty {
+        SamplerType::Nearest | SamplerType::Linear => None,
+        SamplerType::Shadow => Some(CompareFunction::LessEqual),
+    };
+
     device.create_sampler(&SamplerDescriptor {
         label: Some("linear sampler"),
         address_mode_u: AddressMode::Repeat,
         address_mode_v: AddressMode::Repeat,
         address_mode_w: AddressMode::Repeat,
-        mag_filter: FilterMode::Linear,
-        min_filter: FilterMode::Linear,
-        mipmap_filter: FilterMode::Linear,
+        mag_filter: filter,
+        min_filter: filter,
+        mipmap_filter: filter,
         lod_min_clamp: -100.0,
         lod_max_clamp: 100.0,
-        compare: None,
+        compare,
         anisotropy_clamp: NonZeroU8::new(16),
     })
 }

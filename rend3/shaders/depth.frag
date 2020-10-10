@@ -12,7 +12,7 @@ layout(location = 3) flat in uint i_material;
 layout(set = 0, binding = 2) uniform MaterialBuffer {
     MaterialData materials[MATERIAL_COUNT];
 };
-layout(set = 0, binding = 3) uniform sampler samplr;
+layout(set = 0, binding = 3) uniform sampler linear_sampler;
 layout(set = 1, binding = 0, std430) restrict readonly buffer ObjectOutputDataBuffer {
     ObjectOutputData object_output[];
 };
@@ -28,7 +28,7 @@ void main() {
 
     if (has_albedo) {
         uint albedo_idx = material.albedo_tex - 1;
-        vec4 albedo = texture(sampler2D(textures[nonuniformEXT(albedo_idx)], samplr), i_coords);
+        vec4 albedo = texture(sampler2D(textures[nonuniformEXT(albedo_idx)], linear_sampler), i_coords);
 
         if (albedo.a <= 0.5) {
             discard;

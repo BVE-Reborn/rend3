@@ -16,8 +16,9 @@ layout(location = 1) out vec4 o_normal;
 layout(set = 0, binding = 2) uniform MaterialBuffer {
     MaterialData materials[MATERIAL_COUNT];
 };
-layout(set = 0, binding = 3) uniform sampler samplr;
-layout(set = 0, binding = 4) restrict readonly buffer DirectionalLightBuffer {
+layout(set = 0, binding = 3) uniform sampler linear_sampler;
+layout(set = 0, binding = 4) uniform samplerShadow shadow_sampler;
+layout(set = 0, binding = 5) restrict readonly buffer DirectionalLightBuffer {
     DirectionalLightBufferHeader directional_light_header;
     DirectionalLight directional_lights[];
 };
@@ -41,7 +42,14 @@ void main() {
 
     vec3 color = vec3(0.0);
     for (uint i = 0; i < directional_light_header.total_lights; ++i) {
-        color += surface_shading(directional_lights[i], pixel, v, pixel.ambient_occlusion);
+        DirectionalLight light = directional_lights[i];
+
+        vec3 shadow_ndc = (directional_lights[i].view_proj * uniforms.inv_view * i_view_position).xyz;
+        vec3 shadow_texture_coords = vec3((shadow_ndc.xy + 1.0) * 0.5, shadow_ndc.z);
+
+        float shadow_value = texture(sampler2DShadow(internal_textures[light.shadow_tex - 1], shadow_sampler), shadow_texture_coords);
+
+        color += surface_shading(directional_lights[i], pixel, v, shadow_value);
     }
 
     o_color =  vec4(color, 1.0);

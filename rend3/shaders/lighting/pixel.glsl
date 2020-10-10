@@ -47,7 +47,7 @@ PixelData get_per_pixel_data(MaterialData material) {
 
     if (bool(material.material_flags & FLAGS_ALBEDO_ACTIVE)) {
         if (has_texture(material.albedo_tex)) {
-            pixel.albedo = texture(sampler2D(textures[nonuniformEXT(material.albedo_tex - 1)], samplr), i_coords);
+            pixel.albedo = texture(sampler2D(textures[nonuniformEXT(material.albedo_tex - 1)], linear_sampler), i_coords);
         } else {
             pixel.albedo = vec4(1.0);
         }
@@ -71,19 +71,19 @@ PixelData get_per_pixel_data(MaterialData material) {
     pixel.normal = normalize(pixel.normal);
 
     if (has_texture(material.roughness_tex)) {
-        pixel.perceptual_roughness = texture(sampler2D(textures[nonuniformEXT(material.roughness_tex - 1)], samplr), i_coords).r;
+        pixel.perceptual_roughness = texture(sampler2D(textures[nonuniformEXT(material.roughness_tex - 1)], linear_sampler), i_coords).r;
     } else {
         pixel.perceptual_roughness = material.roughness;
     }
 
     if (has_texture(material.metallic_tex)) {
-        pixel.metallic = texture(sampler2D(textures[nonuniformEXT(material.metallic_tex - 1)], samplr), i_coords).r;
+        pixel.metallic = texture(sampler2D(textures[nonuniformEXT(material.metallic_tex - 1)], linear_sampler), i_coords).r;
     } else {
         pixel.metallic = material.metallic;
     }
 
     if (has_texture(material.reflectance_tex)) {
-        pixel.reflectance = texture(sampler2D(textures[nonuniformEXT(material.reflectance_tex - 1)], samplr), i_coords).r;
+        pixel.reflectance = texture(sampler2D(textures[nonuniformEXT(material.reflectance_tex - 1)], linear_sampler), i_coords).r;
     } else {
         pixel.reflectance = material.reflectance;
     }
@@ -94,13 +94,13 @@ PixelData get_per_pixel_data(MaterialData material) {
     pixel.f0 = compute_f0(pixel.albedo, pixel.metallic, reflectance);
 
     if (has_texture(material.clear_coat_tex)) {
-        pixel.clear_coat = texture(sampler2D(textures[nonuniformEXT(material.clear_coat_tex - 1)], samplr), i_coords).r;
+        pixel.clear_coat = texture(sampler2D(textures[nonuniformEXT(material.clear_coat_tex - 1)], linear_sampler), i_coords).r;
     } else {
         pixel.clear_coat = material.clear_coat;
     }
     if (pixel.clear_coat != 0.0) {
         if (has_texture(material.clear_coat_roughness_tex)) {
-            pixel.clear_coat_perceptual_roughness = texture(sampler2D(textures[nonuniformEXT(material.clear_coat_roughness_tex - 1)], samplr), i_coords).r;
+            pixel.clear_coat_perceptual_roughness = texture(sampler2D(textures[nonuniformEXT(material.clear_coat_roughness_tex - 1)], linear_sampler), i_coords).r;
         } else {
             pixel.clear_coat_perceptual_roughness = material.clear_coat_roughness;
         }
@@ -114,13 +114,13 @@ PixelData get_per_pixel_data(MaterialData material) {
 
     // TODO: Aniso info
     if (has_texture(material.anisotropy_tex)) {
-        pixel.anisotropy = texture(sampler2D(textures[nonuniformEXT(material.anisotropy_tex - 1)], samplr), i_coords).r;
+        pixel.anisotropy = texture(sampler2D(textures[nonuniformEXT(material.anisotropy_tex - 1)], linear_sampler), i_coords).r;
     } else {
         pixel.anisotropy = material.anisotropy;
     }
 
     if (has_texture(material.ambient_occlusion_tex)) {
-        pixel.ambient_occlusion = texture(sampler2D(textures[nonuniformEXT(material.ambient_occlusion_tex - 1)], samplr), i_coords).r;
+        pixel.ambient_occlusion = texture(sampler2D(textures[nonuniformEXT(material.ambient_occlusion_tex - 1)], linear_sampler), i_coords).r;
     } else {
         pixel.ambient_occlusion = material.ambient_occlusion;
     }

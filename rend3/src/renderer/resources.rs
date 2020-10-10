@@ -1,7 +1,7 @@
 use crate::{
     bind_merge::BindGroupBuilder,
     datatypes::TextureHandle,
-    renderer::{camera::Camera, util},
+    renderer::{camera::Camera, util, util::SamplerType},
     RendererOptions,
 };
 use wgpu::{
@@ -31,7 +31,8 @@ pub struct RendererGlobalResources {
     pub object_output_noindirect_bgl: BindGroupLayout,
     pub uniform_bgl: BindGroupLayout,
 
-    pub sampler: Sampler,
+    pub linear_sampler: Sampler,
+    pub shadow_sampler: Sampler,
 }
 impl RendererGlobalResources {
     pub fn new(device: &Device, surface: &Surface, options: &RendererOptions) -> Self {
@@ -54,9 +55,10 @@ impl RendererGlobalResources {
         let object_output_noindirect_bgl = util::create_object_output_noindirect_bgl(device);
         let uniform_bgl = util::create_uniform_bgl(device);
 
-        let sampler = util::create_sampler(device);
+        let linear_sampler = util::create_sampler(device, SamplerType::Linear);
+        let shadow_sampler = util::create_sampler(device, SamplerType::Shadow);
 
-        let color_bg = util::create_blit_bg(device, &blit_bgl, &color_texture_view, &sampler);
+        let color_bg = util::create_blit_bg(device, &blit_bgl, &color_texture_view, &linear_sampler);
 
         Self {
             swapchain,
@@ -76,7 +78,8 @@ impl RendererGlobalResources {
             object_output_bgl,
             object_output_noindirect_bgl,
             uniform_bgl,
-            sampler,
+            linear_sampler,
+            shadow_sampler,
         }
     }
 
@@ -103,7 +106,7 @@ impl RendererGlobalResources {
                 util::create_framebuffer_texture(device, new_options.size, util::FramebufferTextureKind::Normal);
             let (depth_texture, depth_texture_view) =
                 util::create_framebuffer_texture(device, new_options.size, util::FramebufferTextureKind::Depth);
-            let color_bg = util::create_blit_bg(device, &self.blit_bgl, &color_texture_view, &self.sampler);
+            let color_bg = util::create_blit_bg(device, &self.blit_bgl, &color_texture_view, &self.linear_sampler);
 
             self.color_texture = color_texture;
             self.color_texture_view = color_texture_view;
@@ -120,7 +123,11 @@ impl RendererGlobalResources {
     pub fn append_to_bgb<'a>(&'a self, general_bgb: &mut BindGroupBuilder<'a>) {
         general_bgb.append(BindGroupEntry {
             binding: 0,
-            resource: BindingResource::Sampler(&self.sampler),
+            resource: BindingResource::Sampler(&self.linear_sampler),
+        });
+        general_bgb.append(BindGroupEntry {
+            binding: 0,
+            resource: BindingResource::Sampler(&self.shadow_sampler),
         });
     }
 }

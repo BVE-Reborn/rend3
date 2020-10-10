@@ -73,7 +73,8 @@ struct MaterialData {
 struct UniformData {
     mat4 view;
     mat4 view_proj;
-    mat4 inv_view_proj;
+    mat4 inv_view;
+    mat4 inv_origin_view_proj;
     Frustum frustum;
 };
 
@@ -82,7 +83,7 @@ struct DirectionalLightBufferHeader {
 };
 
 struct DirectionalLight {
-    mat4 inv_view_proj;
+    mat4 view_proj;
     vec3 color;
     uint shadow_tex;
     vec3 direction;
