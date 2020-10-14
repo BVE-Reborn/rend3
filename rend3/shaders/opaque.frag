@@ -45,9 +45,10 @@ void main() {
         DirectionalLight light = directional_lights[i];
 
         vec3 shadow_ndc = (directional_lights[i].view_proj * uniforms.inv_view * i_view_position).xyz;
-        vec3 shadow_texture_coords = vec3((shadow_ndc.xy + 1.0) * 0.5, shadow_ndc.z);
+        vec2 shadow_flipped = (shadow_ndc.xy * 0.5) + 0.5;
+        vec3 shadow_shadow_coords = vec3(shadow_flipped.x, 1 - shadow_flipped.y, shadow_ndc.z);
 
-        float shadow_value = texture(sampler2DShadow(internal_textures[light.shadow_tex - 1], shadow_sampler), shadow_texture_coords);
+        float shadow_value = texture(sampler2DShadow(internal_textures[light.shadow_tex - 1], shadow_sampler), shadow_shadow_coords);
 
         color += surface_shading(directional_lights[i], pixel, v, shadow_value);
     }

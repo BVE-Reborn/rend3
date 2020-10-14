@@ -18,7 +18,7 @@ imgui-winit-support = { version = "0.4", git = "https://github.com/BVE-Reborn/im
 obj = { version = "0.10", git = "https://github.com/cwfitzgerald/obj.git", branch = "map_ns" }
 rend3 = { path = "../rend3", version = "0.1.0" }
 smallvec = "1"
-switchyard = { version = "0.1", git = "https://github.com/BVE-Reborn/switchyard.git", rev = "8deafe19d4236a26e011774933424d8f07c03b23" }
+switchyard = { version = "0.1", git = "https://github.com/BVE-Reborn/switchyard.git", rev = "b216ac0c9f2612e2d258430cf856f448f4a3bcc2" }
 tracing = { version = "0.1", default-features = false, features = ["std"] }
 wgpu-subscriber = "0.1"
 winit = { git = "https://github.com/rust-windowing/winit.git", rev = "c1ea0dde92e1de9e029e7fbb2485a454aa81b918",  default-features = false, features = ["x11"] }

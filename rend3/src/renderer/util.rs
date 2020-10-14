@@ -414,11 +414,11 @@ pub fn create_render_pipeline(
             },
             clamp_depth: false,
             depth_bias: match ty {
-                RenderPipelineType::Shadow => 3,
+                RenderPipelineType::Shadow => 2,
                 RenderPipelineType::Skybox | RenderPipelineType::Opaque | RenderPipelineType::Depth => 0,
             },
             depth_bias_slope_scale: match ty {
-                RenderPipelineType::Shadow => 3.0,
+                RenderPipelineType::Shadow => 2.0,
                 RenderPipelineType::Skybox | RenderPipelineType::Opaque | RenderPipelineType::Depth => 0.0,
             },
             depth_bias_clamp: 0.0,

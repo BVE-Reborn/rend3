@@ -268,20 +268,42 @@ fn main() {
     rend3::span_transfer!(renderer_span -> loading_span, INFO, "Loading resources");
 
     let cube = load_obj(&renderer, "tmp/cube.obj");
-    single(&renderer, cube.0, cube.1);
+    renderer.add_object(Object {
+        mesh: cube.0,
+        materials: cube.1,
+        transform: AffineTransform {
+            transform: Mat4::from_scale_rotation_translation(
+                Vec3::new(1.0, 1.0, 1.0),
+                Quat::identity(),
+                Vec3::new(0.0, -0.5, 0.0),
+            ),
+        },
+    });
     let suzanne = load_obj(&renderer, "tmp/suzanne.obj");
-    distribute(&renderer, suzanne.0, suzanne.1);
+    renderer.add_object(Object {
+        mesh: suzanne.0,
+        materials: suzanne.1,
+        transform: AffineTransform {
+            transform: Mat4::from_scale_rotation_translation(
+                Vec3::new(1.0, 1.0, 1.0),
+                Quat::identity(),
+                Vec3::new(0.0, 1.0, 0.0),
+            ),
+        },
+    });
+
     load_skybox(&renderer);
+
     renderer.add_directional_light(DirectionalLight {
         color: Vec3::one(),
         intensity: 10.0,
         direction: Vec3::new(-1.0, -1.0, 0.0),
     });
-    renderer.add_directional_light(DirectionalLight {
-        color: Vec3::one(),
-        intensity: 2.0,
-        direction: Vec3::new(1.0, 0.0, 0.0),
-    });
+    // renderer.add_directional_light(DirectionalLight {
+    //     color: Vec3::one(),
+    //     intensity: 2.0,
+    //     direction: Vec3::new(1.0, 0.0, 0.0),
+    // });
 
     rend3::span_transfer!(loading_span -> _);
     rend3::span_transfer!(main_thread_span -> _);

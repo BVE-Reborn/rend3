@@ -1599,7 +1599,7 @@ dependencies = [
 [[package]]
 name = "switchyard"
 version = "0.1.0"
-source = "git+https://github.com/BVE-Reborn/switchyard.git?rev=8deafe19d4236a26e011774933424d8f07c03b23#8deafe19d4236a26e011774933424d8f07c03b23"
+source = "git+https://github.com/BVE-Reborn/switchyard.git?rev=b216ac0c9f2612e2d258430cf856f448f4a3bcc2#b216ac0c9f2612e2d258430cf856f448f4a3bcc2"
 dependencies = [
  "affinity",
  "arrayvec",
