@@ -88,7 +88,7 @@ impl SkyboxPass {
         texture: u32,
     ) {
         rpass.set_pipeline(&self.pipeline);
-        rpass.set_push_constants(ShaderStage::FRAGMENT, 0, &[texture]);
+        rpass.set_push_constants(ShaderStage::FRAGMENT, 0, bytemuck::bytes_of(&texture));
         rpass.set_bind_group(0, &general_bg, &[]);
         rpass.set_bind_group(1, &output_noindirect_bg, &[]);
         rpass.set_bind_group(2, &texture_bg, &[]);

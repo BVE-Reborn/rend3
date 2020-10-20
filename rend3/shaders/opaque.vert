@@ -1,7 +1,5 @@
 #version 450
 
-#extension GL_ARB_shader_draw_parameters : require
-
 #include "structures.glsl"
 
 layout(location = 0) in vec3 i_position;
@@ -27,7 +25,7 @@ layout(set = 1, binding = 1) uniform UniformBuffer {
 };
 
 void main() {
-    uint object_idx = gl_DrawIDARB;
+    uint object_idx = gl_InstanceIndex;
 
     ObjectOutputData data = object_output[object_idx];
 

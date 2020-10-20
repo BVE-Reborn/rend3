@@ -6,7 +6,7 @@ use crate::{
 };
 use glam::f32::Vec4;
 use std::{mem::size_of, num::NonZeroU32, sync::Arc};
-use wgpu::{BindGroupEntry, BindingResource, BufferAddress, BufferUsage, CommandEncoder, Device};
+use wgpu::{BindGroupEntry, BufferAddress, BufferUsage, CommandEncoder, Device};
 use wgpu_conveyor::{AutomatedBuffer, AutomatedBufferManager, IdBuffer};
 
 pub const MAX_MATERIALS: usize = MAX_UNIFORM_BUFFER_BINDING_SIZE as usize / size_of::<ShaderMaterial>();
@@ -141,7 +141,7 @@ impl MaterialManager {
     pub fn append_to_bgb<'a>(&'a self, general_bgb: &mut BindGroupBuilder<'a>) {
         general_bgb.append(BindGroupEntry {
             binding: 0,
-            resource: BindingResource::Buffer(self.buffer_storage.as_ref().unwrap().inner.slice(..)),
+            resource: self.buffer_storage.as_ref().unwrap().inner.as_entire_binding(),
         });
     }
 }

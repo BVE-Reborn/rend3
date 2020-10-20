@@ -53,7 +53,7 @@ impl ForwardPassSet {
 
         object_output_noindirect_bgb.append(BindGroupEntry {
             binding: 0,
-            resource: BindingResource::Buffer(culling_pass_data.output_buffer.slice(..)),
+            resource: culling_pass_data.output_buffer.as_entire_binding(),
         });
 
         self.uniform

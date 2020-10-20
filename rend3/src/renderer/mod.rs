@@ -100,8 +100,7 @@ where
     depth_pass: RwLock<passes::DepthPass>,
     opaque_pass: RwLock<passes::OpaquePass>,
 
-    _imgui_renderer: imgui_wgpu::Renderer,
-
+    // _imgui_renderer: imgui_wgpu::Renderer,
     options: RwLock<RendererOptions>,
 }
 impl<TLD: 'static> Renderer<TLD> {

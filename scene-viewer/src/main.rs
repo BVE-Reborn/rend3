@@ -268,30 +268,9 @@ fn main() {
     rend3::span_transfer!(renderer_span -> loading_span, INFO, "Loading resources");
 
     let cube = load_obj(&renderer, "tmp/cube.obj");
-    renderer.add_object(Object {
-        mesh: cube.0,
-        materials: cube.1,
-        transform: AffineTransform {
-            transform: Mat4::from_scale_rotation_translation(
-                Vec3::new(1.0, 1.0, 1.0),
-                Quat::identity(),
-                Vec3::new(0.0, -0.5, 0.0),
-            ),
-        },
-    });
+    single(&renderer, cube.0, cube.1);
     let suzanne = load_obj(&renderer, "tmp/suzanne.obj");
-    renderer.add_object(Object {
-        mesh: suzanne.0,
-        materials: suzanne.1,
-        transform: AffineTransform {
-            transform: Mat4::from_scale_rotation_translation(
-                Vec3::new(1.0, 1.0, 1.0),
-                Quat::identity(),
-                Vec3::new(0.0, 1.0, 0.0),
-            ),
-        },
-    });
-
+    distribute(&renderer, suzanne.0, suzanne.1);
     load_skybox(&renderer);
 
     renderer.add_directional_light(DirectionalLight {

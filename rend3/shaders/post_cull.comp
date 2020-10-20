@@ -64,6 +64,6 @@ void main() {
     call.instance_count = 1;
     call.base_index = in_data.start_idx;
     call.vertex_offset = in_data.vertex_offset;
-    call.base_instance = 0;
+    call.base_instance = output_idx;
     indirect_call[output_idx] = call;
 }

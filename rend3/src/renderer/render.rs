@@ -426,6 +426,8 @@ pub fn render_loop<TLD: 'static>(renderer: Arc<Renderer<TLD>>) -> impl Future<Ou
 
         span_transfer!(blit_span -> queue_submit_span, INFO, "Submitting to Queue");
 
+        renderer.device.poll(wgpu::Maintain::Wait);
+
         renderer.queue.submit(std::iter::once(encoder.finish()));
 
         span_transfer!(queue_submit_span -> buffer_pump_span, INFO, "Pumping Buffers");

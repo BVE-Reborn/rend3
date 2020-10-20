@@ -11,10 +11,11 @@ use wgpu::{
     AddressMode, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor,
     BindGroupLayoutEntry, BindingResource, BindingType, BlendDescriptor, ColorStateDescriptor, ColorWrite,
     CompareFunction, CullMode, DepthStencilStateDescriptor, Device, Extent3d, FilterMode, FrontFace, IndexFormat,
-    PipelineLayout, PresentMode, PrimitiveTopology, ProgrammableStageDescriptor, RasterizationStateDescriptor,
-    RenderPipeline, RenderPipelineDescriptor, Sampler, SamplerDescriptor, ShaderModule, ShaderStage,
-    StencilStateDescriptor, Surface, SwapChain, SwapChainDescriptor, Texture, TextureComponentType, TextureDescriptor,
-    TextureDimension, TextureUsage, TextureView, TextureViewDescriptor, TextureViewDimension, VertexStateDescriptor,
+    PipelineLayout, PolygonMode, PresentMode, PrimitiveTopology, ProgrammableStageDescriptor,
+    RasterizationStateDescriptor, RenderPipeline, RenderPipelineDescriptor, Sampler, SamplerDescriptor, ShaderModule,
+    ShaderStage, StencilStateDescriptor, Surface, SwapChain, SwapChainDescriptor, Texture, TextureComponentType,
+    TextureDescriptor, TextureDimension, TextureUsage, TextureView, TextureViewDescriptor, TextureViewDimension,
+    VertexStateDescriptor,
 };
 use winit::dpi::PhysicalSize;
 
@@ -28,7 +29,7 @@ pub fn create_swapchain(device: &Device, surface: &Surface, size: PhysicalSize<u
             format: SWAPCHAIN_FORMAT,
             present_mode: match vsync {
                 VSyncMode::On => PresentMode::Fifo,
-                VSyncMode::Off => PresentMode::Mailbox,
+                VSyncMode::Off => PresentMode::Immediate,
             },
         },
     )
@@ -186,13 +187,13 @@ pub fn create_general_bind_group_layout(device: &Device) -> BindGroupLayout {
 }
 
 pub fn create_object_output_bgl(device: &Device) -> BindGroupLayout {
-    let entry = BindGroupLayoutEntry {
-        binding: 0,
+    let entry = |binding: u32, readonly: bool| BindGroupLayoutEntry {
+        binding,
         visibility: ShaderStage::COMPUTE,
         ty: BindingType::StorageBuffer {
             dynamic: false,
             min_binding_size: None,
-            readonly: true,
+            readonly,
         },
         count: None,
     };
@@ -200,20 +201,11 @@ pub fn create_object_output_bgl(device: &Device) -> BindGroupLayout {
     device.create_bind_group_layout(&BindGroupLayoutDescriptor {
         label: Some("object output bgl"),
         entries: &[
-            entry.clone(),
-            BindGroupLayoutEntry {
-                binding: 1,
-                ..entry.clone()
-            },
-            BindGroupLayoutEntry {
-                binding: 2,
-                ..entry.clone()
-            },
-            BindGroupLayoutEntry {
-                binding: 3,
-                ..entry.clone()
-            },
-            BindGroupLayoutEntry { binding: 4, ..entry },
+            entry(0, true),
+            entry(1, true),
+            entry(2, false),
+            entry(3, false),
+            entry(4, false),
         ],
     })
 }
@@ -297,6 +289,7 @@ pub fn create_sampler(device: &Device, ty: SamplerType) -> Sampler {
             SamplerType::Linear => NonZeroU8::new(16),
             SamplerType::Shadow | SamplerType::Nearest => None,
         },
+        border_color: None,
     })
 }
 
@@ -412,7 +405,12 @@ pub fn create_render_pipeline(
                 RenderPipelineType::Shadow | RenderPipelineType::Opaque | RenderPipelineType::Depth => CullMode::Back,
                 RenderPipelineType::Skybox => CullMode::None,
             },
-            clamp_depth: false,
+            polygon_mode: PolygonMode::Fill,
+            clamp_depth: match ty {
+                RenderPipelineType::Shadow => false,
+                // RenderPipelineType::Shadow => true,
+                RenderPipelineType::Skybox | RenderPipelineType::Opaque | RenderPipelineType::Depth => false,
+            },
             depth_bias: match ty {
                 RenderPipelineType::Shadow => 2,
                 RenderPipelineType::Skybox | RenderPipelineType::Opaque | RenderPipelineType::Depth => 0,

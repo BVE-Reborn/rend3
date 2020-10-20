@@ -143,7 +143,7 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
 
     span_transfer!(_ -> imgui_guard, INFO, "Creating Imgui Renderer");
 
-    let imgui_renderer = imgui_wgpu::Renderer::new(imgui, &device, &queue, SWAPCHAIN_FORMAT);
+    // let imgui_renderer = imgui_wgpu::Renderer::new(imgui, &device, &queue, SWAPCHAIN_FORMAT);
 
     span_transfer!(imgui_guard -> _);
 
@@ -181,8 +181,7 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
         depth_pass,
         opaque_pass,
 
-        _imgui_renderer: imgui_renderer,
-
+        // _imgui_renderer: imgui_renderer,
         options: RwLock::new(options),
     }))
 }

@@ -42,7 +42,7 @@ impl WrappedUniform {
             layout: uniform_bgl,
             entries: &[BindGroupEntry {
                 binding: 0,
-                resource: BindingResource::Buffer(buffer.slice(..)),
+                resource: buffer.as_entire_binding(),
             }],
         });
 
@@ -71,7 +71,7 @@ impl WrappedUniform {
 
         object_output_noindirect_bgb.append(BindGroupEntry {
             binding: 0,
-            resource: BindingResource::Buffer(self.buffer.slice(..)),
+            resource: self.buffer.as_entire_binding(),
         });
     }
 }

@@ -4,3 +4,6 @@ members = ["scene-viewer", "rend3"]
 [profile.release]
 debug = true
 lto = "thin"
+
+[patch.crates-io]
+wgpu = { git = "https://github.com/gfx-rs/wgpu-rs.git", rev = "e3eadca8c626beb9a1c25c359b0e20f6fdef00c4" }

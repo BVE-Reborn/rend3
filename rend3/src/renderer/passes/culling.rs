@@ -205,11 +205,11 @@ impl CullingPass {
             entries: &[
                 BindGroupEntry {
                     binding: 0,
-                    resource: BindingResource::Buffer(index_buffer1.slice(..)),
+                    resource: index_buffer1.as_entire_binding(),
                 },
                 BindGroupEntry {
                     binding: 1,
-                    resource: BindingResource::Buffer(status_buffer.slice(..)),
+                    resource: status_buffer.as_entire_binding(),
                 },
             ],
         });
@@ -220,11 +220,11 @@ impl CullingPass {
             entries: &[
                 BindGroupEntry {
                     binding: 0,
-                    resource: BindingResource::Buffer(index_buffer1.slice(..)),
+                    resource: index_buffer1.as_entire_binding(),
                 },
                 BindGroupEntry {
                     binding: 1,
-                    resource: BindingResource::Buffer(index_buffer2.slice(..)),
+                    resource: index_buffer2.as_entire_binding(),
                 },
             ],
         });
@@ -235,11 +235,11 @@ impl CullingPass {
             entries: &[
                 BindGroupEntry {
                     binding: 0,
-                    resource: BindingResource::Buffer(index_buffer2.slice(..)),
+                    resource: index_buffer2.as_entire_binding(),
                 },
                 BindGroupEntry {
                     binding: 1,
-                    resource: BindingResource::Buffer(index_buffer1.slice(..)),
+                    resource: index_buffer1.as_entire_binding(),
                 },
             ],
         });
@@ -252,23 +252,23 @@ impl CullingPass {
             entries: &[
                 BindGroupEntry {
                     binding: 0,
-                    resource: BindingResource::Buffer(index_buffer.slice(..)),
+                    resource: index_buffer.as_entire_binding(),
                 },
                 BindGroupEntry {
                     binding: 1,
-                    resource: BindingResource::Buffer(status_buffer.slice(..)),
+                    resource: status_buffer.as_entire_binding(),
                 },
                 BindGroupEntry {
                     binding: 2,
-                    resource: BindingResource::Buffer(output_buffer.slice(..)),
+                    resource: output_buffer.as_entire_binding(),
                 },
                 BindGroupEntry {
                     binding: 3,
-                    resource: BindingResource::Buffer(indirect_buffer.slice(..)),
+                    resource: indirect_buffer.as_entire_binding(),
                 },
                 BindGroupEntry {
                     binding: 4,
-                    resource: BindingResource::Buffer(count_buffer.slice(..)),
+                    resource: count_buffer.as_entire_binding(),
                 },
             ],
         });
@@ -297,7 +297,7 @@ impl CullingPass {
 
         span_transfer!(_ -> run_span, WARN, "Running CullingPass");
         cpass.set_pipeline(&self.pre_cull_pipeline);
-        cpass.set_push_constants(0, &[data.object_count]);
+        cpass.set_push_constants(0, bytemuck::bytes_of(&data.object_count));
         cpass.set_bind_group(0, general_bg, &[]);
         cpass.set_bind_group(1, &data.pre_cull_bg, &[]);
         cpass.set_bind_group(2, uniform_bg, &[]);
@@ -307,7 +307,7 @@ impl CullingPass {
         let mut stride = 1_u32;
         let mut iteration = 0;
         while stride < data.object_count {
-            cpass.set_push_constants(0, &[stride, data.object_count]);
+            cpass.set_push_constants(0, bytemuck::cast_slice(&[stride, data.object_count]));
             let bind_group = if iteration % 2 == 0 {
                 &data.prefix_sum_bg1
             } else {
@@ -320,7 +320,7 @@ impl CullingPass {
         }
 
         cpass.set_pipeline(&self.post_cull_pipeline);
-        cpass.set_push_constants(0, &[data.object_count]);
+        cpass.set_push_constants(0, bytemuck::bytes_of(&data.object_count));
         cpass.set_bind_group(0, general_bg, &[]);
         cpass.set_bind_group(1, &data.output_bg, &[]);
         cpass.set_bind_group(2, uniform_bg, &[]);

@@ -170,18 +170,22 @@ impl ObjectManager {
     pub fn append_to_bgb<'a>(&'a self, general_bgb: &mut BindGroupBuilder<'a>) {
         general_bgb.append(BindGroupEntry {
             binding: 0,
-            resource: BindingResource::Buffer(self.object_info_buffer_storage.as_ref().unwrap().inner.slice(..)),
+            resource: self
+                .object_info_buffer_storage
+                .as_ref()
+                .unwrap()
+                .inner
+                .as_entire_binding(),
         });
 
         general_bgb.append(BindGroupEntry {
             binding: 0,
-            resource: BindingResource::Buffer(
-                self.material_translation_buffer_storage
-                    .as_ref()
-                    .unwrap()
-                    .inner
-                    .slice(..),
-            ),
+            resource: self
+                .material_translation_buffer_storage
+                .as_ref()
+                .unwrap()
+                .inner
+                .as_entire_binding(),
         });
     }
 

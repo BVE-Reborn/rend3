@@ -4,7 +4,7 @@ use std::future::Future;
 use tracing_futures::Instrument;
 use wgpu::{
     BindGroup, BindGroupLayout, BlendDescriptor, ColorStateDescriptor, ColorWrite, CullMode, Device, FrontFace,
-    IndexFormat, PipelineLayout, PipelineLayoutDescriptor, PrimitiveTopology, ProgrammableStageDescriptor,
+    IndexFormat, PipelineLayout, PipelineLayoutDescriptor, PolygonMode, PrimitiveTopology, ProgrammableStageDescriptor,
     RasterizationStateDescriptor, RenderPass, RenderPipeline, RenderPipelineDescriptor, ShaderModule, TextureFormat,
     VertexStateDescriptor,
 };
@@ -85,6 +85,7 @@ fn create_blit_pipeline(
         rasterization_state: Some(RasterizationStateDescriptor {
             front_face: FrontFace::Ccw,
             cull_mode: CullMode::None,
+            polygon_mode: PolygonMode::Fill,
             clamp_depth: false,
             depth_bias: 0,
             depth_bias_slope_scale: 0.0,
