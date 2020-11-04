@@ -99,7 +99,7 @@ fn load_obj(renderer: &Renderer, file: &str) -> (MeshHandle, SmallVec<[MaterialH
 
             material_index_map.insert(material.name.clone(), materials.len() as u32);
 
-            let handle = renderer.add_material(dbg!(Material {
+            let handle = renderer.add_material(Material {
                 albedo: match albedo_handle {
                     None => AlbedoComponent::Vertex { srgb: false },
                     Some(handle) => AlbedoComponent::Texture(handle),
@@ -114,7 +114,7 @@ fn load_obj(renderer: &Renderer, file: &str) -> (MeshHandle, SmallVec<[MaterialH
                     Some(handle) => MaterialComponent::Texture(handle),
                 },
                 ..Material::default()
-            }));
+            });
 
             materials.push(handle);
         }
@@ -188,7 +188,7 @@ fn single(renderer: &Renderer, mesh: MeshHandle, materials: SmallVec<[MaterialHa
 fn distribute(renderer: &Renderer, mesh: MeshHandle, materials: SmallVec<[MaterialHandle; 4]>) {
     for x in (-11..=11).step_by(4) {
         for y in (-11..=11).step_by(4) {
-            for z in (0..=100).step_by(10) {
+            for z in (0..=100).step_by(50) {
                 renderer.add_object(Object {
                     mesh,
                     materials: materials.clone(),
