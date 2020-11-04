@@ -1,3 +1,4 @@
+use crate::renderer::info::Vendor;
 use crate::{
     instruction::InstructionStreamPair,
     renderer::{
@@ -16,12 +17,96 @@ use crate::{
     },
     RendererInitializationError, RendererOptions,
 };
+use arrayvec::ArrayVec;
+use fnv::FnvHashMap;
 use parking_lot::{Mutex, RwLock};
 use raw_window_handle::HasRawWindowHandle;
 use std::sync::Arc;
 use switchyard::Switchyard;
-use wgpu::{BackendBit, DeviceDescriptor, Instance, PowerPreference, RequestAdapterOptions, TextureViewDimension};
+use wgpu::{
+    Adapter, Backend, BackendBit, DeviceDescriptor, DeviceType, Features, Instance, Limits, TextureViewDimension,
+};
 use wgpu_conveyor::{AutomatedBufferManager, UploadStyle};
+
+struct PotentialAdapter {
+    adapter: Adapter,
+    info: ExtendedAdapterInfo,
+    features: Features,
+    limits: Limits,
+}
+
+pub fn create_adapter() -> Result<(Instance, Adapter), RendererInitializationError> {
+    let backend_bits = BackendBit::VULKAN | BackendBit::DX12;
+    let default_backend_order = [Backend::Vulkan, Backend::Dx12];
+    let intel_backend_order = [Backend::Dx12, Backend::Vulkan];
+
+    let instance = Instance::new(backend_bits);
+
+    let mut valid_adapters = FnvHashMap::default();
+
+    for backend in &default_backend_order {
+        let adapters = instance.enumerate_adapters(BackendBit::from(*backend));
+
+        let mut potential_adapters = ArrayVec::<[PotentialAdapter; 4]>::new();
+        for (idx, adapter) in adapters.enumerate() {
+            let info = ExtendedAdapterInfo::from(adapter.get_info());
+
+            tracing::debug!("{:?} Adapter {}: {:#?}", backend, idx, info);
+
+            let features = check_features(adapter.features()).ok();
+            let limits = check_limits(adapter.limits()).ok();
+
+            if let (Some(features), Some(limits)) = (features, limits) {
+                tracing::debug!("Adapter usable");
+                potential_adapters.push(PotentialAdapter {
+                    adapter,
+                    info,
+                    features,
+                    limits,
+                })
+            } else {
+                tracing::debug!("Adapter not usable");
+            }
+        }
+        valid_adapters.insert(*backend, potential_adapters);
+    }
+
+    for backend_adapters in valid_adapters.values_mut() {
+        backend_adapters.sort_by_key(|a: &PotentialAdapter| match a.info.device_type {
+            DeviceType::DiscreteGpu => 0,
+            DeviceType::IntegratedGpu => 1,
+            DeviceType::VirtualGpu => 2,
+            DeviceType::Cpu => 3,
+            DeviceType::Other => 4,
+        });
+    }
+
+    let intel_vendor = valid_adapters
+        .get(&Backend::Vulkan)
+        .and_then(|arr| arr.get(0))
+        .map(|a: &PotentialAdapter| a.info.vendor.clone());
+    let is_intel = Some(Vendor::Intel) == intel_vendor;
+
+    let backend_order = if is_intel {
+        &intel_backend_order
+    } else {
+        &default_backend_order
+    };
+
+    for backend in backend_order {
+        let adapter: Option<PotentialAdapter> = valid_adapters.remove(backend).and_then(|arr| arr.into_iter().next());
+
+        if let Some(adapter) = adapter {
+            tracing::debug!("Chosen adapter: {:#?}", adapter.info);
+            tracing::debug!("Chosen backend: {:?}", backend);
+            tracing::debug!("Chosen features: {:#?}", adapter.features);
+            tracing::debug!("Chosen limits: {:#?}", adapter.limits);
+            return Ok((instance, adapter.adapter));
+        }
+    }
+
+    Err(RendererInitializationError::MissingAdapter)
+}
 
 pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
     window: &W,
@@ -29,17 +114,9 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
     imgui: &mut imgui::Context,
     options: RendererOptions,
 ) -> Result<Arc<Renderer<TLD>>, RendererInitializationError> {
-    let instance = Instance::new(BackendBit::VULKAN);
+    let (instance, adapter) = create_adapter()?;
 
     let surface = unsafe { instance.create_surface(window) };
-
-    let adapter = instance
-        .request_adapter(&RequestAdapterOptions {
-            power_preference: PowerPreference::HighPerformance,
-            compatible_surface: Some(&surface),
-        })
-        .await
-        .ok_or(RendererInitializationError::MissingAdapter)?;
 
     let adapter_info = ExtendedAdapterInfo::from(adapter.get_info());
     let features = check_features(adapter.features())?;

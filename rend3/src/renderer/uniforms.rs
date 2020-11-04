@@ -5,8 +5,8 @@ use crate::{
 use glam::Mat4;
 use std::mem::size_of;
 use wgpu::{
-    BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindingResource, Buffer, BufferAddress,
-    BufferDescriptor, BufferUsage, Device, Queue,
+    BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, Buffer, BufferAddress, BufferDescriptor,
+    BufferUsage, Device, Queue,
 };
 
 #[derive(Debug, Copy, Clone)]

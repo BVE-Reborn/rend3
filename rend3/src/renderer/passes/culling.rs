@@ -3,9 +3,9 @@ use shaderc::ShaderKind;
 use std::future::Future;
 use tracing_futures::Instrument;
 use wgpu::{
-    BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindingResource, Buffer, BufferAddress,
-    BufferDescriptor, BufferUsage, ComputePass, ComputePipeline, ComputePipelineDescriptor, Device,
-    PipelineLayoutDescriptor, ProgrammableStageDescriptor, PushConstantRange, ShaderStage,
+    BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, Buffer, BufferAddress, BufferDescriptor,
+    BufferUsage, ComputePass, ComputePipeline, ComputePipelineDescriptor, Device, PipelineLayoutDescriptor,
+    ProgrammableStageDescriptor, PushConstantRange, ShaderStage,
 };
 
 const SIZE_OF_STATUS: BufferAddress = 4;
@@ -180,7 +180,7 @@ impl CullingPass {
         let indirect_buffer = device.create_buffer(&BufferDescriptor {
             label: Some(&*format!("indirect buffer for {}", &name)),
             size: SIZE_OF_INDIRECT_CALL * object_count as BufferAddress,
-            usage: BufferUsage::STORAGE | BufferUsage::INDIRECT,
+            usage: BufferUsage::STORAGE | BufferUsage::INDIRECT | BufferUsage::VERTEX,
             mapped_at_creation: false,
         });
 

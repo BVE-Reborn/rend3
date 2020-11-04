@@ -7,6 +7,7 @@ layout(location = 1) in vec3 i_normal;
 layout(location = 2) in vec2 i_coords;
 layout(location = 3) in vec4 i_color;
 layout(location = 4) in uint i_material;
+layout(location = 5) in uint i_object_idx;
 
 layout(location = 0) out vec4 o_position;
 layout(location = 1) out vec2 o_coords;
@@ -24,7 +25,7 @@ layout(set = 1, binding = 1) uniform UniformBuffer {
 };
 
 void main() {
-    uint object_idx = gl_InstanceIndex;
+    uint object_idx = i_object_idx;
 
     ObjectOutputData data = object_output[object_idx];
 

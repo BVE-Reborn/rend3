@@ -15,7 +15,6 @@ use std::{
     fs::File,
     hash::BuildHasher,
     io::BufReader,
-    path::Path,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -207,7 +206,7 @@ fn button_pressed<Hash: BuildHasher>(map: &HashMap<u32, bool, Hash>, key: u32) -
 }
 
 fn main() {
-    wgpu_subscriber::initialize_default_subscriber(Some(Path::new("target/profile.json")));
+    wgpu_subscriber::initialize_default_subscriber(None);
 
     rend3::span_transfer!(_ -> main_thread_span, INFO, "Main Thread Setup");
     rend3::span_transfer!(_ -> event_loop_span, INFO, "Building Event Loop");

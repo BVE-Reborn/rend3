@@ -10,7 +10,7 @@ use crate::{
     Renderer,
 };
 use std::sync::Arc;
-use wgpu::{BindGroup, BindGroupEntry, BindGroupLayout, BindingResource, Buffer, ComputePass, Device, RenderPass};
+use wgpu::{BindGroup, BindGroupEntry, BindGroupLayout, Buffer, ComputePass, Device, RenderPass};
 
 pub struct ShadowPassSetData {
     culling_pass_data: CullingPassData,

@@ -27,7 +27,7 @@ raw-window-handle = "0.3"
 range-alloc = "0.1"
 shaderc = "0.6"
 smallvec = "1"
-switchyard = { version = "0.1", git = "https://github.com/BVE-Reborn/switchyard.git", rev = "b216ac0c9f2612e2d258430cf856f448f4a3bcc2" }
+switchyard = "0.1"
 tracing = { version = "0.1", default-features = false, features = ["std"] }
 tracing-futures = "0.2"
 thiserror = "1"

@@ -6,7 +6,7 @@ use crate::{
 };
 use smallvec::SmallVec;
 use std::{mem::size_of, sync::Arc};
-use wgpu::{BindGroupEntry, BindingResource, BufferAddress, BufferUsage, CommandEncoder, Device};
+use wgpu::{BindGroupEntry, BufferAddress, BufferUsage, CommandEncoder, Device};
 use wgpu_conveyor::{write_to_buffer2, AutomatedBuffer, AutomatedBufferManager, IdBuffer};
 
 #[derive(Debug, Clone)]

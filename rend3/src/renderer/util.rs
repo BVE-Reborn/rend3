@@ -332,13 +332,26 @@ pub fn create_framebuffer_texture(
     (texture, view)
 }
 
-macro_rules! create_vertex_buffer_descriptor {
+macro_rules! create_vertex_buffer_descriptors {
     () => {
-        wgpu::VertexBufferDescriptor {
-            stride: std::mem::size_of::<crate::datatypes::ModelVertex>() as u64,
-            step_mode: wgpu::InputStepMode::Vertex,
-            attributes: &wgpu::vertex_attr_array![0 => Float3, 1 => Float3, 2 => Float2, 3 => Uchar4Norm, 4 => Uint],
-        }
+        [
+            wgpu::VertexBufferDescriptor {
+                stride: std::mem::size_of::<crate::datatypes::ModelVertex>() as u64,
+                step_mode: wgpu::InputStepMode::Vertex,
+                attributes: &wgpu::vertex_attr_array![0 => Float3, 1 => Float3, 2 => Float2, 3 => Uchar4Norm, 4 => Uint],
+            },
+            wgpu::VertexBufferDescriptor {
+                stride: 20,
+                step_mode: wgpu::InputStepMode::Instance,
+                attributes: &[
+                    wgpu::VertexAttributeDescriptor {
+                        format: wgpu::VertexFormat::Uint,
+                        offset: 16,
+                        shader_location: 5
+                    }
+                ],
+            }
+        ]
     };
 }
 
@@ -357,7 +370,7 @@ pub fn create_render_pipeline(
     fragment: &ShaderModule,
     ty: RenderPipelineType,
 ) -> RenderPipeline {
-    let vertex_buffers = [create_vertex_buffer_descriptor!()];
+    let vertex_buffers = create_vertex_buffer_descriptors!();
 
     let mut color_states: ArrayVec<[ColorStateDescriptor; 2]> = ArrayVec::new();
     if ty != RenderPipelineType::Shadow {

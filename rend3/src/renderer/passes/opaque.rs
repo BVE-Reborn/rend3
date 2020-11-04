@@ -109,6 +109,7 @@ impl OpaquePass {
     ) {
         rpass.set_pipeline(&self.pipeline);
         rpass.set_vertex_buffer(0, vertex_buffer.slice(..));
+        rpass.set_vertex_buffer(1, indirect_buffer.slice(..));
         rpass.set_index_buffer(index_buffer.slice(..));
         rpass.set_bind_group(0, &input_bg, &[]);
         rpass.set_bind_group(1, &output_noindirect_bg, &[]);

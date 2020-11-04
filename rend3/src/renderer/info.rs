@@ -5,6 +5,7 @@ pub enum Vendor {
     NV,
     AMD,
     Intel,
+    Qualcomm,
     Unknown(usize),
 }
 
@@ -28,6 +29,7 @@ impl From<AdapterInfo> for ExtendedAdapterInfo {
             vendor: match info.vendor {
                 0x1002 => Vendor::AMD,
                 0x10DE => Vendor::NV,
+                0x5143 => Vendor::Qualcomm,
                 0x8086 => Vendor::Intel,
                 v => Vendor::Unknown(v),
             },
@@ -41,7 +43,7 @@ impl ExtendedAdapterInfo {
     pub fn subgroup_size(&self) -> u32 {
         match self.vendor {
             Vendor::Intel | Vendor::NV => 32,
-            Vendor::AMD | Vendor::Unknown(_) => 64,
+            Vendor::AMD | Vendor::Qualcomm | Vendor::Unknown(_) => 64,
         }
     }
 }
