@@ -4,19 +4,20 @@ use wgpu::{BufferAddress, Features, Limits};
 pub const MAX_UNIFORM_BUFFER_BINDING_SIZE: BufferAddress = 1 << 16; // Guaranteed on DI hardware
 
 // This is a macro as bitflags are just totally not const
+#[rustfmt::skip] // rustfmt just keeps pushing the | further and further over.
 #[allow(non_snake_case)]
 macro_rules! REQUIRED_FEATURES {
     () => {
         wgpu::Features::MAPPABLE_PRIMARY_BUFFERS
-                    | wgpu::Features::PUSH_CONSTANTS
-                    | wgpu::Features::TEXTURE_COMPRESSION_BC
-                    // | wgpu::Features::DEPTH_CLAMPING
-                    | wgpu::Features::SAMPLED_TEXTURE_BINDING_ARRAY
-                    | wgpu::Features::SAMPLED_TEXTURE_ARRAY_DYNAMIC_INDEXING
-                    | wgpu::Features::SAMPLED_TEXTURE_ARRAY_NON_UNIFORM_INDEXING
-                    | wgpu::Features::UNSIZED_BINDING_ARRAY
-                    | wgpu::Features::MULTI_DRAW_INDIRECT
-                    | wgpu::Features::MULTI_DRAW_INDIRECT_COUNT
+            | wgpu::Features::PUSH_CONSTANTS
+            | wgpu::Features::TEXTURE_COMPRESSION_BC
+            // | wgpu::Features::DEPTH_CLAMPING
+            | wgpu::Features::SAMPLED_TEXTURE_BINDING_ARRAY
+            | wgpu::Features::SAMPLED_TEXTURE_ARRAY_DYNAMIC_INDEXING
+            | wgpu::Features::SAMPLED_TEXTURE_ARRAY_NON_UNIFORM_INDEXING
+            | wgpu::Features::UNSIZED_BINDING_ARRAY
+            | wgpu::Features::MULTI_DRAW_INDIRECT
+            | wgpu::Features::MULTI_DRAW_INDIRECT_COUNT
     };
 }
 
