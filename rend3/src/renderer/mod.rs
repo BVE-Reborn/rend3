@@ -156,7 +156,7 @@ impl<TLD: 'static> Renderer<TLD> {
         handle
     }
 
-    pub fn remove_texture_dube(&self, handle: TextureHandle) {
+    pub fn remove_texture_cube(&self, handle: TextureHandle) {
         self.instructions
             .producer
             .lock()

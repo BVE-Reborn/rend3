@@ -47,6 +47,7 @@ macro_rules! span_transfer {
 mod bind_merge;
 pub mod datatypes;
 mod instruction;
+pub mod list;
 mod options;
 mod registry;
 mod renderer;
