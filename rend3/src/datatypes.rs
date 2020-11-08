@@ -6,6 +6,8 @@ use smallvec::SmallVec;
 use std::num::NonZeroU32;
 use wgpu::TextureFormat;
 
+#[macro_export]
+#[doc(hidden)]
 macro_rules! declare_handle {
     ($($name:ident),*) => {$(
         #[derive(Debug, Copy, Clone, PartialEq, Eq)]

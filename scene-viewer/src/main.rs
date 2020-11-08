@@ -393,7 +393,7 @@ fn main() {
 
             renderer.set_camera_location(camera_location);
             renderer.set_options(options.clone());
-            let handle = renderer.render();
+            let handle = renderer.render(rend3::list::default_render_list());
 
             rend3::span_transfer!(redraw_span -> render_wait_span, INFO, "Waiting for render");
             futures::executor::block_on(handle);

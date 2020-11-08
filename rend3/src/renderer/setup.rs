@@ -1,8 +1,7 @@
-use crate::renderer::info::Vendor;
 use crate::{
     instruction::InstructionStreamPair,
     renderer::{
-        info::ExtendedAdapterInfo,
+        info::{ExtendedAdapterInfo, Vendor},
         light::DirectionalLightManager,
         limits::{check_features, check_limits},
         material::MaterialManager,

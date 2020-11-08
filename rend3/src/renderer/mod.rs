@@ -4,6 +4,7 @@ use crate::{
         MaterialChange, MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, Texture, TextureHandle,
     },
     instruction::{Instruction, InstructionStreamPair},
+    list::RenderList,
     renderer::{
         info::ExtendedAdapterInfo, material::MaterialManager, mesh::MeshManager, object::ObjectManager,
         passes::ForwardPassSet, resources::RendererGlobalResources, shaders::ShaderManager, texture::TextureManager,
@@ -11,6 +12,7 @@ use crate::{
     statistics::RendererStatistics,
     RendererInitializationError, RendererOptions,
 };
+pub use material::{MATERIALS_SIZE, MAX_MATERIALS};
 use parking_lot::{Mutex, RwLock};
 use raw_window_handle::HasRawWindowHandle;
 use std::{future::Future, sync::Arc};
@@ -262,8 +264,8 @@ impl<TLD: 'static> Renderer<TLD> {
             .push(Instruction::ClearBackgroundTexture)
     }
 
-    pub fn render(self: &Arc<Self>) -> JoinHandle<RendererStatistics> {
+    pub fn render(self: &Arc<Self>, list: RenderList) -> JoinHandle<RendererStatistics> {
         self.yard
-            .spawn(0, MAIN_TASK_PRIORITY, render::render_loop(Arc::clone(self)))
+            .spawn(0, MAIN_TASK_PRIORITY, render::render_loop(Arc::clone(self), list))
     }
 }

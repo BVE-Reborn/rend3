@@ -1,6 +1,7 @@
 use crate::{
     bind_merge::BindGroupBuilder,
     instruction::Instruction,
+    list::RenderList,
     renderer::{BUFFER_RECALL_PRIORITY, COMPUTE_POOL},
     statistics::RendererStatistics,
     Renderer,
@@ -13,7 +14,10 @@ use wgpu::{
     TextureDataLayout, TextureDescriptor, TextureDimension, TextureUsage, TextureViewDescriptor, TextureViewDimension,
 };
 
-pub fn render_loop<TLD: 'static>(renderer: Arc<Renderer<TLD>>) -> impl Future<Output = RendererStatistics> {
+pub fn render_loop<TLD: 'static>(
+    renderer: Arc<Renderer<TLD>>,
+    render_list: RenderList,
+) -> impl Future<Output = RendererStatistics> {
     span_transfer!(_ -> render_create_span, INFO, "Render Loop Creation");
 
     // blocks, do it before we async

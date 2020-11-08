@@ -1,7 +1,7 @@
 use crate::datatypes::TextureHandle;
 use glam::Vec2;
 
-pub enum ResourceBinding<'a> {
+pub enum ResourceBinding {
     /// Bindings in All Modes:
     /// 0: Linear Sampler
     /// 1: Shadow Sampler
@@ -39,49 +39,62 @@ pub enum ResourceBinding<'a> {
     /// Usable in all modes.
     ///
     /// Each given texture will be it's own binding
-    Custom2DTexture(&'a [TextureHandle]),
+    Custom2DTexture(Vec<ImageInputReference>),
     /// Usable in all modes.
     ///
     /// Each given texture will be it's own binding
-    CustomCubeTexture(&'a [TextureHandle]),
+    CustomCubeTexture(Vec<ImageInputReference>),
 }
 
 pub type ImageFormat = wgpu::TextureFormat;
 
-pub enum ImageReference<'a> {
-    SwapchainFrame,
-    Custom(&'a str),
+pub enum ImageReference {
+    OutputImage,
+    Handle(TextureHandle),
+    Custom(String),
 }
 
-pub enum ImageResource<'a> {
-    SwapchainFrame,
-    Custom(ImageResourceDescriptor<'a>),
+pub enum ImageInputReference {
+    Handle(TextureHandle),
+    Custom(String),
 }
 
-pub enum ImageResolution<'a> {
+pub struct ImageOutput {
+    pub output: ImageOutputReference,
+    pub resolve_target: Option<ImageOutputReference>,
+}
+
+pub enum ImageOutputReference {
+    OutputImage,
+    Custom(String),
+}
+
+pub struct ImageResourceDescriptor {
+    pub identifier: String,
+    pub resolution: ImageResolution,
+    pub format: ImageFormat,
+    pub samples: u8,
+}
+
+pub enum ImageResolution {
     /// Will be created at the given resolution. Must be a multiple
     /// of the block size.
     Fixed([u32; 2]),
     /// Floating point factor of another resource. Will be rounded
     /// to nearest multiple of block size.
-    Relative(ImageReference<'a>, Vec2),
-}
-
-pub struct ImageResourceDescriptor<'a> {
-    pub identifier: &'a str,
-    pub resolution: [u32; 2],
-    pub format: ImageFormat,
+    Relative(ImageReference, Vec2),
 }
 
 pub enum BufferReference<'a> {
     Custom(&'a str),
 }
 
-pub enum BufferResource<'a> {
-    Custom(BufferResourceDescriptor<'a>),
+pub enum BufferResource {
+    // TODO: Add uploadable buffers
+    Custom(BufferResourceDescriptor),
 }
 
-pub struct BufferResourceDescriptor<'a> {
-    pub identifier: &'a str,
+pub struct BufferResourceDescriptor {
+    pub identifier: String,
     pub size: usize,
 }
