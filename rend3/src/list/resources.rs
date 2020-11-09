@@ -36,6 +36,9 @@ pub enum ResourceBinding {
     /// Bindings in All Modes:
     /// 0: Shadow `texture2DArray`
     ShadowTexture,
+    /// Binding in All Modes:
+    /// 0: Current skybox texture
+    SkyboxTexture,
     /// Usable in all modes.
     ///
     /// Each given texture will be it's own binding

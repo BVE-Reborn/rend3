@@ -107,6 +107,8 @@ fn compile_shader_loop(device: Arc<Device>, receiver: flume::Receiver<CompileCom
 fn compile_shader(compiler: &mut Compiler, device: &Device, args: &ShaderArguments) -> ShaderCompileResult {
     span_transfer!(_ -> file_span, WARN, "Loading File");
 
+    tracing::debug!("Compiling shader {:?}", args);
+
     let contents = std::fs::read_to_string(&args.file).map_err(|e| ShaderError::FileError(e, args.clone()))?;
 
     span_transfer!(file_span -> compile_span, WARN, "Shader Compilation");

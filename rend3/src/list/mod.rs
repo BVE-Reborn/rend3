@@ -41,11 +41,27 @@ impl RenderList {
             .last_mut()
             .expect("Added render pass with no active render pass sets")
             .render_passes
+            .push(RenderPass { desc, ops: Vec::new() });
+    }
+
+    pub fn add_render_op(&mut self, desc: RenderOpDescriptor) {
+        self.sets
+            .last_mut()
+            .expect("Added render pass with no active render pass sets")
+            .render_passes
+            .last_mut()
+            .expect("Added render op with no active render pass")
+            .ops
             .push(desc);
     }
 }
 
 pub(crate) struct RenderPassSet {
     run_rate: RenderPassSetRunRate,
-    render_passes: Vec<RenderPassDescriptor>,
+    render_passes: Vec<RenderPass>,
+}
+
+pub(crate) struct RenderPass {
+    desc: RenderPassDescriptor,
+    ops: Vec<RenderOpDescriptor>,
 }

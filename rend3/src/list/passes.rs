@@ -12,11 +12,23 @@ pub enum RenderPassSetRunRate {
 }
 
 pub struct RenderPassDescriptor {
+    pub outputs: Vec<ImageOutput>,
+    pub depth: Option<ImageOutputReference>,
+}
+
+pub struct RenderOpDescriptor {
+    pub input: RenderOpInputType,
     pub vertex: ShaderSource,
     pub fragment: Option<ShaderSource>,
     pub bindings: Vec<ResourceBinding>,
-    pub outputs: Vec<ImageOutput>,
-    pub depth: Option<ImageOutputReference>,
+}
+
+pub enum RenderOpInputType {
+    /// No bound vertex inputs, just a simple `draw(0..3)`
+    FullscreenTriangle,
+    /// Render all 3D models.
+    // TODO: Filtering
+    Models3D,
 }
 
 pub enum ShaderSource {
