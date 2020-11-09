@@ -73,7 +73,6 @@ pub enum ImageOutputReference {
 }
 
 pub struct ImageResourceDescriptor {
-    pub identifier: String,
     pub resolution: ImageResolution,
     pub format: ImageFormat,
     pub samples: u8,
@@ -98,6 +97,5 @@ pub enum BufferResource {
 }
 
 pub struct BufferResourceDescriptor {
-    pub identifier: String,
     pub size: usize,
 }

@@ -1,4 +1,5 @@
 pub use default::*;
+use fnv::FnvHashMap;
 pub use passes::*;
 pub use resources::*;
 
@@ -8,16 +9,18 @@ mod resources;
 
 pub struct RenderList {
     pub(crate) sets: Vec<RenderPassSet>,
-    pub(crate) images: Vec<ImageResourceDescriptor>,
-    pub(crate) buffers: Vec<BufferResourceDescriptor>,
+    pub(crate) shaders: FnvHashMap<String, ShaderSource>,
+    pub(crate) images: FnvHashMap<String, ImageResourceDescriptor>,
+    pub(crate) buffers: FnvHashMap<String, BufferResourceDescriptor>,
 }
 
 impl RenderList {
     pub fn new() -> Self {
         Self {
             sets: Vec::new(),
-            images: Vec::new(),
-            buffers: Vec::new(),
+            shaders: FnvHashMap::default(),
+            images: FnvHashMap::default(),
+            buffers: FnvHashMap::default(),
         }
     }
 
@@ -28,12 +31,16 @@ impl RenderList {
         })
     }
 
-    pub fn create_image(&mut self, image: ImageResourceDescriptor) {
-        self.images.push(image);
+    pub fn create_shader(&mut self, name: impl ToString, shader: ShaderSource) {
+        self.shaders.insert(name.to_string(), shader);
     }
 
-    pub fn create_buffer(&mut self, buffer: BufferResourceDescriptor) {
-        self.buffers.push(buffer);
+    pub fn create_image(&mut self, name: impl ToString, image: ImageResourceDescriptor) {
+        self.images.insert(name.to_string(), image);
+    }
+
+    pub fn create_buffer(&mut self, name: impl ToString, buffer: BufferResourceDescriptor) {
+        self.buffers.insert(name.to_string(), buffer);
     }
 
     pub fn add_render_pass(&mut self, desc: RenderPassDescriptor) {

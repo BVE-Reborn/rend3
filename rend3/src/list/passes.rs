@@ -18,8 +18,8 @@ pub struct RenderPassDescriptor {
 
 pub struct RenderOpDescriptor {
     pub input: RenderOpInputType,
-    pub vertex: ShaderSource,
-    pub fragment: Option<ShaderSource>,
+    pub vertex: String,
+    pub fragment: Option<String>,
     pub bindings: Vec<ResourceBinding>,
 }
 
@@ -45,6 +45,13 @@ pub enum ShaderSourceType {
 
 pub struct SourceShaderDescriptor {
     pub source: ShaderSourceType,
+    pub stage: ShaderStage,
     pub includes: Vec<String>,
     pub defines: Vec<(String, Option<String>)>,
+}
+
+pub enum ShaderStage {
+    Vertex,
+    Fragment,
+    Compute,
 }
