@@ -13,12 +13,12 @@ layout(location = 4) flat in uint i_material;
 layout(location = 0) out vec4 o_color;
 layout(location = 1) out vec4 o_normal;
 
-layout(set = 0, binding = 2) uniform MaterialBuffer {
+layout(set = 0, binding = 1) uniform MaterialBuffer {
     MaterialData materials[MATERIAL_COUNT];
 };
-layout(set = 0, binding = 3) uniform sampler linear_sampler;
-layout(set = 0, binding = 4) uniform samplerShadow shadow_sampler;
-layout(set = 0, binding = 5) restrict readonly buffer DirectionalLightBuffer {
+layout(set = 0, binding = 2) uniform sampler linear_sampler;
+layout(set = 0, binding = 3) uniform samplerShadow shadow_sampler;
+layout(set = 0, binding = 4) restrict readonly buffer DirectionalLightBuffer {
     DirectionalLightBufferHeader directional_light_header;
     DirectionalLight directional_lights[];
 };

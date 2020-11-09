@@ -143,16 +143,6 @@ pub fn create_general_bind_group_layout(device: &Device) -> BindGroupLayout {
             },
             BindGroupLayoutEntry {
                 binding: 1,
-                visibility: ShaderStage::VERTEX,
-                ty: BindingType::StorageBuffer {
-                    dynamic: false,
-                    min_binding_size: None,
-                    readonly: true,
-                },
-                count: None,
-            },
-            BindGroupLayoutEntry {
-                binding: 2,
                 visibility: ShaderStage::FRAGMENT,
                 ty: BindingType::UniformBuffer {
                     dynamic: false,
@@ -161,19 +151,19 @@ pub fn create_general_bind_group_layout(device: &Device) -> BindGroupLayout {
                 count: None,
             },
             BindGroupLayoutEntry {
-                binding: 3,
+                binding: 2,
                 visibility: ShaderStage::FRAGMENT,
                 ty: BindingType::Sampler { comparison: false },
                 count: None,
             },
             BindGroupLayoutEntry {
-                binding: 4,
+                binding: 3,
                 visibility: ShaderStage::FRAGMENT,
                 ty: BindingType::Sampler { comparison: true },
                 count: None,
             },
             BindGroupLayoutEntry {
-                binding: 5,
+                binding: 4,
                 visibility: ShaderStage::FRAGMENT,
                 ty: BindingType::StorageBuffer {
                     dynamic: false,

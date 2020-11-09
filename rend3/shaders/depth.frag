@@ -9,10 +9,10 @@ layout(location = 1) in vec2 i_coords;
 layout(location = 2) in vec4 i_color;
 layout(location = 3) flat in uint i_material;
 
-layout(set = 0, binding = 2) uniform MaterialBuffer {
+layout(set = 0, binding = 1) uniform MaterialBuffer {
     MaterialData materials[MATERIAL_COUNT];
 };
-layout(set = 0, binding = 3) uniform sampler linear_sampler;
+layout(set = 0, binding = 2) uniform sampler linear_sampler;
 layout(set = 1, binding = 0, std430) restrict readonly buffer ObjectOutputDataBuffer {
     ObjectOutputData object_output[];
 };

@@ -18,7 +18,7 @@ struct ObjectInputData {
     uint start_idx;
     uint count;
     int vertex_offset;
-    uint material_translation_idx;
+    uint material_idx;
     mat4 transform;
     // xyz position; w radius
     vec4 bounding_sphere;
@@ -29,7 +29,7 @@ struct ObjectOutputData {
     mat4 model_view;
     mat4 model_view_proj;
     mat3 inv_trans_model_view;
-    uint material_translation_idx;
+    uint material_idx;
     bool activ;
 };
 

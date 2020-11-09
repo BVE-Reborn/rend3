@@ -2,7 +2,6 @@ use glam::{
     f32::{Vec3A, Vec4},
     Mat4, Vec2, Vec3,
 };
-use smallvec::SmallVec;
 use std::num::NonZeroU32;
 use wgpu::TextureFormat;
 
@@ -46,7 +45,6 @@ pub struct ModelVertex {
     pub normal: Vec3,   // 12..24
     pub uv: Vec2,       // 24..32
     pub color: [u8; 4], // 32..36
-    pub material: u32,  // 36..40
 }
 
 unsafe impl bytemuck::Zeroable for ModelVertex {}
@@ -327,7 +325,7 @@ changeable_struct! {
 #[derive(Debug, Clone)]
 pub struct Object {
     pub mesh: MeshHandle,
-    pub materials: SmallVec<[MaterialHandle; 4]>,
+    pub material: MaterialHandle,
     pub transform: AffineTransform,
 }
 

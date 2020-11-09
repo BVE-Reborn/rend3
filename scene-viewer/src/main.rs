@@ -9,7 +9,6 @@ use rend3::{
     },
     Renderer, RendererOptions, VSyncMode,
 };
-use smallvec::SmallVec;
 use std::{
     collections::HashMap,
     fs::File,
@@ -73,7 +72,7 @@ fn load_skybox(renderer: &Renderer) {
     renderer.set_background_texture(handle);
 }
 
-fn load_obj(renderer: &Renderer, file: &str) -> (MeshHandle, SmallVec<[MaterialHandle; 4]>) {
+fn load_obj(renderer: &Renderer, file: &str) -> (MeshHandle, MaterialHandle) {
     rend3::span!(obj_guard, INFO, "Loading Obj");
 
     let mut object = Obj::load(file).unwrap();
@@ -83,7 +82,7 @@ fn load_obj(renderer: &Renderer, file: &str) -> (MeshHandle, SmallVec<[MaterialH
 
     let mut textures = HashMap::new();
     let mut material_index_map = HashMap::new();
-    let mut materials = SmallVec::new();
+    let mut materials = Vec::new();
 
     for lib in object.data.material_libs {
         for material in lib.materials {
@@ -120,6 +119,11 @@ fn load_obj(renderer: &Renderer, file: &str) -> (MeshHandle, SmallVec<[MaterialH
         }
     }
 
+    assert!(
+        materials.len() <= 1,
+        "More than one material per obj is currently unsupported"
+    );
+
     rend3::span!(_guard, INFO, "Converting Mesh");
 
     let mut mesh = Mesh {
@@ -131,7 +135,7 @@ fn load_obj(renderer: &Renderer, file: &str) -> (MeshHandle, SmallVec<[MaterialH
     let mut translation: HashMap<(usize, Option<usize>, Option<usize>), u32> = HashMap::new();
     let mut vert_count = 0_u32;
     for group in &object.data.objects[0].groups {
-        let material_name = if let ObjMaterial::Mtl(mtl) = group.material.as_ref().unwrap() {
+        let _material_name = if let ObjMaterial::Mtl(mtl) = group.material.as_ref().unwrap() {
             &mtl.name
         } else {
             unreachable!()
@@ -153,7 +157,6 @@ fn load_obj(renderer: &Renderer, file: &str) -> (MeshHandle, SmallVec<[MaterialH
                         normal: Vec3::from(normal),
                         uv: Vec2::from(texture_coords),
                         color: [255; 4],
-                        material: *material_index_map.get(material_name).unwrap(),
                     });
 
                     translation.insert((position_idx, texture_idx, normal_idx), this_vert);
@@ -168,13 +171,13 @@ fn load_obj(renderer: &Renderer, file: &str) -> (MeshHandle, SmallVec<[MaterialH
 
     let mesh_handle = renderer.add_mesh(mesh);
 
-    (mesh_handle, materials)
+    (mesh_handle, materials.into_iter().next().unwrap())
 }
 
-fn single(renderer: &Renderer, mesh: MeshHandle, materials: SmallVec<[MaterialHandle; 4]>) {
+fn single(renderer: &Renderer, mesh: MeshHandle, material: MaterialHandle) {
     renderer.add_object(Object {
         mesh,
-        materials,
+        material,
         transform: AffineTransform {
             transform: Mat4::from_scale_rotation_translation(
                 Vec3::new(1.0, 1.0, 1.0),
@@ -185,13 +188,13 @@ fn single(renderer: &Renderer, mesh: MeshHandle, materials: SmallVec<[MaterialHa
     });
 }
 
-fn distribute(renderer: &Renderer, mesh: MeshHandle, materials: SmallVec<[MaterialHandle; 4]>) {
+fn distribute(renderer: &Renderer, mesh: MeshHandle, material: MaterialHandle) {
     for x in (-11..=11).step_by(4) {
         for y in (-11..=11).step_by(4) {
             for z in (0..=100).step_by(50) {
                 renderer.add_object(Object {
                     mesh,
-                    materials: materials.clone(),
+                    material,
                     transform: AffineTransform {
                         transform: Mat4::from_translation(Vec3::new(x as f32, y as f32, z as f32)),
                     },

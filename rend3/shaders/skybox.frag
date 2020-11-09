@@ -7,7 +7,7 @@
 layout(location = 0) in vec2 i_clip_position;
 layout(location = 0) out vec4 o_color;
 
-layout(set = 0, binding = 3) uniform sampler linear_sampler;
+layout(set = 0, binding = 2) uniform sampler linear_sampler;
 layout(set = 1, binding = 1) uniform UniformBuffer {
     UniformData uniforms;
 };

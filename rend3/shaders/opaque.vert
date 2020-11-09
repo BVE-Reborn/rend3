@@ -15,9 +15,6 @@ layout(location = 2) out vec2 o_coords;
 layout(location = 3) out vec4 o_color;
 layout(location = 4) flat out uint o_material;
 
-layout(set = 0, binding = 1, std430) restrict readonly buffer MaterialTranslationbuffer {
-    uint material_translation[];
-};
 layout(set = 1, binding = 0, std430) restrict readonly buffer ObjectOutputDataBuffer {
     ObjectOutputData object_output[];
 };
@@ -32,8 +29,7 @@ void main() {
 
     gl_Position = data.model_view_proj * vec4(i_position, 1.0);
 
-    uint material = material_translation[data.material_translation_idx + i_material];
-    o_material = material;
+    o_material = data.material_idx;
 
     o_view_position = data.model_view * vec4(i_position, 1.0);
 

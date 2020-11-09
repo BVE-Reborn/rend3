@@ -55,7 +55,7 @@ void main() {
     out_data.model_view = uniforms.view * in_data.transform;
     out_data.model_view_proj = uniforms.view_proj * in_data.transform;
     out_data.inv_trans_model_view = inverse(transpose(mat3(uniforms.view * in_data.transform)));
-    out_data.material_translation_idx = in_data.material_translation_idx;
+    out_data.material_idx = in_data.material_idx;
 
     object_output[output_idx] = out_data;
 
