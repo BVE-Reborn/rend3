@@ -1,5 +1,5 @@
-use crate::renderer::shaders::{ShaderArguments, ShaderManager};
-use shaderc::ShaderKind;
+use crate::list::{ShaderSourceStage, ShaderSourceType, SourceShaderDescriptor};
+use crate::renderer::shaders::ShaderManager;
 use std::future::Future;
 use tracing_futures::Instrument;
 use wgpu::{
@@ -46,25 +46,25 @@ impl CullingPass {
         let new_span = tracing::warn_span!("Creating CullingPass");
         let new_span_guard = new_span.enter();
 
-        let pre_cull_shader = shader_manager.compile_shader(ShaderArguments {
-            file: String::from("rend3/shaders/pre_cull.comp"),
+        let pre_cull_shader = shader_manager.compile_shader(SourceShaderDescriptor {
+            source: ShaderSourceType::File(String::from("rend3/shaders/pre_cull.comp")),
             defines: vec![(String::from("WARP_SIZE"), Some(subgroup_size.to_string()))],
-            kind: ShaderKind::Compute,
-            debug: cfg!(debug_assertions),
+            includes: vec![],
+            stage: ShaderSourceStage::Compute,
         });
 
-        let prefix_sum = shader_manager.compile_shader(ShaderArguments {
-            file: String::from("rend3/shaders/prefix_sum.comp"),
+        let prefix_sum = shader_manager.compile_shader(SourceShaderDescriptor {
+            source: ShaderSourceType::File(String::from("rend3/shaders/prefix_sum.comp")),
             defines: vec![(String::from("WARP_SIZE"), Some(subgroup_size.to_string()))],
-            kind: ShaderKind::Compute,
-            debug: cfg!(debug_assertions),
+            includes: vec![],
+            stage: ShaderSourceStage::Compute,
         });
 
-        let post_cull_shader = shader_manager.compile_shader(ShaderArguments {
-            file: String::from("rend3/shaders/post_cull.comp"),
+        let post_cull_shader = shader_manager.compile_shader(SourceShaderDescriptor {
+            source: ShaderSourceType::File(String::from("rend3/shaders/post_cull.comp")),
             defines: vec![(String::from("WARP_SIZE"), Some(subgroup_size.to_string()))],
-            kind: ShaderKind::Compute,
-            debug: cfg!(debug_assertions),
+            includes: vec![],
+            stage: ShaderSourceStage::Compute,
         });
 
         let pre_cull_pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {

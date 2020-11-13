@@ -36,7 +36,7 @@ struct PotentialAdapter {
 
 pub fn create_adapter() -> Result<(Instance, Adapter), RendererInitializationError> {
     let backend_bits = BackendBit::VULKAN | BackendBit::DX12;
-    let default_backend_order = [Backend::Vulkan, Backend::Dx12];
+    let default_backend_order = [Backend::Dx12, Backend::Vulkan];
     let intel_backend_order = [Backend::Dx12, Backend::Vulkan];
 
     let instance = Instance::new(backend_bits);

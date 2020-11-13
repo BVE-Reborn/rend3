@@ -1,4 +1,4 @@
-use crate::renderer::shaders::ShaderArguments;
+use crate::list::SourceShaderDescriptor;
 use std::io;
 use thiserror::Error;
 use wgpu::Features;
@@ -41,7 +41,7 @@ pub enum RendererInitializationError {
 #[derive(Error, Debug)]
 pub enum ShaderError {
     #[error("IO error while loading shader {1:?}: {0}")]
-    FileError(#[source] io::Error, ShaderArguments),
+    FileError(#[source] io::Error, SourceShaderDescriptor),
     #[error("Compilation error with shader args: {1:?}: {0}")]
-    CompileError(#[source] shaderc::Error, ShaderArguments),
+    CompileError(#[source] shaderc::Error, SourceShaderDescriptor),
 }

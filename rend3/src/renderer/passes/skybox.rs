@@ -1,8 +1,5 @@
-use crate::renderer::{
-    shaders::{ShaderArguments, ShaderManager},
-    util,
-};
-use shaderc::ShaderKind;
+use crate::list::{ShaderSourceStage, ShaderSourceType, SourceShaderDescriptor};
+use crate::renderer::{shaders::ShaderManager, util};
 use std::{future::Future, sync::Arc};
 use tracing_futures::Instrument;
 use wgpu::{
@@ -26,18 +23,18 @@ impl SkyboxPass {
         let new_span = tracing::warn_span!("Creating SkyboxPass");
         let new_span_guard = new_span.enter();
 
-        let vertex = shader_manager.compile_shader(ShaderArguments {
-            file: String::from("rend3/shaders/skybox.vert"),
+        let vertex = shader_manager.compile_shader(SourceShaderDescriptor {
+            source: ShaderSourceType::File(String::from("rend3/shaders/skybox.vert")),
             defines: vec![],
-            kind: ShaderKind::Vertex,
-            debug: cfg!(debug_assertions),
+            includes: vec![],
+            stage: ShaderSourceStage::Vertex,
         });
 
-        let fragment = shader_manager.compile_shader(ShaderArguments {
-            file: String::from("rend3/shaders/skybox.frag"),
+        let fragment = shader_manager.compile_shader(SourceShaderDescriptor {
+            source: ShaderSourceType::File(String::from("rend3/shaders/skybox.frag")),
             defines: vec![],
-            kind: ShaderKind::Fragment,
-            debug: cfg!(debug_assertions),
+            includes: vec![],
+            stage: ShaderSourceStage::Fragment,
         });
 
         let layout = create_skybox_pipeline_layout(device, general_bgl, output_noindirect_bgl, texture_bgl);

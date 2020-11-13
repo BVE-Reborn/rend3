@@ -1,4 +1,4 @@
-use crate::list::{ImageInputReference, ShaderStage};
+use crate::list::{ImageInputReference, ShaderSourceStage};
 use crate::{
     list::{
         ImageOutput, ImageOutputReference, ImageReference, ImageResolution, ImageResourceDescriptor, RenderList,
@@ -17,7 +17,7 @@ pub fn default_render_list() -> RenderList {
         "depth vert",
         ShaderSource::Glsl(SourceShaderDescriptor {
             source: ShaderSourceType::File("rend3/shaders/depth.vert".to_string()),
-            stage: ShaderStage::Vertex,
+            stage: ShaderSourceStage::Vertex,
             includes: vec![],
             defines: vec![(String::from("MATERIAL_COUNT"), Some(MAX_MATERIALS.to_string()))],
         }),
@@ -27,7 +27,7 @@ pub fn default_render_list() -> RenderList {
         "depth frag",
         ShaderSource::Glsl(SourceShaderDescriptor {
             source: ShaderSourceType::File("rend3/shaders/depth.frag".to_string()),
-            stage: ShaderStage::Fragment,
+            stage: ShaderSourceStage::Fragment,
             includes: vec![],
             defines: vec![(String::from("MATERIAL_COUNT"), Some(MAX_MATERIALS.to_string()))],
         }),
@@ -123,7 +123,7 @@ pub fn default_render_list() -> RenderList {
         "skybox vert",
         ShaderSource::Glsl(SourceShaderDescriptor {
             source: ShaderSourceType::File("rend3/shaders/skybox.vert".to_string()),
-            stage: ShaderStage::Vertex,
+            stage: ShaderSourceStage::Vertex,
             includes: vec![],
             defines: vec![],
         }),
@@ -133,7 +133,7 @@ pub fn default_render_list() -> RenderList {
         "skybox vert",
         ShaderSource::Glsl(SourceShaderDescriptor {
             source: ShaderSourceType::File("rend3/shaders/skybox.frag".to_string()),
-            stage: ShaderStage::Fragment,
+            stage: ShaderSourceStage::Fragment,
             includes: vec![],
             defines: vec![],
         }),
@@ -154,7 +154,7 @@ pub fn default_render_list() -> RenderList {
         "opaque vert",
         ShaderSource::Glsl(SourceShaderDescriptor {
             source: ShaderSourceType::File("rend3/shaders/opaque.vert".to_string()),
-            stage: ShaderStage::Vertex,
+            stage: ShaderSourceStage::Vertex,
             includes: vec![],
             defines: vec![(String::from("MATERIAL_COUNT"), Some(MAX_MATERIALS.to_string()))],
         }),
@@ -164,7 +164,7 @@ pub fn default_render_list() -> RenderList {
         "opaque frag",
         ShaderSource::Glsl(SourceShaderDescriptor {
             source: ShaderSourceType::File("rend3/shaders/opaque.frag".to_string()),
-            stage: ShaderStage::Fragment,
+            stage: ShaderSourceStage::Fragment,
             includes: vec![],
             defines: vec![(String::from("MATERIAL_COUNT"), Some(MAX_MATERIALS.to_string()))],
         }),
@@ -194,7 +194,7 @@ pub fn default_render_list() -> RenderList {
         "blit vert",
         ShaderSource::Glsl(SourceShaderDescriptor {
             source: ShaderSourceType::File("rend3/shaders/blit.vert".to_string()),
-            stage: ShaderStage::Vertex,
+            stage: ShaderSourceStage::Vertex,
             includes: vec![],
             defines: vec![],
         }),
@@ -204,7 +204,7 @@ pub fn default_render_list() -> RenderList {
         "blit vert",
         ShaderSource::Glsl(SourceShaderDescriptor {
             source: ShaderSourceType::File("rend3/shaders/blit.frag".to_string()),
-            stage: ShaderStage::Fragment,
+            stage: ShaderSourceStage::Fragment,
             includes: vec![],
             defines: vec![],
         }),

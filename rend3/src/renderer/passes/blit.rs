@@ -1,5 +1,5 @@
-use crate::renderer::shaders::{ShaderArguments, ShaderManager};
-use shaderc::ShaderKind;
+use crate::list::{ShaderSourceStage, ShaderSourceType, SourceShaderDescriptor};
+use crate::renderer::shaders::ShaderManager;
 use std::future::Future;
 use tracing_futures::Instrument;
 use wgpu::{
@@ -22,18 +22,18 @@ impl BlitPass {
         let new_span = tracing::warn_span!("Creating BlitPass");
         let new_span_guard = new_span.enter();
 
-        let vertex = shader_manager.compile_shader(ShaderArguments {
-            file: String::from("rend3/shaders/blit.vert"),
+        let vertex = shader_manager.compile_shader(SourceShaderDescriptor {
+            source: ShaderSourceType::File(String::from("rend3/shaders/blit.vert")),
             defines: vec![],
-            kind: ShaderKind::Vertex,
-            debug: cfg!(debug_assertions),
+            includes: vec![],
+            stage: ShaderSourceStage::Vertex,
         });
 
-        let fragment = shader_manager.compile_shader(ShaderArguments {
-            file: String::from("rend3/shaders/blit.frag"),
+        let fragment = shader_manager.compile_shader(SourceShaderDescriptor {
+            source: ShaderSourceType::File(String::from("rend3/shaders/blit.frag")),
             defines: vec![],
-            kind: ShaderKind::Fragment,
-            debug: cfg!(debug_assertions),
+            includes: vec![],
+            stage: ShaderSourceStage::Fragment,
         });
 
         let layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {

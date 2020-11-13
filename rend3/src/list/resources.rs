@@ -50,6 +50,8 @@ pub enum ResourceBinding {
 }
 
 pub type ImageFormat = wgpu::TextureFormat;
+pub type ImageUsage = wgpu::TextureUsage;
+pub type BufferUsage = wgpu::BufferUsage;
 
 pub enum ImageReference {
     OutputImage,
@@ -73,27 +75,14 @@ pub enum ImageOutputReference {
 }
 
 pub struct ImageResourceDescriptor {
-    pub resolution: ImageResolution,
+    pub resolution: [u32; 2],
     pub format: ImageFormat,
     pub samples: u8,
-}
-
-pub enum ImageResolution {
-    /// Will be created at the given resolution. Must be a multiple
-    /// of the block size.
-    Fixed([u32; 2]),
-    /// Floating point factor of another resource. Will be rounded
-    /// to nearest multiple of block size.
-    Relative(ImageReference, Vec2),
+    pub usage: ImageUsage,
 }
 
 pub enum BufferReference<'a> {
     Custom(&'a str),
-}
-
-pub enum BufferResource {
-    // TODO: Add uploadable buffers
-    Custom(BufferResourceDescriptor),
 }
 
 pub struct BufferResourceDescriptor {
