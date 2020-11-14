@@ -16,7 +16,7 @@ use wgpu::{
 
 pub fn render_loop<TLD: 'static>(
     renderer: Arc<Renderer<TLD>>,
-    render_list: RenderList,
+    _render_list: RenderList,
 ) -> impl Future<Output = RendererStatistics> {
     span_transfer!(_ -> render_create_span, INFO, "Render Loop Creation");
 

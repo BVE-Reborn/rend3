@@ -110,7 +110,7 @@ pub fn create_adapter() -> Result<(Instance, Adapter), RendererInitializationErr
 pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
     window: &W,
     yard: Arc<Switchyard<TLD>>,
-    imgui: &mut imgui::Context,
+    _imgui: &mut imgui::Context,
     options: RendererOptions,
 ) -> Result<Arc<Renderer<TLD>>, RendererInitializationError> {
     let (instance, adapter) = create_adapter()?;

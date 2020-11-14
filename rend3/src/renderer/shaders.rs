@@ -1,5 +1,7 @@
-use crate::list::{ShaderSourceType, SourceShaderDescriptor};
-use crate::ShaderError;
+use crate::{
+    list::{ShaderSourceType, SourceShaderDescriptor},
+    ShaderError,
+};
 use shaderc::{CompileOptions, Compiler, OptimizationLevel, ResolvedInclude, SourceLanguage, TargetEnv};
 use std::{borrow::Cow, future::Future, path::Path, sync::Arc, thread, thread::JoinHandle};
 use wgpu::{Device, ShaderModule, ShaderModuleSource};
@@ -84,7 +86,7 @@ fn compile_shader(compiler: &mut Compiler, device: &Device, args: &SourceShaderD
     options.set_generate_debug_info();
     options.set_source_language(SourceLanguage::GLSL);
     options.set_target_env(TargetEnv::Vulkan, 0);
-    options.set_optimization_level(match args.debug {
+    options.set_optimization_level(match cfg!(debug_assertions) {
         true => OptimizationLevel::Zero,
         false => OptimizationLevel::Performance,
     });

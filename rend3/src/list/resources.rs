@@ -1,5 +1,4 @@
 use crate::datatypes::TextureHandle;
-use glam::Vec2;
 
 pub enum ResourceBinding {
     /// Bindings in All Modes:
@@ -74,10 +73,11 @@ pub enum ImageOutputReference {
     Custom(String),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ImageResourceDescriptor {
     pub resolution: [u32; 2],
     pub format: ImageFormat,
-    pub samples: u8,
+    pub samples: u32,
     pub usage: ImageUsage,
 }
 
@@ -85,6 +85,8 @@ pub enum BufferReference<'a> {
     Custom(&'a str),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BufferResourceDescriptor {
     pub size: usize,
+    pub usage: BufferUsage,
 }

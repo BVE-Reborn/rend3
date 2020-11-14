@@ -1,5 +1,7 @@
-use crate::list::{ShaderSourceStage, ShaderSourceType, SourceShaderDescriptor};
-use crate::renderer::{shaders::ShaderManager, util};
+use crate::{
+    list::{ShaderSourceStage, ShaderSourceType, SourceShaderDescriptor},
+    renderer::{shaders::ShaderManager, util},
+};
 use std::{future::Future, sync::Arc};
 use tracing_futures::Instrument;
 use wgpu::{

@@ -1,16 +1,17 @@
-use crate::list::{ImageInputReference, ShaderSourceStage};
 use crate::{
     list::{
-        ImageOutput, ImageOutputReference, ImageReference, ImageResolution, ImageResourceDescriptor, RenderList,
+        ImageInputReference, ImageOutput, ImageOutputReference, ImageResourceDescriptor, ImageUsage, RenderList,
         RenderOpDescriptor, RenderOpInputType, RenderPassDescriptor, RenderPassSetDescriptor, RenderPassSetRunRate,
-        ResourceBinding, ShaderSource, ShaderSourceType, SourceShaderDescriptor,
+        ResourceBinding, ShaderSource, ShaderSourceStage, ShaderSourceType, SourceShaderDescriptor,
     },
     renderer::MAX_MATERIALS,
 };
-use glam::Vec2;
 use wgpu::TextureFormat;
+use winit::dpi::PhysicalSize;
 
-pub fn default_render_list() -> RenderList {
+pub fn default_render_list(resolution: PhysicalSize<u32>) -> RenderList {
+    let resolution: [u32; 2] = resolution.into();
+
     let mut list = RenderList::new();
 
     list.create_shader(
@@ -59,33 +60,30 @@ pub fn default_render_list() -> RenderList {
     list.create_image(
         internal_renderbuffer_name,
         ImageResourceDescriptor {
-            resolution: ImageResolution::Relative(ImageReference::OutputImage, Vec2::splat(1.0)),
+            resolution,
             format: TextureFormat::Rgba16Float,
             samples: 1,
+            usage: ImageUsage::SAMPLED | ImageUsage::OUTPUT_ATTACHMENT,
         },
     );
 
     list.create_image(
         "normal buffer",
         ImageResourceDescriptor {
-            resolution: ImageResolution::Relative(
-                ImageReference::Custom(internal_renderbuffer_name.to_string()),
-                Vec2::splat(1.0),
-            ),
+            resolution,
             format: TextureFormat::Rgba16Float,
             samples: 1,
+            usage: ImageUsage::SAMPLED | ImageUsage::OUTPUT_ATTACHMENT,
         },
     );
 
     list.create_image(
         "depth_buffer",
         ImageResourceDescriptor {
-            resolution: ImageResolution::Relative(
-                ImageReference::Custom(internal_renderbuffer_name.to_string()),
-                Vec2::splat(1.0),
-            ),
+            resolution,
             format: TextureFormat::Depth32Float,
             samples: 1,
+            usage: ImageUsage::SAMPLED | ImageUsage::OUTPUT_ATTACHMENT,
         },
     );
 

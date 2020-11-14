@@ -1,11 +1,14 @@
-use crate::list::{ImageReference, ImageResolution, RenderList, ShaderSource};
-use crate::renderer::list::{BufferResource, ImageResource, ShaderResource};
-use crate::renderer::shaders::ShaderManager;
+use crate::{
+    list::{RenderList, ShaderSource},
+    renderer::{
+        list::{BufferResource, ImageResource, ShaderResource},
+        shaders::{ShaderCompileResult, ShaderManager},
+    },
+};
 use fnv::FnvHashMap;
-use futures::stream::FuturesUnordered;
-use std::borrow::Cow;
-use std::sync::Arc;
-use wgpu::{Device, ShaderModuleSource, TextureDescriptor};
+use futures::{future::Either, stream::FuturesUnordered};
+use std::{borrow::Cow, sync::Arc};
+use wgpu::{Device, Extent3d, ShaderModuleSource, TextureDescriptor, TextureDimension, TextureViewDescriptor};
 
 pub struct RenderListCacheResource<T> {
     pub inner: T,
@@ -45,32 +48,61 @@ impl RenderListCache {
         let shaders = FuturesUnordered::new();
         for (key, descriptor) in list.shaders {
             if let Some(value) = self.shaders.get_mut(&key) {
-                if &value.inner.desc == descriptor {
+                if value.inner.desc == descriptor {
                     continue;
                 }
                 value.used = true;
             }
 
             match descriptor {
-                ShaderSource::Glsl(source) => {
-                    shaders.push(async { (key, shader_manager.compile_shader(source).await) })
-                }
+                ShaderSource::Glsl(source) => shaders.push(Either::Left(async {
+                    (key, shader_manager.compile_shader(source).await)
+                })),
                 ShaderSource::SpirV(spirv) => {
                     let module = device.create_shader_module(ShaderModuleSource::SpirV(Cow::Owned(spirv)));
-                    shaders.push(async { (key, Ok(Arc::new(module))) });
+                    shaders.push(Either::Right(async {
+                        (key, ShaderCompileResult::Ok(Arc::new(module)))
+                    }));
                 }
             }
         }
 
         for (key, descriptor) in list.images {
-            if let Some(value) = self.shaders.get_mut(&key) {
-                if &value.inner.desc == descriptor {
+            if let Some(value) = self.images.get_mut(&key) {
+                if value.inner.desc == descriptor {
                     continue;
                 }
                 value.used = true;
             }
 
-            device.create_texture(&TextureDescriptor {})
+            let image = device.create_texture(&TextureDescriptor {
+                label: Some(&*key),
+                size: Extent3d {
+                    width: descriptor.resolution[0],
+                    height: descriptor.resolution[1],
+                    depth: 1,
+                },
+                // TODO: mips
+                mip_level_count: 1,
+                sample_count: descriptor.samples,
+                dimension: TextureDimension::D2,
+                format: descriptor.format,
+                usage: descriptor.usage,
+            });
+
+            let image_view = image.create_view(&TextureViewDescriptor::default());
+
+            self.images.insert(
+                key,
+                RenderListCacheResource {
+                    inner: ImageResource {
+                        desc: descriptor,
+                        image: Arc::new(image),
+                        image_view: Arc::new(image_view),
+                    },
+                    used: true,
+                },
+            );
         }
     }
 }
