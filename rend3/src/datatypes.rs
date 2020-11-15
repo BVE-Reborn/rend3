@@ -1,3 +1,4 @@
+use crate::list::{ImageFormat, RenderPassSetRunRate};
 use glam::{
     f32::{Vec3A, Vec4},
     Mat4, Vec2, Vec3,
@@ -345,4 +346,32 @@ changeable_struct! {
         pub intensity: f32,
         pub direction: Vec3,
     }
+}
+
+pub enum PipelineInputType {
+    FullscreenTriangle,
+    Models3d,
+}
+
+pub enum PipelineBindingType {
+    GeneralData,
+    ObjectData,
+    Material,
+    CameraData,
+    GPU2DTextures,
+    GPUCubeTextures,
+    ShadowTexture,
+    SkyboxTexture,
+    Custom2DTexture { count: usize },
+    CustomCubeTexture { count: usize },
+}
+
+pub struct Pipeline {
+    pub run_rate: RenderPassSetRunRate,
+    pub input: PipelineInputType,
+    pub outputs: Vec<ImageFormat>,
+    pub depth: Option<ImageFormat>,
+    pub vertex: ShaderHandle,
+    pub fragment: Option<ShaderHandle>,
+    pub bindings: Vec<PipelineBindingType>,
 }

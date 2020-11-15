@@ -1,3 +1,5 @@
+use crate::datatypes::ShaderHandle;
+use crate::list::SourceShaderDescriptor;
 use crate::{
     datatypes::{
         AffineTransform, CameraLocation, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Material,
@@ -19,8 +21,6 @@ use std::{future::Future, sync::Arc};
 use switchyard::{JoinHandle, Switchyard};
 use wgpu::{Device, Queue, Surface, TextureFormat};
 use wgpu_conveyor::AutomatedBufferManager;
-use crate::list::SourceShaderDescriptor;
-use crate::datatypes::ShaderHandle;
 
 #[macro_use]
 mod util;
@@ -37,8 +37,8 @@ mod light {
 pub mod limits;
 mod list {
     mod cache;
-    mod resource;
     mod pipeline;
+    mod resource;
 
     pub use cache::*;
     pub use pipeline::*;
@@ -64,6 +64,7 @@ mod passes {
     pub use shadow_set::*;
     pub use skybox::*;
 }
+mod pipeline;
 mod render;
 mod resources;
 mod setup;
@@ -75,6 +76,7 @@ const COMPUTE_POOL: u8 = 0;
 
 const BUFFER_RECALL_PRIORITY: u32 = 0;
 const MAIN_TASK_PRIORITY: u32 = 1;
+const PIPELINE_BUILD_PRIORITY: u32 = 2;
 
 const INTERNAL_RENDERBUFFER_FORMAT: TextureFormat = TextureFormat::Rgba16Float;
 const INTERNAL_RENDERBUFFER_NORMAL_FORMAT: TextureFormat = TextureFormat::Rgba16Float;
@@ -252,7 +254,10 @@ impl<TLD: 'static> Renderer<TLD> {
     pub fn add_binary_shader(&self, shader: Vec<u32>) -> ShaderHandle {
         let handle = self.shader_manager.allocate();
 
-        self.instructions.producer.lock().push(Instruction::AddBinaryShader { handle, shader });
+        self.instructions
+            .producer
+            .lock()
+            .push(Instruction::AddBinaryShader { handle, shader });
 
         handle
     }
@@ -262,7 +267,10 @@ impl<TLD: 'static> Renderer<TLD> {
     }
 
     pub fn remove_shader(&self, handle: ShaderHandle) {
-        self.instructions.producer.lock().push(Instruction::RemoveShader { handle });
+        self.instructions
+            .producer
+            .lock()
+            .push(Instruction::RemoveShader { handle });
     }
 
     pub fn set_options(&self, options: RendererOptions) {
