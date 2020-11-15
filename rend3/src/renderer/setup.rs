@@ -26,6 +26,7 @@ use wgpu::{
     Adapter, Backend, BackendBit, DeviceDescriptor, DeviceType, Features, Instance, Limits, TextureViewDimension,
 };
 use wgpu_conveyor::{AutomatedBufferManager, UploadStyle};
+use crate::renderer::list::RenderListCache;
 
 struct PotentialAdapter {
     adapter: Adapter,
@@ -223,6 +224,8 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
 
     span_transfer!(imgui_guard -> _);
 
+    let render_list_cache = RwLock::new(RenderListCache::new());
+
     let (culling_pass, depth_pass, opaque_pass, swapchain_blit_pass, skybox_pass) =
         futures::join!(culling_pass, depth_pass, opaque_pass, swapchain_blit_pass, skybox_pass);
     let depth_pass = RwLock::new(depth_pass);
@@ -240,7 +243,7 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
 
         buffer_manager,
         global_resources,
-        _shader_manager: shader_manager,
+        shader_manager,
         mesh_manager,
         texture_manager_2d,
         texture_manager_cube,
@@ -251,6 +254,7 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
 
         forward_pass_set,
 
+        render_list_cache,
         swapchain_blit_pass,
         culling_pass,
         skybox_pass,

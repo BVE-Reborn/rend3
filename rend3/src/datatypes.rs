@@ -9,7 +9,7 @@ use wgpu::TextureFormat;
 #[doc(hidden)]
 macro_rules! declare_handle {
     ($($name:ident),*) => {$(
-        #[derive(Debug, Copy, Clone, PartialEq, Eq)]
+        #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
         pub struct $name(pub(crate) usize);
 
         impl $name {
@@ -25,7 +25,9 @@ declare_handle!(
     TextureHandle,
     MaterialHandle,
     ObjectHandle,
-    DirectionalLightHandle
+    DirectionalLightHandle,
+    ShaderHandle,
+    PipelineHandle
 );
 
 // Consider:

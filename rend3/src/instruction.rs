@@ -7,6 +7,7 @@ use crate::{
 };
 use parking_lot::Mutex;
 use std::mem;
+use crate::datatypes::ShaderHandle;
 
 pub enum Instruction {
     AddMesh {
@@ -62,6 +63,13 @@ pub enum Instruction {
     },
     RemoveDirectionalLight {
         handle: DirectionalLightHandle,
+    },
+    AddBinaryShader {
+        handle: ShaderHandle,
+        shader: Vec<u32>,
+    },
+    RemoveShader {
+        handle: ShaderHandle,
     },
     SetOptions {
         options: RendererOptions,

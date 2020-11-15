@@ -6,17 +6,13 @@ use crate::{
     statistics::RendererStatistics,
     Renderer,
 };
-use std::{future::Future, sync::Arc};
+use std::{future::Future, sync::Arc, borrow::Cow};
 use tracing_futures::Instrument;
-use wgpu::{
-    Color, CommandEncoderDescriptor, Extent3d, LoadOp, Operations, Origin3d, RenderPassColorAttachmentDescriptor,
-    RenderPassDepthStencilAttachmentDescriptor, RenderPassDescriptor, TextureAspect, TextureCopyView,
-    TextureDataLayout, TextureDescriptor, TextureDimension, TextureUsage, TextureViewDescriptor, TextureViewDimension,
-};
+use wgpu::{Color, CommandEncoderDescriptor, Extent3d, LoadOp, Operations, Origin3d, RenderPassColorAttachmentDescriptor, RenderPassDepthStencilAttachmentDescriptor, RenderPassDescriptor, TextureAspect, TextureCopyView, TextureDataLayout, TextureDescriptor, TextureDimension, TextureUsage, TextureViewDescriptor, TextureViewDimension, ShaderModuleSource};
 
 pub fn render_loop<TLD: 'static>(
     renderer: Arc<Renderer<TLD>>,
-    _render_list: RenderList,
+    render_list: RenderList,
 ) -> impl Future<Output = RendererStatistics> {
     span_transfer!(_ -> render_create_span, INFO, "Render Loop Creation");
 
@@ -26,10 +22,6 @@ pub fn render_loop<TLD: 'static>(
     let render_loop_span = tracing::warn_span!("Render Loop");
     async move {
         let mut instructions = renderer.instructions.consumer.lock();
-
-        let mut encoder = renderer.device.create_command_encoder(&CommandEncoderDescriptor {
-            label: Some("primary encoder"),
-        });
 
         span_transfer!(_ -> event_span, INFO, "Process events");
 
@@ -188,6 +180,13 @@ pub fn render_loop<TLD: 'static>(
                     }
                 }
                 Instruction::RemoveDirectionalLight { handle } => directional_light_manager.remove(handle),
+                Instruction::AddBinaryShader { handle, shader } => {
+                    let module = renderer.device.create_shader_module(ShaderModuleSource::SpirV(Cow::Owned(shader)));
+                    renderer.shader_manager.insert(handle, Arc::new(module));
+                }
+                Instruction::RemoveShader { handle } => {
+                    renderer.shader_manager.remove(handle);
+                }
                 Instruction::SetOptions { options } => new_options = Some(options),
                 Instruction::SetCameraLocation { location } => {
                     global_resources.camera.set_location(location);
@@ -200,6 +199,12 @@ pub fn render_loop<TLD: 'static>(
                 }
             }
         }
+
+        renderer.render_list_cache.write().add_render_list(&renderer.device, &renderer.shader_manager, render_list).await;
+
+        let mut encoder = renderer.device.create_command_encoder(&CommandEncoderDescriptor {
+            label: Some("primary encoder"),
+        });
 
         let mut general_bgb = BindGroupBuilder::new(Some(String::from("general bg")));
 

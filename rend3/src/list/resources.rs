@@ -1,5 +1,6 @@
 use crate::datatypes::TextureHandle;
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ResourceBinding {
     /// Bindings in All Modes:
     /// 0: Linear Sampler
@@ -58,6 +59,7 @@ pub enum ImageReference {
     Custom(String),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ImageInputReference {
     Handle(TextureHandle),
     Custom(String),
@@ -87,6 +89,6 @@ pub enum BufferReference<'a> {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BufferResourceDescriptor {
-    pub size: usize,
+    pub size: u64,
     pub usage: BufferUsage,
 }

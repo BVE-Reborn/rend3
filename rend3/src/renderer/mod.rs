@@ -19,6 +19,8 @@ use std::{future::Future, sync::Arc};
 use switchyard::{JoinHandle, Switchyard};
 use wgpu::{Device, Queue, Surface, TextureFormat};
 use wgpu_conveyor::AutomatedBufferManager;
+use crate::list::SourceShaderDescriptor;
+use crate::datatypes::ShaderHandle;
 
 #[macro_use]
 mod util;
@@ -36,8 +38,10 @@ pub mod limits;
 mod list {
     mod cache;
     mod resource;
+    mod pipeline;
 
     pub use cache::*;
+    pub use pipeline::*;
     pub use resource::*;
 }
 mod material;
@@ -92,7 +96,7 @@ where
 
     buffer_manager: Mutex<AutomatedBufferManager>,
     global_resources: RwLock<RendererGlobalResources>,
-    _shader_manager: ShaderManager,
+    shader_manager: ShaderManager,
     mesh_manager: RwLock<MeshManager>,
     texture_manager_2d: RwLock<TextureManager>,
     texture_manager_cube: RwLock<TextureManager>,
@@ -102,6 +106,8 @@ where
     directional_light_manager: RwLock<light::DirectionalLightManager>,
 
     forward_pass_set: ForwardPassSet,
+
+    render_list_cache: RwLock<list::RenderListCache>,
 
     swapchain_blit_pass: passes::BlitPass,
     culling_pass: passes::CullingPass,
@@ -241,6 +247,22 @@ impl<TLD: 'static> Renderer<TLD> {
             .producer
             .lock()
             .push(Instruction::RemoveDirectionalLight { handle })
+    }
+
+    pub fn add_binary_shader(&self, shader: Vec<u32>) -> ShaderHandle {
+        let handle = self.shader_manager.allocate();
+
+        self.instructions.producer.lock().push(Instruction::AddBinaryShader { handle, shader });
+
+        handle
+    }
+
+    pub fn add_source_shader(&self, shader: SourceShaderDescriptor) -> impl Future<Output = ShaderHandle> {
+        self.shader_manager.allocate_async_insert(shader)
+    }
+
+    pub fn remove_shader(&self, handle: ShaderHandle) {
+        self.instructions.producer.lock().push(Instruction::RemoveShader { handle });
     }
 
     pub fn set_options(&self, options: RendererOptions) {

@@ -5,12 +5,16 @@ use crate::{
 use shaderc::{CompileOptions, Compiler, OptimizationLevel, ResolvedInclude, SourceLanguage, TargetEnv};
 use std::{borrow::Cow, future::Future, path::Path, sync::Arc, thread, thread::JoinHandle};
 use wgpu::{Device, ShaderModule, ShaderModuleSource};
+use parking_lot::RwLock;
+use crate::registry::ResourceRegistry;
+use crate::datatypes::ShaderHandle;
 
 pub type ShaderCompileResult = Result<Arc<ShaderModule>, ShaderError>;
 
 pub struct ShaderManager {
     shader_thread: Option<JoinHandle<()>>,
     sender: flume::Sender<CompileCommand>,
+    registry: Arc<RwLock<ResourceRegistry<Arc<ShaderModule>>>>
 }
 impl ShaderManager {
     pub fn new(device: Arc<Device>) -> Self {
@@ -23,7 +27,32 @@ impl ShaderManager {
                 .unwrap(),
         );
 
-        Self { shader_thread, sender }
+        let registry = Arc::new(RwLock::new(ResourceRegistry::new()));
+
+        Self { shader_thread, sender, registry }
+    }
+
+    pub fn allocate(&self) -> ShaderHandle {
+        ShaderHandle(self.registry.read().allocate())
+    }
+
+    pub fn allocate_async_insert(&self, args: SourceShaderDescriptor) -> impl Future<Output = ShaderHandle> {
+        let handle = ShaderHandle(self.registry.read().allocate());
+        let fut = self.compile_shader(args);
+        let registry_clone = Arc::clone(&self.registry);
+        async move {
+            let res = fut.await.unwrap();
+            registry_clone.write().insert(handle.0, res);
+            handle
+        }
+    }
+
+    pub fn insert(&self, handle: ShaderHandle, shader: Arc<ShaderModule>) {
+        self.registry.write().insert(handle.0, shader);
+    }
+
+    pub fn remove(&self, handle: ShaderHandle) {
+        self.registry.write().remove(handle.0);
     }
 
     pub fn compile_shader(&self, args: SourceShaderDescriptor) -> impl Future<Output = ShaderCompileResult> {

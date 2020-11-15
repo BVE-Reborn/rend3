@@ -31,13 +31,13 @@ pub enum RenderOpInputType {
     Models3D,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ShaderSource {
     SpirV(Vec<u32>),
     Glsl(SourceShaderDescriptor),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ShaderSourceType {
     /// Load shader from given file
     File(String),
@@ -45,7 +45,7 @@ pub enum ShaderSourceType {
     Value(String),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SourceShaderDescriptor {
     pub source: ShaderSourceType,
     pub stage: ShaderSourceStage,
@@ -53,7 +53,7 @@ pub struct SourceShaderDescriptor {
     pub defines: Vec<(String, Option<String>)>,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum ShaderSourceStage {
     Vertex,
     Fragment,

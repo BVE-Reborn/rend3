@@ -128,7 +128,7 @@ pub fn default_render_list(resolution: PhysicalSize<u32>) -> RenderList {
     );
 
     list.create_shader(
-        "skybox vert",
+        "skybox frag",
         ShaderSource::Glsl(SourceShaderDescriptor {
             source: ShaderSourceType::File("rend3/shaders/skybox.frag".to_string()),
             stage: ShaderSourceStage::Fragment,
@@ -199,7 +199,7 @@ pub fn default_render_list(resolution: PhysicalSize<u32>) -> RenderList {
     );
 
     list.create_shader(
-        "blit vert",
+        "blit frag",
         ShaderSource::Glsl(SourceShaderDescriptor {
             source: ShaderSourceType::File("rend3/shaders/blit.frag".to_string()),
             stage: ShaderSourceStage::Fragment,
