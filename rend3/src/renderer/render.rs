@@ -6,9 +6,14 @@ use crate::{
     statistics::RendererStatistics,
     Renderer,
 };
-use std::{future::Future, sync::Arc, borrow::Cow};
+use std::{borrow::Cow, future::Future, sync::Arc};
 use tracing_futures::Instrument;
-use wgpu::{Color, CommandEncoderDescriptor, Extent3d, LoadOp, Operations, Origin3d, RenderPassColorAttachmentDescriptor, RenderPassDepthStencilAttachmentDescriptor, RenderPassDescriptor, TextureAspect, TextureCopyView, TextureDataLayout, TextureDescriptor, TextureDimension, TextureUsage, TextureViewDescriptor, TextureViewDimension, ShaderModuleSource};
+use wgpu::{
+    Color, CommandEncoderDescriptor, Extent3d, LoadOp, Operations, Origin3d, RenderPassColorAttachmentDescriptor,
+    RenderPassDepthStencilAttachmentDescriptor, RenderPassDescriptor, ShaderModuleSource, TextureAspect,
+    TextureCopyView, TextureDataLayout, TextureDescriptor, TextureDimension, TextureUsage, TextureViewDescriptor,
+    TextureViewDimension,
+};
 
 pub fn render_loop<TLD: 'static>(
     renderer: Arc<Renderer<TLD>>,
@@ -181,11 +186,16 @@ pub fn render_loop<TLD: 'static>(
                 }
                 Instruction::RemoveDirectionalLight { handle } => directional_light_manager.remove(handle),
                 Instruction::AddBinaryShader { handle, shader } => {
-                    let module = renderer.device.create_shader_module(ShaderModuleSource::SpirV(Cow::Owned(shader)));
+                    let module = renderer
+                        .device
+                        .create_shader_module(ShaderModuleSource::SpirV(Cow::Owned(shader)));
                     renderer.shader_manager.insert(handle, Arc::new(module));
                 }
                 Instruction::RemoveShader { handle } => {
                     renderer.shader_manager.remove(handle);
+                }
+                Instruction::RemovePipeline { handle } => {
+                    renderer.pipeline_manager.remove(handle);
                 }
                 Instruction::SetOptions { options } => new_options = Some(options),
                 Instruction::SetCameraLocation { location } => {
@@ -200,7 +210,10 @@ pub fn render_loop<TLD: 'static>(
             }
         }
 
-        renderer.render_list_cache.write().add_render_list(&renderer.device, &renderer.shader_manager, render_list).await;
+        renderer
+            .render_list_cache
+            .write()
+            .add_render_list(&renderer.device, render_list);
 
         let mut encoder = renderer.device.create_command_encoder(&CommandEncoderDescriptor {
             label: Some("primary encoder"),

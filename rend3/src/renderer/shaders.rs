@@ -1,23 +1,23 @@
 use crate::{
+    datatypes::ShaderHandle,
     list::{ShaderSourceType, SourceShaderDescriptor},
+    registry::ResourceRegistry,
     ShaderError,
 };
+use parking_lot::RwLock;
 use shaderc::{CompileOptions, Compiler, OptimizationLevel, ResolvedInclude, SourceLanguage, TargetEnv};
 use std::{borrow::Cow, future::Future, path::Path, sync::Arc, thread, thread::JoinHandle};
 use wgpu::{Device, ShaderModule, ShaderModuleSource};
-use parking_lot::RwLock;
-use crate::registry::ResourceRegistry;
-use crate::datatypes::ShaderHandle;
 
 pub type ShaderCompileResult = Result<Arc<ShaderModule>, ShaderError>;
 
 pub struct ShaderManager {
     shader_thread: Option<JoinHandle<()>>,
     sender: flume::Sender<CompileCommand>,
-    registry: Arc<RwLock<ResourceRegistry<Arc<ShaderModule>>>>
+    registry: RwLock<ResourceRegistry<Arc<ShaderModule>>>,
 }
 impl ShaderManager {
-    pub fn new(device: Arc<Device>) -> Self {
+    pub fn new(device: Arc<Device>) -> Arc<Self> {
         let (sender, receiver) = flume::unbounded();
 
         let shader_thread = Some(
@@ -27,22 +27,26 @@ impl ShaderManager {
                 .unwrap(),
         );
 
-        let registry = Arc::new(RwLock::new(ResourceRegistry::new()));
+        let registry = RwLock::new(ResourceRegistry::new());
 
-        Self { shader_thread, sender, registry }
+        Arc::new(Self {
+            shader_thread,
+            sender,
+            registry,
+        })
     }
 
     pub fn allocate(&self) -> ShaderHandle {
         ShaderHandle(self.registry.read().allocate())
     }
 
-    pub fn allocate_async_insert(&self, args: SourceShaderDescriptor) -> impl Future<Output = ShaderHandle> {
+    pub fn allocate_async_insert(self: &Arc<Self>, args: SourceShaderDescriptor) -> impl Future<Output = ShaderHandle> {
         let handle = ShaderHandle(self.registry.read().allocate());
         let fut = self.compile_shader(args);
-        let registry_clone = Arc::clone(&self.registry);
+        let this = Arc::clone(self);
         async move {
             let res = fut.await.unwrap();
-            registry_clone.write().insert(handle.0, res);
+            this.registry.write().insert(handle.0, res);
             handle
         }
     }

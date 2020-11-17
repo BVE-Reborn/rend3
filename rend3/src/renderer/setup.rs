@@ -4,11 +4,13 @@ use crate::{
         info::{ExtendedAdapterInfo, Vendor},
         light::DirectionalLightManager,
         limits::{check_features, check_limits},
+        list::RenderListCache,
         material::MaterialManager,
         mesh::MeshManager,
         object::ObjectManager,
         passes,
         passes::ForwardPassSet,
+        pipeline::PipelineManager,
         resources::RendererGlobalResources,
         shaders::ShaderManager,
         texture::{TextureManager, STARTING_2D_TEXTURES, STARTING_CUBE_TEXTURES, STARTING_INTERNAL_TEXTURES},
@@ -26,7 +28,6 @@ use wgpu::{
     Adapter, Backend, BackendBit, DeviceDescriptor, DeviceType, Features, Instance, Limits, TextureViewDimension,
 };
 use wgpu_conveyor::{AutomatedBufferManager, UploadStyle};
-use crate::renderer::list::RenderListCache;
 
 struct PotentialAdapter {
     adapter: Adapter,
@@ -37,7 +38,7 @@ struct PotentialAdapter {
 
 pub fn create_adapter() -> Result<(Instance, Adapter), RendererInitializationError> {
     let backend_bits = BackendBit::VULKAN | BackendBit::DX12;
-    let default_backend_order = [Backend::Dx12, Backend::Vulkan];
+    let default_backend_order = [Backend::Vulkan, Backend::Dx12];
     let intel_backend_order = [Backend::Dx12, Backend::Vulkan];
 
     let instance = Instance::new(backend_bits);
@@ -137,6 +138,7 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
     let device = Arc::new(device);
 
     let shader_manager = ShaderManager::new(Arc::clone(&device));
+
     let mut global_resources = RwLock::new(RendererGlobalResources::new(&device, &surface, &options));
     let global_resource_guard = global_resources.get_mut();
 
@@ -204,6 +206,12 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
         &texture_manager_cube_guard.bind_group_layout(),
     );
 
+    let pipeline_manager = PipelineManager::new(
+        &device,
+        texture_manager_2d.read().bind_group_layout_arc(),
+        texture_manager_cube.read().bind_group_layout_arc(),
+    );
+
     let forward_pass_set = ForwardPassSet::new(
         &device,
         &global_resource_guard.uniform_bgl,
@@ -244,6 +252,7 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
         buffer_manager,
         global_resources,
         shader_manager,
+        pipeline_manager,
         mesh_manager,
         texture_manager_2d,
         texture_manager_cube,

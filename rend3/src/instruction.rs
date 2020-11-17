@@ -1,13 +1,13 @@
 use crate::{
     datatypes::{
         AffineTransform, CameraLocation, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Material,
-        MaterialChange, MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, Texture, TextureHandle,
+        MaterialChange, MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, PipelineHandle, ShaderHandle, Texture,
+        TextureHandle,
     },
     RendererOptions,
 };
 use parking_lot::Mutex;
 use std::mem;
-use crate::datatypes::ShaderHandle;
 
 pub enum Instruction {
     AddMesh {
@@ -70,6 +70,9 @@ pub enum Instruction {
     },
     RemoveShader {
         handle: ShaderHandle,
+    },
+    RemovePipeline {
+        handle: PipelineHandle,
     },
     SetOptions {
         options: RendererOptions,

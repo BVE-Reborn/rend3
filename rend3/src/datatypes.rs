@@ -1,4 +1,4 @@
-use crate::list::{ImageFormat, RenderPassSetRunRate};
+use crate::list::{ImageFormat, RenderPassRunRate};
 use glam::{
     f32::{Vec3A, Vec4},
     Mat4, Vec2, Vec3,
@@ -348,11 +348,13 @@ changeable_struct! {
     }
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum PipelineInputType {
     FullscreenTriangle,
     Models3d,
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum PipelineBindingType {
     GeneralData,
     ObjectData,
@@ -366,13 +368,36 @@ pub enum PipelineBindingType {
     CustomCubeTexture { count: usize },
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum DepthCompare {
+    Closer,
+    CloserEqual,
+    Equal,
+    Further,
+    FurtherEqual,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub struct PipelineOutputAttachment {
+    pub format: ImageFormat,
+    pub write: bool,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub struct PipelineDepthState {
+    pub format: ImageFormat,
+    pub compare: DepthCompare,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Pipeline {
     // TODO: Alpha
-    pub run_rate: RenderPassSetRunRate,
+    pub run_rate: RenderPassRunRate,
     pub input: PipelineInputType,
-    pub outputs: Vec<ImageFormat>,
-    pub depth: Option<ImageFormat>,
+    pub outputs: Vec<PipelineOutputAttachment>,
+    pub depth: Option<PipelineDepthState>,
     pub vertex: ShaderHandle,
     pub fragment: Option<ShaderHandle>,
     pub bindings: Vec<PipelineBindingType>,
+    pub samples: u8,
 }

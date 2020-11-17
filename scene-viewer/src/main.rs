@@ -7,6 +7,7 @@ use rend3::{
         AffineTransform, AlbedoComponent, CameraLocation, DirectionalLight, Material, MaterialComponent,
         MaterialHandle, Mesh, MeshHandle, ModelVertex, Object, RendererTextureFormat, Texture, TextureHandle,
     },
+    list::{DefaultPipelines, DefaultShaders},
     Renderer, RendererOptions, VSyncMode,
 };
 use std::{
@@ -267,6 +268,11 @@ fn main() {
     ))
     .unwrap();
 
+    let pipelines = futures::executor::block_on(async {
+        let shaders = DefaultShaders::new(&renderer).await;
+        DefaultPipelines::new(&renderer, &shaders).await
+    });
+
     rend3::span_transfer!(renderer_span -> loading_span, INFO, "Loading resources");
 
     let cube = load_obj(&renderer, "tmp/cube.obj");
@@ -396,7 +402,7 @@ fn main() {
 
             renderer.set_camera_location(camera_location);
             renderer.set_options(options.clone());
-            let handle = renderer.render(rend3::list::default_render_list(options.size));
+            let handle = renderer.render(rend3::list::default_render_list(options.size, &pipelines));
 
             rend3::span_transfer!(redraw_span -> render_wait_span, INFO, "Waiting for render");
             futures::executor::block_on(handle);

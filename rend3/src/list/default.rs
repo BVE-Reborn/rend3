@@ -1,52 +1,262 @@
 use crate::{
+    datatypes::{
+        DepthCompare, Pipeline, PipelineBindingType, PipelineDepthState, PipelineHandle, PipelineInputType,
+        PipelineOutputAttachment, ShaderHandle,
+    },
     list::{
-        ImageInputReference, ImageOutput, ImageOutputReference, ImageResourceDescriptor, ImageUsage, RenderList,
-        RenderOpDescriptor, RenderOpInputType, RenderPassDescriptor, RenderPassSetDescriptor, RenderPassSetRunRate,
-        ResourceBinding, ShaderSource, ShaderSourceStage, ShaderSourceType, SourceShaderDescriptor,
+        ImageFormat, ImageInputReference, ImageOutput, ImageOutputReference, ImageResourceDescriptor, ImageUsage,
+        RenderList, RenderOpDescriptor, RenderOpInputType, RenderPassDescriptor, RenderPassRunRate, ResourceBinding,
+        ShaderSourceStage, ShaderSourceType, SourceShaderDescriptor,
     },
     renderer::MAX_MATERIALS,
+    Renderer,
 };
+use std::future::Future;
 use wgpu::TextureFormat;
 use winit::dpi::PhysicalSize;
 
-pub fn default_render_list(resolution: PhysicalSize<u32>) -> RenderList {
-    let resolution: [u32; 2] = resolution.into();
-
-    let mut list = RenderList::new();
-
-    list.create_shader(
-        "depth vert",
-        ShaderSource::Glsl(SourceShaderDescriptor {
+pub struct DefaultShaders {
+    pub depth_vert: ShaderHandle,
+    pub depth_frag: ShaderHandle,
+    pub skybox_vert: ShaderHandle,
+    pub skybox_frag: ShaderHandle,
+    pub opaque_vert: ShaderHandle,
+    pub opaque_frag: ShaderHandle,
+    pub blit_vert: ShaderHandle,
+    pub blit_frag: ShaderHandle,
+}
+impl DefaultShaders {
+    pub fn new<TLD>(renderer: &Renderer<TLD>) -> impl Future<Output = Self>
+    where
+        TLD: 'static,
+    {
+        let depth_vert = renderer.add_source_shader(SourceShaderDescriptor {
             source: ShaderSourceType::File("rend3/shaders/depth.vert".to_string()),
             stage: ShaderSourceStage::Vertex,
             includes: vec![],
             defines: vec![(String::from("MATERIAL_COUNT"), Some(MAX_MATERIALS.to_string()))],
-        }),
-    );
-
-    list.create_shader(
-        "depth frag",
-        ShaderSource::Glsl(SourceShaderDescriptor {
+        });
+        let depth_frag = renderer.add_source_shader(SourceShaderDescriptor {
             source: ShaderSourceType::File("rend3/shaders/depth.frag".to_string()),
             stage: ShaderSourceStage::Fragment,
             includes: vec![],
             defines: vec![(String::from("MATERIAL_COUNT"), Some(MAX_MATERIALS.to_string()))],
-        }),
-    );
+        });
 
-    list.start_render_pass_set(RenderPassSetDescriptor {
-        run_rate: RenderPassSetRunRate::PerShadow,
-    });
+        let skybox_vert = renderer.add_source_shader(SourceShaderDescriptor {
+            source: ShaderSourceType::File("rend3/shaders/skybox.vert".to_string()),
+            stage: ShaderSourceStage::Vertex,
+            includes: vec![],
+            defines: vec![],
+        });
+        let skybox_frag = renderer.add_source_shader(SourceShaderDescriptor {
+            source: ShaderSourceType::File("rend3/shaders/skybox.frag".to_string()),
+            stage: ShaderSourceStage::Fragment,
+            includes: vec![],
+            defines: vec![],
+        });
+
+        let opaque_vert = renderer.add_source_shader(SourceShaderDescriptor {
+            source: ShaderSourceType::File("rend3/shaders/opaque.vert".to_string()),
+            stage: ShaderSourceStage::Vertex,
+            includes: vec![],
+            defines: vec![(String::from("MATERIAL_COUNT"), Some(MAX_MATERIALS.to_string()))],
+        });
+        let opaque_frag = renderer.add_source_shader(SourceShaderDescriptor {
+            source: ShaderSourceType::File("rend3/shaders/opaque.frag".to_string()),
+            stage: ShaderSourceStage::Fragment,
+            includes: vec![],
+            defines: vec![(String::from("MATERIAL_COUNT"), Some(MAX_MATERIALS.to_string()))],
+        });
+
+        let blit_vert = renderer.add_source_shader(SourceShaderDescriptor {
+            source: ShaderSourceType::File("rend3/shaders/blit.vert".to_string()),
+            stage: ShaderSourceStage::Vertex,
+            includes: vec![],
+            defines: vec![],
+        });
+        let blit_frag = renderer.add_source_shader(SourceShaderDescriptor {
+            source: ShaderSourceType::File("rend3/shaders/blit.frag".to_string()),
+            stage: ShaderSourceStage::Fragment,
+            includes: vec![],
+            defines: vec![],
+        });
+
+        async move {
+            Self {
+                depth_vert: depth_vert.await,
+                depth_frag: depth_frag.await,
+                skybox_vert: skybox_vert.await,
+                skybox_frag: skybox_frag.await,
+                opaque_vert: opaque_vert.await,
+                opaque_frag: opaque_frag.await,
+                blit_vert: blit_vert.await,
+                blit_frag: blit_frag.await,
+            }
+        }
+    }
+}
+
+pub struct DefaultPipelines {
+    pub shadow_depth_pipeline: PipelineHandle,
+    pub depth_pipeline: PipelineHandle,
+    pub skybox_pipeline: PipelineHandle,
+    pub opaque_pipeline: PipelineHandle,
+    pub blit_pipeline: PipelineHandle,
+}
+
+impl DefaultPipelines {
+    pub fn new<TLD>(renderer: &Renderer<TLD>, shaders: &DefaultShaders) -> impl Future<Output = Self>
+    where
+        TLD: 'static,
+    {
+        let shadow_depth_pipeline = renderer.add_pipeline(Pipeline {
+            run_rate: RenderPassRunRate::PerShadow,
+            input: PipelineInputType::Models3d,
+            outputs: vec![],
+            depth: Some(PipelineDepthState {
+                format: ImageFormat::Depth32Float,
+                compare: DepthCompare::Closer,
+            }),
+            vertex: shaders.depth_vert,
+            fragment: Some(shaders.depth_frag),
+            bindings: vec![
+                PipelineBindingType::GeneralData,
+                PipelineBindingType::ObjectData,
+                PipelineBindingType::GPU2DTextures,
+                PipelineBindingType::CameraData,
+            ],
+            samples: 1,
+        });
+
+        let depth_pipeline = renderer.add_pipeline(Pipeline {
+            run_rate: RenderPassRunRate::Once,
+            input: PipelineInputType::Models3d,
+            outputs: vec![
+                PipelineOutputAttachment {
+                    format: ImageFormat::Rgba16Float,
+                    write: false,
+                },
+                PipelineOutputAttachment {
+                    format: ImageFormat::Rgba16Float,
+                    write: false,
+                },
+            ],
+            depth: Some(PipelineDepthState {
+                format: ImageFormat::Depth32Float,
+                compare: DepthCompare::Closer,
+            }),
+            vertex: shaders.depth_vert,
+            fragment: Some(shaders.depth_frag),
+            bindings: vec![
+                PipelineBindingType::GeneralData,
+                PipelineBindingType::ObjectData,
+                PipelineBindingType::GPU2DTextures,
+                PipelineBindingType::CameraData,
+            ],
+            samples: 1,
+        });
+
+        let skybox_pipeline = renderer.add_pipeline(Pipeline {
+            run_rate: RenderPassRunRate::Once,
+            input: PipelineInputType::FullscreenTriangle,
+            outputs: vec![
+                PipelineOutputAttachment {
+                    format: ImageFormat::Rgba16Float,
+                    write: false,
+                },
+                PipelineOutputAttachment {
+                    format: ImageFormat::Rgba16Float,
+                    write: false,
+                },
+            ],
+            depth: Some(PipelineDepthState {
+                format: ImageFormat::Depth32Float,
+                compare: DepthCompare::Further,
+            }),
+            vertex: shaders.skybox_vert,
+            fragment: Some(shaders.skybox_frag),
+            bindings: vec![
+                PipelineBindingType::GeneralData,
+                PipelineBindingType::SkyboxTexture,
+                PipelineBindingType::CameraData,
+            ],
+            samples: 1,
+        });
+
+        let opaque_pipeline = renderer.add_pipeline(Pipeline {
+            run_rate: RenderPassRunRate::Once,
+            input: PipelineInputType::Models3d,
+            outputs: vec![
+                PipelineOutputAttachment {
+                    format: ImageFormat::Rgba16Float,
+                    write: true,
+                },
+                PipelineOutputAttachment {
+                    format: ImageFormat::Rgba16Float,
+                    write: true,
+                },
+            ],
+            depth: Some(PipelineDepthState {
+                format: ImageFormat::Depth32Float,
+                compare: DepthCompare::Equal,
+            }),
+            vertex: shaders.opaque_vert,
+            fragment: Some(shaders.opaque_frag),
+            bindings: vec![
+                PipelineBindingType::GeneralData,
+                PipelineBindingType::ObjectData,
+                PipelineBindingType::GPU2DTextures,
+                PipelineBindingType::CameraData,
+            ],
+            samples: 1,
+        });
+
+        let blit_pipeline = renderer.add_pipeline(Pipeline {
+            run_rate: RenderPassRunRate::Once,
+            input: PipelineInputType::Models3d,
+            outputs: vec![PipelineOutputAttachment {
+                format: ImageFormat::Bgra8UnormSrgb,
+                write: true,
+            }],
+            depth: None,
+            vertex: shaders.blit_vert,
+            fragment: Some(shaders.blit_frag),
+            bindings: vec![
+                PipelineBindingType::GeneralData,
+                PipelineBindingType::ObjectData,
+                PipelineBindingType::GPU2DTextures,
+                PipelineBindingType::CameraData,
+            ],
+            samples: 1,
+        });
+
+        async move {
+            Self {
+                shadow_depth_pipeline: shadow_depth_pipeline.await,
+                depth_pipeline: depth_pipeline.await,
+                skybox_pipeline: skybox_pipeline.await,
+                opaque_pipeline: opaque_pipeline.await,
+                blit_pipeline: blit_pipeline.await,
+            }
+        }
+    }
+}
+
+pub fn default_render_list(resolution: PhysicalSize<u32>, pipelines: &DefaultPipelines) -> RenderList {
+    let resolution: [u32; 2] = resolution.into();
+
+    let mut list = RenderList::new();
 
     list.add_render_pass(RenderPassDescriptor {
+        run_rate: RenderPassRunRate::PerShadow,
         outputs: vec![],
         depth: Some(ImageOutputReference::OutputImage),
     });
 
     list.add_render_op(RenderOpDescriptor {
+        pipeline: pipelines.shadow_depth_pipeline,
         input: RenderOpInputType::Models3D,
-        vertex: String::from("depth vert"),
-        fragment: Some(String::from("depth frag")),
         bindings: vec![
             ResourceBinding::GeneralData,
             ResourceBinding::ObjectData,
@@ -87,11 +297,8 @@ pub fn default_render_list(resolution: PhysicalSize<u32>) -> RenderList {
         },
     );
 
-    list.start_render_pass_set(RenderPassSetDescriptor {
-        run_rate: RenderPassSetRunRate::Once,
-    });
-
     list.add_render_pass(RenderPassDescriptor {
+        run_rate: RenderPassRunRate::Once,
         outputs: vec![
             ImageOutput {
                 output: ImageOutputReference::Custom(internal_renderbuffer_name.to_owned()),
@@ -106,9 +313,8 @@ pub fn default_render_list(resolution: PhysicalSize<u32>) -> RenderList {
     });
 
     list.add_render_op(RenderOpDescriptor {
+        pipeline: pipelines.depth_pipeline,
         input: RenderOpInputType::Models3D,
-        vertex: String::from("depth vert"),
-        fragment: Some(String::from("depth frag")),
         bindings: vec![
             ResourceBinding::GeneralData,
             ResourceBinding::ObjectData,
@@ -117,30 +323,9 @@ pub fn default_render_list(resolution: PhysicalSize<u32>) -> RenderList {
         ],
     });
 
-    list.create_shader(
-        "skybox vert",
-        ShaderSource::Glsl(SourceShaderDescriptor {
-            source: ShaderSourceType::File("rend3/shaders/skybox.vert".to_string()),
-            stage: ShaderSourceStage::Vertex,
-            includes: vec![],
-            defines: vec![],
-        }),
-    );
-
-    list.create_shader(
-        "skybox frag",
-        ShaderSource::Glsl(SourceShaderDescriptor {
-            source: ShaderSourceType::File("rend3/shaders/skybox.frag".to_string()),
-            stage: ShaderSourceStage::Fragment,
-            includes: vec![],
-            defines: vec![],
-        }),
-    );
-
     list.add_render_op(RenderOpDescriptor {
+        pipeline: pipelines.skybox_pipeline,
         input: RenderOpInputType::FullscreenTriangle,
-        vertex: String::from("skybox vert"),
-        fragment: Some(String::from("skybox frag")),
         bindings: vec![
             ResourceBinding::GeneralData,
             ResourceBinding::SkyboxTexture,
@@ -148,30 +333,9 @@ pub fn default_render_list(resolution: PhysicalSize<u32>) -> RenderList {
         ],
     });
 
-    list.create_shader(
-        "opaque vert",
-        ShaderSource::Glsl(SourceShaderDescriptor {
-            source: ShaderSourceType::File("rend3/shaders/opaque.vert".to_string()),
-            stage: ShaderSourceStage::Vertex,
-            includes: vec![],
-            defines: vec![(String::from("MATERIAL_COUNT"), Some(MAX_MATERIALS.to_string()))],
-        }),
-    );
-
-    list.create_shader(
-        "opaque frag",
-        ShaderSource::Glsl(SourceShaderDescriptor {
-            source: ShaderSourceType::File("rend3/shaders/opaque.frag".to_string()),
-            stage: ShaderSourceStage::Fragment,
-            includes: vec![],
-            defines: vec![(String::from("MATERIAL_COUNT"), Some(MAX_MATERIALS.to_string()))],
-        }),
-    );
-
     list.add_render_op(RenderOpDescriptor {
+        pipeline: pipelines.opaque_pipeline,
         input: RenderOpInputType::Models3D,
-        vertex: String::from("opaque vert"),
-        fragment: Some(String::from("opaque frag")),
         bindings: vec![
             ResourceBinding::GeneralData,
             ResourceBinding::ObjectData,
@@ -181,6 +345,7 @@ pub fn default_render_list(resolution: PhysicalSize<u32>) -> RenderList {
     });
 
     list.add_render_pass(RenderPassDescriptor {
+        run_rate: RenderPassRunRate::Once,
         outputs: vec![ImageOutput {
             output: ImageOutputReference::OutputImage,
             resolve_target: None,
@@ -188,30 +353,9 @@ pub fn default_render_list(resolution: PhysicalSize<u32>) -> RenderList {
         depth: None,
     });
 
-    list.create_shader(
-        "blit vert",
-        ShaderSource::Glsl(SourceShaderDescriptor {
-            source: ShaderSourceType::File("rend3/shaders/blit.vert".to_string()),
-            stage: ShaderSourceStage::Vertex,
-            includes: vec![],
-            defines: vec![],
-        }),
-    );
-
-    list.create_shader(
-        "blit frag",
-        ShaderSource::Glsl(SourceShaderDescriptor {
-            source: ShaderSourceType::File("rend3/shaders/blit.frag".to_string()),
-            stage: ShaderSourceStage::Fragment,
-            includes: vec![],
-            defines: vec![],
-        }),
-    );
-
     list.add_render_op(RenderOpDescriptor {
+        pipeline: pipelines.blit_pipeline,
         input: RenderOpInputType::FullscreenTriangle,
-        vertex: String::from("blit vert"),
-        fragment: Some(String::from("blit frag")),
         bindings: vec![
             ResourceBinding::GeneralData,
             ResourceBinding::Custom2DTexture(vec![ImageInputReference::Custom(

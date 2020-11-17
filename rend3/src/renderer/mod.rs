@@ -1,15 +1,15 @@
-use crate::datatypes::ShaderHandle;
-use crate::list::SourceShaderDescriptor;
 use crate::{
     datatypes::{
         AffineTransform, CameraLocation, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Material,
-        MaterialChange, MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, Texture, TextureHandle,
+        MaterialChange, MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, Pipeline, PipelineHandle, ShaderHandle,
+        Texture, TextureHandle,
     },
     instruction::{Instruction, InstructionStreamPair},
-    list::RenderList,
+    list::{RenderList, SourceShaderDescriptor},
     renderer::{
         info::ExtendedAdapterInfo, material::MaterialManager, mesh::MeshManager, object::ObjectManager,
-        passes::ForwardPassSet, resources::RendererGlobalResources, shaders::ShaderManager, texture::TextureManager,
+        passes::ForwardPassSet, pipeline::PipelineManager, resources::RendererGlobalResources, shaders::ShaderManager,
+        texture::TextureManager,
     },
     statistics::RendererStatistics,
     RendererInitializationError, RendererOptions,
@@ -37,11 +37,9 @@ mod light {
 pub mod limits;
 mod list {
     mod cache;
-    mod pipeline;
     mod resource;
 
     pub use cache::*;
-    pub use pipeline::*;
     pub use resource::*;
 }
 mod material;
@@ -98,7 +96,8 @@ where
 
     buffer_manager: Mutex<AutomatedBufferManager>,
     global_resources: RwLock<RendererGlobalResources>,
-    shader_manager: ShaderManager,
+    shader_manager: Arc<ShaderManager>,
+    pipeline_manager: Arc<PipelineManager>,
     mesh_manager: RwLock<MeshManager>,
     texture_manager_2d: RwLock<TextureManager>,
     texture_manager_cube: RwLock<TextureManager>,
@@ -271,6 +270,22 @@ impl<TLD: 'static> Renderer<TLD> {
             .producer
             .lock()
             .push(Instruction::RemoveShader { handle });
+    }
+
+    pub fn add_pipeline(&self, pipeline: Pipeline) -> impl Future<Output = PipelineHandle> {
+        self.pipeline_manager.allocate_async_insert(
+            &self.yard,
+            Arc::clone(&self.device),
+            Arc::clone(&self.shader_manager),
+            pipeline,
+        )
+    }
+
+    pub fn remove_pipeline(&self, handle: PipelineHandle) {
+        self.instructions
+            .producer
+            .lock()
+            .push(Instruction::RemovePipeline { handle });
     }
 
     pub fn set_options(&self, options: RendererOptions) {

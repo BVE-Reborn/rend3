@@ -1,6 +1,6 @@
-use crate::list::{BufferResourceDescriptor, ImageResourceDescriptor, ShaderSource};
+use crate::list::{BufferResourceDescriptor, ImageResourceDescriptor};
 use std::sync::Arc;
-use wgpu::{Buffer, ShaderModule, Texture, TextureView};
+use wgpu::{Buffer, Texture, TextureView};
 
 pub struct ImageResource {
     pub desc: ImageResourceDescriptor,
@@ -11,9 +11,4 @@ pub struct ImageResource {
 pub struct BufferResource {
     pub desc: BufferResourceDescriptor,
     pub buffer: Arc<Buffer>,
-}
-
-pub struct ShaderResource {
-    pub desc: ShaderSource,
-    pub shader: Arc<ShaderModule>,
 }

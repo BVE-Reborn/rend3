@@ -1,10 +1,10 @@
-use crate::list::{ImageOutput, ImageOutputReference, ResourceBinding};
+use crate::{
+    datatypes::PipelineHandle,
+    list::{ImageOutput, ImageOutputReference, ResourceBinding},
+};
 
-pub struct RenderPassSetDescriptor {
-    pub run_rate: RenderPassSetRunRate,
-}
-
-pub enum RenderPassSetRunRate {
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum RenderPassRunRate {
     /// Run this RenderPassSet once for every shadow, the output texture being the shadow map.
     PerShadow,
     /// Run this RenderPassSet once. Output texture is the swapchain frame.
@@ -12,14 +12,14 @@ pub enum RenderPassSetRunRate {
 }
 
 pub struct RenderPassDescriptor {
+    pub run_rate: RenderPassRunRate,
     pub outputs: Vec<ImageOutput>,
     pub depth: Option<ImageOutputReference>,
 }
 
 pub struct RenderOpDescriptor {
+    pub pipeline: PipelineHandle,
     pub input: RenderOpInputType,
-    pub vertex: String,
-    pub fragment: Option<String>,
     pub bindings: Vec<ResourceBinding>,
 }
 
