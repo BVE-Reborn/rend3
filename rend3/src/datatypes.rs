@@ -367,6 +367,7 @@ pub enum PipelineBindingType {
 }
 
 pub struct Pipeline {
+    // TODO: Alpha
     pub run_rate: RenderPassSetRunRate,
     pub input: PipelineInputType,
     pub outputs: Vec<ImageFormat>,

@@ -55,6 +55,10 @@ impl ShaderManager {
         self.registry.write().remove(handle.0);
     }
 
+    pub fn get(&self, handle: ShaderHandle) -> Arc<ShaderModule> {
+        self.registry.read().get(handle.0).clone()
+    }
+
     pub fn compile_shader(&self, args: SourceShaderDescriptor) -> impl Future<Output = ShaderCompileResult> {
         let (sender, receiver) = flume::bounded(1);
 

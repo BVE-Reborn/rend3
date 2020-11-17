@@ -1,15 +1,13 @@
-use crate::datatypes::{Pipeline, PipelineBindingType, PipelineHandle};
+use crate::datatypes::{Pipeline, PipelineBindingType, PipelineHandle, PipelineInputType};
 use crate::registry::ResourceRegistry;
 use crate::renderer::{COMPUTE_POOL, PIPELINE_BUILD_PRIORITY};
 use parking_lot::RwLock;
 use std::future::Future;
 use std::sync::Arc;
 use switchyard::Switchyard;
-use wgpu::{
-    BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, Device, PipelineLayoutDescriptor,
-    ProgrammableStageDescriptor, RenderPipeline, RenderPipelineDescriptor, ShaderStage, TextureComponentType,
-    TextureViewDimension,
-};
+use wgpu::{BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, Device, PipelineLayoutDescriptor, ProgrammableStageDescriptor, RenderPipeline, RenderPipelineDescriptor, ShaderStage, TextureComponentType, TextureViewDimension, RasterizationStateDescriptor, FrontFace, CullMode, PolygonMode, PrimitiveTopology, ColorStateDescriptor, BlendDescriptor, ColorWrite};
+use crate::renderer::shaders::ShaderManager;
+use crate::list::RenderPassSetRunRate;
 
 pub struct DefaultBindGroupLayouts {
     general_data: BindGroupLayout,
@@ -160,6 +158,7 @@ impl PipelineManager {
         yard: Switchyard<TD>,
         device: Arc<Device>,
         pipeline: Pipeline,
+        shader_manager: Arc<ShaderManager>,
     ) -> impl Future<Output = PipelineHandle>
     where
         TD: 'static,
@@ -216,14 +215,49 @@ impl PipelineManager {
                 push_constant_ranges: &[],
             });
 
+            let color_states: Vec<_> = pipeline.outputs.into_iter().map(|format| ColorStateDescriptor {
+                alpha_blend: BlendDescriptor::REPLACE,
+                color_blend: BlendDescriptor::REPLACE,
+                write_mask: ColorWrite::ALL,
+                format,
+            }).collect();
+
             device.create_render_pipeline(&RenderPipelineDescriptor {
                 label: None,
                 layout: Some(&pipeline_layout),
-                vertex_stage: ProgrammableStageDescriptor {},
-                fragment_stage: None,
-                rasterization_state: None,
-                primitive_topology: PrimitiveTopology::PointList,
-                color_states: &[],
+                vertex_stage: ProgrammableStageDescriptor {
+                    entry_point: "main",
+                    module: &shader_manager.get(pipeline.vertex)
+                },
+                fragment_stage: pipeline.fragment.map(|handle| {
+                    ProgrammableStageDescriptor {
+                        entry_point: "main",
+                        module: &shader_manager.get(handle)
+                    }
+                }),
+                rasterization_state: Some(RasterizationStateDescriptor {
+                    front_face: FrontFace::Cw,
+                    cull_mode: match pipeline.input {
+                        PipelineInputType::FullscreenTriangle => CullMode::None,
+                        PipelineInputType::Models3d => CullMode::Back,
+                    },
+                    polygon_mode: PolygonMode::Fill,
+                    clamp_depth: match pipeline.run_rate {
+                        RenderPassSetRunRate::PerShadow => true,
+                        RenderPassSetRunRate::Once => false,
+                    },
+                    depth_bias: match pipeline.run_rate {
+                        RenderPassSetRunRate::PerShadow => 2,
+                        RenderPassSetRunRate::Once => 0,
+                    },
+                    depth_bias_slope_scale: match pipeline.run_rate {
+                        RenderPassSetRunRate::PerShadow => 2.0,
+                        RenderPassSetRunRate::Once => 0.0,
+                    },
+                    depth_bias_clamp: 0.0
+                }),
+                primitive_topology: PrimitiveTopology::TriangleList,
+                color_states: &color_states,
                 depth_stencil_state: None,
                 vertex_state: VertexStateDescriptor {},
                 sample_count: 0,
