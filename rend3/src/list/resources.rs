@@ -1,4 +1,5 @@
-use crate::datatypes::TextureHandle;
+use crate::datatypes::{ClearColor, TextureHandle};
+use wgpu::LoadOp;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ResourceBinding {
@@ -68,6 +69,12 @@ pub enum ImageInputReference {
 pub struct ImageOutput {
     pub output: ImageOutputReference,
     pub resolve_target: Option<ImageOutputReference>,
+    pub clear: LoadOp<ClearColor>,
+}
+
+pub struct DepthOutput {
+    pub output: ImageOutputReference,
+    pub clear: LoadOp<f32>,
 }
 
 pub enum ImageOutputReference {

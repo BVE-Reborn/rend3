@@ -1,17 +1,19 @@
 use crate::{
-    list::RenderList,
+    list::RenderListResources,
     renderer::list::{BufferResource, ImageResource},
 };
 use fnv::FnvHashMap;
 use std::sync::Arc;
-use wgpu::{BufferDescriptor, Device, Extent3d, TextureDescriptor, TextureDimension, TextureViewDescriptor};
+use wgpu::{
+    Buffer, BufferDescriptor, Device, Extent3d, TextureDescriptor, TextureDimension, TextureView, TextureViewDescriptor,
+};
 
-pub struct RenderListCacheResource<T> {
+pub(crate) struct RenderListCacheResource<T> {
     pub inner: T,
     pub used: bool,
 }
 
-pub struct RenderListCache {
+pub(crate) struct RenderListCache {
     images: FnvHashMap<String, RenderListCacheResource<ImageResource>>,
     buffers: FnvHashMap<String, RenderListCacheResource<BufferResource>>,
 }
@@ -38,10 +40,10 @@ impl RenderListCache {
         self.buffers.retain(|_, b| b.used);
     }
 
-    pub fn add_render_list(&mut self, device: &Device, list: RenderList) {
+    pub fn add_render_list(&mut self, device: &Device, resources: RenderListResources) {
         self.mark_all_unused();
 
-        for (key, descriptor) in list.images {
+        for (key, descriptor) in resources.images {
             if let Some(value) = self.images.get_mut(&key) {
                 if value.inner.desc == descriptor {
                     value.used = true;
@@ -79,7 +81,7 @@ impl RenderListCache {
             );
         }
 
-        for (key, descriptor) in list.buffers {
+        for (key, descriptor) in resources.buffers {
             if let Some(value) = self.buffers.get_mut(&key) {
                 if value.inner.desc == descriptor {
                     value.used = true;
@@ -107,5 +109,13 @@ impl RenderListCache {
         }
 
         self.purge_unused_resources();
+    }
+
+    pub fn get_buffer(&self, name: &str) -> &Buffer {
+        &*self.buffers.get(name).unwrap().inner.buffer
+    }
+
+    pub fn get_image(&self, name: &str) -> &TextureView {
+        &*self.images.get(name).unwrap().inner.image_view
     }
 }

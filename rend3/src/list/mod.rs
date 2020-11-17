@@ -7,27 +7,33 @@ mod default;
 mod passes;
 mod resources;
 
-pub struct RenderList {
-    pub(crate) passes: Vec<RenderPass>,
+pub(crate) struct RenderListResources {
     pub(crate) images: FnvHashMap<String, ImageResourceDescriptor>,
     pub(crate) buffers: FnvHashMap<String, BufferResourceDescriptor>,
+}
+
+pub struct RenderList {
+    pub(crate) passes: Vec<RenderPass>,
+    pub(crate) resources: RenderListResources,
 }
 
 impl RenderList {
     pub fn new() -> Self {
         Self {
             passes: Vec::new(),
-            images: FnvHashMap::default(),
-            buffers: FnvHashMap::default(),
+            resources: RenderListResources {
+                images: FnvHashMap::default(),
+                buffers: FnvHashMap::default(),
+            },
         }
     }
 
     pub fn create_image(&mut self, name: impl ToString, image: ImageResourceDescriptor) {
-        self.images.insert(name.to_string(), image);
+        self.resources.images.insert(name.to_string(), image);
     }
 
     pub fn create_buffer(&mut self, name: impl ToString, buffer: BufferResourceDescriptor) {
-        self.buffers.insert(name.to_string(), buffer);
+        self.resources.buffers.insert(name.to_string(), buffer);
     }
 
     pub fn add_render_pass(&mut self, desc: RenderPassDescriptor) {
@@ -44,6 +50,6 @@ impl RenderList {
 }
 
 pub(crate) struct RenderPass {
-    desc: RenderPassDescriptor,
-    ops: Vec<RenderOpDescriptor>,
+    pub desc: RenderPassDescriptor,
+    pub ops: Vec<RenderOpDescriptor>,
 }

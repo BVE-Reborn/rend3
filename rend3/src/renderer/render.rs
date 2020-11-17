@@ -213,7 +213,7 @@ pub fn render_loop<TLD: 'static>(
         renderer
             .render_list_cache
             .write()
-            .add_render_list(&renderer.device, render_list);
+            .add_render_list(&renderer.device, render_list.resources);
 
         let mut encoder = renderer.device.create_command_encoder(&CommandEncoderDescriptor {
             label: Some("primary encoder"),

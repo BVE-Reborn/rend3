@@ -5,6 +5,7 @@ use glam::{
 };
 use std::num::NonZeroU32;
 use wgpu::TextureFormat;
+pub use wgpu::{Color as ClearColor, LoadOp as PipelineLoadOp};
 
 #[macro_export]
 #[doc(hidden)]

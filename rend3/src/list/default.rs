@@ -4,15 +4,15 @@ use crate::{
         PipelineOutputAttachment, ShaderHandle,
     },
     list::{
-        ImageFormat, ImageInputReference, ImageOutput, ImageOutputReference, ImageResourceDescriptor, ImageUsage,
-        RenderList, RenderOpDescriptor, RenderOpInputType, RenderPassDescriptor, RenderPassRunRate, ResourceBinding,
-        ShaderSourceStage, ShaderSourceType, SourceShaderDescriptor,
+        DepthOutput, ImageFormat, ImageInputReference, ImageOutput, ImageOutputReference, ImageResourceDescriptor,
+        ImageUsage, RenderList, RenderOpDescriptor, RenderOpInputType, RenderPassDescriptor, RenderPassRunRate,
+        ResourceBinding, ShaderSourceStage, ShaderSourceType, SourceShaderDescriptor,
     },
     renderer::MAX_MATERIALS,
     Renderer,
 };
 use std::future::Future;
-use wgpu::TextureFormat;
+use wgpu::{Color, LoadOp, TextureFormat};
 use winit::dpi::PhysicalSize;
 
 pub struct DefaultShaders {
@@ -251,7 +251,10 @@ pub fn default_render_list(resolution: PhysicalSize<u32>, pipelines: &DefaultPip
     list.add_render_pass(RenderPassDescriptor {
         run_rate: RenderPassRunRate::PerShadow,
         outputs: vec![],
-        depth: Some(ImageOutputReference::OutputImage),
+        depth: Some(DepthOutput {
+            clear: LoadOp::Clear(0.0),
+            output: ImageOutputReference::OutputImage,
+        }),
     });
 
     list.add_render_op(RenderOpDescriptor {
@@ -303,13 +306,18 @@ pub fn default_render_list(resolution: PhysicalSize<u32>, pipelines: &DefaultPip
             ImageOutput {
                 output: ImageOutputReference::Custom(internal_renderbuffer_name.to_owned()),
                 resolve_target: None,
+                clear: LoadOp::Clear(Color::BLACK),
             },
             ImageOutput {
                 output: ImageOutputReference::Custom(String::from("normal buffer")),
                 resolve_target: None,
+                clear: LoadOp::Clear(Color::BLACK),
             },
         ],
-        depth: Some(ImageOutputReference::Custom(String::from("depth buffer"))),
+        depth: Some(DepthOutput {
+            clear: LoadOp::Clear(0.0),
+            output: ImageOutputReference::Custom(String::from("depth buffer")),
+        }),
     });
 
     list.add_render_op(RenderOpDescriptor {
@@ -349,6 +357,7 @@ pub fn default_render_list(resolution: PhysicalSize<u32>, pipelines: &DefaultPip
         outputs: vec![ImageOutput {
             output: ImageOutputReference::OutputImage,
             resolve_target: None,
+            clear: LoadOp::Clear(Color::BLACK),
         }],
         depth: None,
     });

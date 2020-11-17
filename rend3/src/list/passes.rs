@@ -1,6 +1,6 @@
 use crate::{
     datatypes::PipelineHandle,
-    list::{ImageOutput, ImageOutputReference, ResourceBinding},
+    list::{DepthOutput, ImageOutput, ResourceBinding},
 };
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -14,7 +14,7 @@ pub enum RenderPassRunRate {
 pub struct RenderPassDescriptor {
     pub run_rate: RenderPassRunRate,
     pub outputs: Vec<ImageOutput>,
-    pub depth: Option<ImageOutputReference>,
+    pub depth: Option<DepthOutput>,
 }
 
 pub struct RenderOpDescriptor {
