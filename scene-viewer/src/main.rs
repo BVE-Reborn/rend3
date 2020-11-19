@@ -246,8 +246,8 @@ fn main() {
     let yard = Arc::new(
         Switchyard::new(
             2,
-            threads::single_pool_single_thread(Some("scene-viewer".into()), None),
-            // threads::double_pool_two_to_one(threads::thread_info(), Some("scene-viewer")),
+            // threads::single_pool_single_thread(Some("scene-viewer".into()), None),
+            threads::double_pool_one_to_one(threads::thread_info(), Some("scene-viewer")),
             || (),
         )
         .unwrap(),
