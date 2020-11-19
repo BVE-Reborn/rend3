@@ -1,22 +1,21 @@
 use crate::{
     bind_merge::BindGroupBuilder,
-    datatypes::{DirectionalLight, DirectionalLightHandle, TextureHandle},
+    datatypes::{DirectionalLight, DirectionalLightHandle},
     registry::ResourceRegistry,
-    renderer::{camera::Camera, passes, passes::ShadowPassSet, texture::TextureManager, INTERNAL_SHADOW_DEPTH_FORMAT},
+    renderer::{camera::Camera, INTERNAL_SHADOW_DEPTH_FORMAT, SHADOW_DIMENSIONS},
 };
 use glam::{Mat4, Vec3};
 use std::{mem::size_of, num::NonZeroU32, sync::Arc};
 use wgpu::{
-    BindGroupEntry, BindGroupLayout, BufferAddress, BufferUsage, CommandEncoder, Device, Extent3d, TextureDescriptor,
-    TextureDimension, TextureUsage, TextureViewDescriptor,
+    BindGroupEntry, BindingResource, BufferAddress, BufferUsage, CommandEncoder, Device, Extent3d, TextureAspect,
+    TextureDescriptor, TextureDimension, TextureUsage, TextureView, TextureViewDescriptor, TextureViewDimension,
 };
 use wgpu_conveyor::{write_to_buffer1, AutomatedBuffer, AutomatedBufferManager, IdBuffer};
 
 pub struct InternalDirectionalLight {
     pub inner: DirectionalLight,
     pub camera: Camera,
-    pub shadow_tex: Option<TextureHandle>,
-    pub shadow_pass_set: passes::ShadowPassSet,
+    pub shadow_tex: u32,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -33,7 +32,7 @@ unsafe impl bytemuck::Pod for ShaderDirectionalLightBufferHeader {}
 struct ShaderDirectionalLight {
     pub view_proj: Mat4,
     pub color: Vec3,
-    pub shadow_tex: Option<NonZeroU32>,
+    pub shadow_tex: u32,
     pub direction: Vec3,
 }
 
@@ -44,6 +43,9 @@ pub struct DirectionalLightManager {
     buffer_storage: Option<Arc<IdBuffer>>,
     buffer: AutomatedBuffer,
 
+    view: TextureView,
+    layer_views: Vec<Arc<TextureView>>,
+
     registry: ResourceRegistry<InternalDirectionalLight>,
 }
 impl DirectionalLightManager {
@@ -52,9 +54,13 @@ impl DirectionalLightManager {
 
         let buffer = buffer_manager.create_new_buffer(device, 0, BufferUsage::STORAGE, Some("directional lights"));
 
+        let (view, layer_views) = create_shadow_texture(device, 1);
+
         Self {
             buffer_storage: None,
             buffer,
+            view,
+            layer_views,
             registry,
         }
     }
@@ -63,44 +69,13 @@ impl DirectionalLightManager {
         DirectionalLightHandle(self.registry.allocate())
     }
 
-    pub fn fill(
-        &mut self,
-        device: &Device,
-        texture_manager_internal: &mut TextureManager,
-        uniform_bgl: &BindGroupLayout,
-        handle: DirectionalLightHandle,
-        light: DirectionalLight,
-    ) {
-        let texture_handle = texture_manager_internal.allocate();
-
-        let texture = device.create_texture(&TextureDescriptor {
-            // TODO: label
-            label: None,
-            // TODO: shadow map sizes
-            size: Extent3d {
-                width: 2048,
-                height: 2048,
-                depth: 1,
-            },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: TextureDimension::D2,
-            format: INTERNAL_SHADOW_DEPTH_FORMAT,
-            usage: TextureUsage::OUTPUT_ATTACHMENT | TextureUsage::SAMPLED,
-        });
-        let view = texture.create_view(&TextureViewDescriptor::default());
-
-        texture_manager_internal.fill(texture_handle, view, None);
-
-        let shadow_pass_set = ShadowPassSet::new(device, uniform_bgl, String::from("directional light"));
-
+    pub fn fill(&mut self, handle: DirectionalLightHandle, light: DirectionalLight) {
         self.registry.insert(
             handle.0,
             InternalDirectionalLight {
                 inner: light,
                 camera: Camera::new_orthographic(light.direction),
-                shadow_tex: Some(texture_handle),
-                shadow_pass_set,
+                shadow_tex: self.registry.count() as u32,
             },
         );
     }
@@ -109,12 +84,21 @@ impl DirectionalLightManager {
         self.registry.get_mut(handle.0)
     }
 
+    pub fn get_layer_view_arc(&self, layer: u32) -> Arc<TextureView> {
+        Arc::clone(&self.layer_views[layer as usize])
+    }
+
     pub fn remove(&mut self, handle: DirectionalLightHandle) {
         self.registry.remove(handle.0);
     }
 
-    pub fn ready(&mut self, device: &Device, encoder: &mut CommandEncoder, texture_manager: &TextureManager) {
-        let translate_texture = texture_manager.translation_fn();
+    pub fn ready(&mut self, device: &Device, encoder: &mut CommandEncoder) {
+        let registered_count = self.registry.count();
+        if registered_count != self.layer_views.len() && registered_count != 0 {
+            let (view, layer_views) = create_shadow_texture(device, registered_count as u32);
+            self.view = view;
+            self.layer_views = layer_views;
+        }
 
         let registry = &self.registry;
 
@@ -139,7 +123,7 @@ impl DirectionalLightManager {
                         view_proj: light.camera.view_proj(),
                         color: light.inner.color * light.inner.intensity,
                         direction: light.inner.direction,
-                        shadow_tex: light.shadow_tex.map(translate_texture),
+                        shadow_tex: light.shadow_tex as u32,
                     }
                 }
             },
@@ -152,10 +136,49 @@ impl DirectionalLightManager {
         builder.append(BindGroupEntry {
             binding: 0,
             resource: self.buffer_storage.as_ref().unwrap().inner.as_entire_binding(),
-        })
+        });
+        builder.append(BindGroupEntry {
+            binding: 0,
+            resource: BindingResource::TextureView(&self.view),
+        });
     }
 
     pub fn values(&self) -> impl Iterator<Item = &InternalDirectionalLight> {
         self.registry.values()
     }
+}
+
+fn create_shadow_texture(device: &Device, count: u32) -> (TextureView, Vec<Arc<TextureView>>) {
+    let texture = device.create_texture(&TextureDescriptor {
+        label: Some("shadow texture"),
+        size: Extent3d {
+            width: SHADOW_DIMENSIONS,
+            height: SHADOW_DIMENSIONS,
+            depth: count,
+        },
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: TextureDimension::D2,
+        format: INTERNAL_SHADOW_DEPTH_FORMAT,
+        usage: TextureUsage::OUTPUT_ATTACHMENT | TextureUsage::SAMPLED,
+    });
+
+    let primary_view = texture.create_view(&TextureViewDescriptor::default());
+
+    let layer_views: Vec<_> = (0..count)
+        .map(|idx| {
+            Arc::new(texture.create_view(&TextureViewDescriptor {
+                label: Some(&format!("shadow texture layer {}", count)),
+                format: None,
+                dimension: Some(TextureViewDimension::D2),
+                aspect: TextureAspect::All,
+                base_mip_level: 0,
+                level_count: None,
+                base_array_layer: idx,
+                array_layer_count: NonZeroU32::new(1),
+            }))
+        })
+        .collect();
+
+    (primary_view, layer_views)
 }

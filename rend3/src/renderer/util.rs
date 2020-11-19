@@ -1,21 +1,9 @@
-use crate::{
-    renderer::{
-        INTERNAL_RENDERBUFFER_DEPTH_FORMAT, INTERNAL_RENDERBUFFER_FORMAT, INTERNAL_RENDERBUFFER_NORMAL_FORMAT,
-        INTERNAL_SHADOW_DEPTH_FORMAT, SWAPCHAIN_FORMAT,
-    },
-    VSyncMode,
-};
-use arrayvec::ArrayVec;
+use crate::{renderer::SWAPCHAIN_FORMAT, VSyncMode};
 use std::num::NonZeroU8;
 use wgpu::{
-    AddressMode, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor,
-    BindGroupLayoutEntry, BindingResource, BindingType, BlendDescriptor, ColorStateDescriptor, ColorWrite,
-    CompareFunction, CullMode, DepthStencilStateDescriptor, Device, Extent3d, FilterMode, FrontFace, IndexFormat,
-    PipelineLayout, PolygonMode, PresentMode, PrimitiveTopology, ProgrammableStageDescriptor,
-    RasterizationStateDescriptor, RenderPipeline, RenderPipelineDescriptor, Sampler, SamplerDescriptor, ShaderModule,
-    ShaderStage, StencilStateDescriptor, Surface, SwapChain, SwapChainDescriptor, Texture, TextureComponentType,
-    TextureDescriptor, TextureDimension, TextureUsage, TextureView, TextureViewDescriptor, TextureViewDimension,
-    VertexStateDescriptor,
+    AddressMode, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, CompareFunction,
+    Device, FilterMode, PresentMode, Sampler, SamplerDescriptor, ShaderStage, Surface, SwapChain, SwapChainDescriptor,
+    TextureComponentType, TextureUsage, TextureViewDimension,
 };
 use winit::dpi::PhysicalSize;
 
@@ -63,52 +51,6 @@ pub fn create_prefix_sum_bgl(device: &Device) -> BindGroupLayout {
     })
 }
 
-pub fn create_blit_bgl(device: &Device) -> BindGroupLayout {
-    device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-        label: Some("blit bgl"),
-        entries: &[
-            BindGroupLayoutEntry {
-                binding: 0,
-                visibility: ShaderStage::FRAGMENT,
-                ty: BindingType::SampledTexture {
-                    dimension: TextureViewDimension::D2,
-                    component_type: TextureComponentType::Float,
-                    multisampled: false,
-                },
-                count: None,
-            },
-            BindGroupLayoutEntry {
-                binding: 1,
-                visibility: ShaderStage::FRAGMENT,
-                ty: BindingType::Sampler { comparison: false },
-                count: None,
-            },
-        ],
-    })
-}
-
-pub fn create_blit_bg(
-    device: &Device,
-    blit_bgl: &BindGroupLayout,
-    source_image: &TextureView,
-    sampler: &Sampler,
-) -> BindGroup {
-    device.create_bind_group(&BindGroupDescriptor {
-        label: Some("blit bgl"),
-        layout: blit_bgl,
-        entries: &[
-            BindGroupEntry {
-                binding: 0,
-                resource: BindingResource::TextureView(source_image),
-            },
-            BindGroupEntry {
-                binding: 1,
-                resource: BindingResource::Sampler(sampler),
-            },
-        ],
-    })
-}
-
 pub fn create_pre_cull_bgl(device: &Device) -> BindGroupLayout {
     let entry = BindGroupLayoutEntry {
         binding: 0,
@@ -127,52 +69,19 @@ pub fn create_pre_cull_bgl(device: &Device) -> BindGroupLayout {
     })
 }
 
-pub fn create_general_bind_group_layout(device: &Device) -> BindGroupLayout {
+pub fn create_object_input_bgl(device: &Device) -> BindGroupLayout {
     device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-        label: Some("general bind group"),
-        entries: &[
-            BindGroupLayoutEntry {
-                binding: 0,
-                visibility: ShaderStage::COMPUTE,
-                ty: BindingType::StorageBuffer {
-                    dynamic: false,
-                    min_binding_size: None,
-                    readonly: true,
-                },
-                count: None,
+        label: Some("object input bgl"),
+        entries: &[BindGroupLayoutEntry {
+            binding: 0,
+            visibility: ShaderStage::COMPUTE,
+            ty: BindingType::StorageBuffer {
+                dynamic: false,
+                min_binding_size: None,
+                readonly: true,
             },
-            BindGroupLayoutEntry {
-                binding: 1,
-                visibility: ShaderStage::FRAGMENT,
-                ty: BindingType::UniformBuffer {
-                    dynamic: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            },
-            BindGroupLayoutEntry {
-                binding: 2,
-                visibility: ShaderStage::FRAGMENT,
-                ty: BindingType::Sampler { comparison: false },
-                count: None,
-            },
-            BindGroupLayoutEntry {
-                binding: 3,
-                visibility: ShaderStage::FRAGMENT,
-                ty: BindingType::Sampler { comparison: true },
-                count: None,
-            },
-            BindGroupLayoutEntry {
-                binding: 4,
-                visibility: ShaderStage::FRAGMENT,
-                ty: BindingType::StorageBuffer {
-                    dynamic: false,
-                    min_binding_size: None,
-                    readonly: true,
-                },
-                count: None,
-            },
-        ],
+            count: None,
+        }],
     })
 }
 
@@ -199,9 +108,76 @@ pub fn create_object_output_bgl(device: &Device) -> BindGroupLayout {
         ],
     })
 }
-pub fn create_object_output_noindirect_bgl(device: &Device) -> BindGroupLayout {
+
+pub fn create_general_bind_group_layout(device: &Device) -> BindGroupLayout {
     device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-        label: Some("object output noindirect bgl"),
+        label: Some("general bind group"),
+        entries: &[
+            BindGroupLayoutEntry {
+                binding: 0,
+                visibility: ShaderStage::VERTEX | ShaderStage::FRAGMENT | ShaderStage::COMPUTE,
+                ty: BindingType::Sampler { comparison: false },
+                count: None,
+            },
+            BindGroupLayoutEntry {
+                binding: 1,
+                visibility: ShaderStage::VERTEX | ShaderStage::FRAGMENT | ShaderStage::COMPUTE,
+                ty: BindingType::Sampler { comparison: true },
+                count: None,
+            },
+        ],
+    })
+}
+
+pub fn create_object_data_bgl(device: &Device) -> BindGroupLayout {
+    device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+        label: Some("object data bgl"),
+        entries: &[BindGroupLayoutEntry {
+            binding: 0,
+            visibility: ShaderStage::VERTEX | ShaderStage::FRAGMENT | ShaderStage::COMPUTE,
+            ty: BindingType::StorageBuffer {
+                dynamic: false,
+                min_binding_size: None,
+                readonly: false,
+            },
+            count: None,
+        }],
+    })
+}
+
+pub fn create_material_bgl(device: &Device) -> BindGroupLayout {
+    device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+        label: Some("material data bgl"),
+        entries: &[BindGroupLayoutEntry {
+            binding: 0,
+            visibility: ShaderStage::VERTEX | ShaderStage::FRAGMENT | ShaderStage::COMPUTE,
+            ty: BindingType::UniformBuffer {
+                dynamic: false,
+                min_binding_size: None,
+            },
+            count: None,
+        }],
+    })
+}
+
+pub fn create_camera_data_bgl(device: &Device) -> BindGroupLayout {
+    device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+        label: Some("camera data bgl"),
+        entries: &[BindGroupLayoutEntry {
+            binding: 0,
+            visibility: ShaderStage::VERTEX | ShaderStage::FRAGMENT | ShaderStage::COMPUTE,
+            ty: BindingType::UniformBuffer {
+                dynamic: false,
+                min_binding_size: None,
+            },
+            count: None,
+        }],
+    })
+}
+
+pub fn create_shadow_texture_bgl(device: &Device) -> BindGroupLayout {
+    device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+        label: Some("shadow texture bgl"),
         entries: &[
             BindGroupLayoutEntry {
                 binding: 0,
@@ -209,16 +185,17 @@ pub fn create_object_output_noindirect_bgl(device: &Device) -> BindGroupLayout {
                 ty: BindingType::StorageBuffer {
                     dynamic: false,
                     min_binding_size: None,
-                    readonly: false,
+                    readonly: true,
                 },
                 count: None,
             },
             BindGroupLayoutEntry {
                 binding: 1,
-                visibility: ShaderStage::COMPUTE | ShaderStage::FRAGMENT,
-                ty: BindingType::UniformBuffer {
-                    dynamic: false,
-                    min_binding_size: None,
+                visibility: ShaderStage::VERTEX | ShaderStage::FRAGMENT | ShaderStage::COMPUTE,
+                ty: BindingType::SampledTexture {
+                    dimension: TextureViewDimension::D2Array,
+                    component_type: TextureComponentType::Float,
+                    multisampled: false,
                 },
                 count: None,
             },
@@ -226,15 +203,16 @@ pub fn create_object_output_noindirect_bgl(device: &Device) -> BindGroupLayout {
     })
 }
 
-pub fn create_uniform_bgl(device: &Device) -> BindGroupLayout {
+pub fn create_skybox_bgl(device: &Device) -> BindGroupLayout {
     device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-        label: Some("uniform bgl"),
+        label: Some("skybox bgl"),
         entries: &[BindGroupLayoutEntry {
             binding: 0,
-            visibility: ShaderStage::COMPUTE | ShaderStage::FRAGMENT,
-            ty: BindingType::UniformBuffer {
-                dynamic: false,
-                min_binding_size: None,
+            visibility: ShaderStage::VERTEX | ShaderStage::FRAGMENT | ShaderStage::COMPUTE,
+            ty: BindingType::SampledTexture {
+                dimension: TextureViewDimension::Cube,
+                component_type: TextureComponentType::Float,
+                multisampled: false,
             },
             count: None,
         }],
@@ -280,179 +258,5 @@ pub fn create_sampler(device: &Device, ty: SamplerType) -> Sampler {
             SamplerType::Shadow | SamplerType::Nearest => None,
         },
         border_color: None,
-    })
-}
-
-#[derive(Debug, Copy, Clone)]
-pub enum FramebufferTextureKind {
-    Color,
-    Depth,
-    Normal,
-}
-
-pub fn create_framebuffer_texture(
-    device: &Device,
-    size: PhysicalSize<u32>,
-    kind: FramebufferTextureKind,
-) -> (Texture, TextureView) {
-    let texture = device.create_texture(&TextureDescriptor {
-        label: Some(match kind {
-            FramebufferTextureKind::Color => "RenderBuffer Color Texture",
-            FramebufferTextureKind::Depth => "RenderBuffer Depth Texture",
-            FramebufferTextureKind::Normal => "RenderBuffer Normal Texture",
-        }),
-        size: Extent3d {
-            width: size.width,
-            height: size.height,
-            depth: 1,
-        },
-        mip_level_count: 1,
-        sample_count: 1,
-        dimension: TextureDimension::D2,
-        format: match kind {
-            FramebufferTextureKind::Color => INTERNAL_RENDERBUFFER_FORMAT,
-            FramebufferTextureKind::Normal => INTERNAL_RENDERBUFFER_NORMAL_FORMAT,
-            FramebufferTextureKind::Depth => INTERNAL_RENDERBUFFER_DEPTH_FORMAT,
-        },
-        usage: TextureUsage::SAMPLED | TextureUsage::OUTPUT_ATTACHMENT,
-    });
-
-    let view = texture.create_view(&TextureViewDescriptor::default());
-
-    (texture, view)
-}
-
-macro_rules! create_vertex_buffer_descriptors {
-    () => {
-        [
-            wgpu::VertexBufferDescriptor {
-                stride: std::mem::size_of::<crate::datatypes::ModelVertex>() as u64,
-                step_mode: wgpu::InputStepMode::Vertex,
-                attributes: &wgpu::vertex_attr_array![0 => Float3, 1 => Float3, 2 => Float2, 3 => Uchar4Norm, 4 => Uint],
-            },
-            wgpu::VertexBufferDescriptor {
-                stride: 20,
-                step_mode: wgpu::InputStepMode::Instance,
-                attributes: &[
-                    wgpu::VertexAttributeDescriptor {
-                        format: wgpu::VertexFormat::Uint,
-                        offset: 16,
-                        shader_location: 5
-                    }
-                ],
-            }
-        ]
-    };
-}
-
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub enum RenderPipelineType {
-    Depth,
-    Shadow,
-    Opaque,
-    Skybox,
-}
-
-pub fn create_render_pipeline(
-    device: &Device,
-    layout: &PipelineLayout,
-    vertex: &ShaderModule,
-    fragment: &ShaderModule,
-    ty: RenderPipelineType,
-) -> RenderPipeline {
-    let vertex_buffers = create_vertex_buffer_descriptors!();
-
-    let mut color_states: ArrayVec<[ColorStateDescriptor; 2]> = ArrayVec::new();
-    if ty != RenderPipelineType::Shadow {
-        color_states.push(ColorStateDescriptor {
-            format: INTERNAL_RENDERBUFFER_FORMAT,
-            alpha_blend: BlendDescriptor::REPLACE,
-            color_blend: BlendDescriptor::REPLACE,
-            write_mask: match ty {
-                RenderPipelineType::Depth => ColorWrite::empty(),
-                RenderPipelineType::Opaque | RenderPipelineType::Skybox => ColorWrite::ALL,
-                RenderPipelineType::Shadow => unreachable!(),
-            },
-        });
-        color_states.push(ColorStateDescriptor {
-            format: INTERNAL_RENDERBUFFER_NORMAL_FORMAT,
-            alpha_blend: BlendDescriptor::REPLACE,
-            color_blend: BlendDescriptor::REPLACE,
-            write_mask: match ty {
-                RenderPipelineType::Depth | RenderPipelineType::Skybox => ColorWrite::empty(),
-                RenderPipelineType::Opaque => ColorWrite::ALL,
-                RenderPipelineType::Shadow => unreachable!(),
-            },
-        });
-    }
-
-    device.create_render_pipeline(&RenderPipelineDescriptor {
-        label: Some(match ty {
-            RenderPipelineType::Depth => "depth pipeline",
-            RenderPipelineType::Shadow => "shadow pipeline",
-            RenderPipelineType::Opaque => "opaque pipeline",
-            RenderPipelineType::Skybox => "skybox pipeline",
-        }),
-        layout: Some(&layout),
-        vertex_stage: ProgrammableStageDescriptor {
-            module: &vertex,
-            entry_point: "main",
-        },
-        fragment_stage: Some(ProgrammableStageDescriptor {
-            module: &fragment,
-            entry_point: "main",
-        }),
-        rasterization_state: Some(RasterizationStateDescriptor {
-            front_face: FrontFace::Cw,
-            cull_mode: match ty {
-                RenderPipelineType::Shadow | RenderPipelineType::Opaque | RenderPipelineType::Depth => CullMode::Back,
-                RenderPipelineType::Skybox => CullMode::None,
-            },
-            polygon_mode: PolygonMode::Fill,
-            clamp_depth: match ty {
-                RenderPipelineType::Shadow => false,
-                // RenderPipelineType::Shadow => true,
-                RenderPipelineType::Skybox | RenderPipelineType::Opaque | RenderPipelineType::Depth => false,
-            },
-            depth_bias: match ty {
-                RenderPipelineType::Shadow => 2,
-                RenderPipelineType::Skybox | RenderPipelineType::Opaque | RenderPipelineType::Depth => 0,
-            },
-            depth_bias_slope_scale: match ty {
-                RenderPipelineType::Shadow => 2.0,
-                RenderPipelineType::Skybox | RenderPipelineType::Opaque | RenderPipelineType::Depth => 0.0,
-            },
-            depth_bias_clamp: 0.0,
-        }),
-        primitive_topology: PrimitiveTopology::TriangleList,
-        color_states: &color_states,
-        depth_stencil_state: Some(DepthStencilStateDescriptor {
-            format: match ty {
-                RenderPipelineType::Shadow => INTERNAL_SHADOW_DEPTH_FORMAT,
-                RenderPipelineType::Depth | RenderPipelineType::Opaque | RenderPipelineType::Skybox => {
-                    INTERNAL_RENDERBUFFER_DEPTH_FORMAT
-                }
-            },
-            depth_write_enabled: match ty {
-                RenderPipelineType::Shadow | RenderPipelineType::Depth => true,
-                RenderPipelineType::Opaque | RenderPipelineType::Skybox => false,
-            },
-            depth_compare: match ty {
-                RenderPipelineType::Shadow => CompareFunction::LessEqual,
-                RenderPipelineType::Depth => CompareFunction::Greater,
-                RenderPipelineType::Opaque | RenderPipelineType::Skybox => CompareFunction::Equal,
-            },
-            stencil: StencilStateDescriptor::default(),
-        }),
-        vertex_state: VertexStateDescriptor {
-            index_format: IndexFormat::Uint32,
-            vertex_buffers: match ty {
-                RenderPipelineType::Shadow | RenderPipelineType::Depth | RenderPipelineType::Opaque => &vertex_buffers,
-                RenderPipelineType::Skybox => &[],
-            },
-        },
-        sample_count: 1,
-        sample_mask: !0,
-        alpha_to_coverage_enabled: false,
     })
 }

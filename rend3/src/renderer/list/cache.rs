@@ -111,6 +111,7 @@ impl RenderListCache {
         self.purge_unused_resources();
     }
 
+    #[allow(unused)]
     pub fn get_buffer(&self, name: &str) -> &Buffer {
         &*self.buffers.get(name).unwrap().inner.buffer
     }

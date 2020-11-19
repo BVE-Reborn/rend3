@@ -8,8 +8,7 @@ use crate::{
     list::{RenderList, SourceShaderDescriptor},
     renderer::{
         info::ExtendedAdapterInfo, material::MaterialManager, mesh::MeshManager, object::ObjectManager,
-        passes::ForwardPassSet, pipeline::PipelineManager, resources::RendererGlobalResources, shaders::ShaderManager,
-        texture::TextureManager,
+        pipeline::PipelineManager, resources::RendererGlobalResources, shaders::ShaderManager, texture::TextureManager,
     },
     statistics::RendererStatistics,
     RendererInitializationError, RendererOptions,
@@ -40,29 +39,17 @@ mod list {
     mod forward;
     mod resource;
 
-    pub use cache::*;
-    pub use forward::*;
+    pub(crate) use cache::*;
+    pub(crate) use forward::*;
     pub use resource::*;
 }
 mod material;
 mod mesh;
 mod object;
 mod passes {
-    mod blit;
     mod culling;
-    mod depth;
-    mod forward_set;
-    mod opaque;
-    mod shadow_set;
-    mod skybox;
 
-    pub use blit::*;
     pub use culling::*;
-    pub use depth::*;
-    pub use forward_set::*;
-    pub use opaque::*;
-    pub use shadow_set::*;
-    pub use skybox::*;
 }
 mod pipeline;
 mod render;
@@ -76,13 +63,13 @@ const COMPUTE_POOL: u8 = 0;
 
 const BUFFER_RECALL_PRIORITY: u32 = 0;
 const MAIN_TASK_PRIORITY: u32 = 1;
-const PIPELINE_BUILD_PRIORITY: u32 = 2;
+const RENDER_RECORD_PRIORITY: u32 = 2;
+const PIPELINE_BUILD_PRIORITY: u32 = 3;
 
-const INTERNAL_RENDERBUFFER_FORMAT: TextureFormat = TextureFormat::Rgba16Float;
-const INTERNAL_RENDERBUFFER_NORMAL_FORMAT: TextureFormat = TextureFormat::Rgba16Float;
-const INTERNAL_RENDERBUFFER_DEPTH_FORMAT: TextureFormat = TextureFormat::Depth32Float;
 const INTERNAL_SHADOW_DEPTH_FORMAT: TextureFormat = TextureFormat::Depth32Float;
 const SWAPCHAIN_FORMAT: TextureFormat = TextureFormat::Bgra8UnormSrgb;
+
+const SHADOW_DIMENSIONS: u32 = 2048;
 
 pub struct Renderer<TLD = ()>
 where
@@ -103,20 +90,13 @@ where
     mesh_manager: RwLock<MeshManager>,
     texture_manager_2d: RwLock<TextureManager>,
     texture_manager_cube: RwLock<TextureManager>,
-    texture_manager_internal: RwLock<TextureManager>,
     material_manager: RwLock<MaterialManager>,
     object_manager: RwLock<ObjectManager>,
     directional_light_manager: RwLock<light::DirectionalLightManager>,
 
-    forward_pass_set: ForwardPassSet,
-
     render_list_cache: RwLock<list::RenderListCache>,
 
-    swapchain_blit_pass: passes::BlitPass,
     culling_pass: passes::CullingPass,
-    skybox_pass: RwLock<passes::SkyboxPass>,
-    depth_pass: RwLock<passes::DepthPass>,
-    opaque_pass: RwLock<passes::OpaquePass>,
 
     // _imgui_renderer: imgui_wgpu::Renderer,
     options: RwLock<RendererOptions>,

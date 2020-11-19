@@ -68,10 +68,9 @@ impl DefaultBindGroupLayouts {
             entries: &[BindGroupLayoutEntry {
                 binding: 0,
                 visibility: ShaderStage::VERTEX | ShaderStage::FRAGMENT | ShaderStage::COMPUTE,
-                ty: BindingType::StorageBuffer {
+                ty: BindingType::UniformBuffer {
                     min_binding_size: None,
                     dynamic: false,
-                    readonly: true,
                 },
                 count: None,
             }],
@@ -138,6 +137,7 @@ pub struct CompiledPipeline {
     uses_cube: bool,
 }
 
+// TODO: invalidation based on 2d and cube manager
 pub struct PipelineManager {
     default_bind_group_layouts: RwLock<DefaultBindGroupLayouts>,
     registry: RwLock<ResourceRegistry<CompiledPipeline>>,
@@ -336,12 +336,16 @@ impl PipelineManager {
         })
     }
 
+    pub fn get_arc(&self, handle: PipelineHandle) -> Arc<RenderPipeline> {
+        Arc::clone(&self.registry.read().get(handle.0).inner)
+    }
+
     pub fn remove(&self, handle: PipelineHandle) {
         self.registry.write().remove(handle.0);
     }
 }
 
-fn create_custom_texture_bgl(device: &Device, dimension: TextureViewDimension, count: u32) -> BindGroupLayout {
+pub fn create_custom_texture_bgl(device: &Device, dimension: TextureViewDimension, count: u32) -> BindGroupLayout {
     let entry = BindGroupLayoutEntry {
         binding: 0,
         visibility: ShaderStage::VERTEX | ShaderStage::FRAGMENT | ShaderStage::COMPUTE,

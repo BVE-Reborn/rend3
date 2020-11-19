@@ -123,6 +123,7 @@ impl DefaultPipelines {
             bindings: vec![
                 PipelineBindingType::GeneralData,
                 PipelineBindingType::ObjectData,
+                PipelineBindingType::Material,
                 PipelineBindingType::GPU2DTextures,
                 PipelineBindingType::CameraData,
             ],
@@ -151,6 +152,7 @@ impl DefaultPipelines {
             bindings: vec![
                 PipelineBindingType::GeneralData,
                 PipelineBindingType::ObjectData,
+                PipelineBindingType::Material,
                 PipelineBindingType::GPU2DTextures,
                 PipelineBindingType::CameraData,
             ],
@@ -206,7 +208,9 @@ impl DefaultPipelines {
             bindings: vec![
                 PipelineBindingType::GeneralData,
                 PipelineBindingType::ObjectData,
+                PipelineBindingType::Material,
                 PipelineBindingType::GPU2DTextures,
+                PipelineBindingType::ShadowTexture,
                 PipelineBindingType::CameraData,
             ],
             samples: 1,
@@ -224,9 +228,7 @@ impl DefaultPipelines {
             fragment: Some(shaders.blit_frag),
             bindings: vec![
                 PipelineBindingType::GeneralData,
-                PipelineBindingType::ObjectData,
-                PipelineBindingType::GPU2DTextures,
-                PipelineBindingType::CameraData,
+                PipelineBindingType::Custom2DTexture { count: 1 },
             ],
             samples: 1,
         });

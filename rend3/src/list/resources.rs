@@ -36,6 +36,7 @@ pub enum ResourceBinding {
     GPUCubeTextures,
     /// Bindings in All Modes:
     /// 0: Shadow `texture2DArray`
+    /// 1: Directional light data
     ShadowTexture,
     /// Binding in All Modes:
     /// 0: Current skybox texture
@@ -66,17 +67,20 @@ pub enum ImageInputReference {
     Custom(String),
 }
 
+#[derive(Debug, Clone)]
 pub struct ImageOutput {
     pub output: ImageOutputReference,
     pub resolve_target: Option<ImageOutputReference>,
     pub clear: LoadOp<ClearColor>,
 }
 
+#[derive(Debug, Clone)]
 pub struct DepthOutput {
     pub output: ImageOutputReference,
     pub clear: LoadOp<f32>,
 }
 
+#[derive(Debug, Clone)]
 pub enum ImageOutputReference {
     OutputImage,
     Custom(String),

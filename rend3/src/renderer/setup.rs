@@ -9,12 +9,11 @@ use crate::{
         mesh::MeshManager,
         object::ObjectManager,
         passes,
-        passes::ForwardPassSet,
         pipeline::PipelineManager,
         resources::RendererGlobalResources,
         shaders::ShaderManager,
-        texture::{TextureManager, STARTING_2D_TEXTURES, STARTING_CUBE_TEXTURES, STARTING_INTERNAL_TEXTURES},
-        Renderer, SWAPCHAIN_FORMAT,
+        texture::{TextureManager, STARTING_2D_TEXTURES, STARTING_CUBE_TEXTURES},
+        Renderer,
     },
     RendererInitializationError, RendererOptions,
 };
@@ -147,75 +146,27 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
         &shader_manager,
         &global_resource_guard.prefix_sum_bgl,
         &global_resource_guard.pre_cull_bgl,
-        &global_resource_guard.general_bgl,
+        &global_resource_guard.object_input_bgl,
         &global_resource_guard.object_output_bgl,
-        &global_resource_guard.uniform_bgl,
+        &global_resource_guard.camera_data_bgl,
         adapter_info.subgroup_size(),
     );
 
-    let swapchain_blit_pass = passes::BlitPass::new(
-        &device,
-        &shader_manager,
-        &global_resource_guard.blit_bgl,
-        SWAPCHAIN_FORMAT,
-    );
-
-    let mut texture_manager_2d = RwLock::new(TextureManager::new(
+    let texture_manager_2d = RwLock::new(TextureManager::new(
         &device,
         STARTING_2D_TEXTURES,
         TextureViewDimension::D2,
     ));
-    let texture_manager_2d_guard = texture_manager_2d.get_mut();
-
-    let depth_pass = passes::DepthPass::new(
-        &device,
-        &shader_manager,
-        &global_resource_guard.general_bgl,
-        &global_resource_guard.object_output_noindirect_bgl,
-        &texture_manager_2d_guard.bind_group_layout(),
-    );
-
-    let mut texture_manager_internal = RwLock::new(TextureManager::new(
-        &device,
-        STARTING_INTERNAL_TEXTURES,
-        TextureViewDimension::D2,
-    ));
-    let texture_manager_internal_guard = texture_manager_internal.get_mut();
-
-    let opaque_pass = passes::OpaquePass::new(
-        &device,
-        &shader_manager,
-        &global_resource_guard.general_bgl,
-        &global_resource_guard.object_output_noindirect_bgl,
-        &texture_manager_2d_guard.bind_group_layout(),
-        &texture_manager_internal_guard.bind_group_layout(),
-    );
-
-    let mut texture_manager_cube = RwLock::new(TextureManager::new(
+    let texture_manager_cube = RwLock::new(TextureManager::new(
         &device,
         STARTING_CUBE_TEXTURES,
         TextureViewDimension::Cube,
     ));
-    let texture_manager_cube_guard = texture_manager_cube.get_mut();
-
-    let skybox_pass = passes::SkyboxPass::new(
-        &device,
-        &shader_manager,
-        &global_resource_guard.general_bgl,
-        &global_resource_guard.object_output_noindirect_bgl,
-        &texture_manager_cube_guard.bind_group_layout(),
-    );
 
     let pipeline_manager = PipelineManager::new(
         &device,
         texture_manager_2d.read().bind_group_layout_arc(),
         texture_manager_cube.read().bind_group_layout_arc(),
-    );
-
-    let forward_pass_set = ForwardPassSet::new(
-        &device,
-        &global_resource_guard.uniform_bgl,
-        String::from("Forward Pass"),
     );
 
     let mut buffer_manager = Mutex::new(AutomatedBufferManager::new(UploadStyle::from_device_type(
@@ -234,11 +185,7 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
 
     let render_list_cache = RwLock::new(RenderListCache::new());
 
-    let (culling_pass, depth_pass, opaque_pass, swapchain_blit_pass, skybox_pass) =
-        futures::join!(culling_pass, depth_pass, opaque_pass, swapchain_blit_pass, skybox_pass);
-    let depth_pass = RwLock::new(depth_pass);
-    let skybox_pass = RwLock::new(skybox_pass);
-    let opaque_pass = RwLock::new(opaque_pass);
+    let (culling_pass,) = futures::join!(culling_pass);
 
     Ok(Arc::new(Renderer {
         yard,
@@ -256,19 +203,12 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
         mesh_manager,
         texture_manager_2d,
         texture_manager_cube,
-        texture_manager_internal,
         material_manager,
         object_manager,
         directional_light_manager,
 
-        forward_pass_set,
-
         render_list_cache,
-        swapchain_blit_pass,
         culling_pass,
-        skybox_pass,
-        depth_pass,
-        opaque_pass,
 
         // _imgui_renderer: imgui_renderer,
         options: RwLock::new(options),

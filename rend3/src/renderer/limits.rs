@@ -32,7 +32,7 @@ pub fn check_features(device: Features) -> Result<Features, RendererInitializati
 }
 
 const REQUIRED_LIMITS: Limits = Limits {
-    max_bind_groups: 4,
+    max_bind_groups: 6,
     max_dynamic_uniform_buffers_per_pipeline_layout: 0,
     max_dynamic_storage_buffers_per_pipeline_layout: 0,
     max_sampled_textures_per_shader_stage: 128,
@@ -71,7 +71,7 @@ fn check_limit_unlimited(d: u32, r: u32, ty: LimitType) -> Result<u32, RendererI
 pub fn check_limits(device_limits: Limits) -> Result<Limits, RendererInitializationError> {
     let required_limits = REQUIRED_LIMITS;
     Ok(Limits {
-        max_bind_groups: check_limit(
+        max_bind_groups: check_limit_unlimited(
             device_limits.max_bind_groups,
             required_limits.max_bind_groups,
             LimitType::BindGroups,

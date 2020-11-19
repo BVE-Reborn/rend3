@@ -17,7 +17,7 @@ layout(location = 3) flat out uint o_material;
 layout(set = 1, binding = 0, std430) restrict readonly buffer ObjectOutputDataBuffer {
     ObjectOutputData object_output[];
 };
-layout(set = 1, binding = 1) uniform UniformBuffer {
+layout(set = 4, binding = 0) uniform UniformBuffer {
     UniformData uniforms;
 };
 

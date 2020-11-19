@@ -11,7 +11,6 @@ use wgpu::{
 
 pub const STARTING_2D_TEXTURES: usize = 1 << 6;
 pub const STARTING_CUBE_TEXTURES: usize = 1 << 3;
-pub const STARTING_INTERNAL_TEXTURES: usize = 1 << 4;
 
 pub struct InternalTexture {
     pub format: Option<RendererTextureFormat>,
@@ -127,12 +126,12 @@ impl TextureManager {
         &self.views[self.registry.get_index_of(handle.0)]
     }
 
-    pub fn bind_group_layout(&self) -> &BindGroupLayout {
-        &self.layout
+    pub fn get_null_view(&mut self) -> &TextureView {
+        self.null_tex_man.get_ref(self.dimension)
     }
 
     pub fn bind_group_layout_arc(&self) -> Arc<BindGroupLayout> {
-        self.layout.clone()
+        Arc::clone(&self.layout)
     }
 
     pub fn translation_fn(&self) -> impl Fn(TextureHandle) -> NonZeroU32 + Copy + '_ {
@@ -228,15 +227,27 @@ impl NullTextureManager {
         }
     }
 
+    fn ensure_at_least_one(&mut self, dimension: TextureViewDimension) {
+        if self.inner.is_empty() {
+            self.inner.push(self.null_tex.create_view(&TextureViewDescriptor {
+                dimension: Some(dimension),
+                ..TextureViewDescriptor::default()
+            }));
+        }
+    }
+
     pub fn get(&mut self, dimension: TextureViewDimension) -> TextureView {
         span_transfer!(_ -> get_span, INFO, "Null Texture Manager Get");
 
-        self.inner.pop().unwrap_or_else(|| {
-            self.null_tex.create_view(&TextureViewDescriptor {
-                dimension: Some(dimension),
-                ..TextureViewDescriptor::default()
-            })
-        })
+        self.ensure_at_least_one(dimension);
+
+        self.inner.pop().unwrap()
+    }
+
+    pub fn get_ref(&mut self, dimension: TextureViewDimension) -> &TextureView {
+        self.ensure_at_least_one(dimension);
+
+        self.inner.first().unwrap()
     }
 
     pub fn put(&mut self, view: TextureView) {

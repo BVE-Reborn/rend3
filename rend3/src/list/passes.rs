@@ -11,18 +11,21 @@ pub enum RenderPassRunRate {
     Once,
 }
 
+#[derive(Debug, Clone)]
 pub struct RenderPassDescriptor {
     pub run_rate: RenderPassRunRate,
     pub outputs: Vec<ImageOutput>,
     pub depth: Option<DepthOutput>,
 }
 
+#[derive(Debug, Clone)]
 pub struct RenderOpDescriptor {
     pub pipeline: PipelineHandle,
     pub input: RenderOpInputType,
     pub bindings: Vec<ResourceBinding>,
 }
 
+#[derive(Debug, Clone)]
 pub enum RenderOpInputType {
     /// No bound vertex inputs, just a simple `draw(0..3)`
     FullscreenTriangle,

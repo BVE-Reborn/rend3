@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use wgpu::{BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, Device};
 
 pub struct BindGroupBuilder<'a> {
@@ -20,13 +21,13 @@ impl<'a> BindGroupBuilder<'a> {
         });
     }
 
-    pub fn build(self, device: &Device, layout: &BindGroupLayout) -> BindGroup {
+    pub fn build(self, device: &Device, layout: &BindGroupLayout) -> Arc<BindGroup> {
         let bind_group = device.create_bind_group(&BindGroupDescriptor {
             label: self.label.as_deref(),
             layout,
             entries: &self.bindings,
         });
 
-        bind_group
+        Arc::new(bind_group)
     }
 }

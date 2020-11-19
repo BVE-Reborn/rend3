@@ -49,6 +49,7 @@ impl RenderList {
     }
 }
 
+#[derive(Clone)]
 pub(crate) struct RenderPass {
     pub desc: RenderPassDescriptor,
     pub ops: Vec<RenderOpDescriptor>,

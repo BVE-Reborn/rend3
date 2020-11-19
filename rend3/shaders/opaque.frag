@@ -13,23 +13,23 @@ layout(location = 4) flat in uint i_material;
 layout(location = 0) out vec4 o_color;
 layout(location = 1) out vec4 o_normal;
 
-layout(set = 0, binding = 1) uniform MaterialBuffer {
-    MaterialData materials[MATERIAL_COUNT];
-};
-layout(set = 0, binding = 2) uniform sampler linear_sampler;
-layout(set = 0, binding = 3) uniform samplerShadow shadow_sampler;
-layout(set = 0, binding = 4) restrict readonly buffer DirectionalLightBuffer {
-    DirectionalLightBufferHeader directional_light_header;
-    DirectionalLight directional_lights[];
-};
+layout(set = 0, binding = 0) uniform sampler linear_sampler;
+layout(set = 0, binding = 1) uniform samplerShadow shadow_sampler;
 layout(set = 1, binding = 0, std430) restrict readonly buffer ObjectOutputDataBuffer {
     ObjectOutputData object_output[];
 };
-layout(set = 1, binding = 1) uniform UniformBuffer {
+layout(set = 2, binding = 0) uniform MaterialBuffer {
+    MaterialData materials[MATERIAL_COUNT];
+};
+layout(set = 3, binding = 0) uniform texture2D textures[];
+layout(set = 4, binding = 0) uniform texture2DArray shadow;
+layout(set = 4, binding = 1) restrict readonly buffer DirectionalLightBuffer {
+    DirectionalLightBufferHeader directional_light_header;
+    DirectionalLight directional_lights[];
+};
+layout(set = 5, binding = 0) uniform UniformBuffer {
     UniformData uniforms;
 };
-layout(set = 2, binding = 0) uniform texture2D textures[];
-layout(set = 3, binding = 0) uniform texture2D internal_textures[];
 
 #include "lighting/surface.glsl"
 
@@ -48,7 +48,7 @@ void main() {
         vec2 shadow_flipped = (shadow_ndc.xy * 0.5) + 0.5;
         vec3 shadow_shadow_coords = vec3(shadow_flipped.x, 1 - shadow_flipped.y, shadow_ndc.z);
 
-        float shadow_value = texture(sampler2DShadow(internal_textures[light.shadow_tex - 1], shadow_sampler), shadow_shadow_coords);
+        float shadow_value = texture(sampler2DArrayShadow(shadow, shadow_sampler), vec4(shadow_shadow_coords, light.shadow_tex));
 
         color += surface_shading(directional_lights[i], pixel, v, shadow_value);
     }
