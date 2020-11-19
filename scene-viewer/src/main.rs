@@ -20,6 +20,7 @@ use std::{
 };
 use switchyard::{threads, Switchyard};
 use winit::{
+    dpi::PhysicalSize,
     event::{DeviceEvent, ElementState, Event, KeyboardInput, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
     window::WindowBuilder,
@@ -303,6 +304,8 @@ fn main() {
     let mut timestamp_last_frame = Instant::now();
     let mut frames = 0_usize;
 
+    let mut render_handle = None;
+
     event_loop.run(move |event, _window_target, control| match event {
         Event::MainEventsCleared => {
             frames += 1;
@@ -398,14 +401,24 @@ fn main() {
             *control = ControlFlow::Exit;
         }
         Event::RedrawRequested(_) => {
+            if let Some(handle) = render_handle.take() {
+                futures::executor::block_on(handle);
+            }
+
             rend3::span_transfer!(_ -> redraw_span, INFO, "Redraw");
 
             renderer.set_camera_location(camera_location);
             renderer.set_options(options.clone());
-            let handle = renderer.render(rend3::list::default_render_list(options.size, &pipelines));
+            let handle = renderer.render(rend3::list::default_render_list(
+                PhysicalSize {
+                    width: (options.size.width as f32 * 1.0) as u32,
+                    height: (options.size.height as f32 * 1.0) as u32,
+                },
+                &pipelines,
+            ));
 
             rend3::span_transfer!(redraw_span -> render_wait_span, INFO, "Waiting for render");
-            futures::executor::block_on(handle);
+            render_handle = Some(handle);
         }
         _ => {}
     })

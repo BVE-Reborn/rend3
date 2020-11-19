@@ -49,21 +49,21 @@ impl CullingPass {
         let new_span_guard = new_span.enter();
 
         let pre_cull_shader = shader_manager.compile_shader(SourceShaderDescriptor {
-            source: ShaderSourceType::File(String::from("rend3/shaders/pre_cull.comp")),
+            source: ShaderSourceType::Builtin(String::from("pre_cull.comp")),
             defines: vec![(String::from("WARP_SIZE"), Some(subgroup_size.to_string()))],
             includes: vec![],
             stage: ShaderSourceStage::Compute,
         });
 
         let prefix_sum = shader_manager.compile_shader(SourceShaderDescriptor {
-            source: ShaderSourceType::File(String::from("rend3/shaders/prefix_sum.comp")),
+            source: ShaderSourceType::Builtin(String::from("prefix_sum.comp")),
             defines: vec![(String::from("WARP_SIZE"), Some(subgroup_size.to_string()))],
             includes: vec![],
             stage: ShaderSourceStage::Compute,
         });
 
         let post_cull_shader = shader_manager.compile_shader(SourceShaderDescriptor {
-            source: ShaderSourceType::File(String::from("rend3/shaders/post_cull.comp")),
+            source: ShaderSourceType::Builtin(String::from("post_cull.comp")),
             defines: vec![(String::from("WARP_SIZE"), Some(subgroup_size.to_string()))],
             includes: vec![],
             stage: ShaderSourceStage::Compute,

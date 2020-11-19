@@ -44,6 +44,8 @@ pub enum ShaderSource {
 pub enum ShaderSourceType {
     /// Load shader from given file
     File(String),
+    /// Load builtin shader
+    Builtin(String),
     /// Use given shader source
     Value(String),
 }

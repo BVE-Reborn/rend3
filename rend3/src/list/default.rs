@@ -31,52 +31,52 @@ impl DefaultShaders {
         TLD: 'static,
     {
         let depth_vert = renderer.add_source_shader(SourceShaderDescriptor {
-            source: ShaderSourceType::File("rend3/shaders/depth.vert".to_string()),
+            source: ShaderSourceType::Builtin("depth.vert".to_string()),
             stage: ShaderSourceStage::Vertex,
             includes: vec![],
             defines: vec![(String::from("MATERIAL_COUNT"), Some(MAX_MATERIALS.to_string()))],
         });
         let depth_frag = renderer.add_source_shader(SourceShaderDescriptor {
-            source: ShaderSourceType::File("rend3/shaders/depth.frag".to_string()),
+            source: ShaderSourceType::Builtin("depth.frag".to_string()),
             stage: ShaderSourceStage::Fragment,
             includes: vec![],
             defines: vec![(String::from("MATERIAL_COUNT"), Some(MAX_MATERIALS.to_string()))],
         });
 
         let skybox_vert = renderer.add_source_shader(SourceShaderDescriptor {
-            source: ShaderSourceType::File("rend3/shaders/skybox.vert".to_string()),
+            source: ShaderSourceType::Builtin("skybox.vert".to_string()),
             stage: ShaderSourceStage::Vertex,
             includes: vec![],
             defines: vec![],
         });
         let skybox_frag = renderer.add_source_shader(SourceShaderDescriptor {
-            source: ShaderSourceType::File("rend3/shaders/skybox.frag".to_string()),
+            source: ShaderSourceType::Builtin("skybox.frag".to_string()),
             stage: ShaderSourceStage::Fragment,
             includes: vec![],
             defines: vec![],
         });
 
         let opaque_vert = renderer.add_source_shader(SourceShaderDescriptor {
-            source: ShaderSourceType::File("rend3/shaders/opaque.vert".to_string()),
+            source: ShaderSourceType::Builtin("opaque.vert".to_string()),
             stage: ShaderSourceStage::Vertex,
             includes: vec![],
             defines: vec![(String::from("MATERIAL_COUNT"), Some(MAX_MATERIALS.to_string()))],
         });
         let opaque_frag = renderer.add_source_shader(SourceShaderDescriptor {
-            source: ShaderSourceType::File("rend3/shaders/opaque.frag".to_string()),
+            source: ShaderSourceType::Builtin("opaque.frag".to_string()),
             stage: ShaderSourceStage::Fragment,
             includes: vec![],
             defines: vec![(String::from("MATERIAL_COUNT"), Some(MAX_MATERIALS.to_string()))],
         });
 
         let blit_vert = renderer.add_source_shader(SourceShaderDescriptor {
-            source: ShaderSourceType::File("rend3/shaders/blit.vert".to_string()),
+            source: ShaderSourceType::Builtin("blit.vert".to_string()),
             stage: ShaderSourceStage::Vertex,
             includes: vec![],
             defines: vec![],
         });
         let blit_frag = renderer.add_source_shader(SourceShaderDescriptor {
-            source: ShaderSourceType::File("rend3/shaders/blit.frag".to_string()),
+            source: ShaderSourceType::Builtin("blit.frag".to_string()),
             stage: ShaderSourceStage::Fragment,
             includes: vec![],
             defines: vec![],

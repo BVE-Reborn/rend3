@@ -11,6 +11,8 @@ use wgpu::{Device, ShaderModule, ShaderModuleSource};
 
 pub type ShaderCompileResult = Result<Arc<ShaderModule>, ShaderError>;
 
+const BUILTIN_SHADERS: include_dir::Dir = include_dir::include_dir!("./shaders");
+
 pub struct ShaderManager {
     shader_thread: Option<JoinHandle<()>>,
     sender: flume::Sender<CompileCommand>,
@@ -109,13 +111,21 @@ fn compile_shader(compiler: &mut Compiler, device: &Device, args: &SourceShaderD
         ShaderSourceType::File(ref file) => {
             std::fs::read_to_string(file).map_err(|e| ShaderError::FileError(e, args.clone()))?
         }
+        ShaderSourceType::Builtin(ref file) => BUILTIN_SHADERS
+            .get_file(file)
+            .ok_or_else(|| ShaderError::Builtin(args.clone()))?
+            .contents_utf8()
+            .unwrap()
+            .to_string(),
         ShaderSourceType::Value(ref code) => code.clone(),
     };
 
     let file_name = match args.source {
-        ShaderSourceType::File(ref file) => &**file,
-        ShaderSourceType::Value(_) => "./",
+        ShaderSourceType::File(ref file) | ShaderSourceType::Builtin(ref file) => &**file,
+        ShaderSourceType::Value(_) => "./file",
     };
+
+    let builtin = matches!(args.source, ShaderSourceType::Builtin(_));
 
     span_transfer!(file_span -> compile_span, WARN, "Shader Compilation");
 
@@ -140,8 +150,32 @@ fn compile_shader(compiler: &mut Compiler, device: &Device, args: &SourceShaderD
                 )
             })?
             .join(Path::new(include));
-        let contents = std::fs::read_to_string(&joined)
-            .map_err(|e| format!("Error while loading include <{}> from file {}: {}", include, src, e))?;
+        let contents = if builtin {
+            let dedot = path_dedot::ParseDot::parse_dot(&joined).unwrap();
+            BUILTIN_SHADERS
+                .get_file(dedot)
+                .ok_or_else(|| {
+                    format!(
+                        "Error while locating builtin include <{}> from file {} for path {}",
+                        include,
+                        src,
+                        joined.display()
+                    )
+                })?
+                .contents_utf8()
+                .unwrap()
+                .to_string()
+        } else {
+            std::fs::read_to_string(&joined).map_err(|e| {
+                format!(
+                    "Error while loading include <{}> from file {} for path {}: {}",
+                    include,
+                    src,
+                    joined.display(),
+                    e
+                )
+            })?
+        };
         Ok(ResolvedInclude {
             resolved_name: joined.to_string_lossy().to_string(),
             content: contents,

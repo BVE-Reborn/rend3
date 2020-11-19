@@ -134,10 +134,6 @@ impl TextureManager {
         &self.layout
     }
 
-    pub fn bind_group_layout_arc(&self) -> Arc<BindGroupLayout> {
-        Arc::clone(&self.layout)
-    }
-
     pub fn translation_fn(&self) -> impl Fn(TextureHandle) -> NonZeroU32 + Copy + '_ {
         move |v: TextureHandle| unsafe {
             // SAFETY: overflowing this number will panic
