@@ -8,11 +8,13 @@ use wgpu::{
     Buffer, BufferDescriptor, Device, Extent3d, TextureDescriptor, TextureDimension, TextureView, TextureViewDescriptor,
 };
 
+#[derive(Debug)]
 pub(crate) struct RenderListCacheResource<T> {
     pub inner: T,
     pub used: bool,
 }
 
+#[derive(Debug)]
 pub(crate) struct RenderListCache {
     images: FnvHashMap<String, RenderListCacheResource<ImageResource>>,
     buffers: FnvHashMap<String, RenderListCacheResource<BufferResource>>,

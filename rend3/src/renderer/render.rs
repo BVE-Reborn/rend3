@@ -239,9 +239,9 @@ pub fn render_loop<TLD: 'static>(
             let shadow_bg = shadow_bgb.build(&renderer.device, &global_resources.shadow_texture_bgl);
 
             let skybox_texture_view = if let Some(ref sky) = global_resources.background_texture {
-                texture_manager_2d.get_view(*sky)
+                texture_manager_cube.get_view(*sky)
             } else {
-                texture_manager_2d.get_null_view()
+                texture_manager_cube.get_null_view()
             };
             let mut skybox_bgb = BindGroupBuilder::new(Some(String::from("skybox bg")));
             skybox_bgb.append(BindGroupEntry {
@@ -339,7 +339,7 @@ pub fn render_loop<TLD: 'static>(
 
             drop(directional_light_manager);
 
-            let frame = Arc::new(renderer.global_resources.write().swapchain.get_current_frame().unwrap());
+            let frame = Arc::new(global_resources.swapchain.get_current_frame().unwrap());
 
             {
                 let cull_data = Arc::new(renderer.culling_pass.prepare(

@@ -254,13 +254,8 @@ impl<TLD: 'static> Renderer<TLD> {
             .push(Instruction::RemoveShader { handle });
     }
 
-    pub fn add_pipeline(&self, pipeline: Pipeline) -> impl Future<Output = PipelineHandle> {
-        self.pipeline_manager.allocate_async_insert(
-            &self.yard,
-            Arc::clone(&self.device),
-            Arc::clone(&self.shader_manager),
-            pipeline,
-        )
+    pub fn add_pipeline(self: &Arc<Self>, pipeline: Pipeline) -> impl Future<Output = PipelineHandle> {
+        self.pipeline_manager.allocate_async_insert(Arc::clone(self), pipeline)
     }
 
     pub fn remove_pipeline(&self, handle: PipelineHandle) {

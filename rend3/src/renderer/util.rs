@@ -138,7 +138,7 @@ pub fn create_object_data_bgl(device: &Device) -> BindGroupLayout {
             ty: BindingType::StorageBuffer {
                 dynamic: false,
                 min_binding_size: None,
-                readonly: false,
+                readonly: true,
             },
             count: None,
         }],

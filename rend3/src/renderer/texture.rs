@@ -130,6 +130,10 @@ impl TextureManager {
         self.null_tex_man.get_ref(self.dimension)
     }
 
+    pub fn bind_group_layout(&self) -> &BindGroupLayout {
+        &self.layout
+    }
+
     pub fn bind_group_layout_arc(&self) -> Arc<BindGroupLayout> {
         Arc::clone(&self.layout)
     }

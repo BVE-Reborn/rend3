@@ -84,6 +84,8 @@ where
             stencil_ops: None,
         });
 
+    dbg!(&pass.desc, &pass.ops);
+
     let texture_2d_guard = renderer.texture_manager_2d.read();
     let texture_cube_guard = renderer.texture_manager_cube.read();
 

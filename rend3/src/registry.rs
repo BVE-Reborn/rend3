@@ -2,6 +2,7 @@ use fnv::FnvBuildHasher;
 use indexmap::map::IndexMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+#[derive(Debug)]
 pub struct ResourceRegistry<T> {
     mapping: IndexMap<usize, T, FnvBuildHasher>,
     current_idx: AtomicUsize,
@@ -32,11 +33,11 @@ impl<T> ResourceRegistry<T> {
     }
 
     pub fn get(&self, handle: usize) -> &T {
-        &self.mapping[handle]
+        self.mapping.get(&handle).unwrap()
     }
 
     pub fn get_mut(&mut self, handle: usize) -> &mut T {
-        &mut self.mapping[handle]
+        self.mapping.get_mut(&handle).unwrap()
     }
 
     pub fn get_index_of(&self, handle: usize) -> usize {

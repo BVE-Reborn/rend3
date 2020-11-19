@@ -22,11 +22,11 @@ layout(set = 2, binding = 0) uniform MaterialBuffer {
     MaterialData materials[MATERIAL_COUNT];
 };
 layout(set = 3, binding = 0) uniform texture2D textures[];
-layout(set = 4, binding = 0) uniform texture2DArray shadow;
-layout(set = 4, binding = 1) restrict readonly buffer DirectionalLightBuffer {
+layout(set = 4, binding = 0) restrict readonly buffer DirectionalLightBuffer {
     DirectionalLightBufferHeader directional_light_header;
     DirectionalLight directional_lights[];
 };
+layout(set = 4, binding = 1) uniform texture2DArray shadow;
 layout(set = 5, binding = 0) uniform UniformBuffer {
     UniformData uniforms;
 };

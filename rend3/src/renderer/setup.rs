@@ -163,11 +163,7 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
         TextureViewDimension::Cube,
     ));
 
-    let pipeline_manager = PipelineManager::new(
-        &device,
-        texture_manager_2d.read().bind_group_layout_arc(),
-        texture_manager_cube.read().bind_group_layout_arc(),
-    );
+    let pipeline_manager = PipelineManager::new();
 
     let mut buffer_manager = Mutex::new(AutomatedBufferManager::new(UploadStyle::from_device_type(
         &adapter_info.device_type,

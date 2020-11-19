@@ -11,7 +11,7 @@ use crate::{
     renderer::MAX_MATERIALS,
     Renderer,
 };
-use std::future::Future;
+use std::{future::Future, sync::Arc};
 use wgpu::{Color, LoadOp, TextureFormat};
 use winit::dpi::PhysicalSize;
 
@@ -97,6 +97,7 @@ impl DefaultShaders {
     }
 }
 
+#[derive(Debug)]
 pub struct DefaultPipelines {
     pub shadow_depth_pipeline: PipelineHandle,
     pub depth_pipeline: PipelineHandle,
@@ -106,7 +107,7 @@ pub struct DefaultPipelines {
 }
 
 impl DefaultPipelines {
-    pub fn new<TLD>(renderer: &Renderer<TLD>, shaders: &DefaultShaders) -> impl Future<Output = Self>
+    pub fn new<TLD>(renderer: &Arc<Renderer<TLD>>, shaders: &DefaultShaders) -> impl Future<Output = Self>
     where
         TLD: 'static,
     {
@@ -218,7 +219,7 @@ impl DefaultPipelines {
 
         let blit_pipeline = renderer.add_pipeline(Pipeline {
             run_rate: RenderPassRunRate::Once,
-            input: PipelineInputType::Models3d,
+            input: PipelineInputType::FullscreenTriangle,
             outputs: vec![PipelineOutputAttachment {
                 format: ImageFormat::Bgra8UnormSrgb,
                 write: true,
@@ -234,13 +235,13 @@ impl DefaultPipelines {
         });
 
         async move {
-            Self {
+            dbg!(Self {
                 shadow_depth_pipeline: shadow_depth_pipeline.await,
                 depth_pipeline: depth_pipeline.await,
                 skybox_pipeline: skybox_pipeline.await,
                 opaque_pipeline: opaque_pipeline.await,
                 blit_pipeline: blit_pipeline.await,
-            }
+            })
         }
     }
 }
@@ -265,6 +266,7 @@ pub fn default_render_list(resolution: PhysicalSize<u32>, pipelines: &DefaultPip
         bindings: vec![
             ResourceBinding::GeneralData,
             ResourceBinding::ObjectData,
+            ResourceBinding::Material,
             ResourceBinding::GPU2DTextures,
             ResourceBinding::CameraData,
         ],
@@ -293,7 +295,7 @@ pub fn default_render_list(resolution: PhysicalSize<u32>, pipelines: &DefaultPip
     );
 
     list.create_image(
-        "depth_buffer",
+        "depth buffer",
         ImageResourceDescriptor {
             resolution,
             format: TextureFormat::Depth32Float,
@@ -328,6 +330,7 @@ pub fn default_render_list(resolution: PhysicalSize<u32>, pipelines: &DefaultPip
         bindings: vec![
             ResourceBinding::GeneralData,
             ResourceBinding::ObjectData,
+            ResourceBinding::Material,
             ResourceBinding::GPU2DTextures,
             ResourceBinding::CameraData,
         ],
@@ -349,7 +352,9 @@ pub fn default_render_list(resolution: PhysicalSize<u32>, pipelines: &DefaultPip
         bindings: vec![
             ResourceBinding::GeneralData,
             ResourceBinding::ObjectData,
+            ResourceBinding::Material,
             ResourceBinding::GPU2DTextures,
+            ResourceBinding::SkyboxTexture,
             ResourceBinding::CameraData,
         ],
     });

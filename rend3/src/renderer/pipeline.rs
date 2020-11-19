@@ -2,11 +2,11 @@ use crate::{
     datatypes::{DepthCompare, Pipeline, PipelineBindingType, PipelineHandle, PipelineInputType},
     list::RenderPassRunRate,
     registry::ResourceRegistry,
-    renderer::{shaders::ShaderManager, COMPUTE_POOL, PIPELINE_BUILD_PRIORITY},
+    renderer::{COMPUTE_POOL, PIPELINE_BUILD_PRIORITY},
+    Renderer,
 };
 use parking_lot::RwLock;
 use std::{future::Future, sync::Arc};
-use switchyard::Switchyard;
 use wgpu::{
     BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, BlendDescriptor,
     ColorStateDescriptor, ColorWrite, CompareFunction, CullMode, DepthStencilStateDescriptor, Device, FrontFace,
@@ -15,121 +15,7 @@ use wgpu::{
     TextureComponentType, TextureViewDimension, VertexStateDescriptor,
 };
 
-pub struct DefaultBindGroupLayouts {
-    general_data: BindGroupLayout,
-    object_data: BindGroupLayout,
-    material_data: BindGroupLayout,
-    camera_data: BindGroupLayout,
-    gpu_2d_textures: Arc<BindGroupLayout>,
-    gpu_cube_textures: Arc<BindGroupLayout>,
-    shadow_texture: BindGroupLayout,
-    skybox_texture: BindGroupLayout,
-}
-impl DefaultBindGroupLayouts {
-    pub fn new(
-        device: &Device,
-        gpu_2d_textures: Arc<BindGroupLayout>,
-        gpu_cube_textures: Arc<BindGroupLayout>,
-    ) -> Self {
-        let general_data = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-            label: Some("general data bgl"),
-            entries: &[
-                BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: ShaderStage::VERTEX | ShaderStage::FRAGMENT | ShaderStage::COMPUTE,
-                    ty: BindingType::Sampler { comparison: false },
-                    count: None,
-                },
-                BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: ShaderStage::VERTEX | ShaderStage::FRAGMENT | ShaderStage::COMPUTE,
-                    ty: BindingType::Sampler { comparison: true },
-                    count: None,
-                },
-            ],
-        });
-
-        let object_data = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-            label: Some("object data bgl"),
-            entries: &[BindGroupLayoutEntry {
-                binding: 0,
-                visibility: ShaderStage::VERTEX | ShaderStage::FRAGMENT | ShaderStage::COMPUTE,
-                ty: BindingType::StorageBuffer {
-                    min_binding_size: None,
-                    dynamic: false,
-                    readonly: true,
-                },
-                count: None,
-            }],
-        });
-
-        let material_data = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-            label: Some("material data bgl"),
-            entries: &[BindGroupLayoutEntry {
-                binding: 0,
-                visibility: ShaderStage::VERTEX | ShaderStage::FRAGMENT | ShaderStage::COMPUTE,
-                ty: BindingType::UniformBuffer {
-                    min_binding_size: None,
-                    dynamic: false,
-                },
-                count: None,
-            }],
-        });
-
-        let camera_data = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-            label: Some("camera data bgl"),
-            entries: &[BindGroupLayoutEntry {
-                binding: 0,
-                visibility: ShaderStage::VERTEX | ShaderStage::FRAGMENT | ShaderStage::COMPUTE,
-                ty: BindingType::UniformBuffer {
-                    min_binding_size: None,
-                    dynamic: false,
-                },
-                count: None,
-            }],
-        });
-
-        let shadow_texture = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-            label: Some("shadow data bgl"),
-            entries: &[BindGroupLayoutEntry {
-                binding: 0,
-                visibility: ShaderStage::VERTEX | ShaderStage::FRAGMENT | ShaderStage::COMPUTE,
-                ty: BindingType::SampledTexture {
-                    dimension: TextureViewDimension::D2Array,
-                    component_type: TextureComponentType::Float,
-                    multisampled: false,
-                },
-                count: None,
-            }],
-        });
-
-        let skybox_texture = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-            label: Some("skybox data bgl"),
-            entries: &[BindGroupLayoutEntry {
-                binding: 0,
-                visibility: ShaderStage::VERTEX | ShaderStage::FRAGMENT | ShaderStage::COMPUTE,
-                ty: BindingType::SampledTexture {
-                    dimension: TextureViewDimension::Cube,
-                    component_type: TextureComponentType::Float,
-                    multisampled: false,
-                },
-                count: None,
-            }],
-        });
-
-        Self {
-            general_data,
-            object_data,
-            material_data,
-            camera_data,
-            gpu_2d_textures,
-            gpu_cube_textures,
-            shadow_texture,
-            skybox_texture,
-        }
-    }
-}
-
+#[derive(Debug)]
 pub struct CompiledPipeline {
     desc: Pipeline,
     inner: Arc<RenderPipeline>,
@@ -139,31 +25,18 @@ pub struct CompiledPipeline {
 
 // TODO: invalidation based on 2d and cube manager
 pub struct PipelineManager {
-    default_bind_group_layouts: RwLock<DefaultBindGroupLayouts>,
     registry: RwLock<ResourceRegistry<CompiledPipeline>>,
 }
 impl PipelineManager {
-    pub fn new(
-        device: &Device,
-        gpu_2d_textures: Arc<BindGroupLayout>,
-        gpu_cube_textures: Arc<BindGroupLayout>,
-    ) -> Arc<Self> {
+    pub fn new() -> Arc<Self> {
         let registry = RwLock::new(ResourceRegistry::new());
 
-        let default_bind_group_layouts =
-            RwLock::new(DefaultBindGroupLayouts::new(device, gpu_2d_textures, gpu_cube_textures));
-
-        Arc::new(Self {
-            default_bind_group_layouts,
-            registry,
-        })
+        Arc::new(Self { registry })
     }
 
     pub fn allocate_async_insert<TD>(
         self: &Arc<Self>,
-        yard: &Switchyard<TD>,
-        device: Arc<Device>,
-        shader_manager: Arc<ShaderManager>,
+        renderer: Arc<Renderer<TD>>,
         pipeline_desc: Pipeline,
     ) -> impl Future<Output = PipelineHandle>
     where
@@ -171,16 +44,17 @@ impl PipelineManager {
     {
         let handle = self.registry.read().allocate();
         let this = Arc::clone(&self);
-        yard.spawn(COMPUTE_POOL, PIPELINE_BUILD_PRIORITY, async move {
+        let renderer_clone = Arc::clone(&renderer);
+        renderer_clone.yard.spawn(COMPUTE_POOL, PIPELINE_BUILD_PRIORITY, async move {
             let custom_layouts: Vec<_> = pipeline_desc
                 .bindings
                 .iter()
                 .filter_map(|bind| match bind {
                     PipelineBindingType::Custom2DTexture { count } => {
-                        Some(create_custom_texture_bgl(&device, TextureViewDimension::D2, *count as u32))
+                        Some(create_custom_texture_bgl(&renderer.device, TextureViewDimension::D2, *count as u32))
                     }
                     PipelineBindingType::CustomCubeTexture { count } => {
-                        Some(create_custom_texture_bgl(&device, TextureViewDimension::Cube, *count as u32))
+                        Some(create_custom_texture_bgl(&renderer.device, TextureViewDimension::Cube, *count as u32))
                     }
                     _ => None,
                 })
@@ -190,40 +64,45 @@ impl PipelineManager {
             let mut uses_2d = false;
             let mut uses_cube = false;
 
-            let default_bind_group_layout_guard = this.default_bind_group_layouts.read();
+            let global_data = renderer.global_resources.read();
+            let texture_2d = renderer.texture_manager_2d.read();
+            let texture_cube = renderer.texture_manager_cube.read();
 
             let layouts: Vec<_> = pipeline_desc
                 .bindings
                 .iter()
                 .map(|bind| match bind {
-                    PipelineBindingType::GeneralData => &default_bind_group_layout_guard.general_data,
-                    PipelineBindingType::ObjectData => &default_bind_group_layout_guard.object_data,
-                    PipelineBindingType::Material => &default_bind_group_layout_guard.material_data,
-                    PipelineBindingType::CameraData => &default_bind_group_layout_guard.camera_data,
+                    PipelineBindingType::GeneralData => &global_data.general_bgl,
+                    PipelineBindingType::ObjectData => &global_data.object_data_bgl,
+                    PipelineBindingType::Material => &global_data.material_bgl,
+                    PipelineBindingType::CameraData => &global_data.camera_data_bgl,
                     PipelineBindingType::GPU2DTextures => {
                         uses_2d = true;
-                        &default_bind_group_layout_guard.gpu_2d_textures
+                        texture_2d.bind_group_layout()
                     }
                     PipelineBindingType::GPUCubeTextures => {
                         uses_cube = true;
-                        &default_bind_group_layout_guard.gpu_cube_textures
+                        texture_cube.bind_group_layout()
                     }
-                    PipelineBindingType::ShadowTexture => &default_bind_group_layout_guard.shadow_texture,
-                    PipelineBindingType::SkyboxTexture => &default_bind_group_layout_guard.skybox_texture,
+                    PipelineBindingType::ShadowTexture => &global_data.shadow_texture_bgl,
+                    PipelineBindingType::SkyboxTexture => &global_data.skybox_bgl,
                     PipelineBindingType::Custom2DTexture { .. } => custom_layout_iter.next().unwrap(),
                     PipelineBindingType::CustomCubeTexture { .. } => custom_layout_iter.next().unwrap(),
                 })
                 .collect();
 
-            let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
+            let pipeline_layout = renderer.device.create_pipeline_layout(&PipelineLayoutDescriptor {
                 label: None,
                 bind_group_layouts: &layouts,
                 push_constant_ranges: &[],
             });
 
+            drop((global_data, texture_2d, texture_cube));
+
             let color_states: Vec<_> = pipeline_desc
                 .outputs
                 .iter()
+                .inspect(|v| { dbg!(handle, v); })
                 .map(|&attachment| ColorStateDescriptor {
                     alpha_blend: BlendDescriptor::REPLACE,
                     color_blend: BlendDescriptor::REPLACE,
@@ -275,14 +154,14 @@ impl PipelineManager {
                 }
             ];
 
-            let fragment_stage_module = pipeline_desc.fragment.map(|handle| shader_manager.get(handle));
+            let fragment_stage_module = pipeline_desc.fragment.map(|handle| renderer.shader_manager.get(handle));
 
-            let pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
+            let pipeline = renderer.device.create_render_pipeline(&RenderPipelineDescriptor {
                 label: None,
                 layout: Some(&pipeline_layout),
                 vertex_stage: ProgrammableStageDescriptor {
                     entry_point: "main",
-                    module: &shader_manager.get(pipeline_desc.vertex),
+                    module: &renderer.shader_manager.get(pipeline_desc.vertex),
                 },
                 fragment_stage: fragment_stage_module.as_ref().map(|module| ProgrammableStageDescriptor {
                     entry_point: "main",
