@@ -102,7 +102,6 @@ impl PipelineManager {
             let color_states: Vec<_> = pipeline_desc
                 .outputs
                 .iter()
-                .inspect(|v| { dbg!(handle, v); })
                 .map(|&attachment| ColorStateDescriptor {
                     alpha_blend: BlendDescriptor::REPLACE,
                     color_blend: BlendDescriptor::REPLACE,

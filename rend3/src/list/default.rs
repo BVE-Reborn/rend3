@@ -166,7 +166,7 @@ impl DefaultPipelines {
             outputs: vec![
                 PipelineOutputAttachment {
                     format: ImageFormat::Rgba16Float,
-                    write: false,
+                    write: true,
                 },
                 PipelineOutputAttachment {
                     format: ImageFormat::Rgba16Float,
@@ -175,7 +175,7 @@ impl DefaultPipelines {
             ],
             depth: Some(PipelineDepthState {
                 format: ImageFormat::Depth32Float,
-                compare: DepthCompare::Further,
+                compare: DepthCompare::Equal,
             }),
             vertex: shaders.skybox_vert,
             fragment: Some(shaders.skybox_frag),
@@ -235,13 +235,13 @@ impl DefaultPipelines {
         });
 
         async move {
-            dbg!(Self {
+            Self {
                 shadow_depth_pipeline: shadow_depth_pipeline.await,
                 depth_pipeline: depth_pipeline.await,
                 skybox_pipeline: skybox_pipeline.await,
                 opaque_pipeline: opaque_pipeline.await,
                 blit_pipeline: blit_pipeline.await,
-            })
+            }
         }
     }
 }
@@ -255,7 +255,7 @@ pub fn default_render_list(resolution: PhysicalSize<u32>, pipelines: &DefaultPip
         run_rate: RenderPassRunRate::PerShadow,
         outputs: vec![],
         depth: Some(DepthOutput {
-            clear: LoadOp::Clear(0.0),
+            clear: LoadOp::Clear(1.0),
             output: ImageOutputReference::OutputImage,
         }),
     });
@@ -354,7 +354,7 @@ pub fn default_render_list(resolution: PhysicalSize<u32>, pipelines: &DefaultPip
             ResourceBinding::ObjectData,
             ResourceBinding::Material,
             ResourceBinding::GPU2DTextures,
-            ResourceBinding::SkyboxTexture,
+            ResourceBinding::ShadowTexture,
             ResourceBinding::CameraData,
         ],
     });

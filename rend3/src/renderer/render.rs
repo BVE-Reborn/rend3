@@ -222,7 +222,7 @@ pub fn render_loop<TLD: 'static>(
             let object_count = object_manager.ready(&renderer.device, &mut encoder, &material_manager);
             directional_light_manager.ready(&renderer.device, &mut encoder);
 
-            let mut object_input_bgb = BindGroupBuilder::new(Some(String::from("general bg")));
+            let mut object_input_bgb = BindGroupBuilder::new(Some(String::from("object input bg")));
             object_manager.append_to_bgb(&mut object_input_bgb);
             let object_input_bg = object_input_bgb.build(&renderer.device, &global_resources.object_input_bgl);
 

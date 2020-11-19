@@ -163,7 +163,16 @@ fn create_shadow_texture(device: &Device, count: u32) -> (TextureView, Vec<Arc<T
         usage: TextureUsage::OUTPUT_ATTACHMENT | TextureUsage::SAMPLED,
     });
 
-    let primary_view = texture.create_view(&TextureViewDescriptor::default());
+    let primary_view = texture.create_view(&TextureViewDescriptor {
+        label: Some("shadow texture view"),
+        format: None,
+        dimension: Some(TextureViewDimension::D2Array),
+        aspect: TextureAspect::All,
+        base_mip_level: 0,
+        level_count: None,
+        base_array_layer: 0,
+        array_layer_count: None,
+    });
 
     let layer_views: Vec<_> = (0..count)
         .map(|idx| {

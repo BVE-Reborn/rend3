@@ -192,7 +192,7 @@ fn single(renderer: &Renderer, mesh: MeshHandle, material: MaterialHandle) {
 fn distribute(renderer: &Renderer, mesh: MeshHandle, material: MaterialHandle) {
     for x in (-11..=11).step_by(4) {
         for y in (-11..=11).step_by(4) {
-            for z in (0..=100).step_by(50) {
+            for z in (0..=50).step_by(10) {
                 renderer.add_object(Object {
                     mesh,
                     material,
