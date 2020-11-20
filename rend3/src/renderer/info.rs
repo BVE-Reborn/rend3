@@ -46,8 +46,7 @@ impl From<AdapterInfo> for ExtendedAdapterInfo {
 impl ExtendedAdapterInfo {
     pub fn subgroup_size(&self) -> u32 {
         match self.vendor {
-            // TODO: warp warp
-            Vendor::Microsoft => 8,
+            Vendor::Microsoft => 4,
             // TODO: buy a rpi4 and verify
             Vendor::Broadcom => 16,
             Vendor::Intel | Vendor::NV => 32,

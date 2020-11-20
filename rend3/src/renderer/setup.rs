@@ -35,7 +35,10 @@ struct PotentialAdapter {
     limits: Limits,
 }
 
-pub fn create_adapter(desired_backend: Option<Backend>) -> Result<(Instance, Adapter), RendererInitializationError> {
+pub fn create_adapter(
+    desired_backend: Option<Backend>,
+    desired_device: Option<String>,
+) -> Result<(Instance, Adapter), RendererInitializationError> {
     let backend_bits = BackendBit::VULKAN | BackendBit::DX12;
     let default_backend_order = [Backend::Vulkan, Backend::Dx12];
     let intel_backend_order = [Backend::Dx12, Backend::Vulkan];
@@ -56,7 +59,13 @@ pub fn create_adapter(desired_backend: Option<Backend>) -> Result<(Instance, Ada
             let features = check_features(adapter.features()).ok();
             let limits = check_limits(adapter.limits()).ok();
 
-            if let (Some(features), Some(limits)) = (features, limits) {
+            let desired = if let Some(ref desired_device) = desired_device {
+                info.name.to_lowercase().contains(desired_device)
+            } else {
+                true
+            };
+
+            if let (Some(features), Some(limits), true) = (features, limits, desired) {
                 tracing::debug!("Adapter usable");
                 potential_adapters.push(PotentialAdapter {
                     adapter,
@@ -119,10 +128,11 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
     window: &W,
     yard: Arc<Switchyard<TLD>>,
     _imgui: &mut imgui::Context,
-    backend: Option<Backend>,
+    desired_backend: Option<Backend>,
+    desired_device: Option<String>,
     options: RendererOptions,
 ) -> Result<Arc<Renderer<TLD>>, RendererInitializationError> {
-    let (instance, adapter) = create_adapter(backend)?;
+    let (instance, adapter) = create_adapter(desired_backend, desired_device)?;
 
     let surface = unsafe { instance.create_surface(window) };
 

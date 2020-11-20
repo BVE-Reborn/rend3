@@ -107,9 +107,10 @@ impl<TLD: 'static> Renderer<TLD> {
         yard: Arc<Switchyard<TLD>>,
         imgui_context: &'a mut imgui::Context,
         backend: Option<Backend>,
+        device: Option<String>,
         options: RendererOptions,
     ) -> impl Future<Output = Result<Arc<Self>, RendererInitializationError>> + 'a {
-        setup::create_renderer(window, yard, imgui_context, backend, options)
+        setup::create_renderer(window, yard, imgui_context, backend, device, options)
     }
 
     pub fn add_mesh(&self, mesh: Mesh) -> MeshHandle {

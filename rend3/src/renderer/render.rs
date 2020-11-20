@@ -12,9 +12,9 @@ use futures::{stream::FuturesOrdered, StreamExt};
 use std::{borrow::Cow, future::Future, sync::Arc};
 use tracing_futures::Instrument;
 use wgpu::{
-    BindGroupEntry, BindingResource, CommandEncoderDescriptor, Extent3d, Origin3d, ShaderModuleSource, TextureAspect,
-    TextureCopyView, TextureDataLayout, TextureDescriptor, TextureDimension, TextureUsage, TextureViewDescriptor,
-    TextureViewDimension,
+    BindGroupEntry, BindingResource, CommandEncoderDescriptor, Extent3d, Origin3d, ShaderModuleSource, SwapChainError,
+    TextureAspect, TextureCopyView, TextureDataLayout, TextureDescriptor, TextureDimension, TextureUsage,
+    TextureViewDescriptor, TextureViewDimension,
 };
 
 pub fn render_loop<TLD: 'static>(
@@ -339,7 +339,16 @@ pub fn render_loop<TLD: 'static>(
 
             drop(directional_light_manager);
 
-            let frame = Arc::new(global_resources.swapchain.get_current_frame().unwrap());
+            let mut frame = None;
+            while frame.is_none() {
+                match global_resources.swapchain.get_current_frame() {
+                    Ok(v) => frame = Some(v),
+                    Err(SwapChainError::Timeout) => {}
+                    Err(err) => panic!("Could not make swapchain: {}", err),
+                }
+            }
+
+            let frame = Arc::new(frame.unwrap());
 
             {
                 let cull_data = Arc::new(renderer.culling_pass.prepare(

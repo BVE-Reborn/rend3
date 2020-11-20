@@ -226,7 +226,11 @@ fn main() {
     wgpu_subscriber::initialize_default_subscriber(None);
 
     let mut args = Arguments::from_env();
-    let backend = args.value_from_fn(["-b", "--backend"], extract_backend).ok();
+    let desired_backend = args.value_from_fn(["-b", "--backend"], extract_backend).ok();
+    let desired_device: Option<String> = args
+        .value_from_str(["-d", "--device"])
+        .ok()
+        .map(|s: String| s.to_lowercase());
 
     rend3::span_transfer!(_ -> main_thread_span, INFO, "Main Thread Setup");
     rend3::span_transfer!(_ -> event_loop_span, INFO, "Building Event Loop");
@@ -280,7 +284,8 @@ fn main() {
         &window,
         Arc::clone(&yard),
         &mut imgui,
-        backend,
+        desired_backend,
+        desired_device,
         options.clone(),
     ))
     .unwrap();
