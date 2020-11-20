@@ -126,7 +126,11 @@ impl TextureManager {
         &self.views[self.registry.get_index_of(handle.0)]
     }
 
-    pub fn get_null_view(&mut self) -> &TextureView {
+    pub fn ensure_null_view(&mut self) {
+        self.null_tex_man.ensure_at_least_one(self.dimension)
+    }
+
+    pub fn get_null_view(&self) -> &TextureView {
         self.null_tex_man.get_ref(self.dimension)
     }
 
@@ -244,9 +248,7 @@ impl NullTextureManager {
         self.inner.pop().unwrap()
     }
 
-    pub fn get_ref(&mut self, dimension: TextureViewDimension) -> &TextureView {
-        self.ensure_at_least_one(dimension);
-
+    pub fn get_ref(&self, dimension: TextureViewDimension) -> &TextureView {
         self.inner.first().unwrap()
     }
 

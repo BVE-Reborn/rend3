@@ -266,9 +266,9 @@ impl AlbedoComponent {
         }
     }
 
-    pub(crate) fn to_texture<Func>(&self, func: Func) -> Option<NonZeroU32>
+    pub(crate) fn to_texture<Func, Out>(&self, func: Func) -> Option<Out>
     where
-        Func: FnOnce(TextureHandle) -> NonZeroU32,
+        Func: FnOnce(TextureHandle) -> Out,
     {
         match *self {
             Self::None | Self::Vertex { .. } | Self::Value(_) | Self::ValueVertex { .. } => None,
@@ -298,9 +298,9 @@ impl<T: Copy> MaterialComponent<T> {
         }
     }
 
-    pub(crate) fn to_texture<Func>(&self, func: Func) -> Option<NonZeroU32>
+    pub(crate) fn to_texture<Func, Out>(&self, func: Func) -> Option<Out>
     where
-        Func: FnOnce(TextureHandle) -> NonZeroU32,
+        Func: FnOnce(TextureHandle) -> Out,
     {
         match *self {
             Self::None | Self::Value(_) => None,
