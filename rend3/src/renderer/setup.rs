@@ -35,7 +35,7 @@ struct PotentialAdapter {
     limits: Limits,
 }
 
-pub fn create_adapter() -> Result<(Instance, Adapter), RendererInitializationError> {
+pub fn create_adapter(desired_backend: Option<Backend>) -> Result<(Instance, Adapter), RendererInitializationError> {
     let backend_bits = BackendBit::VULKAN | BackendBit::DX12;
     let default_backend_order = [Backend::Vulkan, Backend::Dx12];
     let intel_backend_order = [Backend::Dx12, Backend::Vulkan];
@@ -94,6 +94,13 @@ pub fn create_adapter() -> Result<(Instance, Adapter), RendererInitializationErr
     };
 
     for backend in backend_order {
+        if let Some(desired_backend) = desired_backend {
+            if desired_backend != *backend {
+                tracing::debug!("Skipping unwanted backend {:?}", backend);
+                continue;
+            }
+        }
+
         let adapter: Option<PotentialAdapter> = valid_adapters.remove(backend).and_then(|arr| arr.into_iter().next());
 
         if let Some(adapter) = adapter {
@@ -112,9 +119,10 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
     window: &W,
     yard: Arc<Switchyard<TLD>>,
     _imgui: &mut imgui::Context,
+    backend: Option<Backend>,
     options: RendererOptions,
 ) -> Result<Arc<Renderer<TLD>>, RendererInitializationError> {
-    let (instance, adapter) = create_adapter()?;
+    let (instance, adapter) = create_adapter(backend)?;
 
     let surface = unsafe { instance.create_surface(window) };
 

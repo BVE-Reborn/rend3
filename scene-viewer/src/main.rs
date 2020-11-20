@@ -2,6 +2,7 @@ use fnv::FnvBuildHasher;
 use glam::{Mat4, Quat, Vec2, Vec3};
 use imgui::FontSource;
 use obj::{IndexTuple, Obj, ObjMaterial};
+use pico_args::Arguments;
 use rend3::{
     datatypes::{
         AffineTransform, AlbedoComponent, CameraLocation, DirectionalLight, Material, MaterialComponent,
@@ -210,8 +211,22 @@ fn button_pressed<Hash: BuildHasher>(map: &HashMap<u32, bool, Hash>, key: u32) -
     map.get(&key).map_or(false, |b| *b)
 }
 
+fn extract_backend(value: &str) -> Result<wgpu::Backend, &'static str> {
+    Ok(match value.to_lowercase().as_str() {
+        "vulkan" | "vk" => wgpu::Backend::Vulkan,
+        "dx12" | "12" => wgpu::Backend::Dx12,
+        "dx11" | "11" => wgpu::Backend::Dx11,
+        "metal" | "mtl" => wgpu::Backend::Metal,
+        "opengl" | "gl" => wgpu::Backend::Gl,
+        _ => return Err("backend requested but not found"),
+    })
+}
+
 fn main() {
     wgpu_subscriber::initialize_default_subscriber(None);
+
+    let mut args = Arguments::from_env();
+    let backend = args.value_from_fn(["-b", "--backend"], extract_backend).ok();
 
     rend3::span_transfer!(_ -> main_thread_span, INFO, "Main Thread Setup");
     rend3::span_transfer!(_ -> event_loop_span, INFO, "Building Event Loop");
@@ -265,6 +280,7 @@ fn main() {
         &window,
         Arc::clone(&yard),
         &mut imgui,
+        backend,
         options.clone(),
     ))
     .unwrap();

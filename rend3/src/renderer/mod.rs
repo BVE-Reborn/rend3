@@ -18,7 +18,7 @@ use parking_lot::{Mutex, RwLock};
 use raw_window_handle::HasRawWindowHandle;
 use std::{future::Future, sync::Arc};
 use switchyard::{JoinHandle, Switchyard};
-use wgpu::{Device, Queue, Surface, TextureFormat};
+use wgpu::{Backend, Device, Queue, Surface, TextureFormat};
 use wgpu_conveyor::AutomatedBufferManager;
 
 #[macro_use]
@@ -106,9 +106,10 @@ impl<TLD: 'static> Renderer<TLD> {
         window: &'a W,
         yard: Arc<Switchyard<TLD>>,
         imgui_context: &'a mut imgui::Context,
+        backend: Option<Backend>,
         options: RendererOptions,
     ) -> impl Future<Output = Result<Arc<Self>, RendererInitializationError>> + 'a {
-        setup::create_renderer(window, yard, imgui_context, options)
+        setup::create_renderer(window, yard, imgui_context, backend, options)
     }
 
     pub fn add_mesh(&self, mesh: Mesh) -> MeshHandle {
