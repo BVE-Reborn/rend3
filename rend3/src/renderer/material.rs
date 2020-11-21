@@ -73,27 +73,32 @@ struct InternalMaterial {
 }
 
 pub struct MaterialManager {
-    buffer: AutomatedBuffer,
-    buffer_storage: Option<Arc<IdBuffer>>,
+    buffer: ModeData<(), AutomatedBuffer>,
+    buffer_storage: ModeData<(), Option<Arc<IdBuffer>>>,
 
     registry: ResourceRegistry<InternalMaterial>,
 }
 
 impl MaterialManager {
-    pub fn new(device: &Device, manager: &mut AutomatedBufferManager) -> Self {
+    pub fn new(device: &Device, mode: RendererMode, manager: &mut AutomatedBufferManager) -> Self {
         span_transfer!(_ -> new_span, INFO, "Creating Material Manager");
 
-        let buffer = manager.create_new_buffer(
-            device,
-            MAX_UNIFORM_BUFFER_BINDING_SIZE,
-            BufferUsage::UNIFORM,
-            Some("material buffer"),
+        let buffer = mode.into_data(
+            || (),
+            || {
+                manager.create_new_buffer(
+                    device,
+                    MAX_UNIFORM_BUFFER_BINDING_SIZE,
+                    BufferUsage::UNIFORM,
+                    Some("material buffer"),
+                )
+            },
         );
         let registry = ResourceRegistry::new();
 
         Self {
             buffer,
-            buffer_storage: None,
+            buffer_storage: mode.into_data(|| (), || None),
             registry,
         }
     }
@@ -243,8 +248,8 @@ impl MaterialManager {
         span_transfer!(_ -> ready_span, INFO, "Material Manager Ready");
 
         let registry = &self.registry;
-        self.buffer
-            .write_to_buffer(device, encoder, MATERIALS_SIZE, move |_, slice| {
+        if let ModeData::GPU(ref mut buffer) = self.buffer {
+            buffer.write_to_buffer(device, encoder, MATERIALS_SIZE, move |_, slice| {
                 let typed_slice: &mut [GPUShaderMaterial] = bytemuck::cast_slice_mut(slice);
 
                 let translate_texture = texture_manager.translation_fn();
@@ -286,14 +291,14 @@ impl MaterialManager {
                     }
                 }
             });
-
-        self.buffer_storage = Some(self.buffer.get_current_inner());
+            *self.buffer_storage.as_gpu_mut() = Some(self.buffer.as_gpu().get_current_inner());
+        }
     }
 
     pub fn append_to_bgb<'a>(&'a self, general_bgb: &mut BindGroupBuilder<'a>) {
         general_bgb.append(BindGroupEntry {
             binding: 0,
-            resource: self.buffer_storage.as_ref().unwrap().inner.as_entire_binding(),
+            resource: self.buffer_storage.as_gpu().as_ref().unwrap().inner.as_entire_binding(),
         });
     }
 }

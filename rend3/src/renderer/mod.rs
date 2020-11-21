@@ -177,6 +177,7 @@ where
     yard: Arc<Switchyard<TLD>>,
     instructions: InstructionStreamPair,
 
+    mode: RendererMode,
     _adapter_info: ExtendedAdapterInfo,
     queue: Queue,
     device: Arc<Device>,

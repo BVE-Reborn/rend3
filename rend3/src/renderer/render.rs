@@ -153,7 +153,14 @@ pub fn render_loop<TLD: 'static>(
                         texture_manager_cube.remove(handle);
                     }
                     Instruction::AddMaterial { handle, material } => {
-                        material_manager.fill(handle, material);
+                        material_manager.fill(
+                            &renderer.device,
+                            renderer.mode,
+                            &mut texture_manager_2d,
+                            &global_resources.material_bgl,
+                            handle,
+                            material,
+                        );
                     }
                     Instruction::ChangeMaterial { handle, change } => {
                         material_manager.get_mut(handle).update_from_changes(change)

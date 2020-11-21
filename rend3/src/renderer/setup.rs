@@ -1,3 +1,4 @@
+use crate::renderer::RendererMode;
 use crate::{
     instruction::InstructionStreamPair,
     renderer::{
@@ -28,17 +29,18 @@ use wgpu::{
 };
 use wgpu_conveyor::{AutomatedBufferManager, UploadStyle};
 
-struct PotentialAdapter {
-    adapter: Adapter,
+pub struct PotentialAdapter {
+    inner: Adapter,
     info: ExtendedAdapterInfo,
     features: Features,
     limits: Limits,
+    mode: RendererMode,
 }
 
 pub fn create_adapter(
     desired_backend: Option<Backend>,
     desired_device: Option<String>,
-) -> Result<(Instance, Adapter), RendererInitializationError> {
+) -> Result<(Instance, PotentialAdapter), RendererInitializationError> {
     let backend_bits = BackendBit::VULKAN | BackendBit::DX12;
     let default_backend_order = [Backend::Vulkan, Backend::Dx12];
     let intel_backend_order = [Backend::Dx12, Backend::Vulkan];
@@ -56,8 +58,18 @@ pub fn create_adapter(
 
             tracing::debug!("{:?} Adapter {}: {:#?}", backend, idx, info);
 
-            let features = check_features(adapter.features()).ok();
-            let limits = check_limits(adapter.limits()).ok();
+            let adapter_features = adapter.features();
+            let adapter_limits = adapter.limits();
+
+            let mut features = check_features(RendererMode::GPUPowered, adapter_features).ok();
+            let mut limits = check_limits(RendererMode::GPUPowered, &adapter_limits).ok();
+            let mut mode = RendererMode::GPUPowered;
+
+            if features.is_none() || limits.is_none() {
+                features = check_features(RendererMode::CPUPowered, adapter_features).ok();
+                limits = check_limits(RendererMode::CPUPowered, &adapter_limits).ok();
+                mode = RendererMode::CPUPowered;
+            }
 
             let desired = if let Some(ref desired_device) = desired_device {
                 info.name.to_lowercase().contains(desired_device)
@@ -66,12 +78,13 @@ pub fn create_adapter(
             };
 
             if let (Some(features), Some(limits), true) = (features, limits, desired) {
-                tracing::debug!("Adapter usable");
+                tracing::debug!("Adapter usable in {:?} mode", mode);
                 potential_adapters.push(PotentialAdapter {
-                    adapter,
+                    inner: adapter,
                     info,
                     features,
                     limits,
+                    mode,
                 })
             } else {
                 tracing::debug!("Adapter not usable");
@@ -117,7 +130,7 @@ pub fn create_adapter(
             tracing::debug!("Chosen backend: {:?}", backend);
             tracing::debug!("Chosen features: {:#?}", adapter.features);
             tracing::debug!("Chosen limits: {:#?}", adapter.limits);
-            return Ok((instance, adapter.adapter));
+            return Ok((instance, adapter));
         }
     }
 
@@ -132,19 +145,18 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
     desired_device: Option<String>,
     options: RendererOptions,
 ) -> Result<Arc<Renderer<TLD>>, RendererInitializationError> {
-    let (instance, adapter) = create_adapter(desired_backend, desired_device)?;
+    let (instance, chosen_adapter) = create_adapter(desired_backend, desired_device)?;
 
     let surface = unsafe { instance.create_surface(window) };
 
-    let adapter_info = ExtendedAdapterInfo::from(adapter.get_info());
-    let features = check_features(adapter.features())?;
-    let limits = check_limits(adapter.limits())?;
+    let adapter_info = chosen_adapter.info;
 
-    let (device, queue) = adapter
+    let (device, queue) = chosen_adapter
+        .inner
         .request_device(
             &DeviceDescriptor {
-                features,
-                limits,
+                features: chosen_adapter.features,
+                limits: chosen_adapter.limits,
                 shader_validation: true,
             },
             None,
@@ -187,7 +199,11 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
         &adapter_info.device_type,
     )));
     let mesh_manager = RwLock::new(MeshManager::new(&device));
-    let material_manager = RwLock::new(MaterialManager::new(&device, buffer_manager.get_mut()));
+    let material_manager = RwLock::new(MaterialManager::new(
+        &device,
+        chosen_adapter.mode,
+        buffer_manager.get_mut(),
+    ));
     let object_manager = RwLock::new(ObjectManager::new(&device, buffer_manager.get_mut()));
     let directional_light_manager = RwLock::new(DirectionalLightManager::new(&device, buffer_manager.get_mut()));
 
@@ -205,6 +221,7 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
         yard,
         instructions: InstructionStreamPair::new(),
 
+        mode: chosen_adapter.mode,
         _adapter_info: adapter_info,
         queue,
         device,
