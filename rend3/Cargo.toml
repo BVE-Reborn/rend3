@@ -14,20 +14,20 @@ categories = []
 arrayvec = "0.5"
 bitflags = "1"
 bytemuck = "1"
-glam = "0.9"
-imgui = "0.4"
+glam = "0.10"
+imgui = "0.6"
 #imgui-wgpu = "0.9"
 include_dir = "0.6"
 indexmap = "1"
 flume = "0.9"
 fnv = "1"
 futures = { version = "0.3", default-features = false, features = ["std", "async-await"] }
-futures-intrusive = "0.3"
+futures-intrusive = "0.4"
 parking_lot = { version = "0.11", features = ["send_guard"] }
 path-dedot = "3"
 raw-window-handle = "0.3"
 range-alloc = "0.1"
-shaderc = "0.6"
+shaderc = "0.7"
 smallvec = "1"
 switchyard = "0.1"
 tracing = { version = "0.1", default-features = false, features = ["std"] }
@@ -35,4 +35,4 @@ tracing-futures = "0.2"
 thiserror = "1"
 wgpu = { version = "0.6", features = ["trace"] }
 wgpu-conveyor = { version = "0.1", git = "https://github.com/BVE-Reborn/wgpu-conveyor.git", rev = "380d8bc8a74abc684b8c0a21a7987fe505c84d19" }
-winit = { git = "https://github.com/rust-windowing/winit.git", rev = "c1ea0dde92e1de9e029e7fbb2485a454aa81b918",  default-features = false, features = ["x11"] }
+winit = { version = "0.23",  default-features = false }

@@ -11,10 +11,10 @@ edition = "2018"
 ddsfile = "0.4"
 fnv = "1"
 futures = { version = "0.3", default-features = false, features = ["executor"] }
-glam = "0.9"
+glam = "0.10"
 image = { version = "0.23", default-features = false, features = ["png", "jpeg", "tiff"]}
-imgui = "0.4"
-imgui-winit-support = { version = "0.4", git = "https://github.com/BVE-Reborn/imgui-rs.git", rev = "d95b63623ededc12b0536b7df7d80608b6a605a1" }
+imgui = "0.6"
+imgui-winit-support = "0.6"
 obj = { version = "0.10", git = "https://github.com/cwfitzgerald/obj.git", branch = "map_ns" }
 pico-args = "0.3"
 rend3 = { path = "../rend3", version = "0.1.0" }
@@ -23,4 +23,5 @@ switchyard = "0.1"
 tracing = { version = "0.1", default-features = false, features = ["std"] }
 wgpu = "0.6"
 wgpu-subscriber = "0.1"
-winit = { git = "https://github.com/rust-windowing/winit.git", rev = "c1ea0dde92e1de9e029e7fbb2485a454aa81b918",  default-features = false, features = ["x11"] }
+winit = { version = "0.23" }
+

@@ -21,13 +21,9 @@ skip = [
     # graphics
     { name = "core-foundation", version = "0.7.0" }, # winit uses old version
     { name = "core-foundation-sys", version = "0.7.0" }, # winit uses old version
+    { name = "core-graphics", version = "0.19.2" }, # winit uses old version
     # image
     { name = "miniz_oxide", version = "0.3.7" }, # png uses old version
-    # parking_lot
-    { name = "parking_lot", version = "0.10" },
-    { name = "parking_lot_core", version = "0.7.2" },
-    { name = "lock_api", version = "0.3.4" },
-    { name = "cloudabi", version = "0.0.3" },
     # wasi
     { name = "wasi", version = "0.9.0+wasi-snapshot-preview1" },
     # ddsfile
@@ -41,7 +37,8 @@ skip = [
 vulnerability = "deny"
 unmaintained = "deny"
 ignore = [
-    "RUSTSEC-2020-0016"  # async-std is using net2 which id deprecated in favor of socket2
+    "RUSTSEC-2020-0016",  # async-std is using net2 which id deprecated in favor of socket2
+    "RUSTSEC-2020-0056",  # stdweb maintainer is unresponsive
 ]
 
 [sources]
