@@ -244,6 +244,7 @@ impl Default for AlbedoComponent {
 impl AlbedoComponent {
     pub(crate) fn to_value(&self) -> Vec4 {
         match *self {
+            Self::Vertex { .. } => Vec4::splat(1.0),
             Self::Value(value) => value,
             Self::ValueVertex { value, .. } => value,
             _ => Vec4::default(),
@@ -253,8 +254,11 @@ impl AlbedoComponent {
     pub(crate) fn to_flags(&self) -> MaterialFlags {
         match *self {
             Self::None => MaterialFlags::empty(),
-            Self::Vertex { srgb: false } => MaterialFlags::ALBEDO_ACTIVE | MaterialFlags::ALBEDO_VERTEX_SRGB,
-            Self::Vertex { srgb: true } | Self::Value(_) | Self::Texture(_) => MaterialFlags::ALBEDO_ACTIVE,
+            Self::Value(_) | Self::Texture(_) => MaterialFlags::ALBEDO_ACTIVE,
+            Self::Vertex { srgb: false } => MaterialFlags::ALBEDO_ACTIVE | MaterialFlags::ALBEDO_BLEND,
+            Self::Vertex { srgb: true } => {
+                MaterialFlags::ALBEDO_ACTIVE | MaterialFlags::ALBEDO_BLEND | MaterialFlags::ALBEDO_VERTEX_SRGB
+            }
             Self::ValueVertex { srgb: false, .. } | Self::TextureVertex { srgb: false, .. } => {
                 MaterialFlags::ALBEDO_ACTIVE | MaterialFlags::ALBEDO_BLEND
             }

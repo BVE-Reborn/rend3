@@ -49,7 +49,7 @@ PixelData get_per_pixel_data(MaterialData material) {
         if (has_texture(material.albedo_tex)) {
             pixel.albedo = texture(sampler2D(textures[nonuniformEXT(material.albedo_tex - 1)], linear_sampler), i_coords);
         } else {
-            pixel.albedo = vec4(1.0);
+            pixel.albedo = material.albedo;
         }
         if (bool(material.material_flags & FLAGS_ALBEDO_BLEND) || !has_texture(material.albedo_tex)) {
             vec4 vert_color = i_color;
