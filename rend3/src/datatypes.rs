@@ -255,14 +255,12 @@ impl AlbedoComponent {
         match *self {
             Self::None => MaterialFlags::empty(),
             Self::Value(_) | Self::Texture(_) => MaterialFlags::ALBEDO_ACTIVE,
-            Self::Vertex { srgb: false } => MaterialFlags::ALBEDO_ACTIVE | MaterialFlags::ALBEDO_BLEND,
-            Self::Vertex { srgb: true } => {
-                MaterialFlags::ALBEDO_ACTIVE | MaterialFlags::ALBEDO_BLEND | MaterialFlags::ALBEDO_VERTEX_SRGB
-            }
-            Self::ValueVertex { srgb: false, .. } | Self::TextureVertex { srgb: false, .. } => {
-                MaterialFlags::ALBEDO_ACTIVE | MaterialFlags::ALBEDO_BLEND
-            }
-            Self::ValueVertex { srgb: true, .. } | Self::TextureVertex { srgb: true, .. } => {
+            Self::Vertex { srgb: false }
+            | Self::ValueVertex { srgb: false, .. }
+            | Self::TextureVertex { srgb: false, .. } => MaterialFlags::ALBEDO_ACTIVE | MaterialFlags::ALBEDO_BLEND,
+            Self::Vertex { srgb: true }
+            | Self::ValueVertex { srgb: true, .. }
+            | Self::TextureVertex { srgb: true, .. } => {
                 MaterialFlags::ALBEDO_ACTIVE | MaterialFlags::ALBEDO_BLEND | MaterialFlags::ALBEDO_VERTEX_SRGB
             }
         }
