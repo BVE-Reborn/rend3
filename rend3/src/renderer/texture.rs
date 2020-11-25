@@ -1,6 +1,7 @@
 use crate::{
     datatypes::{RendererTextureFormat, TextureHandle},
     registry::ResourceRegistry,
+    renderer::{ModeData, RendererMode},
 };
 use std::{mem, num::NonZeroU32, sync::Arc};
 use wgpu::{
@@ -17,11 +18,11 @@ pub struct InternalTexture {
 }
 
 pub struct TextureManager {
-    layout: Arc<BindGroupLayout>,
-    layout_dirty: bool,
+    layout: ModeData<(), Arc<BindGroupLayout>>,
+    layout_dirty: ModeData<(), bool>,
 
-    group: Arc<BindGroup>,
-    group_dirty: bool,
+    group: ModeData<(), Arc<BindGroup>>,
+    group_dirty: ModeData<(), bool>,
 
     null_tex_man: NullTextureManager,
 
@@ -31,7 +32,7 @@ pub struct TextureManager {
     dimension: TextureViewDimension,
 }
 impl TextureManager {
-    pub fn new(device: &Device, starting_textures: usize, dimension: TextureViewDimension) -> Self {
+    pub fn new(device: &Device, mode: RendererMode, starting_textures: usize, dimension: TextureViewDimension) -> Self {
         span_transfer!(_ -> new_span, INFO, "Creating Texture Manager");
 
         let mut null_tex_man = NullTextureManager::new(device, dimension);
@@ -41,16 +42,16 @@ impl TextureManager {
         let mut views = Vec::with_capacity(view_count);
         fill_to_size(&mut null_tex_man, &mut views, dimension, view_count);
 
-        let layout = create_bind_group_layout(device, view_count as u32, dimension);
-        let group = create_bind_group(device, &layout, &views, dimension);
+        let layout = mode.into_data(|| (), || create_bind_group_layout(device, view_count as u32, dimension));
+        let group = mode.into_data(|| (), || create_bind_group(device, layout.as_gpu(), &views, dimension));
 
         let registry = ResourceRegistry::new();
 
         Self {
             layout,
-            layout_dirty: false,
+            layout_dirty: mode.into_data(|| (), || false),
             group,
-            group_dirty: false,
+            group_dirty: mode.into_data(|| (), || false),
             null_tex_man,
             views,
             registry,
@@ -65,12 +66,12 @@ impl TextureManager {
     pub fn fill(&mut self, handle: TextureHandle, texture: TextureView, format: Option<RendererTextureFormat>) {
         span_transfer!(_ -> fill_span, INFO, "Texture Manager Fill");
 
-        self.group_dirty = true;
+        self.group_dirty = self.group_dirty.map_gpu(|_| true);
 
         let index = self.registry.insert(handle.0, InternalTexture { format });
 
         if index > self.views.len() {
-            self.layout_dirty = true;
+            self.layout_dirty = self.layout_dirty.map_gpu(|_| true);
 
             let new_size = self.views.len() * 2;
             fill_to_size(&mut self.null_tex_man, &mut self.views, self.dimension, new_size);
@@ -100,22 +101,37 @@ impl TextureManager {
         self.registry.get_index_of(handle.0)
     }
 
-    pub fn ready(&mut self, device: &Device) -> (Arc<BindGroupLayout>, Arc<BindGroup>, bool) {
+    pub fn ready(
+        &mut self,
+        device: &Device,
+    ) -> (
+        ModeData<(), Arc<BindGroupLayout>>,
+        ModeData<(), Arc<BindGroup>>,
+        ModeData<(), bool>,
+    ) {
         span_transfer!(_ -> ready_span, INFO, "Material Manager Ready");
 
-        let layout_dirty = self.layout_dirty;
+        if let ModeData::GPU(_) = self.layout_dirty {
+            let layout_dirty = self.layout_dirty;
 
-        if self.layout_dirty {
-            self.layout = create_bind_group_layout(device, self.views.len() as u32, self.dimension);
-            self.layout_dirty = false;
+            if self.layout_dirty.into_gpu() {
+                *self.layout.as_gpu_mut() = create_bind_group_layout(device, self.views.len() as u32, self.dimension);
+                *self.layout_dirty.as_gpu_mut() = false;
+            }
+
+            if self.group_dirty.into_gpu() {
+                *self.group.as_gpu_mut() = create_bind_group(device, self.layout.as_gpu(), &self.views, self.dimension);
+                *self.group_dirty.as_gpu_mut() = false;
+            }
+
+            (
+                self.layout.map_gpu(Arc::clone),
+                self.group.map_gpu(Arc::clone),
+                layout_dirty,
+            )
+        } else {
+            (ModeData::CPU(()), ModeData::CPU(()), ModeData::CPU(()))
         }
-
-        if self.group_dirty {
-            self.group = create_bind_group(device, &self.layout, &self.views, self.dimension);
-            self.group_dirty = false;
-        }
-
-        (Arc::clone(&self.layout), Arc::clone(&self.group), layout_dirty)
     }
 
     pub fn get(&self, handle: TextureHandle) -> &InternalTexture {
@@ -134,8 +150,8 @@ impl TextureManager {
         self.null_tex_man.get_ref()
     }
 
-    pub fn bind_group_layout(&self) -> &BindGroupLayout {
-        &self.layout
+    pub fn gpu_bind_group_layout(&self) -> &BindGroupLayout {
+        self.layout.as_gpu()
     }
 
     pub fn translation_fn(&self) -> impl Fn(TextureHandle) -> NonZeroU32 + Copy + '_ {

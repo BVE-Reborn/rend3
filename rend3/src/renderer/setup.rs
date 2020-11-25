@@ -184,11 +184,13 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
 
     let texture_manager_2d = RwLock::new(TextureManager::new(
         &device,
+        chosen_adapter.mode,
         STARTING_2D_TEXTURES,
         TextureViewDimension::D2,
     ));
     let texture_manager_cube = RwLock::new(TextureManager::new(
         &device,
+        chosen_adapter.mode,
         STARTING_CUBE_TEXTURES,
         TextureViewDimension::Cube,
     ));

@@ -78,11 +78,11 @@ impl PipelineManager {
                     PipelineBindingType::CameraData => &global_data.camera_data_bgl,
                     PipelineBindingType::GPU2DTextures => {
                         uses_2d = true;
-                        texture_2d.bind_group_layout()
+                        texture_2d.gpu_bind_group_layout()
                     }
                     PipelineBindingType::GPUCubeTextures => {
                         uses_cube = true;
-                        texture_cube.bind_group_layout()
+                        texture_cube.gpu_bind_group_layout()
                     }
                     PipelineBindingType::ShadowTexture => &global_data.shadow_texture_bgl,
                     PipelineBindingType::SkyboxTexture => &global_data.skybox_bgl,
