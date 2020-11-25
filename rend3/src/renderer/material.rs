@@ -1,17 +1,14 @@
-use crate::datatypes::{AlbedoComponent, TextureHandle};
-use crate::renderer::{ModeData, RendererMode};
 use crate::{
     bind_merge::BindGroupBuilder,
-    datatypes::{Material, MaterialFlags, MaterialHandle, RendererTextureFormat},
+    datatypes::{Material, MaterialChange, MaterialFlags, MaterialHandle, RendererTextureFormat, TextureHandle},
     registry::ResourceRegistry,
-    renderer::{limits::MAX_UNIFORM_BUFFER_BINDING_SIZE, texture::TextureManager},
+    renderer::{limits::MAX_UNIFORM_BUFFER_BINDING_SIZE, texture::TextureManager, ModeData, RendererMode},
 };
 use glam::f32::Vec4;
 use std::{mem::size_of, num::NonZeroU32, sync::Arc};
-use wgpu::util::{BufferInitDescriptor, DeviceExt};
 use wgpu::{
-    BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindingResource, Buffer, BufferAddress,
-    BufferDescriptor, BufferUsage, CommandEncoder, Device,
+    util::{BufferInitDescriptor, DeviceExt},
+    BindGroup, BindGroupLayout, BindingResource, Buffer, BufferAddress, BufferUsage, CommandEncoder, Device, Queue,
 };
 use wgpu_conveyor::{AutomatedBuffer, AutomatedBufferManager, IdBuffer};
 
@@ -37,6 +34,36 @@ struct CPUShaderMaterial {
 
 unsafe impl bytemuck::Zeroable for CPUShaderMaterial {}
 unsafe impl bytemuck::Pod for CPUShaderMaterial {}
+
+impl CPUShaderMaterial {
+    pub fn from_material(material: &Material, texture_manager_2d: &TextureManager) -> Self {
+        Self {
+            albedo: material.albedo.to_value(),
+            roughness: material.roughness.to_value(0.0),
+            metallic: material.metallic.to_value(0.0),
+            reflectance: material.reflectance.to_value(0.5),
+            clear_coat: material.clear_coat.to_value(0.0),
+            clear_coat_roughness: material.clear_coat_roughness.to_value(0.0),
+            anisotropy: material.anisotropy.to_value(0.0),
+            ambient_occlusion: material.ambient_occlusion.to_value(1.0),
+            alpha_cutout: material.alpha_cutout.unwrap_or(0.0),
+            texture_enable: !0,
+            material_flags: {
+                let mut flags = material.albedo.to_flags();
+                flags.set(MaterialFlags::ALPHA_CUTOUT, material.alpha_cutout.is_some());
+                flags.set(
+                    MaterialFlags::BICOMPONENT_NORMAL,
+                    material
+                        .normal
+                        .and_then(|handle| texture_manager_2d.get(handle).format)
+                        .map(|format| format == RendererTextureFormat::Bc5Normal)
+                        .unwrap_or(false),
+                );
+                flags
+            },
+        }
+    }
+}
 
 #[repr(C, align(16))]
 #[derive(Debug, Copy, Clone)]
@@ -123,31 +150,7 @@ impl MaterialManager {
 
         let material_buffer = mode.into_data(
             || {
-                let data = CPUShaderMaterial {
-                    albedo: material.albedo.to_value(),
-                    roughness: material.roughness.to_value(0.0),
-                    metallic: material.metallic.to_value(0.0),
-                    reflectance: material.reflectance.to_value(0.5),
-                    clear_coat: material.clear_coat.to_value(0.0),
-                    clear_coat_roughness: material.clear_coat_roughness.to_value(0.0),
-                    anisotropy: material.anisotropy.to_value(0.0),
-                    ambient_occlusion: material.ambient_occlusion.to_value(1.0),
-                    alpha_cutout: material.alpha_cutout.unwrap_or(0.0),
-                    texture_enable: !0,
-                    material_flags: {
-                        let mut flags = material.albedo.to_flags();
-                        flags.set(MaterialFlags::ALPHA_CUTOUT, material.alpha_cutout.is_some());
-                        flags.set(
-                            MaterialFlags::BICOMPONENT_NORMAL,
-                            material
-                                .normal
-                                .and_then(|handle| texture_manager_2d.get(handle).format)
-                                .map(|format| format == RendererTextureFormat::Bc5Normal)
-                                .unwrap_or(false),
-                        );
-                        flags
-                    },
-                };
+                let data = CPUShaderMaterial::from_material(&material, texture_manager_2d);
 
                 device.create_buffer_init(&BufferInitDescriptor {
                     label: None,
@@ -166,62 +169,34 @@ impl MaterialManager {
                 bind_group: mode.into_data(
                     || {
                         let mut bgb = BindGroupBuilder::new(None);
-                        bgb.append(BindGroupEntry {
-                            binding: 0,
-                            resource: BindingResource::TextureView(
-                                material.albedo.to_texture(lookup_fn).unwrap_or(null_tex),
-                            ),
-                        });
-                        bgb.append(BindGroupEntry {
-                            binding: 1,
-                            resource: BindingResource::TextureView(material.normal.map(lookup_fn).unwrap_or(null_tex)),
-                        });
-                        bgb.append(BindGroupEntry {
-                            binding: 2,
-                            resource: BindingResource::TextureView(
-                                material.roughness.to_texture(lookup_fn).unwrap_or(null_tex),
-                            ),
-                        });
-                        bgb.append(BindGroupEntry {
-                            binding: 2,
-                            resource: BindingResource::TextureView(
-                                material.metallic.to_texture(lookup_fn).unwrap_or(null_tex),
-                            ),
-                        });
-                        bgb.append(BindGroupEntry {
-                            binding: 2,
-                            resource: BindingResource::TextureView(
-                                material.reflectance.to_texture(lookup_fn).unwrap_or(null_tex),
-                            ),
-                        });
-                        bgb.append(BindGroupEntry {
-                            binding: 2,
-                            resource: BindingResource::TextureView(
-                                material.clear_coat.to_texture(lookup_fn).unwrap_or(null_tex),
-                            ),
-                        });
-                        bgb.append(BindGroupEntry {
-                            binding: 2,
-                            resource: BindingResource::TextureView(
-                                material.clear_coat_roughness.to_texture(lookup_fn).unwrap_or(null_tex),
-                            ),
-                        });
-                        bgb.append(BindGroupEntry {
-                            binding: 2,
-                            resource: BindingResource::TextureView(
-                                material.anisotropy.to_texture(lookup_fn).unwrap_or(null_tex),
-                            ),
-                        });
-                        bgb.append(BindGroupEntry {
-                            binding: 2,
-                            resource: BindingResource::TextureView(
-                                material.ambient_occlusion.to_texture(lookup_fn).unwrap_or(null_tex),
-                            ),
-                        });
-                        bgb.append(BindGroupEntry {
-                            binding: 2,
-                            resource: material_buffer.as_cpu().as_entire_binding(),
-                        });
+                        bgb.append(BindingResource::TextureView(
+                            material.albedo.to_texture(lookup_fn).unwrap_or(null_tex),
+                        ));
+                        bgb.append(BindingResource::TextureView(
+                            material.normal.map(lookup_fn).unwrap_or(null_tex),
+                        ));
+                        bgb.append(BindingResource::TextureView(
+                            material.roughness.to_texture(lookup_fn).unwrap_or(null_tex),
+                        ));
+                        bgb.append(BindingResource::TextureView(
+                            material.metallic.to_texture(lookup_fn).unwrap_or(null_tex),
+                        ));
+                        bgb.append(BindingResource::TextureView(
+                            material.reflectance.to_texture(lookup_fn).unwrap_or(null_tex),
+                        ));
+                        bgb.append(BindingResource::TextureView(
+                            material.clear_coat.to_texture(lookup_fn).unwrap_or(null_tex),
+                        ));
+                        bgb.append(BindingResource::TextureView(
+                            material.clear_coat_roughness.to_texture(lookup_fn).unwrap_or(null_tex),
+                        ));
+                        bgb.append(BindingResource::TextureView(
+                            material.anisotropy.to_texture(lookup_fn).unwrap_or(null_tex),
+                        ));
+                        bgb.append(BindingResource::TextureView(
+                            material.ambient_occlusion.to_texture(lookup_fn).unwrap_or(null_tex),
+                        ));
+                        bgb.append(material_buffer.as_cpu().as_entire_binding());
                         bgb.build(device, material_bgl)
                     },
                     || (),
@@ -236,8 +211,20 @@ impl MaterialManager {
         self.registry.remove(handle.0);
     }
 
-    pub fn get_mut(&mut self, handle: MaterialHandle) -> &mut Material {
-        &mut self.registry.get_mut(handle.0).mat
+    pub fn update_from_changes(
+        &mut self,
+        queue: &Queue,
+        texture_manager_2d: &TextureManager,
+        handle: MaterialHandle,
+        change: MaterialChange,
+    ) {
+        let material = self.registry.get_mut(handle.0);
+        material.mat.update_from_changes(change);
+
+        if let ModeData::CPU(ref mut mat_buffer) = material.material_buffer {
+            let cpu = CPUShaderMaterial::from_material(&material.mat, texture_manager_2d);
+            queue.write_buffer(mat_buffer, 0, bytemuck::bytes_of(&cpu));
+        }
     }
 
     pub fn internal_index(&self, handle: MaterialHandle) -> usize {
@@ -296,9 +283,6 @@ impl MaterialManager {
     }
 
     pub fn append_to_bgb<'a>(&'a self, general_bgb: &mut BindGroupBuilder<'a>) {
-        general_bgb.append(BindGroupEntry {
-            binding: 0,
-            resource: self.buffer_storage.as_gpu().as_ref().unwrap().inner.as_entire_binding(),
-        });
+        general_bgb.append(self.buffer_storage.as_gpu().as_ref().unwrap().inner.as_entire_binding());
     }
 }

@@ -13,6 +13,7 @@ use crate::{
     statistics::RendererStatistics,
     RendererInitializationError, RendererOptions,
 };
+use bitflags::_core::cmp::Ordering;
 pub use material::{MATERIALS_SIZE, MAX_MATERIALS};
 use parking_lot::{Mutex, RwLock};
 use raw_window_handle::HasRawWindowHandle;
@@ -25,6 +26,7 @@ use wgpu_conveyor::AutomatedBufferManager;
 mod util;
 
 mod camera;
+mod culling;
 pub mod error;
 mod frustum;
 mod info;
@@ -46,11 +48,6 @@ mod list {
 mod material;
 mod mesh;
 mod object;
-mod passes {
-    mod culling;
-
-    pub use culling::*;
-}
 mod pipeline;
 mod render;
 mod resources;
@@ -58,6 +55,15 @@ mod setup;
 mod shaders;
 mod texture;
 mod uniforms;
+
+#[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
+pub struct OrdEqFloat(pub f32);
+impl Eq for OrdEqFloat {}
+impl Ord for OrdEqFloat {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.partial_cmp(other).unwrap_or(Ordering::Greater)
+    }
+}
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum RendererMode {
@@ -79,6 +85,7 @@ pub(crate) enum ModeData<C, G> {
     CPU(C),
     GPU(G),
 }
+#[allow(dead_code)] // Even if these are unused, don't warn
 impl<C, G> ModeData<C, G> {
     pub fn mode(&self) -> RendererMode {
         match self {
@@ -162,6 +169,7 @@ const COMPUTE_POOL: u8 = 0;
 
 const BUFFER_RECALL_PRIORITY: u32 = 0;
 const MAIN_TASK_PRIORITY: u32 = 1;
+const CULLING_PRIORITY: u32 = 2;
 const RENDER_RECORD_PRIORITY: u32 = 2;
 const PIPELINE_BUILD_PRIORITY: u32 = 3;
 
@@ -178,7 +186,7 @@ where
     instructions: InstructionStreamPair,
 
     mode: RendererMode,
-    _adapter_info: ExtendedAdapterInfo,
+    adapter_info: ExtendedAdapterInfo,
     queue: Queue,
     device: Arc<Device>,
     surface: Surface,
@@ -196,7 +204,7 @@ where
 
     render_list_cache: RwLock<list::RenderListCache>,
 
-    culling_pass: passes::CullingPass,
+    culling_pass: culling::CullingPass,
 
     // _imgui_renderer: imgui_wgpu::Renderer,
     options: RwLock<RendererOptions>,
@@ -211,6 +219,14 @@ impl<TLD: 'static> Renderer<TLD> {
         options: RendererOptions,
     ) -> impl Future<Output = Result<Arc<Self>, RendererInitializationError>> + 'a {
         setup::create_renderer(window, yard, imgui_context, backend, device, options)
+    }
+
+    pub fn mode(&self) -> RendererMode {
+        self.mode
+    }
+
+    pub fn adapter_info(&self) -> ExtendedAdapterInfo {
+        self.adapter_info.clone()
     }
 
     pub fn add_mesh(&self, mesh: Mesh) -> MeshHandle {

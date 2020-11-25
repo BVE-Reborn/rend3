@@ -1,4 +1,4 @@
-use crate::renderer::RendererMode;
+use crate::renderer::culling;
 use crate::{
     instruction::InstructionStreamPair,
     renderer::{
@@ -9,12 +9,11 @@ use crate::{
         material::MaterialManager,
         mesh::MeshManager,
         object::ObjectManager,
-        passes,
         pipeline::PipelineManager,
         resources::RendererGlobalResources,
         shaders::ShaderManager,
         texture::{TextureManager, STARTING_2D_TEXTURES, STARTING_CUBE_TEXTURES},
-        Renderer,
+        Renderer, RendererMode,
     },
     RendererInitializationError, RendererOptions,
 };
@@ -171,8 +170,9 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
     let mut global_resources = RwLock::new(RendererGlobalResources::new(&device, &surface, &options));
     let global_resource_guard = global_resources.get_mut();
 
-    let culling_pass = passes::CullingPass::new(
+    let culling_pass = culling::CullingPass::new(
         &device,
+        chosen_adapter.mode,
         &shader_manager,
         &global_resource_guard.prefix_sum_bgl,
         &global_resource_guard.pre_cull_bgl,
@@ -204,7 +204,11 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
         chosen_adapter.mode,
         buffer_manager.get_mut(),
     ));
-    let object_manager = RwLock::new(ObjectManager::new(&device, buffer_manager.get_mut()));
+    let object_manager = RwLock::new(ObjectManager::new(
+        &device,
+        chosen_adapter.mode,
+        buffer_manager.get_mut(),
+    ));
     let directional_light_manager = RwLock::new(DirectionalLightManager::new(&device, buffer_manager.get_mut()));
 
     span_transfer!(_ -> imgui_guard, INFO, "Creating Imgui Renderer");
@@ -222,7 +226,7 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
         instructions: InstructionStreamPair::new(),
 
         mode: chosen_adapter.mode,
-        _adapter_info: adapter_info,
+        adapter_info,
         queue,
         device,
         surface,

@@ -1,5 +1,4 @@
-use crate::renderer::RendererMode;
-use crate::{LimitType, RendererInitializationError};
+use crate::{renderer::RendererMode, LimitType, RendererInitializationError};
 use wgpu::{BufferAddress, Features, Limits};
 
 pub const MAX_UNIFORM_BUFFER_BINDING_SIZE: BufferAddress = 1 << 16; // Guaranteed on DI hardware

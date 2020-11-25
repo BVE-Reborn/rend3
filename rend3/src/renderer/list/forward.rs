@@ -1,6 +1,7 @@
+use crate::renderer::ModeData;
 use crate::{
     list::{ImageInputReference, ImageOutputReference, RenderOpInputType, RenderPass, ResourceBinding},
-    renderer::{passes::CullingPassData, pipeline::create_custom_texture_bgl, uniforms::WrappedUniform},
+    renderer::{culling::CullingPassData, pipeline::create_custom_texture_bgl, uniforms::WrappedUniform},
     Renderer,
 };
 use std::sync::Arc;
@@ -199,18 +200,21 @@ where
             RenderOpInputType::FullscreenTriangle => {
                 rpass.draw(0..3, 0..1);
             }
-            RenderOpInputType::Models3D => {
-                rpass.set_vertex_buffer(0, vertex.slice(..));
-                rpass.set_vertex_buffer(1, culling_data.indirect_buffer.slice(..));
-                rpass.set_index_buffer(index.slice(..));
-                rpass.multi_draw_indexed_indirect_count(
-                    &culling_data.indirect_buffer,
-                    0,
-                    &culling_data.count_buffer,
-                    0,
-                    culling_data.object_count,
-                );
-            }
+            RenderOpInputType::Models3D => match culling_data.inner {
+                ModeData::CPU(ref c) => {}
+                ModeData::GPU(ref g) => {
+                    rpass.set_vertex_buffer(0, vertex.slice(..));
+                    rpass.set_vertex_buffer(1, g.indirect_buffer.slice(..));
+                    rpass.set_index_buffer(index.slice(..));
+                    rpass.multi_draw_indexed_indirect_count(
+                        &g.indirect_buffer,
+                        0,
+                        &g.count_buffer,
+                        0,
+                        culling_data.object_count,
+                    );
+                }
+            },
         }
     }
 

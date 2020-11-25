@@ -7,8 +7,8 @@ use crate::{
 use glam::{Mat4, Vec3};
 use std::{mem::size_of, num::NonZeroU32, sync::Arc};
 use wgpu::{
-    BindGroupEntry, BindingResource, BufferAddress, BufferUsage, CommandEncoder, Device, Extent3d, TextureAspect,
-    TextureDescriptor, TextureDimension, TextureUsage, TextureView, TextureViewDescriptor, TextureViewDimension,
+    BindingResource, BufferAddress, BufferUsage, CommandEncoder, Device, Extent3d, TextureAspect, TextureDescriptor,
+    TextureDimension, TextureUsage, TextureView, TextureViewDescriptor, TextureViewDimension,
 };
 use wgpu_conveyor::{write_to_buffer1, AutomatedBuffer, AutomatedBufferManager, IdBuffer};
 
@@ -133,14 +133,8 @@ impl DirectionalLightManager {
     }
 
     pub fn append_to_bgb<'a>(&'a self, builder: &mut BindGroupBuilder<'a>) {
-        builder.append(BindGroupEntry {
-            binding: 0,
-            resource: self.buffer_storage.as_ref().unwrap().inner.as_entire_binding(),
-        });
-        builder.append(BindGroupEntry {
-            binding: 0,
-            resource: BindingResource::TextureView(&self.view),
-        });
+        builder.append(self.buffer_storage.as_ref().unwrap().inner.as_entire_binding());
+        builder.append(BindingResource::TextureView(&self.view));
     }
 
     pub fn values(&self) -> impl Iterator<Item = &InternalDirectionalLight> {

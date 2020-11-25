@@ -131,7 +131,7 @@ impl TextureManager {
     }
 
     pub fn get_null_view(&self) -> &TextureView {
-        self.null_tex_man.get_ref(self.dimension)
+        self.null_tex_man.get_ref()
     }
 
     pub fn bind_group_layout(&self) -> &BindGroupLayout {
@@ -248,7 +248,7 @@ impl NullTextureManager {
         self.inner.pop().unwrap()
     }
 
-    pub fn get_ref(&self, dimension: TextureViewDimension) -> &TextureView {
+    pub fn get_ref(&self) -> &TextureView {
         self.inner.first().unwrap()
     }
 

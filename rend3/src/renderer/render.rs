@@ -12,9 +12,9 @@ use futures::{stream::FuturesOrdered, StreamExt};
 use std::{borrow::Cow, future::Future, sync::Arc};
 use tracing_futures::Instrument;
 use wgpu::{
-    BindGroupEntry, BindingResource, CommandEncoderDescriptor, Extent3d, Origin3d, ShaderModuleSource, SwapChainError,
-    TextureAspect, TextureCopyView, TextureDataLayout, TextureDescriptor, TextureDimension, TextureUsage,
-    TextureViewDescriptor, TextureViewDimension,
+    BindingResource, CommandEncoderDescriptor, Extent3d, Origin3d, ShaderModuleSource, SwapChainError, TextureAspect,
+    TextureCopyView, TextureDataLayout, TextureDescriptor, TextureDimension, TextureUsage, TextureViewDescriptor,
+    TextureViewDimension,
 };
 
 pub fn render_loop<TLD: 'static>(
@@ -163,7 +163,7 @@ pub fn render_loop<TLD: 'static>(
                         );
                     }
                     Instruction::ChangeMaterial { handle, change } => {
-                        material_manager.get_mut(handle).update_from_changes(change)
+                        material_manager.update_from_changes(&renderer.queue, &texture_manager_2d, handle, change);
                     }
                     Instruction::RemoveMaterial { handle } => {
                         material_manager.remove(handle);
@@ -251,10 +251,7 @@ pub fn render_loop<TLD: 'static>(
                 texture_manager_cube.get_null_view()
             };
             let mut skybox_bgb = BindGroupBuilder::new(Some(String::from("skybox bg")));
-            skybox_bgb.append(BindGroupEntry {
-                binding: 0,
-                resource: BindingResource::TextureView(skybox_texture_view),
-            });
+            skybox_bgb.append(BindingResource::TextureView(skybox_texture_view));
             let skybox_bg = skybox_bgb.build(&renderer.device, &global_resources.skybox_bgl);
 
             drop((
@@ -287,6 +284,7 @@ pub fn render_loop<TLD: 'static>(
             for light in directional_light_manager.values() {
                 let cull_data = Arc::new(renderer.culling_pass.prepare(
                     &renderer.device,
+                    renderer.mode,
                     &global_resources.prefix_sum_bgl,
                     &global_resources.pre_cull_bgl,
                     &global_resources.object_output_bgl,
@@ -295,10 +293,7 @@ pub fn render_loop<TLD: 'static>(
                 ));
 
                 let mut object_bgb = BindGroupBuilder::new(Some(String::from("object bg")));
-                object_bgb.append(BindGroupEntry {
-                    binding: 0,
-                    resource: cull_data.output_buffer.as_entire_binding(),
-                });
+                object_bgb.append(cull_data.output_buffer.as_entire_binding());
                 let object_bg = object_bgb.build(&renderer.device, &global_resources.object_data_bgl);
 
                 let uniform = WrappedUniform::new(&renderer.device, &global_resources.camera_data_bgl);
@@ -308,7 +303,7 @@ pub fn render_loop<TLD: 'static>(
 
                 renderer
                     .culling_pass
-                    .run(&mut cpass, &object_input_bg, &uniform.uniform_bg, &*cull_data);
+                    .gpu_run(&mut cpass, &object_input_bg, &uniform.uniform_bg, &*cull_data);
 
                 drop(cpass);
 
@@ -360,6 +355,7 @@ pub fn render_loop<TLD: 'static>(
             {
                 let cull_data = Arc::new(renderer.culling_pass.prepare(
                     &renderer.device,
+                    renderer.mode,
                     &global_resources.prefix_sum_bgl,
                     &global_resources.pre_cull_bgl,
                     &global_resources.object_output_bgl,
@@ -368,10 +364,7 @@ pub fn render_loop<TLD: 'static>(
                 ));
 
                 let mut object_bgb = BindGroupBuilder::new(Some(String::from("object bg")));
-                object_bgb.append(BindGroupEntry {
-                    binding: 0,
-                    resource: cull_data.output_buffer.as_entire_binding(),
-                });
+                object_bgb.append(cull_data.output_buffer.as_entire_binding());
                 let object_bg = object_bgb.build(&renderer.device, &global_resources.object_data_bgl);
 
                 let uniform = WrappedUniform::new(&renderer.device, &global_resources.camera_data_bgl);
@@ -381,7 +374,7 @@ pub fn render_loop<TLD: 'static>(
 
                 renderer
                     .culling_pass
-                    .run(&mut cpass, &object_input_bg, &uniform.uniform_bg, &*cull_data);
+                    .gpu_run(&mut cpass, &object_input_bg, &uniform.uniform_bg, &*cull_data);
 
                 drop(cpass);
 

@@ -47,7 +47,7 @@ void main() {
     ObjectInputData data = object_input[input_idx];
 
     mat4 model_view = uniforms.view * data.transform;
-    /// TODO: Deal with scale
+    // TODO: Deal with scale
     vec3 mesh_center = (model_view * vec4(data.bounding_sphere.xyz, 1.0)).xyz;
     float mesh_radius = data.bounding_sphere.w;
 

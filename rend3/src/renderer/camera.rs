@@ -3,6 +3,7 @@ use glam::{Mat3, Mat4, Vec3, Vec3A};
 
 const CAMERA_VFOV: f32 = 60.0;
 
+#[derive(Copy, Clone)]
 pub struct Camera {
     orig_view: Mat4,
     view: Mat4,

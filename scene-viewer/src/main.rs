@@ -351,22 +351,22 @@ fn main() {
                 1.0
             };
             if button_pressed(&scancode_status, platform::Scancodes::W) {
-                *camera_location.location.z_mut() += velocity * delta_time.as_secs_f32();
+                camera_location.location.z += velocity * delta_time.as_secs_f32();
             }
             if button_pressed(&scancode_status, platform::Scancodes::S) {
-                *camera_location.location.z_mut() -= velocity * delta_time.as_secs_f32();
+                camera_location.location.z -= velocity * delta_time.as_secs_f32();
             }
             if button_pressed(&scancode_status, platform::Scancodes::A) {
-                *camera_location.location.x_mut() -= velocity * delta_time.as_secs_f32();
+                camera_location.location.x -= velocity * delta_time.as_secs_f32();
             }
             if button_pressed(&scancode_status, platform::Scancodes::D) {
-                *camera_location.location.x_mut() += velocity * delta_time.as_secs_f32();
+                camera_location.location.x += velocity * delta_time.as_secs_f32();
             }
             if button_pressed(&scancode_status, platform::Scancodes::Q) {
-                *camera_location.location.y_mut() += velocity * delta_time.as_secs_f32();
+                camera_location.location.y += velocity * delta_time.as_secs_f32();
             }
             if button_pressed(&scancode_status, platform::Scancodes::Z) {
-                *camera_location.location.y_mut() -= velocity * delta_time.as_secs_f32();
+                camera_location.location.y -= velocity * delta_time.as_secs_f32();
             }
 
             window.request_redraw();

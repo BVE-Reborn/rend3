@@ -4,7 +4,7 @@ use crate::{
     renderer::{camera::Camera, util, util::SamplerType},
     RendererOptions,
 };
-use wgpu::{BindGroupEntry, BindGroupLayout, BindingResource, Device, Sampler, Surface, SwapChain};
+use wgpu::{BindGroupLayout, BindingResource, Device, Sampler, Surface, SwapChain};
 
 pub struct RendererGlobalResources {
     pub swapchain: SwapChain,
@@ -88,14 +88,8 @@ impl RendererGlobalResources {
     }
 
     pub fn append_to_bgb<'a>(&'a self, general_bgb: &mut BindGroupBuilder<'a>) {
-        general_bgb.append(BindGroupEntry {
-            binding: 0,
-            resource: BindingResource::Sampler(&self.linear_sampler),
-        });
-        general_bgb.append(BindGroupEntry {
-            binding: 0,
-            resource: BindingResource::Sampler(&self.shadow_sampler),
-        });
+        general_bgb.append(BindingResource::Sampler(&self.linear_sampler));
+        general_bgb.append(BindingResource::Sampler(&self.shadow_sampler));
     }
 }
 
