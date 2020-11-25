@@ -325,6 +325,7 @@ impl CullingPass {
     }
 
     pub(crate) fn cpu_run<'a, TD>(
+        &self,
         yard: &'a Switchyard<TD>,
         queue: &'a Queue,
         object_manager: &'a ObjectManager,

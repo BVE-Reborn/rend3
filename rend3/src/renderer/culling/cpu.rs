@@ -1,16 +1,17 @@
-use crate::datatypes::MaterialHandle;
-use crate::renderer::frustum::ShaderFrustum;
-use crate::renderer::object::InternalObject;
-use crate::renderer::{
-    camera::Camera, culling::CullingPassData, object::ObjectManager, OrdEqFloat, COMPUTE_POOL, CULLING_PRIORITY,
+use crate::{
+    datatypes::MaterialHandle,
+    renderer::{
+        camera::Camera,
+        culling::CullingPassData,
+        frustum::ShaderFrustum,
+        object::{InternalObject, ObjectManager},
+        OrdEqFloat, COMPUTE_POOL, CULLING_PRIORITY,
+    },
 };
-use futures::stream::FuturesUnordered;
-use futures::StreamExt;
-use glam::Vec4;
-use glam::{Mat4, Vec4Swizzles};
+use futures::{stream::FuturesUnordered, StreamExt};
+use glam::{Mat4, Vec4, Vec4Swizzles};
 use itertools::Itertools;
 use smallvec::SmallVec;
-use std::sync::Arc;
 use switchyard::Switchyard;
 use wgpu::Queue;
 
@@ -136,4 +137,6 @@ pub(crate) async fn run<TD>(
     }
 
     queue.write_buffer(&data.output_buffer, 0, bytemuck::cast_slice(&output_data));
+
+    *data.inner.as_cpu_mut() = calls;
 }

@@ -1,7 +1,6 @@
-use crate::renderer::ModeData;
 use crate::{
     list::{ImageInputReference, ImageOutputReference, RenderOpInputType, RenderPass, ResourceBinding},
-    renderer::{culling::CullingPassData, pipeline::create_custom_texture_bgl, uniforms::WrappedUniform},
+    renderer::{culling::CullingPassData, pipeline::create_custom_texture_bgl, uniforms::WrappedUniform, ModeData},
     Renderer,
 };
 use std::sync::Arc;

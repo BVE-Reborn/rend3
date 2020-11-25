@@ -1,7 +1,7 @@
-use crate::renderer::culling;
 use crate::{
     instruction::InstructionStreamPair,
     renderer::{
+        culling,
         info::{ExtendedAdapterInfo, Vendor},
         light::DirectionalLightManager,
         limits::{check_features, check_limits},

@@ -412,7 +412,8 @@ impl<TLD: 'static> Renderer<TLD> {
     }
 
     pub fn render(self: &Arc<Self>, list: RenderList) -> JoinHandle<RendererStatistics> {
+        let this = Arc::clone(self);
         self.yard
-            .spawn(0, MAIN_TASK_PRIORITY, render::render_loop(Arc::clone(self), list))
+            .spawn_local(0, MAIN_TASK_PRIORITY, move |_| render::render_loop(this, list))
     }
 }
