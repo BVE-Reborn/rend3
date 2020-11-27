@@ -10,9 +10,9 @@ use std::{future::Future, sync::Arc};
 use wgpu::{
     BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, BlendDescriptor,
     ColorStateDescriptor, ColorWrite, CompareFunction, CullMode, DepthStencilStateDescriptor, Device, FrontFace,
-    IndexFormat, PipelineLayoutDescriptor, PolygonMode, PrimitiveTopology, ProgrammableStageDescriptor,
-    PushConstantRange, RasterizationStateDescriptor, RenderPipeline, RenderPipelineDescriptor, ShaderStage,
-    StencilStateDescriptor, TextureComponentType, TextureViewDimension, VertexStateDescriptor,
+    IndexFormat, PipelineLayoutDescriptor, PrimitiveTopology, ProgrammableStageDescriptor, PushConstantRange,
+    RasterizationStateDescriptor, RenderPipeline, RenderPipelineDescriptor, ShaderStage, StencilStateDescriptor,
+    TextureComponentType, TextureViewDimension, VertexStateDescriptor,
 };
 
 #[derive(Debug)]
@@ -186,7 +186,6 @@ impl PipelineManager {
                         PipelineInputType::FullscreenTriangle => CullMode::None,
                         PipelineInputType::Models3d => CullMode::Back,
                     },
-                    polygon_mode: PolygonMode::Fill,
                     clamp_depth: match pipeline_desc.run_rate {
                         // TODO
                         RenderPassRunRate::PerShadow => false,

@@ -429,6 +429,9 @@ fn main() {
             event: WindowEvent::CloseRequested,
             ..
         } => {
+            if let Some(handle) = render_handle.take() {
+                futures::executor::block_on(handle);
+            }
             *control = ControlFlow::Exit;
         }
         Event::RedrawRequested(_) => {

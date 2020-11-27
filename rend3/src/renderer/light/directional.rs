@@ -133,7 +133,9 @@ impl DirectionalLightManager {
     }
 
     pub fn append_to_bgb<'a>(&'a self, builder: &mut BindGroupBuilder<'a>) {
-        builder.append(self.buffer_storage.as_ref().unwrap().inner.as_entire_binding());
+        builder.append(BindingResource::Buffer(
+            self.buffer_storage.as_ref().unwrap().inner.slice(..),
+        ));
         builder.append(BindingResource::TextureView(&self.view));
     }
 

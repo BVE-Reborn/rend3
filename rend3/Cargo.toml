@@ -14,7 +14,7 @@ categories = []
 arrayvec = "0.5"
 bitflags = "1"
 bytemuck = "1"
-glam = "0.10"
+glam = "0.11"
 imgui = "0.6"
 #imgui-wgpu = "0.9"
 include_dir = "0.6"
@@ -34,6 +34,6 @@ switchyard = "0.1"
 tracing = { version = "0.1", default-features = false, features = ["std"] }
 tracing-futures = "0.2"
 thiserror = "1"
-wgpu = { version = "0.6", features = ["trace"] }
-wgpu-conveyor = { version = "0.1", git = "https://github.com/BVE-Reborn/wgpu-conveyor.git", rev = "380d8bc8a74abc684b8c0a21a7987fe505c84d19" }
+wgpu = "0.6"
+wgpu-conveyor = { version = "0.1", git = "https://github.com/BVE-Reborn/wgpu-conveyor.git", rev = "4a68d83f6d263e3c83ff4fd4ef4f58d6e6d4eeb0" }
 winit = { version = "0.23",  default-features = false }

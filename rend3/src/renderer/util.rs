@@ -166,35 +166,35 @@ pub fn create_material_bgl(device: &Device, mode: RendererMode) -> BindGroupLayo
                 entries: &[
                     BindGroupLayoutEntry {
                         binding: 0,
-                        ..texture_entry
+                        ..texture_entry.clone()
                     },
                     BindGroupLayoutEntry {
                         binding: 1,
-                        ..texture_entry
+                        ..texture_entry.clone()
                     },
                     BindGroupLayoutEntry {
                         binding: 2,
-                        ..texture_entry
+                        ..texture_entry.clone()
                     },
                     BindGroupLayoutEntry {
                         binding: 3,
-                        ..texture_entry
+                        ..texture_entry.clone()
                     },
                     BindGroupLayoutEntry {
                         binding: 4,
-                        ..texture_entry
+                        ..texture_entry.clone()
                     },
                     BindGroupLayoutEntry {
                         binding: 5,
-                        ..texture_entry
+                        ..texture_entry.clone()
                     },
                     BindGroupLayoutEntry {
                         binding: 6,
-                        ..texture_entry
+                        ..texture_entry.clone()
                     },
                     BindGroupLayoutEntry {
                         binding: 7,
-                        ..texture_entry
+                        ..texture_entry.clone()
                     },
                     BindGroupLayoutEntry {
                         binding: 8,
@@ -324,6 +324,5 @@ pub fn create_sampler(device: &Device, ty: SamplerType) -> Sampler {
             SamplerType::Linear => NonZeroU8::new(16),
             SamplerType::Shadow | SamplerType::Nearest => None,
         },
-        border_color: None,
     })
 }

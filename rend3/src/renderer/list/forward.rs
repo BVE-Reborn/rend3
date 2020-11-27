@@ -224,7 +224,7 @@ where
                         rpass.set_push_constants(
                             ShaderStage::VERTEX | ShaderStage::FRAGMENT,
                             0,
-                            bytemuck::bytes_of(&(draw_call_idx as u32)),
+                            &[draw_call_idx as u32],
                         );
                         rpass.draw_indexed(object.start_idx..object.count, object.vertex_offset, 0..1);
                     }

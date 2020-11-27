@@ -13,9 +13,9 @@ use futures::{stream::FuturesOrdered, StreamExt};
 use std::{borrow::Cow, future::Future, sync::Arc};
 use tracing_futures::Instrument;
 use wgpu::{
-    BindingResource, CommandEncoderDescriptor, Extent3d, Origin3d, ShaderModuleSource, SwapChainError, TextureAspect,
-    TextureCopyView, TextureDataLayout, TextureDescriptor, TextureDimension, TextureUsage, TextureViewDescriptor,
-    TextureViewDimension,
+    BindingResource, CommandEncoderDescriptor, Extent3d, Maintain, Origin3d, ShaderModuleSource, SwapChainError,
+    TextureAspect, TextureCopyView, TextureDataLayout, TextureDescriptor, TextureDimension, TextureUsage,
+    TextureViewDescriptor, TextureViewDimension,
 };
 
 pub fn render_loop<TLD: 'static>(
@@ -303,7 +303,7 @@ pub fn render_loop<TLD: 'static>(
             );
 
             let mut object_bgb = BindGroupBuilder::new(Some(String::from("object bg")));
-            object_bgb.append(cull_data.output_buffer.as_entire_binding());
+            object_bgb.append(BindingResource::Buffer(cull_data.output_buffer.slice(..)));
             let object_bg = object_bgb.build(&renderer.device, &global_resources.object_data_bgl);
 
             let uniform = WrappedUniform::new(&renderer.device, &global_resources.camera_data_bgl);
@@ -372,14 +372,19 @@ pub fn render_loop<TLD: 'static>(
 
         drop(directional_light_manager);
 
+        // In wgpu 0.6, get_current_frame erroneously requires &mut
+        drop(global_resources);
+
         let mut frame = None;
         while frame.is_none() {
-            match global_resources.swapchain.get_current_frame() {
+            match renderer.global_resources.write().swapchain.get_current_frame() {
                 Ok(v) => frame = Some(v),
                 Err(SwapChainError::Timeout) => {}
                 Err(err) => panic!("Could not make swapchain: {}", err),
             }
         }
+
+        let global_resources = renderer.global_resources.read();
 
         let frame = Arc::new(frame.unwrap());
 
@@ -395,7 +400,7 @@ pub fn render_loop<TLD: 'static>(
             );
 
             let mut object_bgb = BindGroupBuilder::new(Some(String::from("object bg")));
-            object_bgb.append(cull_data.output_buffer.as_entire_binding());
+            object_bgb.append(BindingResource::Buffer(cull_data.output_buffer.slice(..)));
             let object_bg = object_bgb.build(&renderer.device, &global_resources.object_data_bgl);
 
             let uniform = WrappedUniform::new(&renderer.device, &global_resources.camera_data_bgl);
@@ -472,6 +477,7 @@ pub fn render_loop<TLD: 'static>(
 
         span_transfer!(_ -> queue_submit_span, INFO, "Submitting to Queue");
 
+        renderer.device.poll(Maintain::Wait);
         renderer.queue.submit(command_buffers);
 
         span_transfer!(queue_submit_span -> buffer_pump_span, INFO, "Pumping Buffers");
@@ -485,7 +491,6 @@ pub fn render_loop<TLD: 'static>(
         }
 
         span_transfer!(buffer_pump_span -> present_span, INFO, "Presenting");
-
         drop(frame); //
 
         span_transfer!(present_span -> drop_span, INFO, "Dropping loop data");
