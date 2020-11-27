@@ -1,5 +1,3 @@
-use crate::list::PerObjectResourceBinding;
-use crate::renderer::RendererMode;
 use crate::{
     datatypes::{
         DepthCompare, Pipeline, PipelineBindingType, PipelineDepthState, PipelineHandle, PipelineInputType,
@@ -7,10 +5,10 @@ use crate::{
     },
     list::{
         DepthOutput, ImageFormat, ImageInputReference, ImageOutput, ImageOutputReference, ImageResourceDescriptor,
-        ImageUsage, RenderList, RenderOpDescriptor, RenderOpInputType, RenderPassDescriptor, RenderPassRunRate,
-        ResourceBinding, ShaderSourceStage, ShaderSourceType, SourceShaderDescriptor,
+        ImageUsage, PerObjectResourceBinding, RenderList, RenderOpDescriptor, RenderOpInputType, RenderPassDescriptor,
+        RenderPassRunRate, ResourceBinding, ShaderSourceStage, ShaderSourceType, SourceShaderDescriptor,
     },
-    renderer::MAX_MATERIALS,
+    renderer::{RendererMode, MAX_MATERIALS},
     Renderer,
 };
 use std::{future::Future, sync::Arc};

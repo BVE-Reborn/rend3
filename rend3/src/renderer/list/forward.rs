@@ -209,7 +209,7 @@ where
                     rpass.set_vertex_buffer(0, vertex.slice(..));
                     rpass.set_index_buffer(index.slice(..));
                     let mut last_material = None;
-                    for (draw_call_idx, object) in culling_data.inner.as_cpu().iter().enumerate() {
+                    for (draw_call_idx, object) in c.iter().enumerate() {
                         for (idx, binding) in op.per_object_bindings.iter().enumerate() {
                             match binding {
                                 PerObjectResourceBinding::CPUMaterial => {

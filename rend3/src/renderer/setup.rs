@@ -2,7 +2,7 @@ use crate::{
     instruction::InstructionStreamPair,
     renderer::{
         culling,
-        info::{ExtendedAdapterInfo, Vendor},
+        info::ExtendedAdapterInfo,
         light::DirectionalLightManager,
         limits::{check_features, check_limits},
         list::RenderListCache,
@@ -41,9 +41,8 @@ pub fn create_adapter(
     desired_device: Option<String>,
     desired_mode: Option<RendererMode>,
 ) -> Result<(Instance, PotentialAdapter), RendererInitializationError> {
-    let backend_bits = BackendBit::VULKAN | BackendBit::DX12;
-    let default_backend_order = [Backend::Vulkan, Backend::Dx12];
-    let intel_backend_order = [Backend::Dx12, Backend::Vulkan];
+    let backend_bits = BackendBit::VULKAN | BackendBit::DX12 | BackendBit::DX11 | BackendBit::METAL;
+    let default_backend_order = [Backend::Vulkan, Backend::Metal, Backend::Dx12, Backend::Dx11];
 
     let instance = Instance::new(backend_bits);
 
@@ -60,6 +59,9 @@ pub fn create_adapter(
 
             let adapter_features = adapter.features();
             let adapter_limits = adapter.limits();
+
+            tracing::trace!("Features: {:?}", adapter_features);
+            tracing::trace!("Limits: {:#?}", adapter_limits);
 
             let mut features = check_features(RendererMode::GPUPowered, adapter_features).ok();
             let mut limits = check_limits(RendererMode::GPUPowered, &adapter_limits).ok();
@@ -105,19 +107,7 @@ pub fn create_adapter(
         });
     }
 
-    let intel_vendor = valid_adapters
-        .get(&Backend::Vulkan)
-        .and_then(|arr| arr.get(0))
-        .map(|a: &PotentialAdapter| a.info.vendor.clone());
-    let is_intel = Some(Vendor::Intel) == intel_vendor;
-
-    let backend_order = if is_intel {
-        &intel_backend_order
-    } else {
-        &default_backend_order
-    };
-
-    for backend in backend_order {
+    for backend in &default_backend_order {
         if let Some(desired_backend) = desired_backend {
             if desired_backend != *backend {
                 tracing::debug!("Skipping unwanted backend {:?}", backend);
