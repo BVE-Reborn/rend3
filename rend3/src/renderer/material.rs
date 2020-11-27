@@ -47,7 +47,15 @@ impl CPUShaderMaterial {
             anisotropy: material.anisotropy.to_value(0.0),
             ambient_occlusion: material.ambient_occlusion.to_value(1.0),
             alpha_cutout: material.alpha_cutout.unwrap_or(0.0),
-            texture_enable: !0,
+            texture_enable: (material.albedo.is_texture() as u32) << 0
+                | (material.normal.is_some() as u32) << 1
+                | (material.roughness.is_texture() as u32) << 2
+                | (material.metallic.is_texture() as u32) << 3
+                | (material.reflectance.is_texture() as u32) << 4
+                | (material.clear_coat.is_texture() as u32) << 5
+                | (material.clear_coat_roughness.is_texture() as u32) << 6
+                | (material.anisotropy.is_texture() as u32) << 7
+                | (material.ambient_occlusion.is_texture() as u32) << 8,
             material_flags: {
                 let mut flags = material.albedo.to_flags();
                 flags.set(MaterialFlags::ALPHA_CUTOUT, material.alpha_cutout.is_some());
@@ -227,6 +235,10 @@ impl MaterialManager {
         }
     }
 
+    pub fn cpu_get_bind_group(&self, handle: MaterialHandle) -> &BindGroup {
+        self.registry.get(handle.0).bind_group.as_cpu()
+    }
+
     pub fn internal_index(&self, handle: MaterialHandle) -> usize {
         self.registry.get_index_of(handle.0)
     }
@@ -282,7 +294,7 @@ impl MaterialManager {
         }
     }
 
-    pub fn append_to_bgb<'a>(&'a self, general_bgb: &mut BindGroupBuilder<'a>) {
+    pub fn gpu_append_to_bgb<'a>(&'a self, general_bgb: &mut BindGroupBuilder<'a>) {
         general_bgb.append(self.buffer_storage.as_gpu().as_ref().unwrap().inner.as_entire_binding());
     }
 }

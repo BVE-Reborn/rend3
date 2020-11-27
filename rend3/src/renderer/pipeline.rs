@@ -2,7 +2,7 @@ use crate::{
     datatypes::{DepthCompare, Pipeline, PipelineBindingType, PipelineHandle, PipelineInputType},
     list::RenderPassRunRate,
     registry::ResourceRegistry,
-    renderer::{COMPUTE_POOL, PIPELINE_BUILD_PRIORITY},
+    renderer::{RendererMode, COMPUTE_POOL, PIPELINE_BUILD_PRIORITY},
     Renderer,
 };
 use parking_lot::RwLock;
@@ -11,8 +11,8 @@ use wgpu::{
     BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, BlendDescriptor,
     ColorStateDescriptor, ColorWrite, CompareFunction, CullMode, DepthStencilStateDescriptor, Device, FrontFace,
     IndexFormat, PipelineLayoutDescriptor, PolygonMode, PrimitiveTopology, ProgrammableStageDescriptor,
-    RasterizationStateDescriptor, RenderPipeline, RenderPipelineDescriptor, ShaderStage, StencilStateDescriptor,
-    TextureComponentType, TextureViewDimension, VertexStateDescriptor,
+    PushConstantRange, RasterizationStateDescriptor, RenderPipeline, RenderPipelineDescriptor, ShaderStage,
+    StencilStateDescriptor, TextureComponentType, TextureViewDimension, VertexStateDescriptor,
 };
 
 #[derive(Debug)]
@@ -74,7 +74,7 @@ impl PipelineManager {
                 .map(|bind| match bind {
                     PipelineBindingType::GeneralData => &global_data.general_bgl,
                     PipelineBindingType::ObjectData => &global_data.object_data_bgl,
-                    PipelineBindingType::Material => &global_data.material_bgl,
+                    PipelineBindingType::CPUMaterial | PipelineBindingType::GPUMaterial => &global_data.material_bgl,
                     PipelineBindingType::CameraData => &global_data.camera_data_bgl,
                     PipelineBindingType::GPU2DTextures => {
                         uses_2d = true;
@@ -91,10 +91,24 @@ impl PipelineManager {
                 })
                 .collect();
 
+            let cpu_push_constants = [PushConstantRange {
+                range: 0..4,
+                stages: ShaderStage::VERTEX | ShaderStage::FRAGMENT
+            }];
+
+            let push_constant_ranges = match renderer.mode {
+                RendererMode::CPUPowered => {
+                    &cpu_push_constants[..]
+                }
+                RendererMode::GPUPowered => {
+                    &[]
+                }
+            };
+
             let pipeline_layout = renderer.device.create_pipeline_layout(&PipelineLayoutDescriptor {
                 label: None,
                 bind_group_layouts: &layouts,
-                push_constant_ranges: &[],
+                push_constant_ranges,
             });
 
             drop((global_data, texture_2d, texture_cube));
@@ -195,7 +209,14 @@ impl PipelineManager {
                     index_format: IndexFormat::Uint32,
                     vertex_buffers: match pipeline_desc.input {
                         PipelineInputType::FullscreenTriangle => &[],
-                        PipelineInputType::Models3d => &vertex_states,
+                        PipelineInputType::Models3d => match renderer.mode {
+                            RendererMode::CPUPowered => {
+                                &vertex_states[0..1]
+                            }
+                            RendererMode::GPUPowered => {
+                                &vertex_states
+                            }
+                        },
                     },
                 },
                 sample_count: pipeline_desc.samples as u32,

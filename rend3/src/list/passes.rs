@@ -1,6 +1,6 @@
 use crate::{
     datatypes::PipelineHandle,
-    list::{DepthOutput, ImageOutput, ResourceBinding},
+    list::{DepthOutput, ImageOutput, PerObjectResourceBinding, ResourceBinding},
 };
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -22,7 +22,8 @@ pub struct RenderPassDescriptor {
 pub struct RenderOpDescriptor {
     pub pipeline: PipelineHandle,
     pub input: RenderOpInputType,
-    pub bindings: Vec<ResourceBinding>,
+    pub per_op_bindings: Vec<ResourceBinding>,
+    pub per_object_bindings: Vec<PerObjectResourceBinding>,
 }
 
 #[derive(Debug, Clone)]

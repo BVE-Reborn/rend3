@@ -47,7 +47,7 @@ struct IndirectCall {
 #define FLAGS_ALPHA_CUTOUT       0x08
 #define FLAGS_BICOMPONENT_NORMAL 0x10
 
-struct MaterialData {
+struct GPUMaterialData {
     vec4 albedo;
     float roughness;
     float metallic;
@@ -67,6 +67,21 @@ struct MaterialData {
     uint clear_coat_roughness_tex;
     uint anisotropy_tex;
     uint ambient_occlusion_tex;
+    uint material_flags;
+};
+
+struct CPUMaterialData {
+    vec4 albedo;
+    float roughness;
+    float metallic;
+    float reflectance;
+    float clear_coat;
+    float clear_coat_roughness;
+    float anisotropy;
+    float ambient_occlusion;
+    float alpha_cutout;
+
+    uint texture_enable;
     uint material_flags;
 };
 

@@ -39,6 +39,7 @@ pub struct PotentialAdapter {
 pub fn create_adapter(
     desired_backend: Option<Backend>,
     desired_device: Option<String>,
+    desired_mode: Option<RendererMode>,
 ) -> Result<(Instance, PotentialAdapter), RendererInitializationError> {
     let backend_bits = BackendBit::VULKAN | BackendBit::DX12;
     let default_backend_order = [Backend::Vulkan, Backend::Dx12];
@@ -64,7 +65,9 @@ pub fn create_adapter(
             let mut limits = check_limits(RendererMode::GPUPowered, &adapter_limits).ok();
             let mut mode = RendererMode::GPUPowered;
 
-            if features.is_none() || limits.is_none() {
+            if (features.is_none() || limits.is_none() || desired_mode == Some(RendererMode::CPUPowered))
+                && desired_mode != Some(RendererMode::GPUPowered)
+            {
                 features = check_features(RendererMode::CPUPowered, adapter_features).ok();
                 limits = check_limits(RendererMode::CPUPowered, &adapter_limits).ok();
                 mode = RendererMode::CPUPowered;
@@ -142,9 +145,10 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
     _imgui: &mut imgui::Context,
     desired_backend: Option<Backend>,
     desired_device: Option<String>,
+    desired_mode: Option<RendererMode>,
     options: RendererOptions,
 ) -> Result<Arc<Renderer<TLD>>, RendererInitializationError> {
-    let (instance, chosen_adapter) = create_adapter(desired_backend, desired_device)?;
+    let (instance, chosen_adapter) = create_adapter(desired_backend, desired_device, desired_mode)?;
 
     let surface = unsafe { instance.create_surface(window) };
 
@@ -167,7 +171,12 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
 
     let shader_manager = ShaderManager::new(Arc::clone(&device));
 
-    let mut global_resources = RwLock::new(RendererGlobalResources::new(&device, &surface, &options));
+    let mut global_resources = RwLock::new(RendererGlobalResources::new(
+        &device,
+        &surface,
+        chosen_adapter.mode,
+        &options,
+    ));
     let global_resource_guard = global_resources.get_mut();
 
     let culling_pass = culling::CullingPass::new(

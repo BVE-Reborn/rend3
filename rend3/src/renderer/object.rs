@@ -124,7 +124,7 @@ impl ObjectManager {
         self.registry.values()
     }
 
-    pub fn append_to_bgb<'a>(&'a self, general_bgb: &mut BindGroupBuilder<'a>) {
+    pub fn gpu_append_to_bgb<'a>(&'a self, general_bgb: &mut BindGroupBuilder<'a>) {
         general_bgb.append(
             self.object_info_buffer_storage
                 .as_gpu()

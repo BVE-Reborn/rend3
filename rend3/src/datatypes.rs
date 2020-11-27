@@ -265,6 +265,10 @@ impl AlbedoComponent {
         }
     }
 
+    pub(crate) fn is_texture(&self) -> bool {
+        matches!(*self, Self::Texture(..) | Self::TextureVertex { .. })
+    }
+
     pub(crate) fn to_texture<Func, Out>(&self, func: Func) -> Option<Out>
     where
         Func: FnOnce(TextureHandle) -> Out,
@@ -295,6 +299,10 @@ impl<T: Copy> MaterialComponent<T> {
             Self::Value(value) => value,
             Self::None | Self::Texture(_) => default,
         }
+    }
+
+    pub(crate) fn is_texture(&self) -> bool {
+        matches!(*self, Self::Texture(..))
     }
 
     pub(crate) fn to_texture<Func, Out>(&self, func: Func) -> Option<Out>
@@ -360,7 +368,8 @@ pub enum PipelineInputType {
 pub enum PipelineBindingType {
     GeneralData,
     ObjectData,
-    Material,
+    GPUMaterial,
+    CPUMaterial,
     CameraData,
     GPU2DTextures,
     GPUCubeTextures,

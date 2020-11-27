@@ -1,4 +1,7 @@
-use crate::{renderer::SWAPCHAIN_FORMAT, VSyncMode};
+use crate::{
+    renderer::{RendererMode, SWAPCHAIN_FORMAT},
+    VSyncMode,
+};
 use std::num::NonZeroU8;
 use wgpu::{
     AddressMode, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, CompareFunction,
@@ -145,19 +148,83 @@ pub fn create_object_data_bgl(device: &Device) -> BindGroupLayout {
     })
 }
 
-pub fn create_material_bgl(device: &Device) -> BindGroupLayout {
-    device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-        label: Some("material data bgl"),
-        entries: &[BindGroupLayoutEntry {
-            binding: 0,
-            visibility: ShaderStage::VERTEX | ShaderStage::FRAGMENT | ShaderStage::COMPUTE,
-            ty: BindingType::UniformBuffer {
-                dynamic: false,
-                min_binding_size: None,
-            },
-            count: None,
-        }],
-    })
+pub fn create_material_bgl(device: &Device, mode: RendererMode) -> BindGroupLayout {
+    match mode {
+        RendererMode::CPUPowered => {
+            let texture_entry = BindGroupLayoutEntry {
+                binding: 0,
+                visibility: ShaderStage::VERTEX | ShaderStage::FRAGMENT | ShaderStage::COMPUTE,
+                ty: BindingType::SampledTexture {
+                    dimension: TextureViewDimension::D2,
+                    component_type: TextureComponentType::Float,
+                    multisampled: false,
+                },
+                count: None,
+            };
+            device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+                label: Some("material data bgl"),
+                entries: &[
+                    BindGroupLayoutEntry {
+                        binding: 0,
+                        ..texture_entry
+                    },
+                    BindGroupLayoutEntry {
+                        binding: 1,
+                        ..texture_entry
+                    },
+                    BindGroupLayoutEntry {
+                        binding: 2,
+                        ..texture_entry
+                    },
+                    BindGroupLayoutEntry {
+                        binding: 3,
+                        ..texture_entry
+                    },
+                    BindGroupLayoutEntry {
+                        binding: 4,
+                        ..texture_entry
+                    },
+                    BindGroupLayoutEntry {
+                        binding: 5,
+                        ..texture_entry
+                    },
+                    BindGroupLayoutEntry {
+                        binding: 6,
+                        ..texture_entry
+                    },
+                    BindGroupLayoutEntry {
+                        binding: 7,
+                        ..texture_entry
+                    },
+                    BindGroupLayoutEntry {
+                        binding: 8,
+                        ..texture_entry
+                    },
+                    BindGroupLayoutEntry {
+                        binding: 9,
+                        visibility: ShaderStage::VERTEX | ShaderStage::FRAGMENT | ShaderStage::COMPUTE,
+                        ty: BindingType::UniformBuffer {
+                            dynamic: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
+                ],
+            })
+        }
+        RendererMode::GPUPowered => device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+            label: Some("material data bgl"),
+            entries: &[BindGroupLayoutEntry {
+                binding: 0,
+                visibility: ShaderStage::VERTEX | ShaderStage::FRAGMENT | ShaderStage::COMPUTE,
+                ty: BindingType::UniformBuffer {
+                    dynamic: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            }],
+        }),
+    }
 }
 
 pub fn create_camera_data_bgl(device: &Device) -> BindGroupLayout {

@@ -4,7 +4,7 @@ use crate::{
     renderer::{camera::Camera, object::ObjectManager, shaders::ShaderManager, ModeData, RendererMode},
 };
 use futures::future::Either;
-use std::{future::Future, sync::Arc};
+use std::future::Future;
 use switchyard::Switchyard;
 use tracing_futures::Instrument;
 use wgpu::{
@@ -181,7 +181,10 @@ impl CullingPass {
         let output_buffer = device.create_buffer(&BufferDescriptor {
             label: Some(&*format!("object output buffer for {}", &name)),
             size: SIZE_OF_OUTPUT_DATA * object_count as BufferAddress,
-            usage: BufferUsage::STORAGE,
+            usage: match mode {
+                RendererMode::CPUPowered => BufferUsage::COPY_DST | BufferUsage::STORAGE,
+                RendererMode::GPUPowered => BufferUsage::STORAGE,
+            },
             mapped_at_creation: false,
         });
 

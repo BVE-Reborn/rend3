@@ -1,3 +1,4 @@
+use crate::renderer::RendererMode;
 use crate::{
     bind_merge::BindGroupBuilder,
     datatypes::TextureHandle,
@@ -28,7 +29,7 @@ pub struct RendererGlobalResources {
     pub shadow_sampler: Sampler,
 }
 impl RendererGlobalResources {
-    pub fn new(device: &Device, surface: &Surface, options: &RendererOptions) -> Self {
+    pub fn new(device: &Device, surface: &Surface, mode: RendererMode, options: &RendererOptions) -> Self {
         let swapchain = util::create_swapchain(device, surface, options.size, options.vsync);
 
         let camera = Camera::new_projection(options.size.width as f32 / options.size.height as f32);
@@ -40,7 +41,7 @@ impl RendererGlobalResources {
 
         let general_bgl = util::create_general_bind_group_layout(device);
         let object_data_bgl = util::create_object_data_bgl(device);
-        let material_bgl = util::create_material_bgl(device);
+        let material_bgl = util::create_material_bgl(device, mode);
         let camera_data_bgl = util::create_camera_data_bgl(device);
         let shadow_texture_bgl = util::create_shadow_texture_bgl(device);
         let skybox_bgl = util::create_skybox_bgl(device);

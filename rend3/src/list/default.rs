@@ -1,3 +1,5 @@
+use crate::list::PerObjectResourceBinding;
+use crate::renderer::RendererMode;
 use crate::{
     datatypes::{
         DepthCompare, Pipeline, PipelineBindingType, PipelineDepthState, PipelineHandle, PipelineInputType,
@@ -30,56 +32,75 @@ impl DefaultShaders {
     where
         TLD: 'static,
     {
+        let mode = renderer.mode();
+
+        let mode_define = match mode {
+            RendererMode::CPUPowered => (String::from("CPU_MODE"), None),
+            RendererMode::GPUPowered => (String::from("GPU_MODE"), None),
+        };
+
         let depth_vert = renderer.add_source_shader(SourceShaderDescriptor {
             source: ShaderSourceType::Builtin("depth.vert".to_string()),
             stage: ShaderSourceStage::Vertex,
             includes: vec![],
-            defines: vec![(String::from("MATERIAL_COUNT"), Some(MAX_MATERIALS.to_string()))],
+            defines: vec![
+                (String::from("MATERIAL_COUNT"), Some(MAX_MATERIALS.to_string())),
+                mode_define.clone(),
+            ],
         });
         let depth_frag = renderer.add_source_shader(SourceShaderDescriptor {
             source: ShaderSourceType::Builtin("depth.frag".to_string()),
             stage: ShaderSourceStage::Fragment,
             includes: vec![],
-            defines: vec![(String::from("MATERIAL_COUNT"), Some(MAX_MATERIALS.to_string()))],
+            defines: vec![
+                (String::from("MATERIAL_COUNT"), Some(MAX_MATERIALS.to_string())),
+                mode_define.clone(),
+            ],
         });
 
         let skybox_vert = renderer.add_source_shader(SourceShaderDescriptor {
             source: ShaderSourceType::Builtin("skybox.vert".to_string()),
             stage: ShaderSourceStage::Vertex,
             includes: vec![],
-            defines: vec![],
+            defines: vec![mode_define.clone()],
         });
         let skybox_frag = renderer.add_source_shader(SourceShaderDescriptor {
             source: ShaderSourceType::Builtin("skybox.frag".to_string()),
             stage: ShaderSourceStage::Fragment,
             includes: vec![],
-            defines: vec![],
+            defines: vec![mode_define.clone()],
         });
 
         let opaque_vert = renderer.add_source_shader(SourceShaderDescriptor {
             source: ShaderSourceType::Builtin("opaque.vert".to_string()),
             stage: ShaderSourceStage::Vertex,
             includes: vec![],
-            defines: vec![(String::from("MATERIAL_COUNT"), Some(MAX_MATERIALS.to_string()))],
+            defines: vec![
+                (String::from("MATERIAL_COUNT"), Some(MAX_MATERIALS.to_string())),
+                mode_define.clone(),
+            ],
         });
         let opaque_frag = renderer.add_source_shader(SourceShaderDescriptor {
             source: ShaderSourceType::Builtin("opaque.frag".to_string()),
             stage: ShaderSourceStage::Fragment,
             includes: vec![],
-            defines: vec![(String::from("MATERIAL_COUNT"), Some(MAX_MATERIALS.to_string()))],
+            defines: vec![
+                (String::from("MATERIAL_COUNT"), Some(MAX_MATERIALS.to_string())),
+                mode_define.clone(),
+            ],
         });
 
         let blit_vert = renderer.add_source_shader(SourceShaderDescriptor {
             source: ShaderSourceType::Builtin("blit.vert".to_string()),
             stage: ShaderSourceStage::Vertex,
             includes: vec![],
-            defines: vec![],
+            defines: vec![mode_define.clone()],
         });
         let blit_frag = renderer.add_source_shader(SourceShaderDescriptor {
             source: ShaderSourceType::Builtin("blit.frag".to_string()),
             stage: ShaderSourceStage::Fragment,
             includes: vec![],
-            defines: vec![],
+            defines: vec![mode_define.clone()],
         });
 
         async move {
@@ -111,6 +132,42 @@ impl DefaultPipelines {
     where
         TLD: 'static,
     {
+        let mode = renderer.mode();
+
+        let depth_bindings = match mode {
+            RendererMode::CPUPowered => vec![
+                PipelineBindingType::GeneralData,
+                PipelineBindingType::ObjectData,
+                PipelineBindingType::CameraData,
+                PipelineBindingType::CPUMaterial,
+            ],
+            RendererMode::GPUPowered => vec![
+                PipelineBindingType::GeneralData,
+                PipelineBindingType::ObjectData,
+                PipelineBindingType::CameraData,
+                PipelineBindingType::GPUMaterial,
+                PipelineBindingType::GPU2DTextures,
+            ],
+        };
+
+        let opaque_bindings = match mode {
+            RendererMode::CPUPowered => vec![
+                PipelineBindingType::GeneralData,
+                PipelineBindingType::ObjectData,
+                PipelineBindingType::ShadowTexture,
+                PipelineBindingType::CameraData,
+                PipelineBindingType::CPUMaterial,
+            ],
+            RendererMode::GPUPowered => vec![
+                PipelineBindingType::GeneralData,
+                PipelineBindingType::ObjectData,
+                PipelineBindingType::ShadowTexture,
+                PipelineBindingType::CameraData,
+                PipelineBindingType::GPUMaterial,
+                PipelineBindingType::GPU2DTextures,
+            ],
+        };
+
         let shadow_depth_pipeline = renderer.add_pipeline(Pipeline {
             run_rate: RenderPassRunRate::PerShadow,
             input: PipelineInputType::Models3d,
@@ -121,13 +178,7 @@ impl DefaultPipelines {
             }),
             vertex: shaders.depth_vert,
             fragment: Some(shaders.depth_frag),
-            bindings: vec![
-                PipelineBindingType::GeneralData,
-                PipelineBindingType::ObjectData,
-                PipelineBindingType::Material,
-                PipelineBindingType::GPU2DTextures,
-                PipelineBindingType::CameraData,
-            ],
+            bindings: depth_bindings.clone(),
             samples: 1,
         });
 
@@ -150,13 +201,7 @@ impl DefaultPipelines {
             }),
             vertex: shaders.depth_vert,
             fragment: Some(shaders.depth_frag),
-            bindings: vec![
-                PipelineBindingType::GeneralData,
-                PipelineBindingType::ObjectData,
-                PipelineBindingType::Material,
-                PipelineBindingType::GPU2DTextures,
-                PipelineBindingType::CameraData,
-            ],
+            bindings: depth_bindings,
             samples: 1,
         });
 
@@ -206,14 +251,7 @@ impl DefaultPipelines {
             }),
             vertex: shaders.opaque_vert,
             fragment: Some(shaders.opaque_frag),
-            bindings: vec![
-                PipelineBindingType::GeneralData,
-                PipelineBindingType::ObjectData,
-                PipelineBindingType::Material,
-                PipelineBindingType::GPU2DTextures,
-                PipelineBindingType::ShadowTexture,
-                PipelineBindingType::CameraData,
-            ],
+            bindings: opaque_bindings,
             samples: 1,
         });
 
@@ -246,8 +284,56 @@ impl DefaultPipelines {
     }
 }
 
-pub fn default_render_list(resolution: PhysicalSize<u32>, pipelines: &DefaultPipelines) -> RenderList {
+pub fn default_render_list(
+    mode: RendererMode,
+    resolution: PhysicalSize<u32>,
+    pipelines: &DefaultPipelines,
+) -> RenderList {
     let resolution: [u32; 2] = resolution.into();
+
+    let (depth_bindings, depth_per_obj_bindings) = match mode {
+        RendererMode::CPUPowered => (
+            vec![
+                ResourceBinding::GeneralData,
+                ResourceBinding::ObjectData,
+                ResourceBinding::CameraData,
+            ],
+            vec![PerObjectResourceBinding::CPUMaterial],
+        ),
+        RendererMode::GPUPowered => (
+            vec![
+                ResourceBinding::GeneralData,
+                ResourceBinding::ObjectData,
+                ResourceBinding::CameraData,
+                ResourceBinding::GPUMaterial,
+                ResourceBinding::GPU2DTextures,
+            ],
+            vec![],
+        ),
+    };
+
+    let (opaque_bindings, opaque_per_obj_binding) = match mode {
+        RendererMode::CPUPowered => (
+            vec![
+                ResourceBinding::GeneralData,
+                ResourceBinding::ObjectData,
+                ResourceBinding::ShadowTexture,
+                ResourceBinding::CameraData,
+            ],
+            vec![PerObjectResourceBinding::CPUMaterial],
+        ),
+        RendererMode::GPUPowered => (
+            vec![
+                ResourceBinding::GeneralData,
+                ResourceBinding::ObjectData,
+                ResourceBinding::ShadowTexture,
+                ResourceBinding::CameraData,
+                ResourceBinding::GPUMaterial,
+                ResourceBinding::GPU2DTextures,
+            ],
+            vec![],
+        ),
+    };
 
     let mut list = RenderList::new();
 
@@ -263,13 +349,8 @@ pub fn default_render_list(resolution: PhysicalSize<u32>, pipelines: &DefaultPip
     list.add_render_op(RenderOpDescriptor {
         pipeline: pipelines.shadow_depth_pipeline,
         input: RenderOpInputType::Models3D,
-        bindings: vec![
-            ResourceBinding::GeneralData,
-            ResourceBinding::ObjectData,
-            ResourceBinding::Material,
-            ResourceBinding::GPU2DTextures,
-            ResourceBinding::CameraData,
-        ],
+        per_op_bindings: depth_bindings.clone(),
+        per_object_bindings: depth_per_obj_bindings.clone(),
     });
 
     let internal_renderbuffer_name = "color renderbuffer";
@@ -327,36 +408,26 @@ pub fn default_render_list(resolution: PhysicalSize<u32>, pipelines: &DefaultPip
     list.add_render_op(RenderOpDescriptor {
         pipeline: pipelines.depth_pipeline,
         input: RenderOpInputType::Models3D,
-        bindings: vec![
-            ResourceBinding::GeneralData,
-            ResourceBinding::ObjectData,
-            ResourceBinding::Material,
-            ResourceBinding::GPU2DTextures,
-            ResourceBinding::CameraData,
-        ],
+        per_op_bindings: depth_bindings,
+        per_object_bindings: depth_per_obj_bindings,
     });
 
     list.add_render_op(RenderOpDescriptor {
         pipeline: pipelines.skybox_pipeline,
         input: RenderOpInputType::FullscreenTriangle,
-        bindings: vec![
+        per_op_bindings: vec![
             ResourceBinding::GeneralData,
             ResourceBinding::SkyboxTexture,
             ResourceBinding::CameraData,
         ],
+        per_object_bindings: vec![],
     });
 
     list.add_render_op(RenderOpDescriptor {
         pipeline: pipelines.opaque_pipeline,
         input: RenderOpInputType::Models3D,
-        bindings: vec![
-            ResourceBinding::GeneralData,
-            ResourceBinding::ObjectData,
-            ResourceBinding::Material,
-            ResourceBinding::GPU2DTextures,
-            ResourceBinding::ShadowTexture,
-            ResourceBinding::CameraData,
-        ],
+        per_op_bindings: opaque_bindings,
+        per_object_bindings: opaque_per_obj_binding,
     });
 
     list.add_render_pass(RenderPassDescriptor {
@@ -372,12 +443,13 @@ pub fn default_render_list(resolution: PhysicalSize<u32>, pipelines: &DefaultPip
     list.add_render_op(RenderOpDescriptor {
         pipeline: pipelines.blit_pipeline,
         input: RenderOpInputType::FullscreenTriangle,
-        bindings: vec![
+        per_op_bindings: vec![
             ResourceBinding::GeneralData,
             ResourceBinding::Custom2DTexture(vec![ImageInputReference::Custom(
                 internal_renderbuffer_name.to_string(),
             )]),
         ],
+        per_object_bindings: vec![],
     });
 
     list

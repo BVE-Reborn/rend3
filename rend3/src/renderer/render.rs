@@ -228,17 +228,27 @@ pub fn render_loop<TLD: 'static>(
         let object_count = object_manager.ready(&renderer.device, &mut encoder, &material_manager);
         directional_light_manager.ready(&renderer.device, &mut encoder);
 
-        let mut object_input_bgb = BindGroupBuilder::new(Some(String::from("object input bg")));
-        object_manager.append_to_bgb(&mut object_input_bgb);
-        let object_input_bg = object_input_bgb.build(&renderer.device, &global_resources.object_input_bgl);
+        let object_input_bg = renderer.mode.into_data(
+            || (),
+            || {
+                let mut object_input_bgb = BindGroupBuilder::new(Some(String::from("object input bg")));
+                object_manager.gpu_append_to_bgb(&mut object_input_bgb);
+                object_input_bgb.build(&renderer.device, &global_resources.object_input_bgl)
+            },
+        );
 
         let mut general_bgb = BindGroupBuilder::new(Some(String::from("general bg")));
         global_resources.append_to_bgb(&mut general_bgb);
         let general_bg = general_bgb.build(&renderer.device, &global_resources.general_bgl);
 
-        let mut material_bgb = BindGroupBuilder::new(Some(String::from("material bg")));
-        material_manager.append_to_bgb(&mut material_bgb);
-        let material_bg = material_bgb.build(&renderer.device, &global_resources.material_bgl);
+        let material_bg = renderer.mode.into_data(
+            || (),
+            || {
+                let mut material_bgb = BindGroupBuilder::new(Some(String::from("material bg")));
+                material_manager.gpu_append_to_bgb(&mut material_bgb);
+                material_bgb.build(&renderer.device, &global_resources.material_bgl)
+            },
+        );
 
         let mut shadow_bgb = BindGroupBuilder::new(Some(String::from("shadow bg")));
         directional_light_manager.append_to_bgb(&mut shadow_bgb);
@@ -308,16 +318,19 @@ pub fn render_loop<TLD: 'static>(
                             &renderer.queue,
                             &object_manager,
                             &mut cull_data,
-                            global_resources.camera.clone(),
+                            light.camera.clone(),
                         )
                         .await;
                 }
                 RendererMode::GPUPowered => {
                     let mut cpass = encoder.begin_compute_pass();
 
-                    renderer
-                        .culling_pass
-                        .gpu_run(&mut cpass, &object_input_bg, &uniform.uniform_bg, &cull_data);
+                    renderer.culling_pass.gpu_run(
+                        &mut cpass,
+                        object_input_bg.as_gpu(),
+                        &uniform.uniform_bg,
+                        &cull_data,
+                    );
 
                     drop(cpass);
                 }
@@ -326,9 +339,9 @@ pub fn render_loop<TLD: 'static>(
             let binding_data = list::BindingData {
                 general_bg: Arc::clone(&general_bg),
                 object_bg: Arc::clone(&object_bg),
-                material_bg: Arc::clone(&material_bg),
-                gpu_2d_textures_bg: texture_2d_bg.map_gpu(Arc::clone),
-                gpu_cube_textures_bg: texture_cube_bg.map_gpu(Arc::clone),
+                material_bg: material_bg.as_ref().map(|_| (), Arc::clone),
+                gpu_2d_textures_bg: texture_2d_bg.as_ref().map(|_| (), Arc::clone),
+                gpu_cube_textures_bg: texture_cube_bg.as_ref().map(|_| (), Arc::clone),
                 shadow_texture_bg: Arc::clone(&shadow_bg),
                 skybox_texture_bg: Arc::clone(&skybox_bg),
                 wrapped_uniform: Arc::new(uniform),
@@ -404,9 +417,12 @@ pub fn render_loop<TLD: 'static>(
                 RendererMode::GPUPowered => {
                     let mut cpass = encoder.begin_compute_pass();
 
-                    renderer
-                        .culling_pass
-                        .gpu_run(&mut cpass, &object_input_bg, &uniform.uniform_bg, &cull_data);
+                    renderer.culling_pass.gpu_run(
+                        &mut cpass,
+                        object_input_bg.as_gpu(),
+                        &uniform.uniform_bg,
+                        &cull_data,
+                    );
 
                     drop(cpass);
                 }
@@ -415,9 +431,9 @@ pub fn render_loop<TLD: 'static>(
             let binding_data = list::BindingData {
                 general_bg: Arc::clone(&general_bg),
                 object_bg: Arc::clone(&object_bg),
-                material_bg: Arc::clone(&material_bg),
-                gpu_2d_textures_bg: texture_2d_bg.map_gpu(Arc::clone),
-                gpu_cube_textures_bg: texture_cube_bg.map_gpu(Arc::clone),
+                material_bg: material_bg.as_ref().map(|_| (), Arc::clone),
+                gpu_2d_textures_bg: texture_2d_bg.as_ref().map(|_| (), Arc::clone),
+                gpu_cube_textures_bg: texture_cube_bg.as_ref().map(|_| (), Arc::clone),
                 shadow_texture_bg: Arc::clone(&shadow_bg),
                 skybox_texture_bg: Arc::clone(&skybox_bg),
                 wrapped_uniform: Arc::new(uniform),

@@ -97,42 +97,42 @@ impl<C, G> ModeData<C, G> {
     pub fn into_cpu(self) -> C {
         match self {
             Self::CPU(c) => c,
-            Self::GPU(_) => panic!("tried to extract gpu data in cpu mode"),
+            Self::GPU(_) => panic!("tried to extract cpu data in gpu mode"),
         }
     }
 
     pub fn as_cpu(&self) -> &C {
         match self {
             Self::CPU(c) => c,
-            Self::GPU(_) => panic!("tried to extract gpu data in cpu mode"),
+            Self::GPU(_) => panic!("tried to extract cpu data in gpu mode"),
         }
     }
 
     pub fn as_cpu_mut(&mut self) -> &mut C {
         match self {
             Self::CPU(c) => c,
-            Self::GPU(_) => panic!("tried to extract gpu data in cpu mode"),
+            Self::GPU(_) => panic!("tried to extract cpu data in gpu mode"),
         }
     }
 
     pub fn into_gpu(self) -> G {
         match self {
             Self::GPU(g) => g,
-            Self::CPU(_) => panic!("tried to extract cpu data in gpu mode"),
+            Self::CPU(_) => panic!("tried to extract gpu data in cpu mode"),
         }
     }
 
     pub fn as_gpu(&self) -> &G {
         match self {
             Self::GPU(g) => g,
-            Self::CPU(_) => panic!("tried to extract cpu data in gpu mode"),
+            Self::CPU(_) => panic!("tried to extract gpu data in cpu mode"),
         }
     }
 
     pub fn as_gpu_mut(&mut self) -> &mut G {
         match self {
             Self::GPU(g) => g,
-            Self::CPU(_) => panic!("tried to extract cpu data in gpu mode"),
+            Self::CPU(_) => panic!("tried to extract gpu data in cpu mode"),
         }
     }
 
@@ -161,6 +161,13 @@ impl<C, G> ModeData<C, G> {
         match self {
             Self::CPU(c) => ModeData::CPU(c),
             Self::GPU(g) => ModeData::GPU(func(g)),
+        }
+    }
+
+    pub fn map<C2, G2>(self, cpu_func: impl FnOnce(C) -> C2, gpu_func: impl FnOnce(G) -> G2) -> ModeData<C2, G2> {
+        match self {
+            Self::CPU(c) => ModeData::CPU(cpu_func(c)),
+            Self::GPU(g) => ModeData::GPU(gpu_func(g)),
         }
     }
 }
@@ -216,9 +223,10 @@ impl<TLD: 'static> Renderer<TLD> {
         imgui_context: &'a mut imgui::Context,
         backend: Option<Backend>,
         device: Option<String>,
+        mode: Option<RendererMode>,
         options: RendererOptions,
     ) -> impl Future<Output = Result<Arc<Self>, RendererInitializationError>> + 'a {
-        setup::create_renderer(window, yard, imgui_context, backend, device, options)
+        setup::create_renderer(window, yard, imgui_context, backend, device, mode, options)
     }
 
     pub fn mode(&self) -> RendererMode {

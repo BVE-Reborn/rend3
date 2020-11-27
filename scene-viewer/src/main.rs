@@ -194,7 +194,7 @@ fn single(renderer: &Renderer, mesh: MeshHandle, material: MaterialHandle) {
 fn distribute(renderer: &Renderer, mesh: MeshHandle, material: MaterialHandle) {
     for x in (-11..=11).step_by(4) {
         for y in (-11..=11).step_by(4) {
-            for z in (0..=50).step_by(10) {
+            for z in (0..=50).step_by(25) {
                 renderer.add_object(Object {
                     mesh,
                     material,
@@ -222,6 +222,14 @@ fn extract_backend(value: &str) -> Result<wgpu::Backend, &'static str> {
     })
 }
 
+fn extract_mode(value: &str) -> Result<rend3::RendererMode, &'static str> {
+    Ok(match value.to_lowercase().as_str() {
+        "legacy" | "c" | "cpu" => rend3::RendererMode::CPUPowered,
+        "modern" | "g" | "gpu" => rend3::RendererMode::GPUPowered,
+        _ => return Err("mode requested but not found"),
+    })
+}
+
 fn main() {
     wgpu_subscriber::initialize_default_subscriber(None);
 
@@ -231,6 +239,7 @@ fn main() {
         .value_from_str(["-d", "--device"])
         .ok()
         .map(|s: String| s.to_lowercase());
+    let desired_mode = args.value_from_fn(["-m", "--mode"], extract_mode).ok();
 
     rend3::span_transfer!(_ -> main_thread_span, INFO, "Main Thread Setup");
     rend3::span_transfer!(_ -> event_loop_span, INFO, "Building Event Loop");
@@ -286,6 +295,7 @@ fn main() {
         &mut imgui,
         desired_backend,
         desired_device,
+        desired_mode,
         options.clone(),
     ))
     .unwrap();
@@ -431,6 +441,7 @@ fn main() {
             renderer.set_camera_location(camera_location);
             renderer.set_options(options.clone());
             let handle = renderer.render(rend3::list::default_render_list(
+                renderer.mode(),
                 PhysicalSize {
                     width: (options.size.width as f32 * 1.0) as u32,
                     height: (options.size.height as f32 * 1.0) as u32,

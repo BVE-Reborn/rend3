@@ -101,7 +101,7 @@ impl TextureManager {
         self.registry.get_index_of(handle.0)
     }
 
-    pub fn ready(
+    pub(crate) fn ready(
         &mut self,
         device: &Device,
     ) -> (
@@ -125,8 +125,8 @@ impl TextureManager {
             }
 
             (
-                self.layout.map_gpu(Arc::clone),
-                self.group.map_gpu(Arc::clone),
+                self.layout.as_ref().map(|_| (), Arc::clone),
+                self.group.as_ref().map(|_| (), Arc::clone),
                 layout_dirty,
             )
         } else {
