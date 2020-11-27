@@ -76,7 +76,7 @@ pub(crate) async fn run<TD>(
 
             for object in object_chunk {
                 let model = object.transform.transform;
-                let model_view = view;
+                let model_view = view * model;
 
                 let transformed = object.sphere.apply_transform(model_view);
                 if !frustum.contains_sphere(transformed) {
