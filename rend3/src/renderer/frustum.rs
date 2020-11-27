@@ -17,6 +17,14 @@ impl BoundingSphere {
             radius,
         }
     }
+
+    pub fn apply_transform(self, model_view: Mat4) -> Self {
+        // TODO: Deal with scale
+        Self {
+            center: Vec3::from(model_view * self.center.extend(1.0)),
+            radius: self.radius,
+        }
+    }
 }
 
 fn find_mesh_center(mesh: &[ModelVertex]) -> Vec3A {
@@ -66,6 +74,10 @@ impl ShaderPlane {
         self.d /= mag;
 
         self
+    }
+
+    pub fn distance(self, point: Vec3) -> f32 {
+        self.abc.dot(point) + self.d
     }
 }
 
@@ -129,5 +141,20 @@ impl ShaderFrustum {
             bottom: bottom.normalize(),
             near: near.normalize(),
         }
+    }
+
+    pub fn contains_sphere(&self, sphere: BoundingSphere) -> bool {
+        let neg_radius = -sphere.radius;
+
+        let array = [self.left, self.right, self.top, self.bottom, self.near];
+
+        for plane in &array {
+            let inside = plane.distance(sphere.center) >= neg_radius;
+            if !inside {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

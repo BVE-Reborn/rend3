@@ -2,7 +2,7 @@ use crate::{
     datatypes::{DepthCompare, Pipeline, PipelineBindingType, PipelineHandle, PipelineInputType},
     list::RenderPassRunRate,
     registry::ResourceRegistry,
-    renderer::{COMPUTE_POOL, PIPELINE_BUILD_PRIORITY},
+    renderer::{RendererMode, COMPUTE_POOL, PIPELINE_BUILD_PRIORITY},
     Renderer,
 };
 use parking_lot::RwLock;
@@ -10,7 +10,7 @@ use std::{future::Future, sync::Arc};
 use wgpu::{
     BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, BlendDescriptor,
     ColorStateDescriptor, ColorWrite, CompareFunction, CullMode, DepthStencilStateDescriptor, Device, FrontFace,
-    IndexFormat, PipelineLayoutDescriptor, PolygonMode, PrimitiveTopology, ProgrammableStageDescriptor,
+    IndexFormat, PipelineLayoutDescriptor, PrimitiveTopology, ProgrammableStageDescriptor, PushConstantRange,
     RasterizationStateDescriptor, RenderPipeline, RenderPipelineDescriptor, ShaderStage, StencilStateDescriptor,
     TextureComponentType, TextureViewDimension, VertexStateDescriptor,
 };
@@ -74,15 +74,15 @@ impl PipelineManager {
                 .map(|bind| match bind {
                     PipelineBindingType::GeneralData => &global_data.general_bgl,
                     PipelineBindingType::ObjectData => &global_data.object_data_bgl,
-                    PipelineBindingType::Material => &global_data.material_bgl,
+                    PipelineBindingType::CPUMaterial | PipelineBindingType::GPUMaterial => &global_data.material_bgl,
                     PipelineBindingType::CameraData => &global_data.camera_data_bgl,
                     PipelineBindingType::GPU2DTextures => {
                         uses_2d = true;
-                        texture_2d.bind_group_layout()
+                        texture_2d.gpu_bind_group_layout()
                     }
                     PipelineBindingType::GPUCubeTextures => {
                         uses_cube = true;
-                        texture_cube.bind_group_layout()
+                        texture_cube.gpu_bind_group_layout()
                     }
                     PipelineBindingType::ShadowTexture => &global_data.shadow_texture_bgl,
                     PipelineBindingType::SkyboxTexture => &global_data.skybox_bgl,
@@ -91,10 +91,24 @@ impl PipelineManager {
                 })
                 .collect();
 
+            let cpu_push_constants = [PushConstantRange {
+                range: 0..4,
+                stages: ShaderStage::VERTEX | ShaderStage::FRAGMENT
+            }];
+
+            let push_constant_ranges = match renderer.mode {
+                RendererMode::CPUPowered => {
+                    &cpu_push_constants[..]
+                }
+                RendererMode::GPUPowered => {
+                    &[]
+                }
+            };
+
             let pipeline_layout = renderer.device.create_pipeline_layout(&PipelineLayoutDescriptor {
                 label: None,
                 bind_group_layouts: &layouts,
-                push_constant_ranges: &[],
+                push_constant_ranges,
             });
 
             drop((global_data, texture_2d, texture_cube));
@@ -172,7 +186,6 @@ impl PipelineManager {
                         PipelineInputType::FullscreenTriangle => CullMode::None,
                         PipelineInputType::Models3d => CullMode::Back,
                     },
-                    polygon_mode: PolygonMode::Fill,
                     clamp_depth: match pipeline_desc.run_rate {
                         // TODO
                         RenderPassRunRate::PerShadow => false,
@@ -195,7 +208,14 @@ impl PipelineManager {
                     index_format: IndexFormat::Uint32,
                     vertex_buffers: match pipeline_desc.input {
                         PipelineInputType::FullscreenTriangle => &[],
-                        PipelineInputType::Models3d => &vertex_states,
+                        PipelineInputType::Models3d => match renderer.mode {
+                            RendererMode::CPUPowered => {
+                                &vertex_states[0..1]
+                            }
+                            RendererMode::GPUPowered => {
+                                &vertex_states
+                            }
+                        },
                     },
                 },
                 sample_count: pipeline_desc.samples as u32,

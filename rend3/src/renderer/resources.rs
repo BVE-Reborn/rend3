@@ -1,10 +1,10 @@
 use crate::{
     bind_merge::BindGroupBuilder,
     datatypes::TextureHandle,
-    renderer::{camera::Camera, util, util::SamplerType},
+    renderer::{camera::Camera, util, util::SamplerType, RendererMode},
     RendererOptions,
 };
-use wgpu::{BindGroupEntry, BindGroupLayout, BindingResource, Device, Sampler, Surface, SwapChain};
+use wgpu::{BindGroupLayout, BindingResource, Device, Sampler, Surface, SwapChain};
 
 pub struct RendererGlobalResources {
     pub swapchain: SwapChain,
@@ -28,7 +28,7 @@ pub struct RendererGlobalResources {
     pub shadow_sampler: Sampler,
 }
 impl RendererGlobalResources {
-    pub fn new(device: &Device, surface: &Surface, options: &RendererOptions) -> Self {
+    pub fn new(device: &Device, surface: &Surface, mode: RendererMode, options: &RendererOptions) -> Self {
         let swapchain = util::create_swapchain(device, surface, options.size, options.vsync);
 
         let camera = Camera::new_projection(options.size.width as f32 / options.size.height as f32);
@@ -40,7 +40,7 @@ impl RendererGlobalResources {
 
         let general_bgl = util::create_general_bind_group_layout(device);
         let object_data_bgl = util::create_object_data_bgl(device);
-        let material_bgl = util::create_material_bgl(device);
+        let material_bgl = util::create_material_bgl(device, mode);
         let camera_data_bgl = util::create_camera_data_bgl(device);
         let shadow_texture_bgl = util::create_shadow_texture_bgl(device);
         let skybox_bgl = util::create_skybox_bgl(device);
@@ -88,14 +88,8 @@ impl RendererGlobalResources {
     }
 
     pub fn append_to_bgb<'a>(&'a self, general_bgb: &mut BindGroupBuilder<'a>) {
-        general_bgb.append(BindGroupEntry {
-            binding: 0,
-            resource: BindingResource::Sampler(&self.linear_sampler),
-        });
-        general_bgb.append(BindGroupEntry {
-            binding: 0,
-            resource: BindingResource::Sampler(&self.shadow_sampler),
-        });
+        general_bgb.append(BindingResource::Sampler(&self.linear_sampler));
+        general_bgb.append(BindingResource::Sampler(&self.shadow_sampler));
     }
 }
 

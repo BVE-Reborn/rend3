@@ -7,7 +7,9 @@ layout(location = 1) in vec3 i_normal;
 layout(location = 2) in vec2 i_coords;
 layout(location = 3) in vec4 i_color;
 layout(location = 4) in uint i_material;
+#ifdef GPU_MODE
 layout(location = 5) in uint i_object_idx;
+#endif
 
 layout(location = 0) out vec4 o_position;
 layout(location = 1) out vec2 o_coords;
@@ -17,9 +19,14 @@ layout(location = 3) flat out uint o_material;
 layout(set = 1, binding = 0, std430) restrict readonly buffer ObjectOutputDataBuffer {
     ObjectOutputData object_output[];
 };
-layout(set = 4, binding = 0) uniform UniformBuffer {
+layout(set = 2, binding = 0) uniform UniformBuffer {
     UniformData uniforms;
 };
+#ifdef CPU_MODE
+layout(push_constant) uniform PushConstant {
+    uint i_object_idx;
+};
+#endif
 
 void main() {
     uint object_idx = i_object_idx;

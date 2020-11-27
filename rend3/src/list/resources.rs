@@ -10,7 +10,7 @@ pub enum ResourceBinding {
     /// Bindings in All Modes:
     /// 0: Object Data buffer
     ObjectData,
-    /// Bindings in GPU-Powered Mode:
+    /// May only be bound in GPU-powered mode:
     /// 0: Material Buffer
     ///
     /// Bindings in CPU-Powered Mode:
@@ -24,7 +24,7 @@ pub enum ResourceBinding {
     /// 7: Anisotropy Texture
     /// 8: Ambient Occlusion Texture
     /// 9: Texture Data
-    Material,
+    GPUMaterial,
     /// Bindings in All Modes:
     /// 0: Camera Data Uniform Buffer
     CameraData,
@@ -49,6 +49,22 @@ pub enum ResourceBinding {
     ///
     /// Each given texture will be it's own binding
     CustomCubeTexture(Vec<ImageInputReference>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum PerObjectResourceBinding {
+    /// May only be bound in GPU-powered mode:
+    /// 0: Albedo Texture
+    /// 1: Normal Texture
+    /// 2: Roughness Texture
+    /// 3: Metallic Texture
+    /// 4: Reflectance Texture
+    /// 5: Clear Coat Texture
+    /// 6: Clear Coat Roughness Texture
+    /// 7: Anisotropy Texture
+    /// 8: Ambient Occlusion Texture
+    /// 9: Texture Data
+    CPUMaterial,
 }
 
 pub type ImageFormat = wgpu::TextureFormat;

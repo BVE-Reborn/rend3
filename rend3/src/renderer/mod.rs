@@ -13,6 +13,7 @@ use crate::{
     statistics::RendererStatistics,
     RendererInitializationError, RendererOptions,
 };
+use bitflags::_core::cmp::Ordering;
 pub use material::{MATERIALS_SIZE, MAX_MATERIALS};
 use parking_lot::{Mutex, RwLock};
 use raw_window_handle::HasRawWindowHandle;
@@ -25,6 +26,7 @@ use wgpu_conveyor::AutomatedBufferManager;
 mod util;
 
 mod camera;
+mod culling;
 pub mod error;
 mod frustum;
 mod info;
@@ -46,11 +48,6 @@ mod list {
 mod material;
 mod mesh;
 mod object;
-mod passes {
-    mod culling;
-
-    pub use culling::*;
-}
 mod pipeline;
 mod render;
 mod resources;
@@ -59,10 +56,127 @@ mod shaders;
 mod texture;
 mod uniforms;
 
+#[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
+pub struct OrdEqFloat(pub f32);
+impl Eq for OrdEqFloat {}
+impl Ord for OrdEqFloat {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.partial_cmp(other).unwrap_or(Ordering::Greater)
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum RendererMode {
+    CPUPowered,
+    GPUPowered,
+}
+
+impl RendererMode {
+    pub(crate) fn into_data<C, G>(self, cpu: impl FnOnce() -> C, gpu: impl FnOnce() -> G) -> ModeData<C, G> {
+        match self {
+            Self::CPUPowered => ModeData::CPU(cpu()),
+            Self::GPUPowered => ModeData::GPU(gpu()),
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub(crate) enum ModeData<C, G> {
+    CPU(C),
+    GPU(G),
+}
+#[allow(dead_code)] // Even if these are unused, don't warn
+impl<C, G> ModeData<C, G> {
+    pub fn mode(&self) -> RendererMode {
+        match self {
+            Self::CPU(_) => RendererMode::CPUPowered,
+            Self::GPU(_) => RendererMode::GPUPowered,
+        }
+    }
+
+    pub fn into_cpu(self) -> C {
+        match self {
+            Self::CPU(c) => c,
+            Self::GPU(_) => panic!("tried to extract cpu data in gpu mode"),
+        }
+    }
+
+    pub fn as_cpu(&self) -> &C {
+        match self {
+            Self::CPU(c) => c,
+            Self::GPU(_) => panic!("tried to extract cpu data in gpu mode"),
+        }
+    }
+
+    pub fn as_cpu_mut(&mut self) -> &mut C {
+        match self {
+            Self::CPU(c) => c,
+            Self::GPU(_) => panic!("tried to extract cpu data in gpu mode"),
+        }
+    }
+
+    pub fn into_gpu(self) -> G {
+        match self {
+            Self::GPU(g) => g,
+            Self::CPU(_) => panic!("tried to extract gpu data in cpu mode"),
+        }
+    }
+
+    pub fn as_gpu(&self) -> &G {
+        match self {
+            Self::GPU(g) => g,
+            Self::CPU(_) => panic!("tried to extract gpu data in cpu mode"),
+        }
+    }
+
+    pub fn as_gpu_mut(&mut self) -> &mut G {
+        match self {
+            Self::GPU(g) => g,
+            Self::CPU(_) => panic!("tried to extract gpu data in cpu mode"),
+        }
+    }
+
+    pub fn as_ref(&self) -> ModeData<&C, &G> {
+        match self {
+            Self::CPU(c) => ModeData::CPU(c),
+            Self::GPU(c) => ModeData::GPU(c),
+        }
+    }
+
+    pub fn as_ref_mut(&mut self) -> ModeData<&mut C, &mut G> {
+        match self {
+            Self::CPU(c) => ModeData::CPU(c),
+            Self::GPU(c) => ModeData::GPU(c),
+        }
+    }
+
+    pub fn map_cpu<C2>(self, func: impl FnOnce(C) -> C2) -> ModeData<C2, G> {
+        match self {
+            Self::CPU(c) => ModeData::CPU(func(c)),
+            Self::GPU(g) => ModeData::GPU(g),
+        }
+    }
+
+    pub fn map_gpu<G2>(self, func: impl FnOnce(G) -> G2) -> ModeData<C, G2> {
+        match self {
+            Self::CPU(c) => ModeData::CPU(c),
+            Self::GPU(g) => ModeData::GPU(func(g)),
+        }
+    }
+
+    pub fn map<C2, G2>(self, cpu_func: impl FnOnce(C) -> C2, gpu_func: impl FnOnce(G) -> G2) -> ModeData<C2, G2> {
+        match self {
+            Self::CPU(c) => ModeData::CPU(cpu_func(c)),
+            Self::GPU(g) => ModeData::GPU(gpu_func(g)),
+        }
+    }
+}
+
 const COMPUTE_POOL: u8 = 0;
 
 const BUFFER_RECALL_PRIORITY: u32 = 0;
 const MAIN_TASK_PRIORITY: u32 = 1;
+const CULLING_PRIORITY: u32 = 2;
 const RENDER_RECORD_PRIORITY: u32 = 2;
 const PIPELINE_BUILD_PRIORITY: u32 = 3;
 
@@ -78,7 +192,8 @@ where
     yard: Arc<Switchyard<TLD>>,
     instructions: InstructionStreamPair,
 
-    _adapter_info: ExtendedAdapterInfo,
+    mode: RendererMode,
+    adapter_info: ExtendedAdapterInfo,
     queue: Queue,
     device: Arc<Device>,
     surface: Surface,
@@ -96,7 +211,7 @@ where
 
     render_list_cache: RwLock<list::RenderListCache>,
 
-    culling_pass: passes::CullingPass,
+    culling_pass: culling::CullingPass,
 
     // _imgui_renderer: imgui_wgpu::Renderer,
     options: RwLock<RendererOptions>,
@@ -108,9 +223,18 @@ impl<TLD: 'static> Renderer<TLD> {
         imgui_context: &'a mut imgui::Context,
         backend: Option<Backend>,
         device: Option<String>,
+        mode: Option<RendererMode>,
         options: RendererOptions,
     ) -> impl Future<Output = Result<Arc<Self>, RendererInitializationError>> + 'a {
-        setup::create_renderer(window, yard, imgui_context, backend, device, options)
+        setup::create_renderer(window, yard, imgui_context, backend, device, mode, options)
+    }
+
+    pub fn mode(&self) -> RendererMode {
+        self.mode
+    }
+
+    pub fn adapter_info(&self) -> ExtendedAdapterInfo {
+        self.adapter_info.clone()
     }
 
     pub fn add_mesh(&self, mesh: Mesh) -> MeshHandle {
@@ -296,7 +420,8 @@ impl<TLD: 'static> Renderer<TLD> {
     }
 
     pub fn render(self: &Arc<Self>, list: RenderList) -> JoinHandle<RendererStatistics> {
+        let this = Arc::clone(self);
         self.yard
-            .spawn(0, MAIN_TASK_PRIORITY, render::render_loop(Arc::clone(self), list))
+            .spawn_local(0, MAIN_TASK_PRIORITY, move |_| render::render_loop(this, list))
     }
 }

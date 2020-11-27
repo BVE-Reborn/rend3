@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use wgpu::{BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, Device};
+use wgpu::{BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindingResource, Device};
 
 pub struct BindGroupBuilder<'a> {
     bindings: Vec<BindGroupEntry<'a>>,
@@ -13,11 +13,11 @@ impl<'a> BindGroupBuilder<'a> {
         }
     }
 
-    pub fn append(&mut self, binding: BindGroupEntry<'a>) {
+    pub fn append(&mut self, resource: BindingResource<'a>) {
         let index = self.bindings.len();
         self.bindings.push(BindGroupEntry {
             binding: index as u32,
-            ..binding
+            resource,
         });
     }
 

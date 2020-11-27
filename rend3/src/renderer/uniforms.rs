@@ -2,8 +2,8 @@ use crate::renderer::{camera::Camera, frustum::ShaderFrustum};
 use glam::Mat4;
 use std::mem::size_of;
 use wgpu::{
-    BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, Buffer, BufferAddress, BufferDescriptor,
-    BufferUsage, Device, Queue,
+    BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindingResource, Buffer, BufferAddress,
+    BufferDescriptor, BufferUsage, Device, Queue,
 };
 
 #[derive(Debug, Copy, Clone)]
@@ -39,7 +39,7 @@ impl WrappedUniform {
             layout: uniform_bgl,
             entries: &[BindGroupEntry {
                 binding: 0,
-                resource: buffer.as_entire_binding(),
+                resource: BindingResource::Buffer(buffer.slice(..)),
             }],
         });
 

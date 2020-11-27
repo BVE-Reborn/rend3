@@ -1,6 +1,8 @@
 #version 450
 
+#ifdef GPU_MODE
 #extension GL_EXT_nonuniform_qualifier : require
+#endif
 
 #include "structures.glsl"
 
@@ -18,23 +20,41 @@ layout(set = 0, binding = 1) uniform samplerShadow shadow_sampler;
 layout(set = 1, binding = 0, std430) restrict readonly buffer ObjectOutputDataBuffer {
     ObjectOutputData object_output[];
 };
-layout(set = 2, binding = 0) uniform MaterialBuffer {
-    MaterialData materials[MATERIAL_COUNT];
-};
-layout(set = 3, binding = 0) uniform texture2D textures[];
-layout(set = 4, binding = 0) restrict readonly buffer DirectionalLightBuffer {
+layout(set = 2, binding = 0) restrict readonly buffer DirectionalLightBuffer {
     DirectionalLightBufferHeader directional_light_header;
     DirectionalLight directional_lights[];
 };
-layout(set = 4, binding = 1) uniform texture2DArray shadow;
-layout(set = 5, binding = 0) uniform UniformBuffer {
+layout(set = 2, binding = 1) uniform texture2DArray shadow;
+layout(set = 3, binding = 0) uniform UniformBuffer {
     UniformData uniforms;
 };
+#ifdef GPU_MODE
+layout(set = 4, binding = 0) uniform MaterialBuffer {
+    GPUMaterialData materials[MATERIAL_COUNT];
+};
+layout(set = 5, binding = 0) uniform texture2D textures[];
+#endif
+#ifdef CPU_MODE
+layout(set = 4, binding = 0) uniform texture2D albedo_tex;
+layout(set = 4, binding = 1) uniform texture2D normal_tex;
+layout(set = 4, binding = 2) uniform texture2D roughness_tex;
+layout(set = 4, binding = 3) uniform texture2D metallic_tex;
+layout(set = 4, binding = 4) uniform texture2D reflectance_tex;
+layout(set = 4, binding = 5) uniform texture2D clear_coat_tex;
+layout(set = 4, binding = 6) uniform texture2D clear_coat_roughness_tex;
+layout(set = 4, binding = 7) uniform texture2D anisotropy_tex;
+layout(set = 4, binding = 8) uniform texture2D ambient_occlusion_tex;
+layout(set = 4, binding = 9) uniform TexterData {
+    CPUMaterialData material;
+};
+#endif
 
 #include "lighting/surface.glsl"
 
 void main() {
-    MaterialData material = materials[i_material];
+    #ifdef GPU_MODE
+    GPUMaterialData material = materials[i_material];
+    #endif
 
     PixelData pixel = get_per_pixel_data(material);
 

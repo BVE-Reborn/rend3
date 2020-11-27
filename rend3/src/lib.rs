@@ -54,5 +54,5 @@ mod renderer;
 mod statistics;
 
 pub use options::*;
-pub use renderer::{error::*, Renderer};
+pub use renderer::{error::*, Renderer, RendererMode};
 pub use statistics::*;

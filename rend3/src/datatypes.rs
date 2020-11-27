@@ -3,7 +3,6 @@ use glam::{
     f32::{Vec3A, Vec4},
     Mat4, Vec2, Vec3,
 };
-use std::num::NonZeroU32;
 use wgpu::TextureFormat;
 pub use wgpu::{Color as ClearColor, LoadOp as PipelineLoadOp};
 
@@ -266,9 +265,13 @@ impl AlbedoComponent {
         }
     }
 
-    pub(crate) fn to_texture<Func>(&self, func: Func) -> Option<NonZeroU32>
+    pub(crate) fn is_texture(&self) -> bool {
+        matches!(*self, Self::Texture(..) | Self::TextureVertex { .. })
+    }
+
+    pub(crate) fn to_texture<Func, Out>(&self, func: Func) -> Option<Out>
     where
-        Func: FnOnce(TextureHandle) -> NonZeroU32,
+        Func: FnOnce(TextureHandle) -> Out,
     {
         match *self {
             Self::None | Self::Vertex { .. } | Self::Value(_) | Self::ValueVertex { .. } => None,
@@ -298,9 +301,13 @@ impl<T: Copy> MaterialComponent<T> {
         }
     }
 
-    pub(crate) fn to_texture<Func>(&self, func: Func) -> Option<NonZeroU32>
+    pub(crate) fn is_texture(&self) -> bool {
+        matches!(*self, Self::Texture(..))
+    }
+
+    pub(crate) fn to_texture<Func, Out>(&self, func: Func) -> Option<Out>
     where
-        Func: FnOnce(TextureHandle) -> NonZeroU32,
+        Func: FnOnce(TextureHandle) -> Out,
     {
         match *self {
             Self::None | Self::Value(_) => None,
@@ -361,7 +368,8 @@ pub enum PipelineInputType {
 pub enum PipelineBindingType {
     GeneralData,
     ObjectData,
-    Material,
+    GPUMaterial,
+    CPUMaterial,
     CameraData,
     GPU2DTextures,
     GPUCubeTextures,
