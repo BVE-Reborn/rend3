@@ -14,7 +14,6 @@ use crate::{
     RendererInitializationError, RendererOptions,
 };
 use bitflags::_core::cmp::Ordering;
-pub use material::{MATERIALS_SIZE, MAX_MATERIALS};
 use parking_lot::{Mutex, RwLock};
 use raw_window_handle::HasRawWindowHandle;
 use std::{future::Future, sync::Arc};
