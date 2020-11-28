@@ -335,8 +335,6 @@ fn main() {
     let mut timestamp_last_frame = Instant::now();
     let mut frames = 0_usize;
 
-    let mut render_handle = None;
-
     event_loop.run(move |event, _window_target, control| match event {
         Event::MainEventsCleared => {
             frames += 1;
@@ -429,16 +427,9 @@ fn main() {
             event: WindowEvent::CloseRequested,
             ..
         } => {
-            if let Some(handle) = render_handle.take() {
-                futures::executor::block_on(handle);
-            }
             *control = ControlFlow::Exit;
         }
         Event::RedrawRequested(_) => {
-            if let Some(handle) = render_handle.take() {
-                futures::executor::block_on(handle);
-            }
-
             rend3::span_transfer!(_ -> redraw_span, INFO, "Redraw");
 
             renderer.set_camera_location(camera_location);
@@ -453,7 +444,7 @@ fn main() {
             ));
 
             rend3::span_transfer!(redraw_span -> render_wait_span, INFO, "Waiting for render");
-            render_handle = Some(handle);
+            futures::executor::block_on(handle);
         }
         _ => {}
     })
