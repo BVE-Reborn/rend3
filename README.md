@@ -14,7 +14,7 @@ This repo currently consists of two crates:
 
 Easy to use, customizable, efficient 3D renderer library built on wgpu.
 
-Library is currently under heavy development and teh api will rapidly change
+Library is currently under heavy development and the api will rapidly change
 as things are factored.
 
 License: MPL-2.0
