@@ -1,7 +1,7 @@
 use fnv::FnvBuildHasher;
 use glam::{Mat4, Quat, Vec2, Vec3, Vec3A};
 use imgui::FontSource;
-use obj::{IndexTuple, Obj, ObjMaterial};
+use obj::{IndexTuple, Obj};
 use pico_args::Arguments;
 use rend3::{
     datatypes::{
@@ -13,9 +13,7 @@ use rend3::{
 };
 use std::{
     collections::hash_map::{self, HashMap},
-    fs::File,
     hash::BuildHasher,
-    io::BufReader,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -39,13 +37,28 @@ fn load_texture(
     Ok(match cache.entry(name.clone()) {
         hash_map::Entry::Occupied(o) => *o.get(),
         hash_map::Entry::Vacant(v) => *v.insert({
-            let dds = ddsfile::Dds::read(&mut BufReader::new(File::open(name)?))?;
+            let real_name = concat!(env!("CARGO_MANIFEST_DIR"), "/data/").to_owned() + name;
+            let file = std::fs::read(&real_name).unwrap_or_else(|_| panic!("Could not read object {}", real_name));
+
+            let transcoder = basis::Transcoder::new();
+            let image_info = transcoder.get_image_level_info(&file, 0, 0).ok_or("can't transcode missing image")?;
+
+            let basis_format = match format {
+                RendererTextureFormat::Bc4Linear => basis::TargetTextureFormat::Bc4R,
+                RendererTextureFormat::Bc5Normal => basis::TargetTextureFormat::Bc5Rg,
+                RendererTextureFormat::Bc7Srgb => basis::TargetTextureFormat::Bc7Rgba,
+                _ => unreachable!(),
+            };
+
+            let mut prepared = transcoder.prepare_transcoding(&file).ok_or("couldn't prepare transcoding")?;
+            let image = prepared.transcode_image_level(0, 0, basis_format)?;
+            drop(prepared);
 
             renderer.add_texture_2d(Texture {
                 format,
-                width: dds.get_width(),
-                height: dds.get_height(),
-                data: dds.data,
+                width: image_info.width,
+                height: image_info.height,
+                data: image,
                 label: Some(name.clone()),
             })
         }),
@@ -53,13 +66,27 @@ fn load_texture(
 }
 
 fn load_skybox(renderer: &Renderer) -> Result<(), Box<dyn std::error::Error>> {
-    let dds = ddsfile::Dds::read(&mut BufReader::new(File::open("tmp/skybox/skybox-compressed.dds")?))?;
+    let name = concat!(env!("CARGO_MANIFEST_DIR"), "/data/skybox.basis");
+    let file = std::fs::read(name).unwrap_or_else(|_| panic!("Could not read skybox {}", name));
+
+    let transcoder = basis::Transcoder::new();
+    let image_info = transcoder.get_image_level_info(&file, 0, 0).ok_or("skybox image missing")?;
+
+    let mut prepared = transcoder.prepare_transcoding(&file).ok_or("could not prepare skybox transcoding")?;
+    let mut image = Vec::with_capacity(image_info.total_blocks as usize * 16 * 6);
+    for i in 0..6 {
+        image.extend_from_slice(
+            &prepared
+                .transcode_image_level(i, 0, basis::TargetTextureFormat::Bc7Rgba)?,
+        );
+    }
+    drop(prepared);
 
     let handle = renderer.add_texture_cube(Texture {
         format: RendererTextureFormat::Bc7Srgb,
-        width: dds.get_width(),
-        height: dds.get_height(),
-        data: dds.data,
+        width: image_info.width,
+        height: image_info.height,
+        data: image,
         label: Some("background".into()),
     });
     renderer.set_background_texture(handle);
@@ -309,9 +336,9 @@ fn main() {
 
     rend3::span_transfer!(renderer_span -> loading_span, INFO, "Loading resources");
 
-    let cube = load_obj(&renderer, "tmp/cube.obj").unwrap();
+    let cube = load_obj(&renderer, concat!(env!("CARGO_MANIFEST_DIR"), "/data/cube.obj")).unwrap();
     single(&renderer, cube.0, cube.1);
-    let suzanne = load_obj(&renderer, "tmp/suzanne.obj").unwrap();
+    let suzanne = load_obj(&renderer, concat!(env!("CARGO_MANIFEST_DIR"), "/data/suzanne.obj")).unwrap();
     distribute(&renderer, suzanne.0, suzanne.1);
     load_skybox(&renderer).unwrap();
 
@@ -336,8 +363,6 @@ fn main() {
     let mut timestamp_last_second = Instant::now();
     let mut timestamp_last_frame = Instant::now();
     let mut frames = 0_usize;
-
-    let mut render_handle = None;
 
     event_loop.run(move |event, _window_target, control| match event {
         Event::MainEventsCleared => {
@@ -437,16 +462,9 @@ fn main() {
             event: WindowEvent::CloseRequested,
             ..
         } => {
-            if let Some(handle) = render_handle.take() {
-                futures::executor::block_on(handle);
-            }
             *control = ControlFlow::Exit;
         }
         Event::RedrawRequested(_) => {
-            if let Some(handle) = render_handle.take() {
-                futures::executor::block_on(handle);
-            }
-
             rend3::span_transfer!(_ -> redraw_span, INFO, "Redraw");
 
             renderer.set_camera_location(camera_location);
@@ -461,7 +479,7 @@ fn main() {
             ));
 
             rend3::span_transfer!(redraw_span -> render_wait_span, INFO, "Waiting for render");
-            render_handle = Some(handle);
+            futures::executor::block_on(handle);
         }
         _ => {}
     })

@@ -217,7 +217,8 @@ pub fn create_material_bgl(device: &Device, mode: RendererMode) -> BindGroupLayo
             entries: &[BindGroupLayoutEntry {
                 binding: 0,
                 visibility: ShaderStage::VERTEX | ShaderStage::FRAGMENT | ShaderStage::COMPUTE,
-                ty: BindingType::UniformBuffer {
+                ty: BindingType::StorageBuffer {
+                    readonly: true,
                     dynamic: false,
                     min_binding_size: None,
                 },

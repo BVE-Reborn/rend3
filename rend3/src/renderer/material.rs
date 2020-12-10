@@ -2,7 +2,7 @@ use crate::{
     bind_merge::BindGroupBuilder,
     datatypes::{Material, MaterialChange, MaterialFlags, MaterialHandle, RendererTextureFormat, TextureHandle},
     registry::ResourceRegistry,
-    renderer::{limits::MAX_UNIFORM_BUFFER_BINDING_SIZE, texture::TextureManager, ModeData, RendererMode},
+    renderer::{texture::TextureManager, ModeData, RendererMode},
 };
 use glam::f32::Vec4;
 use std::{mem::size_of, num::NonZeroU32, sync::Arc};
@@ -12,12 +12,9 @@ use wgpu::{
 };
 use wgpu_conveyor::{AutomatedBuffer, AutomatedBufferManager, IdBuffer};
 
-pub const MAX_MATERIALS: usize = MAX_UNIFORM_BUFFER_BINDING_SIZE as usize / size_of::<GPUShaderMaterial>();
-pub const MATERIALS_SIZE: BufferAddress = (MAX_MATERIALS * size_of::<GPUShaderMaterial>()) as BufferAddress;
-
 #[repr(C, align(16))]
 #[derive(Debug, Copy, Clone)]
-struct CPUShaderMaterial {
+pub struct CPUShaderMaterial {
     albedo: Vec4,
     roughness: f32,
     metallic: f32,
@@ -120,14 +117,7 @@ impl MaterialManager {
 
         let buffer = mode.into_data(
             || (),
-            || {
-                manager.create_new_buffer(
-                    device,
-                    MAX_UNIFORM_BUFFER_BINDING_SIZE,
-                    BufferUsage::UNIFORM,
-                    Some("material buffer"),
-                )
-            },
+            || manager.create_new_buffer(device, 0, BufferUsage::STORAGE, Some("material buffer")),
         );
         let registry = ResourceRegistry::new();
 
@@ -246,9 +236,11 @@ impl MaterialManager {
     pub fn ready(&mut self, device: &Device, encoder: &mut CommandEncoder, texture_manager: &TextureManager) {
         span_transfer!(_ -> ready_span, INFO, "Material Manager Ready");
 
-        let registry = &self.registry;
         if let ModeData::GPU(ref mut buffer) = self.buffer {
-            buffer.write_to_buffer(device, encoder, MATERIALS_SIZE, move |_, slice| {
+            let registry = &self.registry;
+            let size = registry.count() * size_of::<GPUShaderMaterial>();
+
+            buffer.write_to_buffer(device, encoder, size as BufferAddress, move |_, slice| {
                 let typed_slice: &mut [GPUShaderMaterial] = bytemuck::cast_slice_mut(slice);
 
                 let translate_texture = texture_manager.translation_fn();
