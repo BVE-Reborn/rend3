@@ -128,8 +128,8 @@ fn load_obj(renderer: &Renderer, file: &str) -> Result<(MeshHandle, MaterialHand
                     )?),
                 },
                 // `MaterialComponent` is a superset of `Option<TextureHandle>`. It adds a `Value`
-                // variant which represents a kind of "flat plane" texture where each texel in the
-                // is the same. This behavio does not make sense for normals, however, so it uses
+                // variant which represents a kind of "flat plane" texture where each texel is the
+                // same. This behavior is never desirable for normals, however, so it uses
                 // `Option<TextureHandle>` instead.
                 normal: map_bump
                     .as_ref()
