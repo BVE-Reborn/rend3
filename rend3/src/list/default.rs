@@ -13,7 +13,6 @@ use crate::{
 };
 use std::{future::Future, sync::Arc};
 use wgpu::{Color, LoadOp, TextureFormat};
-use winit::dpi::PhysicalSize;
 
 pub struct DefaultShaders {
     pub depth_vert: ShaderHandle,
@@ -270,11 +269,7 @@ impl DefaultPipelines {
     }
 }
 
-pub fn default_render_list(
-    mode: RendererMode,
-    resolution: PhysicalSize<u32>,
-    pipelines: &DefaultPipelines,
-) -> RenderList {
+pub fn default_render_list(mode: RendererMode, resolution: [u32; 2], pipelines: &DefaultPipelines) -> RenderList {
     let resolution: [u32; 2] = resolution.into();
 
     let (depth_bindings, depth_per_obj_bindings) = match mode {

@@ -183,8 +183,34 @@ macro_rules! changeable_struct {
 pub struct Mesh {
     pub vertices: Vec<ModelVertex>,
     pub indices: Vec<u32>,
-    pub material_count: u32,
     // TODO: Bones/joints/animation
+}
+
+impl Mesh {
+    pub fn calculate_normals(&mut self) {
+        for vert in &mut self.vertices {
+            vert.normal = Vec3::zero();
+        }
+
+        for idx in self.indices.chunks_exact(3) {
+            let pos1 = self.vertices[idx[0] as usize].position;
+            let pos2 = self.vertices[idx[1] as usize].position;
+            let pos3 = self.vertices[idx[2] as usize].position;
+
+            let edge1 = pos2 - pos1;
+            let edge2 = pos3 - pos1;
+
+            let normal = edge1.cross(edge2);
+
+            self.vertices[idx[0] as usize].normal += normal;
+            self.vertices[idx[1] as usize].normal += normal;
+            self.vertices[idx[2] as usize].normal += normal;
+        }
+
+        for vert in &mut self.vertices {
+            vert.normal = vert.normal.normalize();
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
