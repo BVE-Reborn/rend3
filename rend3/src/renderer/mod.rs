@@ -14,7 +14,6 @@ use crate::{
     RendererInitializationError, RendererOptions,
 };
 use bitflags::_core::cmp::Ordering;
-pub use material::{MATERIALS_SIZE, MAX_MATERIALS};
 use parking_lot::{Mutex, RwLock};
 use raw_window_handle::HasRawWindowHandle;
 use std::{future::Future, sync::Arc};
@@ -26,6 +25,7 @@ use wgpu_conveyor::AutomatedBufferManager;
 mod util;
 
 mod camera;
+mod copy;
 mod culling;
 pub mod error;
 mod frustum;
@@ -208,9 +208,9 @@ where
     material_manager: RwLock<MaterialManager>,
     object_manager: RwLock<ObjectManager>,
     directional_light_manager: RwLock<light::DirectionalLightManager>,
-
     render_list_cache: RwLock<list::RenderListCache>,
 
+    gpu_copy: copy::GpuCopy,
     culling_pass: culling::CullingPass,
 
     // _imgui_renderer: imgui_wgpu::Renderer,

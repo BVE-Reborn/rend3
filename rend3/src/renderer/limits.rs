@@ -1,7 +1,7 @@
 use crate::{renderer::RendererMode, LimitType, RendererInitializationError};
 use wgpu::{BufferAddress, Features, Limits};
 
-pub const MAX_UNIFORM_BUFFER_BINDING_SIZE: BufferAddress = 1 << 16; // Guaranteed on DI hardware
+pub const MAX_UNIFORM_BUFFER_BINDING_SIZE: BufferAddress = 1024;
 
 // This is a macro as bitflags are just totally not const
 #[rustfmt::skip] // rustfmt just keeps pushing the | further and further over.
@@ -60,7 +60,7 @@ const GPU_REQUIRED_LIMITS: Limits = Limits {
     max_samplers_per_shader_stage: 2,
     max_storage_buffers_per_shader_stage: 5,
     max_storage_textures_per_shader_stage: 0,
-    max_uniform_buffers_per_shader_stage: 1,
+    max_uniform_buffers_per_shader_stage: 2,
     max_uniform_buffer_binding_size: MAX_UNIFORM_BUFFER_BINDING_SIZE as u32,
     max_push_constant_size: 128,
 };
@@ -73,7 +73,7 @@ const CPU_REQUIRED_LIMITS: Limits = Limits {
     max_samplers_per_shader_stage: 2,
     max_storage_buffers_per_shader_stage: 2,
     max_storage_textures_per_shader_stage: 0,
-    max_uniform_buffers_per_shader_stage: 1,
+    max_uniform_buffers_per_shader_stage: 2,
     max_uniform_buffer_binding_size: MAX_UNIFORM_BUFFER_BINDING_SIZE as u32,
     max_push_constant_size: 128,
 };

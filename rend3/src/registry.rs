@@ -32,6 +32,10 @@ impl<T> ResourceRegistry<T> {
         self.mapping.values()
     }
 
+    pub fn values_mut(&mut self) -> impl Iterator<Item = &mut T> {
+        self.mapping.values_mut()
+    }
+
     pub fn get(&self, handle: usize) -> &T {
         self.mapping.get(&handle).unwrap()
     }

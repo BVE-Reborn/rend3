@@ -34,11 +34,12 @@ skip = [
 ]
 
 [advisories]
-vulnerability = "deny"
-unmaintained = "deny"
+vulnerability = "warn"
+unmaintained = "warn"
 ignore = [
     "RUSTSEC-2020-0016",  # async-std is using net2 which id deprecated in favor of socket2
     "RUSTSEC-2020-0056",  # stdweb maintainer is unresponsive
+    "RUSTSEC-2020-0089",  # nanorand has issue < 0.5.1
 ]
 
 [sources]

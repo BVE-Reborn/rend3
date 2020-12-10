@@ -8,7 +8,7 @@ use crate::{
         ImageUsage, PerObjectResourceBinding, RenderList, RenderOpDescriptor, RenderOpInputType, RenderPassDescriptor,
         RenderPassRunRate, ResourceBinding, ShaderSourceStage, ShaderSourceType, SourceShaderDescriptor,
     },
-    renderer::{RendererMode, MAX_MATERIALS},
+    renderer::RendererMode,
     Renderer,
 };
 use std::{future::Future, sync::Arc};
@@ -41,19 +41,13 @@ impl DefaultShaders {
             source: ShaderSourceType::Builtin("depth.vert".to_string()),
             stage: ShaderSourceStage::Vertex,
             includes: vec![],
-            defines: vec![
-                (String::from("MATERIAL_COUNT"), Some(MAX_MATERIALS.to_string())),
-                mode_define.clone(),
-            ],
+            defines: vec![mode_define.clone()],
         });
         let depth_frag = renderer.add_source_shader(SourceShaderDescriptor {
             source: ShaderSourceType::Builtin("depth.frag".to_string()),
             stage: ShaderSourceStage::Fragment,
             includes: vec![],
-            defines: vec![
-                (String::from("MATERIAL_COUNT"), Some(MAX_MATERIALS.to_string())),
-                mode_define.clone(),
-            ],
+            defines: vec![mode_define.clone()],
         });
 
         let skybox_vert = renderer.add_source_shader(SourceShaderDescriptor {
@@ -73,19 +67,13 @@ impl DefaultShaders {
             source: ShaderSourceType::Builtin("opaque.vert".to_string()),
             stage: ShaderSourceStage::Vertex,
             includes: vec![],
-            defines: vec![
-                (String::from("MATERIAL_COUNT"), Some(MAX_MATERIALS.to_string())),
-                mode_define.clone(),
-            ],
+            defines: vec![mode_define.clone()],
         });
         let opaque_frag = renderer.add_source_shader(SourceShaderDescriptor {
             source: ShaderSourceType::Builtin("opaque.frag".to_string()),
             stage: ShaderSourceStage::Fragment,
             includes: vec![],
-            defines: vec![
-                (String::from("MATERIAL_COUNT"), Some(MAX_MATERIALS.to_string())),
-                mode_define.clone(),
-            ],
+            defines: vec![mode_define.clone()],
         });
 
         let blit_vert = renderer.add_source_shader(SourceShaderDescriptor {
@@ -98,7 +86,7 @@ impl DefaultShaders {
             source: ShaderSourceType::Builtin("blit.frag".to_string()),
             stage: ShaderSourceStage::Fragment,
             includes: vec![],
-            defines: vec![mode_define.clone()],
+            defines: vec![mode_define],
         });
 
         async move {

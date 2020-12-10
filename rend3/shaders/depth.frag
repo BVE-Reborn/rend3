@@ -19,8 +19,8 @@ layout(set = 2, binding = 0) uniform UniformBuffer {
     UniformData uniforms;
 };
 #ifdef GPU_MODE
-layout(set = 3, binding = 0) uniform MaterialBuffer {
-    GPUMaterialData materials[MATERIAL_COUNT];
+layout(set = 3, binding = 0, std430) restrict readonly buffer MaterialBuffer {
+    GPUMaterialData materials[];
 };
 layout(set = 4, binding = 0) uniform texture2D textures[];
 #endif

@@ -13,9 +13,7 @@ use rend3::{
 };
 use std::{
     collections::HashMap,
-    fs::File,
     hash::BuildHasher,
-    io::BufReader,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -40,13 +38,28 @@ fn load_texture(
         if let Some(handle) = cache.get(name) {
             Some(*handle)
         } else {
-            let dds = ddsfile::Dds::read(&mut BufReader::new(File::open(name).unwrap())).unwrap();
+            let real_name = concat!(env!("CARGO_MANIFEST_DIR"), "/data/").to_owned() + name;
+            let file = std::fs::read(&real_name).unwrap_or_else(|_| panic!("Could not read object {}", real_name));
+
+            let transcoder = basis::Transcoder::new();
+            let image_info = transcoder.get_image_level_info(&file, 0, 0).unwrap();
+
+            let basis_format = match format {
+                RendererTextureFormat::Bc4Linear => basis::TargetTextureFormat::Bc4R,
+                RendererTextureFormat::Bc5Normal => basis::TargetTextureFormat::Bc5Rg,
+                RendererTextureFormat::Bc7Srgb => basis::TargetTextureFormat::Bc7Rgba,
+                _ => unreachable!(),
+            };
+
+            let mut prepared = transcoder.prepare_transcoding(&file).unwrap();
+            let image = prepared.transcode_image_level(0, 0, basis_format).unwrap();
+            drop(prepared);
 
             let handle = renderer.add_texture_2d(Texture {
                 format,
-                width: dds.get_width(),
-                height: dds.get_height(),
-                data: dds.data,
+                width: image_info.width,
+                height: image_info.height,
+                data: image,
                 label: Some(name.clone()),
             });
 
@@ -60,16 +73,28 @@ fn load_texture(
 }
 
 fn load_skybox(renderer: &Renderer) {
-    let dds = ddsfile::Dds::read(&mut BufReader::new(
-        File::open("tmp/skybox/skybox-compressed.dds").unwrap(),
-    ))
-    .unwrap();
+    let name = concat!(env!("CARGO_MANIFEST_DIR"), "/data/skybox.basis");
+    let file = std::fs::read(name).unwrap_or_else(|_| panic!("Could not read skybox {}", name));
+
+    let transcoder = basis::Transcoder::new();
+    let image_info = transcoder.get_image_level_info(&file, 0, 0).unwrap();
+
+    let mut prepared = transcoder.prepare_transcoding(&file).unwrap();
+    let mut image = Vec::with_capacity(image_info.total_blocks as usize * 16 * 6);
+    for i in 0..6 {
+        image.extend_from_slice(
+            &prepared
+                .transcode_image_level(i, 0, basis::TargetTextureFormat::Bc7Rgba)
+                .unwrap(),
+        );
+    }
+    drop(prepared);
 
     let handle = renderer.add_texture_cube(Texture {
         format: RendererTextureFormat::Bc7Srgb,
-        width: dds.get_width(),
-        height: dds.get_height(),
-        data: dds.data,
+        width: image_info.width,
+        height: image_info.height,
+        data: image,
         label: Some("background".into()),
     });
     renderer.set_background_texture(handle);
@@ -307,9 +332,9 @@ fn main() {
 
     rend3::span_transfer!(renderer_span -> loading_span, INFO, "Loading resources");
 
-    let cube = load_obj(&renderer, "tmp/cube.obj");
+    let cube = load_obj(&renderer, concat!(env!("CARGO_MANIFEST_DIR"), "/data/cube.obj"));
     single(&renderer, cube.0, cube.1);
-    let suzanne = load_obj(&renderer, "tmp/suzanne.obj");
+    let suzanne = load_obj(&renderer, concat!(env!("CARGO_MANIFEST_DIR"), "/data/suzanne.obj"));
     distribute(&renderer, suzanne.0, suzanne.1);
     load_skybox(&renderer);
 
@@ -334,8 +359,6 @@ fn main() {
     let mut timestamp_last_second = Instant::now();
     let mut timestamp_last_frame = Instant::now();
     let mut frames = 0_usize;
-
-    let mut render_handle = None;
 
     event_loop.run(move |event, _window_target, control| match event {
         Event::MainEventsCleared => {
@@ -435,16 +458,9 @@ fn main() {
             event: WindowEvent::CloseRequested,
             ..
         } => {
-            if let Some(handle) = render_handle.take() {
-                futures::executor::block_on(handle);
-            }
             *control = ControlFlow::Exit;
         }
         Event::RedrawRequested(_) => {
-            if let Some(handle) = render_handle.take() {
-                futures::executor::block_on(handle);
-            }
-
             rend3::span_transfer!(_ -> redraw_span, INFO, "Redraw");
 
             renderer.set_camera_location(camera_location);
@@ -459,7 +475,7 @@ fn main() {
             ));
 
             rend3::span_transfer!(redraw_span -> render_wait_span, INFO, "Waiting for render");
-            render_handle = Some(handle);
+            futures::executor::block_on(handle);
         }
         _ => {}
     })

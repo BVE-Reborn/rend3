@@ -1,6 +1,7 @@
 use crate::{
     instruction::InstructionStreamPair,
     renderer::{
+        copy::GpuCopy,
         culling,
         info::ExtendedAdapterInfo,
         light::DirectionalLightManager,
@@ -169,6 +170,8 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
     ));
     let global_resource_guard = global_resources.get_mut();
 
+    let gpu_copy = GpuCopy::new(&device, &shader_manager, adapter_info.subgroup_size());
+
     let culling_pass = culling::CullingPass::new(
         &device,
         chosen_adapter.mode,
@@ -220,7 +223,7 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
 
     let render_list_cache = RwLock::new(RenderListCache::new());
 
-    let (culling_pass,) = futures::join!(culling_pass);
+    let (culling_pass, gpu_copy) = futures::join!(culling_pass, gpu_copy);
 
     Ok(Arc::new(Renderer {
         yard,
@@ -244,6 +247,8 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
         directional_light_manager,
 
         render_list_cache,
+
+        gpu_copy,
         culling_pass,
 
         // _imgui_renderer: imgui_renderer,

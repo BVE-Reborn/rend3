@@ -155,6 +155,6 @@ impl ShaderFrustum {
             }
         }
 
-        return true;
+        true
     }
 }

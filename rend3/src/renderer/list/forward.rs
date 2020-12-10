@@ -226,7 +226,9 @@ where
                             0,
                             &[draw_call_idx as u32],
                         );
-                        rpass.draw_indexed(object.start_idx..object.count, object.vertex_offset, 0..1);
+                        let start = object.start_idx;
+                        let end = start + object.count;
+                        rpass.draw_indexed(start..end, object.vertex_offset, 0..1);
                     }
                 }
                 ModeData::GPU(ref g) => {
