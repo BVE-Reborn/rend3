@@ -1,5 +1,8 @@
 [workspace]
-members = ["scene-viewer", "rend3"]
+members = [
+    "examples/scene-viewer",
+    "rend3"
+]
 
 [profile.release]
 debug = true
