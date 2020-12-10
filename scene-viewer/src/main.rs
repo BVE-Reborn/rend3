@@ -1,5 +1,5 @@
 use fnv::FnvBuildHasher;
-use glam::{Mat4, Quat, Vec2, Vec3};
+use glam::{Mat4, Quat, Vec2, Vec3, Vec3A};
 use imgui::FontSource;
 use obj::{IndexTuple, Obj, ObjMaterial};
 use pico_args::Arguments;
@@ -355,28 +355,34 @@ fn main() {
             let delta_time = now - timestamp_last_frame;
             timestamp_last_frame = now;
 
+            let forward = {
+                let CameraLocation { yaw, pitch, .. } = camera_location;
+                Vec3A::new(yaw.sin() * pitch.cos(), -pitch.sin(), yaw.cos() * pitch.cos())
+            };
+            let up = Vec3A::unit_y();
+            let side: Vec3A = forward.cross(up).normalize().into();
             let velocity = if button_pressed(&scancode_status, platform::Scancodes::SHIFT) {
                 10.0
             } else {
                 1.0
             };
             if button_pressed(&scancode_status, platform::Scancodes::W) {
-                camera_location.location.z += velocity * delta_time.as_secs_f32();
+                camera_location.location += forward * velocity * delta_time.as_secs_f32();
             }
             if button_pressed(&scancode_status, platform::Scancodes::S) {
-                camera_location.location.z -= velocity * delta_time.as_secs_f32();
+                camera_location.location -= forward * velocity * delta_time.as_secs_f32();
             }
             if button_pressed(&scancode_status, platform::Scancodes::A) {
-                camera_location.location.x -= velocity * delta_time.as_secs_f32();
+                camera_location.location += side * velocity * delta_time.as_secs_f32();
             }
             if button_pressed(&scancode_status, platform::Scancodes::D) {
-                camera_location.location.x += velocity * delta_time.as_secs_f32();
+                camera_location.location -= side * velocity * delta_time.as_secs_f32();
             }
             if button_pressed(&scancode_status, platform::Scancodes::Q) {
-                camera_location.location.y += velocity * delta_time.as_secs_f32();
+                camera_location.location += up * velocity * delta_time.as_secs_f32();
             }
             if button_pressed(&scancode_status, platform::Scancodes::Z) {
-                camera_location.location.y -= velocity * delta_time.as_secs_f32();
+                camera_location.location -= up * velocity * delta_time.as_secs_f32();
             }
 
             window.request_redraw();
