@@ -26,8 +26,6 @@ skip = [
     { name = "miniz_oxide", version = "0.3.7" }, # png uses old version
     # wasi
     { name = "wasi", version = "0.9.0+wasi-snapshot-preview1" },
-    # ddsfile
-    { name = "num-traits", version = "0.1.43" },
     # tracing-futures
     { name = "pin-project", version = "0.4.27" },
     { name = "pin-project-internal", version = "0.4.27" }
@@ -39,7 +37,6 @@ unmaintained = "warn"
 ignore = [
     "RUSTSEC-2020-0016",  # async-std is using net2 which id deprecated in favor of socket2
     "RUSTSEC-2020-0056",  # stdweb maintainer is unresponsive
-    "RUSTSEC-2020-0089",  # nanorand has issue < 0.5.1
 ]
 
 [sources]
