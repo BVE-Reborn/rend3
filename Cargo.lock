@@ -92,6 +92,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a4521f3e3d031370679b3b140beb36dfe4801b09ac77e30c61941f97df3ef28b"
 
 [[package]]
+name = "basis"
+version = "0.1.0"
+source = "git+https://github.com/BVE-Reborn/basis-rs.git?rev=17480940261db81877ce4fec983a18a39d7db633#17480940261db81877ce4fec983a18a39d7db633"
+dependencies = [
+ "basis-sys",
+ "once_cell",
+]
+
+[[package]]
+name = "basis-sys"
+version = "0.1.0"
+source = "git+https://github.com/BVE-Reborn/basis-rs.git?rev=17480940261db81877ce4fec983a18a39d7db633#17480940261db81877ce4fec983a18a39d7db633"
+dependencies = [
+ "cc",
+]
+
+[[package]]
 name = "bit-set"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -175,7 +192,7 @@ checksum = "670ad68c9088c2a963aaa298cb369688cf3f9465ce5e2d4ca10e6e0098a1ce73"
 dependencies = [
  "libc",
  "num-integer",
- "num-traits 0.2.14",
+ "num-traits",
  "time",
  "winapi 0.3.9",
 ]
@@ -370,17 +387,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ddsfile"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "34f357e96445b4238418b6f4f2b5a956ac1306f89f01d68b85a2d81de3a7cab9"
-dependencies = [
- "bitflags",
- "byteorder",
- "enum_primitive",
-]
-
-[[package]]
 name = "deflate"
 version = "0.8.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -433,15 +439,6 @@ name = "either"
 version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e78d4f1cc4ae33bbfc157ed5d5a5ef3bc29227303d595861deb238fcec4e9457"
-
-[[package]]
-name = "enum_primitive"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "be4551092f4d519593039259a9ed8daedf0da12e5109c5280338073eaeb81180"
-dependencies = [
- "num-traits 0.1.43",
-]
 
 [[package]]
 name = "errno"
@@ -857,7 +854,7 @@ dependencies = [
  "jpeg-decoder",
  "num-iter",
  "num-rational",
- "num-traits 0.2.14",
+ "num-traits",
  "png",
  "tiff",
 ]
@@ -1201,7 +1198,7 @@ dependencies = [
  "bitflags",
  "fxhash",
  "log",
- "num-traits 0.2.14",
+ "num-traits",
  "spirv_headers",
  "thiserror",
 ]
@@ -1300,7 +1297,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d2cc698a63b549a70bc047073d2949cce27cd1c7b0a4a862d08a8031bc2801db"
 dependencies = [
  "autocfg",
- "num-traits 0.2.14",
+ "num-traits",
 ]
 
 [[package]]
@@ -1311,7 +1308,7 @@ checksum = "b2021c8337a54d21aca0d59a92577a029af9431cb59b909b03252b9c164fad59"
 dependencies = [
  "autocfg",
  "num-integer",
- "num-traits 0.2.14",
+ "num-traits",
 ]
 
 [[package]]
@@ -1322,16 +1319,7 @@ checksum = "12ac428b1cb17fce6f731001d307d351ec70a6d202fc2e60f7d4c5e42d8f4f07"
 dependencies = [
  "autocfg",
  "num-integer",
- "num-traits 0.2.14",
-]
-
-[[package]]
-name = "num-traits"
-version = "0.1.43"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "92e5113e9fd4cc14ded8e499429f396a20f98c772a47cc8622a736e1ec843c31"
-dependencies = [
- "num-traits 0.2.14",
+ "num-traits",
 ]
 
 [[package]]
@@ -1694,7 +1682,7 @@ dependencies = [
 name = "scene-viewer"
 version = "0.1.0"
 dependencies = [
- "ddsfile",
+ "basis",
  "fnv",
  "futures",
  "glam",
@@ -1871,7 +1859,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f5b132530b1ac069df335577e3581765995cba5a13995cdbbdbc8fb057c532c"
 dependencies = [
  "bitflags",
- "num-traits 0.2.14",
+ "num-traits",
 ]
 
 [[package]]

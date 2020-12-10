@@ -86,7 +86,7 @@ impl DefaultShaders {
             source: ShaderSourceType::Builtin("blit.frag".to_string()),
             stage: ShaderSourceStage::Fragment,
             includes: vec![],
-            defines: vec![mode_define.clone()],
+            defines: vec![mode_define],
         });
 
         async move {
