@@ -16,7 +16,6 @@ const STARTING_INDICES: usize = 1 << 16;
 pub struct InternalMesh {
     pub vertex_range: Range<usize>,
     pub index_range: Range<usize>,
-    pub material_count: u32,
     pub bounding_sphere: BoundingSphere,
 }
 
@@ -125,7 +124,6 @@ impl MeshManager {
         let mesh = InternalMesh {
             vertex_range,
             index_range,
-            material_count: mesh.material_count,
             bounding_sphere,
         };
 

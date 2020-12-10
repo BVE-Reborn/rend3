@@ -264,6 +264,7 @@ pub fn render_loop<TLD: 'static>(
         let skybox_texture_view = if let Some(ref sky) = global_resources.background_texture {
             texture_manager_cube.get_view(*sky)
         } else {
+            texture_manager_cube.ensure_null_view();
             texture_manager_cube.get_null_view()
         };
         let mut skybox_bgb = BindGroupBuilder::new(Some(String::from("skybox bg")));

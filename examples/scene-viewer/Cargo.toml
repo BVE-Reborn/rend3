@@ -17,11 +17,11 @@ imgui = "0.6"
 imgui-winit-support = "0.6"
 obj = { version = "0.10", git = "https://github.com/cwfitzgerald/obj.git", branch = "map_ns" }
 pico-args = "0.3"
-rend3 = { path = "../rend3", version = "0.1.0" }
+rend3 = { path = "../../rend3", version = "0.1.0" }
 smallvec = "1"
 switchyard = "0.1"
 tracing = { version = "0.1", default-features = false, features = ["std"] }
 wgpu = "0.6"
 wgpu-subscriber = "0.1"
-winit = { version = "0.23" }
+winit = "0.23"
 

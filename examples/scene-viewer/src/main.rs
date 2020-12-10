@@ -9,7 +9,7 @@ use rend3::{
         MaterialHandle, Mesh, MeshHandle, ModelVertex, Object, RendererTextureFormat, Texture, TextureHandle,
     },
     list::{DefaultPipelines, DefaultShaders},
-    Renderer, RendererOptions, VSyncMode,
+    Renderer,
 };
 use std::{
     collections::hash_map::{self, HashMap},
@@ -19,7 +19,6 @@ use std::{
 };
 use switchyard::{threads, Switchyard};
 use winit::{
-    dpi::PhysicalSize,
     event::{DeviceEvent, ElementState, Event, KeyboardInput, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
     window::WindowBuilder,
@@ -171,7 +170,6 @@ fn load_obj(renderer: &Renderer, file: &str) -> Result<(MeshHandle, MaterialHand
     let mut mesh = Mesh {
         vertices: vec![],
         indices: vec![],
-        material_count: materials.len() as u32,
     };
 
     let mut translation: HashMap<IndexTuple, u32> = HashMap::new();
@@ -313,15 +311,16 @@ fn main() {
 
     rend3::span_transfer!(switchyard_span -> renderer_span, INFO, "Building Renderer");
 
-    let mut options = RendererOptions {
-        vsync: VSyncMode::Off,
-        size: window.inner_size(),
+    let window_size = window.inner_size();
+
+    let mut options = rend3::RendererOptions {
+        vsync: rend3::VSyncMode::Off,
+        size: [window_size.width, window_size.height],
     };
 
     let renderer = futures::executor::block_on(rend3::Renderer::new(
         &window,
         Arc::clone(&yard),
-        &mut imgui,
         desired_backend,
         desired_device,
         desired_mode,
@@ -456,7 +455,7 @@ fn main() {
             event: WindowEvent::Resized(size),
             ..
         } => {
-            options.size = size;
+            options.size = [size.width, size.height];
         }
         Event::WindowEvent {
             event: WindowEvent::CloseRequested,
@@ -471,10 +470,10 @@ fn main() {
             renderer.set_options(options.clone());
             let handle = renderer.render(rend3::list::default_render_list(
                 renderer.mode(),
-                PhysicalSize {
-                    width: (options.size.width as f32 * 1.0) as u32,
-                    height: (options.size.height as f32 * 1.0) as u32,
-                },
+                [
+                    (options.size[0] as f32 * 1.0) as u32,
+                    (options.size[1] as f32 * 1.0) as u32,
+                ],
                 &pipelines,
             ));
 
