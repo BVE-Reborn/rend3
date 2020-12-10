@@ -74,7 +74,7 @@ fn main() {
     let yard = Arc::new(
         switchyard::Switchyard::new(
             2,
-            switchyard::threads::double_pool_one_to_one(switchyard::threads::thread_info(), Some("scene-viewer")),
+            switchyard::threads::double_pool_one_to_one(switchyard::threads::thread_info(), Some("rend3 cube")),
             || (),
         )
         .unwrap(),
