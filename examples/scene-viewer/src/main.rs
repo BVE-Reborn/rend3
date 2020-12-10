@@ -40,7 +40,9 @@ fn load_texture(
             let file = std::fs::read(&real_name).unwrap_or_else(|_| panic!("Could not read object {}", real_name));
 
             let transcoder = basis::Transcoder::new();
-            let image_info = transcoder.get_image_level_info(&file, 0, 0).ok_or("can't transcode missing image")?;
+            let image_info = transcoder
+                .get_image_level_info(&file, 0, 0)
+                .ok_or("can't transcode missing image")?;
 
             let basis_format = match format {
                 RendererTextureFormat::Bc4Linear => basis::TargetTextureFormat::Bc4R,
@@ -49,7 +51,9 @@ fn load_texture(
                 _ => unreachable!(),
             };
 
-            let mut prepared = transcoder.prepare_transcoding(&file).ok_or("couldn't prepare transcoding")?;
+            let mut prepared = transcoder
+                .prepare_transcoding(&file)
+                .ok_or("couldn't prepare transcoding")?;
             let image = prepared.transcode_image_level(0, 0, basis_format)?;
             drop(prepared);
 
@@ -69,15 +73,16 @@ fn load_skybox(renderer: &Renderer) -> Result<(), Box<dyn std::error::Error>> {
     let file = std::fs::read(name).unwrap_or_else(|_| panic!("Could not read skybox {}", name));
 
     let transcoder = basis::Transcoder::new();
-    let image_info = transcoder.get_image_level_info(&file, 0, 0).ok_or("skybox image missing")?;
+    let image_info = transcoder
+        .get_image_level_info(&file, 0, 0)
+        .ok_or("skybox image missing")?;
 
-    let mut prepared = transcoder.prepare_transcoding(&file).ok_or("could not prepare skybox transcoding")?;
+    let mut prepared = transcoder
+        .prepare_transcoding(&file)
+        .ok_or("could not prepare skybox transcoding")?;
     let mut image = Vec::with_capacity(image_info.total_blocks as usize * 16 * 6);
     for i in 0..6 {
-        image.extend_from_slice(
-            &prepared
-                .transcode_image_level(i, 0, basis::TargetTextureFormat::Bc7Rgba)?,
-        );
+        image.extend_from_slice(&prepared.transcode_image_level(i, 0, basis::TargetTextureFormat::Bc7Rgba)?);
     }
     drop(prepared);
 
