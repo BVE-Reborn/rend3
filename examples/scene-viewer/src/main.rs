@@ -1,7 +1,7 @@
 use fnv::FnvBuildHasher;
 use glam::{Mat4, Quat, Vec2, Vec3, Vec3A};
 use imgui::FontSource;
-use obj::{IndexTuple, Obj, ObjMaterial};
+use obj::{IndexTuple, Obj};
 use pico_args::Arguments;
 use rend3::{
     datatypes::{
@@ -12,7 +12,7 @@ use rend3::{
     Renderer,
 };
 use std::{
-    collections::HashMap,
+    collections::hash_map::{self, HashMap},
     hash::BuildHasher,
     sync::Arc,
     time::{Duration, Instant},
@@ -29,19 +29,20 @@ mod platform;
 fn load_texture(
     renderer: &Renderer,
     cache: &mut HashMap<String, TextureHandle>,
-    texture: &Option<String>,
+    name: &String,
     format: RendererTextureFormat,
-) -> Option<TextureHandle> {
-    rend3::span!(_guard, INFO, "Loading Texture", name = ?texture);
-    if let Some(name) = texture {
-        if let Some(handle) = cache.get(name) {
-            Some(*handle)
-        } else {
+) -> Result<TextureHandle, Box<dyn std::error::Error>> {
+    rend3::span!(_guard, INFO, "Loading Texture", name = ?name);
+    Ok(match cache.entry(name.clone()) {
+        hash_map::Entry::Occupied(o) => *o.get(),
+        hash_map::Entry::Vacant(v) => *v.insert({
             let real_name = concat!(env!("CARGO_MANIFEST_DIR"), "/data/").to_owned() + name;
             let file = std::fs::read(&real_name).unwrap_or_else(|_| panic!("Could not read object {}", real_name));
 
             let transcoder = basis::Transcoder::new();
-            let image_info = transcoder.get_image_level_info(&file, 0, 0).unwrap();
+            let image_info = transcoder
+                .get_image_level_info(&file, 0, 0)
+                .ok_or("can't transcode missing image")?;
 
             let basis_format = match format {
                 RendererTextureFormat::Bc4Linear => basis::TargetTextureFormat::Bc4R,
@@ -50,42 +51,38 @@ fn load_texture(
                 _ => unreachable!(),
             };
 
-            let mut prepared = transcoder.prepare_transcoding(&file).unwrap();
-            let image = prepared.transcode_image_level(0, 0, basis_format).unwrap();
+            let mut prepared = transcoder
+                .prepare_transcoding(&file)
+                .ok_or("couldn't prepare transcoding")?;
+            let image = prepared.transcode_image_level(0, 0, basis_format)?;
             drop(prepared);
 
-            let handle = renderer.add_texture_2d(Texture {
+            renderer.add_texture_2d(Texture {
                 format,
                 width: image_info.width,
                 height: image_info.height,
                 data: image,
                 label: Some(name.clone()),
-            });
-
-            cache.insert(name.clone(), handle);
-
-            Some(handle)
-        }
-    } else {
-        None
-    }
+            })
+        }),
+    })
 }
 
-fn load_skybox(renderer: &Renderer) {
+fn load_skybox(renderer: &Renderer) -> Result<(), Box<dyn std::error::Error>> {
     let name = concat!(env!("CARGO_MANIFEST_DIR"), "/data/skybox.basis");
     let file = std::fs::read(name).unwrap_or_else(|_| panic!("Could not read skybox {}", name));
 
     let transcoder = basis::Transcoder::new();
-    let image_info = transcoder.get_image_level_info(&file, 0, 0).unwrap();
+    let image_info = transcoder
+        .get_image_level_info(&file, 0, 0)
+        .ok_or("skybox image missing")?;
 
-    let mut prepared = transcoder.prepare_transcoding(&file).unwrap();
+    let mut prepared = transcoder
+        .prepare_transcoding(&file)
+        .ok_or("could not prepare skybox transcoding")?;
     let mut image = Vec::with_capacity(image_info.total_blocks as usize * 16 * 6);
     for i in 0..6 {
-        image.extend_from_slice(
-            &prepared
-                .transcode_image_level(i, 0, basis::TargetTextureFormat::Bc7Rgba)
-                .unwrap(),
-        );
+        image.extend_from_slice(&prepared.transcode_image_level(i, 0, basis::TargetTextureFormat::Bc7Rgba)?);
     }
     drop(prepared);
 
@@ -97,13 +94,14 @@ fn load_skybox(renderer: &Renderer) {
         label: Some("background".into()),
     });
     renderer.set_background_texture(handle);
+    Ok(())
 }
 
-fn load_obj(renderer: &Renderer, file: &str) -> (MeshHandle, MaterialHandle) {
+fn load_obj(renderer: &Renderer, file: &str) -> Result<(MeshHandle, MaterialHandle), Box<dyn std::error::Error>> {
     rend3::span!(obj_guard, INFO, "Loading Obj");
 
-    let mut object = Obj::load(file).unwrap();
-    object.load_mtls().unwrap();
+    let mut object = Obj::load(file)?;
+    object.load_mtls()?;
 
     drop(obj_guard);
 
@@ -111,33 +109,54 @@ fn load_obj(renderer: &Renderer, file: &str) -> (MeshHandle, MaterialHandle) {
     let mut material_index_map = HashMap::new();
     let mut materials = Vec::new();
 
-    for lib in object.data.material_libs {
-        for material in lib.materials {
-            let albedo = &material.map_kd;
-            let normal = &material.map_bump;
-            let roughness = &material.map_ns;
-            let ao = &material.map_d;
-
-            let albedo_handle = load_texture(renderer, &mut textures, albedo, RendererTextureFormat::Bc7Srgb);
-            let normal_handle = load_texture(renderer, &mut textures, normal, RendererTextureFormat::Bc5Normal);
-            let roughness_handle = load_texture(renderer, &mut textures, roughness, RendererTextureFormat::Bc4Linear);
-            let ao_handle = load_texture(renderer, &mut textures, ao, RendererTextureFormat::Bc4Linear);
-
-            material_index_map.insert(material.name.clone(), materials.len() as u32);
+    for lib in &object.data.material_libs {
+        // These names are an artifact of the Obj spec, which came before PBR.
+        for obj::Material {
+            name,
+            map_kd,
+            map_bump,
+            map_ns,
+            map_d,
+            ..
+        } in lib.materials.iter().map(|m| m.as_ref())
+        {
+            material_index_map.insert(name.clone(), materials.len() as u32);
 
             let handle = renderer.add_material(Material {
-                albedo: match albedo_handle {
+                albedo: match map_kd {
                     None => AlbedoComponent::Vertex { srgb: false },
-                    Some(handle) => AlbedoComponent::Texture(handle),
+                    Some(name) => AlbedoComponent::Texture(load_texture(
+                        renderer,
+                        &mut textures,
+                        name,
+                        RendererTextureFormat::Bc7Srgb,
+                    )?),
                 },
-                normal: normal_handle,
-                roughness: match roughness_handle {
+                // `MaterialComponent` is a superset of `Option<TextureHandle>`. It adds a `Value`
+                // variant which represents a kind of "flat plane" texture where each texel is the
+                // same. This behavior is never desirable for normals, however, so it uses
+                // `Option<TextureHandle>` instead.
+                normal: map_bump
+                    .as_ref()
+                    .map(|name| load_texture(renderer, &mut textures, name, RendererTextureFormat::Bc5Normal))
+                    .transpose()?,
+                roughness: match map_ns {
                     None => MaterialComponent::None,
-                    Some(handle) => MaterialComponent::Texture(handle),
+                    Some(name) => MaterialComponent::Texture(load_texture(
+                        renderer,
+                        &mut textures,
+                        name,
+                        RendererTextureFormat::Bc4Linear,
+                    )?),
                 },
-                ambient_occlusion: match ao_handle {
+                ambient_occlusion: match map_d {
                     None => MaterialComponent::None,
-                    Some(handle) => MaterialComponent::Texture(handle),
+                    Some(name) => MaterialComponent::Texture(load_texture(
+                        renderer,
+                        &mut textures,
+                        name,
+                        RendererTextureFormat::Bc4Linear,
+                    )?),
                 },
                 ..Material::default()
             });
@@ -158,21 +177,13 @@ fn load_obj(renderer: &Renderer, file: &str) -> (MeshHandle, MaterialHandle) {
         indices: vec![],
     };
 
-    let mut translation: HashMap<(usize, Option<usize>, Option<usize>), u32> = HashMap::new();
-    let mut vert_count = 0_u32;
+    let mut translation: HashMap<IndexTuple, u32> = HashMap::new();
     for group in &object.data.objects[0].groups {
-        let _material_name = if let ObjMaterial::Mtl(mtl) = group.material.as_ref().unwrap() {
-            &mtl.name
-        } else {
-            unreachable!()
-        };
         for polygon in &group.polys {
-            for &IndexTuple(position_idx, texture_idx, normal_idx) in &polygon.0 {
-                let vert_idx = if let Some(&vert_idx) = translation.get(&(position_idx, normal_idx, texture_idx)) {
-                    vert_idx
-                } else {
-                    let this_vert = vert_count;
-                    vert_count += 1;
+            for &index in &polygon.0 {
+                let this_vert = translation.len() as u32;
+                let vert_idx = *translation.entry(index).or_insert_with(|| {
+                    let IndexTuple(position_idx, texture_idx, normal_idx) = index;
 
                     let position = object.data.position[position_idx];
                     let normal = object.data.normal[normal_idx.unwrap()];
@@ -185,10 +196,8 @@ fn load_obj(renderer: &Renderer, file: &str) -> (MeshHandle, MaterialHandle) {
                         color: [255; 4],
                     });
 
-                    translation.insert((position_idx, texture_idx, normal_idx), this_vert);
-
                     this_vert
-                };
+                });
 
                 mesh.indices.push(vert_idx);
             }
@@ -197,7 +206,7 @@ fn load_obj(renderer: &Renderer, file: &str) -> (MeshHandle, MaterialHandle) {
 
     let mesh_handle = renderer.add_mesh(mesh);
 
-    (mesh_handle, materials.into_iter().next().unwrap())
+    Ok((mesh_handle, materials.into_iter().next().ok_or("no materials")?))
 }
 
 fn single(renderer: &Renderer, mesh: MeshHandle, material: MaterialHandle) {
@@ -331,11 +340,11 @@ fn main() {
 
     rend3::span_transfer!(renderer_span -> loading_span, INFO, "Loading resources");
 
-    let cube = load_obj(&renderer, concat!(env!("CARGO_MANIFEST_DIR"), "/data/cube.obj"));
+    let cube = load_obj(&renderer, concat!(env!("CARGO_MANIFEST_DIR"), "/data/cube.obj")).unwrap();
     single(&renderer, cube.0, cube.1);
-    let suzanne = load_obj(&renderer, concat!(env!("CARGO_MANIFEST_DIR"), "/data/suzanne.obj"));
+    let suzanne = load_obj(&renderer, concat!(env!("CARGO_MANIFEST_DIR"), "/data/suzanne.obj")).unwrap();
     distribute(&renderer, suzanne.0, suzanne.1);
-    load_skybox(&renderer);
+    load_skybox(&renderer).unwrap();
 
     renderer.add_directional_light(DirectionalLight {
         color: Vec3::one(),
