@@ -220,13 +220,12 @@ impl<TLD: 'static> Renderer<TLD> {
     pub fn new<'a, W: HasRawWindowHandle>(
         window: &'a W,
         yard: Arc<Switchyard<TLD>>,
-        imgui_context: &'a mut imgui::Context,
         backend: Option<Backend>,
         device: Option<String>,
         mode: Option<RendererMode>,
         options: RendererOptions,
     ) -> impl Future<Output = Result<Arc<Self>, RendererInitializationError>> + 'a {
-        setup::create_renderer(window, yard, imgui_context, backend, device, mode, options)
+        setup::create_renderer(window, yard, backend, device, mode, options)
     }
 
     pub fn mode(&self) -> RendererMode {

@@ -8,14 +8,12 @@ use wgpu::{
     Device, FilterMode, PresentMode, Sampler, SamplerDescriptor, ShaderStage, Surface, SwapChain, SwapChainDescriptor,
     TextureComponentType, TextureUsage, TextureViewDimension,
 };
-use winit::dpi::PhysicalSize;
-
-pub fn create_swapchain(device: &Device, surface: &Surface, size: PhysicalSize<u32>, vsync: VSyncMode) -> SwapChain {
+pub fn create_swapchain(device: &Device, surface: &Surface, size: [u32; 2], vsync: VSyncMode) -> SwapChain {
     device.create_swap_chain(
         &surface,
         &SwapChainDescriptor {
-            width: size.width,
-            height: size.height,
+            width: size[0],
+            height: size[1],
             usage: TextureUsage::OUTPUT_ATTACHMENT,
             format: SWAPCHAIN_FORMAT,
             present_mode: match vsync {

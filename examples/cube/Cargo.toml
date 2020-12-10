@@ -1,0 +1,22 @@
+[package]
+name = "cube"
+license = "MPL-2.0"
+version = "0.1.0"
+authors = ["Connor Fitzgerald <connorwadefitzgerald@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+# Linear algebra library
+glam = "0.11"
+# Renderer
+rend3 = { path = "../../rend3", version = "0.1.0" }
+# Provides `block_on` to wait for futures from sync code
+pollster = "0.2"
+# Async executor used by `rend3` internally
+switchyard = "0.1"
+# wgpu-aware logging
+wgpu-subscriber = "0.1"
+# windowing
+winit = "0.23"

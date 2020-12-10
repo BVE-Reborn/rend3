@@ -23,5 +23,5 @@ switchyard = "0.1"
 tracing = { version = "0.1", default-features = false, features = ["std"] }
 wgpu = "0.6"
 wgpu-subscriber = "0.1"
-winit = { version = "0.23" }
+winit = "0.23"
 

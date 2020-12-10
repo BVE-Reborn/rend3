@@ -133,7 +133,6 @@ pub fn create_adapter(
 pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
     window: &W,
     yard: Arc<Switchyard<TLD>>,
-    _imgui: &mut imgui::Context,
     desired_backend: Option<Backend>,
     desired_device: Option<String>,
     desired_mode: Option<RendererMode>,

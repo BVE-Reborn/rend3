@@ -31,7 +31,7 @@ impl RendererGlobalResources {
     pub fn new(device: &Device, surface: &Surface, mode: RendererMode, options: &RendererOptions) -> Self {
         let swapchain = util::create_swapchain(device, surface, options.size, options.vsync);
 
-        let camera = Camera::new_projection(options.size.width as f32 / options.size.height as f32);
+        let camera = Camera::new_projection(options.size[0] as f32 / options.size[1] as f32);
 
         let prefix_sum_bgl = util::create_prefix_sum_bgl(device);
         let pre_cull_bgl = util::create_pre_cull_bgl(device);
@@ -81,7 +81,7 @@ impl RendererGlobalResources {
         }
         if dirty.contains(DirtyResources::CAMERA) {
             self.camera
-                .set_aspect_ratio(new_options.size.width as f32 / new_options.size.height as f32);
+                .set_aspect_ratio(new_options.size[0] as f32 / new_options.size[1] as f32);
         }
 
         *old_options = new_options

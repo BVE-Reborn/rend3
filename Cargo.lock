@@ -341,6 +341,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "cube"
+version = "0.1.0"
+dependencies = [
+ "glam",
+ "pollster",
+ "rend3",
+ "switchyard",
+ "wgpu-subscriber",
+ "winit",
+]
+
+[[package]]
 name = "d3d12"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1519,6 +1531,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "pollster"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9824e18e85003f0b5a38fa1932ae8be8c2aac9447c2f28ab6f9704dbe0a1ab58"
+
+[[package]]
 name = "priority-queue"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1641,7 +1659,6 @@ dependencies = [
  "tracing-futures",
  "wgpu",
  "wgpu-conveyor",
- "winit",
 ]
 
 [[package]]

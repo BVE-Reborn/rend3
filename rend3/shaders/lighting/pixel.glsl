@@ -48,7 +48,7 @@ PixelData get_per_pixel_data(MATERIAL_TYPE material) {
         } else {
             pixel.albedo = material.albedo;
         }
-        if (bool(material.material_flags & FLAGS_ALBEDO_BLEND) || !HAS_ALBEDO_TEXTURE) {
+        if (bool(material.material_flags & FLAGS_ALBEDO_BLEND)) {
             vec4 vert_color = i_color;
             if (bool(material.material_flags & FLAGS_ALBEDO_VERTEX_SRGB)) {
                 vert_color = srgb_to_linear(vert_color);
