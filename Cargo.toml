@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "examples/cube",
+    "examples/gltf",
     "examples/scene-viewer",
     "rend3"
 ]
