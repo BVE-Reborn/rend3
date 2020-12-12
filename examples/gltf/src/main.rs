@@ -8,23 +8,39 @@ fn load_gltf(
     let mesh_data = doc.meshes().next().expect("no meshes in data.glb");
 
     let primitive = mesh_data.primitives().next().expect("no primitives in data.glb");
-    let reader = primitive.reader(|b| Some(&datas.get(0)?.0[b.index()..b.length()]));
-    let mut normals = reader.read_normals();
-    let mut uv = reader.read_tex_coords(0).map(|tc| tc.into_f32());
-    let mut mesh = rend3::datatypes::Mesh {
-        vertices: reader
-            .read_positions()
-            .unwrap()
-            .map(|pos| rend3::datatypes::ModelVertex {
+    let reader = primitive.reader(|b| Some(&datas.get(b.index())?.0[..b.length()]));
+
+    let positions = reader.read_positions().unwrap();
+    let vertex_count = reader.read_positions().unwrap().count();
+
+    let indices = reader.read_indices().unwrap().into_u32().collect();
+    let mut vertices: Vec<_> = reader
+        .read_positions()
+        .unwrap()
+        .map(|pos| {
+            rend3::datatypes::ModelVertex {
                 position: pos.into(),
-                normal: normals.as_mut().and_then(|n| n.next()).unwrap_or_default().into(),
-                uv: uv.as_mut().and_then(|n| n.next()).unwrap_or_default().into(),
-                color: [0; 4],
-            })
-            .collect(),
-        indices: reader.read_indices().unwrap().into_u32().collect(),
-    };
-    if normals.is_none() {
+                normal: Default::default(),
+                uv: Default::default(),
+                color: [0; 4]
+            }
+        })
+        .collect();
+
+    if let Some(normals) = reader.read_normals() {
+        for (i, normal) in normals.enumerate() {
+            vertices[i].normal = normal.into();
+        }
+    }
+
+    if let Some(tex) = reader.read_tex_coords(0) {
+        for (i, uv) in tex.into_f32().enumerate() {
+            vertices[i].uv = uv.into();
+        }
+    }
+
+    let mut mesh = rend3::datatypes::Mesh { vertices, indices };
+    if reader.read_normals().is_none() {
         mesh.calculate_normals();
     }
 
@@ -32,13 +48,12 @@ fn load_gltf(
     let mesh_handle = renderer.add_mesh(mesh);
 
     // Add basic material with all defaults except a single color.
-    let material = rend3::datatypes::Material {
-        albedo: rend3::datatypes::AlbedoComponent::Value(
-            primitive.material().pbr_metallic_roughness().base_color_factor().into(),
-        ),
+    let material = primitive.material();
+    let metallic_roughness = material.pbr_metallic_roughness();
+    let material_handle = renderer.add_material(rend3::datatypes::Material {
+        albedo: rend3::datatypes::AlbedoComponent::Value(metallic_roughness.base_color_factor().into()),
         ..Default::default()
-    };
-    let material_handle = renderer.add_material(material);
+    });
 
     (mesh_handle, material_handle)
 }
