@@ -75,7 +75,7 @@ void main() {
             shadow_value = texture(sampler2DArrayShadow(shadow, shadow_sampler), shadow_shadow_coords);
         }
 
-        color += surface_shading(directional_lights[i], pixel, v, shadow_value);
+        color += surface_shading(directional_lights[i], pixel, v, shadow_value * pixel.ambient_occlusion);
     }
 
     o_color =  vec4(color, 1.0);
