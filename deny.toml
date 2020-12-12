@@ -15,6 +15,7 @@ multiple-versions = "deny"
 wildcards = "allow"
 skip = [
     # everything
+    { name = "gltf", version = "0.15.2" },
     { name = "cfg-if", version = "0.1.10" },
     # Winit
     { name = "winapi", version = "0.2.8" }, # winit -> mio-extras -> mio requires this

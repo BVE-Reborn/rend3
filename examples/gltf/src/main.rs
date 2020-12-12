@@ -17,13 +17,11 @@ fn load_gltf(
     let mut vertices: Vec<_> = reader
         .read_positions()
         .unwrap()
-        .map(|pos| {
-            rend3::datatypes::ModelVertex {
-                position: pos.into(),
-                normal: Default::default(),
-                uv: Default::default(),
-                color: [0; 4]
-            }
+        .map(|pos| rend3::datatypes::ModelVertex {
+            position: pos.into(),
+            normal: Default::default(),
+            uv: Default::default(),
+            color: [0; 4],
         })
         .collect();
 
