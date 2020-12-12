@@ -366,24 +366,34 @@ fn main() {
 
     let mut timestamp_last_second = Instant::now();
     let mut timestamp_last_frame = Instant::now();
-    let mut frames = 0_usize;
+
+    let mut frame_times = histogram::Histogram::new();
 
     event_loop.run(move |event, _window_target, control| match event {
         Event::MainEventsCleared => {
-            frames += 1;
             let now = Instant::now();
+
+            let delta_time = now - timestamp_last_frame;
+            frame_times.increment(delta_time.as_micros() as u64).unwrap();
+
             let elapsed_since_second = now - timestamp_last_second;
             if elapsed_since_second > Duration::from_secs(1) {
+                let count = frame_times.entries();
                 println!(
-                    "{} frames over {:.3}s: {:.3}ms/frame",
-                    frames,
+                    "{:0>5} frames over {:0>5.2}s. Min: {:0>5.2}ms; Average: {:0>5.2}ms; 95%: {:0>5.2}ms; 99%: {:0>5.2}ms; Max: {:0>5.2}ms; StdDev: {:0>5.2}ms",
+                    count,
                     elapsed_since_second.as_secs_f32(),
-                    elapsed_since_second.as_secs_f64() * 1000.0 / frames as f64
+                    frame_times.minimum().unwrap() as f32 / 1_000.0,
+                    frame_times.mean().unwrap() as f32 / 1_000.0,
+                    frame_times.percentile(95.0).unwrap() as f32 / 1_000.0,
+                    frame_times.percentile(99.0).unwrap() as f32 / 1_000.0,
+                    frame_times.maximum().unwrap() as f32 / 1_000.0,
+                    frame_times.stddev().unwrap() as f32 / 1_000.0,
                 );
                 timestamp_last_second = now;
-                frames = 0;
+                frame_times.clear();
             }
-            let delta_time = now - timestamp_last_frame;
+
             timestamp_last_frame = now;
 
             let forward = {
