@@ -78,6 +78,7 @@ macro_rules! span_transfer {
 }
 
 mod bind_merge;
+mod builder;
 pub mod datatypes;
 mod instruction;
 pub mod list;
@@ -86,6 +87,7 @@ mod registry;
 mod renderer;
 mod statistics;
 
+pub use builder::RendererBuilder;
 pub use options::*;
 pub use renderer::{error::*, Renderer, RendererMode};
 pub use statistics::*;

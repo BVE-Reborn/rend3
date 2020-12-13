@@ -10,9 +10,6 @@ fn load_gltf(
     let primitive = mesh_data.primitives().next().expect("no primitives in data.glb");
     let reader = primitive.reader(|b| Some(&datas.get(b.index())?.0[..b.length()]));
 
-    let positions = reader.read_positions().unwrap();
-    let vertex_count = reader.read_positions().unwrap().count();
-
     let indices = reader.read_indices().unwrap().into_u32().collect();
     let mut vertices: Vec<_> = reader
         .read_positions()
