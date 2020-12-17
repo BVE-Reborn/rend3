@@ -113,6 +113,14 @@ impl<TLD: 'static> Renderer<TLD> {
         self.mode
     }
 
+    pub fn device(&self) -> &Arc<Device> {
+        &self.device
+    }
+
+    pub fn queue(&self) -> &Arc<Queue> {
+        &self.queue
+    }
+
     pub fn adapter_info(&self) -> ExtendedAdapterInfo {
         self.adapter_info.clone()
     }
