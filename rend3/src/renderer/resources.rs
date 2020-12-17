@@ -1,8 +1,8 @@
 use crate::{
     bind_merge::BindGroupBuilder,
     datatypes::TextureHandle,
-    renderer::{camera::Camera, util, util::SamplerType, RendererMode},
-    RendererOptions,
+    renderer::{camera::Camera, util, util::SamplerType},
+    RendererMode, RendererOptions,
 };
 use wgpu::{BindGroupLayout, BindingResource, Device, Sampler, Surface, SwapChain};
 

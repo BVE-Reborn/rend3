@@ -3,11 +3,10 @@ use crate::{
     instruction::Instruction,
     list::{RenderList, RenderPassRunRate},
     renderer::{
-        list, list::OutputFrame, uniforms::WrappedUniform, RendererMode, BUFFER_RECALL_PRIORITY, COMPUTE_POOL,
-        RENDER_RECORD_PRIORITY,
+        list, list::OutputFrame, uniforms::WrappedUniform, BUFFER_RECALL_PRIORITY, COMPUTE_POOL, RENDER_RECORD_PRIORITY,
     },
     statistics::RendererStatistics,
-    Renderer,
+    Renderer, RendererMode,
 };
 use futures::{stream::FuturesOrdered, StreamExt};
 use std::{borrow::Cow, future::Future, sync::Arc};

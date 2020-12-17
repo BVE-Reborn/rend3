@@ -3,7 +3,8 @@ use crate::{
         ImageInputReference, ImageOutputReference, PerObjectResourceBinding, RenderOpInputType, RenderPass,
         ResourceBinding,
     },
-    renderer::{culling::CullingPassData, pipeline::create_custom_texture_bgl, uniforms::WrappedUniform, ModeData},
+    mode::ModeData,
+    renderer::{culling::CullingPassData, pipeline::create_custom_texture_bgl, uniforms::WrappedUniform},
     Renderer,
 };
 use std::sync::Arc;

@@ -14,34 +14,64 @@ use crate::{
         resources::RendererGlobalResources,
         shaders::ShaderManager,
         texture::{TextureManager, STARTING_2D_TEXTURES, STARTING_CUBE_TEXTURES},
-        Renderer, RendererMode,
     },
-    RendererInitializationError, RendererOptions,
+    Renderer, RendererBuilder, RendererInitializationError, RendererMode,
 };
 use arrayvec::ArrayVec;
 use fnv::FnvHashMap;
 use parking_lot::{Mutex, RwLock};
 use raw_window_handle::HasRawWindowHandle;
 use std::sync::Arc;
-use switchyard::Switchyard;
 use wgpu::{
-    Adapter, Backend, BackendBit, DeviceDescriptor, DeviceType, Features, Instance, Limits, TextureViewDimension,
+    Adapter, AdapterInfo, Backend, BackendBit, DeviceDescriptor, DeviceType, Features, Instance, Limits,
+    TextureViewDimension,
 };
 use wgpu_conveyor::{AutomatedBufferManager, UploadStyle};
 
-pub struct PotentialAdapter {
-    inner: Adapter,
+pub struct PotentialAdapter<T> {
+    inner: T,
     info: ExtendedAdapterInfo,
     features: Features,
     limits: Limits,
     mode: RendererMode,
+}
+impl<T> PotentialAdapter<T> {
+    pub fn new(
+        inner: T,
+        inner_info: AdapterInfo,
+        inner_limits: Limits,
+        inner_features: Features,
+        desired_mode: Option<RendererMode>,
+    ) -> Result<Self, RendererInitializationError> {
+        let info = ExtendedAdapterInfo::from(inner_info);
+
+        let mut features = check_features(RendererMode::GPUPowered, inner_features);
+        let mut limits = check_limits(RendererMode::GPUPowered, &inner_limits);
+        let mut mode = RendererMode::GPUPowered;
+
+        if (features.is_err() || limits.is_err() || desired_mode == Some(RendererMode::CPUPowered))
+            && desired_mode != Some(RendererMode::GPUPowered)
+        {
+            features = check_features(RendererMode::CPUPowered, inner_features);
+            limits = check_limits(RendererMode::CPUPowered, &inner_limits);
+            mode = RendererMode::CPUPowered;
+        }
+
+        Ok(PotentialAdapter {
+            inner,
+            info,
+            features: features?,
+            limits: limits?,
+            mode,
+        })
+    }
 }
 
 pub fn create_adapter(
     desired_backend: Option<Backend>,
     desired_device: Option<String>,
     desired_mode: Option<RendererMode>,
-) -> Result<(Instance, PotentialAdapter), RendererInitializationError> {
+) -> Result<(Instance, PotentialAdapter<Adapter>), RendererInitializationError> {
     let backend_bits = BackendBit::VULKAN | BackendBit::DX12 | BackendBit::DX11 | BackendBit::METAL;
     let default_backend_order = [Backend::Vulkan, Backend::Metal, Backend::Dx12, Backend::Dx11];
 
@@ -52,45 +82,32 @@ pub fn create_adapter(
     for backend in &default_backend_order {
         let adapters = instance.enumerate_adapters(BackendBit::from(*backend));
 
-        let mut potential_adapters = ArrayVec::<[PotentialAdapter; 4]>::new();
+        let mut potential_adapters = ArrayVec::<[PotentialAdapter<Adapter>; 4]>::new();
         for (idx, adapter) in adapters.enumerate() {
-            let info = ExtendedAdapterInfo::from(adapter.get_info());
+            let info = adapter.get_info();
+            let limits = adapter.limits();
+            let features = adapter.features();
+            let potential = PotentialAdapter::new(adapter, info, limits, features, desired_mode);
 
-            tracing::debug!("{:?} Adapter {}: {:#?}", backend, idx, info);
-
-            let adapter_features = adapter.features();
-            let adapter_limits = adapter.limits();
-
-            tracing::trace!("Features: {:?}", adapter_features);
-            tracing::trace!("Limits: {:#?}", adapter_limits);
-
-            let mut features = check_features(RendererMode::GPUPowered, adapter_features).ok();
-            let mut limits = check_limits(RendererMode::GPUPowered, &adapter_limits).ok();
-            let mut mode = RendererMode::GPUPowered;
-
-            if (features.is_none() || limits.is_none() || desired_mode == Some(RendererMode::CPUPowered))
-                && desired_mode != Some(RendererMode::GPUPowered)
-            {
-                features = check_features(RendererMode::CPUPowered, adapter_features).ok();
-                limits = check_limits(RendererMode::CPUPowered, &adapter_limits).ok();
-                mode = RendererMode::CPUPowered;
-            }
+            tracing::debug!(
+                "{:?} Adapter {}: {:#?}",
+                backend,
+                idx,
+                potential.as_ref().map(|p| &p.info)
+            );
 
             let desired = if let Some(ref desired_device) = desired_device {
-                info.name.to_lowercase().contains(desired_device)
+                potential
+                    .as_ref()
+                    .map(|i| i.info.name.to_lowercase().contains(desired_device))
+                    .is_ok()
             } else {
                 true
             };
 
-            if let (Some(features), Some(limits), true) = (features, limits, desired) {
-                tracing::debug!("Adapter usable in {:?} mode", mode);
-                potential_adapters.push(PotentialAdapter {
-                    inner: adapter,
-                    info,
-                    features,
-                    limits,
-                    mode,
-                })
+            if let (Ok(potential), true) = (potential, desired) {
+                tracing::debug!("Adapter usable in {:?} mode", potential.mode);
+                potential_adapters.push(potential)
             } else {
                 tracing::debug!("Adapter not usable");
             }
@@ -99,7 +116,7 @@ pub fn create_adapter(
     }
 
     for backend_adapters in valid_adapters.values_mut() {
-        backend_adapters.sort_by_key(|a: &PotentialAdapter| match a.info.device_type {
+        backend_adapters.sort_by_key(|a: &PotentialAdapter<Adapter>| match a.info.device_type {
             DeviceType::DiscreteGpu => 0,
             DeviceType::IntegratedGpu => 1,
             DeviceType::VirtualGpu => 2,
@@ -116,7 +133,8 @@ pub fn create_adapter(
             }
         }
 
-        let adapter: Option<PotentialAdapter> = valid_adapters.remove(backend).and_then(|arr| arr.into_iter().next());
+        let adapter: Option<PotentialAdapter<Adapter>> =
+            valid_adapters.remove(backend).and_then(|arr| arr.into_iter().next());
 
         if let Some(adapter) = adapter {
             tracing::debug!("Chosen adapter: {:#?}", adapter.info);
@@ -131,49 +149,62 @@ pub fn create_adapter(
 }
 
 pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
-    window: &W,
-    yard: Arc<Switchyard<TLD>>,
-    desired_backend: Option<Backend>,
-    desired_device: Option<String>,
-    desired_mode: Option<RendererMode>,
-    options: RendererOptions,
+    builder: RendererBuilder<'_, W, TLD>,
 ) -> Result<Arc<Renderer<TLD>>, RendererInitializationError> {
-    let (instance, chosen_adapter) = create_adapter(desired_backend, desired_device, desired_mode)?;
+    let (surface, device, queue, adapter_info, mode) = if let Some(crate::CustomDevice {
+        instance,
+        queue,
+        device,
+        info,
+    }) = builder.device
+    {
+        let limits = device.limits();
+        let features = device.features();
+        let potential = PotentialAdapter::new(device, info, limits, features, builder.desired_mode)?;
 
-    let surface = unsafe { instance.create_surface(window) };
+        let surface = unsafe { instance.create_surface(builder.window) };
 
-    let adapter_info = chosen_adapter.info;
+        (surface, potential.inner, queue, potential.info, potential.mode)
+    } else {
+        let (instance, chosen_adapter) = create_adapter(
+            builder.desired_backend,
+            builder.desired_device_name,
+            builder.desired_mode,
+        )?;
 
-    let (device, queue) = chosen_adapter
-        .inner
-        .request_device(
-            &DeviceDescriptor {
-                features: chosen_adapter.features,
-                limits: chosen_adapter.limits,
-                shader_validation: true,
-            },
-            None,
-        )
-        .await
-        .map_err(|_| RendererInitializationError::RequestDeviceFailed)?;
+        let adapter_info = chosen_adapter.info;
 
-    let device = Arc::new(device);
+        let (device, queue) = chosen_adapter
+            .inner
+            .request_device(
+                &DeviceDescriptor {
+                    features: chosen_adapter.features,
+                    limits: chosen_adapter.limits,
+                    shader_validation: true,
+                },
+                None,
+            )
+            .await
+            .map_err(|_| RendererInitializationError::RequestDeviceFailed)?;
+
+        let device = Arc::new(device);
+        let queue = Arc::new(queue);
+
+        let surface = unsafe { instance.create_surface(builder.window) };
+
+        (surface, device, queue, adapter_info, chosen_adapter.mode)
+    };
 
     let shader_manager = ShaderManager::new(Arc::clone(&device));
 
-    let mut global_resources = RwLock::new(RendererGlobalResources::new(
-        &device,
-        &surface,
-        chosen_adapter.mode,
-        &options,
-    ));
+    let mut global_resources = RwLock::new(RendererGlobalResources::new(&device, &surface, mode, &builder.options));
     let global_resource_guard = global_resources.get_mut();
 
     let gpu_copy = GpuCopy::new(&device, &shader_manager, adapter_info.subgroup_size());
 
     let culling_pass = culling::CullingPass::new(
         &device,
-        chosen_adapter.mode,
+        mode,
         &shader_manager,
         &global_resource_guard.prefix_sum_bgl,
         &global_resource_guard.pre_cull_bgl,
@@ -185,13 +216,13 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
 
     let texture_manager_2d = RwLock::new(TextureManager::new(
         &device,
-        chosen_adapter.mode,
+        mode,
         STARTING_2D_TEXTURES,
         TextureViewDimension::D2,
     ));
     let texture_manager_cube = RwLock::new(TextureManager::new(
         &device,
-        chosen_adapter.mode,
+        mode,
         STARTING_CUBE_TEXTURES,
         TextureViewDimension::Cube,
     ));
@@ -202,16 +233,8 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
         &adapter_info.device_type,
     )));
     let mesh_manager = RwLock::new(MeshManager::new(&device));
-    let material_manager = RwLock::new(MaterialManager::new(
-        &device,
-        chosen_adapter.mode,
-        buffer_manager.get_mut(),
-    ));
-    let object_manager = RwLock::new(ObjectManager::new(
-        &device,
-        chosen_adapter.mode,
-        buffer_manager.get_mut(),
-    ));
+    let material_manager = RwLock::new(MaterialManager::new(&device, mode, buffer_manager.get_mut()));
+    let object_manager = RwLock::new(ObjectManager::new(&device, mode, buffer_manager.get_mut()));
     let directional_light_manager = RwLock::new(DirectionalLightManager::new(&device, buffer_manager.get_mut()));
 
     span_transfer!(_ -> imgui_guard, INFO, "Creating Imgui Renderer");
@@ -225,10 +248,10 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
     let (culling_pass, gpu_copy) = futures::join!(culling_pass, gpu_copy);
 
     Ok(Arc::new(Renderer {
-        yard,
+        yard: builder.yard.expect("The yard should be populated by the builder"),
         instructions: InstructionStreamPair::new(),
 
-        mode: chosen_adapter.mode,
+        mode,
         adapter_info,
         queue,
         device,
@@ -251,6 +274,6 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
         culling_pass,
 
         // _imgui_renderer: imgui_renderer,
-        options: RwLock::new(options),
+        options: RwLock::new(builder.options),
     }))
 }

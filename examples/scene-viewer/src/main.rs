@@ -14,10 +14,8 @@ use rend3::{
 use std::{
     collections::hash_map::{self, HashMap},
     hash::BuildHasher,
-    sync::Arc,
     time::{Duration, Instant},
 };
-use switchyard::{threads, Switchyard};
 use winit::{
     event::{DeviceEvent, ElementState, Event, KeyboardInput, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
@@ -267,7 +265,7 @@ fn main() {
 
     let mut args = Arguments::from_env();
     let desired_backend = args.value_from_fn(["-b", "--backend"], extract_backend).ok();
-    let desired_device: Option<String> = args
+    let desired_device_name: Option<String> = args
         .value_from_str(["-d", "--device"])
         .ok()
         .map(|s: String| s.to_lowercase());
@@ -302,19 +300,7 @@ fn main() {
         }),
     }]);
 
-    rend3::span_transfer!(imgui_span -> switchyard_span, INFO, "Building Switchyard");
-
-    let yard = Arc::new(
-        Switchyard::new(
-            2,
-            // threads::single_pool_single_thread(Some("scene-viewer".into()), None),
-            threads::double_pool_one_to_one(threads::thread_info(), Some("scene-viewer")),
-            || (),
-        )
-        .unwrap(),
-    );
-
-    rend3::span_transfer!(switchyard_span -> renderer_span, INFO, "Building Renderer");
+    rend3::span_transfer!(imgui_span -> renderer_span, INFO, "Building Renderer");
 
     let window_size = window.inner_size();
 
@@ -323,17 +309,14 @@ fn main() {
         size: [window_size.width, window_size.height],
     };
 
-    let renderer = futures::executor::block_on(rend3::Renderer::new(
-        &window,
-        Arc::clone(&yard),
-        desired_backend,
-        desired_device,
-        desired_mode,
-        options.clone(),
-    ))
+    let renderer = pollster::block_on(
+        rend3::RendererBuilder::new(&window, options.clone())
+            .desired_device(desired_backend, desired_device_name, desired_mode)
+            .build(),
+    )
     .unwrap();
 
-    let pipelines = futures::executor::block_on(async {
+    let pipelines = pollster::block_on(async {
         let shaders = DefaultShaders::new(&renderer).await;
         DefaultPipelines::new(&renderer, &shaders).await
     });
@@ -493,7 +476,7 @@ fn main() {
             ));
 
             rend3::span_transfer!(redraw_span -> render_wait_span, INFO, "Waiting for render");
-            futures::executor::block_on(handle);
+            pollster::block_on(handle);
         }
         _ => {}
     })

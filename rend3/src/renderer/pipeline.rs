@@ -2,8 +2,8 @@ use crate::{
     datatypes::{DepthCompare, Pipeline, PipelineBindingType, PipelineHandle, PipelineInputType},
     list::RenderPassRunRate,
     registry::ResourceRegistry,
-    renderer::{RendererMode, COMPUTE_POOL, PIPELINE_BUILD_PRIORITY},
-    Renderer,
+    renderer::{COMPUTE_POOL, PIPELINE_BUILD_PRIORITY},
+    Renderer, RendererMode,
 };
 use parking_lot::RwLock;
 use std::{future::Future, sync::Arc};

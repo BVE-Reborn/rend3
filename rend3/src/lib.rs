@@ -82,12 +82,14 @@ mod builder;
 pub mod datatypes;
 mod instruction;
 pub mod list;
+mod mode;
 mod options;
 mod registry;
 mod renderer;
 mod statistics;
 
-pub use builder::RendererBuilder;
+pub use builder::*;
+pub use mode::*;
 pub use options::*;
-pub use renderer::{error::*, Renderer, RendererMode};
+pub use renderer::{error::*, Renderer};
 pub use statistics::*;

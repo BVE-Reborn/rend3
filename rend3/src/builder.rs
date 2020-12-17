@@ -5,30 +5,36 @@ use switchyard::{
     threads::{single_pool_one_to_one, thread_info},
     Switchyard,
 };
-use wgpu::{AdapterInfo, Backend, Device, Queue};
+use wgpu::{AdapterInfo, Backend, Device, Instance, Queue};
 
-struct CustomDevice {
-    device: Arc<Device>,
-    queue: Arc<Queue>,
-    info: AdapterInfo,
+pub struct CustomDevice<'a> {
+    pub instance: &'a Instance,
+    pub device: Arc<Device>,
+    pub queue: Arc<Queue>,
+    pub info: AdapterInfo,
 }
 
-pub struct RendererBuilder<TLD = ()>
+pub struct RendererBuilder<'a, W, TLD = ()>
 where
     TLD: 'static,
+    W: HasRawWindowHandle,
 {
-    device: Option<CustomDevice>,
-    yard: Option<Arc<Switchyard<TLD>>>,
-    desired_backend: Option<Backend>,
-    desired_device_name: Option<String>,
-    desired_mode: Option<RendererMode>,
+    pub(crate) window: &'a W,
+    pub(crate) options: RendererOptions,
+    pub(crate) device: Option<CustomDevice<'a>>,
+    pub(crate) yard: Option<Arc<Switchyard<TLD>>>,
+    pub(crate) desired_backend: Option<Backend>,
+    pub(crate) desired_device_name: Option<String>,
+    pub(crate) desired_mode: Option<RendererMode>,
 }
-impl<TLD> RendererBuilder<TLD>
+impl<'a, W> RendererBuilder<'a, W, ()>
 where
-    TLD: 'static + Default,
+    W: HasRawWindowHandle,
 {
-    pub fn new() -> Self {
+    pub fn new(window: &'a W, options: RendererOptions) -> Self {
         Self {
+            window,
+            options,
             device: None,
             yard: None,
             desired_backend: None,
@@ -36,9 +42,15 @@ where
             desired_mode: None,
         }
     }
+}
 
-    pub fn device(mut self, device: Arc<Device>, queue: Arc<Queue>, info: AdapterInfo) -> Self {
-        self.device = Some(CustomDevice { device, queue, info });
+impl<'a, W, TLD> RendererBuilder<'a, W, TLD>
+where
+    TLD: 'static,
+    W: HasRawWindowHandle,
+{
+    pub fn device(mut self, device: CustomDevice<'a>) -> Self {
+        self.device = Some(device);
         self
     }
 
@@ -54,8 +66,10 @@ where
         self
     }
 
-    pub fn yard<TLD2: 'static>(self, yard: Arc<Switchyard<TLD2>>) -> RendererBuilder<TLD2> {
+    pub fn yard<TLD2: 'static>(self, yard: Arc<Switchyard<TLD2>>) -> RendererBuilder<'a, W, TLD2> {
         RendererBuilder {
+            window: self.window,
+            options: self.options,
             device: self.device,
             yard: Some(yard),
             desired_backend: self.desired_backend,
@@ -64,22 +78,15 @@ where
         }
     }
 
-    pub fn build<'a, W: HasRawWindowHandle>(
-        self,
-        window: &'a W,
-        option: RendererOptions,
-    ) -> impl Future<Output = Result<Arc<Renderer<TLD>>, RendererInitializationError>> + 'a {
-        let yard = self.yard.unwrap_or_else(|| {
+    pub fn build(mut self) -> impl Future<Output = Result<Arc<Renderer<TLD>>, RendererInitializationError>> + 'a
+    where
+        TLD: Default,
+    {
+        // TODO: figure out how to deal with non-defaultable TLDs
+        self.yard.get_or_insert_with(|| {
             Arc::new(Switchyard::new(1, single_pool_one_to_one(thread_info(), None), || TLD::default()).unwrap())
         });
 
-        Renderer::new(
-            window,
-            yard,
-            self.desired_backend,
-            self.desired_device_name,
-            self.desired_mode,
-            option,
-        )
+        Renderer::new(self)
     }
 }
