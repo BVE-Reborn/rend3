@@ -48,6 +48,11 @@ impl RenderList {
             .push(desc);
     }
 }
+impl Default for RenderList {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 #[derive(Clone)]
 pub(crate) struct RenderPass {

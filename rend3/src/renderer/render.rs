@@ -2,22 +2,23 @@ use crate::{
     bind_merge::BindGroupBuilder,
     instruction::Instruction,
     list::{RenderList, RenderPassRunRate},
-    renderer::{list, list::OutputFrame, uniforms::WrappedUniform},
+    renderer::{culling, list, uniforms::WrappedUniform},
     statistics::RendererStatistics,
-    Renderer, RendererMode,
+    OutputFrame, Renderer, RendererMode, RendererOutput,
 };
 use futures::{stream::FuturesOrdered, StreamExt};
 use std::{borrow::Cow, future::Future, sync::Arc};
 use tracing_futures::Instrument;
 use wgpu::{
-    BindingResource, CommandEncoderDescriptor, Extent3d, Maintain, Origin3d, ShaderModuleSource, SwapChainError,
-    TextureAspect, TextureCopyView, TextureDataLayout, TextureDescriptor, TextureDimension, TextureUsage,
-    TextureViewDescriptor, TextureViewDimension,
+    BindingResource, CommandEncoderDescriptor, Extent3d, Maintain, Origin3d, ShaderModuleSource, TextureAspect,
+    TextureCopyView, TextureDataLayout, TextureDescriptor, TextureDimension, TextureUsage, TextureViewDescriptor,
+    TextureViewDimension,
 };
 
 pub fn render_loop<TLD: 'static>(
     renderer: Arc<Renderer<TLD>>,
     render_list: RenderList,
+    output: RendererOutput,
 ) -> impl Future<Output = RendererStatistics> {
     span_transfer!(_ -> render_create_span, INFO, "Render Loop Creation");
 
@@ -226,8 +227,8 @@ pub fn render_loop<TLD: 'static>(
             .write()
             .add_render_list(&renderer.device, render_list.resources);
 
-        let (texture_2d_bgl, texture_2d_bg, texture_2d_bgl_dirty) = texture_manager_2d.ready(&renderer.device);
-        let (texture_cube_bgl, texture_cube_bg, texture_cube_bgl_dirty) = texture_manager_cube.ready(&renderer.device);
+        let texture_2d_ready = texture_manager_2d.ready(&renderer.device);
+        let texture_cube_ready = texture_manager_cube.ready(&renderer.device);
         material_manager.ready(&renderer.device, &mut encoder, &texture_manager_2d);
         let object_count = object_manager.ready(&renderer.device, &mut encoder, &material_manager);
         directional_light_manager.ready(&renderer.device, &mut encoder);
@@ -282,7 +283,7 @@ pub fn render_loop<TLD: 'static>(
         if let Some(new_opt) = new_options {
             global_resources.update(
                 &renderer.device,
-                &renderer.surface,
+                renderer.surface.as_ref(),
                 &mut renderer.options.write(),
                 new_opt,
             );
@@ -297,15 +298,15 @@ pub fn render_loop<TLD: 'static>(
         let mut command_buffer_futures = FuturesOrdered::new();
 
         for light in directional_light_manager.values() {
-            let mut cull_data = renderer.culling_pass.prepare(
-                &renderer.device,
-                renderer.mode,
-                &global_resources.prefix_sum_bgl,
-                &global_resources.pre_cull_bgl,
-                &global_resources.object_output_bgl,
-                object_count as _,
-                String::from("shadow pass"),
-            );
+            let mut cull_data = renderer.culling_pass.prepare(culling::CullingPassPrepareArgs {
+                device: &renderer.device,
+                mode: renderer.mode,
+                prefix_sum_bgl: &global_resources.prefix_sum_bgl,
+                pre_cull_bgl: &global_resources.pre_cull_bgl,
+                output_bgl: &global_resources.object_output_bgl,
+                object_count: object_count as _,
+                name: String::from("shadow pass"),
+            });
 
             let mut object_bgb = BindGroupBuilder::new(Some(String::from("object bg")));
             object_bgb.append(BindingResource::Buffer(cull_data.output_buffer.slice(..)));
@@ -324,7 +325,7 @@ pub fn render_loop<TLD: 'static>(
                             &renderer.queue,
                             &object_manager,
                             &mut cull_data,
-                            light.camera.clone(),
+                            light.camera,
                         )
                         .await;
                 }
@@ -346,8 +347,8 @@ pub fn render_loop<TLD: 'static>(
                 general_bg: Arc::clone(&general_bg),
                 object_bg: Arc::clone(&object_bg),
                 material_bg: material_bg.as_ref().map(|_| (), Arc::clone),
-                gpu_2d_textures_bg: texture_2d_bg.as_ref().map(|_| (), Arc::clone),
-                gpu_cube_textures_bg: texture_cube_bg.as_ref().map(|_| (), Arc::clone),
+                gpu_2d_textures_bg: texture_2d_ready.bg.as_ref().map(|_| (), Arc::clone),
+                gpu_cube_textures_bg: texture_cube_ready.bg.as_ref().map(|_| (), Arc::clone),
                 shadow_texture_bg: Arc::clone(&shadow_bg),
                 skybox_texture_bg: Arc::clone(&skybox_bg),
                 wrapped_uniform: Arc::new(uniform),
@@ -368,7 +369,7 @@ pub fn render_loop<TLD: 'static>(
                     list::render_single_render_pass(
                         Arc::clone(&renderer),
                         render_pass.clone(),
-                        OutputFrame::Shadow(output),
+                        OutputFrame::View(output),
                         Arc::clone(&cull_data_arc),
                         binding_data.clone(),
                     ),
@@ -381,29 +382,20 @@ pub fn render_loop<TLD: 'static>(
         // In wgpu 0.6, get_current_frame erroneously requires &mut
         drop(global_resources);
 
-        let mut frame = None;
-        while frame.is_none() {
-            match renderer.global_resources.write().swapchain.get_current_frame() {
-                Ok(v) => frame = Some(v),
-                Err(SwapChainError::Timeout) => {}
-                Err(err) => panic!("Could not make swapchain: {}", err),
-            }
-        }
+        let frame = output.acquire(&mut renderer.global_resources.write().swapchain);
 
         let global_resources = renderer.global_resources.read();
 
-        let frame = Arc::new(frame.unwrap());
-
         {
-            let mut cull_data = renderer.culling_pass.prepare(
-                &renderer.device,
-                renderer.mode,
-                &global_resources.prefix_sum_bgl,
-                &global_resources.pre_cull_bgl,
-                &global_resources.object_output_bgl,
-                object_count as _,
-                String::from("camera pass"),
-            );
+            let mut cull_data = renderer.culling_pass.prepare(culling::CullingPassPrepareArgs {
+                device: &renderer.device,
+                mode: renderer.mode,
+                prefix_sum_bgl: &global_resources.prefix_sum_bgl,
+                pre_cull_bgl: &global_resources.pre_cull_bgl,
+                output_bgl: &global_resources.object_output_bgl,
+                object_count: object_count as _,
+                name: String::from("camera pass"),
+            });
 
             let mut object_bgb = BindGroupBuilder::new(Some(String::from("object bg")));
             object_bgb.append(BindingResource::Buffer(cull_data.output_buffer.slice(..)));
@@ -422,7 +414,7 @@ pub fn render_loop<TLD: 'static>(
                             &renderer.queue,
                             &object_manager,
                             &mut cull_data,
-                            global_resources.camera.clone(),
+                            global_resources.camera,
                         )
                         .await;
                 }
@@ -444,8 +436,8 @@ pub fn render_loop<TLD: 'static>(
                 general_bg: Arc::clone(&general_bg),
                 object_bg: Arc::clone(&object_bg),
                 material_bg: material_bg.as_ref().map(|_| (), Arc::clone),
-                gpu_2d_textures_bg: texture_2d_bg.as_ref().map(|_| (), Arc::clone),
-                gpu_cube_textures_bg: texture_cube_bg.as_ref().map(|_| (), Arc::clone),
+                gpu_2d_textures_bg: texture_2d_ready.bg.as_ref().map(|_| (), Arc::clone),
+                gpu_cube_textures_bg: texture_cube_ready.bg.as_ref().map(|_| (), Arc::clone),
                 shadow_texture_bg: Arc::clone(&shadow_bg),
                 skybox_texture_bg: Arc::clone(&skybox_bg),
                 wrapped_uniform: Arc::new(uniform),
@@ -464,7 +456,7 @@ pub fn render_loop<TLD: 'static>(
                     list::render_single_render_pass(
                         Arc::clone(&renderer),
                         render_pass.clone(),
-                        OutputFrame::Swapchain(Arc::clone(&frame)),
+                        frame.clone(),
                         Arc::clone(&cull_data_arc),
                         binding_data.clone(),
                     ),

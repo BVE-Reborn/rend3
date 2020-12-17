@@ -11,7 +11,7 @@ use crate::{
         pipeline::PipelineManager, resources::RendererGlobalResources, shaders::ShaderManager, texture::TextureManager,
     },
     statistics::RendererStatistics,
-    JobPriorities, RendererBuilder, RendererInitializationError, RendererMode, RendererOptions,
+    JobPriorities, RendererBuilder, RendererInitializationError, RendererMode, RendererOptions, RendererOutput,
 };
 use bitflags::_core::cmp::Ordering;
 use parking_lot::{Mutex, RwLock};
@@ -59,6 +59,7 @@ mod uniforms;
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
 pub struct OrdEqFloat(pub f32);
 impl Eq for OrdEqFloat {}
+#[allow(clippy::derive_ord_xor_partial_ord)] // Shhh let me break your contract in peace
 impl Ord for OrdEqFloat {
     fn cmp(&self, other: &Self) -> Ordering {
         self.partial_cmp(other).unwrap_or(Ordering::Greater)
@@ -66,7 +67,6 @@ impl Ord for OrdEqFloat {
 }
 
 const INTERNAL_SHADOW_DEPTH_FORMAT: TextureFormat = TextureFormat::Depth32Float;
-const SWAPCHAIN_FORMAT: TextureFormat = TextureFormat::Bgra8UnormSrgb;
 
 const SHADOW_DIMENSIONS: u32 = 2048;
 
@@ -82,7 +82,7 @@ where
     adapter_info: ExtendedAdapterInfo,
     queue: Arc<Queue>,
     device: Arc<Device>,
-    surface: Surface,
+    surface: Option<Surface>,
 
     buffer_manager: Mutex<AutomatedBufferManager>,
     global_resources: RwLock<RendererGlobalResources>,
@@ -112,6 +112,14 @@ impl<TLD: 'static> Renderer<TLD> {
 
     pub fn mode(&self) -> RendererMode {
         self.mode
+    }
+
+    pub fn device(&self) -> &Arc<Device> {
+        &self.device
+    }
+
+    pub fn queue(&self) -> &Arc<Queue> {
+        &self.queue
     }
 
     pub fn adapter_info(&self) -> ExtendedAdapterInfo {
@@ -300,12 +308,12 @@ impl<TLD: 'static> Renderer<TLD> {
             .push(Instruction::ClearBackgroundTexture)
     }
 
-    pub fn render(self: &Arc<Self>, list: RenderList) -> JoinHandle<RendererStatistics> {
+    pub fn render(self: &Arc<Self>, list: RenderList, output: RendererOutput) -> JoinHandle<RendererStatistics> {
         let this = Arc::clone(self);
         self.yard.spawn_local(
             self.yard_priorites.compute_pool,
             self.yard_priorites.main_task_priority,
-            move |_| render::render_loop(this, list),
+            move |_| render::render_loop(this, list, output),
         )
     }
 }

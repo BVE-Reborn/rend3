@@ -27,11 +27,11 @@ mod platform;
 fn load_texture(
     renderer: &Renderer,
     cache: &mut HashMap<String, TextureHandle>,
-    name: &String,
+    name: &str,
     format: RendererTextureFormat,
 ) -> Result<TextureHandle, Box<dyn std::error::Error>> {
     rend3::span!(_guard, INFO, "Loading Texture", name = ?name);
-    Ok(match cache.entry(name.clone()) {
+    Ok(match cache.entry(name.to_owned()) {
         hash_map::Entry::Occupied(o) => *o.get(),
         hash_map::Entry::Vacant(v) => *v.insert({
             let real_name = concat!(env!("CARGO_MANIFEST_DIR"), "/data/").to_owned() + name;
@@ -60,7 +60,7 @@ fn load_texture(
                 width: image_info.width,
                 height: image_info.height,
                 data: image,
-                label: Some(name.clone()),
+                label: Some(name.to_owned()),
             })
         }),
     })
@@ -310,7 +310,8 @@ fn main() {
     };
 
     let renderer = pollster::block_on(
-        rend3::RendererBuilder::new(&window, options.clone())
+        rend3::RendererBuilder::new(options.clone())
+            .window(&window)
             .desired_device(desired_backend, desired_device_name, desired_mode)
             .build(),
     )
@@ -384,7 +385,7 @@ fn main() {
                 Vec3A::new(yaw.sin() * pitch.cos(), -pitch.sin(), yaw.cos() * pitch.cos())
             };
             let up = Vec3A::unit_y();
-            let side: Vec3A = forward.cross(up).normalize().into();
+            let side: Vec3A = forward.cross(up).normalize();
             let velocity = if button_pressed(&scancode_status, platform::Scancodes::SHIFT) {
                 10.0
             } else {
@@ -466,14 +467,16 @@ fn main() {
 
             renderer.set_camera_location(camera_location);
             renderer.set_options(options.clone());
-            let handle = renderer.render(rend3::list::default_render_list(
+
+            let list = rend3::list::default_render_list(
                 renderer.mode(),
                 [
                     (options.size[0] as f32 * 1.0) as u32,
                     (options.size[1] as f32 * 1.0) as u32,
                 ],
                 &pipelines,
-            ));
+            );
+            let handle = renderer.render(list, rend3::RendererOutput::InternalSwapchain);
 
             rend3::span_transfer!(redraw_span -> render_wait_span, INFO, "Waiting for render");
             pollster::block_on(handle);
