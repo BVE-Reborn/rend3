@@ -2,22 +2,23 @@ use crate::{
     bind_merge::BindGroupBuilder,
     instruction::Instruction,
     list::{RenderList, RenderPassRunRate},
-    renderer::{list, list::OutputFrame, uniforms::WrappedUniform},
+    renderer::{list, uniforms::WrappedUniform},
     statistics::RendererStatistics,
-    Renderer, RendererMode,
+    OutputFrame, Renderer, RendererMode, RendererOutput,
 };
 use futures::{stream::FuturesOrdered, StreamExt};
 use std::{borrow::Cow, future::Future, sync::Arc};
 use tracing_futures::Instrument;
 use wgpu::{
-    BindingResource, CommandEncoderDescriptor, Extent3d, Maintain, Origin3d, ShaderModuleSource, SwapChainError,
-    TextureAspect, TextureCopyView, TextureDataLayout, TextureDescriptor, TextureDimension, TextureUsage,
-    TextureViewDescriptor, TextureViewDimension,
+    BindingResource, CommandEncoderDescriptor, Extent3d, Maintain, Origin3d, ShaderModuleSource, TextureAspect,
+    TextureCopyView, TextureDataLayout, TextureDescriptor, TextureDimension, TextureUsage, TextureViewDescriptor,
+    TextureViewDimension,
 };
 
 pub fn render_loop<TLD: 'static>(
     renderer: Arc<Renderer<TLD>>,
     render_list: RenderList,
+    output: RendererOutput,
 ) -> impl Future<Output = RendererStatistics> {
     span_transfer!(_ -> render_create_span, INFO, "Render Loop Creation");
 
@@ -282,7 +283,7 @@ pub fn render_loop<TLD: 'static>(
         if let Some(new_opt) = new_options {
             global_resources.update(
                 &renderer.device,
-                &renderer.surface,
+                renderer.surface.as_ref(),
                 &mut renderer.options.write(),
                 new_opt,
             );
@@ -368,7 +369,7 @@ pub fn render_loop<TLD: 'static>(
                     list::render_single_render_pass(
                         Arc::clone(&renderer),
                         render_pass.clone(),
-                        OutputFrame::Shadow(output),
+                        OutputFrame::View(output),
                         Arc::clone(&cull_data_arc),
                         binding_data.clone(),
                     ),
@@ -381,18 +382,9 @@ pub fn render_loop<TLD: 'static>(
         // In wgpu 0.6, get_current_frame erroneously requires &mut
         drop(global_resources);
 
-        let mut frame = None;
-        while frame.is_none() {
-            match renderer.global_resources.write().swapchain.get_current_frame() {
-                Ok(v) => frame = Some(v),
-                Err(SwapChainError::Timeout) => {}
-                Err(err) => panic!("Could not make swapchain: {}", err),
-            }
-        }
+        let frame = output.acquire(&mut renderer.global_resources.write().swapchain);
 
         let global_resources = renderer.global_resources.read();
-
-        let frame = Arc::new(frame.unwrap());
 
         {
             let mut cull_data = renderer.culling_pass.prepare(
@@ -464,7 +456,7 @@ pub fn render_loop<TLD: 'static>(
                     list::render_single_render_pass(
                         Arc::clone(&renderer),
                         render_pass.clone(),
-                        OutputFrame::Swapchain(Arc::clone(&frame)),
+                        frame.clone(),
                         Arc::clone(&cull_data_arc),
                         binding_data.clone(),
                     ),

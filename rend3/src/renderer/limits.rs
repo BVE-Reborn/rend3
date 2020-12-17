@@ -3,47 +3,33 @@ use wgpu::{BufferAddress, Features, Limits};
 
 pub const MAX_UNIFORM_BUFFER_BINDING_SIZE: BufferAddress = 1024;
 
-// This is a macro as bitflags are just totally not const
-#[rustfmt::skip] // rustfmt just keeps pushing the | further and further over.
-#[allow(non_snake_case)]
-macro_rules! GPU_REQUIRED_FEATURES {
-    () => {
-        wgpu::Features::MAPPABLE_PRIMARY_BUFFERS
-            | wgpu::Features::PUSH_CONSTANTS
-            | wgpu::Features::TEXTURE_COMPRESSION_BC
-            // | wgpu::Features::DEPTH_CLAMPING
-            | wgpu::Features::SAMPLED_TEXTURE_BINDING_ARRAY
-            | wgpu::Features::SAMPLED_TEXTURE_ARRAY_DYNAMIC_INDEXING
-            | wgpu::Features::SAMPLED_TEXTURE_ARRAY_NON_UNIFORM_INDEXING
-            | wgpu::Features::UNSIZED_BINDING_ARRAY
-            | wgpu::Features::MULTI_DRAW_INDIRECT
-            | wgpu::Features::MULTI_DRAW_INDIRECT_COUNT
-    };
+pub fn gpu_required_features() -> Features {
+    wgpu::Features::MAPPABLE_PRIMARY_BUFFERS
+        | wgpu::Features::PUSH_CONSTANTS
+        | wgpu::Features::TEXTURE_COMPRESSION_BC
+        // | wgpu::Features::DEPTH_CLAMPING
+        | wgpu::Features::SAMPLED_TEXTURE_BINDING_ARRAY
+        | wgpu::Features::SAMPLED_TEXTURE_ARRAY_DYNAMIC_INDEXING
+        | wgpu::Features::SAMPLED_TEXTURE_ARRAY_NON_UNIFORM_INDEXING
+        | wgpu::Features::UNSIZED_BINDING_ARRAY
+        | wgpu::Features::MULTI_DRAW_INDIRECT
+        | wgpu::Features::MULTI_DRAW_INDIRECT_COUNT
 }
 
-#[rustfmt::skip] // rustfmt just keeps pushing the | further and further over.
-#[allow(non_snake_case)]
-macro_rules! CPU_REQUIRED_FEATURES {
-    () => {
-        wgpu::Features::MAPPABLE_PRIMARY_BUFFERS
-            | wgpu::Features::PUSH_CONSTANTS
-    };
+pub fn cpu_required_features() -> Features {
+    wgpu::Features::MAPPABLE_PRIMARY_BUFFERS | wgpu::Features::PUSH_CONSTANTS
 }
 
-#[rustfmt::skip] // rustfmt just keeps pushing the | further and further over.
-#[allow(non_snake_case)]
-macro_rules! OPTIONAL_FEATURES {
-    () => {
-        wgpu::Features::TEXTURE_COMPRESSION_BC
-    };
+pub fn optional_features() -> Features {
+    wgpu::Features::TEXTURE_COMPRESSION_BC
 }
 
 pub fn check_features(mode: RendererMode, device: Features) -> Result<Features, RendererInitializationError> {
     let required = match mode {
-        RendererMode::GPUPowered => GPU_REQUIRED_FEATURES!(),
-        RendererMode::CPUPowered => CPU_REQUIRED_FEATURES!(),
+        RendererMode::GPUPowered => gpu_required_features(),
+        RendererMode::CPUPowered => cpu_required_features(),
     };
-    let optional = OPTIONAL_FEATURES!() & device;
+    let optional = optional_features() & device;
     let missing = required - device;
     if !missing.is_empty() {
         Err(RendererInitializationError::MissingDeviceFeatures { features: missing })
@@ -52,7 +38,7 @@ pub fn check_features(mode: RendererMode, device: Features) -> Result<Features, 
     }
 }
 
-const GPU_REQUIRED_LIMITS: Limits = Limits {
+pub const GPU_REQUIRED_LIMITS: Limits = Limits {
     max_bind_groups: 8,
     max_dynamic_uniform_buffers_per_pipeline_layout: 0,
     max_dynamic_storage_buffers_per_pipeline_layout: 0,
@@ -65,7 +51,7 @@ const GPU_REQUIRED_LIMITS: Limits = Limits {
     max_push_constant_size: 128,
 };
 
-const CPU_REQUIRED_LIMITS: Limits = Limits {
+pub const CPU_REQUIRED_LIMITS: Limits = Limits {
     max_bind_groups: 8,
     max_dynamic_uniform_buffers_per_pipeline_layout: 0,
     max_dynamic_storage_buffers_per_pipeline_layout: 0,

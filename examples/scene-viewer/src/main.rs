@@ -310,7 +310,8 @@ fn main() {
     };
 
     let renderer = pollster::block_on(
-        rend3::RendererBuilder::new(&window, options.clone())
+        rend3::RendererBuilder::new(options.clone())
+            .window(&window)
             .desired_device(desired_backend, desired_device_name, desired_mode)
             .build(),
     )
@@ -466,14 +467,16 @@ fn main() {
 
             renderer.set_camera_location(camera_location);
             renderer.set_options(options.clone());
-            let handle = renderer.render(rend3::list::default_render_list(
+
+            let list = rend3::list::default_render_list(
                 renderer.mode(),
                 [
                     (options.size[0] as f32 * 1.0) as u32,
                     (options.size[1] as f32 * 1.0) as u32,
                 ],
                 &pipelines,
-            ));
+            );
+            let handle = renderer.render(list, rend3::RendererOutput::InternalSwapchain);
 
             rend3::span_transfer!(redraw_span -> render_wait_span, INFO, "Waiting for render");
             pollster::block_on(handle);

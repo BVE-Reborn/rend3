@@ -7,7 +7,7 @@ use crate::{
 use wgpu::{BindGroupLayout, BindingResource, Device, Sampler, Surface, SwapChain};
 
 pub struct RendererGlobalResources {
-    pub swapchain: SwapChain,
+    pub swapchain: Option<SwapChain>,
 
     pub camera: Camera,
     pub background_texture: Option<TextureHandle>,
@@ -28,8 +28,8 @@ pub struct RendererGlobalResources {
     pub shadow_sampler: Sampler,
 }
 impl RendererGlobalResources {
-    pub fn new(device: &Device, surface: &Surface, mode: RendererMode, options: &RendererOptions) -> Self {
-        let swapchain = util::create_swapchain(device, surface, options.size, options.vsync);
+    pub fn new(device: &Device, surface: Option<&Surface>, mode: RendererMode, options: &RendererOptions) -> Self {
+        let swapchain = surface.map(|surface| util::create_swapchain(device, surface, options.size, options.vsync));
 
         let camera = Camera::new_projection(options.size[0] as f32 / options.size[1] as f32);
 
@@ -70,14 +70,15 @@ impl RendererGlobalResources {
     pub fn update(
         &mut self,
         device: &Device,
-        surface: &Surface,
+        surface: Option<&Surface>,
         old_options: &mut RendererOptions,
         new_options: RendererOptions,
     ) {
         let dirty = determine_dirty(old_options, &new_options);
 
         if dirty.contains(DirtyResources::SWAPCHAIN) {
-            self.swapchain = util::create_swapchain(device, surface, new_options.size, new_options.vsync);
+            self.swapchain =
+                surface.map(|surface| util::create_swapchain(device, surface, new_options.size, new_options.vsync));
         }
         if dirty.contains(DirtyResources::CAMERA) {
             self.camera

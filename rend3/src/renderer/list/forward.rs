@@ -4,6 +4,7 @@ use crate::{
         ResourceBinding,
     },
     mode::ModeData,
+    output::OutputFrame,
     renderer::{culling::CullingPassData, pipeline::create_custom_texture_bgl, uniforms::WrappedUniform},
     Renderer,
 };
@@ -11,22 +12,8 @@ use std::sync::Arc;
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindingResource, CommandBuffer, CommandEncoderDescriptor,
     Operations, RenderPassColorAttachmentDescriptor, RenderPassDepthStencilAttachmentDescriptor, RenderPassDescriptor,
-    ShaderStage, SwapChainFrame, TextureView, TextureViewDimension,
+    ShaderStage, TextureViewDimension,
 };
-
-pub(crate) enum OutputFrame {
-    Swapchain(Arc<SwapChainFrame>),
-    Shadow(Arc<TextureView>),
-}
-
-impl OutputFrame {
-    fn as_view(&self) -> &TextureView {
-        match self {
-            Self::Swapchain(inner) => &inner.output.view,
-            Self::Shadow(inner) => &**inner,
-        }
-    }
-}
 
 #[derive(Clone)]
 pub(crate) struct BindingData {

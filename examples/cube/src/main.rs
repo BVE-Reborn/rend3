@@ -75,7 +75,7 @@ fn main() {
         size: [window_size.width, window_size.height],
     };
 
-    let renderer = pollster::block_on(rend3::RendererBuilder::<_, ()>::new(&window, options.clone()).build()).unwrap();
+    let renderer = pollster::block_on(rend3::RendererBuilder::new(options.clone()).window(&window).build()).unwrap();
 
     // Create the default set of shaders and pipelines
     let pipelines = pollster::block_on(async {
@@ -152,7 +152,7 @@ fn main() {
             let render_list = rend3::list::default_render_list(renderer.mode(), internal_renderbuffer_size, &pipelines);
 
             // Dispatch a render!
-            let handle = renderer.render(render_list);
+            let handle = renderer.render(render_list, rend3::RendererOutput::InternalSwapchain);
 
             // Wait until it's done
             pollster::block_on(handle);

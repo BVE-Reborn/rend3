@@ -162,7 +162,7 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
         let features = device.features();
         let potential = PotentialAdapter::new(device, info, limits, features, builder.desired_mode)?;
 
-        let surface = unsafe { instance.create_surface(builder.window) };
+        let surface = builder.window.map(|window| unsafe { instance.create_surface(window) });
 
         (surface, potential.inner, queue, potential.info, potential.mode)
     } else {
@@ -190,14 +190,19 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
         let device = Arc::new(device);
         let queue = Arc::new(queue);
 
-        let surface = unsafe { instance.create_surface(builder.window) };
+        let surface = builder.window.map(|window| unsafe { instance.create_surface(window) });
 
         (surface, device, queue, adapter_info, chosen_adapter.mode)
     };
 
     let shader_manager = ShaderManager::new(Arc::clone(&device));
 
-    let mut global_resources = RwLock::new(RendererGlobalResources::new(&device, &surface, mode, &builder.options));
+    let mut global_resources = RwLock::new(RendererGlobalResources::new(
+        &device,
+        surface.as_ref(),
+        mode,
+        &builder.options,
+    ));
     let global_resource_guard = global_resources.get_mut();
 
     let gpu_copy = GpuCopy::new(&device, &shader_manager, adapter_info.subgroup_size());
