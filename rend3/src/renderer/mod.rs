@@ -59,6 +59,7 @@ mod uniforms;
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
 pub struct OrdEqFloat(pub f32);
 impl Eq for OrdEqFloat {}
+#[allow(clippy::derive_ord_xor_partial_ord)] // Shhh let me break your contract in peace
 impl Ord for OrdEqFloat {
     fn cmp(&self, other: &Self) -> Ordering {
         self.partial_cmp(other).unwrap_or(Ordering::Greater)

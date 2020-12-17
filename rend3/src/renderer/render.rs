@@ -2,7 +2,7 @@ use crate::{
     bind_merge::BindGroupBuilder,
     instruction::Instruction,
     list::{RenderList, RenderPassRunRate},
-    renderer::{list, uniforms::WrappedUniform},
+    renderer::{culling, list, uniforms::WrappedUniform},
     statistics::RendererStatistics,
     OutputFrame, Renderer, RendererMode, RendererOutput,
 };
@@ -227,8 +227,8 @@ pub fn render_loop<TLD: 'static>(
             .write()
             .add_render_list(&renderer.device, render_list.resources);
 
-        let (texture_2d_bgl, texture_2d_bg, texture_2d_bgl_dirty) = texture_manager_2d.ready(&renderer.device);
-        let (texture_cube_bgl, texture_cube_bg, texture_cube_bgl_dirty) = texture_manager_cube.ready(&renderer.device);
+        let texture_2d_ready = texture_manager_2d.ready(&renderer.device);
+        let texture_cube_ready = texture_manager_cube.ready(&renderer.device);
         material_manager.ready(&renderer.device, &mut encoder, &texture_manager_2d);
         let object_count = object_manager.ready(&renderer.device, &mut encoder, &material_manager);
         directional_light_manager.ready(&renderer.device, &mut encoder);
@@ -298,15 +298,15 @@ pub fn render_loop<TLD: 'static>(
         let mut command_buffer_futures = FuturesOrdered::new();
 
         for light in directional_light_manager.values() {
-            let mut cull_data = renderer.culling_pass.prepare(
-                &renderer.device,
-                renderer.mode,
-                &global_resources.prefix_sum_bgl,
-                &global_resources.pre_cull_bgl,
-                &global_resources.object_output_bgl,
-                object_count as _,
-                String::from("shadow pass"),
-            );
+            let mut cull_data = renderer.culling_pass.prepare(culling::CullingPassPrepareArgs {
+                device: &renderer.device,
+                mode: renderer.mode,
+                prefix_sum_bgl: &global_resources.prefix_sum_bgl,
+                pre_cull_bgl: &global_resources.pre_cull_bgl,
+                output_bgl: &global_resources.object_output_bgl,
+                object_count: object_count as _,
+                name: String::from("shadow pass"),
+            });
 
             let mut object_bgb = BindGroupBuilder::new(Some(String::from("object bg")));
             object_bgb.append(BindingResource::Buffer(cull_data.output_buffer.slice(..)));
@@ -325,7 +325,7 @@ pub fn render_loop<TLD: 'static>(
                             &renderer.queue,
                             &object_manager,
                             &mut cull_data,
-                            light.camera.clone(),
+                            light.camera,
                         )
                         .await;
                 }
@@ -347,8 +347,8 @@ pub fn render_loop<TLD: 'static>(
                 general_bg: Arc::clone(&general_bg),
                 object_bg: Arc::clone(&object_bg),
                 material_bg: material_bg.as_ref().map(|_| (), Arc::clone),
-                gpu_2d_textures_bg: texture_2d_bg.as_ref().map(|_| (), Arc::clone),
-                gpu_cube_textures_bg: texture_cube_bg.as_ref().map(|_| (), Arc::clone),
+                gpu_2d_textures_bg: texture_2d_ready.bg.as_ref().map(|_| (), Arc::clone),
+                gpu_cube_textures_bg: texture_cube_ready.bg.as_ref().map(|_| (), Arc::clone),
                 shadow_texture_bg: Arc::clone(&shadow_bg),
                 skybox_texture_bg: Arc::clone(&skybox_bg),
                 wrapped_uniform: Arc::new(uniform),
@@ -387,15 +387,15 @@ pub fn render_loop<TLD: 'static>(
         let global_resources = renderer.global_resources.read();
 
         {
-            let mut cull_data = renderer.culling_pass.prepare(
-                &renderer.device,
-                renderer.mode,
-                &global_resources.prefix_sum_bgl,
-                &global_resources.pre_cull_bgl,
-                &global_resources.object_output_bgl,
-                object_count as _,
-                String::from("camera pass"),
-            );
+            let mut cull_data = renderer.culling_pass.prepare(culling::CullingPassPrepareArgs {
+                device: &renderer.device,
+                mode: renderer.mode,
+                prefix_sum_bgl: &global_resources.prefix_sum_bgl,
+                pre_cull_bgl: &global_resources.pre_cull_bgl,
+                output_bgl: &global_resources.object_output_bgl,
+                object_count: object_count as _,
+                name: String::from("camera pass"),
+            });
 
             let mut object_bgb = BindGroupBuilder::new(Some(String::from("object bg")));
             object_bgb.append(BindingResource::Buffer(cull_data.output_buffer.slice(..)));
@@ -414,7 +414,7 @@ pub fn render_loop<TLD: 'static>(
                             &renderer.queue,
                             &object_manager,
                             &mut cull_data,
-                            global_resources.camera.clone(),
+                            global_resources.camera,
                         )
                         .await;
                 }
@@ -436,8 +436,8 @@ pub fn render_loop<TLD: 'static>(
                 general_bg: Arc::clone(&general_bg),
                 object_bg: Arc::clone(&object_bg),
                 material_bg: material_bg.as_ref().map(|_| (), Arc::clone),
-                gpu_2d_textures_bg: texture_2d_bg.as_ref().map(|_| (), Arc::clone),
-                gpu_cube_textures_bg: texture_cube_bg.as_ref().map(|_| (), Arc::clone),
+                gpu_2d_textures_bg: texture_2d_ready.bg.as_ref().map(|_| (), Arc::clone),
+                gpu_cube_textures_bg: texture_cube_ready.bg.as_ref().map(|_| (), Arc::clone),
                 shadow_texture_bg: Arc::clone(&shadow_bg),
                 skybox_texture_bg: Arc::clone(&skybox_bg),
                 wrapped_uniform: Arc::new(uniform),

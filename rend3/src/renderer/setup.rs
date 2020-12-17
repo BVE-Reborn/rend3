@@ -209,14 +209,16 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
 
     let culling_pass = culling::CullingPass::new(
         &device,
-        mode,
-        &shader_manager,
-        &global_resource_guard.prefix_sum_bgl,
-        &global_resource_guard.pre_cull_bgl,
-        &global_resource_guard.object_input_bgl,
-        &global_resource_guard.object_output_bgl,
-        &global_resource_guard.camera_data_bgl,
-        adapter_info.subgroup_size(),
+        culling::CullingPassCreationArgs {
+            mode,
+            shader_manager: &shader_manager,
+            prefix_sum_bgl: &global_resource_guard.prefix_sum_bgl,
+            pre_cull_bgl: &global_resource_guard.pre_cull_bgl,
+            object_input_bgl: &global_resource_guard.object_input_bgl,
+            output_bgl: &global_resource_guard.object_output_bgl,
+            uniform_bgl: &global_resource_guard.camera_data_bgl,
+            subgroup_size: adapter_info.subgroup_size(),
+        },
     );
 
     let texture_manager_2d = RwLock::new(TextureManager::new(

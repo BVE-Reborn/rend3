@@ -27,11 +27,11 @@ mod platform;
 fn load_texture(
     renderer: &Renderer,
     cache: &mut HashMap<String, TextureHandle>,
-    name: &String,
+    name: &str,
     format: RendererTextureFormat,
 ) -> Result<TextureHandle, Box<dyn std::error::Error>> {
     rend3::span!(_guard, INFO, "Loading Texture", name = ?name);
-    Ok(match cache.entry(name.clone()) {
+    Ok(match cache.entry(name.to_owned()) {
         hash_map::Entry::Occupied(o) => *o.get(),
         hash_map::Entry::Vacant(v) => *v.insert({
             let real_name = concat!(env!("CARGO_MANIFEST_DIR"), "/data/").to_owned() + name;
@@ -60,7 +60,7 @@ fn load_texture(
                 width: image_info.width,
                 height: image_info.height,
                 data: image,
-                label: Some(name.clone()),
+                label: Some(name.to_owned()),
             })
         }),
     })
@@ -385,7 +385,7 @@ fn main() {
                 Vec3A::new(yaw.sin() * pitch.cos(), -pitch.sin(), yaw.cos() * pitch.cos())
             };
             let up = Vec3A::unit_y();
-            let side: Vec3A = forward.cross(up).normalize().into();
+            let side: Vec3A = forward.cross(up).normalize();
             let velocity = if button_pressed(&scancode_status, platform::Scancodes::SHIFT) {
                 10.0
             } else {

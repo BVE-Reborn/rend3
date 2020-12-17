@@ -109,7 +109,7 @@ where
     {
         // TODO: figure out how to deal with non-defaultable TLDs
         self.yard.get_or_insert_with(|| {
-            Arc::new(Switchyard::new(1, single_pool_one_to_one(thread_info(), None), || TLD::default()).unwrap())
+            Arc::new(Switchyard::new(1, single_pool_one_to_one(thread_info(), None), TLD::default).unwrap())
         });
 
         Renderer::new(self)
