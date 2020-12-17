@@ -2,6 +2,7 @@
 members = [
     "examples/cube",
     "examples/gltf",
+    "examples/imgui",
     "examples/scene-viewer",
     "rend3"
 ]

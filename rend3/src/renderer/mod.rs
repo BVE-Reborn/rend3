@@ -18,7 +18,7 @@ use parking_lot::{Mutex, RwLock};
 use raw_window_handle::HasRawWindowHandle;
 use std::{future::Future, sync::Arc};
 use switchyard::{JoinHandle, Switchyard};
-use wgpu::{Device, Queue, Surface, TextureFormat};
+use wgpu::{Device, Instance, Queue, Surface, TextureFormat};
 use wgpu_conveyor::AutomatedBufferManager;
 
 #[macro_use]
@@ -80,6 +80,7 @@ where
 
     mode: RendererMode,
     adapter_info: ExtendedAdapterInfo,
+    instance: Arc<Instance>,
     queue: Arc<Queue>,
     device: Arc<Device>,
     surface: Option<Surface>,
@@ -112,6 +113,10 @@ impl<TLD: 'static> Renderer<TLD> {
 
     pub fn mode(&self) -> RendererMode {
         self.mode
+    }
+
+    pub fn instance(&self) -> &Arc<Instance> {
+        &self.instance
     }
 
     pub fn device(&self) -> &Arc<Device> {

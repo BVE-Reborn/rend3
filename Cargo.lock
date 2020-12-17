@@ -909,6 +909,49 @@ dependencies = [
 ]
 
 [[package]]
+name = "imgui"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "92a0077d3bb882960467aed0bc6eaf5d4033cb9b61bfdbb99c32d1288380032f"
+dependencies = [
+ "bitflags",
+ "imgui-sys",
+ "parking_lot",
+]
+
+[[package]]
+name = "imgui-sys"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0522b693da8a64322afbb32c63c04f39d9b9435cc75199d630207eee48886fc1"
+dependencies = [
+ "cc",
+]
+
+[[package]]
+name = "imgui-wgpu"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8017f74f8880049c1c3fc055868486a610178ab93ad18eadaf5b0bb52f738365"
+dependencies = [
+ "bytemuck",
+ "imgui",
+ "log",
+ "smallvec",
+ "wgpu",
+]
+
+[[package]]
+name = "imgui-winit-support"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0669ee7f52b80aa33d5f45507790223380c253a8fd981ddf67d1427ab8ebc8bc"
+dependencies = [
+ "imgui",
+ "winit",
+]
+
+[[package]]
 name = "include_dir"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1692,6 +1735,21 @@ dependencies = [
  "gltf",
  "pollster",
  "rend3",
+ "wgpu-subscriber",
+ "winit",
+]
+
+[[package]]
+name = "rend3-imgui-example"
+version = "0.1.0"
+dependencies = [
+ "glam",
+ "imgui",
+ "imgui-wgpu",
+ "imgui-winit-support",
+ "pollster",
+ "rend3",
+ "wgpu",
  "wgpu-subscriber",
  "winit",
 ]
