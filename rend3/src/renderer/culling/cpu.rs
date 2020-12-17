@@ -5,8 +5,9 @@ use crate::{
         culling::CullingPassData,
         frustum::ShaderFrustum,
         object::{InternalObject, ObjectManager},
-        OrdEqFloat, COMPUTE_POOL, CULLING_PRIORITY,
+        OrdEqFloat,
     },
+    JobPriorities,
 };
 use futures::{stream::FuturesUnordered, StreamExt};
 use glam::{Mat4, Vec4, Vec4Swizzles};
@@ -50,6 +51,7 @@ unsafe impl bytemuck::Pod for ShaderOutputObject {}
 
 pub(crate) async fn run<TD>(
     yard: &Switchyard<TD>,
+    yard_priorities: JobPriorities,
     queue: &Queue,
     object_manager: &ObjectManager,
     data: &mut CullingPassData,
@@ -71,47 +73,51 @@ pub(crate) async fn run<TD>(
     for object_chunk in (&chunks).into_iter().map(|v| v.collect_vec()) {
         let object_chunk: Vec<InternalObject> = object_chunk;
 
-        res_futures.push(yard.spawn(COMPUTE_POOL, CULLING_PRIORITY, async move {
-            let mut chunk_results = Vec::with_capacity(object_chunk.len());
+        res_futures.push(yard.spawn(
+            yard_priorities.compute_pool,
+            yard_priorities.culling_priority,
+            async move {
+                let mut chunk_results = Vec::with_capacity(object_chunk.len());
 
-            for object in object_chunk {
-                let model = object.transform.transform;
-                let model_view = view * model;
+                for object in object_chunk {
+                    let model = object.transform.transform;
+                    let model_view = view * model;
 
-                let transformed = object.sphere.apply_transform(model_view);
-                if !frustum.contains_sphere(transformed) {
-                    continue;
+                    let transformed = object.sphere.apply_transform(model_view);
+                    if !frustum.contains_sphere(transformed) {
+                        continue;
+                    }
+
+                    let view_position = (model_view * object.sphere.center.extend(1.0)).xyz();
+                    let distance = view_position.length_squared();
+
+                    let model_view_proj = view_proj * model;
+
+                    let inv_trans_model_view = model_view.inverse().transpose();
+
+                    let output = ShaderOutputObject {
+                        model_view,
+                        model_view_proj,
+                        inv_trans_model_view_0: inv_trans_model_view.x_axis,
+                        inv_trans_model_view_1: inv_trans_model_view.y_axis,
+                        inv_trans_model_view_2: inv_trans_model_view.z_axis,
+                        _material_idx: 0,
+                        _active: 0,
+                    };
+
+                    let call = CPUDrawCall {
+                        start_idx: object.start_idx,
+                        count: object.count,
+                        vertex_offset: object.vertex_offset,
+                        handle: object.material,
+                    };
+
+                    chunk_results.push(CullingOutputData { call, output, distance })
                 }
 
-                let view_position = (model_view * object.sphere.center.extend(1.0)).xyz();
-                let distance = view_position.length_squared();
-
-                let model_view_proj = view_proj * model;
-
-                let inv_trans_model_view = model_view.inverse().transpose();
-
-                let output = ShaderOutputObject {
-                    model_view,
-                    model_view_proj,
-                    inv_trans_model_view_0: inv_trans_model_view.x_axis,
-                    inv_trans_model_view_1: inv_trans_model_view.y_axis,
-                    inv_trans_model_view_2: inv_trans_model_view.z_axis,
-                    _material_idx: 0,
-                    _active: 0,
-                };
-
-                let call = CPUDrawCall {
-                    start_idx: object.start_idx,
-                    count: object.count,
-                    vertex_offset: object.vertex_offset,
-                    handle: object.material,
-                };
-
-                chunk_results.push(CullingOutputData { call, output, distance })
-            }
-
-            chunk_results
-        }))
+                chunk_results
+            },
+        ))
     }
 
     let mut total_post_cull_objects = 0_usize;

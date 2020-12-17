@@ -2,9 +2,7 @@ use crate::{
     bind_merge::BindGroupBuilder,
     instruction::Instruction,
     list::{RenderList, RenderPassRunRate},
-    renderer::{
-        list, list::OutputFrame, uniforms::WrappedUniform, BUFFER_RECALL_PRIORITY, COMPUTE_POOL, RENDER_RECORD_PRIORITY,
-    },
+    renderer::{list, list::OutputFrame, uniforms::WrappedUniform},
     statistics::RendererStatistics,
     Renderer, RendererMode,
 };
@@ -322,6 +320,7 @@ pub fn render_loop<TLD: 'static>(
                         .culling_pass
                         .cpu_run(
                             &renderer.yard,
+                            renderer.yard_priorites,
                             &renderer.queue,
                             &object_manager,
                             &mut cull_data,
@@ -364,8 +363,8 @@ pub fn render_loop<TLD: 'static>(
                 let output = directional_light_manager.get_layer_view_arc(light.shadow_tex);
 
                 command_buffer_futures.push(renderer.yard.spawn(
-                    COMPUTE_POOL,
-                    RENDER_RECORD_PRIORITY,
+                    renderer.yard_priorites.compute_pool,
+                    renderer.yard_priorites.render_record_priority,
                     list::render_single_render_pass(
                         Arc::clone(&renderer),
                         render_pass.clone(),
@@ -419,6 +418,7 @@ pub fn render_loop<TLD: 'static>(
                         .culling_pass
                         .cpu_run(
                             &renderer.yard,
+                            renderer.yard_priorites,
                             &renderer.queue,
                             &object_manager,
                             &mut cull_data,
@@ -459,8 +459,8 @@ pub fn render_loop<TLD: 'static>(
                 }
 
                 command_buffer_futures.push(renderer.yard.spawn(
-                    COMPUTE_POOL,
-                    RENDER_RECORD_PRIORITY,
+                    renderer.yard_priorites.compute_pool,
+                    renderer.yard_priorites.render_record_priority,
                     list::render_single_render_pass(
                         Arc::clone(&renderer),
                         render_pass.clone(),
@@ -492,9 +492,11 @@ pub fn render_loop<TLD: 'static>(
         let futures = renderer.buffer_manager.lock().pump();
         for future in futures {
             let span = tracing::debug_span!("Buffer recall");
-            renderer
-                .yard
-                .spawn(COMPUTE_POOL, BUFFER_RECALL_PRIORITY, future.instrument(span));
+            renderer.yard.spawn(
+                renderer.yard_priorites.compute_pool,
+                renderer.yard_priorites.buffer_recall_priority,
+                future.instrument(span),
+            );
         }
 
         span_transfer!(buffer_pump_span -> present_span, INFO, "Presenting");

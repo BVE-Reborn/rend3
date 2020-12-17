@@ -3,7 +3,7 @@ use crate::{
     list::{ShaderSourceStage, ShaderSourceType, SourceShaderDescriptor},
     mode::ModeData,
     renderer::{camera::Camera, object::ObjectManager, shaders::ShaderManager},
-    RendererMode,
+    JobPriorities, RendererMode,
 };
 use futures::future::Either;
 use std::future::Future;
@@ -332,6 +332,7 @@ impl CullingPass {
     pub(crate) fn cpu_run<'a, TD>(
         &self,
         yard: &'a Switchyard<TD>,
+        yard_priorities: JobPriorities,
         queue: &'a Queue,
         object_manager: &'a ObjectManager,
         data: &'a mut CullingPassData,
@@ -340,7 +341,7 @@ impl CullingPass {
     where
         TD: 'static,
     {
-        cpu::run(yard, queue, object_manager, data, camera)
+        cpu::run(yard, yard_priorities, queue, object_manager, data, camera)
     }
 
     pub(crate) fn gpu_run<'a>(

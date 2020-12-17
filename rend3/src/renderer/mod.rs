@@ -11,7 +11,7 @@ use crate::{
         pipeline::PipelineManager, resources::RendererGlobalResources, shaders::ShaderManager, texture::TextureManager,
     },
     statistics::RendererStatistics,
-    RendererBuilder, RendererInitializationError, RendererMode, RendererOptions,
+    JobPriorities, RendererBuilder, RendererInitializationError, RendererMode, RendererOptions,
 };
 use bitflags::_core::cmp::Ordering;
 use parking_lot::{Mutex, RwLock};
@@ -65,14 +65,6 @@ impl Ord for OrdEqFloat {
     }
 }
 
-const COMPUTE_POOL: u8 = 0;
-
-const BUFFER_RECALL_PRIORITY: u32 = 0;
-const MAIN_TASK_PRIORITY: u32 = 1;
-const CULLING_PRIORITY: u32 = 2;
-const RENDER_RECORD_PRIORITY: u32 = 2;
-const PIPELINE_BUILD_PRIORITY: u32 = 3;
-
 const INTERNAL_SHADOW_DEPTH_FORMAT: TextureFormat = TextureFormat::Depth32Float;
 const SWAPCHAIN_FORMAT: TextureFormat = TextureFormat::Bgra8UnormSrgb;
 
@@ -83,6 +75,7 @@ where
     TLD: 'static,
 {
     yard: Arc<Switchyard<TLD>>,
+    yard_priorites: JobPriorities,
     instructions: InstructionStreamPair,
 
     mode: RendererMode,
@@ -309,7 +302,10 @@ impl<TLD: 'static> Renderer<TLD> {
 
     pub fn render(self: &Arc<Self>, list: RenderList) -> JoinHandle<RendererStatistics> {
         let this = Arc::clone(self);
-        self.yard
-            .spawn_local(0, MAIN_TASK_PRIORITY, move |_| render::render_loop(this, list))
+        self.yard.spawn_local(
+            self.yard_priorites.compute_pool,
+            self.yard_priorites.main_task_priority,
+            move |_| render::render_loop(this, list),
+        )
     }
 }

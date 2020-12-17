@@ -15,7 +15,7 @@ use crate::{
         shaders::ShaderManager,
         texture::{TextureManager, STARTING_2D_TEXTURES, STARTING_CUBE_TEXTURES},
     },
-    Renderer, RendererBuilder, RendererInitializationError, RendererMode,
+    JobPriorities, Renderer, RendererBuilder, RendererInitializationError, RendererMode,
 };
 use arrayvec::ArrayVec;
 use fnv::FnvHashMap;
@@ -249,6 +249,7 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
 
     Ok(Arc::new(Renderer {
         yard: builder.yard.expect("The yard should be populated by the builder"),
+        yard_priorites: builder.priorities.unwrap_or_else(JobPriorities::default),
         instructions: InstructionStreamPair::new(),
 
         mode,

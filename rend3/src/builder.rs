@@ -1,4 +1,4 @@
-use crate::{Renderer, RendererInitializationError, RendererMode, RendererOptions};
+use crate::{JobPriorities, Renderer, RendererInitializationError, RendererMode, RendererOptions};
 use raw_window_handle::HasRawWindowHandle;
 use std::{future::Future, sync::Arc};
 use switchyard::{
@@ -23,6 +23,7 @@ where
     pub(crate) options: RendererOptions,
     pub(crate) device: Option<CustomDevice<'a>>,
     pub(crate) yard: Option<Arc<Switchyard<TLD>>>,
+    pub(crate) priorities: Option<JobPriorities>,
     pub(crate) desired_backend: Option<Backend>,
     pub(crate) desired_device_name: Option<String>,
     pub(crate) desired_mode: Option<RendererMode>,
@@ -37,6 +38,7 @@ where
             options,
             device: None,
             yard: None,
+            priorities: None,
             desired_backend: None,
             desired_device_name: None,
             desired_mode: None,
@@ -66,12 +68,17 @@ where
         self
     }
 
-    pub fn yard<TLD2: 'static>(self, yard: Arc<Switchyard<TLD2>>) -> RendererBuilder<'a, W, TLD2> {
+    pub fn yard<TLD2: 'static>(
+        self,
+        yard: Arc<Switchyard<TLD2>>,
+        priorities: JobPriorities,
+    ) -> RendererBuilder<'a, W, TLD2> {
         RendererBuilder {
             window: self.window,
             options: self.options,
             device: self.device,
             yard: Some(yard),
+            priorities: Some(priorities),
             desired_backend: self.desired_backend,
             desired_device_name: self.desired_device_name,
             desired_mode: self.desired_mode,
