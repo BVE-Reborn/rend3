@@ -1,5 +1,7 @@
 # Rend3 Examples
 
+The examples are separate crates, so to run an example run `cargo run --bin <name>`.
+
 | Name         | Description | Image |
 |:------------:|:------------|-------|
 | cube         | Basic example, best way to get started with the api. | ![](cube/screenshot.jpg) |

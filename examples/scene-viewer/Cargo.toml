@@ -1,9 +1,13 @@
 [package]
-name = "scene-viewer"
+name = "rend3-scene-viewer-example"
 license = "MPL-2.0"
 version = "0.1.0"
 authors = ["Connor Fitzgerald <connorwadefitzgerald@gmail.com>"]
 edition = "2018"
+
+[[bin]]
+name = "scene-viewer"
+path = "src/main.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -12,10 +16,8 @@ basis = { version = "0.1.0", git = "https://github.com/BVE-Reborn/basis-rs.git",
 fnv = "1"
 glam = "0.11"
 image = { version = "0.23", default-features = false, features = ["png", "jpeg", "tiff"]}
-imgui = "0.6"
-imgui-winit-support = "0.6"
 histogram = "0.6"
-obj = { version = "0.10", git = "https://github.com/cwfitzgerald/obj.git", branch = "map_ns" }
+obj = "0.10.2"
 pico-args = "0.3"
 pollster = "0.2"
 rend3 = { path = "../../rend3", version = "0.1.0" }
