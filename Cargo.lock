@@ -229,6 +229,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "cocoa"
+version = "0.24.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6f63902e9223530efb4e26ccd0cf55ec30d592d3b42e21a28defc42a9586e832"
+dependencies = [
+ "bitflags",
+ "block",
+ "cocoa-foundation",
+ "core-foundation 0.9.1",
+ "core-graphics 0.22.2",
+ "foreign-types",
+ "libc",
+ "objc",
+]
+
+[[package]]
 name = "cocoa-foundation"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -354,7 +370,7 @@ dependencies = [
  "pollster",
  "rend3",
  "wgpu-subscriber",
- "winit",
+ "winit 0.24.0",
 ]
 
 [[package]]
@@ -844,7 +860,7 @@ dependencies = [
  "pollster",
  "rend3",
  "wgpu-subscriber",
- "winit",
+ "winit 0.24.0",
 ]
 
 [[package]]
@@ -958,7 +974,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5e0fc247afc385ed9cd26860cdb7fae988d5c7e2ad1d70c70aef728ce9b78e85"
 dependencies = [
  "imgui",
- "winit",
+ "winit 0.23.0",
 ]
 
 [[package]]
@@ -1779,7 +1795,7 @@ dependencies = [
  "tracing",
  "wgpu",
  "wgpu-subscriber",
- "winit",
+ "winit 0.24.0",
 ]
 
 [[package]]
@@ -2535,7 +2551,38 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b5bc559da567d8aa671bbcd08304d49e982c7bf2cb91e10288b9188931c1b772"
 dependencies = [
  "bitflags",
- "cocoa",
+ "cocoa 0.23.0",
+ "core-foundation 0.9.1",
+ "core-graphics 0.22.2",
+ "core-video-sys",
+ "dispatch",
+ "instant",
+ "lazy_static",
+ "libc",
+ "log",
+ "mio",
+ "mio-extras",
+ "ndk",
+ "ndk-glue",
+ "ndk-sys",
+ "objc",
+ "parking_lot",
+ "percent-encoding",
+ "raw-window-handle",
+ "smithay-client-toolkit",
+ "wayland-client",
+ "winapi 0.3.9",
+ "x11-dl",
+]
+
+[[package]]
+name = "winit"
+version = "0.24.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "da4eda6fce0eb84bd0a33e3c8794eb902e1033d0a1d5a31bc4f19b1b4bbff597"
+dependencies = [
+ "bitflags",
+ "cocoa 0.24.0",
  "core-foundation 0.9.1",
  "core-graphics 0.22.2",
  "core-video-sys",
