@@ -78,14 +78,20 @@ macro_rules! span_transfer {
 }
 
 mod bind_merge;
+mod builder;
 pub mod datatypes;
 mod instruction;
+mod jobs;
 pub mod list;
+mod mode;
 mod options;
 mod registry;
 mod renderer;
 mod statistics;
 
+pub use builder::*;
+pub use jobs::*;
+pub use mode::*;
 pub use options::*;
-pub use renderer::{error::*, Renderer, RendererMode};
+pub use renderer::{error::*, Renderer};
 pub use statistics::*;

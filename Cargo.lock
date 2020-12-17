@@ -353,7 +353,6 @@ dependencies = [
  "glam",
  "pollster",
  "rend3",
- "switchyard",
  "wgpu-subscriber",
  "winit",
 ]
@@ -844,7 +843,6 @@ dependencies = [
  "gltf 0.15.2",
  "pollster",
  "rend3",
- "switchyard",
  "wgpu-subscriber",
  "winit",
 ]
@@ -1768,7 +1766,6 @@ version = "0.1.0"
 dependencies = [
  "basis",
  "fnv",
- "futures",
  "glam",
  "histogram",
  "image",
@@ -1776,9 +1773,9 @@ dependencies = [
  "imgui-winit-support",
  "obj",
  "pico-args",
+ "pollster",
  "rend3",
  "smallvec",
- "switchyard",
  "tracing",
  "wgpu",
  "wgpu-subscriber",

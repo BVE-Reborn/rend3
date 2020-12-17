@@ -11,14 +11,14 @@ use crate::{
         pipeline::PipelineManager, resources::RendererGlobalResources, shaders::ShaderManager, texture::TextureManager,
     },
     statistics::RendererStatistics,
-    RendererInitializationError, RendererOptions,
+    JobPriorities, RendererBuilder, RendererInitializationError, RendererMode, RendererOptions,
 };
 use bitflags::_core::cmp::Ordering;
 use parking_lot::{Mutex, RwLock};
 use raw_window_handle::HasRawWindowHandle;
 use std::{future::Future, sync::Arc};
 use switchyard::{JoinHandle, Switchyard};
-use wgpu::{Backend, Device, Queue, Surface, TextureFormat};
+use wgpu::{Device, Queue, Surface, TextureFormat};
 use wgpu_conveyor::AutomatedBufferManager;
 
 #[macro_use]
@@ -65,121 +65,6 @@ impl Ord for OrdEqFloat {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum RendererMode {
-    CPUPowered,
-    GPUPowered,
-}
-
-impl RendererMode {
-    pub(crate) fn into_data<C, G>(self, cpu: impl FnOnce() -> C, gpu: impl FnOnce() -> G) -> ModeData<C, G> {
-        match self {
-            Self::CPUPowered => ModeData::CPU(cpu()),
-            Self::GPUPowered => ModeData::GPU(gpu()),
-        }
-    }
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub(crate) enum ModeData<C, G> {
-    CPU(C),
-    GPU(G),
-}
-#[allow(dead_code)] // Even if these are unused, don't warn
-impl<C, G> ModeData<C, G> {
-    pub fn mode(&self) -> RendererMode {
-        match self {
-            Self::CPU(_) => RendererMode::CPUPowered,
-            Self::GPU(_) => RendererMode::GPUPowered,
-        }
-    }
-
-    pub fn into_cpu(self) -> C {
-        match self {
-            Self::CPU(c) => c,
-            Self::GPU(_) => panic!("tried to extract cpu data in gpu mode"),
-        }
-    }
-
-    pub fn as_cpu(&self) -> &C {
-        match self {
-            Self::CPU(c) => c,
-            Self::GPU(_) => panic!("tried to extract cpu data in gpu mode"),
-        }
-    }
-
-    pub fn as_cpu_mut(&mut self) -> &mut C {
-        match self {
-            Self::CPU(c) => c,
-            Self::GPU(_) => panic!("tried to extract cpu data in gpu mode"),
-        }
-    }
-
-    pub fn into_gpu(self) -> G {
-        match self {
-            Self::GPU(g) => g,
-            Self::CPU(_) => panic!("tried to extract gpu data in cpu mode"),
-        }
-    }
-
-    pub fn as_gpu(&self) -> &G {
-        match self {
-            Self::GPU(g) => g,
-            Self::CPU(_) => panic!("tried to extract gpu data in cpu mode"),
-        }
-    }
-
-    pub fn as_gpu_mut(&mut self) -> &mut G {
-        match self {
-            Self::GPU(g) => g,
-            Self::CPU(_) => panic!("tried to extract gpu data in cpu mode"),
-        }
-    }
-
-    pub fn as_ref(&self) -> ModeData<&C, &G> {
-        match self {
-            Self::CPU(c) => ModeData::CPU(c),
-            Self::GPU(c) => ModeData::GPU(c),
-        }
-    }
-
-    pub fn as_ref_mut(&mut self) -> ModeData<&mut C, &mut G> {
-        match self {
-            Self::CPU(c) => ModeData::CPU(c),
-            Self::GPU(c) => ModeData::GPU(c),
-        }
-    }
-
-    pub fn map_cpu<C2>(self, func: impl FnOnce(C) -> C2) -> ModeData<C2, G> {
-        match self {
-            Self::CPU(c) => ModeData::CPU(func(c)),
-            Self::GPU(g) => ModeData::GPU(g),
-        }
-    }
-
-    pub fn map_gpu<G2>(self, func: impl FnOnce(G) -> G2) -> ModeData<C, G2> {
-        match self {
-            Self::CPU(c) => ModeData::CPU(c),
-            Self::GPU(g) => ModeData::GPU(func(g)),
-        }
-    }
-
-    pub fn map<C2, G2>(self, cpu_func: impl FnOnce(C) -> C2, gpu_func: impl FnOnce(G) -> G2) -> ModeData<C2, G2> {
-        match self {
-            Self::CPU(c) => ModeData::CPU(cpu_func(c)),
-            Self::GPU(g) => ModeData::GPU(gpu_func(g)),
-        }
-    }
-}
-
-const COMPUTE_POOL: u8 = 0;
-
-const BUFFER_RECALL_PRIORITY: u32 = 0;
-const MAIN_TASK_PRIORITY: u32 = 1;
-const CULLING_PRIORITY: u32 = 2;
-const RENDER_RECORD_PRIORITY: u32 = 2;
-const PIPELINE_BUILD_PRIORITY: u32 = 3;
-
 const INTERNAL_SHADOW_DEPTH_FORMAT: TextureFormat = TextureFormat::Depth32Float;
 const SWAPCHAIN_FORMAT: TextureFormat = TextureFormat::Bgra8UnormSrgb;
 
@@ -190,11 +75,12 @@ where
     TLD: 'static,
 {
     yard: Arc<Switchyard<TLD>>,
+    yard_priorites: JobPriorities,
     instructions: InstructionStreamPair,
 
     mode: RendererMode,
     adapter_info: ExtendedAdapterInfo,
-    queue: Queue,
+    queue: Arc<Queue>,
     device: Arc<Device>,
     surface: Surface,
 
@@ -217,15 +103,11 @@ where
     options: RwLock<RendererOptions>,
 }
 impl<TLD: 'static> Renderer<TLD> {
-    pub fn new<'a, W: HasRawWindowHandle>(
-        window: &'a W,
-        yard: Arc<Switchyard<TLD>>,
-        backend: Option<Backend>,
-        device: Option<String>,
-        mode: Option<RendererMode>,
-        options: RendererOptions,
+    /// Use [`RendererBuilder`](crate::RendererBuilder) to create a renderer.
+    pub(crate) fn new<'a, W: HasRawWindowHandle>(
+        builder: RendererBuilder<'a, W, TLD>,
     ) -> impl Future<Output = Result<Arc<Self>, RendererInitializationError>> + 'a {
-        setup::create_renderer(window, yard, backend, device, mode, options)
+        setup::create_renderer(builder)
     }
 
     pub fn mode(&self) -> RendererMode {
@@ -420,7 +302,10 @@ impl<TLD: 'static> Renderer<TLD> {
 
     pub fn render(self: &Arc<Self>, list: RenderList) -> JoinHandle<RendererStatistics> {
         let this = Arc::clone(self);
-        self.yard
-            .spawn_local(0, MAIN_TASK_PRIORITY, move |_| render::render_loop(this, list))
+        self.yard.spawn_local(
+            self.yard_priorites.compute_pool,
+            self.yard_priorites.main_task_priority,
+            move |_| render::render_loop(this, list),
+        )
     }
 }

@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 fn vertex(pos: [f32; 3]) -> rend3::datatypes::ModelVertex {
     rend3::datatypes::ModelVertex {
         position: glam::Vec3::from(pos),
@@ -70,16 +68,6 @@ fn main() {
         builder.build(&event_loop).expect("Could not build window")
     };
 
-    // Create executor needed by rend3
-    let yard = Arc::new(
-        switchyard::Switchyard::new(
-            2,
-            switchyard::threads::double_pool_one_to_one(switchyard::threads::thread_info(), Some("rend3 cube")),
-            || (),
-        )
-        .unwrap(),
-    );
-
     let window_size = window.inner_size();
 
     let mut options = rend3::RendererOptions {
@@ -87,15 +75,7 @@ fn main() {
         size: [window_size.width, window_size.height],
     };
 
-    let renderer = pollster::block_on(rend3::Renderer::new(
-        &window,         //
-        yard,            //
-        None,            // No backend preference
-        None,            // No device name preference
-        None,            // No rendering mode preference
-        options.clone(), //
-    ))
-    .unwrap();
+    let renderer = pollster::block_on(rend3::RendererBuilder::<_, ()>::new(&window, options.clone()).build()).unwrap();
 
     // Create the default set of shaders and pipelines
     let pipelines = pollster::block_on(async {

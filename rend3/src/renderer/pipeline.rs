@@ -2,8 +2,7 @@ use crate::{
     datatypes::{DepthCompare, Pipeline, PipelineBindingType, PipelineHandle, PipelineInputType},
     list::RenderPassRunRate,
     registry::ResourceRegistry,
-    renderer::{RendererMode, COMPUTE_POOL, PIPELINE_BUILD_PRIORITY},
-    Renderer,
+    Renderer, RendererMode,
 };
 use parking_lot::RwLock;
 use std::{future::Future, sync::Arc};
@@ -45,7 +44,7 @@ impl PipelineManager {
         let handle = self.registry.read().allocate();
         let this = Arc::clone(&self);
         let renderer_clone = Arc::clone(&renderer);
-        renderer_clone.yard.spawn(COMPUTE_POOL, PIPELINE_BUILD_PRIORITY, async move {
+        renderer_clone.yard.spawn(renderer.yard_priorites.compute_pool, renderer.yard_priorites.pipeline_build_priority, async move {
             let custom_layouts: Vec<_> = pipeline_desc
                 .bindings
                 .iter()

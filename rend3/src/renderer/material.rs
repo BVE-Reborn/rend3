@@ -1,8 +1,10 @@
 use crate::{
     bind_merge::BindGroupBuilder,
     datatypes::{Material, MaterialChange, MaterialFlags, MaterialHandle, RendererTextureFormat, TextureHandle},
+    mode::ModeData,
     registry::ResourceRegistry,
-    renderer::{texture::TextureManager, ModeData, RendererMode},
+    renderer::texture::TextureManager,
+    RendererMode,
 };
 use glam::f32::Vec4;
 use std::{mem::size_of, num::NonZeroU32, sync::Arc};

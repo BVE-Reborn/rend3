@@ -1,7 +1,8 @@
 use crate::{
     datatypes::{RendererTextureFormat, TextureHandle},
+    mode::ModeData,
     registry::ResourceRegistry,
-    renderer::{ModeData, RendererMode},
+    RendererMode,
 };
 use std::{mem, num::NonZeroU32, sync::Arc};
 use wgpu::{

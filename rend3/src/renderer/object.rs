@@ -1,8 +1,10 @@
 use crate::{
     bind_merge::BindGroupBuilder,
     datatypes::{AffineTransform, MaterialHandle, Object, ObjectHandle},
+    mode::ModeData,
     registry::ResourceRegistry,
-    renderer::{frustum::BoundingSphere, material::MaterialManager, mesh::MeshManager, ModeData, RendererMode},
+    renderer::{frustum::BoundingSphere, material::MaterialManager, mesh::MeshManager},
+    RendererMode,
 };
 use std::{mem::size_of, sync::Arc};
 use wgpu::{BindingResource, BufferAddress, BufferUsage, CommandEncoder, Device};

@@ -1,7 +1,4 @@
-use crate::{
-    renderer::{RendererMode, SWAPCHAIN_FORMAT},
-    VSyncMode,
-};
+use crate::{renderer::SWAPCHAIN_FORMAT, RendererMode, VSyncMode};
 use std::num::NonZeroU8;
 use wgpu::{
     AddressMode, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, CompareFunction,

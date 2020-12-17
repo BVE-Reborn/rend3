@@ -8,8 +8,7 @@ use crate::{
         ImageUsage, PerObjectResourceBinding, RenderList, RenderOpDescriptor, RenderOpInputType, RenderPassDescriptor,
         RenderPassRunRate, ResourceBinding, ShaderSourceStage, ShaderSourceType, SourceShaderDescriptor,
     },
-    renderer::RendererMode,
-    Renderer,
+    Renderer, RendererMode,
 };
 use std::{future::Future, sync::Arc};
 use wgpu::{Color, LoadOp, TextureFormat};
