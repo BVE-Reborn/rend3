@@ -953,9 +953,9 @@ dependencies = [
 
 [[package]]
 name = "imgui-winit-support"
-version = "0.6.0"
+version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5e0fc247afc385ed9cd26860cdb7fae988d5c7e2ad1d70c70aef728ce9b78e85"
+checksum = "0669ee7f52b80aa33d5f45507790223380c253a8fd981ddf67d1427ab8ebc8bc"
 dependencies = [
  "imgui",
  "winit",
