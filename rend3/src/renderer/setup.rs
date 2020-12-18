@@ -151,7 +151,7 @@ pub fn create_adapter(
 pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
     builder: RendererBuilder<'_, W, TLD>,
 ) -> Result<Arc<Renderer<TLD>>, RendererInitializationError> {
-    let (surface, device, queue, adapter_info, mode) = if let Some(crate::CustomDevice {
+    let (instance, surface, device, queue, adapter_info, mode) = if let Some(crate::CustomDevice {
         instance,
         queue,
         device,
@@ -164,7 +164,14 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
 
         let surface = builder.window.map(|window| unsafe { instance.create_surface(window) });
 
-        (surface, potential.inner, queue, potential.info, potential.mode)
+        (
+            instance,
+            surface,
+            potential.inner,
+            queue,
+            potential.info,
+            potential.mode,
+        )
     } else {
         let (instance, chosen_adapter) = create_adapter(
             builder.desired_backend,
@@ -187,12 +194,13 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
             .await
             .map_err(|_| RendererInitializationError::RequestDeviceFailed)?;
 
+        let instance = Arc::new(instance);
         let device = Arc::new(device);
         let queue = Arc::new(queue);
 
         let surface = builder.window.map(|window| unsafe { instance.create_surface(window) });
 
-        (surface, device, queue, adapter_info, chosen_adapter.mode)
+        (instance, surface, device, queue, adapter_info, chosen_adapter.mode)
     };
 
     let shader_manager = ShaderManager::new(Arc::clone(&device));
@@ -261,6 +269,7 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
 
         mode,
         adapter_info,
+        instance,
         queue,
         device,
         surface,

@@ -7,8 +7,8 @@ use switchyard::{
 };
 use wgpu::{AdapterInfo, Backend, Device, Instance, Queue};
 
-pub struct CustomDevice<'a> {
-    pub instance: &'a Instance,
+pub struct CustomDevice {
+    pub instance: Arc<Instance>,
     pub device: Arc<Device>,
     pub queue: Arc<Queue>,
     pub info: AdapterInfo,
@@ -29,7 +29,7 @@ where
 {
     pub(crate) window: Option<&'a W>,
     pub(crate) options: RendererOptions,
-    pub(crate) device: Option<CustomDevice<'a>>,
+    pub(crate) device: Option<CustomDevice>,
     pub(crate) yard: Option<Arc<Switchyard<TLD>>>,
     pub(crate) priorities: Option<JobPriorities>,
     pub(crate) desired_backend: Option<Backend>,
@@ -56,7 +56,7 @@ where
     TLD: 'static,
     W: HasRawWindowHandle,
 {
-    pub fn device(mut self, device: CustomDevice<'a>) -> Self {
+    pub fn device(mut self, device: CustomDevice) -> Self {
         self.device = Some(device);
         self
     }

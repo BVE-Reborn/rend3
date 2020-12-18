@@ -32,9 +32,9 @@ dependencies = [
 
 [[package]]
 name = "ahash"
-version = "0.4.6"
+version = "0.4.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f6789e291be47ace86a60303502173d84af8327e3627ecf334356ee0f87a164c"
+checksum = "739f4a8db6605981345c5654f3a85b056ce52f37a39d34da03f25bf2151ea16e"
 
 [[package]]
 name = "andrew"
@@ -344,17 +344,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "81156fece84ab6a9f2afdb109ce3ae577e42b1228441eded99bd77f627953b1a"
 dependencies = [
  "cfg-if 1.0.0",
-]
-
-[[package]]
-name = "cube"
-version = "0.1.0"
-dependencies = [
- "glam",
- "pollster",
- "rend3",
- "wgpu-subscriber",
- "winit",
 ]
 
 [[package]]
@@ -837,18 +826,6 @@ checksum = "9b919933a397b79c37e33b77bb2aa3dc8eb6e165ad809e58ff75bc7db2e34574"
 
 [[package]]
 name = "gltf"
-version = "0.1.0"
-dependencies = [
- "glam",
- "gltf 0.15.2",
- "pollster",
- "rend3",
- "wgpu-subscriber",
- "winit",
-]
-
-[[package]]
-name = "gltf"
 version = "0.15.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d6fb0d1d772daf10ea74528c3aeb12215f6d5b820adf2ecfc93a6578d6779c3c"
@@ -952,10 +929,23 @@ dependencies = [
 ]
 
 [[package]]
-name = "imgui-winit-support"
-version = "0.6.0"
+name = "imgui-wgpu"
+version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5e0fc247afc385ed9cd26860cdb7fae988d5c7e2ad1d70c70aef728ce9b78e85"
+checksum = "8017f74f8880049c1c3fc055868486a610178ab93ad18eadaf5b0bb52f738365"
+dependencies = [
+ "bytemuck",
+ "imgui",
+ "log",
+ "smallvec",
+ "wgpu",
+]
+
+[[package]]
+name = "imgui-winit-support"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0669ee7f52b80aa33d5f45507790223380c253a8fd981ddf67d1427ab8ebc8bc"
 dependencies = [
  "imgui",
  "winit",
@@ -1144,9 +1134,9 @@ dependencies = [
 
 [[package]]
 name = "lru"
-version = "0.6.1"
+version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "be716eb6878ca2263eb5d00a781aa13264a794f519fe6af4fbb2668b2d5441c0"
+checksum = "3abe07af102235a56ac9a6dd904aab1e05483e2e8afdfffec3598be55b1b7606"
 dependencies = [
  "hashbrown",
 ]
@@ -1442,8 +1432,9 @@ dependencies = [
 
 [[package]]
 name = "obj"
-version = "0.10.1"
-source = "git+https://github.com/cwfitzgerald/obj.git?branch=map_ns#0237284ae242c98416f09c3bd3670ae330815425"
+version = "0.10.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "059c95245738cdc7b40078cdd51a23200252a4c0a0a6dd005136152b3f467a4a"
 
 [[package]]
 name = "objc"
@@ -1603,9 +1594,9 @@ checksum = "9824e18e85003f0b5a38fa1932ae8be8c2aac9447c2f28ab6f9704dbe0a1ab58"
 
 [[package]]
 name = "priority-queue"
-version = "1.0.3"
+version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8a6f1a563bbd2d93b9c5a2e4b3af6f0fc728bca22653f31cb515ea932604ea57"
+checksum = "a6fffb2a42c53276c40a3dcef02bd8ec18d4b0105f2828a186bd58d64a8054d0"
 dependencies = [
  "autocfg",
  "indexmap",
@@ -1708,7 +1699,6 @@ dependencies = [
  "futures",
  "futures-intrusive",
  "glam",
- "imgui",
  "include_dir",
  "indexmap",
  "itertools",
@@ -1724,6 +1714,64 @@ dependencies = [
  "tracing-futures",
  "wgpu",
  "wgpu-conveyor",
+]
+
+[[package]]
+name = "rend3-cube-example"
+version = "0.1.0"
+dependencies = [
+ "glam",
+ "pollster",
+ "rend3",
+ "wgpu-subscriber",
+ "winit",
+]
+
+[[package]]
+name = "rend3-gltf-example"
+version = "0.1.0"
+dependencies = [
+ "glam",
+ "gltf",
+ "pollster",
+ "rend3",
+ "wgpu-subscriber",
+ "winit",
+]
+
+[[package]]
+name = "rend3-imgui-example"
+version = "0.1.0"
+dependencies = [
+ "glam",
+ "imgui",
+ "imgui-wgpu",
+ "imgui-winit-support",
+ "pollster",
+ "rend3",
+ "wgpu",
+ "wgpu-subscriber",
+ "winit",
+]
+
+[[package]]
+name = "rend3-scene-viewer-example"
+version = "0.1.0"
+dependencies = [
+ "basis",
+ "fnv",
+ "glam",
+ "histogram",
+ "image",
+ "obj",
+ "pico-args",
+ "pollster",
+ "rend3",
+ "smallvec",
+ "tracing",
+ "wgpu",
+ "wgpu-subscriber",
+ "winit",
 ]
 
 [[package]]
@@ -1758,28 +1806,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "93fc1dc3aaa9bfed95e02e6eadabb4baf7e3078b0bd1b4d7b6b0b68378900502"
 dependencies = [
  "winapi-util",
-]
-
-[[package]]
-name = "scene-viewer"
-version = "0.1.0"
-dependencies = [
- "basis",
- "fnv",
- "glam",
- "histogram",
- "image",
- "imgui",
- "imgui-winit-support",
- "obj",
- "pico-args",
- "pollster",
- "rend3",
- "smallvec",
- "tracing",
- "wgpu",
- "wgpu-subscriber",
- "winit",
 ]
 
 [[package]]
@@ -2084,9 +2110,9 @@ checksum = "7572415bd688d401c52f6e36f4c8e805b9ae1622619303b9fa835d531db0acae"
 
 [[package]]
 name = "tiff"
-version = "0.6.0"
+version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "abeb4e3f32a8973722c0254189e6890358e72b1bf11becb287ee0b23c595a41d"
+checksum = "9a53f4706d65497df0c4349241deddf35f84cee19c87ed86ea8ca590f4464437"
 dependencies = [
  "jpeg-decoder",
  "miniz_oxide 0.4.3",

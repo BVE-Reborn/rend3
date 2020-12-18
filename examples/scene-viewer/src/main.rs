@@ -1,6 +1,5 @@
 use fnv::FnvBuildHasher;
 use glam::{Mat4, Quat, Vec2, Vec3, Vec3A};
-use imgui::FontSource;
 use obj::{IndexTuple, Obj};
 use pico_args::Arguments;
 use rend3::{
@@ -284,23 +283,7 @@ fn main() {
         builder.build(&event_loop).expect("Could not build window")
     };
 
-    rend3::span_transfer!(window_span -> imgui_span, INFO, "Building imgui");
-
-    let mut imgui = imgui::Context::create();
-    let mut platform = imgui_winit_support::WinitPlatform::init(&mut imgui);
-    platform.attach_window(imgui.io_mut(), &window, imgui_winit_support::HiDpiMode::Default);
-    imgui.set_ini_filename(None);
-    imgui.fonts().add_font(&[FontSource::DefaultFontData {
-        config: Some(imgui::FontConfig {
-            oversample_h: 3,
-            oversample_v: 1,
-            pixel_snap_h: true,
-            size_pixels: 13.0,
-            ..imgui::FontConfig::default()
-        }),
-    }]);
-
-    rend3::span_transfer!(imgui_span -> renderer_span, INFO, "Building Renderer");
+    rend3::span_transfer!(window_span -> renderer_span, INFO, "Building Renderer");
 
     let window_size = window.inner_size();
 
