@@ -1,13 +1,11 @@
-use crate::{
-    renderer::{RendererMode, SWAPCHAIN_FORMAT},
-    VSyncMode,
-};
+use crate::{output::SWAPCHAIN_FORMAT, RendererMode, VSyncMode};
 use std::num::NonZeroU8;
 use wgpu::{
     AddressMode, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, CompareFunction,
     Device, FilterMode, PresentMode, Sampler, SamplerDescriptor, ShaderStage, Surface, SwapChain, SwapChainDescriptor,
     TextureComponentType, TextureUsage, TextureViewDimension,
 };
+
 pub fn create_swapchain(device: &Device, surface: &Surface, size: [u32; 2], vsync: VSyncMode) -> SwapChain {
     device.create_swap_chain(
         &surface,

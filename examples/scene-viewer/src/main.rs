@@ -1,6 +1,5 @@
 use fnv::FnvBuildHasher;
 use glam::{Mat4, Quat, Vec2, Vec3, Vec3A};
-use imgui::FontSource;
 use obj::{IndexTuple, Obj};
 use pico_args::Arguments;
 use rend3::{
@@ -14,10 +13,8 @@ use rend3::{
 use std::{
     collections::hash_map::{self, HashMap},
     hash::BuildHasher,
-    sync::Arc,
     time::{Duration, Instant},
 };
-use switchyard::{threads, Switchyard};
 use winit::{
     event::{DeviceEvent, ElementState, Event, KeyboardInput, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
@@ -29,11 +26,11 @@ mod platform;
 fn load_texture(
     renderer: &Renderer,
     cache: &mut HashMap<String, TextureHandle>,
-    name: &String,
+    name: &str,
     format: RendererTextureFormat,
 ) -> Result<TextureHandle, Box<dyn std::error::Error>> {
     rend3::span!(_guard, INFO, "Loading Texture", name = ?name);
-    Ok(match cache.entry(name.clone()) {
+    Ok(match cache.entry(name.to_owned()) {
         hash_map::Entry::Occupied(o) => *o.get(),
         hash_map::Entry::Vacant(v) => *v.insert({
             let real_name = concat!(env!("CARGO_MANIFEST_DIR"), "/data/").to_owned() + name;
@@ -69,7 +66,7 @@ fn load_texture(
                 width: image_info.width,
                 height: image_info.height,
                 data: image,
-                label: Some(name.clone()),
+                label: Some(name.to_owned()),
                 mip_levels: mips,
             })
         }),
@@ -280,7 +277,7 @@ fn main() {
 
     let mut args = Arguments::from_env();
     let desired_backend = args.value_from_fn(["-b", "--backend"], extract_backend).ok();
-    let desired_device: Option<String> = args
+    let desired_device_name: Option<String> = args
         .value_from_str(["-d", "--device"])
         .ok()
         .map(|s: String| s.to_lowercase());
@@ -299,35 +296,7 @@ fn main() {
         builder.build(&event_loop).expect("Could not build window")
     };
 
-    rend3::span_transfer!(window_span -> imgui_span, INFO, "Building imgui");
-
-    let mut imgui = imgui::Context::create();
-    let mut platform = imgui_winit_support::WinitPlatform::init(&mut imgui);
-    platform.attach_window(imgui.io_mut(), &window, imgui_winit_support::HiDpiMode::Default);
-    imgui.set_ini_filename(None);
-    imgui.fonts().add_font(&[FontSource::DefaultFontData {
-        config: Some(imgui::FontConfig {
-            oversample_h: 3,
-            oversample_v: 1,
-            pixel_snap_h: true,
-            size_pixels: 13.0,
-            ..imgui::FontConfig::default()
-        }),
-    }]);
-
-    rend3::span_transfer!(imgui_span -> switchyard_span, INFO, "Building Switchyard");
-
-    let yard = Arc::new(
-        Switchyard::new(
-            2,
-            // threads::single_pool_single_thread(Some("scene-viewer".into()), None),
-            threads::double_pool_one_to_one(threads::thread_info(), Some("scene-viewer")),
-            || (),
-        )
-        .unwrap(),
-    );
-
-    rend3::span_transfer!(switchyard_span -> renderer_span, INFO, "Building Renderer");
+    rend3::span_transfer!(window_span -> renderer_span, INFO, "Building Renderer");
 
     let window_size = window.inner_size();
 
@@ -336,17 +305,15 @@ fn main() {
         size: [window_size.width, window_size.height],
     };
 
-    let renderer = futures::executor::block_on(rend3::Renderer::new(
-        &window,
-        Arc::clone(&yard),
-        desired_backend,
-        desired_device,
-        desired_mode,
-        options.clone(),
-    ))
+    let renderer = pollster::block_on(
+        rend3::RendererBuilder::new(options.clone())
+            .window(&window)
+            .desired_device(desired_backend, desired_device_name, desired_mode)
+            .build(),
+    )
     .unwrap();
 
-    let pipelines = futures::executor::block_on(async {
+    let pipelines = pollster::block_on(async {
         let shaders = DefaultShaders::new(&renderer).await;
         DefaultPipelines::new(&renderer, &shaders).await
     });
@@ -414,7 +381,7 @@ fn main() {
                 Vec3A::new(yaw.sin() * pitch.cos(), -pitch.sin(), yaw.cos() * pitch.cos())
             };
             let up = Vec3A::unit_y();
-            let side: Vec3A = forward.cross(up).normalize().into();
+            let side: Vec3A = forward.cross(up).normalize();
             let velocity = if button_pressed(&scancode_status, platform::Scancodes::SHIFT) {
                 10.0
             } else {
@@ -496,17 +463,19 @@ fn main() {
 
             renderer.set_camera_location(camera_location);
             renderer.set_options(options.clone());
-            let handle = renderer.render(rend3::list::default_render_list(
+
+            let list = rend3::list::default_render_list(
                 renderer.mode(),
                 [
                     (options.size[0] as f32 * 1.0) as u32,
                     (options.size[1] as f32 * 1.0) as u32,
                 ],
                 &pipelines,
-            ));
+            );
+            let handle = renderer.render(list, rend3::RendererOutput::InternalSwapchain);
 
             rend3::span_transfer!(redraw_span -> render_wait_span, INFO, "Waiting for render");
-            futures::executor::block_on(handle);
+            pollster::block_on(handle);
         }
         _ => {}
     })

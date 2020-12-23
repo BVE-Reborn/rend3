@@ -8,8 +8,7 @@ use crate::{
         ImageUsage, PerObjectResourceBinding, RenderList, RenderOpDescriptor, RenderOpInputType, RenderPassDescriptor,
         RenderPassRunRate, ResourceBinding, ShaderSourceStage, ShaderSourceType, SourceShaderDescriptor,
     },
-    renderer::RendererMode,
-    Renderer,
+    Renderer, RendererMode,
 };
 use std::{future::Future, sync::Arc};
 use wgpu::{Color, LoadOp, TextureFormat};
@@ -89,15 +88,23 @@ impl DefaultShaders {
         });
 
         async move {
+            let depth_vert = depth_vert.await;
+            let depth_frag = depth_frag.await;
+            let skybox_vert = skybox_vert.await;
+            let skybox_frag = skybox_frag.await;
+            let opaque_vert = opaque_vert.await;
+            let opaque_frag = opaque_frag.await;
+            let blit_vert = blit_vert.await;
+            let blit_frag = blit_frag.await;
             Self {
-                depth_vert: depth_vert.await,
-                depth_frag: depth_frag.await,
-                skybox_vert: skybox_vert.await,
-                skybox_frag: skybox_frag.await,
-                opaque_vert: opaque_vert.await,
-                opaque_frag: opaque_frag.await,
-                blit_vert: blit_vert.await,
-                blit_frag: blit_frag.await,
+                depth_vert,
+                depth_frag,
+                skybox_vert,
+                skybox_frag,
+                opaque_vert,
+                opaque_frag,
+                blit_vert,
+                blit_frag,
             }
         }
     }
@@ -258,20 +265,23 @@ impl DefaultPipelines {
         });
 
         async move {
+            let shadow_depth_pipeline = shadow_depth_pipeline.await;
+            let depth_pipeline = depth_pipeline.await;
+            let skybox_pipeline = skybox_pipeline.await;
+            let opaque_pipeline = opaque_pipeline.await;
+            let blit_pipeline = blit_pipeline.await;
             Self {
-                shadow_depth_pipeline: shadow_depth_pipeline.await,
-                depth_pipeline: depth_pipeline.await,
-                skybox_pipeline: skybox_pipeline.await,
-                opaque_pipeline: opaque_pipeline.await,
-                blit_pipeline: blit_pipeline.await,
+                shadow_depth_pipeline,
+                depth_pipeline,
+                skybox_pipeline,
+                opaque_pipeline,
+                blit_pipeline,
             }
         }
     }
 }
 
 pub fn default_render_list(mode: RendererMode, resolution: [u32; 2], pipelines: &DefaultPipelines) -> RenderList {
-    let resolution: [u32; 2] = resolution.into();
-
     let (depth_bindings, depth_per_obj_bindings) = match mode {
         RendererMode::CPUPowered => (
             vec![

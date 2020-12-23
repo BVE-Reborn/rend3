@@ -1,7 +1,8 @@
 use crate::{
     datatypes::{RendererTextureFormat, TextureHandle},
+    mode::ModeData,
     registry::ResourceRegistry,
-    renderer::{ModeData, RendererMode},
+    RendererMode,
 };
 use std::{mem, num::NonZeroU32, sync::Arc};
 use wgpu::{
@@ -101,14 +102,7 @@ impl TextureManager {
         self.registry.get_index_of(handle.0)
     }
 
-    pub(crate) fn ready(
-        &mut self,
-        device: &Device,
-    ) -> (
-        ModeData<(), Arc<BindGroupLayout>>,
-        ModeData<(), Arc<BindGroup>>,
-        ModeData<(), bool>,
-    ) {
+    pub(crate) fn ready(&mut self, device: &Device) -> TextureManagerReadyOutput {
         span_transfer!(_ -> ready_span, INFO, "Material Manager Ready");
 
         if let ModeData::GPU(_) = self.layout_dirty {
@@ -124,13 +118,17 @@ impl TextureManager {
                 *self.group_dirty.as_gpu_mut() = false;
             }
 
-            (
-                self.layout.as_ref().map(|_| (), Arc::clone),
-                self.group.as_ref().map(|_| (), Arc::clone),
-                layout_dirty,
-            )
+            TextureManagerReadyOutput {
+                bgl: self.layout.as_ref().map(|_| (), Arc::clone),
+                bg: self.group.as_ref().map(|_| (), Arc::clone),
+                dirty: layout_dirty,
+            }
         } else {
-            (ModeData::CPU(()), ModeData::CPU(()), ModeData::CPU(()))
+            TextureManagerReadyOutput {
+                bgl: ModeData::CPU(()),
+                bg: ModeData::CPU(()),
+                dirty: ModeData::CPU(()),
+            }
         }
     }
 
@@ -160,6 +158,13 @@ impl TextureManager {
             NonZeroU32::new_unchecked((self.internal_index(v) as u32).checked_add(1).unwrap())
         }
     }
+}
+
+pub(crate) struct TextureManagerReadyOutput {
+    pub bgl: ModeData<(), Arc<BindGroupLayout>>,
+    pub bg: ModeData<(), Arc<BindGroup>>,
+    // TODO: #17: When this is dirty we don't do anything
+    pub dirty: ModeData<(), bool>,
 }
 
 fn fill_to_size(

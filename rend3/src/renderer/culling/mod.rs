@@ -1,7 +1,9 @@
 pub use crate::renderer::culling::cpu::CPUDrawCall;
 use crate::{
     list::{ShaderSourceStage, ShaderSourceType, SourceShaderDescriptor},
-    renderer::{camera::Camera, object::ObjectManager, shaders::ShaderManager, ModeData, RendererMode},
+    mode::ModeData,
+    renderer::{camera::Camera, object::ObjectManager, shaders::ShaderManager},
+    JobPriorities, RendererMode,
 };
 use futures::future::Either;
 use std::future::Future;
@@ -44,49 +46,60 @@ pub struct GPUCullingPass {
     subgroup_size: u32,
 }
 
+pub struct CullingPassCreationArgs<'a> {
+    pub mode: RendererMode,
+    pub shader_manager: &'a ShaderManager,
+    pub prefix_sum_bgl: &'a BindGroupLayout,
+    pub pre_cull_bgl: &'a BindGroupLayout,
+    pub object_input_bgl: &'a BindGroupLayout,
+    pub output_bgl: &'a BindGroupLayout,
+    pub uniform_bgl: &'a BindGroupLayout,
+    pub subgroup_size: u32,
+}
+
+pub struct CullingPassPrepareArgs<'a> {
+    pub device: &'a Device,
+    pub mode: RendererMode,
+    pub prefix_sum_bgl: &'a BindGroupLayout,
+    pub pre_cull_bgl: &'a BindGroupLayout,
+    pub output_bgl: &'a BindGroupLayout,
+    pub object_count: u32,
+    pub name: String,
+}
+
 pub struct CullingPass {
     inner: ModeData<(), GPUCullingPass>,
 }
 impl CullingPass {
-    pub fn new<'a>(
-        device: &'a Device,
-        mode: RendererMode,
-        shader_manager: &ShaderManager,
-        prefix_sum_bgl: &BindGroupLayout,
-        pre_cull_bgl: &BindGroupLayout,
-        object_input_bgl: &BindGroupLayout,
-        output_bgl: &BindGroupLayout,
-        uniform_bgl: &BindGroupLayout,
-        subgroup_size: u32,
-    ) -> impl Future<Output = Self> + 'a {
+    pub fn new<'a, 'b>(device: &'a Device, args: CullingPassCreationArgs<'b>) -> impl Future<Output = Self> + 'a {
         let new_span = tracing::warn_span!("Creating CullingPass");
         let new_span_guard = new_span.enter();
 
-        if mode == RendererMode::GPUPowered {
-            let pre_cull_shader = shader_manager.compile_shader(SourceShaderDescriptor {
+        if args.mode == RendererMode::GPUPowered {
+            let pre_cull_shader = args.shader_manager.compile_shader(SourceShaderDescriptor {
                 source: ShaderSourceType::Builtin(String::from("pre_cull.comp")),
-                defines: vec![(String::from("WARP_SIZE"), Some(subgroup_size.to_string()))],
+                defines: vec![(String::from("WARP_SIZE"), Some(args.subgroup_size.to_string()))],
                 includes: vec![],
                 stage: ShaderSourceStage::Compute,
             });
 
-            let prefix_sum = shader_manager.compile_shader(SourceShaderDescriptor {
+            let prefix_sum = args.shader_manager.compile_shader(SourceShaderDescriptor {
                 source: ShaderSourceType::Builtin(String::from("prefix_sum.comp")),
-                defines: vec![(String::from("WARP_SIZE"), Some(subgroup_size.to_string()))],
+                defines: vec![(String::from("WARP_SIZE"), Some(args.subgroup_size.to_string()))],
                 includes: vec![],
                 stage: ShaderSourceStage::Compute,
             });
 
-            let post_cull_shader = shader_manager.compile_shader(SourceShaderDescriptor {
+            let post_cull_shader = args.shader_manager.compile_shader(SourceShaderDescriptor {
                 source: ShaderSourceType::Builtin(String::from("post_cull.comp")),
-                defines: vec![(String::from("WARP_SIZE"), Some(subgroup_size.to_string()))],
+                defines: vec![(String::from("WARP_SIZE"), Some(args.subgroup_size.to_string()))],
                 includes: vec![],
                 stage: ShaderSourceStage::Compute,
             });
 
             let pre_cull_pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
                 label: Some("pre-cull pipeline layout"),
-                bind_group_layouts: &[object_input_bgl, pre_cull_bgl, uniform_bgl],
+                bind_group_layouts: &[args.object_input_bgl, args.pre_cull_bgl, args.uniform_bgl],
                 push_constant_ranges: &[PushConstantRange {
                     range: 0..4,
                     stages: ShaderStage::COMPUTE,
@@ -95,7 +108,7 @@ impl CullingPass {
 
             let prefix_sum_pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
                 label: Some("prefix-sum pipeline layout"),
-                bind_group_layouts: &[prefix_sum_bgl],
+                bind_group_layouts: &[args.prefix_sum_bgl],
                 push_constant_ranges: &[PushConstantRange {
                     range: 0..8,
                     stages: ShaderStage::COMPUTE,
@@ -104,7 +117,7 @@ impl CullingPass {
 
             let post_cull_pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
                 label: Some("post-cull pipeline layout"),
-                bind_group_layouts: &[object_input_bgl, output_bgl, uniform_bgl],
+                bind_group_layouts: &[args.object_input_bgl, args.output_bgl, args.uniform_bgl],
                 push_constant_ranges: &[PushConstantRange {
                     range: 0..4,
                     stages: ShaderStage::COMPUTE,
@@ -112,6 +125,9 @@ impl CullingPass {
             });
 
             drop(new_span_guard);
+
+            // Need to not keep arguments alive
+            let subgroup_size = args.subgroup_size;
 
             Either::Left(
                 async move {
@@ -166,170 +182,159 @@ impl CullingPass {
         }
     }
 
-    pub(crate) fn prepare<'a>(
-        &'a self,
-        device: &Device,
-        mode: RendererMode,
-        prefix_sum_bgl: &BindGroupLayout,
-        pre_cull_bgl: &BindGroupLayout,
-        output_bgl: &BindGroupLayout,
-        object_count: u32,
-        name: String,
-    ) -> CullingPassData {
+    pub(crate) fn prepare(&self, args: CullingPassPrepareArgs<'_>) -> CullingPassData {
         span_transfer!(_ -> prepare_span, WARN, "Preparing CullingPass");
 
-        let output_buffer = device.create_buffer(&BufferDescriptor {
-            label: Some(&*format!("object output buffer for {}", &name)),
-            size: SIZE_OF_OUTPUT_DATA * object_count as BufferAddress,
-            usage: match mode {
+        let output_buffer = args.device.create_buffer(&BufferDescriptor {
+            label: Some(&*format!("object output buffer for {}", &args.name)),
+            size: SIZE_OF_OUTPUT_DATA * args.object_count as BufferAddress,
+            usage: match args.mode {
                 RendererMode::CPUPowered => BufferUsage::COPY_DST | BufferUsage::STORAGE,
                 RendererMode::GPUPowered => BufferUsage::STORAGE,
             },
             mapped_at_creation: false,
         });
 
-        let inner = mode.into_data(
-            || Vec::new(),
-            || {
-                let status_buffer = device.create_buffer(&BufferDescriptor {
-                    label: Some(&*format!("status buffer for {}", &name)),
-                    size: SIZE_OF_STATUS * object_count as BufferAddress,
-                    usage: BufferUsage::STORAGE,
-                    mapped_at_creation: false,
-                });
+        let inner = args.mode.into_data(Vec::new, || {
+            let status_buffer = args.device.create_buffer(&BufferDescriptor {
+                label: Some(&*format!("status buffer for {}", &args.name)),
+                size: SIZE_OF_STATUS * args.object_count as BufferAddress,
+                usage: BufferUsage::STORAGE,
+                mapped_at_creation: false,
+            });
 
-                let index_buffer1 = device.create_buffer(&BufferDescriptor {
-                    label: Some(&*format!("index buffer 1 for {}", &name)),
-                    size: SIZE_OF_INDEX * object_count as BufferAddress,
-                    usage: BufferUsage::STORAGE,
-                    mapped_at_creation: false,
-                });
+            let index_buffer1 = args.device.create_buffer(&BufferDescriptor {
+                label: Some(&*format!("index buffer 1 for {}", &args.name)),
+                size: SIZE_OF_INDEX * args.object_count as BufferAddress,
+                usage: BufferUsage::STORAGE,
+                mapped_at_creation: false,
+            });
 
-                let index_buffer2 = device.create_buffer(&BufferDescriptor {
-                    label: Some(&*format!("index buffer 2 for {}", &name)),
-                    size: SIZE_OF_INDEX * object_count as BufferAddress,
-                    usage: BufferUsage::STORAGE,
-                    mapped_at_creation: false,
-                });
+            let index_buffer2 = args.device.create_buffer(&BufferDescriptor {
+                label: Some(&*format!("index buffer 2 for {}", &args.name)),
+                size: SIZE_OF_INDEX * args.object_count as BufferAddress,
+                usage: BufferUsage::STORAGE,
+                mapped_at_creation: false,
+            });
 
-                let indirect_buffer = device.create_buffer(&BufferDescriptor {
-                    label: Some(&*format!("indirect buffer for {}", &name)),
-                    size: SIZE_OF_INDIRECT_CALL * object_count as BufferAddress,
-                    usage: BufferUsage::STORAGE | BufferUsage::INDIRECT | BufferUsage::VERTEX,
-                    mapped_at_creation: false,
-                });
+            let indirect_buffer = args.device.create_buffer(&BufferDescriptor {
+                label: Some(&*format!("indirect buffer for {}", &args.name)),
+                size: SIZE_OF_INDIRECT_CALL * args.object_count as BufferAddress,
+                usage: BufferUsage::STORAGE | BufferUsage::INDIRECT | BufferUsage::VERTEX,
+                mapped_at_creation: false,
+            });
 
-                let count_buffer = device.create_buffer(&BufferDescriptor {
-                    label: Some(&*format!("count buffer for {}", &name)),
-                    size: SIZE_OF_INDIRECT_COUNT,
-                    usage: BufferUsage::STORAGE | BufferUsage::INDIRECT,
-                    mapped_at_creation: true,
-                });
+            let count_buffer = args.device.create_buffer(&BufferDescriptor {
+                label: Some(&*format!("count buffer for {}", &args.name)),
+                size: SIZE_OF_INDIRECT_COUNT,
+                usage: BufferUsage::STORAGE | BufferUsage::INDIRECT,
+                mapped_at_creation: true,
+            });
 
-                count_buffer
-                    .slice(..)
-                    .get_mapped_range_mut()
-                    .copy_from_slice(bytemuck::bytes_of(&0));
-                count_buffer.unmap();
+            count_buffer
+                .slice(..)
+                .get_mapped_range_mut()
+                .copy_from_slice(bytemuck::bytes_of(&0));
+            count_buffer.unmap();
 
-                let count = (object_count as f32).log2().ceil() as u32;
+            let count = (args.object_count as f32).log2().ceil() as u32;
 
-                let pre_cull_bg = device.create_bind_group(&BindGroupDescriptor {
-                    label: Some(&*format!("pre-cull bind group for {}", &name)),
-                    layout: pre_cull_bgl,
-                    entries: &[
-                        BindGroupEntry {
-                            binding: 0,
-                            resource: BindingResource::Buffer(index_buffer1.slice(..)),
-                        },
-                        BindGroupEntry {
-                            binding: 1,
-                            resource: BindingResource::Buffer(status_buffer.slice(..)),
-                        },
-                    ],
-                });
+            let pre_cull_bg = args.device.create_bind_group(&BindGroupDescriptor {
+                label: Some(&*format!("pre-cull bind group for {}", &args.name)),
+                layout: args.pre_cull_bgl,
+                entries: &[
+                    BindGroupEntry {
+                        binding: 0,
+                        resource: BindingResource::Buffer(index_buffer1.slice(..)),
+                    },
+                    BindGroupEntry {
+                        binding: 1,
+                        resource: BindingResource::Buffer(status_buffer.slice(..)),
+                    },
+                ],
+            });
 
-                let prefix_sum_bg1 = device.create_bind_group(&BindGroupDescriptor {
-                    label: Some(&*format!("prefix-sum bind group 1 for {}", &name)),
-                    layout: &prefix_sum_bgl,
-                    entries: &[
-                        BindGroupEntry {
-                            binding: 0,
-                            resource: BindingResource::Buffer(index_buffer1.slice(..)),
-                        },
-                        BindGroupEntry {
-                            binding: 1,
-                            resource: BindingResource::Buffer(index_buffer2.slice(..)),
-                        },
-                    ],
-                });
+            let prefix_sum_bg1 = args.device.create_bind_group(&BindGroupDescriptor {
+                label: Some(&*format!("prefix-sum bind group 1 for {}", &args.name)),
+                layout: &args.prefix_sum_bgl,
+                entries: &[
+                    BindGroupEntry {
+                        binding: 0,
+                        resource: BindingResource::Buffer(index_buffer1.slice(..)),
+                    },
+                    BindGroupEntry {
+                        binding: 1,
+                        resource: BindingResource::Buffer(index_buffer2.slice(..)),
+                    },
+                ],
+            });
 
-                let prefix_sum_bg2 = device.create_bind_group(&BindGroupDescriptor {
-                    label: Some(&*format!("prefix-sum bind group 2 for {}", &name)),
-                    layout: &prefix_sum_bgl,
-                    entries: &[
-                        BindGroupEntry {
-                            binding: 0,
-                            resource: BindingResource::Buffer(index_buffer2.slice(..)),
-                        },
-                        BindGroupEntry {
-                            binding: 1,
-                            resource: BindingResource::Buffer(index_buffer1.slice(..)),
-                        },
-                    ],
-                });
+            let prefix_sum_bg2 = args.device.create_bind_group(&BindGroupDescriptor {
+                label: Some(&*format!("prefix-sum bind group 2 for {}", &args.name)),
+                layout: &args.prefix_sum_bgl,
+                entries: &[
+                    BindGroupEntry {
+                        binding: 0,
+                        resource: BindingResource::Buffer(index_buffer2.slice(..)),
+                    },
+                    BindGroupEntry {
+                        binding: 1,
+                        resource: BindingResource::Buffer(index_buffer1.slice(..)),
+                    },
+                ],
+            });
 
-                let index_buffer = if count % 2 == 0 { &index_buffer1 } else { &index_buffer2 };
+            let index_buffer = if count % 2 == 0 { &index_buffer1 } else { &index_buffer2 };
 
-                let output_bg = device.create_bind_group(&BindGroupDescriptor {
-                    label: Some(&*format!("output bind group for {}", &name)),
-                    layout: output_bgl,
-                    entries: &[
-                        BindGroupEntry {
-                            binding: 0,
-                            resource: BindingResource::Buffer(index_buffer.slice(..)),
-                        },
-                        BindGroupEntry {
-                            binding: 1,
-                            resource: BindingResource::Buffer(status_buffer.slice(..)),
-                        },
-                        BindGroupEntry {
-                            binding: 2,
-                            resource: BindingResource::Buffer(output_buffer.slice(..)),
-                        },
-                        BindGroupEntry {
-                            binding: 3,
-                            resource: BindingResource::Buffer(indirect_buffer.slice(..)),
-                        },
-                        BindGroupEntry {
-                            binding: 4,
-                            resource: BindingResource::Buffer(count_buffer.slice(..)),
-                        },
-                    ],
-                });
+            let output_bg = args.device.create_bind_group(&BindGroupDescriptor {
+                label: Some(&*format!("output bind group for {}", &args.name)),
+                layout: args.output_bgl,
+                entries: &[
+                    BindGroupEntry {
+                        binding: 0,
+                        resource: BindingResource::Buffer(index_buffer.slice(..)),
+                    },
+                    BindGroupEntry {
+                        binding: 1,
+                        resource: BindingResource::Buffer(status_buffer.slice(..)),
+                    },
+                    BindGroupEntry {
+                        binding: 2,
+                        resource: BindingResource::Buffer(output_buffer.slice(..)),
+                    },
+                    BindGroupEntry {
+                        binding: 3,
+                        resource: BindingResource::Buffer(indirect_buffer.slice(..)),
+                    },
+                    BindGroupEntry {
+                        binding: 4,
+                        resource: BindingResource::Buffer(count_buffer.slice(..)),
+                    },
+                ],
+            });
 
-                GPUCullingPassData {
-                    pre_cull_bg,
-                    prefix_sum_bg1,
-                    prefix_sum_bg2,
-                    output_bg,
-                    indirect_buffer,
-                    count_buffer,
-                }
-            },
-        );
+            GPUCullingPassData {
+                pre_cull_bg,
+                prefix_sum_bg1,
+                prefix_sum_bg2,
+                output_bg,
+                indirect_buffer,
+                count_buffer,
+            }
+        });
 
         CullingPassData {
-            name,
+            name: args.name,
             inner,
             output_buffer,
-            object_count,
+            object_count: args.object_count,
         }
     }
 
     pub(crate) fn cpu_run<'a, TD>(
         &self,
         yard: &'a Switchyard<TD>,
+        yard_priorities: JobPriorities,
         queue: &'a Queue,
         object_manager: &'a ObjectManager,
         data: &'a mut CullingPassData,
@@ -338,7 +343,7 @@ impl CullingPass {
     where
         TD: 'static,
     {
-        cpu::run(yard, queue, object_manager, data, camera)
+        cpu::run(yard, yard_priorities, queue, object_manager, data, camera)
     }
 
     pub(crate) fn gpu_run<'a>(
