@@ -323,3 +323,16 @@ pub fn create_sampler(device: &Device, ty: SamplerType) -> Sampler {
         },
     })
 }
+
+// Take a value and round it upwards to x * multiple, like memory address alignment
+pub(crate) fn round_to_multiple(value: u32, multiple: u32) -> u32 {
+    // We could also use a faster version that only works for multiples that are pow2
+    // (value + multiple - 1) & -multiple
+
+    let rem = value % multiple;
+    if rem == 0 {
+        value
+    } else {
+        value + multiple - rem
+    }
+}

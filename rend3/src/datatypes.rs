@@ -220,6 +220,7 @@ pub struct Texture {
     pub width: u32,
     pub height: u32,
     pub label: Option<String>,
+    pub mip_levels: u32,
 }
 
 bitflags::bitflags! {
