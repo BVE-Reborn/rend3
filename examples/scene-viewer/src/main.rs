@@ -70,9 +70,7 @@ fn load_skybox(renderer: &Renderer) -> Result<(), Box<dyn std::error::Error>> {
     let file = std::fs::read(name).unwrap_or_else(|_| panic!("Could not read skybox {}", name));
 
     let transcoder = basis::Transcoder::new();
-    let image_info = transcoder
-        .get_image_level_info(&file, 0, 0)
-        .ok_or("skybox image missing")?;
+    let image_info = transcoder.get_image_info(&file, 0).ok_or("skybox image missing")?;
 
     let mut prepared = transcoder
         .prepare_transcoding(&file)

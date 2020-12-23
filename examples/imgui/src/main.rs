@@ -1,5 +1,4 @@
-use std::sync::Arc;
-use std::time::Instant;
+use std::{sync::Arc, time::Instant};
 
 fn vertex(pos: [f32; 3]) -> rend3::datatypes::ModelVertex {
     rend3::datatypes::ModelVertex {

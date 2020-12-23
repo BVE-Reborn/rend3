@@ -5,10 +5,16 @@ authors = ["Connor Fitzgerald <connorwadefitzgerald@gmail.com>"]
 edition = "2018"
 description = "gltf scene and model loader for rend3"
 repository = "https://github.com/BVE-Reborn/rend3"
-license = "MPL-2.0"
+license = "MIT OR Apache-2.0 OR Zlib"
 keywords = []
 categories = []
 
 [dependencies]
-gltf = { version = "0.15", features = ["KHR_lights_punctual", "KHR_materials_unlit"] }
+async-std = "1"
+gltf = { version = "0.15", features = ["KHR_lights_punctual", "KHR_materials_unlit", "extras", "names", "utils"] }
+glam = "0.11"
+futures-util = "0.3"
+fnv = "1"
+image = "0.23"
 rend3 = { version = "0.1", path = "../rend3" }
+thiserror = "1"

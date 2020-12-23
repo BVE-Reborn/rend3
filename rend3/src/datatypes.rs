@@ -42,7 +42,7 @@ declare_handle!(
 // I'd consider putting everything you can into the vertex data structure. Vertex data is just per-vertex data, and a lot of things can be per-vertex
 // Then you don't need a million 4K textures
 #[repr(C)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Default, Copy, Clone)]
 pub struct ModelVertex {
     pub position: Vec3, // 00..12
     pub normal: Vec3,   // 12..24
@@ -179,7 +179,7 @@ macro_rules! changeable_struct {
     };
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct Mesh {
     pub vertices: Vec<ModelVertex>,
     pub indices: Vec<u32>,
