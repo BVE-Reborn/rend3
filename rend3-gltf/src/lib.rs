@@ -322,7 +322,6 @@ where
         let rgba = parsed.to_rgba8();
         let handle = renderer.add_texture_2d(dt::Texture {
             label: image.name().map(str::to_owned),
-            // TODO: srgb. We don't know the srgb-ness until usage in an object.
             format: match srgb {
                 true => dt::RendererTextureFormat::Rgba8Srgb,
                 false => dt::RendererTextureFormat::Rgba8Linear,

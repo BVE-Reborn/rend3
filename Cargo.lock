@@ -2088,6 +2088,7 @@ dependencies = [
 name = "rend3-scene-viewer-example"
 version = "0.1.0"
 dependencies = [
+ "async-std",
  "basis",
  "fnv",
  "glam",
@@ -2097,6 +2098,7 @@ dependencies = [
  "pico-args",
  "pollster",
  "rend3",
+ "rend3-gltf",
  "smallvec",
  "tracing",
  "wgpu",

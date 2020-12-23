@@ -11,7 +11,7 @@ use wgpu::{
     TextureDimension, TextureFormat, TextureUsage, TextureView, TextureViewDescriptor, TextureViewDimension,
 };
 
-pub const STARTING_2D_TEXTURES: usize = 1 << 6;
+pub const STARTING_2D_TEXTURES: usize = 1 << 10;
 pub const STARTING_CUBE_TEXTURES: usize = 1 << 3;
 
 pub struct InternalTexture {

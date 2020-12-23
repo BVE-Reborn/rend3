@@ -13,6 +13,7 @@ use rend3::{
 use std::{
     collections::hash_map::{self, HashMap},
     hash::BuildHasher,
+    path::Path,
     time::{Duration, Instant},
 };
 use winit::{
@@ -204,6 +205,29 @@ fn load_obj(renderer: &Renderer, file: &str) -> Result<(MeshHandle, MaterialHand
     Ok((mesh_handle, materials.into_iter().next().ok_or("no materials")?))
 }
 
+fn load_gltf(renderer: &Renderer, location: &'static str) -> rend3_gltf::LoadedGltfScene {
+    let path = Path::new(location);
+    let binary_path = dbg!(path.with_extension("bin"));
+    let parent = dbg!(path.parent().unwrap());
+
+    let gltf_data = std::fs::read(path).unwrap();
+    let bin_data = std::fs::read(binary_path).unwrap();
+
+    pollster::block_on(rend3_gltf::load_gltf(
+        renderer,
+        &gltf_data,
+        &bin_data,
+        move |tex_path| {
+            let tex_path = tex_path.to_owned();
+            async move {
+                let tex_resolved = dbg!(parent.join(&tex_path));
+                async_std::fs::read(tex_resolved).await
+            }
+        },
+    ))
+    .unwrap()
+}
+
 fn single(renderer: &Renderer, mesh: MeshHandle, material: MaterialHandle) {
     renderer.add_object(Object {
         mesh,
@@ -309,6 +333,10 @@ fn main() {
     single(&renderer, cube.0, cube.1);
     let suzanne = load_obj(&renderer, concat!(env!("CARGO_MANIFEST_DIR"), "/data/suzanne.obj")).unwrap();
     distribute(&renderer, suzanne.0, suzanne.1);
+    load_gltf(
+        &renderer,
+        "C:\\Users\\connor\\Programming\\asset-export\\swamp\\Scene_A.gltf",
+    );
     load_skybox(&renderer).unwrap();
 
     renderer.add_directional_light(DirectionalLight {
