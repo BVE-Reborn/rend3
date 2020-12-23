@@ -88,8 +88,8 @@ fn load_skybox(renderer: &Renderer) -> Result<(), Box<dyn std::error::Error>> {
         .prepare_transcoding(&file)
         .ok_or("could not prepare skybox transcoding")?;
     let mut image = Vec::with_capacity(image_info.total_blocks as usize * 16 * 6);
-    for mip in 0..mips {
-        for i in 0..6 {
+    for i in 0..6 {
+        for mip in 0..mips {
             image.extend_from_slice(&prepared.transcode_image_level(i, mip, basis::TargetTextureFormat::Bc7Rgba)?);
         }
     }

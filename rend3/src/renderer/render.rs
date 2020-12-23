@@ -178,43 +178,49 @@ pub fn render_loop<TLD: 'static>(
 
                     let mut offset = 0;
 
-                    for mip in 0..mip_levels {
-                        // Each mip is 1/4th the size of the previous level, so our divisors are the powers of two
-                        let div = 1 << mip;
+                    for layer in 0..6 {
+                        // Not 0..mip_levels, because we do want to skip over the unused mip levels
+                        for mip in 0..texture.mip_levels {
+                            // Each mip is 1/4th the size of the previous level, so our divisors are the powers of two
+                            let div = 1 << mip;
 
-                        // When using compressed textures, we need to round up the extents to the physical memory used
-                        // by the texture, so round to a multiple of the block size (generally 1x1 or 4x4)
-                        let mip_size = Extent3d {
-                            width: round_to_multiple(size.width / div, block_width),
-                            height: round_to_multiple(size.height / div, block_width),
-                            depth: 6,
-                        };
+                            // When using compressed textures, we need to round up the extents to the physical memory used
+                            // by the texture, so round to a multiple of the block size (generally 1x1 or 4x4)
+                            let mip_size = Extent3d {
+                                width: round_to_multiple(size.width / div, block_width),
+                                height: round_to_multiple(size.height / div, block_width),
+                                depth: 1,
+                            };
 
-                        // Size of mip level in pixel blocks
-                        let width_blocks = mip_size.width / block_width;
-                        let height_blocks = mip_size.height / block_width;
+                            // Size of mip level in pixel blocks
+                            let width_blocks = mip_size.width / block_width;
+                            let height_blocks = mip_size.height / block_width;
 
-                        let bytes_per_row = width_blocks * block_bytes;
-                        let bytes = bytes_per_row * height_blocks * 6;
+                            let bytes_per_row = width_blocks * block_bytes;
+                            let bytes = bytes_per_row * height_blocks;
 
-                        let offset_end = offset + bytes as usize;
+                            let offset_end = offset + bytes as usize;
 
-                        renderer.queue.write_texture(
-                            TextureCopyView {
-                                texture: &uploaded_tex,
-                                origin: Origin3d { x: 0, y: 0, z: 0 },
-                                mip_level: mip,
-                            },
-                            &texture.data[offset..offset_end],
-                            TextureDataLayout {
-                                offset: 0,
-                                bytes_per_row,
-                                rows_per_image: mip_size.height,
-                            },
-                            mip_size,
-                        );
+                            // Only write up to the max mip level and skip over unused bytes
+                            if mip < max_mip_levels {
+                                renderer.queue.write_texture(
+                                    TextureCopyView {
+                                        texture: &uploaded_tex,
+                                        origin: Origin3d { x: 0, y: 0, z: layer },
+                                        mip_level: mip,
+                                    },
+                                    &texture.data[offset..offset_end],
+                                    TextureDataLayout {
+                                        offset: 0,
+                                        bytes_per_row,
+                                        rows_per_image: 0,
+                                    },
+                                    mip_size,
+                                );
+                            }
 
-                        offset = offset_end;
+                            offset = offset_end;
+                        }
                     }
 
                     texture_manager_cube.fill(
