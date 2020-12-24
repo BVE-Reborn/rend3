@@ -1,5 +1,5 @@
 use crate::datatypes::ModelVertex;
-use glam::{Mat4, Vec3, Vec3A};
+use glam::{Mat4, Vec3, Vec3A, Vec4Swizzles};
 
 #[derive(Debug, Clone, Copy)]
 #[repr(C, align(16))]
@@ -19,10 +19,23 @@ impl BoundingSphere {
     }
 
     pub fn apply_transform(self, model_view: Mat4) -> Self {
-        // TODO: Deal with scale
+        let max_scale = model_view
+            .x_axis
+            .xyz()
+            .length_squared()
+            .max(
+                model_view
+                    .y_axis
+                    .xyz()
+                    .length_squared()
+                    .max(model_view.z_axis.xyz().length_squared()),
+            )
+            .sqrt();
+        let center = model_view * self.center.extend(1.0);
+
         Self {
-            center: Vec3::from(model_view * self.center.extend(1.0)),
-            radius: self.radius,
+            center: Vec3::from(center),
+            radius: max_scale * self.radius,
         }
     }
 }

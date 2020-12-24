@@ -96,7 +96,7 @@ where
     let mut final_nodes = Vec::new();
     for node in nodes {
         let local_transform = Mat4::from_cols_array_2d(&node.transform().matrix());
-        let transform = local_transform * parent_transform;
+        let transform = parent_transform * local_transform;
 
         let mut objects = Vec::new();
         if let Some(mesh) = node.mesh() {
