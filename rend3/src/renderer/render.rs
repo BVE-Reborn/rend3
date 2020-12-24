@@ -168,7 +168,7 @@ pub fn render_loop<TLD: 'static>(
                     );
                 }
                 Instruction::ChangeMaterial { handle, change } => {
-                    material_manager.update_from_changes(&renderer.queue, &texture_manager_2d, handle, change);
+                    material_manager.update_from_changes(&renderer.queue, handle, change);
                 }
                 Instruction::RemoveMaterial { handle } => {
                     material_manager.remove(handle);

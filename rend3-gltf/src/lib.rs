@@ -272,19 +272,19 @@ where
                 Some(tex) => dt::AlbedoComponent::Texture(tex),
                 None => dt::AlbedoComponent::Value(Vec4::from(albedo_factor)),
             },
-            normal: normals_tex,
-            roughness: match metallic_roughness_tex {
-                Some(tex) => dt::MaterialComponent::Texture(tex),
-                None => dt::MaterialComponent::Value(roughness_factor),
+            normal: match normals_tex {
+                Some(tex) => dt::NormalTexture::Tricomponent(tex),
+                None => dt::NormalTexture::None,
             },
-            metallic: match metallic_roughness_tex {
-                Some(tex) => dt::MaterialComponent::Texture(tex),
-                None => dt::MaterialComponent::Value(metallic_factor),
+            aomr_textures: match (metallic_roughness_tex, occlusion_tex) {
+                (Some(mr), Some(ao)) if mr == ao => dt::AoMRTextures::GltfCombined { texture: Some(mr) },
+                (mr, ao) => dt::AoMRTextures::GltfSplit {
+                    mr_texture: mr,
+                    ao_texture: ao,
+                },
             },
-            ambient_occlusion: match occlusion_tex {
-                Some(tex) => dt::MaterialComponent::Texture(tex),
-                None => dt::MaterialComponent::Value(1.0),
-            },
+            roughness_factor: Some(roughness_factor),
+            metallic_factor: Some(metallic_factor),
             ..dt::Material::default()
         });
 

@@ -132,10 +132,6 @@ impl TextureManager {
         }
     }
 
-    pub fn get(&self, handle: TextureHandle) -> &InternalTexture {
-        &self.registry.get(handle.0)
-    }
-
     pub fn get_view(&self, handle: TextureHandle) -> &TextureView {
         &self.views[self.registry.get_index_of(handle.0)]
     }

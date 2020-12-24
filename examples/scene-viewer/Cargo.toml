@@ -18,7 +18,6 @@ fnv = "1"
 glam = "0.11"
 image = { version = "0.23", default-features = false, features = ["png", "jpeg", "tiff"]}
 histogram = "0.6"
-obj = "0.10.2"
 pico-args = "0.3"
 pollster = "0.2"
 rend3 = { path = "../../rend3", version = "0.1.0" }

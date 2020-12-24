@@ -224,11 +224,18 @@ pub struct Texture {
 
 bitflags::bitflags! {
     pub(crate) struct MaterialFlags : u32 {
-        const ALBEDO_ACTIVE = 0b000_001;
-        const ALBEDO_BLEND = 0b000_010;
-        const ALBEDO_VERTEX_SRGB = 0b000_100;
-        const ALPHA_CUTOUT = 0b001_000;
-        const BICOMPONENT_NORMAL = 0b010_000;
+        const ALBEDO_ACTIVE =      0b0000_0000_0001;
+        const ALBEDO_BLEND =       0b0000_0000_0010;
+        const ALBEDO_VERTEX_SRGB = 0b0000_0000_0100;
+        const ALPHA_CUTOUT =       0b0000_0000_1000;
+        const BICOMPONENT_NORMAL = 0b0000_0001_0000;
+        const SWIZZLED_NORMAL =    0b0000_0010_0000;
+        const AOMR_GLTF_COMBINED = 0b0000_0100_0000;
+        const AOMR_GLTF_SPLIT =    0b0000_1000_0000;
+        const AOMR_BW_SPLIT =      0b0001_0000_0000;
+        const CC_GLTF_COMBINED =   0b0010_0000_0000;
+        const CC_GLTF_SPLIT =      0b0100_0000_0000;
+        const CC_BW_SPLIT =        0b1000_0000_0000;
     }
 }
 
@@ -342,21 +349,229 @@ impl<T: Copy> MaterialComponent<T> {
     }
 }
 
+#[derive(Debug, Copy, Clone)]
+pub enum NormalTexture {
+    /// No normal texture
+    None,
+    /// Normal stored in RGB values
+    Tricomponent(TextureHandle),
+    /// Normal stored in RG values, third value should be reconstructed.
+    Bicomponent(TextureHandle),
+    /// Normal stored in Green and Alpha values, third value should be reconstructed.
+    /// This is useful for storing in BC3 or BC7 compressed textures.
+    BicomponentSwizzled(TextureHandle),
+}
+impl Default for NormalTexture {
+    fn default() -> Self {
+        Self::None
+    }
+}
+
+impl NormalTexture {
+    pub(crate) fn to_texture<Func, Out>(&self, func: Func) -> Option<Out>
+    where
+        Func: FnOnce(TextureHandle) -> Out,
+    {
+        match *self {
+            Self::None => None,
+            Self::Tricomponent(handle) | Self::Bicomponent(handle) | Self::BicomponentSwizzled(handle) => {
+                Some(func(handle))
+            }
+        }
+    }
+
+    pub(crate) fn to_flags(&self) -> MaterialFlags {
+        match self {
+            Self::None => MaterialFlags::empty(),
+            Self::Tricomponent(..) => MaterialFlags::empty(),
+            Self::Bicomponent(..) => MaterialFlags::BICOMPONENT_NORMAL,
+            Self::BicomponentSwizzled(..) => MaterialFlags::BICOMPONENT_NORMAL | MaterialFlags::SWIZZLED_NORMAL,
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum AoMRTextures {
+    None,
+    GltfCombined {
+        /// Texture with Ambient Occlusion in R, Metallic in G, and Roughness in B
+        texture: Option<TextureHandle>,
+    },
+    GltfSplit {
+        /// Texture with Ambient Occlusion in R
+        ao_texture: Option<TextureHandle>,
+        /// Texture with Metallic in G, and Roughness in B
+        mr_texture: Option<TextureHandle>,
+    },
+    BWSplit {
+        /// Texture with Ambient Occlusion in R
+        ao_texture: Option<TextureHandle>,
+        /// Texture with Metallic in R
+        m_texture: Option<TextureHandle>,
+        /// Texture with Roughness in R
+        r_texture: Option<TextureHandle>,
+    },
+}
+
+impl AoMRTextures {
+    pub(crate) fn to_roughness_texture<Func, Out>(&self, func: Func) -> Option<Out>
+    where
+        Func: FnOnce(TextureHandle) -> Out,
+    {
+        match *self {
+            Self::GltfCombined { texture: Some(texture) } => Some(func(texture)),
+            Self::GltfSplit {
+                mr_texture: Some(texture),
+                ..
+            } => Some(func(texture)),
+            Self::BWSplit {
+                r_texture: Some(texture),
+                ..
+            } => Some(func(texture)),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn to_metallic_texture<Func, Out>(&self, func: Func) -> Option<Out>
+    where
+        Func: FnOnce(TextureHandle) -> Out,
+    {
+        match *self {
+            Self::GltfCombined { .. } => None,
+            Self::GltfSplit { .. } => None,
+            Self::BWSplit {
+                m_texture: Some(texture),
+                ..
+            } => Some(func(texture)),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn to_ao_texture<Func, Out>(&self, func: Func) -> Option<Out>
+    where
+        Func: FnOnce(TextureHandle) -> Out,
+    {
+        match *self {
+            Self::GltfCombined { .. } => None,
+            Self::GltfSplit {
+                ao_texture: Some(texture),
+                ..
+            } => Some(func(texture)),
+            Self::BWSplit {
+                ao_texture: Some(texture),
+                ..
+            } => Some(func(texture)),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn to_flags(&self) -> MaterialFlags {
+        match self {
+            Self::GltfCombined { .. } => MaterialFlags::AOMR_GLTF_COMBINED,
+            Self::GltfSplit { .. } => MaterialFlags::AOMR_GLTF_SPLIT,
+            Self::BWSplit { .. } => MaterialFlags::AOMR_BW_SPLIT,
+            // Use AOMR_GLTF_COMBINED so shader only checks roughness texture, then bails
+            Self::None => MaterialFlags::AOMR_GLTF_COMBINED,
+        }
+    }
+}
+impl Default for AoMRTextures {
+    fn default() -> Self {
+        Self::None
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum ClearcoatTextures {
+    GltfCombined {
+        /// Texture with Clearcoat in R, and Clearcoat Roughness in G
+        texture: Option<TextureHandle>,
+    },
+    GltfSplit {
+        /// Texture with Clearcoat in R
+        clearcoat_texture: Option<TextureHandle>,
+        /// Texture with Clearcoat Roughness in G
+        clearcoat_roughness_texture: Option<TextureHandle>,
+    },
+    BWSplit {
+        /// Texture with Clearcoat in R
+        clearcoat_texture: Option<TextureHandle>,
+        /// Texture with Clearcoat Roughness in R
+        clearcoat_roughness_texture: Option<TextureHandle>,
+    },
+    None,
+}
+
+impl ClearcoatTextures {
+    pub(crate) fn to_clearcoat_texture<Func, Out>(&self, func: Func) -> Option<Out>
+    where
+        Func: FnOnce(TextureHandle) -> Out,
+    {
+        match *self {
+            Self::GltfCombined { texture: Some(texture) } => Some(func(texture)),
+            Self::GltfSplit {
+                clearcoat_texture: Some(texture),
+                ..
+            } => Some(func(texture)),
+            Self::BWSplit {
+                clearcoat_texture: Some(texture),
+                ..
+            } => Some(func(texture)),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn to_clearcoat_roughness_texture<Func, Out>(&self, func: Func) -> Option<Out>
+    where
+        Func: FnOnce(TextureHandle) -> Out,
+    {
+        match *self {
+            Self::GltfCombined { .. } => None,
+            Self::GltfSplit {
+                clearcoat_roughness_texture: Some(texture),
+                ..
+            } => Some(func(texture)),
+            Self::BWSplit {
+                clearcoat_roughness_texture: Some(texture),
+                ..
+            } => Some(func(texture)),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn to_flags(&self) -> MaterialFlags {
+        match self {
+            Self::GltfCombined { .. } => MaterialFlags::CC_GLTF_COMBINED,
+            Self::GltfSplit { .. } => MaterialFlags::CC_GLTF_SPLIT,
+            Self::BWSplit { .. } => MaterialFlags::CC_BW_SPLIT,
+            // Use CC_GLTF_COMBINED so shader only checks clear coat texture, then bails
+            Self::None => MaterialFlags::CC_GLTF_COMBINED,
+        }
+    }
+}
+impl Default for ClearcoatTextures {
+    fn default() -> Self {
+        Self::None
+    }
+}
+
 // Consider:
 //
 // - Green screen value
 changeable_struct! {
-    #[derive(Debug, Default,Copy,  Clone)]
+    #[derive(Debug, Default, Copy, Clone)]
     pub struct Material <- nodefault MaterialChange {
         pub albedo: AlbedoComponent,
-        pub normal: Option<TextureHandle>,
-        pub roughness: MaterialComponent<f32>,
-        pub metallic: MaterialComponent<f32>,
+        pub normal: NormalTexture,
+        pub aomr_textures: AoMRTextures,
+        pub ao_factor: Option<f32>,
+        pub metallic_factor: Option<f32>,
+        pub roughness_factor: Option<f32>,
+        pub clearcoat_textures: ClearcoatTextures,
+        pub clearcoat_factor: Option<f32>,
+        pub clearcoat_roughness_factor: Option<f32>,
         pub reflectance: MaterialComponent<f32>,
-        pub clear_coat: MaterialComponent<f32>,
-        pub clear_coat_roughness: MaterialComponent<f32>,
         pub anisotropy: MaterialComponent<f32>,
-        pub ambient_occlusion: MaterialComponent<f32>,
         pub alpha_cutout: Option<f32>,
     }
 }
