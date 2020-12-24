@@ -329,13 +329,13 @@ fn main() {
 
     rend3::span_transfer!(renderer_span -> loading_span, INFO, "Loading resources");
 
-    let cube = load_obj(&renderer, concat!(env!("CARGO_MANIFEST_DIR"), "/data/cube.obj")).unwrap();
-    single(&renderer, cube.0, cube.1);
-    let suzanne = load_obj(&renderer, concat!(env!("CARGO_MANIFEST_DIR"), "/data/suzanne.obj")).unwrap();
-    distribute(&renderer, suzanne.0, suzanne.1);
+    // let cube = load_obj(&renderer, concat!(env!("CARGO_MANIFEST_DIR"), "/data/cube.obj")).unwrap();
+    // single(&renderer, cube.0, cube.1);
+    // let suzanne = load_obj(&renderer, concat!(env!("CARGO_MANIFEST_DIR"), "/data/suzanne.obj")).unwrap();
+    // distribute(&renderer, suzanne.0, suzanne.1);
     load_gltf(
         &renderer,
-        "C:\\Users\\connor\\Programming\\asset-export\\swamp\\Scene_A.gltf",
+        "C:\\Users\\connor\\Programming\\asset-export\\polygon\\Demo.gltf",
     );
     load_skybox(&renderer).unwrap();
 
