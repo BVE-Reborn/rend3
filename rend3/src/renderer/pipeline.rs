@@ -180,7 +180,7 @@ impl PipelineManager {
                     module: &module,
                 }),
                 rasterization_state: Some(RasterizationStateDescriptor {
-                    front_face: FrontFace::Cw,
+                    front_face: FrontFace::Ccw,
                     cull_mode: match pipeline_desc.input {
                         PipelineInputType::FullscreenTriangle => CullMode::None,
                         PipelineInputType::Models3d => CullMode::Back,

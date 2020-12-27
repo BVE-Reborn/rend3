@@ -41,18 +41,20 @@ struct IndirectCall {
     uint base_instance;
 };
 
-#define FLAGS_ALBEDO_ACTIVE      0x01
-#define FLAGS_ALBEDO_BLEND       0x02
-#define FLAGS_ALBEDO_VERTEX_SRGB 0x04
-#define FLAGS_ALPHA_CUTOUT       0x08
-#define FLAGS_BICOMPONENT_NORMAL 0x10
-#define FLAGS_SWIZZLED_NORMAL    0x11
-#define FLAGS_AOMR_GLTF_COMBINED 0x12
-#define FLAGS_AOMR_GLTF_SPLIT    0x14
-#define FLAGS_AOMR_BW_SPLIT      0x18
-#define FLAGS_CC_GLTF_COMBINED   0x20
-#define FLAGS_CC_GLTF_SPLIT      0x21
-#define FLAGS_CC_BW_SPLIT        0x22
+#define FLAGS_ALBEDO_ACTIVE      0x0001
+#define FLAGS_ALBEDO_BLEND       0x0002
+#define FLAGS_ALBEDO_VERTEX_SRGB 0x0004
+#define FLAGS_ALPHA_CUTOUT       0x0008
+#define FLAGS_BICOMPONENT_NORMAL 0x0010
+#define FLAGS_SWIZZLED_NORMAL    0x0020
+#define FLAGS_AOMR_GLTF_COMBINED 0x0040
+#define FLAGS_AOMR_GLTF_SPLIT    0x0080
+#define FLAGS_AOMR_BW_SPLIT      0x0100
+#define FLAGS_CC_GLTF_COMBINED   0x0200
+#define FLAGS_CC_GLTF_SPLIT      0x0400
+#define FLAGS_CC_BW_SPLIT        0x0800
+
+#define MATERIAL_FLAG(name) bool(material.material_flags & name)
 
 struct GPUMaterialData {
     vec4 albedo;

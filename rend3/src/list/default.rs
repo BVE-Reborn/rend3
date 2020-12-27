@@ -436,9 +436,7 @@ pub fn default_render_list(mode: RendererMode, resolution: [u32; 2], pipelines: 
         input: RenderOpInputType::FullscreenTriangle,
         per_op_bindings: vec![
             ResourceBinding::GeneralData,
-            ResourceBinding::Custom2DTexture(vec![ImageInputReference::Custom(
-                internal_renderbuffer_name.to_string(),
-            )]),
+            ResourceBinding::Custom2DTexture(vec![ImageInputReference::Custom(internal_renderbuffer_name.to_owned())]),
         ],
         per_object_bindings: vec![],
     });

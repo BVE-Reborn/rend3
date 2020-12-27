@@ -163,12 +163,6 @@ fn main() {
         intensity: 10.0,
         direction: Vec3::new(-1.0, -1.0, 0.0),
     });
-    // renderer.add_directional_light(DirectionalLight {
-    //     color: Vec3::one(),
-    //     intensity: 2.0,
-    //     direction: Vec3::new(1.0, 0.0, 0.0),
-    // });
-
     rend3::span_transfer!(loading_span -> _);
     rend3::span_transfer!(main_thread_span -> _);
 
@@ -215,7 +209,7 @@ fn main() {
             let up = Vec3A::unit_y();
             let side: Vec3A = forward.cross(up).normalize();
             let velocity = if button_pressed(&scancode_status, platform::Scancodes::SHIFT) {
-                10.0
+                100.0
             } else {
                 1.0
             };

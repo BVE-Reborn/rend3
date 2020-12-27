@@ -1,6 +1,6 @@
 use fnv::FnvHashMap;
 use futures_util::future::OptionFuture;
-use glam::{Mat4, Vec2, Vec3, Vec4};
+use glam::{Mat4, Vec2, Vec3, Vec4, Vec4Swizzles};
 use rend3::{datatypes as dt, datatypes::AffineTransform, Renderer};
 use std::future::Future;
 use thiserror::Error;
@@ -21,6 +21,7 @@ pub struct Node {
     children: Vec<Node>,
     local_transform: Mat4,
     objects: Vec<dt::ObjectHandle>,
+    light: Option<dt::DirectionalLightHandle>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -68,7 +69,7 @@ where
     F: FnMut(&str) -> Fut,
     Fut: Future<Output = Result<Vec<u8>, async_std::io::Error>>,
 {
-    let file = gltf::Gltf::from_slice(data)?;
+    let file = gltf::Gltf::from_slice_without_validation(data)?;
 
     let mut loaded = LoadedGltfScene::default();
     load_meshes(renderer, &mut loaded, file.meshes(), binary)?;
@@ -79,7 +80,12 @@ where
         .or_else(|| file.scenes().next())
         .ok_or(GltfLoadError::MissingScene)?;
 
-    loaded.nodes = load_gltf_impl(renderer, &mut loaded, scene.nodes(), Mat4::identity())?;
+    loaded.nodes = load_gltf_impl(
+        renderer,
+        &mut loaded,
+        scene.nodes(),
+        Mat4::from_scale(Vec3::new(1.0, 1.0, -1.0)),
+    )?;
 
     Ok(loaded)
 }
@@ -119,12 +125,29 @@ where
             }
         }
 
+        let light = if let Some(light) = node.light() {
+            match light.kind() {
+                gltf::khr_lights_punctual::Kind::Directional => {
+                    let direction = (transform * (-Vec3::unit_z()).extend(1.0)).xyz();
+                    Some(renderer.add_directional_light(dt::DirectionalLight {
+                        color: Vec3::from(light.color()),
+                        intensity: light.intensity(),
+                        direction,
+                    }))
+                }
+                _ => None,
+            }
+        } else {
+            None
+        };
+
         let children = load_gltf_impl(renderer, loaded, node.children(), transform)?;
 
         final_nodes.push(Node {
             children,
             local_transform,
             objects,
+            light,
         })
     }
     Ok(final_nodes)
@@ -161,7 +184,7 @@ where
                 .read_positions()
                 .ok_or(GltfLoadError::MissingPositions(mesh.index()))?
                 .map(|pos| rend3::datatypes::ModelVertex {
-                    position: pos.into(),
+                    position: Vec3::from(pos),
                     normal: Default::default(),
                     uv: Default::default(),
                     color: [0; 4],
@@ -236,7 +259,6 @@ where
         let _emissive_factor = material.emissive_factor();
         // TODO: implement scaling
         let normals = material.normal_texture();
-        // TODO: implement needed packing
         let roughness_factor = pbr.roughness_factor();
         let metallic_factor = pbr.metallic_factor();
         let metallic_roughness = pbr.metallic_roughness_texture();
