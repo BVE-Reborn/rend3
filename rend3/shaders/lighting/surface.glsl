@@ -30,7 +30,7 @@ vec3 surface_shading(DirectionalLight light, PixelData pixel, vec3 v, float occl
     vec3 Fr = (D * V) * F;
 
     // diffuse
-    vec3 Fd = pixel.diffuse_color * Fd_Burley(NoV, NoL, LoH, pixel.roughness);
+    vec3 Fd = pixel.diffuse_color * Fd_Lambert();
 
     vec3 color = Fd + Fr * energy_compensation;
 
