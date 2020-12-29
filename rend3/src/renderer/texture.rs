@@ -11,7 +11,7 @@ use wgpu::{
     TextureDimension, TextureFormat, TextureUsage, TextureView, TextureViewDescriptor, TextureViewDimension,
 };
 
-pub const STARTING_2D_TEXTURES: usize = 1 << 10;
+pub const STARTING_2D_TEXTURES: usize = 1 << 7;
 pub const STARTING_CUBE_TEXTURES: usize = 1 << 3;
 
 pub struct InternalTexture {
@@ -71,7 +71,7 @@ impl TextureManager {
 
         let index = self.registry.insert(handle.0, InternalTexture { format });
 
-        if index > self.views.len() {
+        if index >= self.views.len() {
             self.layout_dirty = self.layout_dirty.map_gpu(|_| true);
 
             let new_size = self.views.len() * 2;
@@ -159,7 +159,6 @@ impl TextureManager {
 pub(crate) struct TextureManagerReadyOutput {
     pub bgl: ModeData<(), Arc<BindGroupLayout>>,
     pub bg: ModeData<(), Arc<BindGroup>>,
-    // TODO: #17: When this is dirty we don't do anything
     pub dirty: ModeData<(), bool>,
 }
 

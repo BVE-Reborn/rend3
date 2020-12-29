@@ -28,6 +28,10 @@ impl<T> ResourceRegistry<T> {
         (index, value)
     }
 
+    pub fn iter(&self) -> impl Iterator<Item = (&usize, &T)> {
+        self.mapping.iter()
+    }
+
     pub fn values(&self) -> impl Iterator<Item = &T> {
         self.mapping.values()
     }

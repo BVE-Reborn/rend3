@@ -109,7 +109,7 @@ where
             let mesh_handle = loaded
                 .meshes
                 .get(&mesh.index())
-                .ok_or(GltfLoadError::MissingMesh(mesh.index()))?;
+                .ok_or_else(|| GltfLoadError::MissingMesh(mesh.index()))?;
             for prim in &mesh_handle.primitives {
                 let mat_idx = prim.material;
                 let mat = loaded
@@ -182,7 +182,7 @@ where
 
             let mut vertices: Vec<_> = reader
                 .read_positions()
-                .ok_or(GltfLoadError::MissingPositions(mesh.index()))?
+                .ok_or_else(|| GltfLoadError::MissingPositions(mesh.index()))?
                 .map(|pos| rend3::datatypes::ModelVertex {
                     position: Vec3::from(pos),
                     normal: Default::default(),
