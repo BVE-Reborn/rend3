@@ -811,9 +811,9 @@ dependencies = [
 
 [[package]]
 name = "glam"
-version = "0.11.2"
+version = "0.11.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bef81f244b2a421ddb8ccb382857772379c0996fe5948992db5bee51cef3c28e"
+checksum = "49d9e5a6410cd46e6bea97123cec5ef1cba14274aad26a1835dd3c9b753ae069"
 dependencies = [
  "version_check",
 ]
