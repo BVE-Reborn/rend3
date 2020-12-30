@@ -257,7 +257,6 @@ where
         // TODO: implement emissive
         let _emissive = material.emissive_texture();
         let _emissive_factor = material.emissive_factor();
-        // TODO: implement scaling
         let normals = material.normal_texture();
         let roughness_factor = pbr.roughness_factor();
         let metallic_factor = pbr.metallic_factor();
@@ -290,8 +289,10 @@ where
 
         let handle = renderer.add_material(dt::Material {
             albedo: match albedo_tex {
-                // TODO: Allow texture * value
-                Some(tex) => dt::AlbedoComponent::Texture(tex),
+                Some(tex) => dt::AlbedoComponent::TextureValue {
+                    handle: tex,
+                    value: Vec4::from(albedo_factor),
+                },
                 None => dt::AlbedoComponent::Value(Vec4::from(albedo_factor)),
             },
             normal: match normals_tex {

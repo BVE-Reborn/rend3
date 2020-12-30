@@ -265,6 +265,9 @@ pub enum AlbedoComponent {
         /// Vertex should be converted from srgb -> linear before multiplication
         srgb: bool,
     },
+    /// Albedo color is loaded from given texture, then multiplied
+    /// by the given value.
+    TextureValue { handle: TextureHandle, value: Vec4 },
 }
 
 impl Default for AlbedoComponent {
@@ -276,17 +279,17 @@ impl Default for AlbedoComponent {
 impl AlbedoComponent {
     pub(crate) fn to_value(&self) -> Vec4 {
         match *self {
-            Self::Vertex { .. } => Vec4::splat(1.0),
             Self::Value(value) => value,
             Self::ValueVertex { value, .. } => value,
-            _ => Vec4::default(),
+            Self::TextureValue { value, .. } => value,
+            _ => Vec4::splat(1.0),
         }
     }
 
     pub(crate) fn to_flags(&self) -> MaterialFlags {
         match *self {
             Self::None => MaterialFlags::empty(),
-            Self::Value(_) | Self::Texture(_) => MaterialFlags::ALBEDO_ACTIVE,
+            Self::Value(_) | Self::Texture(_) | Self::TextureValue { .. } => MaterialFlags::ALBEDO_ACTIVE,
             Self::Vertex { srgb: false }
             | Self::ValueVertex { srgb: false, .. }
             | Self::TextureVertex { srgb: false, .. } => MaterialFlags::ALBEDO_ACTIVE | MaterialFlags::ALBEDO_BLEND,
@@ -308,7 +311,9 @@ impl AlbedoComponent {
     {
         match *self {
             Self::None | Self::Vertex { .. } | Self::Value(_) | Self::ValueVertex { .. } => None,
-            Self::Texture(handle) | Self::TextureVertex { handle, .. } => Some(func(handle)),
+            Self::Texture(handle) | Self::TextureVertex { handle, .. } | Self::TextureValue { handle, .. } => {
+                Some(func(handle))
+            }
         }
     }
 }
