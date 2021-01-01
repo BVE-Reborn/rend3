@@ -372,6 +372,8 @@ where
             width: rgba.width(),
             height: rgba.height(),
             data: rgba.into_raw(),
+            /// TODO: automatic mipmapping (#53)
+            mip_levels: 1,
         });
 
         loaded.images.insert(key, handle);
