@@ -27,12 +27,16 @@ fn load_skybox(renderer: &Renderer) -> Result<(), Box<dyn std::error::Error>> {
     let transcoder = basis::Transcoder::new();
     let image_info = transcoder.get_image_info(&file, 0).ok_or("skybox image missing")?;
 
+    let mips = transcoder.get_total_image_levels(&file, 0);
+
     let mut prepared = transcoder
         .prepare_transcoding(&file)
         .ok_or("could not prepare skybox transcoding")?;
     let mut image = Vec::with_capacity(image_info.total_blocks as usize * 16 * 6);
     for i in 0..6 {
-        image.extend_from_slice(&prepared.transcode_image_level(i, 0, basis::TargetTextureFormat::Bc7Rgba)?);
+        for mip in 0..mips {
+            image.extend_from_slice(&prepared.transcode_image_level(i, mip, basis::TargetTextureFormat::Bc7Rgba)?);
+        }
     }
     drop(prepared);
 
@@ -42,6 +46,7 @@ fn load_skybox(renderer: &Renderer) -> Result<(), Box<dyn std::error::Error>> {
         height: image_info.height,
         data: image,
         label: Some("background".into()),
+        mip_levels: mips,
     });
     renderer.set_background_texture(handle);
     Ok(())
