@@ -8,7 +8,7 @@ use thiserror::Error;
 #[derive(Debug)]
 pub struct MeshPrimitive {
     handle: dt::MeshHandle,
-    material: usize,
+    material: Option<usize>,
 }
 
 #[derive(Debug)]
@@ -33,7 +33,7 @@ pub struct ImageKey {
 #[derive(Debug, Default)]
 pub struct LoadedGltfScene {
     meshes: FnvHashMap<usize, Mesh>,
-    materials: FnvHashMap<usize, dt::MaterialHandle>,
+    materials: FnvHashMap<Option<usize>, dt::MaterialHandle>,
     images: FnvHashMap<ImageKey, dt::TextureHandle>,
     nodes: Vec<Node>,
 }
@@ -73,6 +73,7 @@ where
 
     let mut loaded = LoadedGltfScene::default();
     load_meshes(renderer, &mut loaded, file.meshes(), binary)?;
+    load_default_material(renderer, &mut loaded);
     load_materials_and_textures(renderer, &mut loaded, file.materials(), &mut texture_func).await?;
 
     let scene = file
@@ -112,10 +113,9 @@ where
                 .ok_or_else(|| GltfLoadError::MissingMesh(mesh.index()))?;
             for prim in &mesh_handle.primitives {
                 let mat_idx = prim.material;
-                let mat = loaded
-                    .materials
-                    .get(&mat_idx)
-                    .ok_or(GltfLoadError::MissingMaterial(mat_idx))?;
+                let mat = loaded.materials.get(&mat_idx).ok_or(GltfLoadError::MissingMaterial(
+                    mat_idx.expect("Could not find default material"),
+                ))?;
                 let object_handle = renderer.add_object(dt::Object {
                     mesh: prim.handle,
                     material: *mat,
@@ -228,8 +228,7 @@ where
 
             res_prims.push(MeshPrimitive {
                 handle,
-                // TODO: handle default material
-                material: prim.material().index().unwrap(),
+                material: prim.material().index(),
             })
         }
         loaded.meshes.insert(mesh.index(), Mesh { primitives: res_prims });
@@ -238,7 +237,27 @@ where
     Ok(())
 }
 
-pub async fn load_materials_and_textures<'a, TLD, F, Fut>(
+fn load_default_material<TLD>(renderer: &Renderer<TLD>, loaded: &mut LoadedGltfScene) {
+    loaded.materials.insert(
+        None,
+        renderer.add_material(dt::Material {
+            albedo: dt::AlbedoComponent::Value(Vec4::splat(1.0)),
+            normal: dt::NormalTexture::None,
+            aomr_textures: dt::AoMRTextures::None,
+            ao_factor: Some(1.0),
+            metallic_factor: Some(1.0),
+            roughness_factor: Some(1.0),
+            clearcoat_textures: dt::ClearcoatTextures::None,
+            clearcoat_factor: Some(1.0),
+            clearcoat_roughness_factor: Some(1.0),
+            reflectance: dt::MaterialComponent::None,
+            anisotropy: dt::MaterialComponent::None,
+            alpha_cutout: None,
+        }),
+    );
+}
+
+async fn load_materials_and_textures<'a, TLD, F, Fut>(
     renderer: &Renderer<TLD>,
     loaded: &mut LoadedGltfScene,
     materials: impl Iterator<Item = gltf::Material<'a>>,
@@ -311,14 +330,15 @@ where
             ..dt::Material::default()
         });
 
-        // TODO: why is this unwrap needed
-        loaded.materials.insert(material.index().unwrap(), handle);
+        loaded
+            .materials
+            .insert(Some(material.index().expect("unexpected default material")), handle);
     }
 
     Ok(())
 }
 
-pub async fn load_image<'a, TLD, F, Fut>(
+async fn load_image<'a, TLD, F, Fut>(
     renderer: &Renderer<TLD>,
     loaded: &mut LoadedGltfScene,
     image: gltf::Image<'a>,
