@@ -8,7 +8,7 @@ use crate::{
         ImageUsage, PerObjectResourceBinding, RenderList, RenderOpDescriptor, RenderOpInputType, RenderPassDescriptor,
         RenderPassRunRate, ResourceBinding, ShaderSourceStage, ShaderSourceType, SourceShaderDescriptor,
     },
-    Renderer, RendererMode,
+    Renderer, RendererMode, SWAPCHAIN_FORMAT,
 };
 use std::{future::Future, sync::Arc};
 use wgpu::{Color, LoadOp, TextureFormat};
@@ -251,7 +251,7 @@ impl DefaultPipelines {
             run_rate: RenderPassRunRate::Once,
             input: PipelineInputType::FullscreenTriangle,
             outputs: vec![PipelineOutputAttachment {
-                format: ImageFormat::Bgra8UnormSrgb,
+                format: SWAPCHAIN_FORMAT,
                 write: true,
             }],
             depth: None,
