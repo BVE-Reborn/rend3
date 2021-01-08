@@ -118,7 +118,7 @@ fn main() {
         .ok()
         .map(|s: String| s.to_lowercase());
     let desired_mode = args.value_from_fn(["-m", "--mode"], extract_mode).ok();
-    let file_to_load: Option<String> = args.free_from_str().unwrap();
+    let file_to_load: Option<String> = args.free_from_str().ok();
 
     rend3::span_transfer!(_ -> main_thread_span, INFO, "Main Thread Setup");
     rend3::span_transfer!(_ -> event_loop_span, INFO, "Building Event Loop");
