@@ -171,7 +171,7 @@ where
 
     let mesh_manager_guard = renderer.mesh_manager.read();
     let material_manager_guard = renderer.material_manager.read();
-    let (vertex, index) = mesh_manager_guard.buffers();
+    let buffers = mesh_manager_guard.buffers();
 
     let mut encoder = renderer.device.create_command_encoder(&CommandEncoderDescriptor {
         label: Some("single renderpass render encoder"),
@@ -194,8 +194,12 @@ where
             }
             RenderOpInputType::Models3D => match culling_data.inner {
                 ModeData::CPU(ref c) => {
-                    rpass.set_vertex_buffer(0, vertex.slice(..));
-                    rpass.set_index_buffer(index.slice(..));
+                    rpass.set_vertex_buffer(0, buffers.vertex_position.slice(..));
+                    rpass.set_vertex_buffer(1, buffers.vertex_normal.slice(..));
+                    rpass.set_vertex_buffer(2, buffers.vertex_uv.slice(..));
+                    rpass.set_vertex_buffer(3, buffers.vertex_color.slice(..));
+                    rpass.set_vertex_buffer(4, buffers.vertex_mat_index.slice(..));
+                    rpass.set_index_buffer(buffers.index.slice(..));
                     let mut last_material = None;
                     for (draw_call_idx, object) in c.iter().enumerate() {
                         for (idx, binding) in op.per_object_bindings.iter().enumerate() {
@@ -220,10 +224,14 @@ where
                     }
                 }
                 ModeData::GPU(ref g) => {
-                    rpass.set_vertex_buffer(0, vertex.slice(..));
-                    rpass.set_index_buffer(index.slice(..));
+                    rpass.set_vertex_buffer(0, buffers.vertex_position.slice(..));
+                    rpass.set_vertex_buffer(1, buffers.vertex_normal.slice(..));
+                    rpass.set_vertex_buffer(2, buffers.vertex_uv.slice(..));
+                    rpass.set_vertex_buffer(3, buffers.vertex_color.slice(..));
+                    rpass.set_vertex_buffer(4, buffers.vertex_mat_index.slice(..));
+                    rpass.set_index_buffer(buffers.index.slice(..));
 
-                    rpass.set_vertex_buffer(1, g.indirect_buffer.slice(..));
+                    rpass.set_vertex_buffer(5, g.indirect_buffer.slice(..));
                     rpass.multi_draw_indexed_indirect_count(
                         &g.indirect_buffer,
                         0,

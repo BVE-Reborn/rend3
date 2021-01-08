@@ -1,17 +1,9 @@
-fn vertex(pos: [f32; 3]) -> rend3::datatypes::ModelVertex {
-    rend3::datatypes::ModelVertex {
-        position: glam::Vec3::from(pos),
-        // Will be recalculated later.
-        normal: glam::Vec3::unit_y(),
-        // Only used with textures, we don't have one.
-        uv: glam::Vec2::zero(),
-        // We aren't using vertex colors.
-        color: [0, 0, 0, 0],
-    }
+fn vertex(pos: [f32; 3]) -> glam::Vec3 {
+    glam::Vec3::from(pos)
 }
 
-fn create_vertices() -> (Vec<rend3::datatypes::ModelVertex>, Vec<u32>) {
-    let vertex_data = [
+fn create_mesh() -> rend3::datatypes::Mesh {
+    let vertex_positions = [
         // top (0.0, 0.0, 1.0)
         vertex([-1.0, -1.0, 1.0]),
         vertex([1.0, -1.0, 1.0]),
@@ -53,7 +45,9 @@ fn create_vertices() -> (Vec<rend3::datatypes::ModelVertex>, Vec<u32>) {
         22, 21, 20, 20, 23, 22, // back
     ];
 
-    (vertex_data.to_vec(), index_data.to_vec())
+    rend3::datatypes::MeshBuilder::new(vertex_positions.to_vec())
+        .with_indices(index_data.to_vec())
+        .build()
 }
 
 fn main() {
@@ -84,9 +78,7 @@ fn main() {
     });
 
     // Create mesh and calculate smooth normals based on vertices
-    let (vertices, indices) = create_vertices();
-    let mut mesh = rend3::datatypes::Mesh { vertices, indices };
-    mesh.calculate_normals();
+    let mesh = create_mesh();
 
     // Add mesh to renderer's world
     let mesh_handle = renderer.add_mesh(mesh);

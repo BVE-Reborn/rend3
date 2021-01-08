@@ -14,7 +14,7 @@ categories = []
 arrayvec = "0.5"
 bitflags = "1"
 bytemuck = "1"
-glam = "0.11"
+glam = { version = "0.11", features = ["bytemuck"] }
 include_dir = "0.6"
 indexmap = "1"
 itertools = "0.10"

@@ -1,13 +1,18 @@
 use crate::{
-    datatypes::{Mesh, MeshHandle, ModelVertex},
+    datatypes::{Mesh, MeshHandle},
     registry::ResourceRegistry,
     renderer::{copy::GpuCopy, frustum::BoundingSphere},
 };
+use glam::{Vec2, Vec3};
 use range_alloc::RangeAllocator;
 use std::{mem::size_of, ops::Range};
 use wgpu::{Buffer, BufferAddress, BufferDescriptor, BufferUsage, CommandEncoder, Device, Queue};
 
-const VERTEX_SIZE: usize = size_of::<ModelVertex>();
+pub const VERTEX_POSITION_SIZE: usize = size_of::<Vec3>();
+pub const VERTEX_NORMAL_SIZE: usize = size_of::<Vec3>();
+pub const VERTEX_UV_SIZE: usize = size_of::<Vec2>();
+pub const VERTEX_COLOR_SIZE: usize = size_of::<[u8; 4]>();
+pub const VERTEX_MATERIAL_INDEX_SIZE: usize = size_of::<u32>();
 const INDEX_SIZE: usize = size_of::<u32>();
 
 const STARTING_VERTICES: usize = 1 << 16;
@@ -19,12 +24,22 @@ pub struct InternalMesh {
     pub bounding_sphere: BoundingSphere,
 }
 
+pub struct MeshBuffers {
+    pub vertex_position: Buffer,
+    pub vertex_normal: Buffer,
+    pub vertex_uv: Buffer,
+    pub vertex_color: Buffer,
+    pub vertex_mat_index: Buffer,
+
+    pub index: Buffer,
+}
+
 pub struct MeshManager {
-    vertex_buffer: Buffer,
+    buffers: MeshBuffers,
+
     vertex_count: usize,
     vertex_alloc: RangeAllocator<usize>,
 
-    index_buffer: Buffer,
     index_count: usize,
     index_alloc: RangeAllocator<usize>,
 
@@ -35,22 +50,7 @@ impl MeshManager {
     pub fn new(device: &Device) -> Self {
         span_transfer!(_ -> new_span, INFO, "Creating Mesh Manager");
 
-        let vertex_bytes = STARTING_VERTICES * VERTEX_SIZE;
-        let index_bytes = STARTING_INDICES * INDEX_SIZE;
-
-        let vertex_buffer = device.create_buffer(&BufferDescriptor {
-            label: Some("vertex buffer"),
-            size: vertex_bytes as BufferAddress,
-            usage: BufferUsage::COPY_DST | BufferUsage::VERTEX | BufferUsage::STORAGE,
-            mapped_at_creation: false,
-        });
-
-        let index_buffer = device.create_buffer(&BufferDescriptor {
-            label: Some("index buffer"),
-            size: index_bytes as BufferAddress,
-            usage: BufferUsage::COPY_DST | BufferUsage::INDEX | BufferUsage::STORAGE,
-            mapped_at_creation: false,
-        });
+        let buffers = create_buffers(device, STARTING_VERTICES, STARTING_INDICES);
 
         let vertex_count = STARTING_VERTICES;
         let index_count = STARTING_INDICES;
@@ -61,10 +61,9 @@ impl MeshManager {
         let registry = ResourceRegistry::new();
 
         Self {
-            vertex_buffer,
+            buffers,
             vertex_count,
             vertex_alloc,
-            index_buffer,
             index_count,
             index_alloc,
             registry,
@@ -86,7 +85,9 @@ impl MeshManager {
     ) {
         span_transfer!(_ -> fill_span, INFO, "Mesh Manager Fill");
 
-        let vertex_count = mesh.vertices.len();
+        assert!(mesh.validate());
+
+        let vertex_count = mesh.vertex_positions.len();
         let index_count = mesh.indices.len();
 
         let mut vertex_range = self.vertex_alloc.allocate_range(vertex_count).ok();
@@ -109,17 +110,37 @@ impl MeshManager {
         let index_range = index_range.unwrap();
 
         queue.write_buffer(
-            &self.vertex_buffer,
-            (vertex_range.start * VERTEX_SIZE) as BufferAddress,
-            bytemuck::cast_slice(&mesh.vertices),
+            &self.buffers.vertex_position,
+            (vertex_range.start * VERTEX_POSITION_SIZE) as BufferAddress,
+            bytemuck::cast_slice(&mesh.vertex_positions),
         );
         queue.write_buffer(
-            &self.index_buffer,
+            &self.buffers.vertex_normal,
+            (vertex_range.start * VERTEX_NORMAL_SIZE) as BufferAddress,
+            bytemuck::cast_slice(&mesh.vertex_normals),
+        );
+        queue.write_buffer(
+            &self.buffers.vertex_uv,
+            (vertex_range.start * VERTEX_UV_SIZE) as BufferAddress,
+            bytemuck::cast_slice(&mesh.vertex_uvs),
+        );
+        queue.write_buffer(
+            &self.buffers.vertex_color,
+            (vertex_range.start * VERTEX_COLOR_SIZE) as BufferAddress,
+            bytemuck::cast_slice(&mesh.vertex_colors),
+        );
+        queue.write_buffer(
+            &self.buffers.vertex_mat_index,
+            (vertex_range.start * VERTEX_MATERIAL_INDEX_SIZE) as BufferAddress,
+            bytemuck::cast_slice(&mesh.vertex_material_indices),
+        );
+        queue.write_buffer(
+            &self.buffers.index,
             (index_range.start * INDEX_SIZE) as BufferAddress,
             bytemuck::cast_slice(&mesh.indices),
         );
 
-        let bounding_sphere = BoundingSphere::from_mesh(&mesh.vertices);
+        let bounding_sphere = BoundingSphere::from_mesh(&mesh.vertex_positions);
 
         let mesh = InternalMesh {
             vertex_range,
@@ -137,8 +158,8 @@ impl MeshManager {
         self.index_alloc.free_range(mesh.index_range);
     }
 
-    pub fn buffers(&self) -> (&Buffer, &Buffer) {
-        (&self.vertex_buffer, &self.index_buffer)
+    pub fn buffers(&self) -> &MeshBuffers {
+        &self.buffers
     }
 
     pub fn internal_data(&self, handle: MeshHandle) -> &InternalMesh {
@@ -167,37 +188,49 @@ impl MeshManager {
             new_index_count
         );
 
-        let new_vert_bytes = new_vert_count * VERTEX_SIZE;
-        let new_index_bytes = new_index_count * INDEX_SIZE;
-
-        let new_vertex_buffer = device.create_buffer(&BufferDescriptor {
-            label: Some("vertex buffer"),
-            size: new_vert_bytes as BufferAddress,
-            usage: BufferUsage::COPY_DST | BufferUsage::VERTEX | BufferUsage::STORAGE,
-            mapped_at_creation: false,
-        });
-
-        let new_index_buffer = device.create_buffer(&BufferDescriptor {
-            label: Some("index buffer"),
-            size: new_index_bytes as BufferAddress,
-            usage: BufferUsage::COPY_DST | BufferUsage::INDEX | BufferUsage::STORAGE,
-            mapped_at_creation: false,
-        });
+        let new_buffers = create_buffers(device, new_vert_count, new_index_count);
 
         let mut new_vert_alloc = RangeAllocator::new(0..new_vert_count);
         let mut new_index_alloc = RangeAllocator::new(0..new_index_count);
 
-        let vert_copy_data = gpu_copy.prepare(
+        let vertex_position_copy_data = gpu_copy.prepare(
             device,
-            self.vertex_buffer.slice(..),
-            new_vertex_buffer.slice(..),
-            "vertex copy",
+            self.buffers.vertex_position.slice(..),
+            new_buffers.vertex_position.slice(..),
+            "vertex position copy",
         );
 
+        let vertex_normal_copy_data = gpu_copy.prepare(
+            device,
+            self.buffers.vertex_normal.slice(..),
+            new_buffers.vertex_normal.slice(..),
+            "vertex normal copy",
+        );
+
+        let vertex_uv_copy_data = gpu_copy.prepare(
+            device,
+            self.buffers.vertex_uv.slice(..),
+            new_buffers.vertex_uv.slice(..),
+            "vertex uv copy",
+        );
+
+        let vertex_color_copy_data = gpu_copy.prepare(
+            device,
+            self.buffers.vertex_color.slice(..),
+            new_buffers.vertex_color.slice(..),
+            "vertex color copy",
+        );
+
+        let vertex_mat_index_copy_data = gpu_copy.prepare(
+            device,
+            self.buffers.vertex_mat_index.slice(..),
+            new_buffers.vertex_mat_index.slice(..),
+            "vertex material index copy",
+        );
         let index_copy_data = gpu_copy.prepare(
             device,
-            self.index_buffer.slice(..),
-            new_index_buffer.slice(..),
+            self.buffers.index.slice(..),
+            new_buffers.index.slice(..),
             "index copy",
         );
 
@@ -209,16 +242,27 @@ impl MeshManager {
 
             let vert_difference = new_vert_range.start as isize - mesh.vertex_range.start as isize;
 
-            // Copy verts over to new buffer
-            let vert_copy_start = (mesh.vertex_range.start * VERTEX_SIZE) / 4;
-            let vert_copy_end = (mesh.vertex_range.end * VERTEX_SIZE) / 4;
-            let vert_output = (new_vert_range.start * VERTEX_SIZE) / 4;
-            gpu_copy.copy_words(
-                &mut cpass,
-                &vert_copy_data,
-                vert_copy_start as u32..vert_copy_end as u32,
-                vert_output as u32,
-            );
+            // TODO: This was once a function but borrowck wasn't happy with me, could I make it happy?
+            macro_rules! copy_vert_fn {
+                ($data:expr, $size:expr) => {
+                    // Copy verts over to new buffer
+                    let vert_copy_start = (mesh.vertex_range.start * $size) / 4;
+                    let vert_copy_end = (mesh.vertex_range.end * $size) / 4;
+                    let vert_output = (new_vert_range.start * $size) / 4;
+                    gpu_copy.copy_words(
+                        &mut cpass,
+                        $data,
+                        vert_copy_start as u32..vert_copy_end as u32,
+                        vert_output as u32,
+                    );
+                };
+            }
+
+            copy_vert_fn!(&vertex_position_copy_data, VERTEX_POSITION_SIZE);
+            copy_vert_fn!(&vertex_normal_copy_data, VERTEX_NORMAL_SIZE);
+            copy_vert_fn!(&vertex_uv_copy_data, VERTEX_UV_SIZE);
+            copy_vert_fn!(&vertex_color_copy_data, VERTEX_COLOR_SIZE);
+            copy_vert_fn!(&vertex_mat_index_copy_data, VERTEX_MATERIAL_INDEX_SIZE);
 
             // Copy indices over to new buffer, adjusting their value by the difference
             let index_copy_start = (mesh.index_range.start * INDEX_SIZE) / 4;
@@ -238,11 +282,70 @@ impl MeshManager {
 
         drop(cpass);
 
-        self.vertex_buffer = new_vertex_buffer;
-        self.index_buffer = new_index_buffer;
+        self.buffers = new_buffers;
         self.vertex_count = new_vert_count;
         self.index_count = new_index_count;
         self.vertex_alloc = new_vert_alloc;
         self.index_alloc = new_index_alloc;
+    }
+}
+
+fn create_buffers(device: &Device, vertex_count: usize, index_count: usize) -> MeshBuffers {
+    let position_bytes = vertex_count * VERTEX_POSITION_SIZE;
+    let normal_bytes = vertex_count * VERTEX_NORMAL_SIZE;
+    let uv_bytes = vertex_count * VERTEX_UV_SIZE;
+    let color_bytes = vertex_count * VERTEX_COLOR_SIZE;
+    let mat_index_bytes = vertex_count * VERTEX_MATERIAL_INDEX_SIZE;
+    let index_bytes = index_count * INDEX_SIZE;
+
+    let vertex_position = device.create_buffer(&BufferDescriptor {
+        label: Some("position vertex buffer"),
+        size: position_bytes as BufferAddress,
+        usage: BufferUsage::COPY_DST | BufferUsage::VERTEX | BufferUsage::STORAGE,
+        mapped_at_creation: false,
+    });
+
+    let vertex_normal = device.create_buffer(&BufferDescriptor {
+        label: Some("normal vertex buffer"),
+        size: normal_bytes as BufferAddress,
+        usage: BufferUsage::COPY_DST | BufferUsage::VERTEX | BufferUsage::STORAGE,
+        mapped_at_creation: false,
+    });
+
+    let vertex_uv = device.create_buffer(&BufferDescriptor {
+        label: Some("uv vertex buffer"),
+        size: uv_bytes as BufferAddress,
+        usage: BufferUsage::COPY_DST | BufferUsage::VERTEX | BufferUsage::STORAGE,
+        mapped_at_creation: false,
+    });
+
+    let vertex_color = device.create_buffer(&BufferDescriptor {
+        label: Some("color vertex buffer"),
+        size: color_bytes as BufferAddress,
+        usage: BufferUsage::COPY_DST | BufferUsage::VERTEX | BufferUsage::STORAGE,
+        mapped_at_creation: false,
+    });
+
+    let vertex_mat_index = device.create_buffer(&BufferDescriptor {
+        label: Some("material index vertex buffer"),
+        size: mat_index_bytes as BufferAddress,
+        usage: BufferUsage::COPY_DST | BufferUsage::VERTEX | BufferUsage::STORAGE,
+        mapped_at_creation: false,
+    });
+
+    let index = device.create_buffer(&BufferDescriptor {
+        label: Some("index buffer"),
+        size: index_bytes as BufferAddress,
+        usage: BufferUsage::COPY_DST | BufferUsage::INDEX | BufferUsage::STORAGE,
+        mapped_at_creation: false,
+    });
+
+    MeshBuffers {
+        vertex_position,
+        vertex_normal,
+        vertex_uv,
+        vertex_color,
+        vertex_mat_index,
+        index,
     }
 }

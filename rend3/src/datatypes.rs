@@ -3,6 +3,7 @@ use glam::{
     f32::{Vec3A, Vec4},
     Mat4, Vec2, Vec3,
 };
+use itertools::Itertools;
 use std::mem;
 use wgpu::TextureFormat;
 pub use wgpu::{Color as ClearColor, LoadOp as PipelineLoadOp};
@@ -32,27 +33,55 @@ declare_handle!(
     PipelineHandle
 );
 
-// Consider:
-//
-// Bone weights!!!
-// Lightmap UVs
-// Spherical harmonics
-// Baked light color
-// A lot of renderers put the tangent vector in the vertex data, but you can calculate it in the pixel shader ezpz
-// Maybe thiccness data for tree branches
-// I'd consider putting everything you can into the vertex data structure. Vertex data is just per-vertex data, and a lot of things can be per-vertex
-// Then you don't need a million 4K textures
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone)]
-pub struct ModelVertex {
-    pub position: Vec3, // 00..12
-    pub normal: Vec3,   // 12..24
-    pub uv: Vec2,       // 24..32
-    pub color: [u8; 4], // 32..36
+macro_rules! changeable_struct {
+    ($(#[$outer:meta])* pub struct $name:ident <- nodefault $name_change:ident { $($field_vis:vis $field_name:ident : $field_type:ty),* $(,)? } ) => {
+        $(#[$outer])*
+        pub struct $name {
+            $(
+                $field_vis $field_name : $field_type
+            ),*
+        }
+        impl $name {
+            pub fn update_from_changes(&mut self, change: $name_change) {
+                $(
+                    if let Some(inner) = change.$field_name {
+                        self.$field_name = inner;
+                    }
+                );*
+            }
+        }
+        $(#[$outer])*
+        pub struct $name_change {
+            $(
+                $field_vis $field_name : Option<$field_type>
+            ),*
+        }
+    };
+    ($(#[$outer:meta])* pub struct $name:ident <- $name_change:ident { $($field_vis:vis $field_name:ident : $field_type:ty),* $(,)? } ) => {
+        $(#[$outer])*
+        pub struct $name {
+            $(
+                $field_vis $field_name : $field_type
+            ),*
+        }
+        impl $name {
+            pub fn update_from_changes(&mut self, change: $name_change) {
+                $(
+                    if let Some(inner) = change.$field_name {
+                        self.$field_name = inner;
+                    }
+                );*
+            }
+        }
+        $(#[$outer])*
+        #[derive(Default)]
+        pub struct $name_change {
+            $(
+                $field_vis $field_name : Option<$field_type>
+            ),*
+        }
+    };
 }
-
-unsafe impl bytemuck::Zeroable for ModelVertex {}
-unsafe impl bytemuck::Pod for ModelVertex {}
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -130,97 +159,246 @@ impl From<RendererTextureFormat> for wgpu::TextureFormat {
     }
 }
 
-macro_rules! changeable_struct {
-    ($(#[$outer:meta])* pub struct $name:ident <- nodefault $name_change:ident { $($field_vis:vis $field_name:ident : $field_type:ty),* $(,)? } ) => {
-        $(#[$outer])*
-        pub struct $name {
-            $(
-                $field_vis $field_name : $field_type
-            ),*
-        }
-        impl $name {
-            pub fn update_from_changes(&mut self, change: $name_change) {
-                $(
-                    if let Some(inner) = change.$field_name {
-                        self.$field_name = inner;
-                    }
-                );*
-            }
-        }
-        $(#[$outer])*
-        pub struct $name_change {
-            $(
-                $field_vis $field_name : Option<$field_type>
-            ),*
-        }
-    };
-    ($(#[$outer:meta])* pub struct $name:ident <- $name_change:ident { $($field_vis:vis $field_name:ident : $field_type:ty),* $(,)? } ) => {
-        $(#[$outer])*
-        pub struct $name {
-            $(
-                $field_vis $field_name : $field_type
-            ),*
-        }
-        impl $name {
-            pub fn update_from_changes(&mut self, change: $name_change) {
-                $(
-                    if let Some(inner) = change.$field_name {
-                        self.$field_name = inner;
-                    }
-                );*
-            }
-        }
-        $(#[$outer])*
-        #[derive(Default)]
-        pub struct $name_change {
-            $(
-                $field_vis $field_name : Option<$field_type>
-            ),*
-        }
-    };
+// Consider:
+//
+// Bone weights!!!
+// Lightmap UVs
+// Spherical harmonics
+// Baked light color
+// A lot of renderers put the tangent vector in the vertex data, but you can calculate it in the pixel shader ezpz
+// Maybe thiccness data for tree branches
+// I'd consider putting everything you can into the vertex data structure. Vertex data is just per-vertex data, and a lot of things can be per-vertex
+// Then you don't need a million 4K textures
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone)]
+pub struct InterleavedModelVertex {
+    pub position: Vec3,      // 00..12
+    pub normal: Vec3,        // 12..24
+    pub uv: Vec2,            // 24..32
+    pub color: [u8; 4],      // 32..36
+    pub material_index: u32, // 36..40
 }
 
+/// Easy to use builder for a [`Mesh`] that deals with common operations for you.
+#[derive(Debug, Default)]
+pub struct MeshBuilder {
+    vertex_positions: Vec<Vec3>,
+    vertex_normals: Option<Vec<Vec3>>,
+    vertex_uvs: Option<Vec<Vec2>>,
+    vertex_colors: Option<Vec<[u8; 4]>>,
+    vertex_material_indices: Option<Vec<u32>>,
+    vertex_count: usize,
+
+    indices: Option<Vec<u32>>,
+
+    right_handed: bool,
+}
+impl MeshBuilder {
+    /// Create a new [`MeshBuilder`] with a given set of positions.
+    ///
+    /// All vertices must have positions.
+    ///
+    /// # Panic
+    ///
+    /// Will panic if the length is zero.
+    pub fn new(vertex_positions: Vec<Vec3>) -> Self {
+        let me = Self {
+            vertex_count: vertex_positions.len(),
+            vertex_positions,
+            ..Self::default()
+        };
+        assert_ne!(me.vertex_positions.len(), 0, "Cannot have a mesh with zero vertices");
+        me
+    }
+
+    fn validate_len(&self, len: usize) {
+        assert_eq!(self.vertex_count, len)
+    }
+
+    /// Add vertex normals to the given mesh.
+    ///
+    /// # Panic
+    ///
+    /// Will panic if the length is different from the position buffer length.
+    pub fn with_vertex_normals(mut self, normals: Vec<Vec3>) -> Self {
+        self.validate_len(normals.len());
+        self.vertex_normals = Some(normals);
+        self
+    }
+
+    /// Add texture coordinates to the given mesh.
+    ///
+    /// # Panic
+    ///
+    /// Will panic if the length is different from the position buffer length.
+    pub fn with_vertex_uvs(mut self, uvs: Vec<Vec2>) -> Self {
+        self.validate_len(uvs.len());
+        self.vertex_uvs = Some(uvs);
+        self
+    }
+
+    /// Add vertex colors to the given mesh.
+    ///
+    /// # Panic
+    ///
+    /// Will panic if the length is different from the position buffer length.
+    pub fn with_vertex_colors(mut self, colors: Vec<[u8; 4]>) -> Self {
+        self.validate_len(colors.len());
+        self.vertex_colors = Some(colors);
+        self
+    }
+
+    /// Add material indices to the given mesh.
+    ///
+    /// # Panic
+    ///
+    /// Will panic if the length is different from the position buffer length.
+    pub fn with_vertex_material_indices(mut self, material_indices: Vec<u32>) -> Self {
+        self.validate_len(material_indices.len());
+        self.vertex_material_indices = Some(material_indices);
+        self
+    }
+
+    /// Add indices to the given mesh.
+    ///
+    /// # Panic
+    ///
+    /// Will panic if the length is zero.
+    pub fn with_indices(mut self, indices: Vec<u32>) -> Self {
+        assert_ne!(indices.len(), 0, "Cannot have a mesh with zero indices");
+        self.indices = Some(indices);
+        self
+    }
+
+    /// Mark this mesh as using a right handed (Counter Clockwise) winding order. It will be
+    /// converted to rend3 native left handed (Clockwise) winding order on construction. This will
+    /// not change the vertex normals. If this is called, it is advised to not provide a normal
+    /// buffer so a buffer will be calculated for you.
+    ///
+    /// See [`Mesh::flip_winding_order`] for more information.
+    pub fn with_right_handed(mut self) -> Self {
+        self.right_handed = true;
+        self
+    }
+
+    /// Build a mesh, adding whatever components weren't provided.
+    ///
+    /// If normals weren't provided, they will be calculated. If mesh
+    /// is right handed, will be converted to left handed.
+    ///
+    /// All others will be filled with defaults.
+    pub fn build(self) -> Mesh {
+        let length = self.vertex_count;
+        debug_assert_ne!(length, 0, "Length should be guarded by validation");
+
+        let has_normals = self.vertex_normals.is_some();
+
+        let mut mesh = Mesh {
+            vertex_positions: self.vertex_positions,
+            vertex_normals: self.vertex_normals.unwrap_or_else(|| vec![Vec3::zero(); length]),
+            vertex_uvs: self.vertex_uvs.unwrap_or_else(|| vec![Vec2::zero(); length]),
+            vertex_colors: self.vertex_colors.unwrap_or_else(|| vec![[0; 4]; length]),
+            vertex_material_indices: self.vertex_material_indices.unwrap_or_else(|| vec![0; length]),
+            indices: self.indices.unwrap_or_else(|| (0..length as u32).collect()),
+        };
+
+        // We need to flip winding order first, so the normals will be facing the right direction.
+        if self.right_handed {
+            mesh.flip_winding_order();
+        }
+
+        if !has_normals {
+            mesh.calculate_normals();
+        }
+
+        mesh
+    }
+}
+
+/// Represents a mesh that may be used by many objects.
+///
+/// Meshes are in Structure of Array format and must have all the vertex_* arrays be the same length.
+/// This condition can be checked with the [`Mesh::validate`] function.
+///
+/// These can be annoying to construct, so use the [`MeshBuilder`] to make it easier.
 #[derive(Debug, Default, Clone)]
 pub struct Mesh {
-    pub vertices: Vec<ModelVertex>,
+    pub vertex_positions: Vec<Vec3>,
+    pub vertex_normals: Vec<Vec3>,
+    pub vertex_uvs: Vec<Vec2>,
+    pub vertex_colors: Vec<[u8; 4]>,
+    pub vertex_material_indices: Vec<u32>,
+
     pub indices: Vec<u32>,
-    // TODO: Bones/joints/animation
 }
 
 impl Mesh {
+    /// Validates that all vertex attributes have the same length.
+    pub fn validate(&self) -> bool {
+        [
+            self.vertex_positions.len(),
+            self.vertex_normals.len(),
+            self.vertex_uvs.len(),
+            self.vertex_colors.len(),
+            self.vertex_material_indices.len(),
+        ]
+        .iter()
+        .all_equal()
+    }
+
     /// Calculate normals for the given mesh, assuming smooth shading and per-vertex normals.
     ///
     /// Use left-handed normal calculation. Call [`Mesh::flip_winding_order`] first if you have
     /// a right handed mesh you want to use with rend3.
     pub fn calculate_normals(&mut self) {
-        for vert in &mut self.vertices {
-            vert.normal = Vec3::zero();
+        Self::calculate_normals_for_buffers(&mut self.vertex_normals, &self.vertex_positions, &self.indices);
+    }
+
+    /// Calculate normals for the given buffers representing a mesh, assuming smooth shading and per-vertex normals.
+    ///
+    /// Positions and normals must be the same length.
+    pub fn calculate_normals_for_buffers(normals: &mut [Vec3], positions: &[Vec3], indices: &[u32]) {
+        assert_eq!(normals.len(), positions.len());
+
+        for norm in normals.iter_mut() {
+            *norm = Vec3::zero();
         }
 
-        for idx in self.indices.chunks_exact(3) {
-            let pos1 = self.vertices[idx[0] as usize].position;
-            let pos2 = self.vertices[idx[1] as usize].position;
-            let pos3 = self.vertices[idx[2] as usize].position;
+        for idx in indices.chunks_exact(3) {
+            let (idx0, idx1, idx2) = match *idx {
+                [idx0, idx1, idx2] => (idx0, idx1, idx2),
+                // SAFETY: This is guaranteed by chunks_exact(3)
+                _ => unsafe { std::hint::unreachable_unchecked() },
+            };
+
+            let pos1 = positions[idx0 as usize];
+            let pos2 = positions[idx1 as usize];
+            let pos3 = positions[idx2 as usize];
 
             let edge1 = pos2 - pos1;
             let edge2 = pos3 - pos1;
 
             let normal = edge2.cross(edge1);
 
-            self.vertices[idx[0] as usize].normal += normal;
-            self.vertices[idx[1] as usize].normal += normal;
-            self.vertices[idx[2] as usize].normal += normal;
+            // SAFETY: All vectors are the same length by the assert, and indexing succeeded on positions, therefore it's safe on normals
+            unsafe {
+                *normals.get_unchecked_mut(idx0 as usize) += normal;
+                *normals.get_unchecked_mut(idx1 as usize) += normal;
+                *normals.get_unchecked_mut(idx2 as usize) += normal;
+            }
         }
 
-        for vert in &mut self.vertices {
-            vert.normal = vert.normal.normalize();
+        for normal in normals.iter_mut() {
+            *normal = normal.normalize();
         }
     }
 
     /// Inverts the winding order of a mesh. This is useful if you have meshes which
     /// are designed for right-handed (Counter-Clockwise) winding order for use in OpenGL or VK.
     ///
-    /// This does not change vertex location, so does not change coordinate system.
+    /// This does not change vertex location, so does not change coordinate system. This will
+    /// also not change the vertex normals. Calling [`Mesh::calculate_normals`] is advised after
+    /// calling this function.
     ///
     /// rend3 uses a left-handed (Clockwise) winding order.
     pub fn flip_winding_order(&mut self) {
