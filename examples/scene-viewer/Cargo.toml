@@ -1,6 +1,6 @@
 [package]
 name = "rend3-scene-viewer-example"
-license = "MPL-2.0"
+license = "MIT OR Apache-2.0 OR Zlib"
 version = "0.1.0"
 authors = ["Connor Fitzgerald <connorwadefitzgerald@gmail.com>"]
 edition = "2018"
@@ -18,7 +18,7 @@ fnv = "1"
 glam = "0.11"
 image = { version = "0.23", default-features = false, features = ["png", "jpeg", "tiff"]}
 histogram = "0.6"
-pico-args = "0.3"
+pico-args = "0.4"
 pollster = "0.2"
 rend3 = { path = "../../rend3", version = "0.1.0" }
 rend3-gltf = { path = "../../rend3-gltf", version = "0.1.0" }

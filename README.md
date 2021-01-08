@@ -5,6 +5,7 @@
 [![Documentation](https://docs.rs/rend3/badge.svg)](https://docs.rs/rend3)
 ![License](https://img.shields.io/crates/l/rend3)
 
+![](examples/scene-viewer/scifi-base.jpg)
 ![](examples/scene-viewer/screenshot.jpg)
 
 Easy to use, customizable, efficient 3D renderer library built on wgpu.
@@ -45,4 +46,4 @@ under the [enhancement] label.
 
 [enhancement]: https://github.com/BVE-Reborn/rend3/labels/enhancement
 
-License: MPL-2.0
+License: MIT OR Apache-2.0 OR Zlib

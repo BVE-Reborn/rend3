@@ -6,7 +6,7 @@ edition = "2018"
 description = "Easy to use, customizable, efficient 3D renderer library built on wgpu."
 readme = "README.md"
 repository = "https://github.com/BVE-Reborn/rend3"
-license = "MPL-2.0"
+license = "MIT OR Apache-2.0 OR Zlib"
 keywords = []
 categories = []
 
