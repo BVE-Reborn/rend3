@@ -1,3 +1,5 @@
+use glam::Vec3;
+
 fn load_gltf(
     renderer: &rend3::Renderer,
     path: &'static str,
@@ -86,7 +88,8 @@ fn main() {
         mesh,
         material,
         transform: rend3::datatypes::AffineTransform {
-            transform: glam::Mat4::identity(),
+            // Need to flip gltf's coords and winding order
+            transform: glam::Mat4::from_scale(Vec3::new(1.0, 1.0, -1.0)),
         },
     };
     let _object_handle = renderer.add_object(object);
@@ -94,8 +97,8 @@ fn main() {
     // Set camera's location
     renderer.set_camera_location(rend3::datatypes::CameraLocation {
         location: glam::Vec3A::new(3.0, 3.0, -5.0),
-        pitch: 0.5,
-        yaw: -0.55,
+        pitch: 0.43,
+        yaw: -0.49,
     });
 
     // Create a single directional light
