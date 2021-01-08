@@ -3,6 +3,7 @@ use glam::{
     f32::{Vec3A, Vec4},
     Mat4, Vec2, Vec3,
 };
+use std::mem;
 use wgpu::TextureFormat;
 pub use wgpu::{Color as ClearColor, LoadOp as PipelineLoadOp};
 
@@ -187,6 +188,10 @@ pub struct Mesh {
 }
 
 impl Mesh {
+    /// Calculate normals for the given mesh, assuming smooth shading and per-vertex normals.
+    ///
+    /// Use left-handed normal calculation. Call [`Mesh::flip_winding_order`] first if you have
+    /// a right handed mesh you want to use with rend3.
     pub fn calculate_normals(&mut self) {
         for vert in &mut self.vertices {
             vert.normal = Vec3::zero();
@@ -200,7 +205,7 @@ impl Mesh {
             let edge1 = pos2 - pos1;
             let edge2 = pos3 - pos1;
 
-            let normal = edge1.cross(edge2);
+            let normal = edge2.cross(edge1);
 
             self.vertices[idx[0] as usize].normal += normal;
             self.vertices[idx[1] as usize].normal += normal;
@@ -209,6 +214,23 @@ impl Mesh {
 
         for vert in &mut self.vertices {
             vert.normal = vert.normal.normalize();
+        }
+    }
+
+    /// Inverts the winding order of a mesh. This is useful if you have meshes which
+    /// are designed for right-handed (Counter-Clockwise) winding order for use in OpenGL or VK.
+    ///
+    /// This does not change vertex location, so does not change coordinate system.
+    ///
+    /// rend3 uses a left-handed (Clockwise) winding order.
+    pub fn flip_winding_order(&mut self) {
+        for indices in self.indices.chunks_exact_mut(3) {
+            if let [left, _, right] = indices {
+                mem::swap(left, right);
+            } else {
+                // SAFETY: chunks_exact(3) guarantees us 3 value long slices
+                unsafe { std::hint::unreachable_unchecked() }
+            }
         }
     }
 }
