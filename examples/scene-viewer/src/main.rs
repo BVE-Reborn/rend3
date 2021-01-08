@@ -1,18 +1,15 @@
 use fnv::FnvBuildHasher;
-use glam::{Mat4, Quat, Vec2, Vec3, Vec3A};
-use obj::{IndexTuple, Obj};
+use glam::{Vec3, Vec3A};
 use pico_args::Arguments;
 use rend3::{
-    datatypes::{
-        AffineTransform, AlbedoComponent, CameraLocation, DirectionalLight, Material, MaterialComponent,
-        MaterialHandle, Mesh, MeshHandle, ModelVertex, Object, RendererTextureFormat, Texture, TextureHandle,
-    },
+    datatypes::{CameraLocation, DirectionalLight, RendererTextureFormat, Texture},
     list::{DefaultPipelines, DefaultShaders},
     Renderer,
 };
 use std::{
-    collections::hash_map::{self, HashMap},
+    collections::HashMap,
     hash::BuildHasher,
+    path::Path,
     time::{Duration, Instant},
 };
 use winit::{
@@ -23,64 +20,12 @@ use winit::{
 
 mod platform;
 
-fn load_texture(
-    renderer: &Renderer,
-    cache: &mut HashMap<String, TextureHandle>,
-    name: &str,
-    format: RendererTextureFormat,
-) -> Result<TextureHandle, Box<dyn std::error::Error>> {
-    rend3::span!(_guard, INFO, "Loading Texture", name = ?name);
-    Ok(match cache.entry(name.to_owned()) {
-        hash_map::Entry::Occupied(o) => *o.get(),
-        hash_map::Entry::Vacant(v) => *v.insert({
-            let real_name = concat!(env!("CARGO_MANIFEST_DIR"), "/data/").to_owned() + name;
-            let file = std::fs::read(&real_name).unwrap_or_else(|_| panic!("Could not read object {}", real_name));
-
-            let transcoder = basis::Transcoder::new();
-            let image_info = transcoder
-                .get_image_level_info(&file, 0, 0)
-                .ok_or("can't transcode missing image")?;
-
-            let basis_format = match format {
-                RendererTextureFormat::Bc4Linear => basis::TargetTextureFormat::Bc4R,
-                RendererTextureFormat::Bc5Normal => basis::TargetTextureFormat::Bc5Rg,
-                RendererTextureFormat::Bc7Srgb => basis::TargetTextureFormat::Bc7Rgba,
-                _ => unreachable!(),
-            };
-
-            let mips = transcoder.get_total_image_levels(&file, 0);
-
-            let mut prepared = transcoder
-                .prepare_transcoding(&file)
-                .ok_or("couldn't prepare transcoding")?;
-
-            let mut image = vec![];
-
-            for mip in 0..mips {
-                image.extend_from_slice(&prepared.transcode_image_level(0, mip, basis_format)?);
-            }
-            drop(prepared);
-
-            renderer.add_texture_2d(Texture {
-                format,
-                width: image_info.width,
-                height: image_info.height,
-                data: image,
-                label: Some(name.to_owned()),
-                mip_levels: mips,
-            })
-        }),
-    })
-}
-
 fn load_skybox(renderer: &Renderer) -> Result<(), Box<dyn std::error::Error>> {
     let name = concat!(env!("CARGO_MANIFEST_DIR"), "/data/skybox.basis");
     let file = std::fs::read(name).unwrap_or_else(|_| panic!("Could not read skybox {}", name));
 
     let transcoder = basis::Transcoder::new();
-    let image_info = transcoder
-        .get_image_level_info(&file, 0, 0)
-        .ok_or("skybox image missing")?;
+    let image_info = transcoder.get_image_info(&file, 0).ok_or("skybox image missing")?;
 
     let mips = transcoder.get_total_image_levels(&file, 0);
 
@@ -107,146 +52,37 @@ fn load_skybox(renderer: &Renderer) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn load_obj(renderer: &Renderer, file: &str) -> Result<(MeshHandle, MaterialHandle), Box<dyn std::error::Error>> {
-    rend3::span!(obj_guard, INFO, "Loading Obj");
+fn load_gltf(renderer: &Renderer, location: String) -> rend3_gltf::LoadedGltfScene {
+    let path = Path::new(&location);
+    let binary_path = path.with_extension("bin");
+    let parent = path.parent().unwrap();
 
-    let mut object = Obj::load(file)?;
-    object.load_mtls()?;
-
-    drop(obj_guard);
-
-    let mut textures = HashMap::new();
-    let mut material_index_map = HashMap::new();
-    let mut materials = Vec::new();
-
-    for lib in &object.data.material_libs {
-        // These names are an artifact of the Obj spec, which came before PBR.
-        for obj::Material {
-            name,
-            map_kd,
-            map_bump,
-            map_ns,
-            map_d,
-            ..
-        } in lib.materials.iter().map(|m| m.as_ref())
-        {
-            material_index_map.insert(name.clone(), materials.len() as u32);
-
-            let handle = renderer.add_material(Material {
-                albedo: match map_kd {
-                    None => AlbedoComponent::Vertex { srgb: false },
-                    Some(name) => AlbedoComponent::Texture(load_texture(
-                        renderer,
-                        &mut textures,
-                        name,
-                        RendererTextureFormat::Bc7Srgb,
-                    )?),
-                },
-                // `MaterialComponent` is a superset of `Option<TextureHandle>`. It adds a `Value`
-                // variant which represents a kind of "flat plane" texture where each texel is the
-                // same. This behavior is never desirable for normals, however, so it uses
-                // `Option<TextureHandle>` instead.
-                normal: map_bump
-                    .as_ref()
-                    .map(|name| load_texture(renderer, &mut textures, name, RendererTextureFormat::Bc5Normal))
-                    .transpose()?,
-                roughness: match map_ns {
-                    None => MaterialComponent::None,
-                    Some(name) => MaterialComponent::Texture(load_texture(
-                        renderer,
-                        &mut textures,
-                        name,
-                        RendererTextureFormat::Bc4Linear,
-                    )?),
-                },
-                ambient_occlusion: match map_d {
-                    None => MaterialComponent::None,
-                    Some(name) => MaterialComponent::Texture(load_texture(
-                        renderer,
-                        &mut textures,
-                        name,
-                        RendererTextureFormat::Bc4Linear,
-                    )?),
-                },
-                ..Material::default()
-            });
-
-            materials.push(handle);
-        }
-    }
-
-    assert!(
-        materials.len() <= 1,
-        "More than one material per obj is currently unsupported"
-    );
-
-    rend3::span!(_guard, INFO, "Converting Mesh");
-
-    let mut mesh = Mesh {
-        vertices: vec![],
-        indices: vec![],
-    };
-
-    let mut translation: HashMap<IndexTuple, u32> = HashMap::new();
-    for group in &object.data.objects[0].groups {
-        for polygon in &group.polys {
-            for &index in &polygon.0 {
-                let this_vert = translation.len() as u32;
-                let vert_idx = *translation.entry(index).or_insert_with(|| {
-                    let IndexTuple(position_idx, texture_idx, normal_idx) = index;
-
-                    let position = object.data.position[position_idx];
-                    let normal = object.data.normal[normal_idx.unwrap()];
-                    let texture_coords = object.data.texture[texture_idx.unwrap()];
-
-                    mesh.vertices.push(ModelVertex {
-                        position: Vec3::from(position),
-                        normal: Vec3::from(normal),
-                        uv: Vec2::from(texture_coords),
-                        color: [255; 4],
-                    });
-
-                    this_vert
-                });
-
-                mesh.indices.push(vert_idx);
-            }
-        }
-    }
-
-    let mesh_handle = renderer.add_mesh(mesh);
-
-    Ok((mesh_handle, materials.into_iter().next().ok_or("no materials")?))
-}
-
-fn single(renderer: &Renderer, mesh: MeshHandle, material: MaterialHandle) {
-    renderer.add_object(Object {
-        mesh,
-        material,
-        transform: AffineTransform {
-            transform: Mat4::from_scale_rotation_translation(
-                Vec3::new(1.0, 1.0, 1.0),
-                Quat::identity(),
-                Vec3::new(0.0, -10.0, 10.0),
-            ),
-        },
+    println!("Reading gltf file: {}", path.display());
+    let gltf_data =
+        std::fs::read(&path).unwrap_or_else(|e| panic!("tried to load gltf file {}: {}", path.display(), e));
+    println!("Reading gltf sidecar file file: {}", binary_path.display());
+    let bin_data = std::fs::read(&binary_path).unwrap_or_else(|e| {
+        panic!(
+            "tried to load gltf binary sidecar file {}: {}",
+            binary_path.display(),
+            e
+        )
     });
-}
 
-fn distribute(renderer: &Renderer, mesh: MeshHandle, material: MaterialHandle) {
-    for x in (-11..=11).step_by(4) {
-        for y in (-11..=11).step_by(4) {
-            for z in (0..=50).step_by(25) {
-                renderer.add_object(Object {
-                    mesh,
-                    material,
-                    transform: AffineTransform {
-                        transform: Mat4::from_translation(Vec3::new(x as f32, y as f32, z as f32)),
-                    },
-                });
+    pollster::block_on(rend3_gltf::load_gltf(
+        renderer,
+        &gltf_data,
+        &bin_data,
+        move |tex_path| {
+            println!("Reading image file: {}", tex_path);
+            let tex_path = tex_path.to_owned();
+            async move {
+                let tex_resolved = parent.join(&tex_path);
+                async_std::fs::read(tex_resolved).await
             }
-        }
-    }
+        },
+    ))
+    .unwrap()
 }
 
 fn button_pressed<Hash: BuildHasher>(map: &HashMap<u32, bool, Hash>, key: u32) -> bool {
@@ -282,6 +118,7 @@ fn main() {
         .ok()
         .map(|s: String| s.to_lowercase());
     let desired_mode = args.value_from_fn(["-m", "--mode"], extract_mode).ok();
+    let file_to_load: Option<String> = args.free_from_str().ok();
 
     rend3::span_transfer!(_ -> main_thread_span, INFO, "Main Thread Setup");
     rend3::span_transfer!(_ -> event_loop_span, INFO, "Building Event Loop");
@@ -320,10 +157,10 @@ fn main() {
 
     rend3::span_transfer!(renderer_span -> loading_span, INFO, "Loading resources");
 
-    let cube = load_obj(&renderer, concat!(env!("CARGO_MANIFEST_DIR"), "/data/cube.obj")).unwrap();
-    single(&renderer, cube.0, cube.1);
-    let suzanne = load_obj(&renderer, concat!(env!("CARGO_MANIFEST_DIR"), "/data/suzanne.obj")).unwrap();
-    distribute(&renderer, suzanne.0, suzanne.1);
+    load_gltf(
+        &renderer,
+        file_to_load.unwrap_or_else(|| concat!(env!("CARGO_MANIFEST_DIR"), "/data/scene.gltf").to_owned()),
+    );
     load_skybox(&renderer).unwrap();
 
     renderer.add_directional_light(DirectionalLight {
@@ -331,12 +168,6 @@ fn main() {
         intensity: 10.0,
         direction: Vec3::new(-1.0, -1.0, 0.0),
     });
-    // renderer.add_directional_light(DirectionalLight {
-    //     color: Vec3::one(),
-    //     intensity: 2.0,
-    //     direction: Vec3::new(1.0, 0.0, 0.0),
-    // });
-
     rend3::span_transfer!(loading_span -> _);
     rend3::span_transfer!(main_thread_span -> _);
 
@@ -383,7 +214,7 @@ fn main() {
             let up = Vec3A::unit_y();
             let side: Vec3A = forward.cross(up).normalize();
             let velocity = if button_pressed(&scancode_status, platform::Scancodes::SHIFT) {
-                10.0
+                100.0
             } else {
                 1.0
             };

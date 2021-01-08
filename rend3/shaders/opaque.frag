@@ -1,5 +1,7 @@
 #version 450
 
+#extension GL_GOOGLE_include_directive : require
+
 #ifdef GPU_MODE
 #extension GL_EXT_nonuniform_qualifier : require
 #endif

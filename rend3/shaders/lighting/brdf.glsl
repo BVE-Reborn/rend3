@@ -24,6 +24,10 @@ float Fd_Burley(float NoV, float NoL, float LoH, float roughness) {
     return lightScatter * viewScatter * (1.0 / PI);
 }
 
+float Fd_Lambert() {
+    return 1.0 / PI;
+}
+
 float V_SmithGGXCorrelated(float NoV, float NoL, float a) {
     float a2 = a * a;
     float GGXL = NoV * sqrt((-NoL * a2 + NoL) * NoL + a2);

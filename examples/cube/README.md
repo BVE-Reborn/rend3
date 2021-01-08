@@ -2,4 +2,4 @@
 
 Basic example, best way to get started with the api.
 
-![](screenshot.jpg)
+![](screenshot.png)

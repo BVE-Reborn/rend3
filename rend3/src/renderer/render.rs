@@ -252,7 +252,7 @@ pub fn render_loop<TLD: 'static>(
                     );
                 }
                 Instruction::ChangeMaterial { handle, change } => {
-                    material_manager.update_from_changes(&renderer.queue, &texture_manager_2d, handle, change);
+                    material_manager.update_from_changes(&renderer.queue, handle, change);
                 }
                 Instruction::RemoveMaterial { handle } => {
                     material_manager.remove(handle);
@@ -313,6 +313,17 @@ pub fn render_loop<TLD: 'static>(
 
         let texture_2d_ready = texture_manager_2d.ready(&renderer.device);
         let texture_cube_ready = texture_manager_cube.ready(&renderer.device);
+
+        let recompile_future = if renderer.mode == RendererMode::GPUPowered {
+            Some(renderer.pipeline_manager.recompile_pipelines(
+                &renderer,
+                texture_2d_ready.dirty.into_gpu(),
+                texture_cube_ready.dirty.into_gpu(),
+            ))
+        } else {
+            None
+        };
+
         material_manager.ready(&renderer.device, &mut encoder, &texture_manager_2d);
         let object_count = object_manager.ready(&renderer.device, &mut encoder, &material_manager);
         directional_light_manager.ready(&renderer.device, &mut encoder);
@@ -374,6 +385,10 @@ pub fn render_loop<TLD: 'static>(
         }
 
         drop(global_resources);
+
+        if let Some(recomp_future) = recompile_future {
+            recomp_future.await;
+        }
 
         let global_resources = renderer.global_resources.read();
         let object_manager = renderer.object_manager.read();

@@ -28,13 +28,30 @@ bool frustum_contains_sphere(Frustum frustum, vec4 sphere) {
     vec3 location = sphere.xyz;
     float neg_radius = -sphere.w;
 
-    bool left = plane_distance(frustum.left, location) >= neg_radius;
-    bool right = plane_distance(frustum.right, location) >= neg_radius;
-    bool top = plane_distance(frustum.top, location) >= neg_radius;
-    bool bottom = plane_distance(frustum.bottom, location) >= neg_radius;
-    bool near = plane_distance(frustum.near, location) >= neg_radius;
+    if (!(plane_distance(frustum.left, location) >= neg_radius)) {
+        return false;
+    }
+    if (!(plane_distance(frustum.right, location) >= neg_radius)) {
+        return false;
+    }
+    if (!(plane_distance(frustum.top, location) >= neg_radius)) {
+        return false;
+    }
+    if (!(plane_distance(frustum.bottom, location) >= neg_radius)) {
+        return false;
+    }
+    if (!(plane_distance(frustum.near, location) >= neg_radius)) {
+        return false;
+    }
 
-    return left && right && top && bottom && near;
+    return true;
+}
+
+vec4 transform_sphere(vec4 sphere, mat4 transform) {
+    float max_scale = max(max(length(transform[0].xyz), length(transform[1].xyz)), length(transform[2].xyz));
+    vec4 center = transform * vec4(sphere.xyz, 1.0);
+
+    return vec4(center.xyz, sphere.w * max_scale);
 }
 
 void main() {
@@ -47,11 +64,9 @@ void main() {
     ObjectInputData data = object_input[input_idx];
 
     mat4 model_view = uniforms.view * data.transform;
-    // TODO: Deal with scale
-    vec3 mesh_center = (model_view * vec4(data.bounding_sphere.xyz, 1.0)).xyz;
-    float mesh_radius = data.bounding_sphere.w;
+    vec4 mesh_sphere = transform_sphere(data.bounding_sphere, model_view);
 
-    bool visible = frustum_contains_sphere(uniforms.frustum, vec4(mesh_center, mesh_radius));
+    bool visible = frustum_contains_sphere(uniforms.frustum, mesh_sphere);
 
     uint add_value = uint(visible);
     object_index[input_idx] = add_value;

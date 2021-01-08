@@ -4,6 +4,7 @@ use crate::{
     registry::ResourceRegistry,
     Renderer, RendererMode,
 };
+use futures::{stream::FuturesUnordered, StreamExt};
 use parking_lot::RwLock;
 use std::{future::Future, sync::Arc};
 use wgpu::{
@@ -42,6 +43,22 @@ impl PipelineManager {
         TD: 'static,
     {
         let handle = self.registry.read().allocate();
+        let update_fut = self.update_pipeline(renderer, PipelineHandle(handle), pipeline_desc);
+        async move {
+            update_fut.await;
+            PipelineHandle(handle)
+        }
+    }
+
+    pub fn update_pipeline<TD>(
+        self: &Arc<Self>,
+        renderer: Arc<Renderer<TD>>,
+        handle: PipelineHandle,
+        pipeline_desc: Pipeline,
+    ) -> impl Future<Output = ()>
+    where
+        TD: 'static,
+    {
         let this = Arc::clone(&self);
         let renderer_clone = Arc::clone(&renderer);
         renderer_clone.yard.spawn(renderer.yard_priorites.compute_pool, renderer.yard_priorites.pipeline_build_priority, async move {
@@ -180,10 +197,11 @@ impl PipelineManager {
                     module: &module,
                 }),
                 rasterization_state: Some(RasterizationStateDescriptor {
-                    front_face: FrontFace::Cw,
-                    cull_mode: match pipeline_desc.input {
-                        PipelineInputType::FullscreenTriangle => CullMode::None,
-                        PipelineInputType::Models3d => CullMode::Back,
+                    front_face: FrontFace::Ccw,
+                    cull_mode: match (pipeline_desc.input, pipeline_desc.run_rate) {
+                        (PipelineInputType::FullscreenTriangle, _) => CullMode::None,
+                        (PipelineInputType::Models3d, RenderPassRunRate::Once) => CullMode::Back,
+                        (PipelineInputType::Models3d, RenderPassRunRate::PerShadow) => CullMode::Front,
                     },
                     clamp_depth: match pipeline_desc.run_rate {
                         // TODO
@@ -222,15 +240,29 @@ impl PipelineManager {
                 alpha_to_coverage_enabled: false,
             });
 
-            this.registry.write().insert(handle, CompiledPipeline {
+            this.registry.write().insert(handle.0, CompiledPipeline {
                 desc: pipeline_desc,
                 inner: Arc::new(pipeline),
                 uses_2d,
                 uses_cube,
             });
-
-            PipelineHandle(handle)
         })
+    }
+
+    pub fn recompile_pipelines<TD>(
+        self: &Arc<Self>,
+        renderer: &Arc<Renderer<TD>>,
+        dirty_2d: bool,
+        dirty_cube: bool,
+    ) -> impl Future<Output = ()> {
+        let mut futs = FuturesUnordered::new();
+        for (handle, pipeline) in self.registry.read().iter() {
+            let dirty = dirty_2d && pipeline.uses_2d || dirty_cube && pipeline.uses_cube;
+            if dirty {
+                futs.push(self.update_pipeline(Arc::clone(renderer), PipelineHandle(*handle), pipeline.desc.clone()))
+            }
+        }
+        async move { while futs.next().await.is_some() {} }
     }
 
     pub fn get_arc(&self, handle: PipelineHandle) -> Arc<RenderPipeline> {

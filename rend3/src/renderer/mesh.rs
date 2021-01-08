@@ -205,9 +205,9 @@ impl MeshManager {
 
         for mesh in self.registry.values_mut() {
             let new_vert_range = new_vert_alloc.allocate_range(mesh.vertex_range.len()).unwrap();
-            let new_index_range = dbg!(new_index_alloc.allocate_range(mesh.index_range.len()).unwrap());
+            let new_index_range = new_index_alloc.allocate_range(mesh.index_range.len()).unwrap();
 
-            let vert_difference = dbg!(new_vert_range.start as isize - mesh.vertex_range.start as isize);
+            let vert_difference = new_vert_range.start as isize - mesh.vertex_range.start as isize;
 
             // Copy verts over to new buffer
             let vert_copy_start = (mesh.vertex_range.start * VERTEX_SIZE) / 4;

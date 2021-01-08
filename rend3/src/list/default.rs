@@ -8,7 +8,7 @@ use crate::{
         ImageUsage, PerObjectResourceBinding, RenderList, RenderOpDescriptor, RenderOpInputType, RenderPassDescriptor,
         RenderPassRunRate, ResourceBinding, ShaderSourceStage, ShaderSourceType, SourceShaderDescriptor,
     },
-    Renderer, RendererMode,
+    Renderer, RendererMode, SWAPCHAIN_FORMAT,
 };
 use std::{future::Future, sync::Arc};
 use wgpu::{Color, LoadOp, TextureFormat};
@@ -251,7 +251,7 @@ impl DefaultPipelines {
             run_rate: RenderPassRunRate::Once,
             input: PipelineInputType::FullscreenTriangle,
             outputs: vec![PipelineOutputAttachment {
-                format: ImageFormat::Bgra8UnormSrgb,
+                format: SWAPCHAIN_FORMAT,
                 write: true,
             }],
             depth: None,
@@ -436,9 +436,7 @@ pub fn default_render_list(mode: RendererMode, resolution: [u32; 2], pipelines: 
         input: RenderOpInputType::FullscreenTriangle,
         per_op_bindings: vec![
             ResourceBinding::GeneralData,
-            ResourceBinding::Custom2DTexture(vec![ImageInputReference::Custom(
-                internal_renderbuffer_name.to_string(),
-            )]),
+            ResourceBinding::Custom2DTexture(vec![ImageInputReference::Custom(internal_renderbuffer_name.to_owned())]),
         ],
         per_object_bindings: vec![],
     });

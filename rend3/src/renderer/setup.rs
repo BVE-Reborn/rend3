@@ -100,7 +100,7 @@ pub fn create_adapter(
                 potential
                     .as_ref()
                     .map(|i| i.info.name.to_lowercase().contains(desired_device))
-                    .is_ok()
+                    .unwrap_or(false)
             } else {
                 true
             };

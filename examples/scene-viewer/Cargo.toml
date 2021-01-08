@@ -12,15 +12,16 @@ path = "src/main.rs"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+async-std = "1"
 basis = { version = "0.1.0", git = "https://github.com/BVE-Reborn/basis-rs.git", rev = "17480940261db81877ce4fec983a18a39d7db633" }
 fnv = "1"
 glam = "0.11"
 image = { version = "0.23", default-features = false, features = ["png", "jpeg", "tiff"]}
 histogram = "0.6"
-obj = "0.10.2"
 pico-args = "0.4"
 pollster = "0.2"
 rend3 = { path = "../../rend3", version = "0.1.0" }
+rend3-gltf = { path = "../../rend3-gltf", version = "0.1.0" }
 smallvec = "1"
 tracing = { version = "0.1", default-features = false, features = ["std"] }
 wgpu = "0.6"
