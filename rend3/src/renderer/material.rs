@@ -48,7 +48,7 @@ impl CPUShaderMaterial {
             anisotropy: material.anisotropy.to_value(0.0),
             ambient_occlusion: material.ao_factor.unwrap_or(1.0),
             alpha_cutout: material.alpha_cutout.unwrap_or(0.0),
-            texture_enable: dbg!(material.albedo.is_texture() as u32)
+            texture_enable: material.albedo.is_texture() as u32
                 | (material.normal.to_texture(|_| ()).is_some() as u32) << 1
                 | (material.aomr_textures.to_roughness_texture(|_| ()).is_some() as u32) << 2
                 | (material.aomr_textures.to_metallic_texture(|_| ()).is_some() as u32) << 3

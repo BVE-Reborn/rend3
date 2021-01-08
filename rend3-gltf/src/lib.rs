@@ -1,7 +1,11 @@
 use fnv::FnvHashMap;
 use futures_util::future::OptionFuture;
 use glam::{Mat4, Vec2, Vec3, Vec4, Vec4Swizzles};
-use rend3::{datatypes as dt, datatypes::AffineTransform, Renderer};
+use rend3::{
+    datatypes as dt,
+    datatypes::{AffineTransform, MeshBuilder},
+    Renderer,
+};
 use std::future::Future;
 use thiserror::Error;
 
@@ -113,9 +117,10 @@ where
                 .ok_or_else(|| GltfLoadError::MissingMesh(mesh.index()))?;
             for prim in &mesh_handle.primitives {
                 let mat_idx = prim.material;
-                let mat = loaded.materials.get(&mat_idx).ok_or(GltfLoadError::MissingMaterial(
-                    mat_idx.expect("Could not find default material"),
-                ))?;
+                let mat = loaded
+                    .materials
+                    .get(&mat_idx)
+                    .ok_or_else(|| GltfLoadError::MissingMaterial(mat_idx.expect("Could not find default material")))?;
                 let object_handle = renderer.add_object(dt::Object {
                     mesh: prim.handle,
                     material: *mat,
@@ -185,34 +190,25 @@ where
                 .ok_or_else(|| GltfLoadError::MissingPositions(mesh.index()))?
                 .map(Vec3::from)
                 .collect();
+            let mut builder = MeshBuilder::new(vertex_positions);
 
-            let vertex_normals = reader.read_normals().map(|n| n.map(Vec3::from).collect::<Vec<_>>());
-            let vertex_uvs = reader
-                .read_tex_coords(0)
-                .map(|n| n.into_f32().map(Vec2::from).collect::<Vec<_>>());
-            let vertex_colors = reader.read_colors(0).map(|n| n.into_rgba_u8().collect::<Vec<_>>());
-
-            let count = vertex_positions.len();
-
-            let indices: Vec<_> = if let Some(indices) = reader.read_indices() {
-                indices.into_u32().collect()
-            } else {
-                (0..count as u32).collect()
-            };
-
-            let has_normals = vertex_normals.is_some();
-
-            let mut mesh = dt::Mesh {
-                vertex_positions,
-                vertex_normals: vertex_normals.unwrap_or_else(|| vec![Vec3::zero(); count]),
-                vertex_uvs: vertex_uvs.unwrap_or_else(|| vec![Vec2::zero(); count]),
-                vertex_colors: vertex_colors.unwrap_or_else(|| vec![[0; 4]; count]),
-                vertex_material_indices: vec![0; count],
-                indices,
-            };
-            if !has_normals {
-                mesh.calculate_normals();
+            if let Some(normals) = reader.read_normals() {
+                builder = builder.with_vertex_normals(normals.map(Vec3::from).collect::<Vec<_>>())
             }
+
+            if let Some(uvs) = reader.read_tex_coords(0) {
+                builder = builder.with_vertex_uvs(uvs.into_f32().map(Vec2::from).collect::<Vec<_>>())
+            }
+
+            if let Some(colors) = reader.read_colors(0) {
+                builder = builder.with_vertex_colors(colors.into_rgba_u8().collect::<Vec<_>>())
+            }
+
+            if let Some(indices) = reader.read_indices() {
+                builder = builder.with_indices(indices.into_u32().collect())
+            }
+
+            let mesh = builder.build();
 
             let handle = renderer.add_mesh(mesh);
 

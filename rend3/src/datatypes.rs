@@ -179,6 +179,148 @@ pub struct InterleavedModelVertex {
     pub material_index: u32, // 36..40
 }
 
+/// Easy to use builder for a [`Mesh`] that deals with common operations for you.
+#[derive(Debug, Default)]
+pub struct MeshBuilder {
+    vertex_positions: Vec<Vec3>,
+    vertex_normals: Option<Vec<Vec3>>,
+    vertex_uvs: Option<Vec<Vec2>>,
+    vertex_colors: Option<Vec<[u8; 4]>>,
+    vertex_material_indices: Option<Vec<u32>>,
+    vertex_count: usize,
+
+    indices: Option<Vec<u32>>,
+
+    right_handed: bool,
+}
+impl MeshBuilder {
+    /// Create a new [`MeshBuilder`] with a given set of positions.
+    ///
+    /// All vertices must have positions.
+    ///
+    /// # Panic
+    ///
+    /// Will panic if the length is zero.
+    pub fn new(vertex_positions: Vec<Vec3>) -> Self {
+        let me = Self {
+            vertex_count: vertex_positions.len(),
+            vertex_positions,
+            ..Self::default()
+        };
+        assert_ne!(me.vertex_positions.len(), 0, "Cannot have a mesh with zero vertices");
+        me
+    }
+
+    fn validate_len(&self, len: usize) {
+        assert_eq!(self.vertex_count, len)
+    }
+
+    /// Add vertex normals to the given mesh.
+    ///
+    /// # Panic
+    ///
+    /// Will panic if the length is different from the position buffer length.
+    pub fn with_vertex_normals(mut self, normals: Vec<Vec3>) -> Self {
+        self.validate_len(normals.len());
+        self.vertex_normals = Some(normals);
+        self
+    }
+
+    /// Add texture coordinates to the given mesh.
+    ///
+    /// # Panic
+    ///
+    /// Will panic if the length is different from the position buffer length.
+    pub fn with_vertex_uvs(mut self, uvs: Vec<Vec2>) -> Self {
+        self.validate_len(uvs.len());
+        self.vertex_uvs = Some(uvs);
+        self
+    }
+
+    /// Add vertex colors to the given mesh.
+    ///
+    /// # Panic
+    ///
+    /// Will panic if the length is different from the position buffer length.
+    pub fn with_vertex_colors(mut self, colors: Vec<[u8; 4]>) -> Self {
+        self.validate_len(colors.len());
+        self.vertex_colors = Some(colors);
+        self
+    }
+
+    /// Add material indices to the given mesh.
+    ///
+    /// # Panic
+    ///
+    /// Will panic if the length is different from the position buffer length.
+    pub fn with_vertex_material_indices(mut self, material_indices: Vec<u32>) -> Self {
+        self.validate_len(material_indices.len());
+        self.vertex_material_indices = Some(material_indices);
+        self
+    }
+
+    /// Add indices to the given mesh.
+    ///
+    /// # Panic
+    ///
+    /// Will panic if the length is zero.
+    pub fn with_indices(mut self, indices: Vec<u32>) -> Self {
+        assert_ne!(indices.len(), 0, "Cannot have a mesh with zero indices");
+        self.indices = Some(indices);
+        self
+    }
+
+    /// Mark this mesh as using a right handed (Counter Clockwise) winding order. It will be
+    /// converted to rend3 native left handed (Clockwise) winding order on construction. This will
+    /// not change the vertex normals. If this is called, it is advised to not provide a normal
+    /// buffer so a buffer will be calculated for you.
+    ///
+    /// See [`Mesh::flip_winding_order`] for more information.
+    pub fn with_right_handed(mut self) -> Self {
+        self.right_handed = true;
+        self
+    }
+
+    /// Build a mesh, adding whatever components weren't provided.
+    ///
+    /// If normals weren't provided, they will be calculated. If mesh
+    /// is right handed, will be converted to left handed.
+    ///
+    /// All others will be filled with defaults.
+    pub fn build(self) -> Mesh {
+        let length = self.vertex_count;
+        debug_assert_ne!(length, 0, "Length should be guarded by validation");
+
+        let has_normals = self.vertex_normals.is_some();
+
+        let mut mesh = Mesh {
+            vertex_positions: self.vertex_positions,
+            vertex_normals: self.vertex_normals.unwrap_or_else(|| vec![Vec3::zero(); length]),
+            vertex_uvs: self.vertex_uvs.unwrap_or_else(|| vec![Vec2::zero(); length]),
+            vertex_colors: self.vertex_colors.unwrap_or_else(|| vec![[0; 4]; length]),
+            vertex_material_indices: self.vertex_material_indices.unwrap_or_else(|| vec![0; length]),
+            indices: self.indices.unwrap_or_else(|| (0..length as u32).collect()),
+        };
+
+        // We need to flip winding order first, so the normals will be facing the right direction.
+        if self.right_handed {
+            mesh.flip_winding_order();
+        }
+
+        if !has_normals {
+            mesh.calculate_normals();
+        }
+
+        mesh
+    }
+}
+
+/// Represents a mesh that may be used by many objects.
+///
+/// Meshes are in Structure of Array format and must have all the vertex_* arrays be the same length.
+/// This condition can be checked with the [`Mesh::validate`] function.
+///
+/// These can be annoying to construct, so use the [`MeshBuilder`] to make it easier.
 #[derive(Debug, Default, Clone)]
 pub struct Mesh {
     pub vertex_positions: Vec<Vec3>,
@@ -209,22 +351,29 @@ impl Mesh {
     /// Use left-handed normal calculation. Call [`Mesh::flip_winding_order`] first if you have
     /// a right handed mesh you want to use with rend3.
     pub fn calculate_normals(&mut self) {
-        assert!(self.validate(), "Mesh must have vertex attributes of the same length");
+        Self::calculate_normals_for_buffers(&mut self.vertex_normals, &self.vertex_positions, &self.indices);
+    }
 
-        for norm in &mut self.vertex_normals {
+    /// Calculate normals for the given buffers representing a mesh, assuming smooth shading and per-vertex normals.
+    ///
+    /// Positions and normals must be the same length.
+    pub fn calculate_normals_for_buffers(normals: &mut [Vec3], positions: &[Vec3], indices: &[u32]) {
+        assert_eq!(normals.len(), positions.len());
+
+        for norm in normals.iter_mut() {
             *norm = Vec3::zero();
         }
 
-        for idx in self.indices.chunks_exact(3) {
-            let (idx0, idx1, idx2) = match idx {
-                &[idx0, idx1, idx2] => (idx0, idx1, idx2),
+        for idx in indices.chunks_exact(3) {
+            let (idx0, idx1, idx2) = match *idx {
+                [idx0, idx1, idx2] => (idx0, idx1, idx2),
                 // SAFETY: This is guaranteed by chunks_exact(3)
                 _ => unsafe { std::hint::unreachable_unchecked() },
             };
 
-            let pos1 = self.vertex_positions[idx0 as usize];
-            let pos2 = self.vertex_positions[idx1 as usize];
-            let pos3 = self.vertex_positions[idx2 as usize];
+            let pos1 = positions[idx0 as usize];
+            let pos2 = positions[idx1 as usize];
+            let pos3 = positions[idx2 as usize];
 
             let edge1 = pos2 - pos1;
             let edge2 = pos3 - pos1;
@@ -233,13 +382,13 @@ impl Mesh {
 
             // SAFETY: All vectors are the same length by the assert, and indexing succeeded on positions, therefore it's safe on normals
             unsafe {
-                *self.vertex_normals.get_unchecked_mut(idx0 as usize) += normal;
-                *self.vertex_normals.get_unchecked_mut(idx1 as usize) += normal;
-                *self.vertex_normals.get_unchecked_mut(idx2 as usize) += normal;
+                *normals.get_unchecked_mut(idx0 as usize) += normal;
+                *normals.get_unchecked_mut(idx1 as usize) += normal;
+                *normals.get_unchecked_mut(idx2 as usize) += normal;
             }
         }
 
-        for normal in &mut self.vertex_normals {
+        for normal in normals.iter_mut() {
             *normal = normal.normalize();
         }
     }
@@ -247,7 +396,9 @@ impl Mesh {
     /// Inverts the winding order of a mesh. This is useful if you have meshes which
     /// are designed for right-handed (Counter-Clockwise) winding order for use in OpenGL or VK.
     ///
-    /// This does not change vertex location, so does not change coordinate system.
+    /// This does not change vertex location, so does not change coordinate system. This will
+    /// also not change the vertex normals. Calling [`Mesh::calculate_normals`] is advised after
+    /// calling this function.
     ///
     /// rend3 uses a left-handed (Clockwise) winding order.
     pub fn flip_winding_order(&mut self) {

@@ -8,8 +8,6 @@ fn load_gltf(
     let primitive = mesh_data.primitives().next().expect("no primitives in data.glb");
     let reader = primitive.reader(|b| Some(&datas.get(b.index())?.0[..b.length()]));
 
-    let indices = reader.read_indices().unwrap().into_u32().collect();
-
     let vertex_positions: Vec<_> = reader.read_positions().unwrap().map(glam::Vec3::from).collect();
     let vertex_normals: Vec<_> = reader.read_normals().unwrap().map(glam::Vec3::from).collect();
     let vertex_uvs: Vec<_> = reader
@@ -18,17 +16,13 @@ fn load_gltf(
         .into_f32()
         .map(glam::Vec2::from)
         .collect();
+    let indices = reader.read_indices().unwrap().into_u32().collect();
 
-    let count = vertex_positions.len();
-
-    let mesh = rend3::datatypes::Mesh {
-        vertex_positions,
-        vertex_normals,
-        vertex_uvs,
-        vertex_colors: vec![[0; 4]; count],
-        vertex_material_indices: vec![0; count],
-        indices,
-    };
+    let mesh = rend3::datatypes::MeshBuilder::new(vertex_positions.to_vec())
+        .with_vertex_normals(vertex_normals)
+        .with_vertex_uvs(vertex_uvs)
+        .with_indices(indices)
+        .build();
 
     // Add mesh to renderer's world
     let mesh_handle = renderer.add_mesh(mesh);

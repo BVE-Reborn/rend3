@@ -47,21 +47,9 @@ fn create_mesh() -> rend3::datatypes::Mesh {
         22, 21, 20, 20, 23, 22, // back
     ];
 
-    let count = vertex_positions.len();
-
-    let mut mesh = rend3::datatypes::Mesh {
-        vertex_positions: vertex_positions.to_vec(),
-        vertex_normals: vec![glam::Vec3::zero(); count],
-        vertex_uvs: vec![glam::Vec2::zero(); count],
-        vertex_colors: vec![[0; 4]; count],
-        vertex_material_indices: vec![0; count],
-        indices: index_data.to_vec(),
-    };
-
-    // Auto-calculate normals for us
-    mesh.calculate_normals();
-
-    mesh
+    rend3::datatypes::MeshBuilder::new(vertex_positions.to_vec())
+        .with_indices(index_data.to_vec())
+        .build()
 }
 
 fn main() {
