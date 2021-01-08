@@ -3,6 +3,7 @@ use glam::{
     f32::{Vec3A, Vec4},
     Mat4, Vec2, Vec3,
 };
+use itertools::Itertools;
 use std::mem;
 use wgpu::TextureFormat;
 pub use wgpu::{Color as ClearColor, LoadOp as PipelineLoadOp};
@@ -32,27 +33,55 @@ declare_handle!(
     PipelineHandle
 );
 
-// Consider:
-//
-// Bone weights!!!
-// Lightmap UVs
-// Spherical harmonics
-// Baked light color
-// A lot of renderers put the tangent vector in the vertex data, but you can calculate it in the pixel shader ezpz
-// Maybe thiccness data for tree branches
-// I'd consider putting everything you can into the vertex data structure. Vertex data is just per-vertex data, and a lot of things can be per-vertex
-// Then you don't need a million 4K textures
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone)]
-pub struct ModelVertex {
-    pub position: Vec3, // 00..12
-    pub normal: Vec3,   // 12..24
-    pub uv: Vec2,       // 24..32
-    pub color: [u8; 4], // 32..36
+macro_rules! changeable_struct {
+    ($(#[$outer:meta])* pub struct $name:ident <- nodefault $name_change:ident { $($field_vis:vis $field_name:ident : $field_type:ty),* $(,)? } ) => {
+        $(#[$outer])*
+        pub struct $name {
+            $(
+                $field_vis $field_name : $field_type
+            ),*
+        }
+        impl $name {
+            pub fn update_from_changes(&mut self, change: $name_change) {
+                $(
+                    if let Some(inner) = change.$field_name {
+                        self.$field_name = inner;
+                    }
+                );*
+            }
+        }
+        $(#[$outer])*
+        pub struct $name_change {
+            $(
+                $field_vis $field_name : Option<$field_type>
+            ),*
+        }
+    };
+    ($(#[$outer:meta])* pub struct $name:ident <- $name_change:ident { $($field_vis:vis $field_name:ident : $field_type:ty),* $(,)? } ) => {
+        $(#[$outer])*
+        pub struct $name {
+            $(
+                $field_vis $field_name : $field_type
+            ),*
+        }
+        impl $name {
+            pub fn update_from_changes(&mut self, change: $name_change) {
+                $(
+                    if let Some(inner) = change.$field_name {
+                        self.$field_name = inner;
+                    }
+                );*
+            }
+        }
+        $(#[$outer])*
+        #[derive(Default)]
+        pub struct $name_change {
+            $(
+                $field_vis $field_name : Option<$field_type>
+            ),*
+        }
+    };
 }
-
-unsafe impl bytemuck::Zeroable for ModelVertex {}
-unsafe impl bytemuck::Pod for ModelVertex {}
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -130,90 +159,88 @@ impl From<RendererTextureFormat> for wgpu::TextureFormat {
     }
 }
 
-macro_rules! changeable_struct {
-    ($(#[$outer:meta])* pub struct $name:ident <- nodefault $name_change:ident { $($field_vis:vis $field_name:ident : $field_type:ty),* $(,)? } ) => {
-        $(#[$outer])*
-        pub struct $name {
-            $(
-                $field_vis $field_name : $field_type
-            ),*
-        }
-        impl $name {
-            pub fn update_from_changes(&mut self, change: $name_change) {
-                $(
-                    if let Some(inner) = change.$field_name {
-                        self.$field_name = inner;
-                    }
-                );*
-            }
-        }
-        $(#[$outer])*
-        pub struct $name_change {
-            $(
-                $field_vis $field_name : Option<$field_type>
-            ),*
-        }
-    };
-    ($(#[$outer:meta])* pub struct $name:ident <- $name_change:ident { $($field_vis:vis $field_name:ident : $field_type:ty),* $(,)? } ) => {
-        $(#[$outer])*
-        pub struct $name {
-            $(
-                $field_vis $field_name : $field_type
-            ),*
-        }
-        impl $name {
-            pub fn update_from_changes(&mut self, change: $name_change) {
-                $(
-                    if let Some(inner) = change.$field_name {
-                        self.$field_name = inner;
-                    }
-                );*
-            }
-        }
-        $(#[$outer])*
-        #[derive(Default)]
-        pub struct $name_change {
-            $(
-                $field_vis $field_name : Option<$field_type>
-            ),*
-        }
-    };
+// Consider:
+//
+// Bone weights!!!
+// Lightmap UVs
+// Spherical harmonics
+// Baked light color
+// A lot of renderers put the tangent vector in the vertex data, but you can calculate it in the pixel shader ezpz
+// Maybe thiccness data for tree branches
+// I'd consider putting everything you can into the vertex data structure. Vertex data is just per-vertex data, and a lot of things can be per-vertex
+// Then you don't need a million 4K textures
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone)]
+pub struct InterleavedModelVertex {
+    pub position: Vec3,      // 00..12
+    pub normal: Vec3,        // 12..24
+    pub uv: Vec2,            // 24..32
+    pub color: [u8; 4],      // 32..36
+    pub material_index: u32, // 36..40
 }
 
 #[derive(Debug, Default, Clone)]
 pub struct Mesh {
-    pub vertices: Vec<ModelVertex>,
+    pub vertex_positions: Vec<Vec3>,
+    pub vertex_normals: Vec<Vec3>,
+    pub vertex_uvs: Vec<Vec2>,
+    pub vertex_colors: Vec<[u8; 4]>,
+    pub vertex_material_indices: Vec<u32>,
+
     pub indices: Vec<u32>,
-    // TODO: Bones/joints/animation
 }
 
 impl Mesh {
+    /// Validates that all vertex attributes have the same length.
+    pub fn validate(&self) -> bool {
+        [
+            self.vertex_positions.len(),
+            self.vertex_normals.len(),
+            self.vertex_uvs.len(),
+            self.vertex_colors.len(),
+            self.vertex_material_indices.len(),
+        ]
+        .iter()
+        .all_equal()
+    }
+
     /// Calculate normals for the given mesh, assuming smooth shading and per-vertex normals.
     ///
     /// Use left-handed normal calculation. Call [`Mesh::flip_winding_order`] first if you have
     /// a right handed mesh you want to use with rend3.
     pub fn calculate_normals(&mut self) {
-        for vert in &mut self.vertices {
-            vert.normal = Vec3::zero();
+        assert!(self.validate(), "Mesh must have vertex attributes of the same length");
+
+        for norm in &mut self.vertex_normals {
+            *norm = Vec3::zero();
         }
 
         for idx in self.indices.chunks_exact(3) {
-            let pos1 = self.vertices[idx[0] as usize].position;
-            let pos2 = self.vertices[idx[1] as usize].position;
-            let pos3 = self.vertices[idx[2] as usize].position;
+            let (idx0, idx1, idx2) = match idx {
+                &[idx0, idx1, idx2] => (idx0, idx1, idx2),
+                // SAFETY: This is guaranteed by chunks_exact(3)
+                _ => unsafe { std::hint::unreachable_unchecked() },
+            };
+
+            let pos1 = self.vertex_positions[idx0 as usize];
+            let pos2 = self.vertex_positions[idx1 as usize];
+            let pos3 = self.vertex_positions[idx2 as usize];
 
             let edge1 = pos2 - pos1;
             let edge2 = pos3 - pos1;
 
             let normal = edge2.cross(edge1);
 
-            self.vertices[idx[0] as usize].normal += normal;
-            self.vertices[idx[1] as usize].normal += normal;
-            self.vertices[idx[2] as usize].normal += normal;
+            // SAFETY: All vectors are the same length by the assert, and indexing succeeded on positions, therefore it's safe on normals
+            unsafe {
+                *self.vertex_normals.get_unchecked_mut(idx0 as usize) += normal;
+                *self.vertex_normals.get_unchecked_mut(idx1 as usize) += normal;
+                *self.vertex_normals.get_unchecked_mut(idx2 as usize) += normal;
+            }
         }
 
-        for vert in &mut self.vertices {
-            vert.normal = vert.normal.normalize();
+        for normal in &mut self.vertex_normals {
+            *normal = normal.normalize();
         }
     }
 

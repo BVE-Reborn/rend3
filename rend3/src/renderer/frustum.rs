@@ -1,4 +1,3 @@
-use crate::datatypes::ModelVertex;
 use glam::{Mat4, Vec3, Vec3A, Vec4Swizzles};
 
 #[derive(Debug, Clone, Copy)]
@@ -8,7 +7,7 @@ pub struct BoundingSphere {
     pub radius: f32,
 }
 impl BoundingSphere {
-    pub fn from_mesh(mesh: &[ModelVertex]) -> Self {
+    pub fn from_mesh(mesh: &[Vec3]) -> Self {
         let center = find_mesh_center(mesh);
         let radius = find_mesh_bounding_sphere_radius(center, mesh);
 
@@ -40,18 +39,18 @@ impl BoundingSphere {
     }
 }
 
-fn find_mesh_center(mesh: &[ModelVertex]) -> Vec3A {
+fn find_mesh_center(mesh: &[Vec3]) -> Vec3A {
     let first = if let Some(first) = mesh.first() {
         *first
     } else {
         return Vec3A::zero();
     };
     // Bounding box time baby!
-    let mut max = Vec3A::from(first.position);
-    let mut min = Vec3A::from(first.position);
+    let mut max = Vec3A::from(first);
+    let mut min = max;
 
-    for vert in mesh.iter().skip(1) {
-        let pos = Vec3A::from(vert.position);
+    for pos in mesh.iter().skip(1) {
+        let pos = Vec3A::from(*pos);
         max = max.max(pos);
         min = min.min(pos);
     }
@@ -59,9 +58,9 @@ fn find_mesh_center(mesh: &[ModelVertex]) -> Vec3A {
     (max + min) / 2.0
 }
 
-fn find_mesh_bounding_sphere_radius(mesh_center: Vec3A, mesh: &[ModelVertex]) -> f32 {
-    mesh.iter().fold(0.0, |distance, vert| {
-        distance.max((Vec3A::from(vert.position) - mesh_center).length())
+fn find_mesh_bounding_sphere_radius(mesh_center: Vec3A, mesh: &[Vec3]) -> f32 {
+    mesh.iter().fold(0.0, |distance, pos| {
+        distance.max((Vec3A::from(*pos) - mesh_center).length())
     })
 }
 

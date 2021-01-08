@@ -1,5 +1,3 @@
-use glam::Vec3;
-
 fn load_gltf(
     renderer: &rend3::Renderer,
     path: &'static str,
@@ -11,33 +9,26 @@ fn load_gltf(
     let reader = primitive.reader(|b| Some(&datas.get(b.index())?.0[..b.length()]));
 
     let indices = reader.read_indices().unwrap().into_u32().collect();
-    let mut vertices: Vec<_> = reader
-        .read_positions()
+
+    let vertex_positions: Vec<_> = reader.read_positions().unwrap().map(glam::Vec3::from).collect();
+    let vertex_normals: Vec<_> = reader.read_normals().unwrap().map(glam::Vec3::from).collect();
+    let vertex_uvs: Vec<_> = reader
+        .read_tex_coords(0)
         .unwrap()
-        .map(|pos| rend3::datatypes::ModelVertex {
-            position: pos.into(),
-            normal: Default::default(),
-            uv: Default::default(),
-            color: [0; 4],
-        })
+        .into_f32()
+        .map(glam::Vec2::from)
         .collect();
 
-    if let Some(normals) = reader.read_normals() {
-        for (i, normal) in normals.enumerate() {
-            vertices[i].normal = normal.into();
-        }
-    }
+    let count = vertex_positions.len();
 
-    if let Some(tex) = reader.read_tex_coords(0) {
-        for (i, uv) in tex.into_f32().enumerate() {
-            vertices[i].uv = uv.into();
-        }
-    }
-
-    let mut mesh = rend3::datatypes::Mesh { vertices, indices };
-    if reader.read_normals().is_none() {
-        mesh.calculate_normals();
-    }
+    let mesh = rend3::datatypes::Mesh {
+        vertex_positions,
+        vertex_normals,
+        vertex_uvs,
+        vertex_colors: vec![[0; 4]; count],
+        vertex_material_indices: vec![0; count],
+        indices,
+    };
 
     // Add mesh to renderer's world
     let mesh_handle = renderer.add_mesh(mesh);
@@ -89,7 +80,7 @@ fn main() {
         material,
         transform: rend3::datatypes::AffineTransform {
             // Need to flip gltf's coords and winding order
-            transform: glam::Mat4::from_scale(Vec3::new(1.0, 1.0, -1.0)),
+            transform: glam::Mat4::from_scale(glam::Vec3::new(1.0, 1.0, -1.0)),
         },
     };
     let _object_handle = renderer.add_object(object);
