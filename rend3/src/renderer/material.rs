@@ -6,7 +6,7 @@ use crate::{
     renderer::texture::TextureManager,
     RendererMode,
 };
-use glam::f32::Vec4;
+use glam::{Vec3, Vec4};
 use std::{mem::size_of, num::NonZeroU32, sync::Arc};
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
@@ -18,6 +18,7 @@ use wgpu_conveyor::{AutomatedBuffer, AutomatedBufferManager, IdBuffer};
 #[derive(Debug, Copy, Clone)]
 pub struct CPUShaderMaterial {
     albedo: Vec4,
+    emissive: Vec3,
     roughness: f32,
     metallic: f32,
     reflectance: f32,
@@ -43,10 +44,11 @@ impl CPUShaderMaterial {
             reflectance: material.reflectance.to_value(0.5),
             clear_coat: material.clearcoat_factor.unwrap_or(0.0),
             clear_coat_roughness: material.clearcoat_roughness_factor.unwrap_or(0.0),
+            emissive: material.emissive.to_value(Vec3::zero()),
             anisotropy: material.anisotropy.to_value(0.0),
             ambient_occlusion: material.ao_factor.unwrap_or(1.0),
             alpha_cutout: material.alpha_cutout.unwrap_or(0.0),
-            texture_enable: material.albedo.is_texture() as u32
+            texture_enable: dbg!(material.albedo.is_texture() as u32)
                 | (material.normal.to_texture(|_| ()).is_some() as u32) << 1
                 | (material.aomr_textures.to_roughness_texture(|_| ()).is_some() as u32) << 2
                 | (material.aomr_textures.to_metallic_texture(|_| ()).is_some() as u32) << 3
@@ -57,8 +59,9 @@ impl CPUShaderMaterial {
                     .to_clearcoat_roughness_texture(|_| ())
                     .is_some() as u32)
                     << 6
-                | (material.anisotropy.is_texture() as u32) << 7
-                | (material.aomr_textures.to_ao_texture(|_| ()).is_some() as u32) << 8,
+                | (material.emissive.is_texture() as u32) << 7
+                | (material.anisotropy.is_texture() as u32) << 8
+                | (material.aomr_textures.to_ao_texture(|_| ()).is_some() as u32) << 9,
             material_flags: {
                 let mut flags = material.albedo.to_flags();
                 flags |= material.normal.to_flags();
@@ -75,6 +78,7 @@ impl CPUShaderMaterial {
 #[derive(Debug, Copy, Clone)]
 struct GPUShaderMaterial {
     albedo: Vec4,
+    emissive: Vec3,
     roughness: f32,
     metallic: f32,
     reflectance: f32,
@@ -91,6 +95,7 @@ struct GPUShaderMaterial {
     reflectance_tex: Option<NonZeroU32>,
     clear_coat_tex: Option<NonZeroU32>,
     clear_coat_roughness_tex: Option<NonZeroU32>,
+    emissive_tex: Option<NonZeroU32>,
     anisotropy_tex: Option<NonZeroU32>,
     ambient_occlusion_tex: Option<NonZeroU32>,
     material_flags: MaterialFlags,
@@ -202,6 +207,9 @@ impl MaterialManager {
                                 .unwrap_or(null_tex),
                         ));
                         bgb.append(BindingResource::TextureView(
+                            material.emissive.to_texture(lookup_fn).unwrap_or(null_tex),
+                        ));
+                        bgb.append(BindingResource::TextureView(
                             material.anisotropy.to_texture(lookup_fn).unwrap_or(null_tex),
                         ));
                         bgb.append(BindingResource::TextureView(
@@ -256,6 +264,7 @@ impl MaterialManager {
                     let material = &internal.mat;
                     typed_slice[index] = GPUShaderMaterial {
                         albedo: material.albedo.to_value(),
+                        emissive: material.emissive.to_value(Vec3::zero()),
                         roughness: material.roughness_factor.unwrap_or(0.0),
                         metallic: material.metallic_factor.unwrap_or(0.0),
                         reflectance: material.reflectance.to_value(0.5),
@@ -274,6 +283,7 @@ impl MaterialManager {
                         clear_coat_roughness_tex: material
                             .clearcoat_textures
                             .to_clearcoat_roughness_texture(translate_texture),
+                        emissive_tex: material.emissive.to_texture(translate_texture),
                         anisotropy_tex: material.anisotropy.to_texture(translate_texture),
                         ambient_occlusion_tex: material.aomr_textures.to_ao_texture(translate_texture),
                         material_flags: {

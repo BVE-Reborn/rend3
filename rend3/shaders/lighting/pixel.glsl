@@ -29,6 +29,7 @@ struct PixelData {
     float metallic;
     vec3 f0;
     float perceptual_roughness;
+    vec3 emissive;
     float reflectance;
     float clear_coat;
     float clear_coat_roughness;
@@ -46,7 +47,7 @@ PixelData get_per_pixel_data(MATERIAL_TYPE material) {
         if (HAS_ALBEDO_TEXTURE) {
             pixel.albedo = texture(sampler2D(ALBEDO_TEXTURE, linear_sampler), i_coords);
         } else {
-            pixel.albedo = material.albedo;
+            pixel.albedo = vec4(1.0);
         }
         if (MATERIAL_FLAG(FLAGS_ALBEDO_BLEND)) {
             vec4 vert_color = i_color;
@@ -183,6 +184,12 @@ PixelData get_per_pixel_data(MATERIAL_TYPE material) {
         pixel.clear_coat_roughness = perceptual_roughness_to_roughness(pixel.clear_coat_perceptual_roughness);
     }
     pixel.roughness = perceptual_roughness_to_roughness(pixel.perceptual_roughness);
+
+    if (HAS_EMISSIVE_TEXTURE) {
+        pixel.emissive = material.emissive * texture(sampler2D(EMISSIVE_TEXTURE, linear_sampler), i_coords).rgb;
+    } else {
+        pixel.emissive = material.emissive;
+    }
 
     // TODO: Aniso info
     if (HAS_ANISOTROPY_TEXTURE) {

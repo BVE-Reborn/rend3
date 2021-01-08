@@ -325,7 +325,7 @@ impl AlbedoComponent {
     }
 
     pub(crate) fn is_texture(&self) -> bool {
-        matches!(*self, Self::Texture(..) | Self::TextureVertex { .. })
+        matches!(*self, Self::Texture(..) | Self::TextureVertex { .. } | Self::TextureValue { .. })
     }
 
     pub(crate) fn to_texture<Func, Out>(&self, func: Func) -> Option<Out>
@@ -346,6 +346,7 @@ pub enum MaterialComponent<T> {
     None,
     Value(T),
     Texture(TextureHandle),
+    TextureValue { handle: TextureHandle, value: T },
 }
 
 impl<T> Default for MaterialComponent<T> {
@@ -357,13 +358,13 @@ impl<T> Default for MaterialComponent<T> {
 impl<T: Copy> MaterialComponent<T> {
     pub(crate) fn to_value(&self, default: T) -> T {
         match *self {
-            Self::Value(value) => value,
+            Self::Value(value) | Self::TextureValue { value, .. } => value,
             Self::None | Self::Texture(_) => default,
         }
     }
 
     pub(crate) fn is_texture(&self) -> bool {
-        matches!(*self, Self::Texture(..))
+        matches!(*self, Self::Texture(..) | Self::TextureValue { .. })
     }
 
     pub(crate) fn to_texture<Func, Out>(&self, func: Func) -> Option<Out>
@@ -372,7 +373,7 @@ impl<T: Copy> MaterialComponent<T> {
     {
         match *self {
             Self::None | Self::Value(_) => None,
-            Self::Texture(texture) => Some(func(texture)),
+            Self::Texture(handle) | Self::TextureValue { handle, .. } => Some(func(handle)),
         }
     }
 }
@@ -598,6 +599,7 @@ changeable_struct! {
         pub clearcoat_textures: ClearcoatTextures,
         pub clearcoat_factor: Option<f32>,
         pub clearcoat_roughness_factor: Option<f32>,
+        pub emissive: MaterialComponent<Vec3>,
         pub reflectance: MaterialComponent<f32>,
         pub anisotropy: MaterialComponent<f32>,
         pub alpha_cutout: Option<f32>,

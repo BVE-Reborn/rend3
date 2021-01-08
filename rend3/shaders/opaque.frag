@@ -44,9 +44,10 @@ layout(set = 4, binding = 3) uniform texture2D metallic_tex;
 layout(set = 4, binding = 4) uniform texture2D reflectance_tex;
 layout(set = 4, binding = 5) uniform texture2D clear_coat_tex;
 layout(set = 4, binding = 6) uniform texture2D clear_coat_roughness_tex;
-layout(set = 4, binding = 7) uniform texture2D anisotropy_tex;
-layout(set = 4, binding = 8) uniform texture2D ambient_occlusion_tex;
-layout(set = 4, binding = 9) uniform TexterData {
+layout(set = 4, binding = 7) uniform texture2D emissive_tex;
+layout(set = 4, binding = 8) uniform texture2D anisotropy_tex;
+layout(set = 4, binding = 9) uniform texture2D ambient_occlusion_tex;
+layout(set = 4, binding = 10) uniform TexterData {
     CPUMaterialData material;
 };
 #endif
@@ -62,7 +63,7 @@ void main() {
 
     vec3 v = -normalize(i_view_position.xyz);
 
-    vec3 color = vec3(0.0);
+    vec3 color = vec3(pixel.emissive);
     for (uint i = 0; i < directional_light_header.total_lights; ++i) {
         DirectionalLight light = directional_lights[i];
 

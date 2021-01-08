@@ -250,6 +250,7 @@ fn load_default_material<TLD>(renderer: &Renderer<TLD>, loaded: &mut LoadedGltfS
             clearcoat_textures: dt::ClearcoatTextures::None,
             clearcoat_factor: Some(1.0),
             clearcoat_roughness_factor: Some(1.0),
+            emissive: dt::MaterialComponent::None,
             reflectance: dt::MaterialComponent::None,
             anisotropy: dt::MaterialComponent::None,
             alpha_cutout: None,
@@ -273,9 +274,8 @@ where
         let albedo = pbr.base_color_texture();
         let albedo_factor = pbr.base_color_factor();
         let occlusion = material.occlusion_texture();
-        // TODO: implement emissive
-        let _emissive = material.emissive_texture();
-        let _emissive_factor = material.emissive_factor();
+        let emissive = material.emissive_texture();
+        let emissive_factor = material.emissive_factor();
         let normals = material.normal_texture();
         let roughness_factor = pbr.roughness_factor();
         let metallic_factor = pbr.metallic_factor();
@@ -290,8 +290,8 @@ where
         )
         .await
         .transpose()?;
-        let _emissive_tex = OptionFuture::from(
-            _emissive.map(|i| load_image(renderer, loaded, i.texture().source(), false, texture_func)),
+        let emissive_tex = OptionFuture::from(
+            emissive.map(|i| load_image(renderer, loaded, i.texture().source(), true, texture_func)),
         )
         .await
         .transpose()?;
@@ -327,6 +327,13 @@ where
             },
             roughness_factor: Some(roughness_factor),
             metallic_factor: Some(metallic_factor),
+            emissive: match emissive_tex {
+                Some(tex) => dt::MaterialComponent::TextureValue {
+                    handle: tex,
+                    value: Vec3::from(emissive_factor),
+                },
+                None => dt::MaterialComponent::Value(Vec3::from(emissive_factor)),
+            },
             ..dt::Material::default()
         });
 

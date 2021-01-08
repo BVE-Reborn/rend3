@@ -194,10 +194,14 @@ pub fn create_material_bgl(device: &Device, mode: RendererMode) -> BindGroupLayo
                     },
                     BindGroupLayoutEntry {
                         binding: 8,
-                        ..texture_entry
+                        ..texture_entry.clone()
                     },
                     BindGroupLayoutEntry {
                         binding: 9,
+                        ..texture_entry
+                    },
+                    BindGroupLayoutEntry {
+                        binding: 10,
                         visibility: ShaderStage::VERTEX | ShaderStage::FRAGMENT | ShaderStage::COMPUTE,
                         ty: BindingType::UniformBuffer {
                             dynamic: false,

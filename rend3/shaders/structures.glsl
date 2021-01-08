@@ -58,6 +58,7 @@ struct IndirectCall {
 
 struct GPUMaterialData {
     vec4 albedo;
+    vec3 emissive;
     float roughness;
     float metallic;
     float reflectance;
@@ -74,6 +75,7 @@ struct GPUMaterialData {
     uint reflectance_tex;
     uint clear_coat_tex;
     uint clear_coat_roughness_tex;
+    uint emissive_tex;
     uint anisotropy_tex;
     uint ambient_occlusion_tex;
     uint material_flags;
@@ -81,6 +83,7 @@ struct GPUMaterialData {
 
 struct CPUMaterialData {
     vec4 albedo;
+    vec3 emissive;
     float roughness;
     float metallic;
     float reflectance;

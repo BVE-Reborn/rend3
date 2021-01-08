@@ -15,6 +15,7 @@ bool has_texture(uint idx) {
 #define HAS_REFLECTANCE_TEXTURE has_texture(material.reflectance_tex)
 #define HAS_CLEAR_COAT_TEXTURE has_texture(material.clear_coat_tex)
 #define HAS_CLEAR_COAT_ROUGHNESS_TEXTURE has_texture(material.clear_coat_roughness_tex)
+#define HAS_EMISSIVE_TEXTURE has_texture(material.emissive_tex)
 #define HAS_ANISOTROPY_TEXTURE has_texture(material.anisotropy_tex)
 #define HAS_AMBIENT_OCCLUSION_TEXTURE has_texture(material.ambient_occlusion_tex)
 
@@ -25,6 +26,7 @@ bool has_texture(uint idx) {
 #define REFLECTANCE_TEXTURE textures[nonuniformEXT(material.reflectance_tex - 1)]
 #define CLEAR_COAT_TEXTURE textures[nonuniformEXT(material.clear_coat_tex - 1)]
 #define CLEAR_COAT_ROUGHNESS_TEXTURE textures[nonuniformEXT(material.clear_coat_roughness_tex - 1)]
+#define EMISSIVE_TEXTURE textures[nonuniformEXT(material.emissive_tex - 1)]
 #define ANISOTROPY_TEXTURE textures[nonuniformEXT(material.anisotropy_tex - 1)]
 #define AMBIENT_OCCLUSION_TEXTURE textures[nonuniformEXT(material.ambient_occlusion_tex - 1)]
 #endif
@@ -39,8 +41,9 @@ bool has_texture(uint idx) {
 #define HAS_REFLECTANCE_TEXTURE bool((material.texture_enable >> 4) & 0x1)
 #define HAS_CLEAR_COAT_TEXTURE bool((material.texture_enable >> 5) & 0x1)
 #define HAS_CLEAR_COAT_ROUGHNESS_TEXTURE bool((material.texture_enable >> 6) & 0x1)
-#define HAS_ANISOTROPY_TEXTURE bool((material.texture_enable >> 7) & 0x1)
-#define HAS_AMBIENT_OCCLUSION_TEXTURE bool((material.texture_enable >> 8) & 0x1)
+#define HAS_EMISSIVE_TEXTURE bool((material.texture_enable >> 7) & 0x1)
+#define HAS_ANISOTROPY_TEXTURE bool((material.texture_enable >> 8) & 0x1)
+#define HAS_AMBIENT_OCCLUSION_TEXTURE bool((material.texture_enable >> 9) & 0x1)
 
 #define ALBEDO_TEXTURE albedo_tex
 #define NORMAL_TEXTURE normal_tex
@@ -49,6 +52,7 @@ bool has_texture(uint idx) {
 #define REFLECTANCE_TEXTURE reflectance_tex
 #define CLEAR_COAT_TEXTURE clear_coat_tex
 #define CLEAR_COAT_ROUGHNESS_TEXTURE clear_coat_roughness_tex
+#define EMISSIVE_TEXTURE emissive_tex
 #define ANISOTROPY_TEXTURE anisotropy_tex
 #define AMBIENT_OCCLUSION_TEXTURE ambient_occlusion_tex
 #endif
