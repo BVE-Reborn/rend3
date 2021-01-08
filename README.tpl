@@ -5,6 +5,7 @@
 [![Documentation](https://docs.rs/rend3/badge.svg)](https://docs.rs/rend3)
 ![License](https://img.shields.io/crates/l/rend3)
 
+![](examples/scene-viewer/scifi-base.jpg)
 ![](examples/scene-viewer/screenshot.jpg)
 
 {{readme}}

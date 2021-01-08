@@ -1,6 +1,6 @@
 [package]
 name = "rend3-gltf-example"
-license = "MPL-2.0"
+license = "MIT OR Apache-2.0 OR Zlib"
 version = "0.1.0"
 authors = ["Connor Fitzgerald <connorwadefitzgerald@gmail.com>"]
 edition = "2018"

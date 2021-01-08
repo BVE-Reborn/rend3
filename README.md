@@ -46,4 +46,4 @@ under the [enhancement] label.
 
 [enhancement]: https://github.com/BVE-Reborn/rend3/labels/enhancement
 
-License: MPL-2.0
+License: MIT OR Apache-2.0 OR Zlib
