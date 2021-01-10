@@ -10,6 +10,7 @@ use wgpu::{Buffer, BufferAddress, BufferDescriptor, BufferUsage, CommandEncoder,
 
 pub const VERTEX_POSITION_SIZE: usize = size_of::<Vec3>();
 pub const VERTEX_NORMAL_SIZE: usize = size_of::<Vec3>();
+pub const VERTEX_TANGENT_SIZE: usize = size_of::<Vec3>();
 pub const VERTEX_UV_SIZE: usize = size_of::<Vec2>();
 pub const VERTEX_COLOR_SIZE: usize = size_of::<[u8; 4]>();
 pub const VERTEX_MATERIAL_INDEX_SIZE: usize = size_of::<u32>();
@@ -27,6 +28,7 @@ pub struct InternalMesh {
 pub struct MeshBuffers {
     pub vertex_position: Buffer,
     pub vertex_normal: Buffer,
+    pub vertex_tangent: Buffer,
     pub vertex_uv: Buffer,
     pub vertex_color: Buffer,
     pub vertex_mat_index: Buffer,
@@ -113,6 +115,11 @@ impl MeshManager {
             &self.buffers.vertex_position,
             (vertex_range.start * VERTEX_POSITION_SIZE) as BufferAddress,
             bytemuck::cast_slice(&mesh.vertex_positions),
+        );
+        queue.write_buffer(
+            &self.buffers.vertex_tangent,
+            (vertex_range.start * VERTEX_TANGENT_SIZE) as BufferAddress,
+            bytemuck::cast_slice(&mesh.vertex_tangents),
         );
         queue.write_buffer(
             &self.buffers.vertex_normal,
@@ -207,6 +214,13 @@ impl MeshManager {
             "vertex normal copy",
         );
 
+        let vertex_tangent_copy_data = gpu_copy.prepare(
+            device,
+            self.buffers.vertex_tangent.slice(..),
+            new_buffers.vertex_tangent.slice(..),
+            "vertex tangent copy",
+        );
+
         let vertex_uv_copy_data = gpu_copy.prepare(
             device,
             self.buffers.vertex_uv.slice(..),
@@ -260,6 +274,7 @@ impl MeshManager {
 
             copy_vert_fn!(&vertex_position_copy_data, VERTEX_POSITION_SIZE);
             copy_vert_fn!(&vertex_normal_copy_data, VERTEX_NORMAL_SIZE);
+            copy_vert_fn!(&vertex_tangent_copy_data, VERTEX_TANGENT_SIZE);
             copy_vert_fn!(&vertex_uv_copy_data, VERTEX_UV_SIZE);
             copy_vert_fn!(&vertex_color_copy_data, VERTEX_COLOR_SIZE);
             copy_vert_fn!(&vertex_mat_index_copy_data, VERTEX_MATERIAL_INDEX_SIZE);
@@ -293,6 +308,7 @@ impl MeshManager {
 fn create_buffers(device: &Device, vertex_count: usize, index_count: usize) -> MeshBuffers {
     let position_bytes = vertex_count * VERTEX_POSITION_SIZE;
     let normal_bytes = vertex_count * VERTEX_NORMAL_SIZE;
+    let tangent_bytes = vertex_count * VERTEX_TANGENT_SIZE;
     let uv_bytes = vertex_count * VERTEX_UV_SIZE;
     let color_bytes = vertex_count * VERTEX_COLOR_SIZE;
     let mat_index_bytes = vertex_count * VERTEX_MATERIAL_INDEX_SIZE;
@@ -308,6 +324,13 @@ fn create_buffers(device: &Device, vertex_count: usize, index_count: usize) -> M
     let vertex_normal = device.create_buffer(&BufferDescriptor {
         label: Some("normal vertex buffer"),
         size: normal_bytes as BufferAddress,
+        usage: BufferUsage::COPY_DST | BufferUsage::VERTEX | BufferUsage::STORAGE,
+        mapped_at_creation: false,
+    });
+
+    let vertex_tangent = device.create_buffer(&BufferDescriptor {
+        label: Some("tangent vertex buffer"),
+        size: tangent_bytes as BufferAddress,
         usage: BufferUsage::COPY_DST | BufferUsage::VERTEX | BufferUsage::STORAGE,
         mapped_at_creation: false,
     });
@@ -343,6 +366,7 @@ fn create_buffers(device: &Device, vertex_count: usize, index_count: usize) -> M
     MeshBuffers {
         vertex_position,
         vertex_normal,
+        vertex_tangent,
         vertex_uv,
         vertex_color,
         vertex_mat_index,

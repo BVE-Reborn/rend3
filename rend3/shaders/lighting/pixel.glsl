@@ -62,8 +62,12 @@ PixelData get_per_pixel_data(MATERIAL_TYPE material) {
     pixel.albedo *= material.albedo;
 
     if (HAS_NORMAL_TEXTURE) {
-        // TODO: normal mapping
-        pixel.normal = i_normal;
+        vec3 normal = texture(sampler2D(NORMAL_TEXTURE, linear_sampler), i_coords).xyz * 2.0 - 1.0;
+        vec3 binorm = cross(i_normal, i_tangent);
+
+        mat3 tbn = mat3(i_tangent, binorm, i_normal);
+
+        pixel.normal = tbn * normal;
     } else {
         pixel.normal = i_normal;
     }
