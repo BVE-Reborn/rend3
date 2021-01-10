@@ -95,6 +95,10 @@ impl ObjectManager {
 
         let object_count = self.registry.count();
 
+        if object_count == 0 {
+            return object_count;
+        }
+
         if let ModeData::GPU(ref mut obj_buffer) = self.object_info_buffer {
             let registry = &self.registry;
 
