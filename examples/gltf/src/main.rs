@@ -10,6 +10,12 @@ fn load_gltf(
 
     let vertex_positions: Vec<_> = reader.read_positions().unwrap().map(glam::Vec3::from).collect();
     let vertex_normals: Vec<_> = reader.read_normals().unwrap().map(glam::Vec3::from).collect();
+    let vertex_tangents: Vec<_> = reader
+        .read_tangents()
+        .unwrap()
+        .map(glam::Vec4::from)
+        .map(From::from)
+        .collect();
     let vertex_uvs: Vec<_> = reader
         .read_tex_coords(0)
         .unwrap()
@@ -20,6 +26,7 @@ fn load_gltf(
 
     let mesh = rend3::datatypes::MeshBuilder::new(vertex_positions.to_vec())
         .with_vertex_normals(vertex_normals)
+        .with_vertex_tangents(vertex_tangents)
         .with_vertex_uvs(vertex_uvs)
         .with_indices(indices)
         .build();

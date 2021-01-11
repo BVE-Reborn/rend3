@@ -227,7 +227,7 @@ impl MeshBuilder {
         self
     }
 
-    /// Add vertex normals to the given mesh.
+    /// Add vertex tangents to the given mesh.
     ///
     /// # Panic
     ///
@@ -432,6 +432,7 @@ impl Mesh {
         indices: &[u32],
     ) {
         assert_eq!(tangents.len(), positions.len());
+        assert_eq!(uvs.len(), positions.len());
 
         for tan in tangents.iter_mut() {
             *tan = Vec3::zero();
@@ -448,9 +449,14 @@ impl Mesh {
             let pos2 = positions[idx1 as usize];
             let pos3 = positions[idx2 as usize];
 
-            let tex1 = uvs[idx0 as usize];
-            let tex2 = uvs[idx1 as usize];
-            let tex3 = uvs[idx2 as usize];
+            // SAFETY: All vectors are the same length by the assert, and indexing succeeded on positions, therefore it's safe on uvs
+            let (tex1, tex2, tex3) = unsafe {
+                (
+                    *uvs.get_unchecked(idx0 as usize),
+                    *uvs.get_unchecked(idx1 as usize),
+                    *uvs.get_unchecked(idx2 as usize),
+                )
+            };
 
             let edge1 = pos2 - pos1;
             let edge2 = pos3 - pos1;
@@ -466,6 +472,7 @@ impl Mesh {
                 ((edge1.z * uv2.y) - (edge2.z * uv1.y)) * r,
             );
 
+            // SAFETY: All vectors are the same length by the assert, and indexing succeeded on positions, therefore it's safe on tangents
             unsafe {
                 *tangents.get_unchecked_mut(idx0 as usize) += tangent;
                 *tangents.get_unchecked_mut(idx1 as usize) += tangent;
