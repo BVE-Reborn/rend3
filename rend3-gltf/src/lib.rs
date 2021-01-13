@@ -11,35 +11,35 @@ use thiserror::Error;
 
 #[derive(Debug)]
 pub struct MeshPrimitive {
-    handle: dt::MeshHandle,
-    material: Option<usize>,
+    pub handle: dt::MeshHandle,
+    pub material: Option<usize>,
 }
 
 #[derive(Debug)]
 pub struct Mesh {
-    primitives: Vec<MeshPrimitive>,
+    pub primitives: Vec<MeshPrimitive>,
 }
 
 #[derive(Debug)]
 pub struct Node {
-    children: Vec<Node>,
-    local_transform: Mat4,
-    objects: Vec<dt::ObjectHandle>,
-    light: Option<dt::DirectionalLightHandle>,
+    pub children: Vec<Node>,
+    pub local_transform: Mat4,
+    pub objects: Vec<dt::ObjectHandle>,
+    pub light: Option<dt::DirectionalLightHandle>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct ImageKey {
-    index: usize,
-    srgb: bool,
+    pub index: usize,
+    pub srgb: bool,
 }
 
 #[derive(Debug, Default)]
 pub struct LoadedGltfScene {
-    meshes: FnvHashMap<usize, Mesh>,
-    materials: FnvHashMap<Option<usize>, dt::MaterialHandle>,
-    images: FnvHashMap<ImageKey, dt::TextureHandle>,
-    nodes: Vec<Node>,
+    pub meshes: FnvHashMap<usize, Mesh>,
+    pub materials: FnvHashMap<Option<usize>, dt::MaterialHandle>,
+    pub images: FnvHashMap<ImageKey, dt::TextureHandle>,
+    pub nodes: Vec<Node>,
 }
 
 #[derive(Debug, Error)]
@@ -193,15 +193,20 @@ where
             let mut builder = MeshBuilder::new(vertex_positions);
 
             if let Some(normals) = reader.read_normals() {
-                builder = builder.with_vertex_normals(normals.map(Vec3::from).collect::<Vec<_>>())
+                builder = builder.with_vertex_normals(normals.map(Vec3::from).collect())
+            }
+
+            if let Some(tangents) = reader.read_tangents() {
+                // todo: handedness
+                builder = builder.with_vertex_tangents(tangents.map(|[x, y, z, _]| Vec3::new(x, y, z)).collect())
             }
 
             if let Some(uvs) = reader.read_tex_coords(0) {
-                builder = builder.with_vertex_uvs(uvs.into_f32().map(Vec2::from).collect::<Vec<_>>())
+                builder = builder.with_vertex_uvs(uvs.into_f32().map(Vec2::from).collect())
             }
 
             if let Some(colors) = reader.read_colors(0) {
-                builder = builder.with_vertex_colors(colors.into_rgba_u8().collect::<Vec<_>>())
+                builder = builder.with_vertex_colors(colors.into_rgba_u8().collect())
             }
 
             if let Some(indices) = reader.read_indices() {
