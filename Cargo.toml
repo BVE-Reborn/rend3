@@ -5,7 +5,8 @@ members = [
     "examples/imgui",
     "examples/scene-viewer",
     "rend3",
-    "rend3-gltf"
+    "rend3-gltf",
+    "rend3-list"
 ]
 
 [profile.release]

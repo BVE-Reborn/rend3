@@ -3,9 +3,9 @@ use glam::{Vec3, Vec3A};
 use pico_args::Arguments;
 use rend3::{
     datatypes::{CameraLocation, DirectionalLight, RendererTextureFormat, Texture},
-    list::{DefaultPipelines, DefaultShaders},
     Renderer,
 };
+use rend3_list::{DefaultPipelines, DefaultShaders};
 use std::{
     collections::HashMap,
     hash::BuildHasher,
@@ -295,7 +295,7 @@ fn main() {
             renderer.set_camera_location(camera_location);
             renderer.set_options(options.clone());
 
-            let list = rend3::list::default_render_list(
+            let list = rend3_list::default_render_list(
                 renderer.mode(),
                 [
                     (options.size[0] as f32 * 1.0) as u32,

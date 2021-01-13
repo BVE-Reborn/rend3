@@ -1,4 +1,5 @@
-use crate::{
+use rend3::list::{Color, LoadOp};
+use rend3::{
     datatypes::{
         DepthCompare, Pipeline, PipelineBindingType, PipelineDepthState, PipelineHandle, PipelineInputType,
         PipelineOutputAttachment, ShaderHandle,
@@ -11,7 +12,6 @@ use crate::{
     Renderer, RendererMode, SWAPCHAIN_FORMAT,
 };
 use std::{future::Future, sync::Arc};
-use wgpu::{Color, LoadOp, TextureFormat};
 
 pub struct DefaultShaders {
     pub depth_vert: ShaderHandle,
@@ -350,7 +350,7 @@ pub fn default_render_list(mode: RendererMode, resolution: [u32; 2], pipelines: 
         internal_renderbuffer_name,
         ImageResourceDescriptor {
             resolution,
-            format: TextureFormat::Rgba16Float,
+            format: ImageFormat::Rgba16Float,
             samples: 1,
             usage: ImageUsage::SAMPLED | ImageUsage::OUTPUT_ATTACHMENT,
         },
@@ -360,7 +360,7 @@ pub fn default_render_list(mode: RendererMode, resolution: [u32; 2], pipelines: 
         "normal buffer",
         ImageResourceDescriptor {
             resolution,
-            format: TextureFormat::Rgba16Float,
+            format: ImageFormat::Rgba16Float,
             samples: 1,
             usage: ImageUsage::SAMPLED | ImageUsage::OUTPUT_ATTACHMENT,
         },
@@ -370,7 +370,7 @@ pub fn default_render_list(mode: RendererMode, resolution: [u32; 2], pipelines: 
         "depth buffer",
         ImageResourceDescriptor {
             resolution,
-            format: TextureFormat::Depth32Float,
+            format: ImageFormat::Depth32Float,
             samples: 1,
             usage: ImageUsage::SAMPLED | ImageUsage::OUTPUT_ATTACHMENT,
         },
