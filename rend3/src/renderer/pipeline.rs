@@ -3,7 +3,8 @@ use crate::{
     list::RenderPassRunRate,
     registry::ResourceRegistry,
     renderer::mesh::{
-        VERTEX_COLOR_SIZE, VERTEX_MATERIAL_INDEX_SIZE, VERTEX_NORMAL_SIZE, VERTEX_POSITION_SIZE, VERTEX_UV_SIZE,
+        VERTEX_COLOR_SIZE, VERTEX_MATERIAL_INDEX_SIZE, VERTEX_NORMAL_SIZE, VERTEX_POSITION_SIZE, VERTEX_TANGENT_SIZE,
+        VERTEX_UV_SIZE,
     },
     Renderer, RendererMode,
 };
@@ -184,19 +185,24 @@ impl PipelineManager {
                         attributes: &wgpu::vertex_attr_array![1 => Float3],
                     },
                     wgpu::VertexBufferDescriptor {
+                        stride: VERTEX_TANGENT_SIZE as u64,
+                        step_mode: wgpu::InputStepMode::Vertex,
+                        attributes: &wgpu::vertex_attr_array![2 => Float3],
+                    },
+                    wgpu::VertexBufferDescriptor {
                         stride: VERTEX_UV_SIZE as u64,
                         step_mode: wgpu::InputStepMode::Vertex,
-                        attributes: &wgpu::vertex_attr_array![2 => Float2],
+                        attributes: &wgpu::vertex_attr_array![3 => Float2],
                     },
                     wgpu::VertexBufferDescriptor {
                         stride: VERTEX_COLOR_SIZE as u64,
                         step_mode: wgpu::InputStepMode::Vertex,
-                        attributes: &wgpu::vertex_attr_array![3 => Uchar4Norm],
+                        attributes: &wgpu::vertex_attr_array![4 => Uchar4Norm],
                     },
                     wgpu::VertexBufferDescriptor {
                         stride: VERTEX_MATERIAL_INDEX_SIZE as u64,
                         step_mode: wgpu::InputStepMode::Vertex,
-                        attributes: &wgpu::vertex_attr_array![4 => Uint],
+                        attributes: &wgpu::vertex_attr_array![5 => Uint],
                     },
                     wgpu::VertexBufferDescriptor {
                         stride: 20,
@@ -204,7 +210,7 @@ impl PipelineManager {
                         attributes: &[wgpu::VertexAttributeDescriptor {
                             format: wgpu::VertexFormat::Uint,
                             offset: 16,
-                            shader_location: 5,
+                            shader_location: 6,
                         }],
                     },
                 ];
@@ -254,7 +260,7 @@ impl PipelineManager {
                         vertex_buffers: match pipeline_desc.input {
                             PipelineInputType::FullscreenTriangle => &[],
                             PipelineInputType::Models3d => match renderer.mode {
-                                RendererMode::CPUPowered => &vertex_states[0..5],
+                                RendererMode::CPUPowered => &vertex_states[0..6],
                                 RendererMode::GPUPowered => &vertex_states,
                             },
                         },

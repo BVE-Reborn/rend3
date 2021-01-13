@@ -196,9 +196,10 @@ where
                 ModeData::CPU(ref c) => {
                     rpass.set_vertex_buffer(0, buffers.vertex_position.slice(..));
                     rpass.set_vertex_buffer(1, buffers.vertex_normal.slice(..));
-                    rpass.set_vertex_buffer(2, buffers.vertex_uv.slice(..));
-                    rpass.set_vertex_buffer(3, buffers.vertex_color.slice(..));
-                    rpass.set_vertex_buffer(4, buffers.vertex_mat_index.slice(..));
+                    rpass.set_vertex_buffer(2, buffers.vertex_tangent.slice(..));
+                    rpass.set_vertex_buffer(3, buffers.vertex_uv.slice(..));
+                    rpass.set_vertex_buffer(4, buffers.vertex_color.slice(..));
+                    rpass.set_vertex_buffer(5, buffers.vertex_mat_index.slice(..));
                     rpass.set_index_buffer(buffers.index.slice(..));
                     let mut last_material = None;
                     for (draw_call_idx, object) in c.iter().enumerate() {
@@ -226,12 +227,13 @@ where
                 ModeData::GPU(ref g) => {
                     rpass.set_vertex_buffer(0, buffers.vertex_position.slice(..));
                     rpass.set_vertex_buffer(1, buffers.vertex_normal.slice(..));
-                    rpass.set_vertex_buffer(2, buffers.vertex_uv.slice(..));
-                    rpass.set_vertex_buffer(3, buffers.vertex_color.slice(..));
-                    rpass.set_vertex_buffer(4, buffers.vertex_mat_index.slice(..));
+                    rpass.set_vertex_buffer(2, buffers.vertex_tangent.slice(..));
+                    rpass.set_vertex_buffer(3, buffers.vertex_uv.slice(..));
+                    rpass.set_vertex_buffer(4, buffers.vertex_color.slice(..));
+                    rpass.set_vertex_buffer(5, buffers.vertex_mat_index.slice(..));
                     rpass.set_index_buffer(buffers.index.slice(..));
 
-                    rpass.set_vertex_buffer(5, g.indirect_buffer.slice(..));
+                    rpass.set_vertex_buffer(6, g.indirect_buffer.slice(..));
                     rpass.multi_draw_indexed_indirect_count(
                         &g.indirect_buffer,
                         0,

@@ -184,6 +184,7 @@ pub struct InterleavedModelVertex {
 pub struct MeshBuilder {
     vertex_positions: Vec<Vec3>,
     vertex_normals: Option<Vec<Vec3>>,
+    vertex_tangents: Option<Vec<Vec3>>,
     vertex_uvs: Option<Vec<Vec2>>,
     vertex_colors: Option<Vec<[u8; 4]>>,
     vertex_material_indices: Option<Vec<u32>>,
@@ -223,6 +224,17 @@ impl MeshBuilder {
     pub fn with_vertex_normals(mut self, normals: Vec<Vec3>) -> Self {
         self.validate_len(normals.len());
         self.vertex_normals = Some(normals);
+        self
+    }
+
+    /// Add vertex tangents to the given mesh.
+    ///
+    /// # Panic
+    ///
+    /// Will panic if the length is different from the position buffer length.
+    pub fn with_vertex_tangents(mut self, tangents: Vec<Vec3>) -> Self {
+        self.validate_len(tangents.len());
+        self.vertex_tangents = Some(tangents);
         self
     }
 
@@ -292,10 +304,12 @@ impl MeshBuilder {
         debug_assert_ne!(length, 0, "Length should be guarded by validation");
 
         let has_normals = self.vertex_normals.is_some();
+        let has_tangents = self.vertex_tangents.is_some();
 
         let mut mesh = Mesh {
             vertex_positions: self.vertex_positions,
             vertex_normals: self.vertex_normals.unwrap_or_else(|| vec![Vec3::zero(); length]),
+            vertex_tangents: self.vertex_tangents.unwrap_or_else(|| vec![Vec3::zero(); length]),
             vertex_uvs: self.vertex_uvs.unwrap_or_else(|| vec![Vec2::zero(); length]),
             vertex_colors: self.vertex_colors.unwrap_or_else(|| vec![[0; 4]; length]),
             vertex_material_indices: self.vertex_material_indices.unwrap_or_else(|| vec![0; length]),
@@ -309,6 +323,10 @@ impl MeshBuilder {
 
         if !has_normals {
             mesh.calculate_normals();
+        }
+
+        if !has_tangents {
+            mesh.calculate_tangents();
         }
 
         mesh
@@ -325,6 +343,7 @@ impl MeshBuilder {
 pub struct Mesh {
     pub vertex_positions: Vec<Vec3>,
     pub vertex_normals: Vec<Vec3>,
+    pub vertex_tangents: Vec<Vec3>,
     pub vertex_uvs: Vec<Vec2>,
     pub vertex_colors: Vec<[u8; 4]>,
     pub vertex_material_indices: Vec<u32>,
@@ -338,6 +357,7 @@ impl Mesh {
         [
             self.vertex_positions.len(),
             self.vertex_normals.len(),
+            self.vertex_tangents.len(),
             self.vertex_uvs.len(),
             self.vertex_colors.len(),
             self.vertex_material_indices.len(),
@@ -390,6 +410,79 @@ impl Mesh {
 
         for normal in normals.iter_mut() {
             *normal = normal.normalize();
+        }
+    }
+
+    /// Calculate tangents for the given mesh, based on normals and texture coordinates
+    pub fn calculate_tangents(&mut self) {
+        Self::calculate_tangents_for_buffers(
+            &mut self.vertex_tangents,
+            &self.vertex_positions,
+            &self.vertex_normals,
+            &self.vertex_uvs,
+            &self.indices,
+        );
+    }
+
+    fn calculate_tangents_for_buffers(
+        tangents: &mut [Vec3],
+        positions: &[Vec3],
+        normals: &[Vec3],
+        uvs: &[Vec2],
+        indices: &[u32],
+    ) {
+        assert_eq!(tangents.len(), positions.len());
+        assert_eq!(uvs.len(), positions.len());
+
+        for tan in tangents.iter_mut() {
+            *tan = Vec3::zero();
+        }
+
+        for idx in indices.chunks_exact(3) {
+            let (idx0, idx1, idx2) = match *idx {
+                [idx0, idx1, idx2] => (idx0, idx1, idx2),
+                // SAFETY: This is guaranteed by chunks_exact(3)
+                _ => unsafe { std::hint::unreachable_unchecked() },
+            };
+
+            let pos1 = positions[idx0 as usize];
+            let pos2 = positions[idx1 as usize];
+            let pos3 = positions[idx2 as usize];
+
+            // SAFETY: All vectors are the same length by the assert, and indexing succeeded on positions, therefore it's safe on uvs
+            let (tex1, tex2, tex3) = unsafe {
+                (
+                    *uvs.get_unchecked(idx0 as usize),
+                    *uvs.get_unchecked(idx1 as usize),
+                    *uvs.get_unchecked(idx2 as usize),
+                )
+            };
+
+            let edge1 = pos2 - pos1;
+            let edge2 = pos3 - pos1;
+
+            let uv1 = tex2 - tex1;
+            let uv2 = tex3 - tex1;
+
+            let r = 1.0 / (uv1.x * uv2.y - uv1.y * uv2.x);
+
+            let tangent = Vec3::new(
+                ((edge1.x * uv2.y) - (edge2.x * uv1.y)) * r,
+                ((edge1.y * uv2.y) - (edge2.y * uv1.y)) * r,
+                ((edge1.z * uv2.y) - (edge2.z * uv1.y)) * r,
+            );
+
+            // SAFETY: All vectors are the same length by the assert, and indexing succeeded on positions, therefore it's safe on tangents
+            unsafe {
+                *tangents.get_unchecked_mut(idx0 as usize) += tangent;
+                *tangents.get_unchecked_mut(idx1 as usize) += tangent;
+                *tangents.get_unchecked_mut(idx2 as usize) += tangent;
+            }
+        }
+
+        for (tan, norm) in tangents.iter_mut().zip(normals) {
+            let t = *tan - (*norm * norm.dot(*tan));
+            *tan = t.normalize();
         }
     }
 
