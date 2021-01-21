@@ -1,9 +1,7 @@
-pub use default::*;
 use fnv::FnvHashMap;
 pub use passes::*;
 pub use resources::*;
 
-mod default;
 mod passes;
 mod resources;
 

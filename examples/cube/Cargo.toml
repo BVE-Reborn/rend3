@@ -16,6 +16,7 @@ path = "src/main.rs"
 glam = "0.12"
 # Renderer
 rend3 = { path = "../../rend3", version = "0.1.0" }
+rend3-list = { path = "../../rend3-list", version = "0.1.0" }
 # Provides `block_on` to wait for futures from sync code
 pollster = "0.2"
 # wgpu-aware logging

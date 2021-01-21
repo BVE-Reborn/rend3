@@ -1,0 +1,13 @@
+[package]
+name = "rend3-list"
+version = "0.1.0"
+authors = ["Connor Fitzgerald <connorwadefitzgerald@gmail.com>"]
+edition = "2018"
+description = "default renderlist rend3"
+repository = "https://github.com/BVE-Reborn/rend3"
+license = "MIT OR Apache-2.0 OR Zlib"
+keywords = []
+categories = []
+
+[dependencies]
+rend3 = { version = "0.1", path = "../rend3" }

@@ -113,8 +113,8 @@ fn main() {
 
     // Create the default set of shaders and pipelines
     let pipelines = pollster::block_on(async {
-        let shaders = rend3::list::DefaultShaders::new(&renderer).await;
-        rend3::list::DefaultPipelines::new(&renderer, &shaders).await
+        let shaders = rend3_list::DefaultShaders::new(&renderer).await;
+        rend3_list::DefaultPipelines::new(&renderer, &shaders).await
     });
 
     // Create mesh and calculate smooth normals based on vertices
@@ -210,7 +210,7 @@ fn main() {
 
                 // Default set of rendering commands using the default shaders.
                 let render_list =
-                    rend3::list::default_render_list(renderer.mode(), internal_renderbuffer_size, &pipelines);
+                    rend3_list::default_render_list(renderer.mode(), internal_renderbuffer_size, &pipelines);
 
                 // Get our swapchain image
                 let image = Arc::new(swapchain.get_current_frame().unwrap());

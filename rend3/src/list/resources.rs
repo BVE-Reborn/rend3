@@ -1,5 +1,5 @@
 use crate::datatypes::{ClearColor, TextureHandle};
-use wgpu::LoadOp;
+pub use wgpu::{Color, LoadOp};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ResourceBinding {

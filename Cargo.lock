@@ -2046,6 +2046,7 @@ dependencies = [
  "glam",
  "pollster",
  "rend3",
+ "rend3-list",
  "wgpu-subscriber",
  "winit",
 ]
@@ -2072,6 +2073,7 @@ dependencies = [
  "gltf",
  "pollster",
  "rend3",
+ "rend3-list",
  "wgpu-subscriber",
  "winit",
 ]
@@ -2086,9 +2088,17 @@ dependencies = [
  "imgui-winit-support",
  "pollster",
  "rend3",
+ "rend3-list",
  "wgpu",
  "wgpu-subscriber",
  "winit",
+]
+
+[[package]]
+name = "rend3-list"
+version = "0.1.0"
+dependencies = [
+ "rend3",
 ]
 
 [[package]]
@@ -2105,6 +2115,7 @@ dependencies = [
  "pollster",
  "rend3",
  "rend3-gltf",
+ "rend3-list",
  "smallvec",
  "tracing",
  "wgpu",
