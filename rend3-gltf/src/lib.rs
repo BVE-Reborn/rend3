@@ -245,6 +245,7 @@ fn load_default_material<TLD>(renderer: &Renderer<TLD>, loaded: &mut LoadedGltfS
             reflectance: dt::MaterialComponent::None,
             anisotropy: dt::MaterialComponent::None,
             alpha_cutout: None,
+            unlit: false,
         }),
     );
 }
@@ -325,6 +326,7 @@ where
                 },
                 None => dt::MaterialComponent::Value(Vec3::from(emissive_factor)),
             },
+            unlit: true,
             ..dt::Material::default()
         });
 

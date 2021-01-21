@@ -518,18 +518,19 @@ pub struct Texture {
 
 bitflags::bitflags! {
     pub(crate) struct MaterialFlags : u32 {
-        const ALBEDO_ACTIVE =      0b0000_0000_0001;
-        const ALBEDO_BLEND =       0b0000_0000_0010;
-        const ALBEDO_VERTEX_SRGB = 0b0000_0000_0100;
-        const ALPHA_CUTOUT =       0b0000_0000_1000;
-        const BICOMPONENT_NORMAL = 0b0000_0001_0000;
-        const SWIZZLED_NORMAL =    0b0000_0010_0000;
-        const AOMR_GLTF_COMBINED = 0b0000_0100_0000;
-        const AOMR_GLTF_SPLIT =    0b0000_1000_0000;
-        const AOMR_BW_SPLIT =      0b0001_0000_0000;
-        const CC_GLTF_COMBINED =   0b0010_0000_0000;
-        const CC_GLTF_SPLIT =      0b0100_0000_0000;
-        const CC_BW_SPLIT =        0b1000_0000_0000;
+        const ALBEDO_ACTIVE =      0b0000_0000_0000_0001;
+        const ALBEDO_BLEND =       0b0000_0000_0000_0010;
+        const ALBEDO_VERTEX_SRGB = 0b0000_0000_0000_0100;
+        const ALPHA_CUTOUT =       0b0000_0000_0000_1000;
+        const BICOMPONENT_NORMAL = 0b0000_0000_0001_0000;
+        const SWIZZLED_NORMAL =    0b0000_0000_0010_0000;
+        const AOMR_GLTF_COMBINED = 0b0000_0000_0100_0000;
+        const AOMR_GLTF_SPLIT =    0b0000_0000_1000_0000;
+        const AOMR_BW_SPLIT =      0b0000_0001_0000_0000;
+        const CC_GLTF_COMBINED =   0b0000_0010_0000_0000;
+        const CC_GLTF_SPLIT =      0b0000_0100_0000_0000;
+        const CC_BW_SPLIT =        0b0000_1000_0000_0000;
+        const UNLIT =      0b0001_0000_0000_0000;
     }
 }
 
@@ -874,6 +875,8 @@ changeable_struct! {
         pub reflectance: MaterialComponent<f32>,
         pub anisotropy: MaterialComponent<f32>,
         pub alpha_cutout: Option<f32>,
+        // TODO: Determine how to make this a clearer part of the type system, esp. with the changable_struct macro.
+        pub unlit: bool,
     }
 }
 
