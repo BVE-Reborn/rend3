@@ -2,7 +2,7 @@ use fnv::FnvBuildHasher;
 use glam::{Vec3, Vec3A};
 use pico_args::Arguments;
 use rend3::{
-    datatypes::{CameraLocation, DirectionalLight, RendererTextureFormat, Texture},
+    datatypes::{Camera, CameraProjection, DirectionalLight, RendererTextureFormat, Texture},
     Renderer,
 };
 use rend3_list::{DefaultPipelines, DefaultShaders};
@@ -173,7 +173,7 @@ fn main() {
 
     let mut scancode_status = HashMap::with_hasher(FnvBuildHasher::default());
 
-    let mut camera_location = CameraLocation::default();
+    let mut camera_location = Camera::default();
 
     let mut timestamp_last_second = Instant::now();
     let mut timestamp_last_frame = Instant::now();
@@ -208,8 +208,11 @@ fn main() {
             timestamp_last_frame = now;
 
             let forward = {
-                let CameraLocation { yaw, pitch, .. } = camera_location;
-                Vec3A::new(yaw.sin() * pitch.cos(), -pitch.sin(), yaw.cos() * pitch.cos())
+                if let CameraProjection::Projection { yaw, pitch, .. } = camera_location.projection {
+                    Vec3A::new(yaw.sin() * pitch.cos(), -pitch.sin(), yaw.cos() * pitch.cos())
+                } else {
+                    unreachable!()
+                }
             };
             let up = Vec3A::unit_y();
             let side: Vec3A = forward.cross(up).normalize();
@@ -265,17 +268,20 @@ fn main() {
         } => {
             const TAU: f32 = std::f32::consts::PI * 2.0;
 
-            camera_location.yaw += (delta_x / 1000.0) as f32;
-            camera_location.pitch += (delta_y / 1000.0) as f32;
-            if camera_location.yaw < 0.0 {
-                camera_location.yaw += TAU;
-            } else if camera_location.yaw >= TAU {
-                camera_location.yaw -= TAU;
+            if let CameraProjection::Projection { ref mut yaw, ref mut pitch, .. } = camera_location.projection {
+                *yaw += (delta_x / 1000.0) as f32;
+                *pitch += (delta_y / 1000.0) as f32;
+                if *yaw < 0.0 {
+                    *yaw += TAU;
+                } else if *yaw >= TAU {
+                    *yaw -= TAU;
+                }
+                *pitch = pitch
+                    .max(-std::f32::consts::FRAC_PI_2 + 0.0001)
+                    .min(std::f32::consts::FRAC_PI_2 - 0.0001);
+            } else {
+                unreachable!()
             }
-            camera_location.pitch = camera_location
-                .pitch
-                .max(-std::f32::consts::FRAC_PI_2 + 0.0001)
-                .min(std::f32::consts::FRAC_PI_2 - 0.0001);
         }
         Event::WindowEvent {
             event: WindowEvent::Resized(size),
@@ -292,7 +298,7 @@ fn main() {
         Event::RedrawRequested(_) => {
             rend3::span_transfer!(_ -> redraw_span, INFO, "Redraw");
 
-            renderer.set_camera_location(camera_location);
+            renderer.set_camera_data(camera_location);
             renderer.set_options(options.clone());
 
             let list = rend3_list::default_render_list(

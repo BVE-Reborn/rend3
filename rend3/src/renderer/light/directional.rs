@@ -1,8 +1,8 @@
 use crate::{
     bind_merge::BindGroupBuilder,
-    datatypes::{DirectionalLight, DirectionalLightHandle},
+    datatypes::{Camera, CameraProjection, DirectionalLight, DirectionalLightHandle},
     registry::ResourceRegistry,
-    renderer::{camera::Camera, INTERNAL_SHADOW_DEPTH_FORMAT, SHADOW_DIMENSIONS},
+    renderer::{camera::CameraManager, INTERNAL_SHADOW_DEPTH_FORMAT, SHADOW_DIMENSIONS},
 };
 use glam::{Mat4, Vec3};
 use std::{mem::size_of, num::NonZeroU32, sync::Arc};
@@ -14,7 +14,7 @@ use wgpu_conveyor::{write_to_buffer1, AutomatedBuffer, AutomatedBufferManager, I
 
 pub struct InternalDirectionalLight {
     pub inner: DirectionalLight,
-    pub camera: Camera,
+    pub camera: CameraManager,
     pub shadow_tex: u32,
 }
 
@@ -74,7 +74,13 @@ impl DirectionalLightManager {
             handle.0,
             InternalDirectionalLight {
                 inner: light,
-                camera: Camera::new_orthographic(light.direction),
+                camera: CameraManager::new(
+                    Camera {
+                        projection: CameraProjection::from_orthographic_direction(light.direction.into()),
+                        ..Camera::default()
+                    },
+                    None,
+                ),
                 shadow_tex: self.registry.count() as u32,
             },
         );

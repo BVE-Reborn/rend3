@@ -597,7 +597,10 @@ impl AlbedoComponent {
     }
 
     pub(crate) fn is_texture(&self) -> bool {
-        matches!(*self, Self::Texture(..) | Self::TextureVertex { .. } | Self::TextureValue { .. })
+        matches!(
+            *self,
+            Self::Texture(..) | Self::TextureVertex { .. } | Self::TextureValue { .. }
+        )
     }
 
     pub(crate) fn to_texture<Func, Out>(&self, func: Func) -> Option<Out>
@@ -888,10 +891,48 @@ pub struct Object {
 }
 
 #[derive(Debug, Default, Copy, Clone)]
-pub struct CameraLocation {
+pub struct Camera {
+    pub projection: CameraProjection,
     pub location: Vec3A,
-    pub pitch: f32,
-    pub yaw: f32,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum CameraProjection {
+    Orthographic {
+        /// Size assumes the location is at the center of the camera area.
+        size: Vec3A,
+        direction: Vec3A,
+    },
+    Projection {
+        /// Vertical field of view in degrees.
+        vfov: f32,
+        /// Near plane distance. All projection uses a infinite far plane.
+        near: f32,
+        /// Radians
+        pitch: f32,
+        /// Radians
+        yaw: f32,
+    },
+}
+
+impl CameraProjection {
+    pub fn from_orthographic_direction(direction: Vec3A) -> Self {
+        Self::Orthographic {
+            size: Vec3A::new(100.0, 100.0, 200.0),
+            direction,
+        }
+    }
+}
+
+impl Default for CameraProjection {
+    fn default() -> Self {
+        Self::Projection {
+            vfov: 60.0,
+            near: 0.1,
+            pitch: 0.0,
+            yaw: 0.0,
+        }
+    }
 }
 
 changeable_struct! {

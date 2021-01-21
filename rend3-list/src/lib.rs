@@ -1,13 +1,13 @@
-use rend3::list::{Color, LoadOp};
 use rend3::{
     datatypes::{
         DepthCompare, Pipeline, PipelineBindingType, PipelineDepthState, PipelineHandle, PipelineInputType,
         PipelineOutputAttachment, ShaderHandle,
     },
     list::{
-        DepthOutput, ImageFormat, ImageInputReference, ImageOutput, ImageOutputReference, ImageResourceDescriptor,
-        ImageUsage, PerObjectResourceBinding, RenderList, RenderOpDescriptor, RenderOpInputType, RenderPassDescriptor,
-        RenderPassRunRate, ResourceBinding, ShaderSourceStage, ShaderSourceType, SourceShaderDescriptor,
+        Color, DepthOutput, ImageFormat, ImageInputReference, ImageOutput, ImageOutputReference,
+        ImageResourceDescriptor, ImageUsage, LoadOp, PerObjectResourceBinding, RenderList, RenderOpDescriptor,
+        RenderOpInputType, RenderPassDescriptor, RenderPassRunRate, ResourceBinding, ShaderSourceStage,
+        ShaderSourceType, SourceShaderDescriptor,
     },
     Renderer, RendererMode, SWAPCHAIN_FORMAT,
 };

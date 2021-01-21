@@ -1,5 +1,6 @@
 use crate::{
     bind_merge::BindGroupBuilder,
+    datatypes::{Camera, CameraProjection},
     instruction::Instruction,
     list::{RenderList, RenderPassRunRate},
     renderer::{culling, list, uniforms::WrappedUniform, util::round_to_multiple},
@@ -44,6 +45,7 @@ pub fn render_loop<TLD: 'static>(
         let mut object_manager = renderer.object_manager.write();
         let mut directional_light_manager = renderer.directional_light_manager.write();
         let mut global_resources = renderer.global_resources.write();
+        let options = renderer.options.read();
 
         for cmd in instructions.drain(..) {
             match cmd {
@@ -277,7 +279,13 @@ pub fn render_loop<TLD: 'static>(
                     let value = directional_light_manager.get_mut(handle);
                     value.inner.update_from_changes(change);
                     if let Some(direction) = change.direction {
-                        value.camera.set_orthographic_location(direction);
+                        value.camera.set_data(
+                            Camera {
+                                projection: CameraProjection::from_orthographic_direction(direction.into()),
+                                ..Camera::default()
+                            },
+                            None,
+                        );
                     }
                 }
                 Instruction::RemoveDirectionalLight { handle } => directional_light_manager.remove(handle),
@@ -294,8 +302,8 @@ pub fn render_loop<TLD: 'static>(
                     renderer.pipeline_manager.remove(handle);
                 }
                 Instruction::SetOptions { options } => new_options = Some(options),
-                Instruction::SetCameraLocation { location } => {
-                    global_resources.camera.set_location(location);
+                Instruction::SetCameraData { data } => {
+                    global_resources.camera.set_data(data, Some(options.aspect_ratio()));
                 }
                 Instruction::SetBackgroundTexture { handle } => {
                     global_resources.background_texture = Some(handle);
@@ -365,6 +373,7 @@ pub fn render_loop<TLD: 'static>(
         let skybox_bg = skybox_bgb.build(&renderer.device, &global_resources.skybox_bgl);
 
         drop((
+            options,
             mesh_manager,
             texture_manager_2d,
             texture_manager_cube,

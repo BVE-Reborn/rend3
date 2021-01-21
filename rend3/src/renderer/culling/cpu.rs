@@ -1,7 +1,7 @@
 use crate::{
     datatypes::MaterialHandle,
     renderer::{
-        camera::Camera,
+        camera::CameraManager,
         culling::CullingPassData,
         frustum::ShaderFrustum,
         object::{InternalObject, ObjectManager},
@@ -55,7 +55,7 @@ pub(crate) async fn run<TD>(
     queue: &Queue,
     object_manager: &ObjectManager,
     data: &mut CullingPassData,
-    camera: Camera,
+    camera: CameraManager,
 ) where
     TD: 'static,
 {
@@ -69,12 +69,9 @@ pub(crate) async fn run<TD>(
     // TODO: real thread count
     let threads = 8;
     // Want chunks of no smaller than 1 to not trigger assert in chunks.
-    let chunks = ((object_count + threads - 1) / threads).max(1);
+    let chunk_size = ((object_count + threads - 1) / threads).max(1);
 
-    let chunks = object_manager
-        .values()
-        .cloned()
-        .chunks((object_count as usize / 8).max(1));
+    let chunks = object_manager.values().cloned().chunks(chunk_size as usize);
 
     let mut res_futures = FuturesUnordered::new();
     for object_chunk in (&chunks).into_iter().map(|v| v.collect_vec()) {
