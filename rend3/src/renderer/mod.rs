@@ -1,6 +1,6 @@
 use crate::{
     datatypes::{
-        AffineTransform, CameraLocation, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Material,
+        AffineTransform, Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Material,
         MaterialChange, MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, Pipeline, PipelineHandle, ShaderHandle,
         Texture, TextureHandle,
     },
@@ -292,11 +292,11 @@ impl<TLD: 'static> Renderer<TLD> {
             .push(Instruction::SetOptions { options })
     }
 
-    pub fn set_camera_location(&self, location: CameraLocation) {
+    pub fn set_camera_data(&self, data: Camera) {
         self.instructions
             .producer
             .lock()
-            .push(Instruction::SetCameraLocation { location })
+            .push(Instruction::SetCameraData { data })
     }
 
     pub fn set_background_texture(&self, handle: TextureHandle) {

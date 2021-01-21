@@ -68,6 +68,7 @@ impl CPUShaderMaterial {
                 flags |= material.aomr_textures.to_flags();
                 flags |= material.clearcoat_textures.to_flags();
                 flags.set(MaterialFlags::ALPHA_CUTOUT, material.alpha_cutout.is_some());
+                flags.set(MaterialFlags::UNLIT, material.unlit);
                 flags
             },
         }
@@ -292,6 +293,7 @@ impl MaterialManager {
                             flags |= material.aomr_textures.to_flags();
                             flags |= material.clearcoat_textures.to_flags();
                             flags.set(MaterialFlags::ALPHA_CUTOUT, material.alpha_cutout.is_some());
+                            flags.set(MaterialFlags::UNLIT, material.unlit);
                             flags
                         },
                     }

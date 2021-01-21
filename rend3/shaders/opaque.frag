@@ -62,26 +62,31 @@ void main() {
 
     PixelData pixel = get_per_pixel_data(material);
 
-    vec3 v = -normalize(i_view_position.xyz);
+    if (MATERIAL_FLAG(FLAGS_UNLIT)) {
+        o_color = pixel.albedo;
+        o_normal = vec4(i_normal, 0.0);
+    } else {
+        vec3 v = -normalize(i_view_position.xyz);
 
-    vec3 color = vec3(pixel.emissive);
-    for (uint i = 0; i < directional_light_header.total_lights; ++i) {
-        DirectionalLight light = directional_lights[i];
+        vec3 color = vec3(pixel.emissive);
+        for (uint i = 0; i < directional_light_header.total_lights; ++i) {
+            DirectionalLight light = directional_lights[i];
 
-        vec3 shadow_ndc = (directional_lights[i].view_proj * uniforms.inv_view * i_view_position).xyz;
-        vec2 shadow_flipped = (shadow_ndc.xy * 0.5) + 0.5;
-        vec4 shadow_shadow_coords = vec4(shadow_flipped.x, 1 - shadow_flipped.y, light.shadow_tex, shadow_ndc.z);
+            vec3 shadow_ndc = (directional_lights[i].view_proj * uniforms.inv_view * i_view_position).xyz;
+            vec2 shadow_flipped = (shadow_ndc.xy * 0.5) + 0.5;
+            vec4 shadow_shadow_coords = vec4(shadow_flipped.x, 1 - shadow_flipped.y, light.shadow_tex, shadow_ndc.z);
 
-        float shadow_value;
-        if (shadow_shadow_coords.x < 0 || shadow_shadow_coords.x > 1 || shadow_shadow_coords.y < 0 || shadow_shadow_coords.y > 1) {
-            shadow_value = 1.0;
-        } else {
-            shadow_value = texture(sampler2DArrayShadow(shadow, shadow_sampler), shadow_shadow_coords);
+            float shadow_value;
+            if (shadow_shadow_coords.x < 0 || shadow_shadow_coords.x > 1 || shadow_shadow_coords.y < 0 || shadow_shadow_coords.y > 1) {
+                shadow_value = 1.0;
+            } else {
+                shadow_value = texture(sampler2DArrayShadow(shadow, shadow_sampler), shadow_shadow_coords);
+            }
+
+            color += surface_shading(directional_lights[i], pixel, v, shadow_value * pixel.ambient_occlusion);
         }
 
-        color += surface_shading(directional_lights[i], pixel, v, shadow_value * pixel.ambient_occlusion);
+        o_color =  vec4(color, 1.0);
+        o_normal = vec4(pixel.normal, 0.0);
     }
-
-    o_color =  vec4(color, 1.0);
-    o_normal = vec4(pixel.normal, 0.0);
 }

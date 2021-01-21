@@ -2,7 +2,7 @@ pub use crate::renderer::culling::cpu::CPUDrawCall;
 use crate::{
     list::{ShaderSourceStage, ShaderSourceType, SourceShaderDescriptor},
     mode::ModeData,
-    renderer::{camera::Camera, object::ObjectManager, shaders::ShaderManager},
+    renderer::{camera::CameraManager, object::ObjectManager, shaders::ShaderManager},
     JobPriorities, RendererMode,
 };
 use futures::future::Either;
@@ -338,7 +338,7 @@ impl CullingPass {
         queue: &'a Queue,
         object_manager: &'a ObjectManager,
         data: &'a mut CullingPassData,
-        camera: Camera,
+        camera: CameraManager,
     ) -> impl Future<Output = ()> + 'a
     where
         TD: 'static,

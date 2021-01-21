@@ -61,145 +61,150 @@ PixelData get_per_pixel_data(MATERIAL_TYPE material) {
     }
     pixel.albedo *= material.albedo;
 
-    if (HAS_NORMAL_TEXTURE) {
-        vec3 normal = texture(sampler2D(NORMAL_TEXTURE, linear_sampler), i_coords).xyz * 2.0 - 1.0;
-        vec3 binorm = cross(i_normal, i_tangent);
-
-        mat3 tbn = mat3(i_tangent, binorm, i_normal);
-
-        pixel.normal = tbn * normal;
-    } else {
-        pixel.normal = i_normal;
+    if (MATERIAL_FLAG(FLAGS_UNLIT)) {
+        pixel.normal = normalize(i_normal);
     }
-    pixel.normal = normalize(pixel.normal);
+    else {
+        if (HAS_NORMAL_TEXTURE) {
+            vec3 normal = texture(sampler2D(NORMAL_TEXTURE, linear_sampler), i_coords).xyz * 2.0 - 1.0;
+            vec3 binorm = cross(i_normal, i_tangent);
 
-    // Extract AO, metallic, and roughness data from various packed formats
+            mat3 tbn = mat3(i_tangent, binorm, i_normal);
 
-    // In roughness texture:
-    // Red: AO
-    // Green: Metallic
-    // Blue: Roughness
-    if (MATERIAL_FLAG(FLAGS_AOMR_GLTF_COMBINED)) {
-        if (HAS_ROUGHNESS_TEXTURE) {
-            vec3 aomr = texture(sampler2D(ROUGHNESS_TEXTURE, linear_sampler), i_coords).rgb;
-            pixel.ambient_occlusion = material.ambient_occlusion * aomr.r;
-            pixel.metallic = material.metallic * aomr.g;
-            pixel.perceptual_roughness = material.roughness * aomr.b;
+            pixel.normal = tbn * normal;
         } else {
-            pixel.ambient_occlusion = material.ambient_occlusion;
-            pixel.metallic = material.metallic;
-            pixel.perceptual_roughness = material.roughness;
+            pixel.normal = i_normal;
         }
-    }
-    // In ao texture:
-    // Red: AO
-    // In roughness texture:
-    // Green: Metallic
-    // Blue: Roughness
-    else if (MATERIAL_FLAG(FLAGS_AOMR_GLTF_SPLIT)) {
-        if (HAS_ROUGHNESS_TEXTURE) {
-            vec2 mr = texture(sampler2D(ROUGHNESS_TEXTURE, linear_sampler), i_coords).gb;
-            pixel.metallic = material.metallic * mr[0];
-            pixel.perceptual_roughness = material.roughness * mr[1];
-        } else {
-            pixel.metallic = material.metallic;
-            pixel.perceptual_roughness = material.ambient_occlusion;
+        pixel.normal = normalize(pixel.normal);
+
+        // Extract AO, metallic, and roughness data from various packed formats
+
+        // In roughness texture:
+        // Red: AO
+        // Green: Metallic
+        // Blue: Roughness
+        if (MATERIAL_FLAG(FLAGS_AOMR_GLTF_COMBINED)) {
+            if (HAS_ROUGHNESS_TEXTURE) {
+                vec3 aomr = texture(sampler2D(ROUGHNESS_TEXTURE, linear_sampler), i_coords).rgb;
+                pixel.ambient_occlusion = material.ambient_occlusion * aomr.r;
+                pixel.metallic = material.metallic * aomr.g;
+                pixel.perceptual_roughness = material.roughness * aomr.b;
+            } else {
+                pixel.ambient_occlusion = material.ambient_occlusion;
+                pixel.metallic = material.metallic;
+                pixel.perceptual_roughness = material.roughness;
+            }
         }
-        if (HAS_AMBIENT_OCCLUSION_TEXTURE) {
-            pixel.ambient_occlusion = material.ambient_occlusion * texture(sampler2D(AMBIENT_OCCLUSION_TEXTURE, linear_sampler), i_coords).r;
-        } else {
-            pixel.ambient_occlusion = material.ambient_occlusion;
+        // In ao texture:
+        // Red: AO
+        // In roughness texture:
+        // Green: Metallic
+        // Blue: Roughness
+        else if (MATERIAL_FLAG(FLAGS_AOMR_GLTF_SPLIT)) {
+            if (HAS_ROUGHNESS_TEXTURE) {
+                vec2 mr = texture(sampler2D(ROUGHNESS_TEXTURE, linear_sampler), i_coords).gb;
+                pixel.metallic = material.metallic * mr[0];
+                pixel.perceptual_roughness = material.roughness * mr[1];
+            } else {
+                pixel.metallic = material.metallic;
+                pixel.perceptual_roughness = material.ambient_occlusion;
+            }
+            if (HAS_AMBIENT_OCCLUSION_TEXTURE) {
+                pixel.ambient_occlusion = material.ambient_occlusion * texture(sampler2D(AMBIENT_OCCLUSION_TEXTURE, linear_sampler), i_coords).r;
+            } else {
+                pixel.ambient_occlusion = material.ambient_occlusion;
+            }
         }
-    }
-    // In ao texture:
-    // Red: AO
-    // In metallic texture:
-    // Red: Metallic
-    // In roughness texture:
-    // Red: Roughness
-    else if (MATERIAL_FLAG(FLAGS_AOMR_BW_SPLIT)) {
-        if (HAS_ROUGHNESS_TEXTURE) {
-            pixel.perceptual_roughness = material.roughness * texture(sampler2D(ROUGHNESS_TEXTURE, linear_sampler), i_coords).r;
-        } else {
-            pixel.perceptual_roughness = material.roughness;
+        // In ao texture:
+        // Red: AO
+        // In metallic texture:
+        // Red: Metallic
+        // In roughness texture:
+        // Red: Roughness
+        else if (MATERIAL_FLAG(FLAGS_AOMR_BW_SPLIT)) {
+            if (HAS_ROUGHNESS_TEXTURE) {
+                pixel.perceptual_roughness = material.roughness * texture(sampler2D(ROUGHNESS_TEXTURE, linear_sampler), i_coords).r;
+            } else {
+                pixel.perceptual_roughness = material.roughness;
+            }
+
+            if (HAS_METALLIC_TEXTURE) {
+                pixel.metallic = material.metallic * texture(sampler2D(METALLIC_TEXTURE, linear_sampler), i_coords).r;
+            } else {
+                pixel.metallic = material.metallic;
+            }
+
+            if (HAS_AMBIENT_OCCLUSION_TEXTURE) {
+                pixel.ambient_occlusion = material.ambient_occlusion * texture(sampler2D(AMBIENT_OCCLUSION_TEXTURE, linear_sampler), i_coords).r;
+            } else {
+                pixel.ambient_occlusion = material.ambient_occlusion;
+            }
         }
 
-        if (HAS_METALLIC_TEXTURE) {
-            pixel.metallic = material.metallic * texture(sampler2D(METALLIC_TEXTURE, linear_sampler), i_coords).r;
+        if (HAS_REFLECTANCE_TEXTURE) {
+            pixel.reflectance = material.reflectance * texture(sampler2D(REFLECTANCE_TEXTURE, linear_sampler), i_coords).r;
         } else {
-            pixel.metallic = material.metallic;
+            pixel.reflectance = material.reflectance;
         }
 
-        if (HAS_AMBIENT_OCCLUSION_TEXTURE) {
-            pixel.ambient_occlusion = material.ambient_occlusion * texture(sampler2D(AMBIENT_OCCLUSION_TEXTURE, linear_sampler), i_coords).r;
-        } else {
-            pixel.ambient_occlusion = material.ambient_occlusion;
+        pixel.diffuse_color = compute_diffuse_color(pixel.albedo, pixel.metallic);
+        // Assumes an interface from air to an IOR of 1.5 for dielectrics
+        float reflectance = compute_dielectric_f0(pixel.reflectance);
+        pixel.f0 = compute_f0(pixel.albedo, pixel.metallic, reflectance);
+
+        if (MATERIAL_FLAG(FLAGS_CC_GLTF_COMBINED)) {
+            if (HAS_CLEAR_COAT_TEXTURE) {
+                vec2 cc = texture(sampler2D(CLEAR_COAT_TEXTURE, linear_sampler), i_coords).rg;
+                pixel.clear_coat = material.clear_coat * cc.r;
+                pixel.clear_coat_perceptual_roughness = material.clear_coat_roughness * cc.g;
+            } else {
+                pixel.clear_coat = material.clear_coat;
+                pixel.clear_coat_perceptual_roughness = material.clear_coat_roughness;
+            }
+        } else if (MATERIAL_FLAG(FLAGS_CC_GLTF_SPLIT)) {
+            if (HAS_CLEAR_COAT_TEXTURE) {
+                pixel.clear_coat = material.clear_coat * texture(sampler2D(CLEAR_COAT_TEXTURE, linear_sampler), i_coords).r;
+            } else {
+                pixel.clear_coat = material.clear_coat;
+            }
+            if (HAS_CLEAR_COAT_ROUGHNESS_TEXTURE) {
+                pixel.clear_coat_perceptual_roughness = material.clear_coat_roughness * texture(sampler2D(CLEAR_COAT_ROUGHNESS_TEXTURE, linear_sampler), i_coords).g;
+            } else {
+                pixel.clear_coat_perceptual_roughness = material.clear_coat_roughness;
+            }
+        } else if (MATERIAL_FLAG(FLAGS_CC_BW_SPLIT)) {
+            if (HAS_CLEAR_COAT_TEXTURE) {
+                pixel.clear_coat = material.clear_coat * texture(sampler2D(CLEAR_COAT_TEXTURE, linear_sampler), i_coords).r;
+            } else {
+                pixel.clear_coat = material.clear_coat;
+            }
+            if (HAS_CLEAR_COAT_ROUGHNESS_TEXTURE) {
+                pixel.clear_coat_perceptual_roughness = material.clear_coat_roughness * texture(sampler2D(CLEAR_COAT_ROUGHNESS_TEXTURE, linear_sampler), i_coords).r;
+            } else {
+                pixel.clear_coat_perceptual_roughness = material.clear_coat_roughness;
+            }
         }
-    }
 
-    if (HAS_REFLECTANCE_TEXTURE) {
-        pixel.reflectance = material.reflectance * texture(sampler2D(REFLECTANCE_TEXTURE, linear_sampler), i_coords).r;
-    } else {
-        pixel.reflectance = material.reflectance;
-    }
+        if (pixel.clear_coat != 0.0) {
+            float base_perceptual_roughness = max(pixel.perceptual_roughness, pixel.clear_coat_perceptual_roughness);
+            pixel.perceptual_roughness = mix(pixel.perceptual_roughness, base_perceptual_roughness, pixel.clear_coat);
 
-    pixel.diffuse_color = compute_diffuse_color(pixel.albedo, pixel.metallic);
-    // Assumes an interface from air to an IOR of 1.5 for dielectrics
-    float reflectance = compute_dielectric_f0(pixel.reflectance);
-    pixel.f0 = compute_f0(pixel.albedo, pixel.metallic, reflectance);
-
-    if (MATERIAL_FLAG(FLAGS_CC_GLTF_COMBINED)) {
-        if (HAS_CLEAR_COAT_TEXTURE) {
-            vec2 cc = texture(sampler2D(CLEAR_COAT_TEXTURE, linear_sampler), i_coords).rg;
-            pixel.clear_coat = material.clear_coat * cc.r;
-            pixel.clear_coat_perceptual_roughness = material.clear_coat_roughness * cc.g;
-        } else {
-            pixel.clear_coat = material.clear_coat;
-            pixel.clear_coat_perceptual_roughness = material.clear_coat_roughness;
+            pixel.clear_coat_roughness = perceptual_roughness_to_roughness(pixel.clear_coat_perceptual_roughness);
         }
-    } else if (MATERIAL_FLAG(FLAGS_CC_GLTF_SPLIT)) {
-        if (HAS_CLEAR_COAT_TEXTURE) {
-            pixel.clear_coat = material.clear_coat * texture(sampler2D(CLEAR_COAT_TEXTURE, linear_sampler), i_coords).r;
-        } else {
-            pixel.clear_coat = material.clear_coat;
-        }
-        if (HAS_CLEAR_COAT_ROUGHNESS_TEXTURE) {
-            pixel.clear_coat_perceptual_roughness = material.clear_coat_roughness * texture(sampler2D(CLEAR_COAT_ROUGHNESS_TEXTURE, linear_sampler), i_coords).g;
-        } else {
-            pixel.clear_coat_perceptual_roughness = material.clear_coat_roughness;
-        }
-    } else if (MATERIAL_FLAG(FLAGS_CC_BW_SPLIT)) {
-        if (HAS_CLEAR_COAT_TEXTURE) {
-            pixel.clear_coat = material.clear_coat * texture(sampler2D(CLEAR_COAT_TEXTURE, linear_sampler), i_coords).r;
-        } else {
-            pixel.clear_coat = material.clear_coat;
-        }
-        if (HAS_CLEAR_COAT_ROUGHNESS_TEXTURE) {
-            pixel.clear_coat_perceptual_roughness = material.clear_coat_roughness * texture(sampler2D(CLEAR_COAT_ROUGHNESS_TEXTURE, linear_sampler), i_coords).r;
-        } else {
-            pixel.clear_coat_perceptual_roughness = material.clear_coat_roughness;
-        }
-    }
+        pixel.roughness = perceptual_roughness_to_roughness(pixel.perceptual_roughness);
 
-    if (pixel.clear_coat != 0.0) {
-        float base_perceptual_roughness = max(pixel.perceptual_roughness, pixel.clear_coat_perceptual_roughness);
-        pixel.perceptual_roughness = mix(pixel.perceptual_roughness, base_perceptual_roughness, pixel.clear_coat);
+        if (HAS_EMISSIVE_TEXTURE) {
+            pixel.emissive = material.emissive * texture(sampler2D(EMISSIVE_TEXTURE, linear_sampler), i_coords).rgb;
+        } else {
+            pixel.emissive = material.emissive;
+        }
 
-        pixel.clear_coat_roughness = perceptual_roughness_to_roughness(pixel.clear_coat_perceptual_roughness);
-    }
-    pixel.roughness = perceptual_roughness_to_roughness(pixel.perceptual_roughness);
-
-    if (HAS_EMISSIVE_TEXTURE) {
-        pixel.emissive = material.emissive * texture(sampler2D(EMISSIVE_TEXTURE, linear_sampler), i_coords).rgb;
-    } else {
-        pixel.emissive = material.emissive;
-    }
-
-    // TODO: Aniso info
-    if (HAS_ANISOTROPY_TEXTURE) {
-        pixel.anisotropy = material.anisotropy * texture(sampler2D(ANISOTROPY_TEXTURE, linear_sampler), i_coords).r;
-    } else {
-        pixel.anisotropy = material.anisotropy;
+        // TODO: Aniso info
+        if (HAS_ANISOTROPY_TEXTURE) {
+            pixel.anisotropy = material.anisotropy * texture(sampler2D(ANISOTROPY_TEXTURE, linear_sampler), i_coords).r;
+        } else {
+            pixel.anisotropy = material.anisotropy;
+        }
     }
 
     pixel.alpha_cutout = material.alpha_cutout;

@@ -101,10 +101,14 @@ fn main() {
     let _object_handle = renderer.add_object(object);
 
     // Set camera's location
-    renderer.set_camera_location(rend3::datatypes::CameraLocation {
+    renderer.set_camera_data(rend3::datatypes::Camera {
+        projection: rend3::datatypes::CameraProjection::Projection {
+            vfov: 60.0,
+            near: 0.1,
+            pitch: 0.5,
+            yaw: -0.55,
+        },
         location: glam::Vec3A::new(3.0, 3.0, -5.0),
-        pitch: 0.5,
-        yaw: -0.55,
     });
 
     // Create a single directional light

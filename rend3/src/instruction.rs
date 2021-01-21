@@ -1,6 +1,6 @@
 use crate::{
     datatypes::{
-        AffineTransform, CameraLocation, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Material,
+        AffineTransform, Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Material,
         MaterialChange, MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, PipelineHandle, ShaderHandle, Texture,
         TextureHandle,
     },
@@ -77,8 +77,8 @@ pub enum Instruction {
     SetOptions {
         options: RendererOptions,
     },
-    SetCameraLocation {
-        location: CameraLocation,
+    SetCameraData {
+        data: Camera,
     },
     SetBackgroundTexture {
         handle: TextureHandle,

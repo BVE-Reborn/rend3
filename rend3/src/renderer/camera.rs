@@ -1,46 +1,40 @@
-use crate::datatypes::CameraLocation;
+use crate::datatypes::{Camera, CameraProjection};
 use glam::{Mat3, Mat4, Vec3, Vec3A};
 
-const CAMERA_VFOV: f32 = 60.0;
-
 #[derive(Copy, Clone)]
-pub struct Camera {
+pub struct CameraManager {
     orig_view: Mat4,
     view: Mat4,
     proj: Mat4,
+    data: Camera,
 }
-impl Camera {
-    pub fn new_projection(aspect_ratio: f32) -> Self {
-        let proj = Mat4::perspective_infinite_reverse_lh(CAMERA_VFOV.to_radians(), aspect_ratio, 0.1);
-        let view = compute_view_matrix(CameraLocation::default());
-        let orig_view = compute_origin_matrix(CameraLocation::default());
-
-        Self { orig_view, view, proj }
-    }
-
-    pub fn new_orthographic(direction: Vec3) -> Self {
-        let proj = Mat4::orthographic_lh(-50.0, 50.0, -50.0, 50.0, -100.0, 100.0);
-        let view = Mat4::look_at_lh(Vec3::zero(), direction, Vec3::unit_y());
+impl CameraManager {
+    /// Builds a new camera, using the given aspect ratio. If no aspect ratio is given
+    /// it is assumed that no aspect ratio scaling should be done.
+    pub fn new(data: Camera, aspect_ratio: Option<f32>) -> Self {
+        let proj = compute_projection_matrix(data, aspect_ratio.unwrap_or(1.0));
+        let view = compute_view_matrix(data);
+        let orig_view = compute_origin_matrix(data);
 
         Self {
-            orig_view: view,
+            orig_view,
             view,
             proj,
+            data,
         }
     }
 
-    pub fn set_location(&mut self, location: CameraLocation) {
-        self.view = compute_view_matrix(location);
-        self.orig_view = compute_origin_matrix(location);
+    /// Sets the camera data, rebuilding the using the given aspect ratio. If no aspect ratio is given
+    /// it is assumed that no aspect ratio scaling should be done.
+    pub fn set_data(&mut self, data: Camera, aspect_ratio: Option<f32>) {
+        self.proj = compute_projection_matrix(data, aspect_ratio.unwrap_or(1.0));
+        self.view = compute_view_matrix(data);
+        self.orig_view = compute_origin_matrix(data);
+        self.data = data;
     }
 
-    pub fn set_orthographic_location(&mut self, direction: Vec3) {
-        self.view = Mat4::look_at_lh(Vec3::zero(), direction, Vec3::unit_y());
-        self.orig_view = self.view;
-    }
-
-    pub fn set_aspect_ratio(&mut self, aspect_ratio: f32) {
-        self.proj = Mat4::perspective_infinite_reverse_lh(CAMERA_VFOV.to_radians(), aspect_ratio, 0.1);
+    pub fn set_aspect_ratio(&mut self, aspect_ratio: Option<f32>) {
+        self.set_data(self.data, aspect_ratio)
     }
 
     pub fn view(&self) -> Mat4 {
@@ -60,24 +54,41 @@ impl Camera {
     }
 }
 
-fn compute_look_offset(location: CameraLocation) -> Vec3A {
-    let starting = Vec3A::unit_z();
-    Mat3::from_rotation_ypr(location.yaw, location.pitch, 0.0) * starting
+fn compute_look_offset(data: Camera) -> Vec3A {
+    match data.projection {
+        CameraProjection::Projection { pitch, yaw, .. } => {
+            let starting = Vec3A::unit_z();
+            Mat3::from_rotation_ypr(yaw, pitch, 0.0) * starting
+        }
+        CameraProjection::Orthographic { .. } => Vec3A::zero(),
+    }
 }
 
-fn compute_view_matrix(location: CameraLocation) -> Mat4 {
-    let look_offset = compute_look_offset(location);
+fn compute_view_matrix(data: Camera) -> Mat4 {
+    let look_offset = compute_look_offset(data);
 
     Mat4::look_at_lh(
-        Vec3::from(location.location),
-        Vec3::from(location.location + look_offset),
+        Vec3::from(data.location),
+        Vec3::from(data.location + look_offset),
         Vec3::unit_y(),
     )
 }
 
+fn compute_projection_matrix(data: Camera, aspect_ratio: f32) -> Mat4 {
+    match data.projection {
+        CameraProjection::Orthographic { size, .. } => {
+            let half = size / 2.0;
+            Mat4::orthographic_lh(-half.x, half.x, -half.y, half.y, -half.z, half.z)
+        }
+        CameraProjection::Projection { vfov, near, .. } => {
+            Mat4::perspective_infinite_reverse_lh(vfov.to_radians(), aspect_ratio, near)
+        }
+    }
+}
+
 // This is horribly inefficient but is called like once a frame.
-pub fn compute_origin_matrix(location: CameraLocation) -> Mat4 {
-    let look_offset = compute_look_offset(location);
+pub fn compute_origin_matrix(data: Camera) -> Mat4 {
+    let look_offset = compute_look_offset(data);
 
     Mat4::look_at_lh(Vec3::zero(), Vec3::from(look_offset), Vec3::unit_y())
 }

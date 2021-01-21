@@ -1,4 +1,4 @@
-use crate::renderer::{camera::Camera, frustum::ShaderFrustum};
+use crate::renderer::{camera::CameraManager, frustum::ShaderFrustum};
 use glam::Mat4;
 use std::mem::size_of;
 use wgpu::{
@@ -46,7 +46,7 @@ impl WrappedUniform {
         Self { buffer, uniform_bg }
     }
 
-    pub fn upload<'a>(&'a self, queue: &Queue, camera: &Camera) {
+    pub fn upload<'a>(&'a self, queue: &Queue, camera: &CameraManager) {
         span_transfer!(_ -> upload_span, WARN, "Uploading WrappedUniform");
 
         let view = camera.view();

@@ -518,18 +518,19 @@ pub struct Texture {
 
 bitflags::bitflags! {
     pub(crate) struct MaterialFlags : u32 {
-        const ALBEDO_ACTIVE =      0b0000_0000_0001;
-        const ALBEDO_BLEND =       0b0000_0000_0010;
-        const ALBEDO_VERTEX_SRGB = 0b0000_0000_0100;
-        const ALPHA_CUTOUT =       0b0000_0000_1000;
-        const BICOMPONENT_NORMAL = 0b0000_0001_0000;
-        const SWIZZLED_NORMAL =    0b0000_0010_0000;
-        const AOMR_GLTF_COMBINED = 0b0000_0100_0000;
-        const AOMR_GLTF_SPLIT =    0b0000_1000_0000;
-        const AOMR_BW_SPLIT =      0b0001_0000_0000;
-        const CC_GLTF_COMBINED =   0b0010_0000_0000;
-        const CC_GLTF_SPLIT =      0b0100_0000_0000;
-        const CC_BW_SPLIT =        0b1000_0000_0000;
+        const ALBEDO_ACTIVE =      0b0000_0000_0000_0001;
+        const ALBEDO_BLEND =       0b0000_0000_0000_0010;
+        const ALBEDO_VERTEX_SRGB = 0b0000_0000_0000_0100;
+        const ALPHA_CUTOUT =       0b0000_0000_0000_1000;
+        const BICOMPONENT_NORMAL = 0b0000_0000_0001_0000;
+        const SWIZZLED_NORMAL =    0b0000_0000_0010_0000;
+        const AOMR_GLTF_COMBINED = 0b0000_0000_0100_0000;
+        const AOMR_GLTF_SPLIT =    0b0000_0000_1000_0000;
+        const AOMR_BW_SPLIT =      0b0000_0001_0000_0000;
+        const CC_GLTF_COMBINED =   0b0000_0010_0000_0000;
+        const CC_GLTF_SPLIT =      0b0000_0100_0000_0000;
+        const CC_BW_SPLIT =        0b0000_1000_0000_0000;
+        const UNLIT =      0b0001_0000_0000_0000;
     }
 }
 
@@ -596,7 +597,10 @@ impl AlbedoComponent {
     }
 
     pub(crate) fn is_texture(&self) -> bool {
-        matches!(*self, Self::Texture(..) | Self::TextureVertex { .. } | Self::TextureValue { .. })
+        matches!(
+            *self,
+            Self::Texture(..) | Self::TextureVertex { .. } | Self::TextureValue { .. }
+        )
     }
 
     pub(crate) fn to_texture<Func, Out>(&self, func: Func) -> Option<Out>
@@ -874,6 +878,8 @@ changeable_struct! {
         pub reflectance: MaterialComponent<f32>,
         pub anisotropy: MaterialComponent<f32>,
         pub alpha_cutout: Option<f32>,
+        // TODO: Determine how to make this a clearer part of the type system, esp. with the changable_struct macro.
+        pub unlit: bool,
     }
 }
 
@@ -885,10 +891,48 @@ pub struct Object {
 }
 
 #[derive(Debug, Default, Copy, Clone)]
-pub struct CameraLocation {
+pub struct Camera {
+    pub projection: CameraProjection,
     pub location: Vec3A,
-    pub pitch: f32,
-    pub yaw: f32,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum CameraProjection {
+    Orthographic {
+        /// Size assumes the location is at the center of the camera area.
+        size: Vec3A,
+        direction: Vec3A,
+    },
+    Projection {
+        /// Vertical field of view in degrees.
+        vfov: f32,
+        /// Near plane distance. All projection uses a infinite far plane.
+        near: f32,
+        /// Radians
+        pitch: f32,
+        /// Radians
+        yaw: f32,
+    },
+}
+
+impl CameraProjection {
+    pub fn from_orthographic_direction(direction: Vec3A) -> Self {
+        Self::Orthographic {
+            size: Vec3A::new(100.0, 100.0, 200.0),
+            direction,
+        }
+    }
+}
+
+impl Default for CameraProjection {
+    fn default() -> Self {
+        Self::Projection {
+            vfov: 60.0,
+            near: 0.1,
+            pitch: 0.0,
+            yaw: 0.0,
+        }
+    }
 }
 
 changeable_struct! {
