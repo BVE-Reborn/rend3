@@ -47,6 +47,7 @@ fn create_mesh() -> rend3::datatypes::Mesh {
 
     rend3::datatypes::MeshBuilder::new(vertex_positions.to_vec())
         .with_indices(index_data.to_vec())
+        .with_right_handed()
         .build()
 }
 

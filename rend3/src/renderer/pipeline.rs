@@ -231,11 +231,10 @@ impl PipelineManager {
                             module: &module,
                         }),
                     rasterization_state: Some(RasterizationStateDescriptor {
-                        front_face: FrontFace::Ccw,
-                        cull_mode: match (pipeline_desc.input, pipeline_desc.run_rate) {
-                            (PipelineInputType::FullscreenTriangle, _) => CullMode::None,
-                            (PipelineInputType::Models3d, RenderPassRunRate::Once) => CullMode::Back,
-                            (PipelineInputType::Models3d, RenderPassRunRate::PerShadow) => CullMode::Front,
+                        front_face: FrontFace::Cw,
+                        cull_mode: match pipeline_desc.input {
+                            PipelineInputType::FullscreenTriangle => CullMode::None,
+                            PipelineInputType::Models3d => CullMode::Back,
                         },
                         clamp_depth: match pipeline_desc.run_rate {
                             // TODO
