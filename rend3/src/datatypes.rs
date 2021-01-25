@@ -398,7 +398,7 @@ impl Mesh {
             let edge1 = pos2 - pos1;
             let edge2 = pos3 - pos1;
 
-            let normal = edge2.cross(edge1);
+            let normal = edge1.cross(edge2);
 
             // SAFETY: All vectors are the same length by the assert, and indexing succeeded on positions, therefore it's safe on normals
             unsafe {

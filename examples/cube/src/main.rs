@@ -4,32 +4,32 @@ fn vertex(pos: [f32; 3]) -> glam::Vec3 {
 
 fn create_mesh() -> rend3::datatypes::Mesh {
     let vertex_positions = [
-        // top (0.0, 0.0, 1.0)
+        // far side (0.0, 0.0, 1.0)
         vertex([-1.0, -1.0, 1.0]),
         vertex([1.0, -1.0, 1.0]),
         vertex([1.0, 1.0, 1.0]),
         vertex([-1.0, 1.0, 1.0]),
-        // bottom (0.0, 0.0, -1.0)
+        // near side (0.0, 0.0, -1.0)
         vertex([-1.0, 1.0, -1.0]),
         vertex([1.0, 1.0, -1.0]),
         vertex([1.0, -1.0, -1.0]),
         vertex([-1.0, -1.0, -1.0]),
-        // right (1.0, 0.0, 0.0)
+        // right side (1.0, 0.0, 0.0)
         vertex([1.0, -1.0, -1.0]),
         vertex([1.0, 1.0, -1.0]),
         vertex([1.0, 1.0, 1.0]),
         vertex([1.0, -1.0, 1.0]),
-        // left (-1.0, 0.0, 0.0)
+        // left side (-1.0, 0.0, 0.0)
         vertex([-1.0, -1.0, 1.0]),
         vertex([-1.0, 1.0, 1.0]),
         vertex([-1.0, 1.0, -1.0]),
         vertex([-1.0, -1.0, -1.0]),
-        // front (0.0, 1.0, 0.0)
+        // top (0.0, 1.0, 0.0)
         vertex([1.0, 1.0, -1.0]),
         vertex([-1.0, 1.0, -1.0]),
         vertex([-1.0, 1.0, 1.0]),
         vertex([1.0, 1.0, 1.0]),
-        // back (0.0, -1.0, 0.0)
+        // bottom (0.0, -1.0, 0.0)
         vertex([1.0, -1.0, 1.0]),
         vertex([-1.0, -1.0, 1.0]),
         vertex([-1.0, -1.0, -1.0]),
@@ -37,17 +37,16 @@ fn create_mesh() -> rend3::datatypes::Mesh {
     ];
 
     let index_data: &[u32] = &[
-        2, 1, 0, 0, 3, 2, // top
-        6, 5, 4, 4, 7, 6, // bottom
-        10, 9, 8, 8, 11, 10, // right
-        14, 13, 12, 12, 15, 14, // left
-        18, 17, 16, 16, 19, 18, // front
-        22, 21, 20, 20, 23, 22, // back
+        0, 1, 2, 2, 3, 0, // far
+        4, 5, 6, 6, 7, 4, // near
+        8, 9, 10, 10, 11, 8, // right
+        12, 13, 14, 14, 15, 12, // left
+        16, 17, 18, 18, 19, 16, // top
+        20, 21, 22, 22, 23, 20, // bottom
     ];
 
     rend3::datatypes::MeshBuilder::new(vertex_positions.to_vec())
         .with_indices(index_data.to_vec())
-        .with_right_handed()
         .build()
 }
 

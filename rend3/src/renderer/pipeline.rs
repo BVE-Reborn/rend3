@@ -232,9 +232,10 @@ impl PipelineManager {
                         }),
                     rasterization_state: Some(RasterizationStateDescriptor {
                         front_face: FrontFace::Cw,
-                        cull_mode: match pipeline_desc.input {
-                            PipelineInputType::FullscreenTriangle => CullMode::None,
-                            PipelineInputType::Models3d => CullMode::Back,
+                        cull_mode: match (pipeline_desc.input, pipeline_desc.run_rate) {
+                            (PipelineInputType::FullscreenTriangle, _) => CullMode::None,
+                            (PipelineInputType::Models3d, RenderPassRunRate::Once) => CullMode::Back,
+                            (PipelineInputType::Models3d, RenderPassRunRate::PerShadow) => CullMode::Front,
                         },
                         clamp_depth: match pipeline_desc.run_rate {
                             // TODO

@@ -29,6 +29,7 @@ fn load_gltf(
         .with_vertex_tangents(vertex_tangents)
         .with_vertex_uvs(vertex_uvs)
         .with_indices(indices)
+        .with_right_handed()
         .build();
 
     // Add mesh to renderer's world
