@@ -190,7 +190,9 @@ where
                 .ok_or_else(|| GltfLoadError::MissingPositions(mesh.index()))?
                 .map(Vec3::from)
                 .collect();
-            let mut builder = MeshBuilder::new(vertex_positions);
+
+            // glTF models are right handed, so we must flip their winding order
+            let mut builder = MeshBuilder::new(vertex_positions).with_right_handed();
 
             if let Some(normals) = reader.read_normals() {
                 builder = builder.with_vertex_normals(normals.map(Vec3::from).collect())
@@ -326,7 +328,6 @@ where
                 },
                 None => dt::MaterialComponent::Value(Vec3::from(emissive_factor)),
             },
-            unlit: true,
             ..dt::Material::default()
         });
 

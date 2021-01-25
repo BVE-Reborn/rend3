@@ -60,7 +60,7 @@ fn compute_look_offset(data: Camera) -> Vec3A {
             let starting = Vec3A::unit_z();
             Mat3::from_rotation_ypr(yaw, pitch, 0.0) * starting
         }
-        CameraProjection::Orthographic { .. } => Vec3A::zero(),
+        CameraProjection::Orthographic { direction, .. } => direction,
     }
 }
 
