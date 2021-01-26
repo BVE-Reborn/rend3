@@ -1,8 +1,5 @@
 use crate::list::{ImageFormat, RenderPassRunRate};
-use glam::{
-    f32::{Vec3A, Vec4},
-    Mat4, Vec2, Vec3,
-};
+use glam::{Mat3, Mat4, Vec2, Vec3, Vec3A, Vec4};
 use itertools::Itertools;
 use std::mem;
 use wgpu::TextureFormat;
@@ -530,7 +527,7 @@ bitflags::bitflags! {
         const CC_GLTF_COMBINED =   0b0000_0010_0000_0000;
         const CC_GLTF_SPLIT =      0b0000_0100_0000_0000;
         const CC_BW_SPLIT =        0b0000_1000_0000_0000;
-        const UNLIT =      0b0001_0000_0000_0000;
+        const UNLIT =              0b0001_0000_0000_0000;
     }
 }
 
@@ -878,6 +875,7 @@ changeable_struct! {
         pub reflectance: MaterialComponent<f32>,
         pub anisotropy: MaterialComponent<f32>,
         pub alpha_cutout: Option<f32>,
+        pub transform: Mat3,
         // TODO: Determine how to make this a clearer part of the type system, esp. with the changable_struct macro.
         pub unlit: bool,
     }
