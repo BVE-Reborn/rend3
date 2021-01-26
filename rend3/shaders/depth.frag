@@ -50,7 +50,8 @@ void main() {
     bool has_albedo = HAS_ALBEDO_TEXTURE;
 
     if (has_albedo) {
-        vec4 albedo = texture(sampler2D(ALBEDO_TEXTURE, linear_sampler), i_coords);
+        vec2 coords = vec2(material.uv_transform * vec3(i_coords, 1.0));
+        vec4 albedo = texture(sampler2D(ALBEDO_TEXTURE, linear_sampler), coords);
 
         if (albedo.a <= 0.5) {
             discard;

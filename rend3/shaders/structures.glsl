@@ -69,6 +69,8 @@ struct GPUMaterialData {
     float ambient_occlusion;
     float alpha_cutout;
 
+    mat3 uv_transform;
+
     uint albedo_tex;
     uint normal_tex;
     uint roughness_tex;
@@ -93,6 +95,8 @@ struct CPUMaterialData {
     float anisotropy;
     float ambient_occlusion;
     float alpha_cutout;
+
+    mat3 uv_transform;
 
     uint texture_enable;
     uint material_flags;

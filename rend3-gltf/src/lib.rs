@@ -1,6 +1,6 @@
 use fnv::FnvHashMap;
 use futures_util::future::OptionFuture;
-use glam::{Mat4, Vec2, Vec3, Vec4, Vec4Swizzles};
+use glam::{Mat3, Mat4, Vec2, Vec3, Vec4, Vec4Swizzles};
 use rend3::{
     datatypes as dt,
     datatypes::{AffineTransform, MeshBuilder},
@@ -247,6 +247,7 @@ fn load_default_material<TLD>(renderer: &Renderer<TLD>, loaded: &mut LoadedGltfS
             reflectance: dt::MaterialComponent::None,
             anisotropy: dt::MaterialComponent::None,
             alpha_cutout: None,
+            transform: Mat3::identity(),
             unlit: false,
         }),
     );
