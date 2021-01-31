@@ -17,6 +17,9 @@ use wgpu_conveyor::{AutomatedBuffer, AutomatedBufferManager, IdBuffer};
 #[repr(C, align(16))]
 #[derive(Debug, Copy, Clone)]
 pub struct CPUShaderMaterial {
+    uv_transform_row0: Vec4,
+    uv_transform_row1: Vec4,
+    uv_transform_row2: Vec4,
     albedo: Vec4,
     emissive: Vec3,
     roughness: f32,
@@ -28,10 +31,6 @@ pub struct CPUShaderMaterial {
     ambient_occlusion: f32,
     alpha_cutout: f32,
 
-    uv_transform_row0: Vec4,
-    uv_transform_row1: Vec4,
-    uv_transform_row2: Vec4,
-
     texture_enable: u32,
     material_flags: MaterialFlags,
 }
@@ -42,6 +41,9 @@ unsafe impl bytemuck::Pod for CPUShaderMaterial {}
 impl CPUShaderMaterial {
     pub fn from_material(material: &Material) -> Self {
         Self {
+            uv_transform_row0: material.transform.x_axis.extend(0.0),
+            uv_transform_row1: material.transform.y_axis.extend(0.0),
+            uv_transform_row2: material.transform.z_axis.extend(0.0),
             albedo: material.albedo.to_value(),
             roughness: material.roughness_factor.unwrap_or(0.0),
             metallic: material.metallic_factor.unwrap_or(0.0),
@@ -52,9 +54,6 @@ impl CPUShaderMaterial {
             anisotropy: material.anisotropy.to_value(0.0),
             ambient_occlusion: material.ao_factor.unwrap_or(1.0),
             alpha_cutout: material.alpha_cutout.unwrap_or(0.0),
-            uv_transform_row0: material.transform.x_axis.extend(0.0),
-            uv_transform_row1: material.transform.y_axis.extend(0.0),
-            uv_transform_row2: material.transform.z_axis.extend(0.0),
             texture_enable: material.albedo.is_texture() as u32
                 | (material.normal.to_texture(|_| ()).is_some() as u32) << 1
                 | (material.aomr_textures.to_roughness_texture(|_| ()).is_some() as u32) << 2
