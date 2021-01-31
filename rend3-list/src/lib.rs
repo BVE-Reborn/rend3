@@ -352,7 +352,7 @@ pub fn default_render_list(mode: RendererMode, resolution: [u32; 2], pipelines: 
             resolution,
             format: ImageFormat::Rgba16Float,
             samples: 1,
-            usage: ImageUsage::SAMPLED | ImageUsage::OUTPUT_ATTACHMENT,
+            usage: ImageUsage::SAMPLED | ImageUsage::RENDER_ATTACHMENT,
         },
     );
 
@@ -362,7 +362,7 @@ pub fn default_render_list(mode: RendererMode, resolution: [u32; 2], pipelines: 
             resolution,
             format: ImageFormat::Rgba16Float,
             samples: 1,
-            usage: ImageUsage::SAMPLED | ImageUsage::OUTPUT_ATTACHMENT,
+            usage: ImageUsage::SAMPLED | ImageUsage::RENDER_ATTACHMENT,
         },
     );
 
@@ -372,7 +372,7 @@ pub fn default_render_list(mode: RendererMode, resolution: [u32; 2], pipelines: 
             resolution,
             format: ImageFormat::Depth32Float,
             samples: 1,
-            usage: ImageUsage::SAMPLED | ImageUsage::OUTPUT_ATTACHMENT,
+            usage: ImageUsage::SAMPLED | ImageUsage::RENDER_ATTACHMENT,
         },
     );
 

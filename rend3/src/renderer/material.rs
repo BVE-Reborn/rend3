@@ -227,7 +227,7 @@ impl MaterialManager {
                         bgb.append(BindingResource::TextureView(
                             material.aomr_textures.to_ao_texture(lookup_fn).unwrap_or(null_tex),
                         ));
-                        bgb.append(BindingResource::Buffer(material_buffer.as_cpu().slice(..)));
+                        bgb.append(material_buffer.as_cpu().as_entire_binding());
                         bgb.build(device, material_bgl)
                     },
                     || (),
@@ -319,8 +319,6 @@ impl MaterialManager {
     }
 
     pub fn gpu_append_to_bgb<'a>(&'a self, general_bgb: &mut BindGroupBuilder<'a>) {
-        general_bgb.append(BindingResource::Buffer(
-            self.buffer_storage.as_gpu().as_ref().unwrap().inner.slice(..),
-        ));
+        general_bgb.append(self.buffer_storage.as_gpu().as_ref().unwrap().inner.as_entire_binding());
     }
 }

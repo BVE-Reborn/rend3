@@ -7,7 +7,7 @@ use crate::{
 use parking_lot::RwLock;
 use shaderc::{CompileOptions, Compiler, OptimizationLevel, ResolvedInclude, SourceLanguage, TargetEnv};
 use std::{borrow::Cow, future::Future, path::Path, sync::Arc, thread, thread::JoinHandle};
-use wgpu::{Device, ShaderModule, ShaderModuleSource};
+use wgpu::{Device, ShaderFlags, ShaderModule, ShaderModuleDescriptor, ShaderSource};
 
 pub type ShaderCompileResult = Result<Arc<ShaderModule>, ShaderError>;
 
@@ -190,7 +190,11 @@ fn compile_shader(compiler: &mut Compiler, device: &Device, args: &SourceShaderD
 
     span_transfer!(compile_span -> module_create_span, WARN, "Create Shader Module");
 
-    let module = Arc::new(device.create_shader_module(ShaderModuleSource::SpirV(Cow::Borrowed(bytes))));
+    let module = Arc::new(device.create_shader_module(&ShaderModuleDescriptor {
+        label: None,
+        source: ShaderSource::SpirV(Cow::Borrowed(bytes)),
+        flags: ShaderFlags::VALIDATION,
+    }));
 
     Ok(module)
 }

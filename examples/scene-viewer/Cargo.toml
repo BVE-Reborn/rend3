@@ -25,7 +25,7 @@ rend3-gltf = { path = "../../rend3-gltf", version = "0.1.0" }
 rend3-list = { path = "../../rend3-list", version = "0.1.0" }
 smallvec = "1"
 tracing = { version = "0.1", default-features = false, features = ["std"] }
-wgpu = "0.6"
+wgpu = { version = "0.6", git = "https://github.com/gfx-rs/wgpu-rs", rev = "f882abcf4b3d1e9bfbfc95b61874344661956479" }
 wgpu-subscriber = "0.1"
-winit = "0.23"
+winit = "0.24"
 

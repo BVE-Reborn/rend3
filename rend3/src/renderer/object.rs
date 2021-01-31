@@ -7,7 +7,7 @@ use crate::{
     RendererMode,
 };
 use std::{mem::size_of, sync::Arc};
-use wgpu::{BindingResource, BufferAddress, BufferUsage, CommandEncoder, Device};
+use wgpu::{BufferAddress, BufferUsage, CommandEncoder, Device};
 use wgpu_conveyor::{write_to_buffer1, AutomatedBuffer, AutomatedBufferManager, IdBuffer};
 
 #[derive(Debug, Clone)]
@@ -131,14 +131,14 @@ impl ObjectManager {
     }
 
     pub fn gpu_append_to_bgb<'a>(&'a self, general_bgb: &mut BindGroupBuilder<'a>) {
-        general_bgb.append(BindingResource::Buffer(
+        general_bgb.append(
             self.object_info_buffer_storage
                 .as_gpu()
                 .as_ref()
                 .unwrap()
                 .inner
-                .slice(..),
-        ));
+                .as_entire_binding(),
+        );
     }
 
     pub fn set_object_transform(&mut self, handle: ObjectHandle, transform: AffineTransform) {

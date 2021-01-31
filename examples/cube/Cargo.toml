@@ -22,4 +22,4 @@ pollster = "0.2"
 # wgpu-aware logging
 wgpu-subscriber = "0.1"
 # windowing
-winit = "0.23"
+winit = "0.24"

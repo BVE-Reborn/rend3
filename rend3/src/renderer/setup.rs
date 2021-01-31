@@ -185,9 +185,9 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
             .inner
             .request_device(
                 &DeviceDescriptor {
+                    label: None,
                     features: chosen_adapter.features,
                     limits: chosen_adapter.limits,
-                    shader_validation: true,
                 },
                 None,
             )
