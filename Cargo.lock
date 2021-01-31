@@ -900,7 +900,7 @@ dependencies = [
  "libloading",
  "log",
  "parking_lot",
- "range-alloc 0.1.1",
+ "range-alloc 0.1.1 (git+https://github.com/gfx-rs/gfx?rev=2fd74dbe1562a3eef05b11dcd300c1c9c9bc12a8)",
  "raw-window-handle",
  "smallvec",
  "spirv_cross",
@@ -922,7 +922,7 @@ dependencies = [
  "gfx-hal",
  "log",
  "parking_lot",
- "range-alloc 0.1.1",
+ "range-alloc 0.1.1 (git+https://github.com/gfx-rs/gfx?rev=2fd74dbe1562a3eef05b11dcd300c1c9c9bc12a8)",
  "raw-window-handle",
  "smallvec",
  "spirv_cross",
@@ -979,7 +979,7 @@ dependencies = [
  "naga",
  "objc",
  "parking_lot",
- "range-alloc 0.1.1",
+ "range-alloc 0.1.1 (git+https://github.com/gfx-rs/gfx?rev=2fd74dbe1562a3eef05b11dcd300c1c9c9bc12a8)",
  "raw-window-handle",
  "spirv_cross",
  "storage-map",
@@ -1978,13 +1978,13 @@ dependencies = [
 [[package]]
 name = "range-alloc"
 version = "0.1.1"
-source = "git+https://github.com/gfx-rs/gfx?rev=2fd74dbe1562a3eef05b11dcd300c1c9c9bc12a8#2fd74dbe1562a3eef05b11dcd300c1c9c9bc12a8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a871f1e45a3a3f0c73fb60343c811238bb5143a81642e27c2ac7aac27ff01a63"
 
 [[package]]
 name = "range-alloc"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "63e935c45e09cc6dcf00d2f0b2d630a58f4095320223d47fc68918722f0538b6"
+version = "0.1.1"
+source = "git+https://github.com/gfx-rs/gfx?rev=2fd74dbe1562a3eef05b11dcd300c1c9c9bc12a8#2fd74dbe1562a3eef05b11dcd300c1c9c9bc12a8"
 
 [[package]]
 name = "raw-window-handle"
@@ -2068,7 +2068,7 @@ dependencies = [
  "itertools",
  "parking_lot",
  "path-dedot",
- "range-alloc 0.1.2",
+ "range-alloc 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "raw-window-handle",
  "shaderc",
  "smallvec",

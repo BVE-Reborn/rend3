@@ -3,7 +3,6 @@ unlicensed = "deny"
 allow-osi-fsf-free = "either"
 allow = [
     "Apache-2.0",
-    "BSL-1.0",
     "MIT",
     "MPL-2.0",
     "Unlicense",
@@ -16,16 +15,8 @@ wildcards = "allow"
 skip = [
     # everything
     { name = "cfg-if", version = "0.1.10" },
-    # Winit
-    { name = "winapi", version = "0.2.8" }, # winit -> mio-extras -> mio requires this
-    # graphics
-    { name = "core-foundation", version = "0.7.0" }, # winit uses old version
-    { name = "core-foundation-sys", version = "0.7.0" }, # winit uses old version
-    { name = "core-graphics", version = "0.19.2" }, # winit uses old version
-    # image
-    { name = "miniz_oxide", version = "0.3.7" }, # png uses old version
-    # wasi
-    { name = "wasi", version = "0.9.0+wasi-snapshot-preview1" },
+    # range-alloc
+    { name = "range-alloc", version = "0.1.1" },
     # tracing-futures
     { name = "pin-project", version = "0.4.27" },
     { name = "pin-project-internal", version = "0.4.27" }
@@ -35,8 +26,6 @@ skip = [
 vulnerability = "warn"
 unmaintained = "warn"
 ignore = [
-    "RUSTSEC-2020-0016",  # async-std is using net2 which id deprecated in favor of socket2
-    "RUSTSEC-2020-0056",  # stdweb maintainer is unresponsive
 ]
 
 [sources]
