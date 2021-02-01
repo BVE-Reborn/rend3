@@ -2777,7 +2777,7 @@ dependencies = [
 [[package]]
 name = "wgpu-conveyor"
 version = "0.1.0"
-source = "git+https://github.com/BVE-Reborn/wgpu-conveyor.git?rev=a4ea4fdd3ba12212941a032f3bcd7399e258cf0b#a4ea4fdd3ba12212941a032f3bcd7399e258cf0b"
+source = "git+https://github.com/BVE-Reborn/wgpu-conveyor.git?rev=51e5d7bccae29a0e82442e358e290dfd358027cf#51e5d7bccae29a0e82442e358e290dfd358027cf"
 dependencies = [
  "arrayvec",
  "bitflags",

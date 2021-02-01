@@ -33,4 +33,4 @@ tracing = { version = "0.1", default-features = false, features = ["std"] }
 tracing-futures = "0.2"
 thiserror = "1"
 wgpu = { version = "0.6", git = "https://github.com/gfx-rs/wgpu-rs", rev = "f882abcf4b3d1e9bfbfc95b61874344661956479" }
-wgpu-conveyor = { version = "0.1", git = "https://github.com/BVE-Reborn/wgpu-conveyor.git", rev = "a4ea4fdd3ba12212941a032f3bcd7399e258cf0b" }
+wgpu-conveyor = { version = "0.1", git = "https://github.com/BVE-Reborn/wgpu-conveyor.git", rev = "51e5d7bccae29a0e82442e358e290dfd358027cf" }
