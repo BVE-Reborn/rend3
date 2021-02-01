@@ -24,7 +24,7 @@ imgui-wgpu = "0.12"
 # Provides `block_on` to wait for futures from sync code
 pollster = "0.2"
 # core rendering api used by rend3 etc
-wgpu = "0.6"
+wgpu = "0.7"
 # wgpu-aware logging
 wgpu-subscriber = "0.1"
 # windowing

@@ -32,5 +32,5 @@ switchyard = "0.1"
 tracing = { version = "0.1", default-features = false, features = ["std"] }
 tracing-futures = "0.2"
 thiserror = "1"
-wgpu = "0.6"
+wgpu = "0.7"
 wgpu-conveyor = { version = "0.1", git = "https://github.com/BVE-Reborn/wgpu-conveyor.git", rev = "4a68d83f6d263e3c83ff4fd4ef4f58d6e6d4eeb0" }
