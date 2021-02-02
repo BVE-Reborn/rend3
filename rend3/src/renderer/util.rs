@@ -1,9 +1,9 @@
 use crate::{output::SWAPCHAIN_FORMAT, RendererMode, VSyncMode};
 use std::num::NonZeroU8;
 use wgpu::{
-    AddressMode, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, CompareFunction,
-    Device, FilterMode, PresentMode, Sampler, SamplerDescriptor, ShaderStage, Surface, SwapChain, SwapChainDescriptor,
-    TextureComponentType, TextureUsage, TextureViewDimension,
+    AddressMode, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, BufferBindingType,
+    CompareFunction, Device, FilterMode, PresentMode, Sampler, SamplerDescriptor, ShaderStage, Surface, SwapChain,
+    SwapChainDescriptor, TextureSampleType, TextureUsage, TextureViewDimension,
 };
 
 pub fn create_swapchain(device: &Device, surface: &Surface, size: [u32; 2], vsync: VSyncMode) -> SwapChain {
@@ -12,7 +12,7 @@ pub fn create_swapchain(device: &Device, surface: &Surface, size: [u32; 2], vsyn
         &SwapChainDescriptor {
             width: size[0],
             height: size[1],
-            usage: TextureUsage::OUTPUT_ATTACHMENT,
+            usage: TextureUsage::RENDER_ATTACHMENT,
             format: SWAPCHAIN_FORMAT,
             present_mode: match vsync {
                 VSyncMode::On => PresentMode::Fifo,
@@ -29,20 +29,20 @@ pub fn create_prefix_sum_bgl(device: &Device) -> BindGroupLayout {
             BindGroupLayoutEntry {
                 binding: 0,
                 visibility: ShaderStage::COMPUTE,
-                ty: BindingType::StorageBuffer {
-                    dynamic: false,
+                ty: BindingType::Buffer {
+                    ty: BufferBindingType::Storage { read_only: true },
+                    has_dynamic_offset: false,
                     min_binding_size: None,
-                    readonly: true,
                 },
                 count: None,
             },
             BindGroupLayoutEntry {
                 binding: 1,
                 visibility: ShaderStage::COMPUTE,
-                ty: BindingType::StorageBuffer {
-                    dynamic: false,
+                ty: BindingType::Buffer {
+                    ty: BufferBindingType::Storage { read_only: false },
+                    has_dynamic_offset: false,
                     min_binding_size: None,
-                    readonly: false,
                 },
                 count: None,
             },
@@ -54,10 +54,10 @@ pub fn create_pre_cull_bgl(device: &Device) -> BindGroupLayout {
     let entry = BindGroupLayoutEntry {
         binding: 0,
         visibility: ShaderStage::COMPUTE,
-        ty: BindingType::StorageBuffer {
-            dynamic: false,
+        ty: BindingType::Buffer {
+            ty: BufferBindingType::Storage { read_only: false },
+            has_dynamic_offset: false,
             min_binding_size: None,
-            readonly: false,
         },
         count: None,
     };
@@ -74,10 +74,10 @@ pub fn create_object_input_bgl(device: &Device) -> BindGroupLayout {
         entries: &[BindGroupLayoutEntry {
             binding: 0,
             visibility: ShaderStage::COMPUTE,
-            ty: BindingType::StorageBuffer {
-                dynamic: false,
+            ty: BindingType::Buffer {
+                ty: BufferBindingType::Storage { read_only: true },
+                has_dynamic_offset: false,
                 min_binding_size: None,
-                readonly: true,
             },
             count: None,
         }],
@@ -85,13 +85,13 @@ pub fn create_object_input_bgl(device: &Device) -> BindGroupLayout {
 }
 
 pub fn create_object_output_bgl(device: &Device) -> BindGroupLayout {
-    let entry = |binding: u32, readonly: bool| BindGroupLayoutEntry {
+    let entry = |binding: u32, read_only: bool| BindGroupLayoutEntry {
         binding,
         visibility: ShaderStage::COMPUTE,
-        ty: BindingType::StorageBuffer {
-            dynamic: false,
+        ty: BindingType::Buffer {
+            ty: BufferBindingType::Storage { read_only },
+            has_dynamic_offset: false,
             min_binding_size: None,
-            readonly,
         },
         count: None,
     };
@@ -115,13 +115,19 @@ pub fn create_general_bind_group_layout(device: &Device) -> BindGroupLayout {
             BindGroupLayoutEntry {
                 binding: 0,
                 visibility: ShaderStage::VERTEX | ShaderStage::FRAGMENT | ShaderStage::COMPUTE,
-                ty: BindingType::Sampler { comparison: false },
+                ty: BindingType::Sampler {
+                    filtering: true,
+                    comparison: false,
+                },
                 count: None,
             },
             BindGroupLayoutEntry {
                 binding: 1,
                 visibility: ShaderStage::VERTEX | ShaderStage::FRAGMENT | ShaderStage::COMPUTE,
-                ty: BindingType::Sampler { comparison: true },
+                ty: BindingType::Sampler {
+                    filtering: true,
+                    comparison: true,
+                },
                 count: None,
             },
         ],
@@ -134,10 +140,10 @@ pub fn create_object_data_bgl(device: &Device) -> BindGroupLayout {
         entries: &[BindGroupLayoutEntry {
             binding: 0,
             visibility: ShaderStage::VERTEX | ShaderStage::FRAGMENT | ShaderStage::COMPUTE,
-            ty: BindingType::StorageBuffer {
-                dynamic: false,
+            ty: BindingType::Buffer {
+                ty: BufferBindingType::Storage { read_only: true },
+                has_dynamic_offset: false,
                 min_binding_size: None,
-                readonly: true,
             },
             count: None,
         }],
@@ -150,9 +156,9 @@ pub fn create_material_bgl(device: &Device, mode: RendererMode) -> BindGroupLayo
             let texture_entry = BindGroupLayoutEntry {
                 binding: 0,
                 visibility: ShaderStage::VERTEX | ShaderStage::FRAGMENT | ShaderStage::COMPUTE,
-                ty: BindingType::SampledTexture {
-                    dimension: TextureViewDimension::D2,
-                    component_type: TextureComponentType::Float,
+                ty: BindingType::Texture {
+                    view_dimension: TextureViewDimension::D2,
+                    sample_type: TextureSampleType::Float { filterable: true },
                     multisampled: false,
                 },
                 count: None,
@@ -203,8 +209,9 @@ pub fn create_material_bgl(device: &Device, mode: RendererMode) -> BindGroupLayo
                     BindGroupLayoutEntry {
                         binding: 10,
                         visibility: ShaderStage::VERTEX | ShaderStage::FRAGMENT | ShaderStage::COMPUTE,
-                        ty: BindingType::UniformBuffer {
-                            dynamic: false,
+                        ty: BindingType::Buffer {
+                            ty: BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
                             min_binding_size: None,
                         },
                         count: None,
@@ -217,9 +224,9 @@ pub fn create_material_bgl(device: &Device, mode: RendererMode) -> BindGroupLayo
             entries: &[BindGroupLayoutEntry {
                 binding: 0,
                 visibility: ShaderStage::VERTEX | ShaderStage::FRAGMENT | ShaderStage::COMPUTE,
-                ty: BindingType::StorageBuffer {
-                    readonly: true,
-                    dynamic: false,
+                ty: BindingType::Buffer {
+                    ty: BufferBindingType::Storage { read_only: true },
+                    has_dynamic_offset: false,
                     min_binding_size: None,
                 },
                 count: None,
@@ -234,8 +241,9 @@ pub fn create_camera_data_bgl(device: &Device) -> BindGroupLayout {
         entries: &[BindGroupLayoutEntry {
             binding: 0,
             visibility: ShaderStage::VERTEX | ShaderStage::FRAGMENT | ShaderStage::COMPUTE,
-            ty: BindingType::UniformBuffer {
-                dynamic: false,
+            ty: BindingType::Buffer {
+                ty: BufferBindingType::Uniform,
+                has_dynamic_offset: false,
                 min_binding_size: None,
             },
             count: None,
@@ -250,19 +258,19 @@ pub fn create_shadow_texture_bgl(device: &Device) -> BindGroupLayout {
             BindGroupLayoutEntry {
                 binding: 0,
                 visibility: ShaderStage::VERTEX | ShaderStage::FRAGMENT | ShaderStage::COMPUTE,
-                ty: BindingType::StorageBuffer {
-                    dynamic: false,
+                ty: BindingType::Buffer {
+                    ty: BufferBindingType::Storage { read_only: true },
+                    has_dynamic_offset: false,
                     min_binding_size: None,
-                    readonly: true,
                 },
                 count: None,
             },
             BindGroupLayoutEntry {
                 binding: 1,
                 visibility: ShaderStage::VERTEX | ShaderStage::FRAGMENT | ShaderStage::COMPUTE,
-                ty: BindingType::SampledTexture {
-                    dimension: TextureViewDimension::D2Array,
-                    component_type: TextureComponentType::Float,
+                ty: BindingType::Texture {
+                    view_dimension: TextureViewDimension::D2Array,
+                    sample_type: TextureSampleType::Float { filterable: true },
                     multisampled: false,
                 },
                 count: None,
@@ -277,9 +285,9 @@ pub fn create_skybox_bgl(device: &Device) -> BindGroupLayout {
         entries: &[BindGroupLayoutEntry {
             binding: 0,
             visibility: ShaderStage::VERTEX | ShaderStage::FRAGMENT | ShaderStage::COMPUTE,
-            ty: BindingType::SampledTexture {
-                dimension: TextureViewDimension::Cube,
-                component_type: TextureComponentType::Float,
+            ty: BindingType::Texture {
+                view_dimension: TextureViewDimension::Cube,
+                sample_type: TextureSampleType::Float { filterable: true },
                 multisampled: false,
             },
             count: None,
@@ -325,6 +333,7 @@ pub fn create_sampler(device: &Device, ty: SamplerType) -> Sampler {
             SamplerType::Linear => NonZeroU8::new(16),
             SamplerType::Shadow | SamplerType::Nearest => None,
         },
+        border_color: None,
     })
 }
 

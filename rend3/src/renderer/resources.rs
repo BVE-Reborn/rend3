@@ -26,6 +26,8 @@ pub struct RendererGlobalResources {
 
     pub linear_sampler: Sampler,
     pub shadow_sampler: Sampler,
+
+    pub bytes: usize,
 }
 impl RendererGlobalResources {
     pub fn new(device: &Device, surface: Option<&Surface>, mode: RendererMode, options: &RendererOptions) -> Self {
@@ -64,6 +66,7 @@ impl RendererGlobalResources {
             skybox_bgl,
             linear_sampler,
             shadow_sampler,
+            bytes: 0,
         }
     }
 

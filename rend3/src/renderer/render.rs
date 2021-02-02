@@ -11,9 +11,9 @@ use futures::{stream::FuturesOrdered, StreamExt};
 use std::{borrow::Cow, future::Future, sync::Arc};
 use tracing_futures::Instrument;
 use wgpu::{
-    BindingResource, CommandEncoderDescriptor, Extent3d, Maintain, Origin3d, ShaderModuleSource, TextureAspect,
-    TextureCopyView, TextureDataLayout, TextureDescriptor, TextureDimension, TextureUsage, TextureViewDescriptor,
-    TextureViewDimension,
+    BindingResource, CommandEncoderDescriptor, ComputePassDescriptor, Extent3d, Maintain, Origin3d, ShaderFlags,
+    ShaderModuleDescriptor, ShaderSource, TextureAspect, TextureCopyView, TextureDataLayout, TextureDescriptor,
+    TextureDimension, TextureUsage, TextureViewDescriptor, TextureViewDimension,
 };
 
 pub fn render_loop<TLD: 'static>(
@@ -118,6 +118,8 @@ pub fn render_loop<TLD: 'static>(
 
                         let offset_end = offset + bytes as usize;
 
+                        global_resources.bytes += offset_end - offset;
+
                         renderer.queue.write_texture(
                             TextureCopyView {
                                 texture: &uploaded_tex,
@@ -202,6 +204,8 @@ pub fn render_loop<TLD: 'static>(
                             let bytes = bytes_per_row * height_blocks;
 
                             let offset_end = offset + bytes as usize;
+
+                            global_resources.bytes += offset_end - offset;
 
                             // Only write up to the max mip level and skip over unused bytes
                             if mip < max_mip_levels {
@@ -290,9 +294,11 @@ pub fn render_loop<TLD: 'static>(
                 }
                 Instruction::RemoveDirectionalLight { handle } => directional_light_manager.remove(handle),
                 Instruction::AddBinaryShader { handle, shader } => {
-                    let module = renderer
-                        .device
-                        .create_shader_module(ShaderModuleSource::SpirV(Cow::Owned(shader)));
+                    let module = renderer.device.create_shader_module(&ShaderModuleDescriptor {
+                        label: None,
+                        source: ShaderSource::SpirV(Cow::Owned(shader)),
+                        flags: ShaderFlags::VALIDATION,
+                    });
                     renderer.shader_manager.insert(handle, Arc::new(module));
                 }
                 Instruction::RemoveShader { handle } => {
@@ -372,6 +378,10 @@ pub fn render_loop<TLD: 'static>(
         skybox_bgb.append(BindingResource::TextureView(skybox_texture_view));
         let skybox_bg = skybox_bgb.build(&renderer.device, &global_resources.skybox_bgl);
 
+        let allocated = mesh_manager.size_total();
+        let used = mesh_manager.size_used();
+        dbg!(allocated, used, used as f32 / allocated as f32);
+
         drop((
             options,
             mesh_manager,
@@ -391,6 +401,8 @@ pub fn render_loop<TLD: 'static>(
                 &mut renderer.options.write(),
                 new_opt,
             );
+
+            dbg!(global_resources.bytes, global_resources.bytes + allocated);
         }
 
         drop(global_resources);
@@ -417,7 +429,7 @@ pub fn render_loop<TLD: 'static>(
             });
 
             let mut object_bgb = BindGroupBuilder::new(Some(String::from("object bg")));
-            object_bgb.append(BindingResource::Buffer(cull_data.output_buffer.slice(..)));
+            object_bgb.append(cull_data.output_buffer.as_entire_binding());
             let object_bg = object_bgb.build(&renderer.device, &global_resources.object_data_bgl);
 
             let uniform = WrappedUniform::new(&renderer.device, &global_resources.camera_data_bgl);
@@ -438,7 +450,7 @@ pub fn render_loop<TLD: 'static>(
                         .await;
                 }
                 RendererMode::GPUPowered => {
-                    let mut cpass = encoder.begin_compute_pass();
+                    let mut cpass = encoder.begin_compute_pass(&ComputePassDescriptor::default());
 
                     renderer.culling_pass.gpu_run(
                         &mut cpass,
@@ -506,7 +518,7 @@ pub fn render_loop<TLD: 'static>(
             });
 
             let mut object_bgb = BindGroupBuilder::new(Some(String::from("object bg")));
-            object_bgb.append(BindingResource::Buffer(cull_data.output_buffer.slice(..)));
+            object_bgb.append(cull_data.output_buffer.as_entire_binding());
             let object_bg = object_bgb.build(&renderer.device, &global_resources.object_data_bgl);
 
             let uniform = WrappedUniform::new(&renderer.device, &global_resources.camera_data_bgl);
@@ -527,7 +539,7 @@ pub fn render_loop<TLD: 'static>(
                         .await;
                 }
                 RendererMode::GPUPowered => {
-                    let mut cpass = encoder.begin_compute_pass();
+                    let mut cpass = encoder.begin_compute_pass(&ComputePassDescriptor::default());
 
                     renderer.culling_pass.gpu_run(
                         &mut cpass,

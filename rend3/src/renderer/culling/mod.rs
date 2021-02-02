@@ -10,9 +10,9 @@ use std::future::Future;
 use switchyard::Switchyard;
 use tracing_futures::Instrument;
 use wgpu::{
-    BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindingResource, Buffer, BufferAddress,
-    BufferDescriptor, BufferUsage, ComputePass, ComputePipeline, ComputePipelineDescriptor, Device,
-    PipelineLayoutDescriptor, ProgrammableStageDescriptor, PushConstantRange, Queue, ShaderStage,
+    BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, Buffer, BufferAddress, BufferDescriptor,
+    BufferUsage, ComputePass, ComputePipeline, ComputePipelineDescriptor, Device, PipelineLayoutDescriptor,
+    PushConstantRange, Queue, ShaderStage,
 };
 
 mod cpu;
@@ -138,28 +138,22 @@ impl CullingPass {
                     let pre_cull_pipeline = device.create_compute_pipeline(&ComputePipelineDescriptor {
                         label: Some("culling pipeline"),
                         layout: Some(&pre_cull_pipeline_layout),
-                        compute_stage: ProgrammableStageDescriptor {
-                            module: &pre_cull_shader,
-                            entry_point: "main",
-                        },
+                        module: &pre_cull_shader,
+                        entry_point: "main",
                     });
 
                     let prefix_sum_pipeline = device.create_compute_pipeline(&ComputePipelineDescriptor {
                         label: Some("prefix-sum pipeline"),
                         layout: Some(&prefix_sum_pipeline_layout),
-                        compute_stage: ProgrammableStageDescriptor {
-                            module: &prefix_sum,
-                            entry_point: "main",
-                        },
+                        module: &prefix_sum,
+                        entry_point: "main",
                     });
 
                     let post_cull_pipeline = device.create_compute_pipeline(&ComputePipelineDescriptor {
                         label: Some("post-cull pipeline"),
                         layout: Some(&post_cull_pipeline_layout),
-                        compute_stage: ProgrammableStageDescriptor {
-                            module: &post_cull_shader,
-                            entry_point: "main",
-                        },
+                        module: &post_cull_shader,
+                        entry_point: "main",
                     });
 
                     Self {
@@ -245,11 +239,11 @@ impl CullingPass {
                 entries: &[
                     BindGroupEntry {
                         binding: 0,
-                        resource: BindingResource::Buffer(index_buffer1.slice(..)),
+                        resource: index_buffer1.as_entire_binding(),
                     },
                     BindGroupEntry {
                         binding: 1,
-                        resource: BindingResource::Buffer(status_buffer.slice(..)),
+                        resource: status_buffer.as_entire_binding(),
                     },
                 ],
             });
@@ -260,11 +254,11 @@ impl CullingPass {
                 entries: &[
                     BindGroupEntry {
                         binding: 0,
-                        resource: BindingResource::Buffer(index_buffer1.slice(..)),
+                        resource: index_buffer1.as_entire_binding(),
                     },
                     BindGroupEntry {
                         binding: 1,
-                        resource: BindingResource::Buffer(index_buffer2.slice(..)),
+                        resource: index_buffer2.as_entire_binding(),
                     },
                 ],
             });
@@ -275,11 +269,11 @@ impl CullingPass {
                 entries: &[
                     BindGroupEntry {
                         binding: 0,
-                        resource: BindingResource::Buffer(index_buffer2.slice(..)),
+                        resource: index_buffer2.as_entire_binding(),
                     },
                     BindGroupEntry {
                         binding: 1,
-                        resource: BindingResource::Buffer(index_buffer1.slice(..)),
+                        resource: index_buffer1.as_entire_binding(),
                     },
                 ],
             });
@@ -292,23 +286,23 @@ impl CullingPass {
                 entries: &[
                     BindGroupEntry {
                         binding: 0,
-                        resource: BindingResource::Buffer(index_buffer.slice(..)),
+                        resource: index_buffer.as_entire_binding(),
                     },
                     BindGroupEntry {
                         binding: 1,
-                        resource: BindingResource::Buffer(status_buffer.slice(..)),
+                        resource: status_buffer.as_entire_binding(),
                     },
                     BindGroupEntry {
                         binding: 2,
-                        resource: BindingResource::Buffer(output_buffer.slice(..)),
+                        resource: output_buffer.as_entire_binding(),
                     },
                     BindGroupEntry {
                         binding: 3,
-                        resource: BindingResource::Buffer(indirect_buffer.slice(..)),
+                        resource: indirect_buffer.as_entire_binding(),
                     },
                     BindGroupEntry {
                         binding: 4,
-                        resource: BindingResource::Buffer(count_buffer.slice(..)),
+                        resource: count_buffer.as_entire_binding(),
                     },
                 ],
             });
@@ -358,7 +352,7 @@ impl CullingPass {
 
         span_transfer!(_ -> run_span, WARN, "Running CullingPass");
         cpass.set_pipeline(&cull_pass.pre_cull_pipeline);
-        cpass.set_push_constants(0, &[data.object_count]);
+        cpass.set_push_constants(0, bytemuck::bytes_of(&data.object_count));
         cpass.set_bind_group(0, object_input_bg, &[]);
         cpass.set_bind_group(1, &data.inner.as_gpu().pre_cull_bg, &[]);
         cpass.set_bind_group(2, uniform_bg, &[]);
@@ -381,7 +375,7 @@ impl CullingPass {
         }
 
         cpass.set_pipeline(&cull_pass.post_cull_pipeline);
-        cpass.set_push_constants(0, &[data.object_count]);
+        cpass.set_push_constants(0, bytemuck::bytes_of(&data.object_count));
         cpass.set_bind_group(0, object_input_bg, &[]);
         cpass.set_bind_group(1, &data.inner.as_gpu().output_bg, &[]);
         cpass.set_bind_group(2, uniform_bg, &[]);

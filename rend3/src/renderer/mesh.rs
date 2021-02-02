@@ -6,7 +6,9 @@ use crate::{
 use glam::{Vec2, Vec3};
 use range_alloc::RangeAllocator;
 use std::{mem::size_of, ops::Range};
-use wgpu::{Buffer, BufferAddress, BufferDescriptor, BufferUsage, CommandEncoder, Device, Queue};
+use wgpu::{
+    Buffer, BufferAddress, BufferDescriptor, BufferUsage, CommandEncoder, ComputePassDescriptor, Device, Queue,
+};
 
 pub const VERTEX_POSITION_SIZE: usize = size_of::<Vec3>();
 pub const VERTEX_NORMAL_SIZE: usize = size_of::<Vec3>();
@@ -14,7 +16,13 @@ pub const VERTEX_TANGENT_SIZE: usize = size_of::<Vec3>();
 pub const VERTEX_UV_SIZE: usize = size_of::<Vec2>();
 pub const VERTEX_COLOR_SIZE: usize = size_of::<[u8; 4]>();
 pub const VERTEX_MATERIAL_INDEX_SIZE: usize = size_of::<u32>();
-const INDEX_SIZE: usize = size_of::<u32>();
+pub const VERTEX_TOTAL_SIZE: usize = VERTEX_POSITION_SIZE
+    + VERTEX_NORMAL_SIZE
+    + VERTEX_UV_SIZE
+    + VERTEX_TANGENT_SIZE
+    + VERTEX_MATERIAL_INDEX_SIZE
+    + VERTEX_COLOR_SIZE;
+pub const INDEX_SIZE: usize = size_of::<u32>();
 
 const STARTING_VERTICES: usize = 1 << 16;
 const STARTING_INDICES: usize = 1 << 16;
@@ -173,6 +181,15 @@ impl MeshManager {
         self.registry.get(handle.0)
     }
 
+    pub fn size_total(&self) -> usize {
+        self.vertex_count * VERTEX_TOTAL_SIZE + self.index_count * INDEX_SIZE
+    }
+
+    pub fn size_used(&self) -> usize {
+        (self.vertex_count - self.vertex_alloc.total_available()) * VERTEX_TOTAL_SIZE
+            + (self.index_count - self.index_alloc.total_available()) * INDEX_SIZE
+    }
+
     pub fn reallocate_buffers(
         &mut self,
         device: &Device,
@@ -202,53 +219,48 @@ impl MeshManager {
 
         let vertex_position_copy_data = gpu_copy.prepare(
             device,
-            self.buffers.vertex_position.slice(..),
-            new_buffers.vertex_position.slice(..),
+            &self.buffers.vertex_position,
+            &new_buffers.vertex_position,
             "vertex position copy",
         );
 
         let vertex_normal_copy_data = gpu_copy.prepare(
             device,
-            self.buffers.vertex_normal.slice(..),
-            new_buffers.vertex_normal.slice(..),
+            &self.buffers.vertex_normal,
+            &new_buffers.vertex_normal,
             "vertex normal copy",
         );
 
         let vertex_tangent_copy_data = gpu_copy.prepare(
             device,
-            self.buffers.vertex_tangent.slice(..),
-            new_buffers.vertex_tangent.slice(..),
+            &self.buffers.vertex_tangent,
+            &new_buffers.vertex_tangent,
             "vertex tangent copy",
         );
 
         let vertex_uv_copy_data = gpu_copy.prepare(
             device,
-            self.buffers.vertex_uv.slice(..),
-            new_buffers.vertex_uv.slice(..),
+            &self.buffers.vertex_uv,
+            &new_buffers.vertex_uv,
             "vertex uv copy",
         );
 
         let vertex_color_copy_data = gpu_copy.prepare(
             device,
-            self.buffers.vertex_color.slice(..),
-            new_buffers.vertex_color.slice(..),
+            &self.buffers.vertex_color,
+            &new_buffers.vertex_color,
             "vertex color copy",
         );
 
         let vertex_mat_index_copy_data = gpu_copy.prepare(
             device,
-            self.buffers.vertex_mat_index.slice(..),
-            new_buffers.vertex_mat_index.slice(..),
+            &self.buffers.vertex_mat_index,
+            &new_buffers.vertex_mat_index,
             "vertex material index copy",
         );
-        let index_copy_data = gpu_copy.prepare(
-            device,
-            self.buffers.index.slice(..),
-            new_buffers.index.slice(..),
-            "index copy",
-        );
+        let index_copy_data = gpu_copy.prepare(device, &self.buffers.index, &new_buffers.index, "index copy");
 
-        let mut cpass = encoder.begin_compute_pass();
+        let mut cpass = encoder.begin_compute_pass(&ComputePassDescriptor::default());
 
         for mesh in self.registry.values_mut() {
             let new_vert_range = new_vert_alloc.allocate_range(mesh.vertex_range.len()).unwrap();
