@@ -118,6 +118,8 @@ pub fn render_loop<TLD: 'static>(
 
                         let offset_end = offset + bytes as usize;
 
+                        global_resources.bytes += offset_end - offset;
+
                         renderer.queue.write_texture(
                             TextureCopyView {
                                 texture: &uploaded_tex,
@@ -202,6 +204,8 @@ pub fn render_loop<TLD: 'static>(
                             let bytes = bytes_per_row * height_blocks;
 
                             let offset_end = offset + bytes as usize;
+
+                            global_resources.bytes += offset_end - offset;
 
                             // Only write up to the max mip level and skip over unused bytes
                             if mip < max_mip_levels {
@@ -374,6 +378,10 @@ pub fn render_loop<TLD: 'static>(
         skybox_bgb.append(BindingResource::TextureView(skybox_texture_view));
         let skybox_bg = skybox_bgb.build(&renderer.device, &global_resources.skybox_bgl);
 
+        let allocated = mesh_manager.size_total();
+        let used = mesh_manager.size_used();
+        dbg!(allocated, used, used as f32 / allocated as f32);
+
         drop((
             options,
             mesh_manager,
@@ -393,6 +401,8 @@ pub fn render_loop<TLD: 'static>(
                 &mut renderer.options.write(),
                 new_opt,
             );
+
+            dbg!(global_resources.bytes, global_resources.bytes + allocated);
         }
 
         drop(global_resources);

@@ -20,11 +20,11 @@ rend3-list = { path = "../../rend3-list", version = "0.1.0" }
 # imgui and integrations
 imgui = "0.6"
 imgui-winit-support = "0.6"
-imgui-wgpu = { version = "0.12", git = "https://github.com/cwfitzgerald/imgui-wgpu-rs.git", rev = "3967763d077f40834cae28f3aa0ef2acfd6e039c" }
+imgui-wgpu = "0.13"
 # Provides `block_on` to wait for futures from sync code
 pollster = "0.2"
 # core rendering api used by rend3 etc
-wgpu = { version = "0.6", git = "https://github.com/gfx-rs/wgpu-rs", rev = "f882abcf4b3d1e9bfbfc95b61874344661956479" }
+wgpu = "0.7"
 # wgpu-aware logging
 wgpu-subscriber = "0.1"
 # windowing

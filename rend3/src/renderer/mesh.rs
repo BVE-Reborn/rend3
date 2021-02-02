@@ -16,7 +16,13 @@ pub const VERTEX_TANGENT_SIZE: usize = size_of::<Vec3>();
 pub const VERTEX_UV_SIZE: usize = size_of::<Vec2>();
 pub const VERTEX_COLOR_SIZE: usize = size_of::<[u8; 4]>();
 pub const VERTEX_MATERIAL_INDEX_SIZE: usize = size_of::<u32>();
-const INDEX_SIZE: usize = size_of::<u32>();
+pub const VERTEX_TOTAL_SIZE: usize = VERTEX_POSITION_SIZE
+    + VERTEX_NORMAL_SIZE
+    + VERTEX_UV_SIZE
+    + VERTEX_TANGENT_SIZE
+    + VERTEX_MATERIAL_INDEX_SIZE
+    + VERTEX_COLOR_SIZE;
+pub const INDEX_SIZE: usize = size_of::<u32>();
 
 const STARTING_VERTICES: usize = 1 << 16;
 const STARTING_INDICES: usize = 1 << 16;
@@ -173,6 +179,15 @@ impl MeshManager {
 
     pub fn internal_data(&self, handle: MeshHandle) -> &InternalMesh {
         self.registry.get(handle.0)
+    }
+
+    pub fn size_total(&self) -> usize {
+        self.vertex_count * VERTEX_TOTAL_SIZE + self.index_count * INDEX_SIZE
+    }
+
+    pub fn size_used(&self) -> usize {
+        (self.vertex_count - self.vertex_alloc.total_available()) * VERTEX_TOTAL_SIZE
+            + (self.index_count - self.index_alloc.total_available()) * INDEX_SIZE
     }
 
     pub fn reallocate_buffers(
