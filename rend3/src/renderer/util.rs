@@ -121,6 +121,12 @@ pub fn create_general_bind_group_layout(device: &Device) -> BindGroupLayout {
             BindGroupLayoutEntry {
                 binding: 1,
                 visibility: ShaderStage::VERTEX | ShaderStage::FRAGMENT | ShaderStage::COMPUTE,
+                ty: BindingType::Sampler { comparison: false },
+                count: None,
+            },
+            BindGroupLayoutEntry {
+                binding: 2,
+                visibility: ShaderStage::VERTEX | ShaderStage::FRAGMENT | ShaderStage::COMPUTE,
                 ty: BindingType::Sampler { comparison: true },
                 count: None,
             },

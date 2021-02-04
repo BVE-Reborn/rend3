@@ -47,7 +47,11 @@ PixelData get_per_pixel_data(MATERIAL_TYPE material) {
 
     if (MATERIAL_FLAG(FLAGS_ALBEDO_ACTIVE)) {
         if (HAS_ALBEDO_TEXTURE) {
-            pixel.albedo = texture(sampler2D(ALBEDO_TEXTURE, linear_sampler), coords);
+            if (MATERIAL_FLAG(FLAGS_UNLIT)) {
+                pixel.albedo = texture(sampler2D(ALBEDO_TEXTURE, nearest_sampler), coords);
+            } else {
+                pixel.albedo = texture(sampler2D(ALBEDO_TEXTURE, linear_sampler), coords);
+            }
         } else {
             pixel.albedo = vec4(1.0);
         }
