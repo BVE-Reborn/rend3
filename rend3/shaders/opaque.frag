@@ -49,7 +49,7 @@ layout(set = 4, binding = 6) uniform texture2D clear_coat_roughness_tex;
 layout(set = 4, binding = 7) uniform texture2D emissive_tex;
 layout(set = 4, binding = 8) uniform texture2D anisotropy_tex;
 layout(set = 4, binding = 9) uniform texture2D ambient_occlusion_tex;
-layout(set = 4, binding = 10) uniform TexterData {
+layout(set = 4, binding = 10) uniform TextureData {
     CPUMaterialData material;
 };
 #endif

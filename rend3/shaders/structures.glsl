@@ -85,6 +85,8 @@ struct GPUMaterialData {
 };
 
 struct CPUMaterialData {
+    // Must be one of the first two members or else spirv-cross can't allocate registers on DX
+    mat3 uv_transform;
     vec4 albedo;
     vec3 emissive;
     float roughness;
@@ -95,8 +97,6 @@ struct CPUMaterialData {
     float anisotropy;
     float ambient_occlusion;
     float alpha_cutout;
-
-    mat3 uv_transform;
 
     uint texture_enable;
     uint material_flags;

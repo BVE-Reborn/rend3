@@ -6,7 +6,9 @@ use crate::{
 use glam::{Vec2, Vec3};
 use range_alloc::RangeAllocator;
 use std::{mem::size_of, ops::Range};
-use wgpu::{Buffer, BufferAddress, BufferDescriptor, BufferUsage, CommandEncoder, Device, Queue};
+use wgpu::{
+    Buffer, BufferAddress, BufferDescriptor, BufferUsage, CommandEncoder, ComputePassDescriptor, Device, Queue,
+};
 
 pub const VERTEX_POSITION_SIZE: usize = size_of::<Vec3>();
 pub const VERTEX_NORMAL_SIZE: usize = size_of::<Vec3>();
@@ -202,53 +204,48 @@ impl MeshManager {
 
         let vertex_position_copy_data = gpu_copy.prepare(
             device,
-            self.buffers.vertex_position.slice(..),
-            new_buffers.vertex_position.slice(..),
+            &self.buffers.vertex_position,
+            &new_buffers.vertex_position,
             "vertex position copy",
         );
 
         let vertex_normal_copy_data = gpu_copy.prepare(
             device,
-            self.buffers.vertex_normal.slice(..),
-            new_buffers.vertex_normal.slice(..),
+            &self.buffers.vertex_normal,
+            &new_buffers.vertex_normal,
             "vertex normal copy",
         );
 
         let vertex_tangent_copy_data = gpu_copy.prepare(
             device,
-            self.buffers.vertex_tangent.slice(..),
-            new_buffers.vertex_tangent.slice(..),
+            &self.buffers.vertex_tangent,
+            &new_buffers.vertex_tangent,
             "vertex tangent copy",
         );
 
         let vertex_uv_copy_data = gpu_copy.prepare(
             device,
-            self.buffers.vertex_uv.slice(..),
-            new_buffers.vertex_uv.slice(..),
+            &self.buffers.vertex_uv,
+            &new_buffers.vertex_uv,
             "vertex uv copy",
         );
 
         let vertex_color_copy_data = gpu_copy.prepare(
             device,
-            self.buffers.vertex_color.slice(..),
-            new_buffers.vertex_color.slice(..),
+            &self.buffers.vertex_color,
+            &new_buffers.vertex_color,
             "vertex color copy",
         );
 
         let vertex_mat_index_copy_data = gpu_copy.prepare(
             device,
-            self.buffers.vertex_mat_index.slice(..),
-            new_buffers.vertex_mat_index.slice(..),
+            &self.buffers.vertex_mat_index,
+            &new_buffers.vertex_mat_index,
             "vertex material index copy",
         );
-        let index_copy_data = gpu_copy.prepare(
-            device,
-            self.buffers.index.slice(..),
-            new_buffers.index.slice(..),
-            "index copy",
-        );
+        let index_copy_data = gpu_copy.prepare(device, &self.buffers.index, &new_buffers.index, "index copy");
 
-        let mut cpass = encoder.begin_compute_pass();
+        let mut cpass = encoder.begin_compute_pass(&ComputePassDescriptor::default());
 
         for mesh in self.registry.values_mut() {
             let new_vert_range = new_vert_alloc.allocate_range(mesh.vertex_range.len()).unwrap();

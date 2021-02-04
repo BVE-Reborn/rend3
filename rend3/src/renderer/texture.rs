@@ -7,8 +7,8 @@ use crate::{
 use std::{mem, num::NonZeroU32, sync::Arc};
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
-    BindingResource, BindingType, Device, Extent3d, ShaderStage, Texture, TextureComponentType, TextureDescriptor,
-    TextureDimension, TextureFormat, TextureUsage, TextureView, TextureViewDescriptor, TextureViewDimension,
+    BindingResource, BindingType, Device, Extent3d, ShaderStage, Texture, TextureDescriptor, TextureDimension,
+    TextureFormat, TextureSampleType, TextureUsage, TextureView, TextureViewDescriptor, TextureViewDimension,
 };
 
 pub const STARTING_2D_TEXTURES: usize = 1 << 7;
@@ -44,7 +44,10 @@ impl TextureManager {
         fill_to_size(&mut null_tex_man, &mut views, dimension, view_count);
 
         let layout = mode.into_data(|| (), || create_bind_group_layout(device, view_count as u32, dimension));
-        let group = mode.into_data(|| (), || create_bind_group(device, layout.as_gpu(), &views, dimension));
+        let group = mode.into_data(
+            || (),
+            || create_bind_group(device, layout.as_gpu(), &views.iter().collect::<Vec<_>>(), dimension),
+        );
 
         let registry = ResourceRegistry::new();
 
@@ -114,7 +117,12 @@ impl TextureManager {
             }
 
             if self.group_dirty.into_gpu() {
-                *self.group.as_gpu_mut() = create_bind_group(device, self.layout.as_gpu(), &self.views, self.dimension);
+                *self.group.as_gpu_mut() = create_bind_group(
+                    device,
+                    self.layout.as_gpu(),
+                    &self.views.iter().collect::<Vec<_>>(),
+                    self.dimension,
+                );
                 *self.group_dirty.as_gpu_mut() = false;
             }
 
@@ -177,15 +185,15 @@ fn fill_to_size(
     }
 }
 
-fn create_bind_group_layout(device: &Device, count: u32, dimension: TextureViewDimension) -> Arc<BindGroupLayout> {
+fn create_bind_group_layout(device: &Device, count: u32, view_dimension: TextureViewDimension) -> Arc<BindGroupLayout> {
     Arc::new(device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-        label: Some(&*format!("{:?} texture bgl", dimension)),
+        label: Some(&*format!("{:?} texture bgl", view_dimension)),
         entries: &[BindGroupLayoutEntry {
             binding: 0,
             visibility: ShaderStage::FRAGMENT,
-            ty: BindingType::SampledTexture {
-                dimension,
-                component_type: TextureComponentType::Float,
+            ty: BindingType::Texture {
+                view_dimension,
+                sample_type: TextureSampleType::Float { filterable: true },
                 multisampled: false,
             },
             count: NonZeroU32::new(count),
@@ -196,7 +204,7 @@ fn create_bind_group_layout(device: &Device, count: u32, dimension: TextureViewD
 fn create_bind_group(
     device: &Device,
     layout: &BindGroupLayout,
-    views: &[TextureView],
+    views: &[&TextureView],
     dimension: TextureViewDimension,
 ) -> Arc<BindGroup> {
     Arc::new(device.create_bind_group(&BindGroupDescriptor {

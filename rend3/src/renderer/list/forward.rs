@@ -11,8 +11,8 @@ use crate::{
 use std::sync::Arc;
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindingResource, CommandBuffer, CommandEncoderDescriptor,
-    Operations, RenderPassColorAttachmentDescriptor, RenderPassDepthStencilAttachmentDescriptor, RenderPassDescriptor,
-    ShaderStage, TextureViewDimension,
+    IndexFormat, Operations, RenderPassColorAttachmentDescriptor, RenderPassDepthStencilAttachmentDescriptor,
+    RenderPassDescriptor, ShaderStage, TextureViewDimension,
 };
 
 #[derive(Clone)]
@@ -178,6 +178,7 @@ where
     });
 
     let mut rpass = encoder.begin_render_pass(&RenderPassDescriptor {
+        label: None,
         color_attachments: &colors,
         depth_stencil_attachment: depth,
     });
@@ -200,7 +201,7 @@ where
                     rpass.set_vertex_buffer(3, buffers.vertex_uv.slice(..));
                     rpass.set_vertex_buffer(4, buffers.vertex_color.slice(..));
                     rpass.set_vertex_buffer(5, buffers.vertex_mat_index.slice(..));
-                    rpass.set_index_buffer(buffers.index.slice(..));
+                    rpass.set_index_buffer(buffers.index.slice(..), IndexFormat::Uint32);
                     let mut last_material = None;
                     for (draw_call_idx, object) in c.iter().enumerate() {
                         for (idx, binding) in op.per_object_bindings.iter().enumerate() {
@@ -217,7 +218,7 @@ where
                         rpass.set_push_constants(
                             ShaderStage::VERTEX | ShaderStage::FRAGMENT,
                             0,
-                            &[draw_call_idx as u32],
+                            bytemuck::bytes_of(&(draw_call_idx as u32)),
                         );
                         let start = object.start_idx;
                         let end = start + object.count;
@@ -231,7 +232,7 @@ where
                     rpass.set_vertex_buffer(3, buffers.vertex_uv.slice(..));
                     rpass.set_vertex_buffer(4, buffers.vertex_color.slice(..));
                     rpass.set_vertex_buffer(5, buffers.vertex_mat_index.slice(..));
-                    rpass.set_index_buffer(buffers.index.slice(..));
+                    rpass.set_index_buffer(buffers.index.slice(..), IndexFormat::Uint32);
 
                     rpass.set_vertex_buffer(6, g.indirect_buffer.slice(..));
                     rpass.multi_draw_indexed_indirect_count(

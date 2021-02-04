@@ -12,11 +12,10 @@ use futures::{stream::FuturesUnordered, StreamExt};
 use parking_lot::RwLock;
 use std::{future::Future, sync::Arc};
 use wgpu::{
-    BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, BlendDescriptor,
-    ColorStateDescriptor, ColorWrite, CompareFunction, CullMode, DepthStencilStateDescriptor, Device, FrontFace,
-    IndexFormat, PipelineLayoutDescriptor, PrimitiveTopology, ProgrammableStageDescriptor, PushConstantRange,
-    RasterizationStateDescriptor, RenderPipeline, RenderPipelineDescriptor, ShaderStage, StencilStateDescriptor,
-    TextureComponentType, TextureViewDimension, VertexStateDescriptor,
+    BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, BlendState, ColorTargetState,
+    ColorWrite, CompareFunction, CullMode, DepthBiasState, DepthStencilState, Device, FragmentState, FrontFace,
+    MultisampleState, PipelineLayoutDescriptor, PrimitiveState, PrimitiveTopology, PushConstantRange, RenderPipeline,
+    RenderPipelineDescriptor, ShaderStage, StencilState, TextureSampleType, TextureViewDimension, VertexState,
 };
 
 #[derive(Debug)]
@@ -141,9 +140,9 @@ impl PipelineManager {
                 let color_states: Vec<_> = pipeline_desc
                     .outputs
                     .iter()
-                    .map(|&attachment| ColorStateDescriptor {
-                        alpha_blend: BlendDescriptor::REPLACE,
-                        color_blend: BlendDescriptor::REPLACE,
+                    .map(|&attachment| ColorTargetState {
+                        alpha_blend: BlendState::REPLACE,
+                        color_blend: BlendState::REPLACE,
                         write_mask: match attachment.write {
                             true => ColorWrite::ALL,
                             false => ColorWrite::empty(),
@@ -152,7 +151,7 @@ impl PipelineManager {
                     })
                     .collect();
 
-                let depth_state = pipeline_desc.depth.map(|state| DepthStencilStateDescriptor {
+                let depth_state = pipeline_desc.depth.map(|state| DepthStencilState {
                     format: state.format,
                     depth_write_enabled: true,
                     depth_compare: match (state.compare, pipeline_desc.run_rate) {
@@ -170,44 +169,53 @@ impl PipelineManager {
                         (DepthCompare::Further, RenderPassRunRate::Once) => CompareFunction::Less,
                         (DepthCompare::FurtherEqual, RenderPassRunRate::Once) => CompareFunction::LessEqual,
                     },
-                    stencil: StencilStateDescriptor::default(),
+                    stencil: StencilState::default(),
+                    bias: match pipeline_desc.run_rate {
+                        RenderPassRunRate::PerShadow => DepthBiasState {
+                            constant: 2,
+                            slope_scale: 2.0,
+                            clamp: 0.0,
+                        },
+                        RenderPassRunRate::Once => DepthBiasState::default(),
+                    },
+                    clamp_depth: false,
                 });
 
                 let vertex_states = [
-                    wgpu::VertexBufferDescriptor {
-                        stride: VERTEX_POSITION_SIZE as u64,
+                    wgpu::VertexBufferLayout {
+                        array_stride: VERTEX_POSITION_SIZE as u64,
                         step_mode: wgpu::InputStepMode::Vertex,
                         attributes: &wgpu::vertex_attr_array![0 => Float3],
                     },
-                    wgpu::VertexBufferDescriptor {
-                        stride: VERTEX_NORMAL_SIZE as u64,
+                    wgpu::VertexBufferLayout {
+                        array_stride: VERTEX_NORMAL_SIZE as u64,
                         step_mode: wgpu::InputStepMode::Vertex,
                         attributes: &wgpu::vertex_attr_array![1 => Float3],
                     },
-                    wgpu::VertexBufferDescriptor {
-                        stride: VERTEX_TANGENT_SIZE as u64,
+                    wgpu::VertexBufferLayout {
+                        array_stride: VERTEX_TANGENT_SIZE as u64,
                         step_mode: wgpu::InputStepMode::Vertex,
                         attributes: &wgpu::vertex_attr_array![2 => Float3],
                     },
-                    wgpu::VertexBufferDescriptor {
-                        stride: VERTEX_UV_SIZE as u64,
+                    wgpu::VertexBufferLayout {
+                        array_stride: VERTEX_UV_SIZE as u64,
                         step_mode: wgpu::InputStepMode::Vertex,
                         attributes: &wgpu::vertex_attr_array![3 => Float2],
                     },
-                    wgpu::VertexBufferDescriptor {
-                        stride: VERTEX_COLOR_SIZE as u64,
+                    wgpu::VertexBufferLayout {
+                        array_stride: VERTEX_COLOR_SIZE as u64,
                         step_mode: wgpu::InputStepMode::Vertex,
                         attributes: &wgpu::vertex_attr_array![4 => Uchar4Norm],
                     },
-                    wgpu::VertexBufferDescriptor {
-                        stride: VERTEX_MATERIAL_INDEX_SIZE as u64,
+                    wgpu::VertexBufferLayout {
+                        array_stride: VERTEX_MATERIAL_INDEX_SIZE as u64,
                         step_mode: wgpu::InputStepMode::Vertex,
                         attributes: &wgpu::vertex_attr_array![5 => Uint],
                     },
-                    wgpu::VertexBufferDescriptor {
-                        stride: 20,
+                    wgpu::VertexBufferLayout {
+                        array_stride: 20,
                         step_mode: wgpu::InputStepMode::Instance,
-                        attributes: &[wgpu::VertexAttributeDescriptor {
+                        attributes: &[wgpu::VertexAttribute {
                             format: wgpu::VertexFormat::Uint,
                             offset: 16,
                             shader_location: 6,
@@ -220,44 +228,10 @@ impl PipelineManager {
                 let pipeline = renderer.device.create_render_pipeline(&RenderPipelineDescriptor {
                     label: None,
                     layout: Some(&pipeline_layout),
-                    vertex_stage: ProgrammableStageDescriptor {
+                    vertex: VertexState {
                         entry_point: "main",
                         module: &renderer.shader_manager.get(pipeline_desc.vertex),
-                    },
-                    fragment_stage: fragment_stage_module
-                        .as_ref()
-                        .map(|module| ProgrammableStageDescriptor {
-                            entry_point: "main",
-                            module: &module,
-                        }),
-                    rasterization_state: Some(RasterizationStateDescriptor {
-                        front_face: FrontFace::Cw,
-                        cull_mode: match (pipeline_desc.input, pipeline_desc.run_rate) {
-                            (PipelineInputType::FullscreenTriangle, _) => CullMode::None,
-                            (PipelineInputType::Models3d, RenderPassRunRate::Once) => CullMode::Back,
-                            (PipelineInputType::Models3d, RenderPassRunRate::PerShadow) => CullMode::Front,
-                        },
-                        clamp_depth: match pipeline_desc.run_rate {
-                            // TODO
-                            RenderPassRunRate::PerShadow => false,
-                            RenderPassRunRate::Once => false,
-                        },
-                        depth_bias: match pipeline_desc.run_rate {
-                            RenderPassRunRate::PerShadow => 2,
-                            RenderPassRunRate::Once => 0,
-                        },
-                        depth_bias_slope_scale: match pipeline_desc.run_rate {
-                            RenderPassRunRate::PerShadow => 2.0,
-                            RenderPassRunRate::Once => 0.0,
-                        },
-                        depth_bias_clamp: 0.0,
-                    }),
-                    primitive_topology: PrimitiveTopology::TriangleList,
-                    color_states: &color_states,
-                    depth_stencil_state: depth_state,
-                    vertex_state: VertexStateDescriptor {
-                        index_format: IndexFormat::Uint32,
-                        vertex_buffers: match pipeline_desc.input {
+                        buffers: match pipeline_desc.input {
                             PipelineInputType::FullscreenTriangle => &[],
                             PipelineInputType::Models3d => match renderer.mode {
                                 RendererMode::CPUPowered => &vertex_states[0..6],
@@ -265,9 +239,24 @@ impl PipelineManager {
                             },
                         },
                     },
-                    sample_count: pipeline_desc.samples as u32,
-                    sample_mask: !0,
-                    alpha_to_coverage_enabled: false,
+                    primitive: PrimitiveState {
+                        topology: PrimitiveTopology::TriangleList,
+                        strip_index_format: None,
+                        front_face: FrontFace::Cw,
+                        cull_mode: match (pipeline_desc.input, pipeline_desc.run_rate) {
+                            (PipelineInputType::FullscreenTriangle, _) => CullMode::None,
+                            (PipelineInputType::Models3d, RenderPassRunRate::Once) => CullMode::Back,
+                            (PipelineInputType::Models3d, RenderPassRunRate::PerShadow) => CullMode::Front,
+                        },
+                        polygon_mode: Default::default(),
+                    },
+                    depth_stencil: depth_state,
+                    multisample: MultisampleState::default(),
+                    fragment: fragment_stage_module.as_deref().map(|module| FragmentState {
+                        targets: &color_states,
+                        module,
+                        entry_point: "main",
+                    }),
                 });
 
                 this.registry.write().insert(
@@ -308,13 +297,13 @@ impl PipelineManager {
     }
 }
 
-pub fn create_custom_texture_bgl(device: &Device, dimension: TextureViewDimension, count: u32) -> BindGroupLayout {
+pub fn create_custom_texture_bgl(device: &Device, view_dimension: TextureViewDimension, count: u32) -> BindGroupLayout {
     let entry = BindGroupLayoutEntry {
         binding: 0,
         visibility: ShaderStage::VERTEX | ShaderStage::FRAGMENT | ShaderStage::COMPUTE,
-        ty: BindingType::SampledTexture {
-            dimension,
-            component_type: TextureComponentType::Float,
+        ty: BindingType::Texture {
+            sample_type: TextureSampleType::Float { filterable: true },
+            view_dimension,
             multisampled: false,
         },
         count: None,

@@ -5,8 +5,8 @@ use crate::{
 use std::{future::Future, mem::size_of, num::NonZeroU64, ops::Range};
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
-    BindingResource, BindingType, BufferSlice, ComputePass, ComputePipeline, ComputePipelineDescriptor, Device,
-    PipelineLayoutDescriptor, ProgrammableStageDescriptor, PushConstantRange, ShaderStage,
+    BindingType, Buffer, BufferBindingType, ComputePass, ComputePipeline, ComputePipelineDescriptor, Device,
+    PipelineLayoutDescriptor, PushConstantRange, ShaderStage,
 };
 
 #[derive(Debug, Copy, Clone)]
@@ -68,9 +68,9 @@ impl GpuCopy {
                 BindGroupLayoutEntry {
                     binding: 0,
                     visibility: ShaderStage::COMPUTE,
-                    ty: BindingType::StorageBuffer {
-                        readonly: true,
-                        dynamic: false,
+                    ty: BindingType::Buffer {
+                        ty: BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: false,
                         min_binding_size: NonZeroU64::new(4),
                     },
                     count: None,
@@ -78,9 +78,9 @@ impl GpuCopy {
                 BindGroupLayoutEntry {
                     binding: 1,
                     visibility: ShaderStage::COMPUTE,
-                    ty: BindingType::StorageBuffer {
-                        readonly: false,
-                        dynamic: false,
+                    ty: BindingType::Buffer {
+                        ty: BufferBindingType::Storage { read_only: false },
+                        has_dynamic_offset: false,
                         min_binding_size: NonZeroU64::new(4),
                     },
                     count: None,
@@ -113,19 +113,15 @@ impl GpuCopy {
             let copy_pipeline = device.create_compute_pipeline(&ComputePipelineDescriptor {
                 label: Some("copy pipeline"),
                 layout: Some(&copy_pll),
-                compute_stage: ProgrammableStageDescriptor {
-                    module: &copy_shader,
-                    entry_point: "main",
-                },
+                module: &copy_shader,
+                entry_point: "main",
             });
 
             let copy_offset_pipeline = device.create_compute_pipeline(&ComputePipelineDescriptor {
                 label: Some("copy offset pipeline"),
                 layout: Some(&copy_offset_pll),
-                compute_stage: ProgrammableStageDescriptor {
-                    module: &copy_offset_shader,
-                    entry_point: "main",
-                },
+                module: &copy_offset_shader,
+                entry_point: "main",
             });
 
             Self {
@@ -137,24 +133,18 @@ impl GpuCopy {
         }
     }
 
-    pub fn prepare(
-        &self,
-        device: &Device,
-        input: BufferSlice<'_>,
-        output: BufferSlice<'_>,
-        label: &str,
-    ) -> GpuCopyData {
+    pub fn prepare(&self, device: &Device, input: &Buffer, output: &Buffer, label: &str) -> GpuCopyData {
         let bind_group = device.create_bind_group(&BindGroupDescriptor {
             label: Some(label),
             layout: &self.layout,
             entries: &[
                 BindGroupEntry {
                     binding: 0,
-                    resource: BindingResource::Buffer(input),
+                    resource: input.as_entire_binding(),
                 },
                 BindGroupEntry {
                     binding: 1,
-                    resource: BindingResource::Buffer(output),
+                    resource: output.as_entire_binding(),
                 },
             ],
         });

@@ -139,9 +139,7 @@ impl DirectionalLightManager {
     }
 
     pub fn append_to_bgb<'a>(&'a self, builder: &mut BindGroupBuilder<'a>) {
-        builder.append(BindingResource::Buffer(
-            self.buffer_storage.as_ref().unwrap().inner.slice(..),
-        ));
+        builder.append(self.buffer_storage.as_ref().unwrap().inner.as_entire_binding());
         builder.append(BindingResource::TextureView(&self.view));
     }
 
@@ -162,7 +160,7 @@ fn create_shadow_texture(device: &Device, count: u32) -> (TextureView, Vec<Arc<T
         sample_count: 1,
         dimension: TextureDimension::D2,
         format: INTERNAL_SHADOW_DEPTH_FORMAT,
-        usage: TextureUsage::OUTPUT_ATTACHMENT | TextureUsage::SAMPLED,
+        usage: TextureUsage::RENDER_ATTACHMENT | TextureUsage::SAMPLED,
     });
 
     let primary_view = texture.create_view(&TextureViewDescriptor {
