@@ -249,6 +249,7 @@ fn load_default_material<TLD>(renderer: &Renderer<TLD>, loaded: &mut LoadedGltfS
             alpha_cutout: None,
             transform: Mat3::identity(),
             unlit: false,
+            nearest: false,
         }),
     );
 }
@@ -275,6 +276,11 @@ where
         let roughness_factor = pbr.roughness_factor();
         let metallic_factor = pbr.metallic_factor();
         let metallic_roughness = pbr.metallic_roughness_texture();
+
+        let nearest = albedo
+            .as_ref()
+            .map(|i| i.texture().sampler().mag_filter() == Some(gltf::texture::MagFilter::Nearest))
+            .unwrap_or_default();
 
         let albedo_tex =
             OptionFuture::from(albedo.map(|i| load_image(renderer, loaded, i.texture().source(), true, texture_func)))
@@ -329,6 +335,8 @@ where
                 },
                 None => dt::MaterialComponent::Value(Vec3::from(emissive_factor)),
             },
+            unlit: material.unlit(),
+            nearest,
             ..dt::Material::default()
         });
 
