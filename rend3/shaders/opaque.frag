@@ -86,7 +86,7 @@ void main() {
             color += surface_shading(directional_lights[i], pixel, v, shadow_value * pixel.ambient_occlusion);
         }
 
-        o_color =  vec4(color, 1.0);
+        o_color = max(vec4(color, 1.0), uniforms.ambient * pixel.albedo);
         o_normal = vec4(pixel.normal, 0.0);
     }
 }

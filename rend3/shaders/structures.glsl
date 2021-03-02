@@ -108,6 +108,7 @@ struct UniformData {
     mat4 inv_view;
     mat4 inv_origin_view_proj;
     Frustum frustum;
+    vec4 ambient;
 };
 
 struct DirectionalLightBufferHeader {

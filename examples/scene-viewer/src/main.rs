@@ -140,6 +140,7 @@ fn main() {
     let mut options = rend3::RendererOptions {
         vsync: rend3::VSyncMode::Off,
         size: [window_size.width, window_size.height],
+        ambient: glam::Vec4::default(),
     };
 
     let renderer = pollster::block_on(
