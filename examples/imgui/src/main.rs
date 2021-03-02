@@ -69,6 +69,7 @@ fn main() {
     let mut options = rend3::RendererOptions {
         vsync: rend3::VSyncMode::Off,
         size: [window_size.width, window_size.height],
+        ambient: glam::Vec4::default(),
     };
 
     // We want to control the swapchain, so we don't hand rend3 a window, we hand it an image later.

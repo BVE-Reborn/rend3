@@ -386,14 +386,13 @@ pub fn render_loop<TLD: 'static>(
 
         span_transfer!(event_span -> resource_update_span, INFO, "Update resources");
 
-        if let Some(new_opt) = new_options {
-            global_resources.update(
-                &renderer.device,
-                renderer.surface.as_ref(),
-                &mut renderer.options.write(),
-                new_opt,
-            );
-        }
+        let options = if let Some(new_opt) = new_options {
+            let mut option_guard = renderer.options.write();
+            global_resources.update(&renderer.device, renderer.surface.as_ref(), &mut *option_guard, new_opt);
+            option_guard.clone()
+        } else {
+            renderer.options.read().clone()
+        };
 
         drop(global_resources);
 
@@ -423,7 +422,7 @@ pub fn render_loop<TLD: 'static>(
             let object_bg = object_bgb.build(&renderer.device, &global_resources.object_data_bgl);
 
             let uniform = WrappedUniform::new(&renderer.device, &global_resources.camera_data_bgl);
-            uniform.upload(&renderer.queue, &light.camera);
+            uniform.upload(&renderer.queue, &light.camera, options.ambient);
 
             match renderer.mode {
                 RendererMode::CPUPowered => {
@@ -512,7 +511,7 @@ pub fn render_loop<TLD: 'static>(
             let object_bg = object_bgb.build(&renderer.device, &global_resources.object_data_bgl);
 
             let uniform = WrappedUniform::new(&renderer.device, &global_resources.camera_data_bgl);
-            uniform.upload(&renderer.queue, &global_resources.camera);
+            uniform.upload(&renderer.queue, &global_resources.camera, options.ambient);
 
             match renderer.mode {
                 RendererMode::CPUPowered => {

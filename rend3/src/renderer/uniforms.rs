@@ -1,5 +1,5 @@
 use crate::renderer::{camera::CameraManager, frustum::ShaderFrustum};
-use glam::Mat4;
+use glam::{Mat4, Vec4};
 use std::mem::size_of;
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, Buffer, BufferAddress, BufferDescriptor,
@@ -14,6 +14,7 @@ pub struct ShaderCommonUniform {
     inv_view: Mat4,
     inv_origin_view_proj: Mat4,
     frustum: ShaderFrustum,
+    ambient: Vec4,
 }
 
 unsafe impl bytemuck::Zeroable for ShaderCommonUniform {}
@@ -46,7 +47,7 @@ impl WrappedUniform {
         Self { buffer, uniform_bg }
     }
 
-    pub fn upload<'a>(&'a self, queue: &Queue, camera: &CameraManager) {
+    pub fn upload<'a>(&'a self, queue: &Queue, camera: &CameraManager, ambient: Vec4) {
         span_transfer!(_ -> upload_span, WARN, "Uploading WrappedUniform");
 
         let view = camera.view();
@@ -57,6 +58,7 @@ impl WrappedUniform {
             inv_view: view.inverse(),
             inv_origin_view_proj: camera.origin_view_proj().inverse(),
             frustum: ShaderFrustum::from_matrix(camera.proj()),
+            ambient,
         };
 
         queue.write_buffer(&self.buffer, 0, bytemuck::bytes_of(&uniforms));
