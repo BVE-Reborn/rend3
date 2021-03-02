@@ -75,6 +75,7 @@ impl CPUShaderMaterial {
                 flags |= material.clearcoat_textures.to_flags();
                 flags.set(MaterialFlags::ALPHA_CUTOUT, material.alpha_cutout.is_some());
                 flags.set(MaterialFlags::UNLIT, material.unlit);
+                flags.set(MaterialFlags::NEAREST, material.nearest);
                 flags
             },
         }
@@ -308,6 +309,7 @@ impl MaterialManager {
                             flags |= material.clearcoat_textures.to_flags();
                             flags.set(MaterialFlags::ALPHA_CUTOUT, material.alpha_cutout.is_some());
                             flags.set(MaterialFlags::UNLIT, material.unlit);
+                            flags.set(MaterialFlags::NEAREST, material.nearest);
                             flags
                         },
                     }

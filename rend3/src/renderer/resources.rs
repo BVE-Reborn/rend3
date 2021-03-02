@@ -25,6 +25,7 @@ pub struct RendererGlobalResources {
     pub skybox_bgl: BindGroupLayout,
 
     pub linear_sampler: Sampler,
+    pub nearest_sampler: Sampler,
     pub shadow_sampler: Sampler,
 }
 impl RendererGlobalResources {
@@ -46,6 +47,7 @@ impl RendererGlobalResources {
         let skybox_bgl = util::create_skybox_bgl(device);
 
         let linear_sampler = util::create_sampler(device, SamplerType::Linear);
+        let nearest_sampler = util::create_sampler(device, SamplerType::Nearest);
         let shadow_sampler = util::create_sampler(device, SamplerType::Shadow);
 
         Self {
@@ -63,6 +65,7 @@ impl RendererGlobalResources {
             shadow_texture_bgl,
             skybox_bgl,
             linear_sampler,
+            nearest_sampler,
             shadow_sampler,
         }
     }
@@ -89,6 +92,7 @@ impl RendererGlobalResources {
 
     pub fn append_to_bgb<'a>(&'a self, general_bgb: &mut BindGroupBuilder<'a>) {
         general_bgb.append(BindingResource::Sampler(&self.linear_sampler));
+        general_bgb.append(BindingResource::Sampler(&self.nearest_sampler));
         general_bgb.append(BindingResource::Sampler(&self.shadow_sampler));
     }
 }

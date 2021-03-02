@@ -528,6 +528,7 @@ bitflags::bitflags! {
         const CC_GLTF_SPLIT =      0b0000_0100_0000_0000;
         const CC_BW_SPLIT =        0b0000_1000_0000_0000;
         const UNLIT =              0b0001_0000_0000_0000;
+        const NEAREST =            0b0010_0000_0000_0000;
     }
 }
 
@@ -878,6 +879,7 @@ changeable_struct! {
         pub transform: Mat3,
         // TODO: Determine how to make this a clearer part of the type system, esp. with the changable_struct macro.
         pub unlit: bool,
+        pub nearest: bool,
     }
 }
 

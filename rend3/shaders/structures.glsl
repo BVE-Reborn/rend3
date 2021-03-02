@@ -54,6 +54,7 @@ struct IndirectCall {
 #define FLAGS_CC_GLTF_SPLIT      0x0400
 #define FLAGS_CC_BW_SPLIT        0x0800
 #define FLAGS_UNLIT              0x1000
+#define FLAGS_NEAREST            0x2000
 
 #define MATERIAL_FLAG(name) bool(material.material_flags & name)
 
