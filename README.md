@@ -18,7 +18,7 @@ Rend3 is not currently release on crates.io, to use it add the following
 to your Cargo.toml:
 
 ```
-rend3 = { version = "0.1", git = "https://github.com/BVE-Reborn/rend3.git" }
+rend3 = { version = "0.0.1", git = "https://github.com/BVE-Reborn/rend3.git" }
 ```
 
 ## Examples

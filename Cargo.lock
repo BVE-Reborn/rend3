@@ -2104,7 +2104,7 @@ dependencies = [
 
 [[package]]
 name = "rend3-cube-example"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "glam",
  "pollster",
@@ -2130,7 +2130,7 @@ dependencies = [
 
 [[package]]
 name = "rend3-gltf-example"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "glam",
  "gltf",
@@ -2143,7 +2143,7 @@ dependencies = [
 
 [[package]]
 name = "rend3-imgui-example"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "glam",
  "imgui",
@@ -2166,7 +2166,7 @@ dependencies = [
 
 [[package]]
 name = "rend3-scene-viewer-example"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "async-std",
  "basis",
