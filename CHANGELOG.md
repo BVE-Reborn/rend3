@@ -12,41 +12,14 @@ and this project adheres to cargo's version of [Semantic Versioning](https://sem
 
 ## Unreleased
 
+#### Added
+- Internal: use cargo-release for all releases
+
 ## v0.0.2
 
 Released 2021-03-06
 
 #### Changes
-- Update documentation.
-- Update documentation.
-- Update documentation.
-- Update documentation.
-- Update documentation.
-- Update documentation.
-- Update documentation.
-- Update documentation.
-- Update documentation.
-- Update documentation.
-- Update documentation.
-- Update documentation.
-- Update documentation.
-- Update documentation.
-- Update documentation.
-- Update documentation.
-- Update documentation.
-- Update documentation.
-- Update documentation.
-- Update documentation.
-- Update documentation.
-- Update documentation.
-- Update documentation.
-- Update documentation.
-- Update documentation.
-- Update documentation.
-- Update documentation.
-- Update documentation.
-- Update documentation.
-- Update documentation.
 - Update documentation.
 
 ## v0.0.1
@@ -59,4 +32,4 @@ Released 2021-03-06
 ## Diffs
 
 - [Unreleased](https://github.com/BVE-Reborn/rend3/compare/v0.0.2...HEAD)
-- [v0.2.0](https://github.com/BVE-Reborn/rend3/compare/v0.0.1...v0.0.2)
+- [v0.0.2](https://github.com/BVE-Reborn/rend3/compare/v0.0.1...v0.0.2)
