@@ -8,7 +8,7 @@
 //! to your Cargo.toml:
 //!
 //! ```text
-//! rend3 = { version = "0.0.1", git = "https://github.com/BVE-Reborn/rend3.git" }
+//! rend3 = "0.0.2"
 //! ```
 //!
 //! # Examples

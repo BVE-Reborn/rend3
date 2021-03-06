@@ -1,0 +1,4 @@
+consolidate-commits = true
+no-dev-version = true
+disable-tag = true
+pre-release-commit-message = "Bump version for release"
