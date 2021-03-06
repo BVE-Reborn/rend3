@@ -177,39 +177,39 @@ pub fn create_material_bgl(device: &Device, mode: RendererMode) -> BindGroupLayo
                 entries: &[
                     BindGroupLayoutEntry {
                         binding: 0,
-                        ..texture_entry.clone()
+                        ..texture_entry
                     },
                     BindGroupLayoutEntry {
                         binding: 1,
-                        ..texture_entry.clone()
+                        ..texture_entry
                     },
                     BindGroupLayoutEntry {
                         binding: 2,
-                        ..texture_entry.clone()
+                        ..texture_entry
                     },
                     BindGroupLayoutEntry {
                         binding: 3,
-                        ..texture_entry.clone()
+                        ..texture_entry
                     },
                     BindGroupLayoutEntry {
                         binding: 4,
-                        ..texture_entry.clone()
+                        ..texture_entry
                     },
                     BindGroupLayoutEntry {
                         binding: 5,
-                        ..texture_entry.clone()
+                        ..texture_entry
                     },
                     BindGroupLayoutEntry {
                         binding: 6,
-                        ..texture_entry.clone()
+                        ..texture_entry
                     },
                     BindGroupLayoutEntry {
                         binding: 7,
-                        ..texture_entry.clone()
+                        ..texture_entry
                     },
                     BindGroupLayoutEntry {
                         binding: 8,
-                        ..texture_entry.clone()
+                        ..texture_entry
                     },
                     BindGroupLayoutEntry {
                         binding: 9,

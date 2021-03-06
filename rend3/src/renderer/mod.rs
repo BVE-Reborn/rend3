@@ -105,9 +105,9 @@ where
 }
 impl<TLD: 'static> Renderer<TLD> {
     /// Use [`RendererBuilder`](crate::RendererBuilder) to create a renderer.
-    pub(crate) fn new<'a, W: HasRawWindowHandle>(
-        builder: RendererBuilder<'a, W, TLD>,
-    ) -> impl Future<Output = Result<Arc<Self>, RendererInitializationError>> + 'a {
+    pub(crate) fn new<W: HasRawWindowHandle>(
+        builder: RendererBuilder<'_, W, TLD>,
+    ) -> impl Future<Output = Result<Arc<Self>, RendererInitializationError>> + '_ {
         setup::create_renderer(builder)
     }
 

@@ -305,9 +305,9 @@ impl MeshBuilder {
 
         let mut mesh = Mesh {
             vertex_positions: self.vertex_positions,
-            vertex_normals: self.vertex_normals.unwrap_or_else(|| vec![Vec3::zero(); length]),
-            vertex_tangents: self.vertex_tangents.unwrap_or_else(|| vec![Vec3::zero(); length]),
-            vertex_uvs: self.vertex_uvs.unwrap_or_else(|| vec![Vec2::zero(); length]),
+            vertex_normals: self.vertex_normals.unwrap_or_else(|| vec![Vec3::ZERO; length]),
+            vertex_tangents: self.vertex_tangents.unwrap_or_else(|| vec![Vec3::ZERO; length]),
+            vertex_uvs: self.vertex_uvs.unwrap_or_else(|| vec![Vec2::ZERO; length]),
             vertex_colors: self.vertex_colors.unwrap_or_else(|| vec![[0; 4]; length]),
             vertex_material_indices: self.vertex_material_indices.unwrap_or_else(|| vec![0; length]),
             indices: self.indices.unwrap_or_else(|| (0..length as u32).collect()),
@@ -378,7 +378,7 @@ impl Mesh {
         assert_eq!(normals.len(), positions.len());
 
         for norm in normals.iter_mut() {
-            *norm = Vec3::zero();
+            *norm = Vec3::ZERO;
         }
 
         for idx in indices.chunks_exact(3) {
@@ -432,7 +432,7 @@ impl Mesh {
         assert_eq!(uvs.len(), positions.len());
 
         for tan in tangents.iter_mut() {
-            *tan = Vec3::zero();
+            *tan = Vec3::ZERO;
         }
 
         for idx in indices.chunks_exact(3) {
