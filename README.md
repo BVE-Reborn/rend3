@@ -18,7 +18,7 @@ Rend3 is not currently release on crates.io, to use it add the following
 to your Cargo.toml:
 
 ```
-rend3 = { version = "0.0.2" }
+rend3 = "0.0.3"
 ```
 
 ## Examples
