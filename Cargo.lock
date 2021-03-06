@@ -2075,7 +2075,7 @@ checksum = "b5eb417147ba9860a96cfe72a0b93bf88fee1744b5636ec99ab20c1aa9376581"
 
 [[package]]
 name = "rend3"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "arrayvec",
  "bitflags",
@@ -2116,7 +2116,7 @@ dependencies = [
 
 [[package]]
 name = "rend3-gltf"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "async-std",
  "fnv",
@@ -2159,7 +2159,7 @@ dependencies = [
 
 [[package]]
 name = "rend3-list"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "rend3",
 ]

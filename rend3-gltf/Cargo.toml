@@ -6,8 +6,8 @@ edition = "2018"
 description = "gltf scene and model loader for rend3"
 repository = "https://github.com/BVE-Reborn/rend3"
 license = "MIT OR Apache-2.0 OR Zlib"
-keywords = []
-categories = []
+keywords = ["3d", "graphics", "gltf", "loading", "rend3"]
+categories = ["game-devlopment", "graphics", "parser-implementations", "rendering", "rendering::engine"]
 
 [dependencies]
 async-std = "1"
@@ -16,5 +16,5 @@ glam = "0.12"
 futures-util = "0.3"
 fnv = "1"
 image = "0.23"
-rend3 = { version = "0.1", path = "../rend3" }
+rend3 = { version = "0.0.1", path = "../rend3" }
 thiserror = "1"
