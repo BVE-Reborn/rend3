@@ -13,6 +13,9 @@ and this project adheres to cargo's version of [Semantic Versioning](https://sem
 
 ## Unreleased
 
+#### Updated
+- `glam` to `v0.13.0`
+
 ## v0.0.3
 
 Released 2021-03-06
