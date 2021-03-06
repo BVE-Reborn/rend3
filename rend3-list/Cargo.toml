@@ -7,7 +7,7 @@ description = "default renderlist rend3"
 repository = "https://github.com/BVE-Reborn/rend3"
 license = "MIT OR Apache-2.0 OR Zlib"
 keywords = ["3d", "graphics", "gpu", "renderer", "wgpu"]
-categories = ["game-devlopment", "graphics", "rendering", "rendering::engine"]
+categories = ["game-development", "graphics", "rendering", "rendering::engine"]
 
 [dependencies]
 rend3 = { version = "0.0.1", path = "../rend3" }
