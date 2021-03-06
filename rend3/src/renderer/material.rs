@@ -50,7 +50,7 @@ impl CPUShaderMaterial {
             reflectance: material.reflectance.to_value(0.5),
             clear_coat: material.clearcoat_factor.unwrap_or(0.0),
             clear_coat_roughness: material.clearcoat_roughness_factor.unwrap_or(0.0),
-            emissive: material.emissive.to_value(Vec3::zero()),
+            emissive: material.emissive.to_value(Vec3::ZERO),
             anisotropy: material.anisotropy.to_value(0.0),
             ambient_occlusion: material.ao_factor.unwrap_or(1.0),
             alpha_cutout: material.alpha_cutout.unwrap_or(0.0),
@@ -276,7 +276,7 @@ impl MaterialManager {
                     let material = &internal.mat;
                     typed_slice[index] = GPUShaderMaterial {
                         albedo: material.albedo.to_value(),
-                        emissive: material.emissive.to_value(Vec3::zero()),
+                        emissive: material.emissive.to_value(Vec3::ZERO),
                         roughness: material.roughness_factor.unwrap_or(0.0),
                         metallic: material.metallic_factor.unwrap_or(0.0),
                         reflectance: material.reflectance.to_value(0.5),

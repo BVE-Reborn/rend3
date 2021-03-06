@@ -43,7 +43,7 @@ fn find_mesh_center(mesh: &[Vec3]) -> Vec3A {
     let first = if let Some(first) = mesh.first() {
         *first
     } else {
-        return Vec3A::zero();
+        return Vec3A::ZERO;
     };
     // Bounding box time baby!
     let mut max = Vec3A::from(first);

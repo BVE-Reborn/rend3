@@ -165,7 +165,7 @@ fn main() {
     load_skybox(&renderer).unwrap();
 
     renderer.add_directional_light(DirectionalLight {
-        color: Vec3::one(),
+        color: Vec3::ONE,
         intensity: 10.0,
         direction: Vec3::new(-1.0, -1.0, 0.0),
     });
@@ -215,7 +215,7 @@ fn main() {
                     unreachable!()
                 }
             };
-            let up = Vec3A::unit_y();
+            let up = Vec3A::Y;
             let side: Vec3A = forward.cross(up).normalize();
             let velocity = if button_pressed(&scancode_status, platform::Scancodes::SHIFT) {
                 100.0

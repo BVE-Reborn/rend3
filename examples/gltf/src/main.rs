@@ -101,7 +101,7 @@ fn main() {
 
     // Create a single directional light
     renderer.add_directional_light(rend3::datatypes::DirectionalLight {
-        color: glam::Vec3::one(),
+        color: glam::Vec3::ONE,
         intensity: 10.0,
         // Direction will be normalized
         direction: glam::Vec3::new(-1.0, -4.0, 2.0),

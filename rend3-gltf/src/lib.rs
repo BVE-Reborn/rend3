@@ -133,7 +133,7 @@ where
         let light = if let Some(light) = node.light() {
             match light.kind() {
                 gltf::khr_lights_punctual::Kind::Directional => {
-                    let direction = (transform * (-Vec3::unit_z()).extend(1.0)).xyz();
+                    let direction = (transform * (-Vec3::Z).extend(1.0)).xyz();
                     Some(renderer.add_directional_light(dt::DirectionalLight {
                         color: Vec3::from(light.color()),
                         intensity: light.intensity(),
@@ -247,7 +247,7 @@ fn load_default_material<TLD>(renderer: &Renderer<TLD>, loaded: &mut LoadedGltfS
             reflectance: dt::MaterialComponent::None,
             anisotropy: dt::MaterialComponent::None,
             alpha_cutout: None,
-            transform: Mat3::identity(),
+            transform: Mat3::IDENTITY,
             unlit: false,
             nearest: false,
         }),
@@ -348,10 +348,10 @@ where
     Ok(())
 }
 
-async fn load_image<'a, TLD, F, Fut>(
+async fn load_image<TLD, F, Fut>(
     renderer: &Renderer<TLD>,
     loaded: &mut LoadedGltfScene,
-    image: gltf::Image<'a>,
+    image: gltf::Image<'_>,
     srgb: bool,
     texture_func: &mut F,
 ) -> Result<dt::TextureHandle, GltfLoadError>

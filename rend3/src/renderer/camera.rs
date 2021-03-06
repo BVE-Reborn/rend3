@@ -57,7 +57,7 @@ impl CameraManager {
 fn compute_look_offset(data: Camera) -> Vec3A {
     match data.projection {
         CameraProjection::Projection { pitch, yaw, .. } => {
-            let starting = Vec3A::unit_z();
+            let starting = Vec3A::ZERO;
             Mat3::from_rotation_ypr(yaw, pitch, 0.0) * starting
         }
         CameraProjection::Orthographic { direction, .. } => direction,
@@ -70,7 +70,7 @@ fn compute_view_matrix(data: Camera) -> Mat4 {
     Mat4::look_at_lh(
         Vec3::from(data.location),
         Vec3::from(data.location + look_offset),
-        Vec3::unit_y(),
+        Vec3::Y,
     )
 }
 
@@ -90,5 +90,5 @@ fn compute_projection_matrix(data: Camera, aspect_ratio: f32) -> Mat4 {
 pub fn compute_origin_matrix(data: Camera) -> Mat4 {
     let look_offset = compute_look_offset(data);
 
-    Mat4::look_at_lh(Vec3::zero(), Vec3::from(look_offset), Vec3::unit_y())
+    Mat4::look_at_lh(Vec3::ZERO, Vec3::from(look_offset), Vec3::Y)
 }
