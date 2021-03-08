@@ -1,6 +1,6 @@
 [package]
 name = "rend3-list"
-version = "0.0.3"
+version = "0.0.4"
 authors = ["Connor Fitzgerald <connorwadefitzgerald@gmail.com>"]
 edition = "2018"
 description = "default renderlist rend3"
@@ -10,4 +10,4 @@ keywords = ["3d", "graphics", "gpu", "renderer", "wgpu"]
 categories = ["game-development", "graphics", "rendering", "rendering::engine"]
 
 [dependencies]
-rend3 = { version = "^0.0.3", path = "../rend3" }
+rend3 = { version = "^0.0.4", path = "../rend3" }

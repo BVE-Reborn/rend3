@@ -2074,7 +2074,7 @@ checksum = "b5eb417147ba9860a96cfe72a0b93bf88fee1744b5636ec99ab20c1aa9376581"
 
 [[package]]
 name = "rend3"
-version = "0.0.3"
+version = "0.0.4"
 dependencies = [
  "arrayvec",
  "bitflags",
@@ -2103,7 +2103,7 @@ dependencies = [
 
 [[package]]
 name = "rend3-cube-example"
-version = "0.0.3"
+version = "0.0.4"
 dependencies = [
  "glam",
  "pollster",
@@ -2115,7 +2115,7 @@ dependencies = [
 
 [[package]]
 name = "rend3-gltf"
-version = "0.0.3"
+version = "0.0.4"
 dependencies = [
  "async-std",
  "fnv",
@@ -2129,7 +2129,7 @@ dependencies = [
 
 [[package]]
 name = "rend3-gltf-example"
-version = "0.0.3"
+version = "0.0.4"
 dependencies = [
  "glam",
  "gltf",
@@ -2142,7 +2142,7 @@ dependencies = [
 
 [[package]]
 name = "rend3-imgui-example"
-version = "0.0.3"
+version = "0.0.4"
 dependencies = [
  "glam",
  "imgui",
@@ -2158,14 +2158,14 @@ dependencies = [
 
 [[package]]
 name = "rend3-list"
-version = "0.0.3"
+version = "0.0.4"
 dependencies = [
  "rend3",
 ]
 
 [[package]]
 name = "rend3-scene-viewer-example"
-version = "0.0.3"
+version = "0.0.4"
 dependencies = [
  "async-std",
  "basis",

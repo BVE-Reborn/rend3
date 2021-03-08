@@ -1,6 +1,6 @@
 [package]
 name = "rend3-gltf"
-version = "0.0.3"
+version = "0.0.4"
 authors = ["Connor Fitzgerald <connorwadefitzgerald@gmail.com>"]
 edition = "2018"
 description = "gltf scene and model loader for rend3"
@@ -16,5 +16,5 @@ glam = "0.13"
 futures-util = "0.3"
 fnv = "1"
 image = "0.23"
-rend3 = { version = "^0.0.3", path = "../rend3" }
+rend3 = { version = "^0.0.4", path = "../rend3" }
 thiserror = "1"

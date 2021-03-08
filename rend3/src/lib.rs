@@ -8,7 +8,7 @@
 //! to your Cargo.toml:
 //!
 //! ```text
-//! rend3 = "0.0.3"
+//! rend3 = "0.0.4"
 //! ```
 //!
 //! # Examples
