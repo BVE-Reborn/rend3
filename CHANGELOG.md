@@ -14,7 +14,12 @@ and this project adheres to cargo's version of [Semantic Versioning](https://sem
 
 ## Unreleased
 
+### Fixed
+- Fixed silly math error when converting to `glam` to `v0.13.0`.
+
 ## v0.0.4
+
+Yanked 2021-03-10
 
 Released 2021-03-08
 
