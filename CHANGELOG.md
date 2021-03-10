@@ -6,6 +6,7 @@ The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/
 and this project adheres to cargo's version of [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - [Unreleased](#unreleased)
+- [v0.0.5](#v005)
 - [v0.0.4](#v004)
 - [v0.0.3](#v003)
 - [v0.0.2](#v002)
@@ -13,6 +14,10 @@ and this project adheres to cargo's version of [Semantic Versioning](https://sem
 - [Diffs](#diffs)
 
 ## Unreleased
+
+## v0.0.5
+
+Released 2021-03-10
 
 ### Fixed
 - Fixed silly math error when converting to `glam` to `v0.13.0`.
@@ -49,7 +54,8 @@ Released 2021-03-06
 
 ## Diffs
 
-- [Unreleased](https://github.com/BVE-Reborn/rend3/compare/v0.0.4...HEAD)
+- [Unreleased](https://github.com/BVE-Reborn/rend3/compare/v0.0.5...HEAD)
+- [v0.0.5](https://github.com/BVE-Reborn/rend3/compare/v0.0.4...v0.0.5)
 - [v0.0.4](https://github.com/BVE-Reborn/rend3/compare/v0.0.3...v0.0.4)
 - [v0.0.3](https://github.com/BVE-Reborn/rend3/compare/v0.0.2...v0.0.3)
 - [v0.0.2](https://github.com/BVE-Reborn/rend3/compare/v0.0.1...v0.0.2)
