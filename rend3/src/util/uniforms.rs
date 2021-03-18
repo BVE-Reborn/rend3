@@ -1,4 +1,5 @@
-use crate::renderer::{camera::CameraManager, frustum::ShaderFrustum};
+use crate::util::frustum::ShaderFrustum;
+use crate::modules::CameraManager;
 use glam::{Mat4, Vec4};
 use std::mem::size_of;
 use wgpu::{

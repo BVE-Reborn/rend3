@@ -51,7 +51,6 @@ parking_lot = { version = "0.11", features = ["send_guard"] }
 path-dedot = "3"
 raw-window-handle = "0.3"
 range-alloc = "0.1"
-shaderc = "0.6"
 smallvec = "1"
 switchyard = "0.1"
 tracing = { version = "0.1", default-features = false, features = ["std"] }

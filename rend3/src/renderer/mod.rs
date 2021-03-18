@@ -21,40 +21,12 @@ use switchyard::{JoinHandle, Switchyard};
 use wgpu::{Device, Instance, Queue, Surface, TextureFormat};
 use wgpu_conveyor::AutomatedBufferManager;
 
-#[macro_use]
-mod util;
-
-mod camera;
-mod copy;
-mod culling;
 pub mod error;
-mod frustum;
 mod info;
-mod light {
-    pub mod directional;
-
-    pub use directional::*;
-}
 pub mod limits;
-mod list {
-    mod cache;
-    mod forward;
-    mod resource;
-
-    pub(crate) use cache::*;
-    pub(crate) use forward::*;
-    pub use resource::*;
-}
-mod material;
-mod mesh;
-mod object;
-mod pipeline;
 mod render;
 mod resources;
 mod setup;
-mod shaders;
-mod texture;
-mod uniforms;
 
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
 pub struct OrdEqFloat(pub f32);
@@ -95,7 +67,6 @@ where
     material_manager: RwLock<MaterialManager>,
     object_manager: RwLock<ObjectManager>,
     directional_light_manager: RwLock<light::DirectionalLightManager>,
-    render_list_cache: RwLock<list::RenderListCache>,
 
     gpu_copy: copy::GpuCopy,
     culling_pass: culling::CullingPass,
@@ -250,39 +221,6 @@ impl<TLD: 'static> Renderer<TLD> {
             .producer
             .lock()
             .push(Instruction::RemoveDirectionalLight { handle })
-    }
-
-    pub fn add_binary_shader(&self, shader: Vec<u32>) -> ShaderHandle {
-        let handle = self.shader_manager.allocate();
-
-        self.instructions
-            .producer
-            .lock()
-            .push(Instruction::AddBinaryShader { handle, shader });
-
-        handle
-    }
-
-    pub fn add_source_shader(&self, shader: SourceShaderDescriptor) -> impl Future<Output = ShaderHandle> {
-        self.shader_manager.allocate_async_insert(shader)
-    }
-
-    pub fn remove_shader(&self, handle: ShaderHandle) {
-        self.instructions
-            .producer
-            .lock()
-            .push(Instruction::RemoveShader { handle });
-    }
-
-    pub fn add_pipeline(self: &Arc<Self>, pipeline: Pipeline) -> impl Future<Output = PipelineHandle> {
-        self.pipeline_manager.allocate_async_insert(Arc::clone(self), pipeline)
-    }
-
-    pub fn remove_pipeline(&self, handle: PipelineHandle) {
-        self.instructions
-            .producer
-            .lock()
-            .push(Instruction::RemovePipeline { handle });
     }
 
     pub fn set_options(&self, options: RendererOptions) {

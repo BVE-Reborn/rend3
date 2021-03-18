@@ -1,5 +1,3 @@
-use crate::list::SourceShaderDescriptor;
-use std::io;
 use thiserror::Error;
 use wgpu::Features;
 
@@ -36,14 +34,4 @@ pub enum RendererInitializationError {
     MissingDeviceFeatures { features: Features },
     #[error("Requesting a device failed")]
     RequestDeviceFailed,
-}
-
-#[derive(Error, Debug)]
-pub enum ShaderError {
-    #[error("IO error while loading shader {1:?}: {0}")]
-    FileError(#[source] io::Error, SourceShaderDescriptor),
-    #[error("Error locating a builtin shader {0:?}")]
-    Builtin(SourceShaderDescriptor),
-    #[error("Compilation error with shader args: {1:?}: {0}")]
-    CompileError(#[source] shaderc::Error, SourceShaderDescriptor),
 }

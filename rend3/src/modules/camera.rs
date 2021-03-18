@@ -87,7 +87,7 @@ fn compute_projection_matrix(data: Camera, aspect_ratio: f32) -> Mat4 {
 }
 
 // This is horribly inefficient but is called like once a frame.
-pub fn compute_origin_matrix(data: Camera) -> Mat4 {
+fn compute_origin_matrix(data: Camera) -> Mat4 {
     let look_offset = compute_look_offset(data);
 
     Mat4::look_at_lh(Vec3::ZERO, Vec3::from(look_offset), Vec3::Y)

@@ -258,8 +258,6 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
 
     span_transfer!(imgui_guard -> _);
 
-    let render_list_cache = RwLock::new(RenderListCache::new());
-
     let (culling_pass, gpu_copy) = futures::join!(culling_pass, gpu_copy);
 
     Ok(Arc::new(Renderer {
@@ -284,8 +282,6 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
         material_manager,
         object_manager,
         directional_light_manager,
-
-        render_list_cache,
 
         gpu_copy,
         culling_pass,

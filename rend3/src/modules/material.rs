@@ -3,7 +3,7 @@ use crate::{
     datatypes::{Material, MaterialChange, MaterialFlags, MaterialHandle, TextureHandle},
     mode::ModeData,
     registry::ResourceRegistry,
-    renderer::texture::TextureManager,
+    modules::TextureManager,
     RendererMode,
 };
 use glam::{Vec3, Vec4};

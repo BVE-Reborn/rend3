@@ -1,9 +1,11 @@
+use crate::modules::MeshManager;
 use crate::{
     bind_merge::BindGroupBuilder,
     datatypes::{AffineTransform, MaterialHandle, Object, ObjectHandle},
     mode::ModeData,
     registry::ResourceRegistry,
-    renderer::{frustum::BoundingSphere, material::MaterialManager, mesh::MeshManager},
+    renderer::modules::MaterialManager,
+    util::frustum::BoundingSphere,
     RendererMode,
 };
 use std::{mem::size_of, sync::Arc};

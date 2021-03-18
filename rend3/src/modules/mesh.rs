@@ -1,7 +1,7 @@
 use crate::{
     datatypes::{Mesh, MeshHandle},
     registry::ResourceRegistry,
-    renderer::{copy::GpuCopy, frustum::BoundingSphere},
+    util::frustum::BoundingSphere,
 };
 use glam::{Vec2, Vec3};
 use range_alloc::RangeAllocator;
@@ -82,7 +82,6 @@ impl MeshManager {
         &mut self,
         device: &Device,
         queue: &Queue,
-        gpu_copy: &GpuCopy,
         encoder: &mut CommandEncoder,
         handle: MeshHandle,
         mesh: Mesh,
@@ -105,7 +104,7 @@ impl MeshManager {
         };
 
         if let Some((needed_verts, needed_indices)) = needed {
-            self.reallocate_buffers(device, encoder, gpu_copy, needed_verts as u32, needed_indices as u32);
+            self.reallocate_buffers(device, encoder, needed_verts as u32, needed_indices as u32);
             vertex_range = self.vertex_alloc.allocate_range(vertex_count).ok();
             index_range = self.index_alloc.allocate_range(index_count).ok();
         }
@@ -179,7 +178,6 @@ impl MeshManager {
         &mut self,
         device: &Device,
         encoder: &mut CommandEncoder,
-        gpu_copy: &GpuCopy,
         needed_verts: u32,
         needed_indices: u32,
     ) {
@@ -202,51 +200,6 @@ impl MeshManager {
         let mut new_vert_alloc = RangeAllocator::new(0..new_vert_count);
         let mut new_index_alloc = RangeAllocator::new(0..new_index_count);
 
-        let vertex_position_copy_data = gpu_copy.prepare(
-            device,
-            &self.buffers.vertex_position,
-            &new_buffers.vertex_position,
-            "vertex position copy",
-        );
-
-        let vertex_normal_copy_data = gpu_copy.prepare(
-            device,
-            &self.buffers.vertex_normal,
-            &new_buffers.vertex_normal,
-            "vertex normal copy",
-        );
-
-        let vertex_tangent_copy_data = gpu_copy.prepare(
-            device,
-            &self.buffers.vertex_tangent,
-            &new_buffers.vertex_tangent,
-            "vertex tangent copy",
-        );
-
-        let vertex_uv_copy_data = gpu_copy.prepare(
-            device,
-            &self.buffers.vertex_uv,
-            &new_buffers.vertex_uv,
-            "vertex uv copy",
-        );
-
-        let vertex_color_copy_data = gpu_copy.prepare(
-            device,
-            &self.buffers.vertex_color,
-            &new_buffers.vertex_color,
-            "vertex color copy",
-        );
-
-        let vertex_mat_index_copy_data = gpu_copy.prepare(
-            device,
-            &self.buffers.vertex_mat_index,
-            &new_buffers.vertex_mat_index,
-            "vertex material index copy",
-        );
-        let index_copy_data = gpu_copy.prepare(device, &self.buffers.index, &new_buffers.index, "index copy");
-
-        let mut cpass = encoder.begin_compute_pass(&ComputePassDescriptor::default());
-
         for mesh in self.registry.values_mut() {
             let new_vert_range = new_vert_alloc.allocate_range(mesh.vertex_range.len()).unwrap();
             let new_index_range = new_index_alloc.allocate_range(mesh.index_range.len()).unwrap();
@@ -255,44 +208,59 @@ impl MeshManager {
 
             // TODO: This was once a function but borrowck wasn't happy with me, could I make it happy?
             macro_rules! copy_vert_fn {
-                ($data:expr, $size:expr) => {
+                ($src:expr, $dst:expr, $size:expr) => {
                     // Copy verts over to new buffer
-                    let vert_copy_start = (mesh.vertex_range.start * $size) / 4;
-                    let vert_copy_end = (mesh.vertex_range.end * $size) / 4;
-                    let vert_output = (new_vert_range.start * $size) / 4;
-                    gpu_copy.copy_words(
-                        &mut cpass,
-                        $data,
-                        vert_copy_start as u32..vert_copy_end as u32,
-                        vert_output as u32,
+                    let vert_copy_start = (mesh.vertex_range.start * $size);
+                    let vert_copy_size = (mesh.vertex_range.end * $size) - vert_copy_start;
+                    let vert_output = (new_vert_range.start * $size);
+                    encoder.copy_buffer_to_buffer(
+                        $src,
+                        vert_copy_start as u64,
+                        $dst,
+                        vert_output as u64,
+                        vert_copy_size as u64,
                     );
                 };
             }
 
-            copy_vert_fn!(&vertex_position_copy_data, VERTEX_POSITION_SIZE);
-            copy_vert_fn!(&vertex_normal_copy_data, VERTEX_NORMAL_SIZE);
-            copy_vert_fn!(&vertex_tangent_copy_data, VERTEX_TANGENT_SIZE);
-            copy_vert_fn!(&vertex_uv_copy_data, VERTEX_UV_SIZE);
-            copy_vert_fn!(&vertex_color_copy_data, VERTEX_COLOR_SIZE);
-            copy_vert_fn!(&vertex_mat_index_copy_data, VERTEX_MATERIAL_INDEX_SIZE);
+            copy_vert_fn!(
+                &self.buffers.vertex_position,
+                &new_buffers.vertex_position,
+                VERTEX_POSITION_SIZE
+            );
+            copy_vert_fn!(
+                &self.buffers.vertex_normal,
+                &new_buffers.vertex_normal,
+                VERTEX_NORMAL_SIZE
+            );
+            copy_vert_fn!(
+                &self.buffers.vertex_tangent,
+                &new_buffers.vertex_tangent,
+                VERTEX_TANGENT_SIZE
+            );
+            copy_vert_fn!(&self.buffers.vertex_uv, &new_buffers.vertex_uv, VERTEX_UV_SIZE);
+            copy_vert_fn!(&self.buffers.vertex_color, &new_buffers.vertex_color, VERTEX_COLOR_SIZE);
+            copy_vert_fn!(
+                &self.buffers.vertex_mat_index,
+                &new_buffers.vertex_mat_index,
+                VERTEX_MATERIAL_INDEX_SIZE
+            );
 
             // Copy indices over to new buffer, adjusting their value by the difference
-            let index_copy_start = (mesh.index_range.start * INDEX_SIZE) / 4;
-            let index_copy_end = (mesh.index_range.end * INDEX_SIZE) / 4;
-            let index_output = (new_index_range.start * INDEX_SIZE) / 4;
-            gpu_copy.copy_words_with_offset(
-                &mut cpass,
-                &index_copy_data,
-                index_copy_start as u32..index_copy_end as u32,
-                index_output as u32,
-                vert_difference as i32,
+            let index_copy_start = mesh.index_range.start * INDEX_SIZE;
+            let index_copy_size = (mesh.index_range.end * INDEX_SIZE) - index_copy_start;
+            let index_output = new_index_range.start * INDEX_SIZE;
+            encoder.copy_buffer_to_buffer(
+                &self.buffers.index,
+                index_copy_start as u64,
+                &new_buffers.index,
+                index_output as u64,
+                index_copy_size as u64,
             );
 
             mesh.vertex_range = new_vert_range;
             mesh.index_range = new_index_range;
         }
-
-        drop(cpass);
 
         self.buffers = new_buffers;
         self.vertex_count = new_vert_count;

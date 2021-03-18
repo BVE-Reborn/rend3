@@ -77,15 +77,37 @@ macro_rules! span_transfer {
     };
 }
 
+pub mod cache {
+    mod pipeline;
+}
+pub mod modules {
+    mod camera;
+    mod directional;
+    mod material;
+    mod mesh;
+    mod object;
+    mod texture;
+
+    pub use camera::*;
+    pub use material::*;
+    pub use mesh::*;
+    pub use object::*;
+    pub use texture::*;
+}
+pub mod util {
+    pub mod frustum;
+    pub mod math;
+    pub mod output;
+    pub mod uniforms;
+}
+
 mod bind_merge;
 mod builder;
 pub mod datatypes;
 mod instruction;
 mod jobs;
-pub mod list;
 mod mode;
 mod options;
-mod output;
 mod registry;
 mod renderer;
 mod statistics;
