@@ -1,6 +1,6 @@
 use crate::{
-    bind_merge::BindGroupBuilder,
-    camera::CameraManager,
+    util::bind_merge::BindGroupBuilder,
+    modules::CameraManager,
     datatypes::{Camera, CameraProjection, DirectionalLight, DirectionalLightHandle},
     modules::CameraManager,
     registry::ResourceRegistry,
@@ -12,7 +12,6 @@ use wgpu::{
     BindingResource, BufferAddress, BufferUsage, CommandEncoder, Device, Extent3d, TextureAspect, TextureDescriptor,
     TextureDimension, TextureUsage, TextureView, TextureViewDescriptor, TextureViewDimension,
 };
-use wgpu_conveyor::{write_to_buffer1, AutomatedBuffer, AutomatedBufferManager, IdBuffer};
 
 pub struct InternalDirectionalLight {
     pub inner: DirectionalLight,

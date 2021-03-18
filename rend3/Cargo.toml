@@ -48,7 +48,6 @@ fnv = "1"
 futures = { version = "0.3", default-features = false, features = ["std", "async-await"] }
 futures-intrusive = "0.4"
 parking_lot = { version = "0.11", features = ["send_guard"] }
-path-dedot = "3"
 raw-window-handle = "0.3"
 range-alloc = "0.1"
 smallvec = "1"
@@ -57,4 +56,3 @@ tracing = { version = "0.1", default-features = false, features = ["std"] }
 tracing-futures = "0.2"
 thiserror = "1"
 wgpu = "0.7"
-wgpu-conveyor = "0.2"

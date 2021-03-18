@@ -4,8 +4,7 @@
 //! as things are factored. While it's still in development, rend3 is able to be
 //! used to build programs.
 //!
-//! Rend3 is not currently release on crates.io, to use it add the following
-//! to your Cargo.toml:
+//! To use rend3 add the following to your Cargo.toml:
 //!
 //! ```text
 //! rend3 = "0.0.5"
@@ -96,6 +95,7 @@ pub mod modules {
 }
 pub mod util {
     pub mod bind_merge;
+    pub mod buffer;
     pub mod frustum;
     pub mod math;
     pub mod output;

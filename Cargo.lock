@@ -1439,15 +1439,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lru"
-version = "0.6.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1f374d42cdfc1d7dbf3d3dec28afab2eb97ffbf43a3234d795b5986dbf4b90ba"
-dependencies = [
- "hashbrown",
-]
-
-[[package]]
 name = "malloc_buf"
 version = "0.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1835,15 +1826,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "path-dedot"
-version = "3.0.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c7794b94034e62eef81e8b9ea0690b31f522fd38394ca51e7997d499d0372fb5"
-dependencies = [
- "once_cell",
-]
-
-[[package]]
 name = "percent-encoding"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2079,7 +2061,6 @@ dependencies = [
  "indexmap",
  "itertools",
  "parking_lot",
- "path-dedot",
  "range-alloc",
  "raw-window-handle",
  "smallvec",
@@ -2088,7 +2069,6 @@ dependencies = [
  "tracing",
  "tracing-futures",
  "wgpu",
- "wgpu-conveyor",
 ]
 
 [[package]]
@@ -2765,20 +2745,6 @@ dependencies = [
  "web-sys",
  "wgpu-core",
  "wgpu-types",
-]
-
-[[package]]
-name = "wgpu-conveyor"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fb25b44fcb9964e2fa0c3ec744f5c9d874148510cbbcd604cad9e4e7ddc7aa8f"
-dependencies = [
- "arrayvec",
- "bitflags",
- "lru",
- "parking_lot",
- "tracing",
- "wgpu",
 ]
 
 [[package]]

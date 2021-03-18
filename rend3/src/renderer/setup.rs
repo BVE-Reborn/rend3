@@ -265,7 +265,6 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
         object_manager,
         directional_light_manager,
 
-        // _imgui_renderer: imgui_renderer,
         options: RwLock::new(builder.options),
     }))
 }

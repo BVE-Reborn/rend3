@@ -7,7 +7,7 @@ pub fn gpu_required_features() -> Features {
     wgpu::Features::MAPPABLE_PRIMARY_BUFFERS
         | wgpu::Features::PUSH_CONSTANTS
         | wgpu::Features::TEXTURE_COMPRESSION_BC
-        // | wgpu::Features::DEPTH_CLAMPING
+        | wgpu::Features::DEPTH_CLAMPING
         | wgpu::Features::SAMPLED_TEXTURE_BINDING_ARRAY
         | wgpu::Features::SAMPLED_TEXTURE_ARRAY_DYNAMIC_INDEXING
         | wgpu::Features::SAMPLED_TEXTURE_ARRAY_NON_UNIFORM_INDEXING
