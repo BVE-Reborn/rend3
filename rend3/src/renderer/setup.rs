@@ -213,22 +213,6 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
     ));
     let global_resource_guard = global_resources.get_mut();
 
-    let gpu_copy = GpuCopy::new(&device, &shader_manager, adapter_info.subgroup_size());
-
-    let culling_pass = culling::CullingPass::new(
-        &device,
-        culling::CullingPassCreationArgs {
-            mode,
-            shader_manager: &shader_manager,
-            prefix_sum_bgl: &global_resource_guard.prefix_sum_bgl,
-            pre_cull_bgl: &global_resource_guard.pre_cull_bgl,
-            object_input_bgl: &global_resource_guard.object_input_bgl,
-            output_bgl: &global_resource_guard.object_output_bgl,
-            uniform_bgl: &global_resource_guard.camera_data_bgl,
-            subgroup_size: adapter_info.subgroup_size(),
-        },
-    );
-
     let texture_manager_2d = RwLock::new(TextureManager::new(
         &device,
         mode,
@@ -258,8 +242,6 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
 
     span_transfer!(imgui_guard -> _);
 
-    let (culling_pass, gpu_copy) = futures::join!(culling_pass, gpu_copy);
-
     Ok(Arc::new(Renderer {
         yard: builder.yard.expect("The yard should be populated by the builder"),
         yard_priorites: builder.priorities.unwrap_or_else(JobPriorities::default),
@@ -282,9 +264,6 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
         material_manager,
         object_manager,
         directional_light_manager,
-
-        gpu_copy,
-        culling_pass,
 
         // _imgui_renderer: imgui_renderer,
         options: RwLock::new(builder.options),

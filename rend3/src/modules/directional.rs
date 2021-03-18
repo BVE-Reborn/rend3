@@ -1,8 +1,10 @@
 use crate::{
     bind_merge::BindGroupBuilder,
+    camera::CameraManager,
     datatypes::{Camera, CameraProjection, DirectionalLight, DirectionalLightHandle},
+    modules::CameraManager,
     registry::ResourceRegistry,
-    renderer::{camera::CameraManager, INTERNAL_SHADOW_DEPTH_FORMAT, SHADOW_DIMENSIONS},
+    INTERNAL_SHADOW_DEPTH_FORMAT, SHADOW_DIMENSIONS,
 };
 use glam::{Mat4, Vec3};
 use std::{mem::size_of, num::NonZeroU32, sync::Arc};

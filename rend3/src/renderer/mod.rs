@@ -38,10 +38,6 @@ impl Ord for OrdEqFloat {
     }
 }
 
-const INTERNAL_SHADOW_DEPTH_FORMAT: TextureFormat = TextureFormat::Depth32Float;
-
-const SHADOW_DIMENSIONS: u32 = 2048;
-
 pub struct Renderer<TLD = ()>
 where
     TLD: 'static,

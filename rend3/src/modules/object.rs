@@ -1,8 +1,8 @@
-use crate::modules::MeshManager;
 use crate::{
     bind_merge::BindGroupBuilder,
     datatypes::{AffineTransform, MaterialHandle, Object, ObjectHandle},
     mode::ModeData,
+    modules::MeshManager,
     registry::ResourceRegistry,
     renderer::modules::MaterialManager,
     util::frustum::BoundingSphere,

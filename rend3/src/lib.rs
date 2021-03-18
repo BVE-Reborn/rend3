@@ -95,13 +95,13 @@ pub mod modules {
     pub use texture::*;
 }
 pub mod util {
+    pub mod bind_merge;
     pub mod frustum;
     pub mod math;
     pub mod output;
     pub mod uniforms;
 }
 
-mod bind_merge;
 mod builder;
 pub mod datatypes;
 mod instruction;
@@ -116,6 +116,9 @@ pub use builder::*;
 pub use jobs::*;
 pub use mode::*;
 pub use options::*;
-pub use output::*;
 pub use renderer::{error::*, Renderer};
 pub use statistics::*;
+
+pub const INTERNAL_SHADOW_DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
+// This needs to be dynamic
+pub const SHADOW_DIMENSIONS: u32 = 2048;

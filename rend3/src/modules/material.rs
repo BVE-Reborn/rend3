@@ -2,8 +2,8 @@ use crate::{
     bind_merge::BindGroupBuilder,
     datatypes::{Material, MaterialChange, MaterialFlags, MaterialHandle, TextureHandle},
     mode::ModeData,
-    registry::ResourceRegistry,
     modules::TextureManager,
+    registry::ResourceRegistry,
     RendererMode,
 };
 use glam::{Vec3, Vec4};
