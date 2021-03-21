@@ -1,7 +1,7 @@
 use crate::{
     instruction::InstructionStreamPair,
     modules::{
-        DirectionalLightManager, MaterialManager, ObjectManager, TextureManager, STARTING_2D_TEXTURES,
+        DirectionalLightManager, MaterialManager, MeshManager, ObjectManager, TextureManager, STARTING_2D_TEXTURES,
         STARTING_CUBE_TEXTURES,
     },
     renderer::{
@@ -13,14 +13,13 @@ use crate::{
 };
 use arrayvec::ArrayVec;
 use fnv::FnvHashMap;
-use parking_lot::{Mutex, RwLock};
+use parking_lot::RwLock;
 use raw_window_handle::HasRawWindowHandle;
 use std::sync::Arc;
 use wgpu::{
     Adapter, AdapterInfo, Backend, BackendBit, DeviceDescriptor, DeviceType, Features, Instance, Limits,
     TextureViewDimension,
 };
-use wgpu_conveyor::{AutomatedBufferManager, UploadStyle};
 
 pub struct PotentialAdapter<T> {
     inner: T,
@@ -197,8 +196,6 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
         (instance, surface, device, queue, adapter_info, chosen_adapter.mode)
     };
 
-    let shader_manager = ShaderManager::new(Arc::clone(&device));
-
     let mut global_resources = RwLock::new(RendererGlobalResources::new(
         &device,
         surface.as_ref(),
@@ -219,16 +216,10 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
         STARTING_CUBE_TEXTURES,
         TextureViewDimension::Cube,
     ));
-
-    let pipeline_manager = PipelineManager::new();
-
-    let mut buffer_manager = Mutex::new(AutomatedBufferManager::new(UploadStyle::from_device_type(
-        &adapter_info.device_type,
-    )));
     let mesh_manager = RwLock::new(MeshManager::new(&device));
-    let material_manager = RwLock::new(MaterialManager::new(&device, mode, buffer_manager.get_mut()));
-    let object_manager = RwLock::new(ObjectManager::new(&device, mode, buffer_manager.get_mut()));
-    let directional_light_manager = RwLock::new(DirectionalLightManager::new(&device, buffer_manager.get_mut()));
+    let material_manager = RwLock::new(MaterialManager::new(&device, mode));
+    let object_manager = RwLock::new(ObjectManager::new(&device, mode));
+    let directional_light_manager = RwLock::new(DirectionalLightManager::new(&device));
 
     span_transfer!(_ -> imgui_guard, INFO, "Creating Imgui Renderer");
 
@@ -248,10 +239,7 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
         device,
         surface,
 
-        buffer_manager,
         global_resources,
-        shader_manager,
-        pipeline_manager,
         mesh_manager,
         texture_manager_2d,
         texture_manager_cube,

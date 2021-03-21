@@ -8,7 +8,7 @@ use crate::{
 use glam::{Mat4, Vec3};
 use std::{mem::size_of, num::NonZeroU32, sync::Arc};
 use wgpu::{
-    BindingResource, BufferUsage, CommandEncoder, Device, Extent3d, Queue, TextureAspect, TextureDescriptor,
+    BindingResource, BufferUsage, Device, Extent3d, Queue, TextureAspect, TextureDescriptor,
     TextureDimension, TextureUsage, TextureView, TextureViewDescriptor, TextureViewDimension,
 };
 

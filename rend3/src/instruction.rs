@@ -1,8 +1,7 @@
 use crate::{
     datatypes::{
         AffineTransform, Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Material,
-        MaterialChange, MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, PipelineHandle, ShaderHandle, Texture,
-        TextureHandle,
+        MaterialChange, MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, Texture, TextureHandle,
     },
     RendererOptions,
 };
@@ -63,16 +62,6 @@ pub enum Instruction {
     },
     RemoveDirectionalLight {
         handle: DirectionalLightHandle,
-    },
-    AddBinaryShader {
-        handle: ShaderHandle,
-        shader: Vec<u32>,
-    },
-    RemoveShader {
-        handle: ShaderHandle,
-    },
-    RemovePipeline {
-        handle: PipelineHandle,
     },
     SetOptions {
         options: RendererOptions,
