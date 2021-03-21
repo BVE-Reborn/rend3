@@ -1,24 +1,26 @@
 use crate::{
-    bind_merge::BindGroupBuilder,
     datatypes::{Camera, CameraProjection},
     instruction::Instruction,
-    list::{RenderList, RenderPassRunRate},
-    renderer::{culling, list, uniforms::WrappedUniform, util::round_to_multiple},
     statistics::RendererStatistics,
-    OutputFrame, Renderer, RendererMode, RendererOutput,
+    util::{
+        bind_merge::BindGroupBuilder,
+        math::round_to_multiple,
+        output::{OutputFrame, RendererOutput},
+        uniforms::WrappedUniform,
+    },
+    Renderer, RendererMode,
 };
 use futures::{stream::FuturesOrdered, StreamExt};
-use std::{borrow::Cow, future::Future, sync::Arc};
+use std::{future::Future, sync::Arc};
 use tracing_futures::Instrument;
 use wgpu::{
-    BindingResource, CommandEncoderDescriptor, ComputePassDescriptor, Extent3d, Maintain, Origin3d, ShaderFlags,
-    ShaderModuleDescriptor, ShaderSource, TextureAspect, TextureCopyView, TextureDataLayout, TextureDescriptor,
-    TextureDimension, TextureUsage, TextureViewDescriptor, TextureViewDimension,
+    BindingResource, CommandEncoderDescriptor, ComputePassDescriptor, Extent3d, Maintain, Origin3d, TextureAspect,
+    TextureCopyView, TextureDataLayout, TextureDescriptor, TextureDimension, TextureUsage, TextureViewDescriptor,
+    TextureViewDimension,
 };
 
 pub fn render_loop<TLD: 'static>(
     renderer: Arc<Renderer<TLD>>,
-    render_list: RenderList,
     output: RendererOutput,
 ) -> impl Future<Output = RendererStatistics> {
     span_transfer!(_ -> render_create_span, INFO, "Render Loop Creation");
@@ -168,7 +170,7 @@ pub fn render_loop<TLD: 'static>(
 
                     let mip_levels = texture.mip_levels.min(max_mip_levels);
 
-                    let uploaded_tex = renderer.device.create_texture(&TextureDescriptor {
+                    let uploaded_tex = renderer.device.create_texture_init(&TextureDescriptor {
                         label: None,
                         size,
                         mip_level_count: mip_levels,
