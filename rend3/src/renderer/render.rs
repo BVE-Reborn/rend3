@@ -52,13 +52,7 @@ pub fn render_loop<TLD: 'static>(
         for cmd in instructions.drain(..) {
             match cmd {
                 Instruction::AddMesh { handle, mesh } => {
-                    mesh_manager.fill(
-                        &renderer.device,
-                        &renderer.queue,
-                        &mut encoder,
-                        handle,
-                        mesh,
-                    );
+                    mesh_manager.fill(&renderer.device, &renderer.queue, &mut encoder, handle, mesh);
                 }
                 Instruction::RemoveMesh { handle } => {
                     mesh_manager.remove(handle);
