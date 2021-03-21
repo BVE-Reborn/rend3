@@ -1,8 +1,7 @@
 use crate::{
     datatypes::{AffineTransform, MaterialHandle, Object, ObjectHandle},
     mode::ModeData,
-    modules::MaterialManager,
-    modules::MeshManager,
+    modules::{MaterialManager, MeshManager},
     registry::ResourceRegistry,
     util::{bind_merge::BindGroupBuilder, buffer::WrappedPotBuffer, frustum::BoundingSphere},
     RendererMode,

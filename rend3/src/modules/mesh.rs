@@ -6,9 +6,7 @@ use crate::{
 use glam::{Vec2, Vec3};
 use range_alloc::RangeAllocator;
 use std::{mem::size_of, ops::Range};
-use wgpu::{
-    Buffer, BufferAddress, BufferDescriptor, BufferUsage, CommandEncoder, Device, Queue,
-};
+use wgpu::{Buffer, BufferAddress, BufferDescriptor, BufferUsage, CommandEncoder, Device, Queue};
 
 pub const VERTEX_POSITION_SIZE: usize = size_of::<Vec3>();
 pub const VERTEX_NORMAL_SIZE: usize = size_of::<Vec3>();

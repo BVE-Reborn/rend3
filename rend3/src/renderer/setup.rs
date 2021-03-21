@@ -1,19 +1,13 @@
 use crate::{
     instruction::InstructionStreamPair,
+    modules::{
+        DirectionalLightManager, MaterialManager, ObjectManager, TextureManager, STARTING_2D_TEXTURES,
+        STARTING_CUBE_TEXTURES,
+    },
     renderer::{
-        copy::GpuCopy,
-        culling,
         info::ExtendedAdapterInfo,
-        light::DirectionalLightManager,
         limits::{check_features, check_limits},
-        list::RenderListCache,
-        material::MaterialManager,
-        mesh::MeshManager,
-        object::ObjectManager,
-        pipeline::PipelineManager,
         resources::RendererGlobalResources,
-        shaders::ShaderManager,
-        texture::{TextureManager, STARTING_2D_TEXTURES, STARTING_CUBE_TEXTURES},
     },
     JobPriorities, Renderer, RendererBuilder, RendererInitializationError, RendererMode,
 };

@@ -100,8 +100,8 @@ pub mod util {
     pub mod frustum;
     pub mod math;
     pub mod output;
-    pub mod uniforms;
     pub mod typedefs;
+    pub mod uniforms;
 }
 
 mod builder;

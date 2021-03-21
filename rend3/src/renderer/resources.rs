@@ -1,13 +1,10 @@
 use crate::{
     datatypes::{Camera, TextureHandle},
     modules::CameraManager,
-    util::{output::SWAPCHAIN_FORMAT},
+    util::output::SWAPCHAIN_FORMAT,
     RendererMode, RendererOptions, VSyncMode,
 };
-use wgpu::{
-    Device, PresentMode, Surface, SwapChain, SwapChainDescriptor,
-    TextureUsage,
-};
+use wgpu::{Device, PresentMode, Surface, SwapChain, SwapChainDescriptor, TextureUsage};
 
 pub struct RendererGlobalResources {
     pub swapchain: Option<SwapChain>,

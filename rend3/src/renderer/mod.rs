@@ -1,12 +1,18 @@
-use crate::{JobPriorities, RendererBuilder, RendererInitializationError, RendererMode, RendererOptions, datatypes::{
+use crate::{
+    datatypes::{
         AffineTransform, Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Material,
-        MaterialChange, MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle,
-        Texture, TextureHandle,
-    }, instruction::{Instruction, InstructionStreamPair}, modules::DirectionalLightManager, modules::{MaterialManager, MeshManager, ObjectManager, TextureManager}, renderer::{info::ExtendedAdapterInfo, resources::RendererGlobalResources}, statistics::RendererStatistics, util::output::RendererOutput};
+        MaterialChange, MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, Texture, TextureHandle,
+    },
+    instruction::{Instruction, InstructionStreamPair},
+    modules::{DirectionalLightManager, MaterialManager, MeshManager, ObjectManager, TextureManager},
+    renderer::{info::ExtendedAdapterInfo, resources::RendererGlobalResources},
+    statistics::RendererStatistics,
+    util::output::RendererOutput,
+    JobPriorities, RendererBuilder, RendererInitializationError, RendererMode, RendererOptions,
+};
 use parking_lot::RwLock;
 use raw_window_handle::HasRawWindowHandle;
-use std::cmp::Ordering;
-use std::{future::Future, sync::Arc};
+use std::{cmp::Ordering, future::Future, sync::Arc};
 use switchyard::{JoinHandle, Switchyard};
 use wgpu::{Device, Instance, Queue, Surface};
 pub mod error;
