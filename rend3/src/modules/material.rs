@@ -1,18 +1,17 @@
 use crate::{
-    bind_merge::BindGroupBuilder,
     datatypes::{Material, MaterialChange, MaterialFlags, MaterialHandle, TextureHandle},
     mode::ModeData,
     modules::TextureManager,
     registry::ResourceRegistry,
+    util::{bind_merge::BindGroupBuilder, buffer::WrappedPotBuffer},
     RendererMode,
 };
 use glam::{Vec3, Vec4};
-use std::{mem::size_of, num::NonZeroU32, sync::Arc};
+use std::{num::NonZeroU32, sync::Arc};
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
-    BindGroup, BindGroupLayout, BindingResource, Buffer, BufferAddress, BufferUsage, CommandEncoder, Device, Queue,
+    BindGroup, BindGroupLayout, BindingResource, Buffer, BufferUsage, Device, Queue,
 };
-use wgpu_conveyor::{AutomatedBuffer, AutomatedBufferManager, IdBuffer};
 
 #[repr(C, align(16))]
 #[derive(Debug, Copy, Clone)]
@@ -116,6 +115,50 @@ struct GPUShaderMaterial {
 unsafe impl bytemuck::Zeroable for GPUShaderMaterial {}
 unsafe impl bytemuck::Pod for GPUShaderMaterial {}
 
+impl GPUShaderMaterial {
+    pub fn from_material(material: &Material, translate_texture: impl FnOnce(TextureHandle) -> NonZeroU32) -> Self {
+        Self {
+            albedo: material.albedo.to_value(),
+            emissive: material.emissive.to_value(Vec3::ZERO),
+            roughness: material.roughness_factor.unwrap_or(0.0),
+            metallic: material.metallic_factor.unwrap_or(0.0),
+            reflectance: material.reflectance.to_value(0.5),
+            clear_coat: material.clearcoat_factor.unwrap_or(0.0),
+            clear_coat_roughness: material.clearcoat_roughness_factor.unwrap_or(0.0),
+            anisotropy: material.anisotropy.to_value(0.0),
+            ambient_occlusion: material.ao_factor.unwrap_or(1.0),
+            alpha_cutout: material.alpha_cutout.unwrap_or(0.0),
+
+            uv_transform_row0: material.transform.x_axis.extend(0.0),
+            uv_transform_row1: material.transform.y_axis.extend(0.0),
+            uv_transform_row2: material.transform.z_axis.extend(0.0),
+
+            albedo_tex: material.albedo.to_texture(translate_texture),
+            normal_tex: material.normal.to_texture(translate_texture),
+            roughness_tex: material.aomr_textures.to_roughness_texture(translate_texture),
+            metallic_tex: material.aomr_textures.to_metallic_texture(translate_texture),
+            reflectance_tex: material.reflectance.to_texture(translate_texture),
+            clear_coat_tex: material.clearcoat_textures.to_clearcoat_texture(translate_texture),
+            clear_coat_roughness_tex: material
+                .clearcoat_textures
+                .to_clearcoat_roughness_texture(translate_texture),
+            emissive_tex: material.emissive.to_texture(translate_texture),
+            anisotropy_tex: material.anisotropy.to_texture(translate_texture),
+            ambient_occlusion_tex: material.aomr_textures.to_ao_texture(translate_texture),
+            material_flags: {
+                let mut flags = material.albedo.to_flags();
+                flags |= material.normal.to_flags();
+                flags |= material.aomr_textures.to_flags();
+                flags |= material.clearcoat_textures.to_flags();
+                flags.set(MaterialFlags::ALPHA_CUTOUT, material.alpha_cutout.is_some());
+                flags.set(MaterialFlags::UNLIT, material.unlit);
+                flags.set(MaterialFlags::NEAREST, material.nearest);
+                flags
+            },
+        }
+    }
+}
+
 struct InternalMaterial {
     mat: Material,
     bind_group: ModeData<Arc<BindGroup>, ()>,
@@ -123,27 +166,22 @@ struct InternalMaterial {
 }
 
 pub struct MaterialManager {
-    buffer: ModeData<(), AutomatedBuffer>,
-    buffer_storage: ModeData<(), Option<Arc<IdBuffer>>>,
+    buffer: ModeData<(), WrappedPotBuffer>,
 
     registry: ResourceRegistry<InternalMaterial>,
 }
 
 impl MaterialManager {
-    pub fn new(device: &Device, mode: RendererMode, manager: &mut AutomatedBufferManager) -> Self {
+    pub fn new(device: &Device, mode: RendererMode) -> Self {
         span_transfer!(_ -> new_span, INFO, "Creating Material Manager");
 
         let buffer = mode.into_data(
             || (),
-            || manager.create_new_buffer(device, 0, BufferUsage::STORAGE, Some("material buffer")),
+            || WrappedPotBuffer::new(device, 0, BufferUsage::STORAGE, Some("material buffer")),
         );
         let registry = ResourceRegistry::new();
 
-        Self {
-            buffer,
-            buffer_storage: mode.into_data(|| (), || None),
-            registry,
-        }
+        Self { buffer, registry }
     }
 
     pub fn allocate(&self) -> MaterialHandle {
@@ -260,66 +298,22 @@ impl MaterialManager {
         self.registry.get_index_of(handle.0)
     }
 
-    pub fn ready(&mut self, device: &Device, encoder: &mut CommandEncoder, texture_manager: &TextureManager) {
+    pub fn ready(&mut self, device: &Device, queue: &Queue, texture_manager: &TextureManager) {
         span_transfer!(_ -> ready_span, INFO, "Material Manager Ready");
 
         if let ModeData::GPU(ref mut buffer) = self.buffer {
-            let registry = &self.registry;
-            let size = registry.count() * size_of::<GPUShaderMaterial>();
+            let translate_texture = texture_manager.translation_fn();
+            let data: Vec<_> = self
+                .registry
+                .values()
+                .map(|internal| GPUShaderMaterial::from_material(&internal.mat, translate_texture))
+                .collect();
 
-            buffer.write_to_buffer(device, encoder, size as BufferAddress, move |_, slice| {
-                let typed_slice: &mut [GPUShaderMaterial] = bytemuck::cast_slice_mut(slice);
-
-                let translate_texture = texture_manager.translation_fn();
-
-                for (index, internal) in registry.values().enumerate() {
-                    let material = &internal.mat;
-                    typed_slice[index] = GPUShaderMaterial {
-                        albedo: material.albedo.to_value(),
-                        emissive: material.emissive.to_value(Vec3::ZERO),
-                        roughness: material.roughness_factor.unwrap_or(0.0),
-                        metallic: material.metallic_factor.unwrap_or(0.0),
-                        reflectance: material.reflectance.to_value(0.5),
-                        clear_coat: material.clearcoat_factor.unwrap_or(0.0),
-                        clear_coat_roughness: material.clearcoat_roughness_factor.unwrap_or(0.0),
-                        anisotropy: material.anisotropy.to_value(0.0),
-                        ambient_occlusion: material.ao_factor.unwrap_or(1.0),
-                        alpha_cutout: material.alpha_cutout.unwrap_or(0.0),
-
-                        uv_transform_row0: material.transform.x_axis.extend(0.0),
-                        uv_transform_row1: material.transform.y_axis.extend(0.0),
-                        uv_transform_row2: material.transform.z_axis.extend(0.0),
-
-                        albedo_tex: material.albedo.to_texture(translate_texture),
-                        normal_tex: material.normal.to_texture(translate_texture),
-                        roughness_tex: material.aomr_textures.to_roughness_texture(translate_texture),
-                        metallic_tex: material.aomr_textures.to_metallic_texture(translate_texture),
-                        reflectance_tex: material.reflectance.to_texture(translate_texture),
-                        clear_coat_tex: material.clearcoat_textures.to_clearcoat_texture(translate_texture),
-                        clear_coat_roughness_tex: material
-                            .clearcoat_textures
-                            .to_clearcoat_roughness_texture(translate_texture),
-                        emissive_tex: material.emissive.to_texture(translate_texture),
-                        anisotropy_tex: material.anisotropy.to_texture(translate_texture),
-                        ambient_occlusion_tex: material.aomr_textures.to_ao_texture(translate_texture),
-                        material_flags: {
-                            let mut flags = material.albedo.to_flags();
-                            flags |= material.normal.to_flags();
-                            flags |= material.aomr_textures.to_flags();
-                            flags |= material.clearcoat_textures.to_flags();
-                            flags.set(MaterialFlags::ALPHA_CUTOUT, material.alpha_cutout.is_some());
-                            flags.set(MaterialFlags::UNLIT, material.unlit);
-                            flags.set(MaterialFlags::NEAREST, material.nearest);
-                            flags
-                        },
-                    }
-                }
-            });
-            *self.buffer_storage.as_gpu_mut() = Some(self.buffer.as_gpu().get_current_inner());
+            buffer.write_to_buffer(device, queue, bytemuck::cast_slice(&data));
         }
     }
 
     pub fn gpu_append_to_bgb<'a>(&'a self, general_bgb: &mut BindGroupBuilder<'a>) {
-        general_bgb.append(self.buffer_storage.as_gpu().as_ref().unwrap().inner.as_entire_binding());
+        general_bgb.append(self.buffer.as_gpu().as_entire_binding());
     }
 }

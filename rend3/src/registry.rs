@@ -28,15 +28,15 @@ impl<T> ResourceRegistry<T> {
         (index, value)
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (&usize, &T)> {
+    pub fn iter(&self) -> impl ExactSizeIterator<Item = (&usize, &T)> {
         self.mapping.iter()
     }
 
-    pub fn values(&self) -> impl Iterator<Item = &T> {
+    pub fn values(&self) -> impl ExactSizeIterator<Item = &T> {
         self.mapping.values()
     }
 
-    pub fn values_mut(&mut self) -> impl Iterator<Item = &mut T> {
+    pub fn values_mut(&mut self) -> impl ExactSizeIterator<Item = &mut T> {
         self.mapping.values_mut()
     }
 

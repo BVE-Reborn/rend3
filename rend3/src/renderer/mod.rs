@@ -1,26 +1,14 @@
-use crate::{
-    datatypes::{
+use crate::{JobPriorities, RendererBuilder, RendererInitializationError, RendererMode, RendererOptions, datatypes::{
         AffineTransform, Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Material,
-        MaterialChange, MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, Pipeline, PipelineHandle, ShaderHandle,
+        MaterialChange, MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle,
         Texture, TextureHandle,
-    },
-    instruction::{Instruction, InstructionStreamPair},
-    list::{RenderList, SourceShaderDescriptor},
-    renderer::{
-        info::ExtendedAdapterInfo, material::MaterialManager, mesh::MeshManager, object::ObjectManager,
-        pipeline::PipelineManager, resources::RendererGlobalResources, shaders::ShaderManager, texture::TextureManager,
-    },
-    statistics::RendererStatistics,
-    JobPriorities, RendererBuilder, RendererInitializationError, RendererMode, RendererOptions, RendererOutput,
-};
-use bitflags::_core::cmp::Ordering;
-use parking_lot::{Mutex, RwLock};
+    }, instruction::{Instruction, InstructionStreamPair}, modules::DirectionalLightManager, modules::{MaterialManager, MeshManager, ObjectManager, TextureManager}, renderer::{info::ExtendedAdapterInfo, resources::RendererGlobalResources}, statistics::RendererStatistics, util::output::RendererOutput};
+use parking_lot::RwLock;
 use raw_window_handle::HasRawWindowHandle;
+use std::cmp::Ordering;
 use std::{future::Future, sync::Arc};
 use switchyard::{JoinHandle, Switchyard};
-use wgpu::{Device, Instance, Queue, Surface, TextureFormat};
-use wgpu_conveyor::AutomatedBufferManager;
-
+use wgpu::{Device, Instance, Queue, Surface};
 pub mod error;
 mod info;
 pub mod limits;
@@ -53,19 +41,13 @@ where
     device: Arc<Device>,
     surface: Option<Surface>,
 
-    buffer_manager: Mutex<AutomatedBufferManager>,
     global_resources: RwLock<RendererGlobalResources>,
-    shader_manager: Arc<ShaderManager>,
-    pipeline_manager: Arc<PipelineManager>,
     mesh_manager: RwLock<MeshManager>,
     texture_manager_2d: RwLock<TextureManager>,
     texture_manager_cube: RwLock<TextureManager>,
     material_manager: RwLock<MaterialManager>,
     object_manager: RwLock<ObjectManager>,
-    directional_light_manager: RwLock<light::DirectionalLightManager>,
-
-    gpu_copy: copy::GpuCopy,
-    culling_pass: culling::CullingPass,
+    directional_light_manager: RwLock<DirectionalLightManager>,
 
     // _imgui_renderer: imgui_wgpu::Renderer,
     options: RwLock<RendererOptions>,
@@ -247,7 +229,7 @@ impl<TLD: 'static> Renderer<TLD> {
             .push(Instruction::ClearBackgroundTexture)
     }
 
-    pub fn render(self: &Arc<Self>, list: RenderList, output: RendererOutput) -> JoinHandle<RendererStatistics> {
+    pub fn render(self: &Arc<Self>, output: RendererOutput) -> JoinHandle<RendererStatistics> {
         let this = Arc::clone(self);
         self.yard.spawn_local(
             self.yard_priorites.compute_pool,

@@ -88,6 +88,7 @@ pub mod modules {
     mod texture;
 
     pub use camera::*;
+    pub use directional::*;
     pub use material::*;
     pub use mesh::*;
     pub use object::*;
@@ -100,6 +101,7 @@ pub mod util {
     pub mod math;
     pub mod output;
     pub mod uniforms;
+    pub mod typedefs;
 }
 
 mod builder;

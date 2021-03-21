@@ -1,10 +1,13 @@
 use crate::{
-    bind_merge::BindGroupBuilder,
     datatypes::{Camera, TextureHandle},
     modules::CameraManager,
-    RendererMode, RendererOptions,
+    util::{output::SWAPCHAIN_FORMAT},
+    RendererMode, RendererOptions, VSyncMode,
 };
-use wgpu::{BindGroupLayout, BindingResource, Device, Sampler, Surface, SwapChain};
+use wgpu::{
+    Device, PresentMode, Surface, SwapChain, SwapChainDescriptor,
+    TextureUsage,
+};
 
 pub struct RendererGlobalResources {
     pub swapchain: Option<SwapChain>,
@@ -14,7 +17,7 @@ pub struct RendererGlobalResources {
 }
 impl RendererGlobalResources {
     pub fn new(device: &Device, surface: Option<&Surface>, mode: RendererMode, options: &RendererOptions) -> Self {
-        let swapchain = surface.map(|surface| util::create_swapchain(device, surface, options.size, options.vsync));
+        let swapchain = surface.map(|surface| create_swapchain(device, surface, options.size, options.vsync));
 
         let camera = CameraManager::new(Camera::default(), Some(options.aspect_ratio()));
 
@@ -36,7 +39,7 @@ impl RendererGlobalResources {
 
         if dirty.contains(DirtyResources::SWAPCHAIN) {
             self.swapchain =
-                surface.map(|surface| util::create_swapchain(device, surface, new_options.size, new_options.vsync));
+                surface.map(|surface| create_swapchain(device, surface, new_options.size, new_options.vsync));
         }
         if dirty.contains(DirtyResources::CAMERA) {
             self.camera.set_aspect_ratio(Some(new_options.aspect_ratio()));
@@ -66,4 +69,20 @@ fn determine_dirty(current: &RendererOptions, new: &RendererOptions) -> DirtyRes
     }
 
     dirty
+}
+
+fn create_swapchain(device: &Device, surface: &Surface, size: [u32; 2], vsync: VSyncMode) -> SwapChain {
+    device.create_swap_chain(
+        &surface,
+        &SwapChainDescriptor {
+            width: size[0],
+            height: size[1],
+            usage: TextureUsage::RENDER_ATTACHMENT,
+            format: SWAPCHAIN_FORMAT,
+            present_mode: match vsync {
+                VSyncMode::On => PresentMode::Fifo,
+                VSyncMode::Off => PresentMode::Immediate,
+            },
+        },
+    )
 }

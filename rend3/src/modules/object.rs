@@ -1,16 +1,14 @@
 use crate::{
-    bind_merge::BindGroupBuilder,
     datatypes::{AffineTransform, MaterialHandle, Object, ObjectHandle},
     mode::ModeData,
+    modules::MaterialManager,
     modules::MeshManager,
     registry::ResourceRegistry,
-    renderer::modules::MaterialManager,
-    util::frustum::BoundingSphere,
+    util::{bind_merge::BindGroupBuilder, buffer::WrappedPotBuffer, frustum::BoundingSphere},
     RendererMode,
 };
-use std::{mem::size_of, sync::Arc};
-use wgpu::{BufferAddress, BufferUsage, CommandEncoder, Device};
-use wgpu_conveyor::{write_to_buffer1, AutomatedBuffer, AutomatedBufferManager, IdBuffer};
+use std::mem::size_of;
+use wgpu::{BufferUsage, Device, Queue};
 
 #[derive(Debug, Clone)]
 pub struct InternalObject {
@@ -39,25 +37,23 @@ unsafe impl bytemuck::Pod for ShaderInputObject {}
 const SHADER_OBJECT_SIZE: usize = size_of::<ShaderInputObject>();
 
 pub struct ObjectManager {
-    object_info_buffer: ModeData<(), AutomatedBuffer>,
-    object_info_buffer_storage: ModeData<(), Option<Arc<IdBuffer>>>,
+    object_info_buffer: ModeData<(), WrappedPotBuffer>,
 
     registry: ResourceRegistry<InternalObject>,
 }
 impl ObjectManager {
-    pub fn new(device: &Device, mode: RendererMode, buffer_manager: &mut AutomatedBufferManager) -> Self {
+    pub fn new(device: &Device, mode: RendererMode) -> Self {
         span_transfer!(_ -> new_span, INFO, "Creating Object Manager");
 
         let object_info_buffer = mode.into_data(
             || (),
-            || buffer_manager.create_new_buffer(device, 0, BufferUsage::STORAGE, Some("object info buffer")),
+            || WrappedPotBuffer::new(device, 0, BufferUsage::STORAGE, Some("object info buffer")),
         );
 
         let registry = ResourceRegistry::new();
 
         Self {
             object_info_buffer,
-            object_info_buffer_storage: mode.into_data(|| (), || None),
             registry,
         }
     }
@@ -87,12 +83,7 @@ impl ObjectManager {
         self.registry.remove(handle.0);
     }
 
-    pub fn ready(
-        &mut self,
-        device: &Device,
-        encoder: &mut CommandEncoder,
-        material_manager: &MaterialManager,
-    ) -> usize {
+    pub fn ready(&mut self, device: &Device, queue: &Queue, material_manager: &MaterialManager) -> usize {
         span_transfer!(_ -> ready_span, INFO, "Object Manager Ready");
 
         let object_count = self.registry.count();
@@ -102,27 +93,20 @@ impl ObjectManager {
         }
 
         if let ModeData::GPU(ref mut obj_buffer) = self.object_info_buffer {
-            let registry = &self.registry;
+            let data: Vec<_> = self
+                .registry
+                .values()
+                .map(|object| ShaderInputObject {
+                    start_idx: object.start_idx,
+                    count: object.count,
+                    vertex_offset: object.vertex_offset,
+                    material_idx: material_manager.internal_index(object.material) as u32,
+                    transform: object.transform,
+                    sphere: object.sphere,
+                })
+                .collect();
 
-            let obj_buffer_size = (object_count * SHADER_OBJECT_SIZE) as BufferAddress;
-            write_to_buffer1(device, encoder, obj_buffer, obj_buffer_size, |_, obj_slice| {
-                let obj_slice: &mut [ShaderInputObject] = bytemuck::cast_slice_mut(obj_slice);
-
-                for (object_idx, object) in registry.values().enumerate() {
-                    // Object Update
-
-                    obj_slice[object_idx] = ShaderInputObject {
-                        start_idx: object.start_idx,
-                        count: object.count,
-                        vertex_offset: object.vertex_offset,
-                        material_idx: material_manager.internal_index(object.material) as u32,
-                        transform: object.transform,
-                        sphere: object.sphere,
-                    };
-                }
-            });
-
-            *self.object_info_buffer_storage.as_gpu_mut() = Some(obj_buffer.get_current_inner());
+            obj_buffer.write_to_buffer(device, queue, bytemuck::cast_slice(&data));
         }
 
         object_count
@@ -133,14 +117,7 @@ impl ObjectManager {
     }
 
     pub fn gpu_append_to_bgb<'a>(&'a self, general_bgb: &mut BindGroupBuilder<'a>) {
-        general_bgb.append(
-            self.object_info_buffer_storage
-                .as_gpu()
-                .as_ref()
-                .unwrap()
-                .inner
-                .as_entire_binding(),
-        );
+        general_bgb.append(self.object_info_buffer.as_gpu().as_entire_binding());
     }
 
     pub fn set_object_transform(&mut self, handle: ObjectHandle, transform: AffineTransform) {

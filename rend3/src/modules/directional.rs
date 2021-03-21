@@ -1,17 +1,13 @@
 use crate::{
-    util::bind_merge::BindGroupBuilder,
-    modules::CameraManager,
     datatypes::{Camera, CameraProjection, DirectionalLight, DirectionalLightHandle},
     modules::CameraManager,
     registry::ResourceRegistry,
+    util::{bind_merge::BindGroupBuilder, buffer::WrappedPotBuffer},
     INTERNAL_SHADOW_DEPTH_FORMAT, SHADOW_DIMENSIONS,
 };
 use glam::{Mat4, Vec3};
 use std::{mem::size_of, num::NonZeroU32, sync::Arc};
-use wgpu::{
-    BindingResource, BufferAddress, BufferUsage, CommandEncoder, Device, Extent3d, TextureAspect, TextureDescriptor,
-    TextureDimension, TextureUsage, TextureView, TextureViewDescriptor, TextureViewDimension,
-};
+use wgpu::{BindingResource, BufferUsage, CommandEncoder, Device, Extent3d, Queue, TextureAspect, TextureDescriptor, TextureDimension, TextureUsage, TextureView, TextureViewDescriptor, TextureViewDimension};
 
 pub struct InternalDirectionalLight {
     pub inner: DirectionalLight,
@@ -41,8 +37,7 @@ unsafe impl bytemuck::Zeroable for ShaderDirectionalLight {}
 unsafe impl bytemuck::Pod for ShaderDirectionalLight {}
 
 pub struct DirectionalLightManager {
-    buffer_storage: Option<Arc<IdBuffer>>,
-    buffer: AutomatedBuffer,
+    buffer: WrappedPotBuffer,
 
     view: TextureView,
     layer_views: Vec<Arc<TextureView>>,
@@ -50,15 +45,14 @@ pub struct DirectionalLightManager {
     registry: ResourceRegistry<InternalDirectionalLight>,
 }
 impl DirectionalLightManager {
-    pub fn new(device: &Device, buffer_manager: &mut AutomatedBufferManager) -> Self {
+    pub fn new(device: &Device) -> Self {
         let registry = ResourceRegistry::new();
 
-        let buffer = buffer_manager.create_new_buffer(device, 0, BufferUsage::STORAGE, Some("directional lights"));
+        let buffer = WrappedPotBuffer::new(device, 0, BufferUsage::STORAGE, Some("directional lights"));
 
         let (view, layer_views) = create_shadow_texture(device, 1);
 
         Self {
-            buffer_storage: None,
             buffer,
             view,
             layer_views,
@@ -99,7 +93,7 @@ impl DirectionalLightManager {
         self.registry.remove(handle.0);
     }
 
-    pub fn ready(&mut self, device: &Device, encoder: &mut CommandEncoder) {
+    pub fn ready(&mut self, device: &Device, queue: &Queue) {
         let registered_count = self.registry.count();
         if registered_count != self.layer_views.len() && registered_count != 0 {
             let (view, layer_views) = create_shadow_texture(device, registered_count as u32);
@@ -111,36 +105,25 @@ impl DirectionalLightManager {
 
         let size = self.registry.count() * size_of::<ShaderDirectionalLight>()
             + size_of::<ShaderDirectionalLightBufferHeader>();
-        write_to_buffer1(
-            device,
-            encoder,
-            &mut self.buffer,
-            size as BufferAddress,
-            |_, raw_buffer| {
-                let (raw_buffer_header, raw_buffer_body) =
-                    raw_buffer.split_at_mut(size_of::<ShaderDirectionalLightBufferHeader>());
-                let buffer_header: &mut ShaderDirectionalLightBufferHeader =
-                    bytemuck::from_bytes_mut(raw_buffer_header);
-                let buffer_body: &mut [ShaderDirectionalLight] = bytemuck::cast_slice_mut(raw_buffer_body);
 
-                buffer_header.total_lights = registry.count() as u32;
+        let buffer = Vec::with_capacity(size);
+        buffer.extend_from_slice(bytemuck::bytes_of(&ShaderDirectionalLightBufferHeader {
+            total_lights: registry.count() as u32,
+        }));
+        for (idx, light) in registry.values().enumerate() {
+            buffer.extend_from_slice(bytemuck::bytes_of(&ShaderDirectionalLight {
+                view_proj: light.camera.view_proj(),
+                color: light.inner.color * light.inner.intensity,
+                direction: light.inner.direction,
+                shadow_tex: light.shadow_tex as u32,
+            }));
+        }
 
-                for (idx, light) in registry.values().enumerate() {
-                    buffer_body[idx] = ShaderDirectionalLight {
-                        view_proj: light.camera.view_proj(),
-                        color: light.inner.color * light.inner.intensity,
-                        direction: light.inner.direction,
-                        shadow_tex: light.shadow_tex as u32,
-                    }
-                }
-            },
-        );
-
-        self.buffer_storage = Some(self.buffer.get_current_inner());
+        self.buffer.write_to_buffer(device, queue, &buffer);
     }
 
     pub fn append_to_bgb<'a>(&'a self, builder: &mut BindGroupBuilder<'a>) {
-        builder.append(self.buffer_storage.as_ref().unwrap().inner.as_entire_binding());
+        builder.append(self.buffer.as_entire_binding());
         builder.append(BindingResource::TextureView(&self.view));
     }
 

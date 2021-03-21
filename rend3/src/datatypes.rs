@@ -24,9 +24,7 @@ declare_handle!(
     TextureHandle,
     MaterialHandle,
     ObjectHandle,
-    DirectionalLightHandle,
-    ShaderHandle,
-    PipelineHandle
+    DirectionalLightHandle
 );
 
 macro_rules! changeable_struct {
