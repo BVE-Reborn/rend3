@@ -77,7 +77,13 @@ macro_rules! span_transfer {
 }
 
 pub mod cache {
+    mod bind_group;
     mod pipeline;
+    mod renderbuffer;
+
+    pub use bind_group::*;
+    pub use pipeline::*;
+    pub use renderbuffer::*;
 }
 pub mod modules {
     mod camera;

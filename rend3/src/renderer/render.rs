@@ -14,9 +14,9 @@ use futures::{stream::FuturesOrdered, StreamExt};
 use std::{future::Future, sync::Arc};
 use tracing_futures::Instrument;
 use wgpu::{
-    BindingResource, CommandEncoderDescriptor, ComputePassDescriptor, Extent3d, Maintain, Origin3d, TextureAspect,
-    TextureCopyView, TextureDataLayout, TextureDescriptor, TextureDimension, TextureUsage, TextureViewDescriptor,
-    TextureViewDimension,
+    util::DeviceExt, BindingResource, CommandEncoderDescriptor, ComputePassDescriptor, Extent3d, Maintain, Origin3d,
+    TextureAspect, TextureCopyView, TextureDataLayout, TextureDescriptor, TextureDimension, TextureUsage,
+    TextureViewDescriptor, TextureViewDimension,
 };
 
 pub fn render_loop<TLD: 'static>(
@@ -55,7 +55,6 @@ pub fn render_loop<TLD: 'static>(
                     mesh_manager.fill(
                         &renderer.device,
                         &renderer.queue,
-                        &renderer.gpu_copy,
                         &mut encoder,
                         handle,
                         mesh,
@@ -73,70 +72,19 @@ pub fn render_loop<TLD: 'static>(
 
                     assert!(texture.mip_levels > 0, "Mipmap levels must be greater than 0");
 
-                    let block_width = texture.format.pixels_per_block();
-                    let block_bytes = texture.format.bytes_per_block();
-
-                    // TODO: This is a workaround, because WGPU 0.6 has an issue when mip map is smaller the format's
-                    // block size, eg with BC1 4x4 and mip level being 2x2 pixels
-                    // The code below calculates log2 of the smaller dimension to get the maximum mip level before
-                    // the texture hits block width
-                    let smaller_dim = size.width.min(size.height);
-                    let tex_mips = (std::mem::size_of_val(&smaller_dim) * 8) as u32 - smaller_dim.leading_zeros() - 1;
-                    let block_mips = (std::mem::size_of_val(&block_width) * 8) as u32 - block_width.leading_zeros() - 1;
-                    let max_mip_levels = tex_mips - block_mips + 1;
-
-                    let mip_levels = texture.mip_levels.min(max_mip_levels);
-
-                    let uploaded_tex = renderer.device.create_texture(&TextureDescriptor {
-                        label: None,
-                        size,
-                        mip_level_count: mip_levels,
-                        sample_count: 1,
-                        dimension: TextureDimension::D2,
-                        format: texture.format.into(),
-                        usage: TextureUsage::SAMPLED | TextureUsage::COPY_DST,
-                    });
-
-                    let mut offset = 0;
-
-                    for mip in 0..mip_levels {
-                        // Each mip is 1/4th the size of the previous level, so our divisors are the powers of two
-                        let div = 1 << mip;
-
-                        // When using compressed textures, we need to round up the extents to the physical memory used
-                        // by the texture, so round to a multiple of the block size (generally 1x1 or 4x4)
-                        let mip_size = Extent3d {
-                            width: round_to_multiple(size.width / div, block_width),
-                            height: round_to_multiple(size.height / div, block_width),
-                            depth: 1,
-                        };
-
-                        // Size of mip level in pixel blocks
-                        let width_blocks = mip_size.width / block_width;
-                        let height_blocks = mip_size.height / block_width;
-
-                        let bytes_per_row = width_blocks * block_bytes;
-                        let bytes = bytes_per_row * height_blocks;
-
-                        let offset_end = offset + bytes as usize;
-
-                        renderer.queue.write_texture(
-                            TextureCopyView {
-                                texture: &uploaded_tex,
-                                origin: Origin3d::ZERO,
-                                mip_level: mip,
-                            },
-                            &texture.data[offset..offset_end],
-                            TextureDataLayout {
-                                offset: 0,
-                                rows_per_image: 0,
-                                bytes_per_row,
-                            },
-                            mip_size,
-                        );
-
-                        offset = offset_end;
-                    }
+                    let uploaded_tex = renderer.device.create_texture_with_data(
+                        &renderer.queue,
+                        &TextureDescriptor {
+                            label: None,
+                            size,
+                            mip_level_count: texture.mip_levels,
+                            sample_count: 1,
+                            dimension: TextureDimension::D2,
+                            format: texture.format.into(),
+                            usage: TextureUsage::SAMPLED | TextureUsage::COPY_DST,
+                        },
+                        &texture.data,
+                    );
 
                     texture_manager_2d.fill(
                         handle,
@@ -156,76 +104,19 @@ pub fn render_loop<TLD: 'static>(
 
                     assert!(texture.mip_levels > 0, "Mipmap levels must be greater than 0");
 
-                    let block_width = texture.format.pixels_per_block();
-                    let block_bytes = texture.format.bytes_per_block();
-
-                    // TODO: This is a workaround, because WGPU 0.6 has an issue when mip map is smaller the format's
-                    // block size, eg with BC1 4x4 and mip level being 2x2 pixels
-                    // The code below calculates log2 of the smaller dimension to get the maximum mip level before
-                    // the texture hits block width
-                    let smaller_dim = size.width.min(size.height);
-                    let tex_mips = (std::mem::size_of_val(&smaller_dim) * 8) as u32 - smaller_dim.leading_zeros() - 1;
-                    let block_mips = (std::mem::size_of_val(&block_width) * 8) as u32 - block_width.leading_zeros() - 1;
-                    let max_mip_levels = tex_mips - block_mips + 1;
-
-                    let mip_levels = texture.mip_levels.min(max_mip_levels);
-
-                    let uploaded_tex = renderer.device.create_texture_init(&TextureDescriptor {
-                        label: None,
-                        size,
-                        mip_level_count: mip_levels,
-                        sample_count: 1,
-                        dimension: TextureDimension::D2,
-                        format: texture.format.into(),
-                        usage: TextureUsage::SAMPLED | TextureUsage::COPY_DST,
-                    });
-
-                    let mut offset = 0;
-
-                    for layer in 0..6 {
-                        // Not 0..mip_levels, because we do want to skip over the unused mip levels
-                        for mip in 0..texture.mip_levels {
-                            // Each mip is 1/4th the size of the previous level, so our divisors are the powers of two
-                            let div = 1 << mip;
-
-                            // When using compressed textures, we need to round up the extents to the physical memory used
-                            // by the texture, so round to a multiple of the block size (generally 1x1 or 4x4)
-                            let mip_size = Extent3d {
-                                width: round_to_multiple(size.width / div, block_width),
-                                height: round_to_multiple(size.height / div, block_width),
-                                depth: 1,
-                            };
-
-                            // Size of mip level in pixel blocks
-                            let width_blocks = mip_size.width / block_width;
-                            let height_blocks = mip_size.height / block_width;
-
-                            let bytes_per_row = width_blocks * block_bytes;
-                            let bytes = bytes_per_row * height_blocks;
-
-                            let offset_end = offset + bytes as usize;
-
-                            // Only write up to the max mip level and skip over unused bytes
-                            if mip < max_mip_levels {
-                                renderer.queue.write_texture(
-                                    TextureCopyView {
-                                        texture: &uploaded_tex,
-                                        origin: Origin3d { x: 0, y: 0, z: layer },
-                                        mip_level: mip,
-                                    },
-                                    &texture.data[offset..offset_end],
-                                    TextureDataLayout {
-                                        offset: 0,
-                                        bytes_per_row,
-                                        rows_per_image: 0,
-                                    },
-                                    mip_size,
-                                );
-                            }
-
-                            offset = offset_end;
-                        }
-                    }
+                    let uploaded_tex = renderer.device.create_texture_with_data(
+                        &renderer.queue,
+                        &TextureDescriptor {
+                            label: None,
+                            size,
+                            mip_level_count: texture.mip_levels,
+                            sample_count: 1,
+                            dimension: TextureDimension::D2,
+                            format: texture.format.into(),
+                            usage: TextureUsage::SAMPLED | TextureUsage::COPY_DST,
+                        },
+                        &texture.data,
+                    );
 
                     texture_manager_cube.fill(
                         handle,
@@ -303,11 +194,6 @@ pub fn render_loop<TLD: 'static>(
                 }
             }
         }
-
-        renderer
-            .render_list_cache
-            .write()
-            .add_render_list(&renderer.device, render_list.resources);
 
         let texture_2d_ready = texture_manager_2d.ready(&renderer.device);
         let texture_cube_ready = texture_manager_cube.ready(&renderer.device);
