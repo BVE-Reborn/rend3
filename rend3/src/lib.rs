@@ -94,12 +94,14 @@ pub mod modules {
     pub use object::*;
     pub use texture::*;
 }
+pub mod shaders;
 pub mod util {
     pub mod bind_merge;
     pub mod buffer;
     pub mod frustum;
     pub mod math;
     pub mod output;
+    pub mod registry;
     pub mod typedefs;
     pub mod uniforms;
 }
@@ -110,7 +112,6 @@ mod instruction;
 mod jobs;
 mod mode;
 mod options;
-mod registry;
 mod renderer;
 mod statistics;
 

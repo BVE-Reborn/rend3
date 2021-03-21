@@ -1,7 +1,7 @@
 use crate::{
     datatypes::{RendererTextureFormat, TextureHandle},
     mode::ModeData,
-    registry::ResourceRegistry,
+    util::registry::ResourceRegistry,
     RendererMode,
 };
 use std::{mem, num::NonZeroU32, sync::Arc};

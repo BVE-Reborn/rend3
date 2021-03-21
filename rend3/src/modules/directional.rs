@@ -1,15 +1,14 @@
 use crate::{
     datatypes::{Camera, CameraProjection, DirectionalLight, DirectionalLightHandle},
     modules::CameraManager,
-    registry::ResourceRegistry,
-    util::{bind_merge::BindGroupBuilder, buffer::WrappedPotBuffer},
+    util::{bind_merge::BindGroupBuilder, buffer::WrappedPotBuffer, registry::ResourceRegistry},
     INTERNAL_SHADOW_DEPTH_FORMAT, SHADOW_DIMENSIONS,
 };
 use glam::{Mat4, Vec3};
 use std::{mem::size_of, num::NonZeroU32, sync::Arc};
 use wgpu::{
-    BindingResource, BufferUsage, Device, Extent3d, Queue, TextureAspect, TextureDescriptor,
-    TextureDimension, TextureUsage, TextureView, TextureViewDescriptor, TextureViewDimension,
+    BindingResource, BufferUsage, Device, Extent3d, Queue, TextureAspect, TextureDescriptor, TextureDimension,
+    TextureUsage, TextureView, TextureViewDescriptor, TextureViewDimension,
 };
 
 pub struct InternalDirectionalLight {

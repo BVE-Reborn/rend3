@@ -2,8 +2,9 @@ use crate::{
     datatypes::{AffineTransform, MaterialHandle, Object, ObjectHandle},
     mode::ModeData,
     modules::{MaterialManager, MeshManager},
-    registry::ResourceRegistry,
-    util::{bind_merge::BindGroupBuilder, buffer::WrappedPotBuffer, frustum::BoundingSphere},
+    util::{
+        bind_merge::BindGroupBuilder, buffer::WrappedPotBuffer, frustum::BoundingSphere, registry::ResourceRegistry,
+    },
     RendererMode,
 };
 use std::mem::size_of;

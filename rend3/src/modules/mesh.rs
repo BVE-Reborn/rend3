@@ -1,7 +1,6 @@
 use crate::{
     datatypes::{Mesh, MeshHandle},
-    registry::ResourceRegistry,
-    util::frustum::BoundingSphere,
+    util::{frustum::BoundingSphere, registry::ResourceRegistry},
 };
 use glam::{Vec2, Vec3};
 use range_alloc::RangeAllocator;

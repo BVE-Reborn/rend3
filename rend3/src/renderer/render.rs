@@ -289,20 +289,6 @@ pub fn render_loop<TLD: 'static>(
                     }
                 }
                 Instruction::RemoveDirectionalLight { handle } => directional_light_manager.remove(handle),
-                Instruction::AddBinaryShader { handle, shader } => {
-                    let module = renderer.device.create_shader_module(&ShaderModuleDescriptor {
-                        label: None,
-                        source: ShaderSource::SpirV(Cow::Owned(shader)),
-                        flags: ShaderFlags::VALIDATION,
-                    });
-                    renderer.shader_manager.insert(handle, Arc::new(module));
-                }
-                Instruction::RemoveShader { handle } => {
-                    renderer.shader_manager.remove(handle);
-                }
-                Instruction::RemovePipeline { handle } => {
-                    renderer.pipeline_manager.remove(handle);
-                }
                 Instruction::SetOptions { options } => new_options = Some(options),
                 Instruction::SetCameraData { data } => {
                     global_resources.camera.set_data(data, Some(options.aspect_ratio()));
