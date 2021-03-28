@@ -14,7 +14,9 @@ multiple-versions = "deny"
 wildcards = "allow"
 skip = [
     # everything
+    { name = "arrayvec", version = "0.5.2" },
     { name = "cfg-if", version = "0.1.10" },
+    { name = "slotmap", version = "0.4.0" },
     # graphics
     { name = "core-foundation", version = "0.7.0" }, # winit uses old version
     { name = "core-foundation-sys", version = "0.7.0" }, # winit uses old version

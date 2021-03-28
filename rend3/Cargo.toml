@@ -36,7 +36,7 @@ search = "\\[Unreleased\\]\\(https://github.com/BVE-Reborn/rend3/compare/v([a-z0
 replace = "[Unreleased](https://github.com/BVE-Reborn/rend3/compare/v{{version}}...HEAD)\n- [v{{version}}](https://github.com/BVE-Reborn/rend3/compare/v$1...v{{version}})"
 
 [dependencies]
-arrayvec = "0.5"
+arrayvec = "0.6"
 bitflags = "1"
 bytemuck = "1"
 glam = { version = "0.13", features = ["bytemuck"] }
@@ -52,7 +52,7 @@ raw-window-handle = "0.3"
 range-alloc = "0.1"
 smallvec = "1"
 smartstring = "0.2"
-switchyard = "0.1"
+switchyard = "0.2"
 tracing = { version = "0.1", default-features = false, features = ["std"] }
 tracing-futures = "0.2"
 thiserror = "1"
