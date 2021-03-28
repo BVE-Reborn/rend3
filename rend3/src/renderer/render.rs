@@ -202,33 +202,33 @@ pub fn render_loop<TLD: 'static>(
             None
         };
 
-        material_manager.ready(&renderer.device, &mut encoder, &texture_manager_2d);
-        let object_count = object_manager.ready(&renderer.device, &mut encoder, &material_manager);
-        directional_light_manager.ready(&renderer.device, &mut encoder);
+        material_manager.ready(&renderer.device, &renderer.queue, &texture_manager_2d);
+        let object_count = object_manager.ready(&renderer.device, &renderer.queue, &material_manager);
+        directional_light_manager.ready(&renderer.device, &renderer.queue);
 
         let object_input_bg = renderer.mode.into_data(
             || (),
             || {
-                let mut object_input_bgb = BindGroupBuilder::new(Some(String::from("object input bg")));
+                let mut object_input_bgb = BindGroupBuilder::new("object input bg");
                 object_manager.gpu_append_to_bgb(&mut object_input_bgb);
                 object_input_bgb.build(&renderer.device, &global_resources.object_input_bgl)
             },
         );
 
-        let mut general_bgb = BindGroupBuilder::new(Some(String::from("general bg")));
+        let mut general_bgb = BindGroupBuilder::new("general bg");
         global_resources.append_to_bgb(&mut general_bgb);
         let general_bg = general_bgb.build(&renderer.device, &global_resources.general_bgl);
 
         let material_bg = renderer.mode.into_data(
             || (),
             || {
-                let mut material_bgb = BindGroupBuilder::new(Some(String::from("material bg")));
+                let mut material_bgb = BindGroupBuilder::new("material bg");
                 material_manager.gpu_append_to_bgb(&mut material_bgb);
                 material_bgb.build(&renderer.device, &global_resources.material_bgl)
             },
         );
 
-        let mut shadow_bgb = BindGroupBuilder::new(Some(String::from("shadow bg")));
+        let mut shadow_bgb = BindGroupBuilder::new("shadow bg");
         directional_light_manager.append_to_bgb(&mut shadow_bgb);
         let shadow_bg = shadow_bgb.build(&renderer.device, &global_resources.shadow_texture_bgl);
 
@@ -238,7 +238,7 @@ pub fn render_loop<TLD: 'static>(
             texture_manager_cube.ensure_null_view();
             texture_manager_cube.get_null_view()
         };
-        let mut skybox_bgb = BindGroupBuilder::new(Some(String::from("skybox bg")));
+        let mut skybox_bgb = BindGroupBuilder::new("skybox bg");
         skybox_bgb.append(BindingResource::TextureView(skybox_texture_view));
         let skybox_bg = skybox_bgb.build(&renderer.device, &global_resources.skybox_bgl);
 
@@ -285,7 +285,7 @@ pub fn render_loop<TLD: 'static>(
                 name: String::from("shadow pass"),
             });
 
-            let mut object_bgb = BindGroupBuilder::new(Some(String::from("object bg")));
+            let mut object_bgb = BindGroupBuilder::new("object bg");
             object_bgb.append(cull_data.output_buffer.as_entire_binding());
             let object_bg = object_bgb.build(&renderer.device, &global_resources.object_data_bgl);
 
@@ -374,7 +374,7 @@ pub fn render_loop<TLD: 'static>(
                 name: String::from("camera pass"),
             });
 
-            let mut object_bgb = BindGroupBuilder::new(Some(String::from("object bg")));
+            let mut object_bgb = BindGroupBuilder::new("object bg");
             object_bgb.append(cull_data.output_buffer.as_entire_binding());
             let object_bg = object_bgb.build(&renderer.device, &global_resources.object_data_bgl);
 

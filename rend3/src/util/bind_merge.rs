@@ -8,7 +8,7 @@ pub struct BindGroupBuilder<'a> {
     bg_entries: Vec<BindGroupEntry<'a>>,
 }
 impl<'a> BindGroupBuilder<'a> {
-    pub fn new<L>(label: Option<L>) -> Self
+    fn new_inner<L>(label: Option<L>) -> Self
     where
         SsoString: From<L>,
     {
@@ -17,6 +17,18 @@ impl<'a> BindGroupBuilder<'a> {
             bgl_entries: Vec::with_capacity(16),
             bg_entries: Vec::with_capacity(16),
         }
+    }
+
+    pub fn new<L>(label: L) -> Self
+    where
+        SsoString: From<L>,
+    {
+        Self::new_inner(Some(label))
+    }
+
+    pub fn new_no_label() -> Self
+    {
+        Self::new_inner::<&str>(None)
     }
 
     pub fn append(
@@ -39,7 +51,7 @@ impl<'a> BindGroupBuilder<'a> {
         });
     }
 
-    pub fn build(self, device: &Device, cache: BindGroupCache) -> Arc<BindGroup> {
+    pub fn build(self, device: &Device, cache: &mut BindGroupCache) -> Arc<BindGroup> {
         cache.bind_group(device, self.label.as_deref(), &self.bgl_entries, &self.bg_entries)
     }
 }

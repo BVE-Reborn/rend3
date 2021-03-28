@@ -1,4 +1,5 @@
 use crate::{
+    cache::BindGroupCache,
     datatypes::{Material, MaterialChange, MaterialFlags, MaterialHandle, TextureHandle},
     mode::ModeData,
     modules::TextureManager,
@@ -9,7 +10,8 @@ use glam::{Vec3, Vec4};
 use std::{num::NonZeroU32, sync::Arc};
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
-    BindGroup, BindGroupLayout, BindingResource, Buffer, BufferUsage, Device, Queue,
+    BindGroup, BindingResource, BindingType, Buffer, BufferBindingType, BufferUsage, Device, Queue,
+    ShaderStage, TextureSampleType, TextureViewDimension,
 };
 
 #[repr(C, align(16))]
@@ -192,7 +194,7 @@ impl MaterialManager {
         device: &Device,
         mode: RendererMode,
         texture_manager_2d: &mut TextureManager,
-        material_bgl: &BindGroupLayout,
+        bgc: &BindGroupCache,
         handle: MaterialHandle,
         material: Material,
     ) {
@@ -221,51 +223,109 @@ impl MaterialManager {
             InternalMaterial {
                 bind_group: mode.into_data(
                     || {
-                        let mut bgb = BindGroupBuilder::new(None);
-                        bgb.append(BindingResource::TextureView(
-                            material.albedo.to_texture(lookup_fn).unwrap_or(null_tex),
-                        ));
-                        bgb.append(BindingResource::TextureView(
-                            material.normal.to_texture(lookup_fn).unwrap_or(null_tex),
-                        ));
-                        bgb.append(BindingResource::TextureView(
-                            material
-                                .aomr_textures
-                                .to_roughness_texture(lookup_fn)
-                                .unwrap_or(null_tex),
-                        ));
-                        bgb.append(BindingResource::TextureView(
-                            material
-                                .aomr_textures
-                                .to_metallic_texture(lookup_fn)
-                                .unwrap_or(null_tex),
-                        ));
-                        bgb.append(BindingResource::TextureView(
-                            material.reflectance.to_texture(lookup_fn).unwrap_or(null_tex),
-                        ));
-                        bgb.append(BindingResource::TextureView(
-                            material
-                                .clearcoat_textures
-                                .to_clearcoat_texture(lookup_fn)
-                                .unwrap_or(null_tex),
-                        ));
-                        bgb.append(BindingResource::TextureView(
-                            material
-                                .clearcoat_textures
-                                .to_clearcoat_roughness_texture(lookup_fn)
-                                .unwrap_or(null_tex),
-                        ));
-                        bgb.append(BindingResource::TextureView(
-                            material.emissive.to_texture(lookup_fn).unwrap_or(null_tex),
-                        ));
-                        bgb.append(BindingResource::TextureView(
-                            material.anisotropy.to_texture(lookup_fn).unwrap_or(null_tex),
-                        ));
-                        bgb.append(BindingResource::TextureView(
-                            material.aomr_textures.to_ao_texture(lookup_fn).unwrap_or(null_tex),
-                        ));
-                        bgb.append(material_buffer.as_cpu().as_entire_binding());
-                        bgb.build(device, material_bgl)
+                        let visibility = ShaderStage::VERTEX | ShaderStage::FRAGMENT | ShaderStage::COMPUTE;
+                        let ty = BindingType::Texture {
+                            view_dimension: TextureViewDimension::D2,
+                            sample_type: TextureSampleType::Float { filterable: true },
+                            multisampled: false,
+                        };
+
+                        let mut bgb = BindGroupBuilder::new_no_label();
+                        bgb.append(
+                            visibility,
+                            ty,
+                            None,
+                            BindingResource::TextureView(material.albedo.to_texture(lookup_fn).unwrap_or(null_tex)),
+                        );
+                        bgb.append(
+                            visibility,
+                            ty,
+                            None,
+                            BindingResource::TextureView(material.normal.to_texture(lookup_fn).unwrap_or(null_tex)),
+                        );
+                        bgb.append(
+                            visibility,
+                            ty,
+                            None,
+                            BindingResource::TextureView(
+                                material
+                                    .aomr_textures
+                                    .to_roughness_texture(lookup_fn)
+                                    .unwrap_or(null_tex),
+                            ),
+                        );
+                        bgb.append(
+                            visibility,
+                            ty,
+                            None,
+                            BindingResource::TextureView(
+                                material
+                                    .aomr_textures
+                                    .to_metallic_texture(lookup_fn)
+                                    .unwrap_or(null_tex),
+                            ),
+                        );
+                        bgb.append(
+                            visibility,
+                            ty,
+                            None,
+                            BindingResource::TextureView(
+                                material.reflectance.to_texture(lookup_fn).unwrap_or(null_tex),
+                            ),
+                        );
+                        bgb.append(
+                            visibility,
+                            ty,
+                            None,
+                            BindingResource::TextureView(
+                                material
+                                    .clearcoat_textures
+                                    .to_clearcoat_texture(lookup_fn)
+                                    .unwrap_or(null_tex),
+                            ),
+                        );
+                        bgb.append(
+                            visibility,
+                            ty,
+                            None,
+                            BindingResource::TextureView(
+                                material
+                                    .clearcoat_textures
+                                    .to_clearcoat_roughness_texture(lookup_fn)
+                                    .unwrap_or(null_tex),
+                            ),
+                        );
+                        bgb.append(
+                            visibility,
+                            ty,
+                            None,
+                            BindingResource::TextureView(material.emissive.to_texture(lookup_fn).unwrap_or(null_tex)),
+                        );
+                        bgb.append(
+                            visibility,
+                            ty,
+                            None,
+                            BindingResource::TextureView(material.anisotropy.to_texture(lookup_fn).unwrap_or(null_tex)),
+                        );
+                        bgb.append(
+                            visibility,
+                            ty,
+                            None,
+                            BindingResource::TextureView(
+                                material.aomr_textures.to_ao_texture(lookup_fn).unwrap_or(null_tex),
+                            ),
+                        );
+                        bgb.append(
+                            visibility,
+                            BindingType::Buffer {
+                                ty: BufferBindingType::Uniform,
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            None,
+                            material_buffer.as_cpu().as_entire_binding(),
+                        );
+                        bgb.build(device, &mut bgc)
                     },
                     || (),
                 ),
@@ -312,7 +372,16 @@ impl MaterialManager {
         }
     }
 
-    pub fn gpu_append_to_bgb<'a>(&'a self, general_bgb: &mut BindGroupBuilder<'a>) {
-        general_bgb.append(self.buffer.as_gpu().as_entire_binding());
+    pub fn gpu_append_to_bgb<'a>(&'a self, visibility: ShaderStage, general_bgb: &mut BindGroupBuilder<'a>) {
+        general_bgb.append(
+            visibility,
+            BindingType::Buffer {
+                ty: BufferBindingType::Storage { read_only: true },
+                has_dynamic_offset: false,
+                min_binding_size: None,
+            },
+            None,
+            self.buffer.as_gpu().as_entire_binding(),
+        );
     }
 }

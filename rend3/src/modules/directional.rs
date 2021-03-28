@@ -7,8 +7,9 @@ use crate::{
 use glam::{Mat4, Vec3};
 use std::{mem::size_of, num::NonZeroU32, sync::Arc};
 use wgpu::{
-    BindingResource, BufferUsage, Device, Extent3d, Queue, TextureAspect, TextureDescriptor, TextureDimension,
-    TextureUsage, TextureView, TextureViewDescriptor, TextureViewDimension,
+    BindingResource, BindingType, BufferBindingType, BufferUsage, Device, Extent3d, Queue, ShaderStage, TextureAspect,
+    TextureDescriptor, TextureDimension, TextureSampleType, TextureUsage, TextureView, TextureViewDescriptor,
+    TextureViewDimension,
 };
 
 pub struct InternalDirectionalLight {
@@ -124,9 +125,27 @@ impl DirectionalLightManager {
         self.buffer.write_to_buffer(device, queue, &buffer);
     }
 
-    pub fn append_to_bgb<'a>(&'a self, builder: &mut BindGroupBuilder<'a>) {
-        builder.append(self.buffer.as_entire_binding());
-        builder.append(BindingResource::TextureView(&self.view));
+    pub fn append_to_bgb<'a>(&'a self, visibility: ShaderStage, builder: &mut BindGroupBuilder<'a>) {
+        builder.append(
+            visibility,
+            BindingType::Buffer {
+                ty: BufferBindingType::Storage { read_only: true },
+                has_dynamic_offset: false,
+                min_binding_size: None,
+            },
+            None,
+            self.buffer.as_entire_binding(),
+        );
+        builder.append(
+            visibility,
+            BindingType::Texture {
+                view_dimension: TextureViewDimension::D2Array,
+                sample_type: TextureSampleType::Float { filterable: true },
+                multisampled: false,
+            },
+            None,
+            BindingResource::TextureView(&self.view),
+        );
     }
 
     pub fn values(&self) -> impl Iterator<Item = &InternalDirectionalLight> {
