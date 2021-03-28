@@ -10,8 +10,8 @@ use glam::{Vec3, Vec4};
 use std::{num::NonZeroU32, sync::Arc};
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
-    BindGroup, BindingResource, BindingType, Buffer, BufferBindingType, BufferUsage, Device, Queue,
-    ShaderStage, TextureSampleType, TextureViewDimension,
+    BindGroup, BindingResource, BindingType, Buffer, BufferBindingType, BufferUsage, Device, Queue, ShaderStage,
+    TextureSampleType, TextureViewDimension,
 };
 
 #[repr(C, align(16))]
@@ -325,7 +325,7 @@ impl MaterialManager {
                             None,
                             material_buffer.as_cpu().as_entire_binding(),
                         );
-                        bgb.build(device, &mut bgc)
+                        bgb.build(device, &mut bgc).1
                     },
                     || (),
                 ),

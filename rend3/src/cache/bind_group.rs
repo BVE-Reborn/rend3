@@ -1,8 +1,11 @@
-use crate::util::typedefs::{FastHashMap, SsoString};
+use crate::{
+    cache::{Cached, ParentedCached},
+    util::typedefs::{FastHashMap, SsoString},
+};
 use std::{num::NonZeroU32, ops::Deref, sync::Arc};
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
-    BindingResource, BindingType, BufferAddress, BufferSize, Device, ShaderStage,
+    BindingResource, BindingType, Buffer, BufferAddress, BufferSize, Device, Sampler, ShaderStage, TextureView,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -81,14 +84,14 @@ impl AddressedBindingResource {
     fn from_wgpu(resource: &BindingResource) -> Self {
         match *resource {
             BindingResource::Buffer { buffer, offset, size } => Self::Buffer {
-                buffer: buffer as *const _ as usize,
+                buffer: buffer as *const Buffer as usize,
                 offset,
                 size,
             },
-            BindingResource::Sampler(s) => Self::Sampler(s as *const _ as usize),
-            BindingResource::TextureView(v) => Self::TextureView(v as *const _ as usize),
+            BindingResource::Sampler(s) => Self::Sampler(s as *const Sampler as usize),
+            BindingResource::TextureView(v) => Self::TextureView(v as *const TextureView as usize),
             BindingResource::TextureViewArray(views) => {
-                Self::TextureViewArray(views.iter().map(|&v| v as *const _ as usize).collect())
+                Self::TextureViewArray(views.iter().map(|&v| v as *const TextureView as usize).collect())
             }
         }
     }
@@ -96,7 +99,7 @@ impl AddressedBindingResource {
 
 pub struct BindGroupCache {
     bgl_cache: FastHashMap<Vec<BindGroupLayoutEntry>, Cached<BindGroupLayout>>,
-    bg_cache: FastHashMap<AddressedBindGroupDescriptor, Cached<BindGroup>>,
+    bg_cache: FastHashMap<AddressedBindGroupDescriptor, ParentedCached<BindGroup, BindGroupLayout>>,
     current_epoch: usize,
 }
 
@@ -119,14 +122,13 @@ impl BindGroupCache {
         self.bg_cache.retain(|_, v| v.epoch == self.current_epoch);
     }
 
-    #[must_use]
     pub fn bind_group<L>(
         &mut self,
         device: &Device,
         label: Option<L>,
         bgl_entries: &[BindGroupLayoutEntry],
         bg_entries: &[BindGroupEntry<'_>],
-    ) -> Arc<BindGroup>
+    ) -> (Arc<BindGroupLayout>, Arc<BindGroup>)
     where
         SsoString: From<L>,
         L: Deref<Target = str>,
@@ -144,18 +146,19 @@ impl BindGroupCache {
             });
             bind_group_layout.epoch = self.current_epoch;
 
-            Cached {
+            ParentedCached {
                 inner: Arc::new(device.create_bind_group(&BindGroupDescriptor {
                     label: label.as_deref(),
                     layout: &bind_group_layout.inner,
                     entries: bg_entries,
                 })),
                 epoch: self.current_epoch,
+                parent: Arc::clone(&bind_group_layout.inner),
             }
         });
 
         bind_group.epoch = self.current_epoch;
-        Arc::clone(&bind_group.inner)
+        (Arc::clone(&bind_group.parent), Arc::clone(&bind_group.inner))
     }
 }
 
@@ -163,9 +166,4 @@ impl Default for BindGroupCache {
     fn default() -> Self {
         Self::new()
     }
-}
-
-struct Cached<T> {
-    inner: Arc<T>,
-    epoch: usize,
 }

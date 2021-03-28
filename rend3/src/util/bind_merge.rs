@@ -1,6 +1,8 @@
 use crate::{cache::BindGroupCache, util::typedefs::SsoString};
 use std::{num::NonZeroU32, sync::Arc};
-use wgpu::{BindGroup, BindGroupEntry, BindGroupLayoutEntry, BindingResource, BindingType, Device, ShaderStage};
+use wgpu::{
+    BindGroup, BindGroupEntry, BindGroupLayout, BindGroupLayoutEntry, BindingResource, BindingType, Device, ShaderStage,
+};
 
 pub struct BindGroupBuilder<'a> {
     label: Option<SsoString>,
@@ -26,8 +28,7 @@ impl<'a> BindGroupBuilder<'a> {
         Self::new_inner(Some(label))
     }
 
-    pub fn new_no_label() -> Self
-    {
+    pub fn new_no_label() -> Self {
         Self::new_inner::<&str>(None)
     }
 
@@ -51,7 +52,7 @@ impl<'a> BindGroupBuilder<'a> {
         });
     }
 
-    pub fn build(self, device: &Device, cache: &mut BindGroupCache) -> Arc<BindGroup> {
+    pub fn build(self, device: &Device, cache: &mut BindGroupCache) -> (Arc<BindGroupLayout>, Arc<BindGroup>) {
         cache.bind_group(device, self.label.as_deref(), &self.bgl_entries, &self.bg_entries)
     }
 }
