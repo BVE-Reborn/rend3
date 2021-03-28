@@ -69,7 +69,7 @@ impl AddressedComputePipelineDescriptor {
     {
         assert!(
             pipeline.layout.is_none(),
-            "Do not attach a pipeline layout in the render pipeline descriptor"
+            "Do not attach a pipeline layout in the compute pipeline descriptor"
         );
         Self {
             label: label.map(SsoString::from),

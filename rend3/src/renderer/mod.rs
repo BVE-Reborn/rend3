@@ -55,7 +55,6 @@ where
     object_manager: RwLock<ObjectManager>,
     directional_light_manager: RwLock<DirectionalLightManager>,
 
-    // _imgui_renderer: imgui_wgpu::Renderer,
     options: RwLock<RendererOptions>,
 }
 impl<TLD: 'static> Renderer<TLD> {
