@@ -8,7 +8,7 @@ use crate::{
     RendererMode,
 };
 use std::mem::size_of;
-use wgpu::{BufferUsage, Device, Queue};
+use wgpu::{BindingType, BufferBindingType, BufferUsage, Device, Queue, ShaderStage};
 
 #[derive(Debug, Clone)]
 pub struct InternalObject {
@@ -116,8 +116,17 @@ impl ObjectManager {
         self.registry.values()
     }
 
-    pub fn gpu_append_to_bgb<'a>(&'a self, general_bgb: &mut BindGroupBuilder<'a>) {
-        general_bgb.append(self.object_info_buffer.as_gpu().as_entire_binding());
+    pub fn gpu_append_to_bgb<'a>(&'a self, visibility: ShaderStage, general_bgb: &mut BindGroupBuilder<'a>) {
+        general_bgb.append(
+            visibility,
+            BindingType::Buffer {
+                ty: BufferBindingType::Storage { read_only: true },
+                has_dynamic_offset: false,
+                min_binding_size: None,
+            },
+            None,
+            self.object_info_buffer.as_gpu().as_entire_binding(),
+        );
     }
 
     pub fn set_object_transform(&mut self, handle: ObjectHandle, transform: AffineTransform) {
