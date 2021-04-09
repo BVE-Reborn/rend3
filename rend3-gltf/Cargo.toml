@@ -12,7 +12,7 @@ categories = ["game-development", "graphics", "parser-implementations", "renderi
 [dependencies]
 async-std = "1"
 gltf = { version = "0.15", features = ["KHR_lights_punctual", "KHR_materials_unlit", "extras", "names", "utils"] }
-glam = "0.13"
+glam = "0.14"
 futures-util = "0.3"
 fnv = "1"
 image = "0.23"

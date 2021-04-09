@@ -39,7 +39,7 @@ replace = "[Unreleased](https://github.com/BVE-Reborn/rend3/compare/v{{version}}
 arrayvec = "0.5"
 bitflags = "1"
 bytemuck = "1"
-glam = { version = "0.13", features = ["bytemuck"] }
+glam = { version = "0.14", features = ["bytemuck"] }
 include_dir = "0.6"
 indexmap = "1"
 itertools = "0.10"

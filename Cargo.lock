@@ -1040,12 +1040,11 @@ dependencies = [
 
 [[package]]
 name = "glam"
-version = "0.13.1"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "70155b56080764b8b758e91e4c63d06da0262c0c939f2cd991cd1382087147df"
+checksum = "333928d5eb103c5d4050533cec0384302db6be8ef7d3cebd30ec6a35350353da"
 dependencies = [
  "bytemuck",
- "spirv-std",
 ]
 
 [[package]]
@@ -1430,12 +1429,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "libm"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c7d73b3f436185384286bd8098d17ec07c9a7d2388a6599f824d8502b529702a"
-
-[[package]]
 name = "lock_api"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1751,7 +1744,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9a64b1ec5cda2586e284722486d802acf1f7dbdc623e2bfc57e65ca1cd099290"
 dependencies = [
  "autocfg",
- "libm",
 ]
 
 [[package]]
@@ -2348,27 +2340,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7e529d73e80d64b5f2631f9035113347c578a1c9c7774b83a2b880788459ab36"
 dependencies = [
  "lock_api",
-]
-
-[[package]]
-name = "spirv-std"
-version = "0.4.0-alpha.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e792178e36b93bae8d2850b3297015dc4f85a6e9d79ed57b4163047cfd92d873"
-dependencies = [
- "num-traits",
- "spirv-std-macros",
-]
-
-[[package]]
-name = "spirv-std-macros"
-version = "0.4.0-alpha.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7e90546293619e97b3694f4b7b997a7054e005abc78433b8328a3180ff3313ca"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
 ]
 
 [[package]]
