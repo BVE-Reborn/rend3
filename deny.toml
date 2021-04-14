@@ -19,6 +19,8 @@ skip = [
     { name = "core-foundation", version = "0.7.0" }, # winit uses old version
     { name = "core-foundation-sys", version = "0.7.0" }, # winit uses old version
     { name = "core-graphics", version = "0.19.2" }, # winit uses old version
+    { name = "arrayvec", version = "0.5.0" },
+    { name = "slotmap", version = "0.4.0" },
     # image
     { name = "miniz_oxide", version = "0.3.7" }, # png uses old version
     # winit
