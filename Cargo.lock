@@ -1851,9 +1851,9 @@ dependencies = [
 
 [[package]]
 name = "path-dedot"
-version = "3.0.8"
+version = "3.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c7794b94034e62eef81e8b9ea0690b31f522fd38394ca51e7997d499d0372fb5"
+checksum = "1a14ca47b49e6abd75cf68db85e1e161d9f2b675716894a18af0e9add0266b26"
 dependencies = [
  "once_cell",
 ]
