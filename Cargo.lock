@@ -1945,9 +1945,9 @@ dependencies = [
 
 [[package]]
 name = "pollster"
-version = "0.2.3"
+version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6cce106fd2646acbe31a0e4006f75779d535c26a44f153ada196e9edcfc6d944"
+checksum = "bb20dcc30536a1508e75d47dd0e399bb2fe7354dcf35cda9127f2bf1ed92e30e"
 
 [[package]]
 name = "priority-queue"
