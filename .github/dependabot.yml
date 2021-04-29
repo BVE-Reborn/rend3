@@ -1,0 +1,45 @@
+version: 2
+updates:
+- package-ecosystem: cargo
+  directory: "/"
+  schedule:
+    interval: daily
+    time: "08:00"
+    timezone: America/New_York
+  open-pull-requests-limit: 10
+  ignore:
+  - dependency-name: shaderc
+    versions:
+    - ">= 0.7.a, < 0.8"
+  - dependency-name: flume
+    versions:
+    - 0.10.3
+    - 0.10.4
+  - dependency-name: arrayvec
+    versions:
+    - 0.6.0
+    - 0.7.0
+  - dependency-name: switchyard
+    versions:
+    - 0.2.0
+  - dependency-name: tracing
+    versions:
+    - 0.1.25
+  - dependency-name: futures
+    versions:
+    - 0.3.13
+  - dependency-name: futures-util
+    versions:
+    - 0.3.13
+  - dependency-name: thiserror
+    versions:
+    - 1.0.24
+  - dependency-name: imgui-wgpu
+    versions:
+    - 0.13.1
+  - dependency-name: wgpu
+    versions:
+    - 0.7.0
+  - dependency-name: range-alloc
+    versions:
+    - 0.1.2
