@@ -16,7 +16,7 @@ path = "src/main.rs"
 # Linear algebra library
 glam = "0.14"
 # parsing model files
-gltf = { version = "0.15.2", features = [ "utils" ] }
+gltf = { version = "0.16.0", features = [ "utils" ] }
 # Renderer
 rend3 = { path = "../../rend3", version = "^0.0.5"}
 rend3-list = { path = "../../rend3-list", version = "^0.0.5"}
