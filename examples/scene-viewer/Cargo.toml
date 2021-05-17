@@ -28,5 +28,5 @@ smallvec = "1"
 tracing = { version = "0.1", default-features = false, features = ["std"] }
 wgpu = "0.7"
 wgpu-subscriber = "0.1"
-winit = "0.24"
+winit = "0.25"
 

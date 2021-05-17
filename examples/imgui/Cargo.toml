@@ -29,4 +29,4 @@ wgpu = "0.7"
 # wgpu-aware logging
 wgpu-subscriber = "0.1"
 # windowing
-winit = "0.24"
+winit = "0.25"
