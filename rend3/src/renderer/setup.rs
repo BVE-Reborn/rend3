@@ -82,7 +82,7 @@ pub fn create_adapter(
     for backend in &default_backend_order {
         let adapters = instance.enumerate_adapters(BackendBit::from(*backend));
 
-        let mut potential_adapters = ArrayVec::<[PotentialAdapter<Adapter>; 4]>::new();
+        let mut potential_adapters = ArrayVec::<PotentialAdapter<Adapter>, 4>::new();
         for (idx, adapter) in adapters.enumerate() {
             let info = adapter.get_info();
             let limits = adapter.limits();

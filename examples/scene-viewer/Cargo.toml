@@ -16,7 +16,7 @@ path = "src/main.rs"
 async-std = "1"
 basis = { version = "0.1.0", git = "https://github.com/BVE-Reborn/basis-rs.git", rev = "17480940261db81877ce4fec983a18a39d7db633" }
 fnv = "1"
-glam = "0.14"
+glam = "0.16"
 image = { version = "0.23", default-features = false, features = ["png", "jpeg", "tiff"]}
 histogram = "0.6"
 pico-args = "0.4"
@@ -28,5 +28,5 @@ smallvec = "1"
 tracing = { version = "0.1", default-features = false, features = ["std"] }
 wgpu = "0.7"
 wgpu-subscriber = "0.1"
-winit = "0.24"
+winit = "0.25"
 

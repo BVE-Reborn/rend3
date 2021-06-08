@@ -14,13 +14,13 @@ path = "src/main.rs"
 
 [dependencies]
 # Linear algebra library
-glam = "0.14"
+glam = "0.16"
 # Renderer
 rend3 = { path = "../../rend3", version = "^0.0.5"}
 rend3-list = { path = "../../rend3-list", version = "^0.0.5"}
 # imgui and integrations
 imgui = "0.7"
-imgui-winit-support = "0.7"
+imgui-winit-support = { version = "0.7.1", default-features = false, features = ["winit-25"] }
 imgui-wgpu = "0.14"
 # Provides `block_on` to wait for futures from sync code
 pollster = "0.2"
@@ -29,4 +29,4 @@ wgpu = "0.7"
 # wgpu-aware logging
 wgpu-subscriber = "0.1"
 # windowing
-winit = "0.24"
+winit = "0.25"
