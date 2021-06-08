@@ -14,7 +14,7 @@ path = "src/main.rs"
 
 [dependencies]
 # Linear algebra library
-glam = "0.14"
+glam = "0.16"
 # Renderer
 rend3 = { path = "../../rend3", version = "^0.0.5"}
 rend3-list = { path = "../../rend3-list", version = "^0.0.5"}
@@ -23,4 +23,4 @@ pollster = "0.2"
 # wgpu-aware logging
 wgpu-subscriber = "0.1"
 # windowing
-winit = "0.24"
+winit = "0.25"
