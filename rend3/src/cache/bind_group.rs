@@ -93,6 +93,7 @@ impl AddressedBindingResource {
             BindingResource::TextureViewArray(views) => {
                 Self::TextureViewArray(views.iter().map(|&v| v as *const TextureView as usize).collect())
             }
+            _ => unreachable!(),
         }
     }
 }
@@ -118,8 +119,9 @@ impl BindGroupCache {
     }
 
     pub fn clear_old_epochs(&mut self) {
-        self.bgl_cache.retain(|_, v| v.epoch == self.current_epoch);
-        self.bg_cache.retain(|_, v| v.epoch == self.current_epoch);
+        let current_epoch = self.current_epoch;
+        self.bgl_cache.retain(|_, v| v.epoch == current_epoch);
+        self.bg_cache.retain(|_, v| v.epoch == current_epoch);
     }
 
     pub fn bind_group<L>(

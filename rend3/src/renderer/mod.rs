@@ -1,20 +1,14 @@
-use crate::{
-    datatypes::{
+use crate::{JobPriorities, RenderList, RendererBuilder, RendererInitializationError, RendererMode, RendererOptions, cache::{BindGroupCache, PipelineCache}, datatypes::{
         AffineTransform, Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Material,
         MaterialChange, MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, Texture, TextureHandle,
-    },
-    instruction::{Instruction, InstructionStreamPair},
-    modules::{DirectionalLightManager, MaterialManager, MeshManager, ObjectManager, TextureManager},
-    renderer::{info::ExtendedAdapterInfo, resources::RendererGlobalResources},
-    statistics::RendererStatistics,
-    util::output::RendererOutput,
-    JobPriorities, RendererBuilder, RendererInitializationError, RendererMode, RendererOptions,
-};
+    }, instruction::{Instruction, InstructionStreamPair}, modules::{DirectionalLightManager, MaterialManager, MeshManager, ObjectManager, TextureManager}, renderer::{info::ExtendedAdapterInfo, resources::RendererGlobalResources}, statistics::RendererStatistics, util::output::RendererOutput};
 use parking_lot::RwLock;
 use raw_window_handle::HasRawWindowHandle;
 use std::{cmp::Ordering, future::Future, sync::Arc};
 use switchyard::{JoinHandle, Switchyard};
 use wgpu::{Device, Instance, Queue, Surface};
+
+pub mod context;
 pub mod error;
 mod info;
 pub mod limits;
@@ -54,6 +48,9 @@ where
     material_manager: RwLock<MaterialManager>,
     object_manager: RwLock<ObjectManager>,
     directional_light_manager: RwLock<DirectionalLightManager>,
+
+    pipeline_cache: RwLock<PipelineCache>,
+    bind_group_cache: RwLock<BindGroupCache>,
 
     options: RwLock<RendererOptions>,
 }
@@ -234,7 +231,7 @@ impl<TLD: 'static> Renderer<TLD> {
             .push(Instruction::ClearBackgroundTexture)
     }
 
-    pub fn render(self: &Arc<Self>, output: RendererOutput) -> JoinHandle<RendererStatistics> {
+    pub fn render(self: &Arc<Self>, list: Arc<dyn RenderList<TLD>>, output: RendererOutput) -> JoinHandle<RendererStatistics> {
         let this = Arc::clone(self);
         self.yard.spawn_local(
             self.yard_priorites.compute_pool,

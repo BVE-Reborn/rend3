@@ -109,11 +109,11 @@ impl DirectionalLightManager {
         let size = self.registry.count() * size_of::<ShaderDirectionalLight>()
             + size_of::<ShaderDirectionalLightBufferHeader>();
 
-        let buffer = Vec::with_capacity(size);
+        let mut buffer = Vec::with_capacity(size);
         buffer.extend_from_slice(bytemuck::bytes_of(&ShaderDirectionalLightBufferHeader {
             total_lights: registry.count() as u32,
         }));
-        for (idx, light) in registry.values().enumerate() {
+        for light in registry.values() {
             buffer.extend_from_slice(bytemuck::bytes_of(&ShaderDirectionalLight {
                 view_proj: light.camera.view_proj(),
                 color: light.inner.color * light.inner.intensity,

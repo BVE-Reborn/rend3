@@ -108,6 +108,7 @@ mod builder;
 pub mod datatypes;
 mod instruction;
 mod jobs;
+mod list;
 mod mode;
 mod options;
 mod renderer;
@@ -115,6 +116,7 @@ mod statistics;
 
 pub use builder::*;
 pub use jobs::*;
+pub use list::*;
 pub use mode::*;
 pub use options::*;
 pub use renderer::{error::*, Renderer};

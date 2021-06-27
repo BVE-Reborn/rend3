@@ -117,7 +117,7 @@ unsafe impl bytemuck::Zeroable for GPUShaderMaterial {}
 unsafe impl bytemuck::Pod for GPUShaderMaterial {}
 
 impl GPUShaderMaterial {
-    pub fn from_material(material: &Material, translate_texture: impl FnOnce(TextureHandle) -> NonZeroU32) -> Self {
+    pub fn from_material(material: &Material, translate_texture: &impl Fn(TextureHandle) -> NonZeroU32) -> Self {
         Self {
             albedo: material.albedo.to_value(),
             emissive: material.emissive.to_value(Vec3::ZERO),
@@ -194,7 +194,7 @@ impl MaterialManager {
         device: &Device,
         mode: RendererMode,
         texture_manager_2d: &mut TextureManager,
-        bgc: &BindGroupCache,
+        bgc: &mut BindGroupCache,
         handle: MaterialHandle,
         material: Material,
     ) {
@@ -325,7 +325,7 @@ impl MaterialManager {
                             None,
                             material_buffer.as_cpu().as_entire_binding(),
                         );
-                        bgb.build(device, &mut bgc).1
+                        bgb.build(device, bgc).1
                     },
                     || (),
                 ),
@@ -365,7 +365,7 @@ impl MaterialManager {
             let data: Vec<_> = self
                 .registry
                 .values()
-                .map(|internal| GPUShaderMaterial::from_material(&internal.mat, translate_texture))
+                .map(|internal| GPUShaderMaterial::from_material(&internal.mat, &translate_texture))
                 .collect();
 
             buffer.write_to_buffer(device, queue, bytemuck::cast_slice(&data));

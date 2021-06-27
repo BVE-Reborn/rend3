@@ -176,7 +176,7 @@ impl AddressedDepthStencilState {
             format: state.format,
             depth_write_enabled: state.depth_write_enabled,
             depth_compare: state.depth_compare,
-            stencil: state.stencil,
+            stencil: state.stencil.clone(),
             bias: AddressedDepthBiasState::from_wgpu(&state.bias),
             clamp_depth: state.clamp_depth,
         }
@@ -259,9 +259,10 @@ impl PipelineCache {
     }
 
     pub fn clear_old_epochs(&mut self) {
-        self.layout_cache.retain(|_, v| v.epoch == self.current_epoch);
-        self.render_cache.retain(|_, v| v.epoch == self.current_epoch);
-        self.compute_cache.retain(|_, v| v.epoch == self.current_epoch);
+        let current_epoch = self.current_epoch;
+        self.layout_cache.retain(|_, v| v.epoch == current_epoch);
+        self.render_cache.retain(|_, v| v.epoch == current_epoch);
+        self.compute_cache.retain(|_, v| v.epoch == current_epoch);
     }
 
     pub fn compute_pipeline<L>(
@@ -279,22 +280,26 @@ impl PipelineCache {
         let pl_key =
             AddressedComputePipelineDescriptor::from_wgpu(label, &pipeline_layout_descriptor, &pipeline_descriptor);
 
-        let render_pipeline = self.compute_cache.entry(pl_key).or_insert_with(|| {
-            let pipeline_layout = self.layout_cache.entry(pll_key).or_insert_with(|| Cached {
+        let current_epoch = self.current_epoch;
+        let compute_cache = &mut self.compute_cache;
+        let layout_cache = &mut self.layout_cache;
+
+        let render_pipeline = compute_cache.entry(pl_key).or_insert_with(|| {
+            let pipeline_layout = layout_cache.entry(pll_key).or_insert_with(|| Cached {
                 inner: Arc::new(device.create_pipeline_layout(pipeline_layout_descriptor)),
-                epoch: self.current_epoch,
+                epoch: current_epoch,
             });
-            pipeline_layout.epoch = self.current_epoch;
+            pipeline_layout.epoch = current_epoch;
 
             let mut pl_descriptor = pipeline_descriptor.clone();
             pl_descriptor.layout = Some(&pipeline_layout.inner);
             Cached {
                 inner: Arc::new(device.create_compute_pipeline(&pl_descriptor)),
-                epoch: self.current_epoch,
+                epoch: current_epoch,
             }
         });
 
-        render_pipeline.epoch = self.current_epoch;
+        render_pipeline.epoch = current_epoch;
         Arc::clone(&render_pipeline.inner)
     }
 
@@ -313,22 +318,26 @@ impl PipelineCache {
         let pl_key =
             AddressedRenderPipelineDescriptor::from_wgpu(label, &pipeline_layout_descriptor, &pipeline_descriptor);
 
-        let render_pipeline = self.render_cache.entry(pl_key).or_insert_with(|| {
-            let pipeline_layout = self.layout_cache.entry(pll_key).or_insert_with(|| Cached {
+            let current_epoch = self.current_epoch;
+            let render_cache = &mut self.render_cache;
+            let layout_cache = &mut self.layout_cache;
+
+        let render_pipeline = render_cache.entry(pl_key).or_insert_with(|| {
+            let pipeline_layout = layout_cache.entry(pll_key).or_insert_with(|| Cached {
                 inner: Arc::new(device.create_pipeline_layout(pipeline_layout_descriptor)),
-                epoch: self.current_epoch,
+                epoch: current_epoch,
             });
-            pipeline_layout.epoch = self.current_epoch;
+            pipeline_layout.epoch = current_epoch;
 
             let mut pl_descriptor = pipeline_descriptor.clone();
             pl_descriptor.layout = Some(&pipeline_layout.inner);
             Cached {
                 inner: Arc::new(device.create_render_pipeline(&pl_descriptor)),
-                epoch: self.current_epoch,
+                epoch: current_epoch,
             }
         });
 
-        render_pipeline.epoch = self.current_epoch;
+        render_pipeline.epoch = current_epoch;
         Arc::clone(&render_pipeline.inner)
     }
 }
