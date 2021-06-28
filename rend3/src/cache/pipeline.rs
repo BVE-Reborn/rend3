@@ -23,20 +23,13 @@ struct AddressedRenderPipelineDescriptor {
 }
 
 impl AddressedRenderPipelineDescriptor {
-    fn from_wgpu<L>(
-        label: Option<L>,
-        pipeline_layout: &PipelineLayoutDescriptor<'_>,
-        pipeline: &RenderPipelineDescriptor<'_>,
-    ) -> Self
-    where
-        SsoString: From<L>,
-    {
+    fn from_wgpu(pipeline_layout: &PipelineLayoutDescriptor<'_>, pipeline: &RenderPipelineDescriptor<'_>) -> Self {
         assert!(
             pipeline.layout.is_none(),
             "Do not attach a pipeline layout in the render pipeline descriptor"
         );
         Self {
-            label: label.map(SsoString::from),
+            label: pipeline.label.map(SsoString::from),
             layout: AddressedPipelineLayoutDescriptor::from_wgpu(pipeline_layout),
             vertex: AddressedVertexState::from_wgpu(&pipeline.vertex),
             primitive: AddressedPrimitiveState::from_wgpu(&pipeline.primitive),
@@ -59,20 +52,13 @@ struct AddressedComputePipelineDescriptor {
 }
 
 impl AddressedComputePipelineDescriptor {
-    fn from_wgpu<L>(
-        label: Option<L>,
-        pipeline_layout: &PipelineLayoutDescriptor<'_>,
-        pipeline: &ComputePipelineDescriptor<'_>,
-    ) -> Self
-    where
-        SsoString: From<L> + for<'a> From<&'a str>,
-    {
+    fn from_wgpu(pipeline_layout: &PipelineLayoutDescriptor<'_>, pipeline: &ComputePipelineDescriptor<'_>) -> Self {
         assert!(
             pipeline.layout.is_none(),
             "Do not attach a pipeline layout in the compute pipeline descriptor"
         );
         Self {
-            label: label.map(SsoString::from),
+            label: pipeline.label.map(SsoString::from),
             layout: AddressedPipelineLayoutDescriptor::from_wgpu(pipeline_layout),
             module: pipeline.module as *const ShaderModule as usize,
             entry_point: SsoString::from(pipeline.entry_point),
@@ -268,7 +254,6 @@ impl PipelineCache {
     pub fn compute_pipeline<L>(
         &mut self,
         device: &Device,
-        label: Option<L>,
         pipeline_layout_descriptor: &PipelineLayoutDescriptor<'_>,
         pipeline_descriptor: &ComputePipelineDescriptor<'_>,
     ) -> Arc<ComputePipeline>
@@ -277,8 +262,7 @@ impl PipelineCache {
         L: Deref<Target = str>,
     {
         let pll_key = AddressedPipelineLayoutDescriptor::from_wgpu(&pipeline_layout_descriptor);
-        let pl_key =
-            AddressedComputePipelineDescriptor::from_wgpu(label, &pipeline_layout_descriptor, &pipeline_descriptor);
+        let pl_key = AddressedComputePipelineDescriptor::from_wgpu(&pipeline_layout_descriptor, &pipeline_descriptor);
 
         let current_epoch = self.current_epoch;
         let compute_cache = &mut self.compute_cache;
@@ -306,7 +290,6 @@ impl PipelineCache {
     pub fn render_pipeline<L>(
         &mut self,
         device: &Device,
-        label: Option<L>,
         pipeline_layout_descriptor: &PipelineLayoutDescriptor<'_>,
         pipeline_descriptor: &RenderPipelineDescriptor,
     ) -> Arc<RenderPipeline>
@@ -315,8 +298,7 @@ impl PipelineCache {
         L: Deref<Target = str>,
     {
         let pll_key = AddressedPipelineLayoutDescriptor::from_wgpu(&pipeline_layout_descriptor);
-        let pl_key =
-            AddressedRenderPipelineDescriptor::from_wgpu(label, &pipeline_layout_descriptor, &pipeline_descriptor);
+        let pl_key = AddressedRenderPipelineDescriptor::from_wgpu(&pipeline_layout_descriptor, &pipeline_descriptor);
 
         let current_epoch = self.current_epoch;
         let render_cache = &mut self.render_cache;
