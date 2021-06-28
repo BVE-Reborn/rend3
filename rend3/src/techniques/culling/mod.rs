@@ -27,7 +27,6 @@ struct CPUDrawCall {
 struct ShaderOutputObject {
     model_view: mint::ColumnMatrix4<f32>,
     model_view_proj: mint::ColumnMatrix4<f32>,
-    // Actually a mat3, but funky shader time
     inv_trans_model_view: mint::ColumnMatrix3<f32>,
     // Unused in shader
     _material_idx: u32,

@@ -3,10 +3,10 @@ use glam::{Mat3, Vec4Swizzles};
 use crate::{
     modules::{CameraManager, InternalObject},
     techniques::culling::{CPUDrawCall, CpuCulledObjectSet, ShaderOutputObject},
-    util::frustum::ShaderFrustum,
+    util::{frustum::ShaderFrustum, math::IndexedDistance},
 };
 
-fn run(objects: &[InternalObject], camera: &CameraManager) -> CpuCulledObjectSet {
+pub(super) fn run(objects: &[InternalObject], camera: &CameraManager) -> CpuCulledObjectSet {
     let frustum = ShaderFrustum::from_matrix(camera.proj());
     let view = camera.view();
     let view_proj = camera.view_proj();
@@ -17,7 +17,7 @@ fn run(objects: &[InternalObject], camera: &CameraManager) -> CpuCulledObjectSet
         distance: Vec::with_capacity(objects.len()),
     };
 
-    for object in objects {
+    for (index, object) in objects.into_iter().enumerate() {
         let model = object.transform;
         let model_view = view * model;
 
@@ -46,8 +46,13 @@ fn run(objects: &[InternalObject], camera: &CameraManager) -> CpuCulledObjectSet
             inv_trans_model_view: inv_trans_model_view.into(),
             _material_idx: 0,
             _active: 0,
-        })
+        });
+
+        object_set.distance.push(IndexedDistance { distance, index });
     }
+
+    assert_eq!(object_set.call.len(), object_set.output.len());
+    assert_eq!(object_set.call.len(), object_set.distance.len());
 
     object_set
 }

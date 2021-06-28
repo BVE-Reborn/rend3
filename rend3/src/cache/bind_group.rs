@@ -2,7 +2,7 @@ use crate::{
     cache::{Cached, ParentedCached},
     util::typedefs::{FastHashMap, SsoString},
 };
-use std::{num::NonZeroU32, ops::Deref, sync::Arc};
+use std::{num::NonZeroU32, sync::Arc};
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
     BindingResource, BindingType, Buffer, BufferAddress, BufferSize, Device, Sampler, ShaderStage, TextureView,
