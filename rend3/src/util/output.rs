@@ -4,13 +4,13 @@ use wgpu::{SwapChain, SwapChainError, SwapChainFrame, TextureFormat, TextureView
 pub const SWAPCHAIN_FORMAT: TextureFormat = TextureFormat::Bgra8Unorm;
 
 #[derive(Clone)]
-pub(crate) enum OutputFrame {
+pub enum OutputFrame {
     Swapchain(Arc<SwapChainFrame>),
     View(Arc<TextureView>),
 }
 
 impl OutputFrame {
-    pub(crate) fn as_view(&self) -> &TextureView {
+    pub fn as_view(&self) -> &TextureView {
         match self {
             Self::Swapchain(inner) => &inner.output.view,
             Self::View(inner) => &**inner,
@@ -32,11 +32,11 @@ pub enum RendererOutput {
     Image(Arc<TextureView>),
 }
 impl RendererOutput {
-    pub(crate) fn acquire(self, internal: &mut Option<SwapChain>) -> OutputFrame {
+    pub(crate) fn acquire(self, internal: &Option<SwapChain>) -> OutputFrame {
         match self {
             RendererOutput::InternalSwapchain => {
                 let sc = internal
-                    .as_mut()
+                    .as_ref()
                     .expect("Must setup renderer with a window in order to use internal swapchain");
                 let mut retrieved_frame = None;
                 for _ in 0..10 {

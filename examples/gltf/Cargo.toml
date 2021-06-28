@@ -19,7 +19,6 @@ glam = "0.13"
 gltf = { version = "0.15.2", features = [ "utils" ] }
 # Renderer
 rend3 = { path = "../../rend3", version = "^0.0.5"}
-rend3-list = { path = "../../rend3-list", version = "^0.0.5"}
 # Provides `block_on` to wait for futures from sync code
 pollster = "0.2"
 # wgpu-aware logging

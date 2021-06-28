@@ -1,5 +1,10 @@
-use crate::renderer::context::RenderContext;
+use std::sync::Arc;
 
-pub trait RenderList<TLD>: Send + Sync where TLD: 'static {
-    fn render(&self, context: RenderContext<TLD>);
+use crate::{util::output::OutputFrame, Renderer};
+
+pub trait RenderList<TLD>: Send + Sync
+where
+    TLD: 'static,
+{
+    fn render(&self, context: Arc<Renderer<TLD>>, frame: OutputFrame);
 }

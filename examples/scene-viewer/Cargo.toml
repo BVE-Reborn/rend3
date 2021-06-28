@@ -23,7 +23,6 @@ pico-args = "0.4"
 pollster = "0.2"
 rend3 = { path = "../../rend3", version = "^0.0.5"}
 rend3-gltf = { path = "../../rend3-gltf", version = "^0.0.5"}
-rend3-list = { path = "../../rend3-list", version = "^0.0.5"}
 smallvec = "1"
 tracing = { version = "0.1", default-features = false, features = ["std"] }
 wgpu = "0.7"

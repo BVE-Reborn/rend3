@@ -1,5 +1,5 @@
 use crate::{
-    datatypes::{AffineTransform, MaterialHandle, Object, ObjectHandle},
+    datatypes::{MaterialHandle, Object, ObjectHandle},
     mode::ModeData,
     modules::{MaterialManager, MeshManager},
     util::{
@@ -7,13 +7,14 @@ use crate::{
     },
     RendererMode,
 };
+use glam::Mat4;
 use std::mem::size_of;
 use wgpu::{BindingType, BufferBindingType, BufferUsage, Device, Queue, ShaderStage};
 
 #[derive(Debug, Clone)]
 pub struct InternalObject {
     pub material: MaterialHandle,
-    pub transform: AffineTransform,
+    pub transform: Mat4,
     pub sphere: BoundingSphere,
     pub start_idx: u32,
     pub count: u32,
@@ -27,7 +28,7 @@ struct ShaderInputObject {
     count: u32,
     vertex_offset: i32,
     material_idx: u32,
-    transform: AffineTransform,
+    transform: Mat4,
     sphere: BoundingSphere,
 }
 
@@ -129,7 +130,7 @@ impl ObjectManager {
         );
     }
 
-    pub fn set_object_transform(&mut self, handle: ObjectHandle, transform: AffineTransform) {
+    pub fn set_object_transform(&mut self, handle: ObjectHandle, transform: Mat4) {
         self.registry.get_mut(handle.0).transform = transform;
     }
 }

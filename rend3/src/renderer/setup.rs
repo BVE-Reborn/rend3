@@ -1,11 +1,17 @@
-use crate::{JobPriorities, Renderer, RendererBuilder, RendererInitializationError, RendererMode, cache::{BindGroupCache, PipelineCache}, instruction::InstructionStreamPair, modules::{
+use crate::{
+    cache::{BindGroupCache, PipelineCache},
+    instruction::InstructionStreamPair,
+    modules::{
         DirectionalLightManager, MaterialManager, MeshManager, ObjectManager, TextureManager, STARTING_2D_TEXTURES,
         STARTING_CUBE_TEXTURES,
-    }, renderer::{
+    },
+    renderer::{
         info::ExtendedAdapterInfo,
         limits::{check_features, check_limits},
         resources::RendererGlobalResources,
-    }};
+    },
+    JobPriorities, Renderer, RendererBuilder, RendererInitializationError, RendererMode,
+};
 use arrayvec::ArrayVec;
 use fnv::FnvHashMap;
 use parking_lot::RwLock;
@@ -191,13 +197,12 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
         (instance, surface, device, queue, adapter_info, chosen_adapter.mode)
     };
 
-    let mut global_resources = RwLock::new(RendererGlobalResources::new(
+    let global_resources = RwLock::new(RendererGlobalResources::new(
         &device,
         surface.as_ref(),
         mode,
         &builder.options,
     ));
-    let global_resource_guard = global_resources.get_mut();
 
     let texture_manager_2d = RwLock::new(TextureManager::new(
         &device,
@@ -237,7 +242,7 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
         material_manager,
         object_manager,
         directional_light_manager,
-        
+
         pipeline_cache,
         bind_group_cache,
 

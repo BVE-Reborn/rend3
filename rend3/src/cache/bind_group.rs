@@ -124,37 +124,37 @@ impl BindGroupCache {
         self.bg_cache.retain(|_, v| v.epoch == current_epoch);
     }
 
-    pub fn bind_group<L>(
+    pub fn bind_group(
         &mut self,
         device: &Device,
-        label: Option<L>,
+        label: Option<&str>,
         bgl_entries: &[BindGroupLayoutEntry],
         bg_entries: &[BindGroupEntry<'_>],
-    ) -> (Arc<BindGroupLayout>, Arc<BindGroup>)
-    where
-        SsoString: From<L>,
-        L: Deref<Target = str>,
-    {
+    ) -> (Arc<BindGroupLayout>, Arc<BindGroup>) {
+        let label_deref = label.map(SsoString::from);
         let bg_key = AddressedBindGroupDescriptor::from_wgpu(label, bgl_entries, bg_entries);
 
-        let bind_group = self.bg_cache.entry(bg_key).or_insert_with(|| {
+        let current_epoch = self.current_epoch;
+        let bg_cache = &mut self.bg_cache;
+        let bgl_cache = &mut self.bgl_cache;
+        let bind_group = bg_cache.entry(bg_key).or_insert_with(|| {
             let bgl_key = bgl_entries.to_vec();
-            let bind_group_layout = self.bgl_cache.entry(bgl_key).or_insert_with(|| Cached {
+            let bind_group_layout = bgl_cache.entry(bgl_key).or_insert_with(|| Cached {
                 inner: Arc::new(device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-                    label: label.as_deref(),
+                    label: label_deref.as_deref(),
                     entries: bgl_entries,
                 })),
-                epoch: self.current_epoch,
+                epoch: current_epoch,
             });
-            bind_group_layout.epoch = self.current_epoch;
+            bind_group_layout.epoch = current_epoch;
 
             ParentedCached {
                 inner: Arc::new(device.create_bind_group(&BindGroupDescriptor {
-                    label: label.as_deref(),
+                    label: label_deref.as_deref(),
                     layout: &bind_group_layout.inner,
                     entries: bg_entries,
                 })),
-                epoch: self.current_epoch,
+                epoch: current_epoch,
                 parent: Arc::clone(&bind_group_layout.inner),
             }
         });

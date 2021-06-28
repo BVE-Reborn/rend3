@@ -93,6 +93,7 @@ pub mod modules {
     pub use texture::*;
 }
 pub mod shaders;
+pub mod techniques;
 pub mod util {
     pub mod bind_merge;
     pub mod buffer;

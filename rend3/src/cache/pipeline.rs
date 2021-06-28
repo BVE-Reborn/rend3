@@ -318,9 +318,9 @@ impl PipelineCache {
         let pl_key =
             AddressedRenderPipelineDescriptor::from_wgpu(label, &pipeline_layout_descriptor, &pipeline_descriptor);
 
-            let current_epoch = self.current_epoch;
-            let render_cache = &mut self.render_cache;
-            let layout_cache = &mut self.layout_cache;
+        let current_epoch = self.current_epoch;
+        let render_cache = &mut self.render_cache;
+        let layout_cache = &mut self.layout_cache;
 
         let render_pipeline = render_cache.entry(pl_key).or_insert_with(|| {
             let pipeline_layout = layout_cache.entry(pll_key).or_insert_with(|| Cached {

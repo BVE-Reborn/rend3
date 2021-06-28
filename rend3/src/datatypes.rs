@@ -77,15 +77,6 @@ macro_rules! changeable_struct {
     };
 }
 
-#[repr(C)]
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub struct AffineTransform {
-    pub transform: Mat4,
-}
-
-unsafe impl bytemuck::Zeroable for AffineTransform {}
-unsafe impl bytemuck::Pod for AffineTransform {}
-
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum RendererTextureFormat {
     Rgba8Srgb,
@@ -884,7 +875,7 @@ changeable_struct! {
 pub struct Object {
     pub mesh: MeshHandle,
     pub material: MaterialHandle,
-    pub transform: AffineTransform,
+    pub transform: Mat4,
 }
 
 #[derive(Debug, Default, Copy, Clone)]

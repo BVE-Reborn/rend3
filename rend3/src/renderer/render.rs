@@ -1,16 +1,15 @@
-use crate::{RenderList, Renderer, RendererMode, datatypes::{Camera, CameraProjection}, instruction::Instruction, statistics::RendererStatistics, util::{
-        bind_merge::BindGroupBuilder,
-        math::round_to_multiple,
-        output::{OutputFrame, RendererOutput},
-        uniforms::WrappedUniform,
-    }};
-use futures::{stream::FuturesOrdered, StreamExt};
+use crate::{
+    datatypes::{Camera, CameraProjection},
+    instruction::Instruction,
+    statistics::RendererStatistics,
+    util::output::RendererOutput,
+    RenderList, Renderer,
+};
 use std::{future::Future, sync::Arc};
 use tracing_futures::Instrument;
 use wgpu::{
-    util::DeviceExt, BindingResource, CommandEncoderDescriptor, ComputePassDescriptor, Extent3d, Maintain, Origin3d,
-    TextureAspect, TextureCopyView, TextureDataLayout, TextureDescriptor, TextureDimension, TextureUsage,
-    TextureViewDescriptor, TextureViewDimension,
+    util::DeviceExt, CommandEncoderDescriptor, Extent3d, TextureAspect, TextureDescriptor, TextureDimension,
+    TextureUsage, TextureViewDescriptor, TextureViewDimension,
 };
 
 pub fn render_loop<TLD: 'static>(
@@ -174,7 +173,9 @@ pub fn render_loop<TLD: 'static>(
                 Instruction::RemoveDirectionalLight { handle } => directional_light_manager.remove(handle),
                 Instruction::SetOptions { options } => new_options = Some(options),
                 Instruction::SetCameraData { data } => {
-                    global_resources.camera.set_data(data, Some(option_guard.aspect_ratio()));
+                    global_resources
+                        .camera
+                        .set_data(data, Some(option_guard.aspect_ratio()));
                 }
                 Instruction::SetBackgroundTexture { handle } => {
                     global_resources.background_texture = Some(handle);
@@ -184,7 +185,6 @@ pub fn render_loop<TLD: 'static>(
                 }
             }
         }
-
 
         let current_options = if let Some(new_opt) = new_options {
             global_resources.update(&renderer.device, renderer.surface.as_ref(), &mut *option_guard, new_opt);
@@ -205,7 +205,9 @@ pub fn render_loop<TLD: 'static>(
             bind_group_cache,
         ));
 
-        let frame = output.acquire(&mut renderer.global_resources.write().swapchain);
+        let frame = output.acquire(&renderer.global_resources.read().swapchain);
+
+        list.render(Arc::clone(&renderer), frame);
 
         RendererStatistics {}
     }

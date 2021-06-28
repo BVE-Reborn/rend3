@@ -1,7 +1,7 @@
 use crate::datatypes::{Camera, CameraProjection};
 use glam::{Mat3, Mat4, Vec3, Vec3A};
 
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 pub struct CameraManager {
     orig_view: Mat4,
     view: Mat4,

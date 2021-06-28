@@ -1,11 +1,7 @@
 use fnv::FnvHashMap;
 use futures_util::future::OptionFuture;
 use glam::{Mat3, Mat4, Vec2, Vec3, Vec4, Vec4Swizzles};
-use rend3::{
-    datatypes as dt,
-    datatypes::{AffineTransform, MeshBuilder},
-    Renderer,
-};
+use rend3::{datatypes as dt, datatypes::MeshBuilder, Renderer};
 use std::future::Future;
 use thiserror::Error;
 

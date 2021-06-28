@@ -1,14 +1,23 @@
-use crate::{JobPriorities, RenderList, RendererBuilder, RendererInitializationError, RendererMode, RendererOptions, cache::{BindGroupCache, PipelineCache}, datatypes::{
-        AffineTransform, Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Material,
+use crate::{
+    cache::{BindGroupCache, PipelineCache},
+    datatypes::{
+        Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Material,
         MaterialChange, MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, Texture, TextureHandle,
-    }, instruction::{Instruction, InstructionStreamPair}, modules::{DirectionalLightManager, MaterialManager, MeshManager, ObjectManager, TextureManager}, renderer::{info::ExtendedAdapterInfo, resources::RendererGlobalResources}, statistics::RendererStatistics, util::output::RendererOutput};
+    },
+    instruction::{Instruction, InstructionStreamPair},
+    modules::{DirectionalLightManager, MaterialManager, MeshManager, ObjectManager, TextureManager},
+    renderer::{info::ExtendedAdapterInfo, resources::RendererGlobalResources},
+    statistics::RendererStatistics,
+    util::output::RendererOutput,
+    JobPriorities, RenderList, RendererBuilder, RendererInitializationError, RendererMode, RendererOptions,
+};
+use glam::Mat4;
 use parking_lot::RwLock;
 use raw_window_handle::HasRawWindowHandle;
 use std::{cmp::Ordering, future::Future, sync::Arc};
 use switchyard::{JoinHandle, Switchyard};
 use wgpu::{Device, Instance, Queue, Surface};
 
-pub mod context;
 pub mod error;
 mod info;
 pub mod limits;
@@ -164,7 +173,7 @@ impl<TLD: 'static> Renderer<TLD> {
         handle
     }
 
-    pub fn set_object_transform(&self, handle: ObjectHandle, transform: AffineTransform) {
+    pub fn set_object_transform(&self, handle: ObjectHandle, transform: Mat4) {
         self.instructions
             .producer
             .lock()
@@ -231,7 +240,11 @@ impl<TLD: 'static> Renderer<TLD> {
             .push(Instruction::ClearBackgroundTexture)
     }
 
-    pub fn render(self: &Arc<Self>, list: Arc<dyn RenderList<TLD>>, output: RendererOutput) -> JoinHandle<RendererStatistics> {
+    pub fn render(
+        self: &Arc<Self>,
+        list: Arc<dyn RenderList<TLD>>,
+        output: RendererOutput,
+    ) -> JoinHandle<RendererStatistics> {
         let this = Arc::clone(self);
         self.yard.spawn_local(
             self.yard_priorites.compute_pool,

@@ -1,10 +1,11 @@
 use crate::{
     datatypes::{
-        AffineTransform, Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Material,
-        MaterialChange, MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, Texture, TextureHandle,
+        Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Material, MaterialChange,
+        MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, Texture, TextureHandle,
     },
     RendererOptions,
 };
+use glam::Mat4;
 use parking_lot::Mutex;
 use std::mem;
 
@@ -47,7 +48,7 @@ pub enum Instruction {
     },
     SetObjectTransform {
         handle: ObjectHandle,
-        transform: AffineTransform,
+        transform: Mat4,
     },
     RemoveObject {
         handle: ObjectHandle,
