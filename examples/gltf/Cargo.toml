@@ -14,7 +14,7 @@ path = "src/main.rs"
 
 [dependencies]
 # Linear algebra library
-glam = "0.16"
+glam = "0.17"
 # parsing model files
 gltf = { version = "0.16", features = [ "utils" ] }
 # Renderer
