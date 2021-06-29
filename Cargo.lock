@@ -1056,9 +1056,9 @@ dependencies = [
 
 [[package]]
 name = "glam"
-version = "0.17.0"
+version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "58c8ea4c9614786931979db7afb7db9f01e4e3df86d219d8cfe2395eea38e144"
+checksum = "7d01468a1d75c441afeb98adc0bcbd174ff59bd35a325c1da57ce7a53e04a5a3"
 dependencies = [
  "bytemuck",
 ]
