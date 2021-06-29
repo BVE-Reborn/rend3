@@ -1,4 +1,5 @@
-use crevice::std430::AsStd430;
+use crevice::{std140::AsStd140, std430::AsStd430};
+use wgpu::Buffer;
 
 use crate::{datatypes::MaterialHandle, util::math::IndexedDistance, ModeData};
 
@@ -11,8 +12,13 @@ struct CulledObjectSet {
 
 struct CpuCulledObjectSet {
     call: Vec<CPUDrawCall>,
-    output: Vec<ShaderOutputObject>,
     distance: Vec<IndexedDistance>,
+    output_buffer: Buffer,
+}
+
+struct GpuCulledObjectSet {
+    indirect_buffer: Buffer,
+    output_buffer: Buffer,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -24,14 +30,21 @@ struct CPUDrawCall {
 }
 
 #[derive(Debug, Copy, Clone, AsStd430)]
-struct ShaderOutputObject {
+struct GPUCullingInput {
+    start_idx: u32,
+    count: u32,
+    vertex_offset: i32,
+    material_idx: u32,
+    transform: mint::ColumnMatrix4<f32>,
+    // xyz position; w radius
+    bounding_sphere: mint::Vector4<f32>,
+}
+
+#[derive(Debug, Copy, Clone, AsStd430)]
+struct CullingOutput {
     model_view: mint::ColumnMatrix4<f32>,
     model_view_proj: mint::ColumnMatrix4<f32>,
     inv_trans_model_view: mint::ColumnMatrix3<f32>,
     // Unused in shader
-    _material_idx: u32,
-    // Unused in shader
-    _active: u32,
+    material_idx: u32,
 }
-
-struct GpuCulledObjectSet {}

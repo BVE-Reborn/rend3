@@ -98,6 +98,7 @@ impl AddressedBindingResource {
     }
 }
 
+
 pub struct BindGroupCache {
     bgl_cache: FastHashMap<Vec<BindGroupLayoutEntry>, Cached<BindGroupLayout>>,
     bg_cache: FastHashMap<AddressedBindGroupDescriptor, ParentedCached<BindGroup, BindGroupLayout>>,
@@ -122,6 +123,21 @@ impl BindGroupCache {
         let current_epoch = self.current_epoch;
         self.bgl_cache.retain(|_, v| v.epoch == current_epoch);
         self.bg_cache.retain(|_, v| v.epoch == current_epoch);
+    }
+
+    pub fn bind_group_layout(&mut self, device: &Device, label: Option<&str>, bgl_entries: &[BindGroupLayoutEntry]) -> Arc<BindGroupLayout> {
+        let current_epoch = self.current_epoch;
+        let bgl_key = bgl_entries.to_vec();
+        let bind_group_layout = self.bgl_cache.entry(bgl_key).or_insert_with(|| Cached {
+            inner: Arc::new(device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+                label,
+                entries: bgl_entries,
+            })),
+            epoch: current_epoch,
+        });
+        bind_group_layout.epoch = current_epoch;
+
+        Arc::clone(&bind_group_layout.inner)
     }
 
     pub fn bind_group(

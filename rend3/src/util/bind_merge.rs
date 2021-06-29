@@ -1,7 +1,8 @@
 use crate::{cache::BindGroupCache, util::typedefs::SsoString};
 use std::{num::NonZeroU32, sync::Arc};
 use wgpu::{
-    BindGroup, BindGroupEntry, BindGroupLayout, BindGroupLayoutEntry, BindingResource, BindingType, Device, ShaderStage,
+    BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutEntry, BindingResource,
+    BindingType, Device, ShaderStage,
 };
 
 pub struct BindGroupBuilder<'a> {
@@ -50,6 +51,22 @@ impl<'a> BindGroupBuilder<'a> {
             binding: index as u32,
             resource,
         });
+    }
+
+    pub fn build_transient(
+        self,
+        device: &Device,
+        cache: &mut BindGroupCache,
+    ) -> (Arc<BindGroupLayout>, Arc<BindGroup>) {
+        let bgl = cache.bind_group_layout(device, self.label.as_deref(), &self.bgl_entries);
+
+        let bind_group = device.create_bind_group(&BindGroupDescriptor {
+            layout: &bgl,
+            entries: &self.bg_entries,
+            label: self.label.as_deref(),
+        });
+
+        (bgl, Arc::new(bind_group))
     }
 
     pub fn build(self, device: &Device, cache: &mut BindGroupCache) -> (Arc<BindGroupLayout>, Arc<BindGroup>) {

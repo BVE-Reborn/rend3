@@ -1,8 +1,9 @@
+use crevice::std430::AsStd430;
 use glam::{Mat3, Vec4Swizzles};
 
 use crate::{
-    modules::{CameraManager, InternalObject},
-    techniques::culling::{CPUDrawCall, CpuCulledObjectSet, ShaderOutputObject},
+    resources::{CameraManager, InternalObject},
+    routines::culling::{CPUDrawCall, CpuCulledObjectSet, CullingOutput},
     util::{frustum::ShaderFrustum, math::IndexedDistance},
 };
 
@@ -11,11 +12,9 @@ pub(super) fn run(objects: &[InternalObject], camera: &CameraManager) -> CpuCull
     let view = camera.view();
     let view_proj = camera.view_proj();
 
-    let mut object_set = CpuCulledObjectSet {
-        call: Vec::with_capacity(objects.len()),
-        output: Vec::with_capacity(objects.len()),
-        distance: Vec::with_capacity(objects.len()),
-    };
+    let mut output: Vec<u8> = Vec::with_capacity(objects.len() * CullingOutput::std430_size_static());
+    let mut call = Vec::with_capacity(objects.len());
+    let mut _distance = Vec::with_capacity(objects.len());
 
     for (index, object) in objects.into_iter().enumerate() {
         let model = object.transform;
@@ -33,26 +32,29 @@ pub(super) fn run(objects: &[InternalObject], camera: &CameraManager) -> CpuCull
 
         let inv_trans_model_view = Mat3::from(model_view.inverse().transpose());
 
-        object_set.call.push(CPUDrawCall {
+        call.push(CPUDrawCall {
             start_idx: object.start_idx,
             count: object.count,
             vertex_offset: object.vertex_offset,
             handle: object.material,
         });
 
-        object_set.output.push(ShaderOutputObject {
+        output.push(CullingOutput {
             model_view: model_view.into(),
             model_view_proj: model_view_proj.into(),
             inv_trans_model_view: inv_trans_model_view.into(),
-            _material_idx: 0,
-            _active: 0,
+            material_idx: 0,
         });
 
-        object_set.distance.push(IndexedDistance { distance, index });
+        _distancea.push(IndexedDistance { distance, index });
     }
 
-    assert_eq!(object_set.call.len(), object_set.output.len());
-    assert_eq!(object_set.call.len(), object_set.distance.len());
+    // TODO: Sorting
+
+    assert_eq!(call.len(), output.len());
+    assert_eq!(call.len(), distance.len());
+
+    let mut writ
 
     object_set
 }

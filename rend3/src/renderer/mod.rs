@@ -5,7 +5,7 @@ use crate::{
         MaterialChange, MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, Texture, TextureHandle,
     },
     instruction::{Instruction, InstructionStreamPair},
-    modules::{DirectionalLightManager, MaterialManager, MeshManager, ObjectManager, TextureManager},
+    resources::{DirectionalLightManager, MaterialManager, MeshManager, ObjectManager, TextureManager},
     renderer::{info::ExtendedAdapterInfo, resources::RendererGlobalResources},
     statistics::RendererStatistics,
     util::output::RendererOutput,

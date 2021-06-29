@@ -1,7 +1,7 @@
 use crate::{
     cache::{BindGroupCache, PipelineCache},
     instruction::InstructionStreamPair,
-    modules::{
+    resources::{
         DirectionalLightManager, MaterialManager, MeshManager, ObjectManager, TextureManager, STARTING_2D_TEXTURES,
         STARTING_CUBE_TEXTURES,
     },

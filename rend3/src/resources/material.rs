@@ -2,7 +2,7 @@ use crate::{
     cache::BindGroupCache,
     datatypes::{Material, MaterialChange, MaterialFlags, MaterialHandle, TextureHandle},
     mode::ModeData,
-    modules::TextureManager,
+    resources::TextureManager,
     util::{bind_merge::BindGroupBuilder, buffer::WrappedPotBuffer, registry::ResourceRegistry},
     RendererMode,
 };

@@ -24,8 +24,8 @@ impl AddressedShaderModuleDescriptor {
         Self {
             label: desc.label.map(SsoString::from),
             source: match desc.source {
-                ShaderSource::SpirV(spv) => OwnedShaderSource::SpirV(spv.into_owned()),
-                ShaderSource::Wgsl(wgs) => OwnedShaderSource::Wgsl(wgs.into_owned()),
+                ShaderSource::SpirV(ref spv) => OwnedShaderSource::SpirV(spv.to_vec()),
+                ShaderSource::Wgsl(ref wgs) => OwnedShaderSource::Wgsl(wgs.to_string()),
             },
             flags: desc.flags,
         }

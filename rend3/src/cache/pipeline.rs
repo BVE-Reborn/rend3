@@ -2,7 +2,7 @@ use crate::{
     cache::Cached,
     util::typedefs::{FastHashMap, SsoString},
 };
-use std::{ops::Deref, sync::Arc};
+use std::{sync::Arc};
 use wgpu::{
     BindGroupLayout, BufferAddress, ColorTargetState, CompareFunction, ComputePipeline, ComputePipelineDescriptor,
     CullMode, DepthBiasState, DepthStencilState, Device, FragmentState, FrontFace, IndexFormat, InputStepMode,

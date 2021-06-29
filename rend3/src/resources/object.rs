@@ -1,7 +1,7 @@
 use crate::{
     datatypes::{MaterialHandle, Object, ObjectHandle},
     mode::ModeData,
-    modules::{MaterialManager, MeshManager},
+    resources::{MaterialManager, MeshManager},
     util::{
         bind_merge::BindGroupBuilder, buffer::WrappedPotBuffer, frustum::BoundingSphere, registry::ResourceRegistry,
     },

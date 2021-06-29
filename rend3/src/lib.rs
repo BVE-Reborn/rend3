@@ -77,7 +77,8 @@ macro_rules! span_transfer {
 }
 
 pub mod cache;
-pub mod modules {
+mod renderer;
+pub mod resources {
     mod camera;
     mod directional;
     mod material;
@@ -93,7 +94,7 @@ pub mod modules {
     pub use texture::*;
 }
 pub mod shaders;
-pub mod techniques;
+pub mod routines;
 pub mod util {
     pub mod bind_merge;
     pub mod buffer;
@@ -112,7 +113,6 @@ mod jobs;
 mod list;
 mod mode;
 mod options;
-mod renderer;
 mod statistics;
 
 pub use builder::*;
