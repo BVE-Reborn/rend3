@@ -251,15 +251,12 @@ impl PipelineCache {
         self.compute_cache.retain(|_, v| v.epoch == current_epoch);
     }
 
-    pub fn compute_pipeline<L>(
+    pub fn compute_pipeline(
         &mut self,
         device: &Device,
         pipeline_layout_descriptor: &PipelineLayoutDescriptor<'_>,
         pipeline_descriptor: &ComputePipelineDescriptor<'_>,
     ) -> Arc<ComputePipeline>
-    where
-        SsoString: From<L>,
-        L: Deref<Target = str>,
     {
         let pll_key = AddressedPipelineLayoutDescriptor::from_wgpu(&pipeline_layout_descriptor);
         let pl_key = AddressedComputePipelineDescriptor::from_wgpu(&pipeline_layout_descriptor, &pipeline_descriptor);
@@ -287,15 +284,12 @@ impl PipelineCache {
         Arc::clone(&render_pipeline.inner)
     }
 
-    pub fn render_pipeline<L>(
+    pub fn render_pipeline(
         &mut self,
         device: &Device,
         pipeline_layout_descriptor: &PipelineLayoutDescriptor<'_>,
         pipeline_descriptor: &RenderPipelineDescriptor,
     ) -> Arc<RenderPipeline>
-    where
-        SsoString: From<L>,
-        L: Deref<Target = str>,
     {
         let pll_key = AddressedPipelineLayoutDescriptor::from_wgpu(&pipeline_layout_descriptor);
         let pl_key = AddressedRenderPipelineDescriptor::from_wgpu(&pipeline_layout_descriptor, &pipeline_descriptor);
