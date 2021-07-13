@@ -1,5 +1,5 @@
 use crate::datatypes::{Camera, CameraProjection};
-use glam::{Mat3, Mat4, Vec3, Vec3A};
+use glam::{Mat3A, Mat4, Vec3, Vec3A};
 
 #[derive(Clone)]
 pub struct CameraManager {
@@ -58,7 +58,7 @@ fn compute_look_offset(data: Camera) -> Vec3A {
     match data.projection {
         CameraProjection::Projection { pitch, yaw, .. } => {
             let starting = Vec3A::Z;
-            Mat3::from_rotation_ypr(yaw, pitch, 0.0) * starting
+            Mat3A::from_euler(glam::EulerRot::YXZ, yaw, pitch, 0.0) * starting
         }
         CameraProjection::Orthographic { direction, .. } => direction,
     }

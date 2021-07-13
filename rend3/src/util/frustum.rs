@@ -38,16 +38,6 @@ impl BoundingSphere {
         }
     }
 }
-impl From<BoundingSphere> for mint::Vector4<f32> {
-    fn from(s: BoundingSphere) -> Self {
-        Self {
-            x: s.center.x,
-            y: s.center.y,
-            z: s.center.z,
-            w: s.radius,
-        }
-    }
-}
 
 fn find_mesh_center(mesh: &[Vec3]) -> Vec3A {
     let first = if let Some(first) = mesh.first() {

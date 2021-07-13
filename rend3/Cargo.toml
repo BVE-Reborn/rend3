@@ -39,16 +39,14 @@ replace = "[Unreleased](https://github.com/BVE-Reborn/rend3/compare/v{{version}}
 arrayvec = "0.7"
 bitflags = "1"
 bytemuck = "1"
-crevice = "0.6"
 flume = "0.10"
 fnv = "1"
 futures = { version = "0.3", default-features = false, features = ["std", "async-await"] }
 futures-intrusive = "0.4"
-glam = { version = "0.13", features = ["bytemuck", "mint"] }
+glam = { version = "0.17", features = ["bytemuck"] }
 include_dir = "0.6"
 indexmap = "1"
 itertools = "0.10"
-mint = "0.5"
 parking_lot = { version = "0.11", features = ["send_guard"] }
 range-alloc = "0.1"
 raw-window-handle = "0.3"

@@ -14,7 +14,7 @@ impl RendererMode {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub(crate) enum ModeData<C, G> {
+pub enum ModeData<C, G> {
     CPU(C),
     GPU(G),
 }

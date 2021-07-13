@@ -1,20 +1,24 @@
-use crevice::std430::AsStd430;
 use glam::{Mat3, Vec4Swizzles};
-
-use crate::{
-    resources::{CameraManager, InternalObject},
-    routines::culling::{CPUDrawCall, CpuCulledObjectSet, CullingOutput},
-    util::{frustum::ShaderFrustum, math::IndexedDistance},
+use wgpu::{
+    util::{BufferInitDescriptor, DeviceExt},
+    BufferUsage, Device, RenderPass,
 };
 
-pub(super) fn run(objects: &[InternalObject], camera: &CameraManager) -> CpuCulledObjectSet {
+use crate::{
+    resources::{CameraManager, InternalObject, MaterialManager},
+    routines::culling::{CPUDrawCall, CulledObjectSet, CullingOutput},
+    util::{frustum::ShaderFrustum, math::IndexedDistance},
+    ModeData,
+};
+
+pub fn cull(device: &Device, objects: &[InternalObject], camera: &CameraManager) -> CulledObjectSet {
     let frustum = ShaderFrustum::from_matrix(camera.proj());
     let view = camera.view();
     let view_proj = camera.view_proj();
 
-    let mut output: Vec<u8> = Vec::with_capacity(objects.len() * CullingOutput::std430_size_static());
-    let mut call = Vec::with_capacity(objects.len());
-    let mut _distance = Vec::with_capacity(objects.len());
+    let mut outputs = Vec::with_capacity(objects.len());
+    let mut calls = Vec::with_capacity(objects.len());
+    let mut _distances = Vec::with_capacity(objects.len());
 
     for (index, object) in objects.into_iter().enumerate() {
         let model = object.transform;
@@ -30,31 +34,50 @@ pub(super) fn run(objects: &[InternalObject], camera: &CameraManager) -> CpuCull
 
         let model_view_proj = view_proj * model;
 
-        let inv_trans_model_view = Mat3::from(model_view.inverse().transpose());
+        let inv_trans_model_view = Mat3::from_mat4(model_view.inverse().transpose());
 
-        call.push(CPUDrawCall {
+        calls.push(CPUDrawCall {
             start_idx: object.start_idx,
             count: object.count,
             vertex_offset: object.vertex_offset,
             handle: object.material,
         });
 
-        output.push(CullingOutput {
+        outputs.push(CullingOutput {
             model_view: model_view.into(),
             model_view_proj: model_view_proj.into(),
             inv_trans_model_view: inv_trans_model_view.into(),
             material_idx: 0,
         });
 
-        _distancea.push(IndexedDistance { distance, index });
+        _distances.push(IndexedDistance { distance, index });
     }
 
     // TODO: Sorting
 
-    assert_eq!(call.len(), output.len());
-    assert_eq!(call.len(), distance.len());
+    assert_eq!(calls.len(), outputs.len());
+    assert_eq!(calls.len(), _distances.len());
 
-    let mut writ
+    let output_buffer = device.create_buffer_init(&BufferInitDescriptor {
+        label: Some("culling output"),
+        contents: bytemuck::cast_slice(&outputs),
+        usage: BufferUsage::STORAGE,
+    });
 
-    object_set
+    CulledObjectSet {
+        calls: ModeData::CPU(calls),
+        output_buffer,
+    }
+}
+
+pub fn run<'rpass>(
+    rpass: &mut RenderPass<'rpass>,
+    draws: &'rpass Vec<CPUDrawCall>,
+    materials: &'rpass MaterialManager,
+    material_binding_index: u32,
+) {
+    for draws in draws {
+        rpass.set_bind_group(material_binding_index, materials.cpu_get_bind_group(draws.handle), &[]);
+        rpass.draw_indexed(0..draws.count, draws.vertex_offset, 0..1);
+    }
 }

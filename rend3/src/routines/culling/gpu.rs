@@ -1,35 +1,37 @@
-use std::{io::Cursor, num::NonZeroU64};
+use std::{mem, num::NonZeroU64};
 
-use crevice::std430::AsStd430;
-use wgpu::{BindGroupLayoutEntry, BindingResource, BindingType, BufferBindingType, BufferDescriptor, BufferUsage, CommandEncoder, ComputePassDescriptor, ComputePipelineDescriptor, Device, PipelineLayoutDescriptor, ShaderFlags, ShaderModuleDescriptor, ShaderStage, util::{BufferInitDescriptor, DeviceExt}};
+use glam::Mat4;
+use wgpu::{BindingResource, BindingType, BufferBindingType, BufferDescriptor, BufferUsage, CommandEncoder, ComputePassDescriptor, ComputePipelineDescriptor, Device, PipelineLayoutDescriptor, RenderPass, ShaderFlags, ShaderModuleDescriptor, ShaderStage, util::{BufferInitDescriptor, DeviceExt}};
 
-use super::GPUCullingInput;
+use super::{CulledObjectSet, GPUCullingInput, GPUIndirectData};
 use crate::{
-    cache::{BindGroupCache, PipelineCache, ShaderModuleCache},
     resources::{CameraManager, InternalObject, MaterialManager},
-    routines::culling::{CullingOutput, GpuCulledObjectSet},
+    routines::{culling::CullingOutput, CacheContext},
     shaders::SPIRV_SHADERS,
     util::bind_merge::BindGroupBuilder,
+    ModeData,
 };
 
-#[derive(Debug, Copy, Clone, AsStd430)]
+#[repr(C, align(16))]
+#[derive(Debug, Copy, Clone)]
 struct GPUCullingUniforms {
-    view: mint::ColumnMatrix4<f32>,
-    view_proj: mint::ColumnMatrix4<f32>,
+    view: Mat4,
+    view_proj: Mat4,
     object_count: u32,
 }
 
-pub(super) fn run(
+unsafe impl bytemuck::Pod for GPUCullingUniforms {}
+unsafe impl bytemuck::Zeroable for GPUCullingUniforms {}
+
+pub(super) fn cull(
     device: &Device,
+    ctx: CacheContext<'_>,
     encoder: &mut CommandEncoder,
-    sm_cache: &mut ShaderModuleCache,
-    pipeline_cache: &mut PipelineCache,
-    bind_group_cache: &mut BindGroupCache,
-    objects: &[InternalObject],
     material: &MaterialManager,
     camera: &CameraManager,
-) -> GpuCulledObjectSet {
-    let sm = sm_cache.shader_module(
+    objects: &[InternalObject],
+) -> CulledObjectSet {
+    let sm = ctx.sm_cache.shader_module(
         device,
         &ShaderModuleDescriptor {
             label: Some("cull"),
@@ -38,26 +40,23 @@ pub(super) fn run(
         },
     );
 
-    let mut data = Vec::<u8>::new();
-    let mut writer = crevice::std430::Writer::new(Cursor::new(&mut data));
-    writer
-        .write(&GPUCullingUniforms {
-            view: camera.view().into(),
-            view_proj: camera.view_proj().into(),
-            object_count: objects.len() as u32,
-        })
-        .unwrap();
+    let mut data = Vec::<u8>::with_capacity(
+        mem::size_of::<GPUCullingUniforms>() + objects.len() * mem::size_of::<GPUCullingInput>(),
+    );
+    data.extend(bytemuck::bytes_of(&GPUCullingUniforms {
+        view: camera.view().into(),
+        view_proj: camera.view_proj().into(),
+        object_count: objects.len() as u32,
+    }));
     for object in objects {
-        writer
-            .write(&GPUCullingInput {
-                start_idx: object.start_idx,
-                count: object.count,
-                vertex_offset: object.vertex_offset,
-                material_idx: material.internal_index(object.material) as u32,
-                transform: object.transform.into(),
-                bounding_sphere: object.sphere.into(),
-            })
-            .unwrap();
+        data.extend(bytemuck::bytes_of(&GPUCullingInput {
+            start_idx: object.start_idx,
+            count: object.count,
+            vertex_offset: object.vertex_offset,
+            material_idx: material.internal_index(object.material) as u32,
+            transform: object.transform.into(),
+            bounding_sphere: object.sphere.into(),
+        }));
     }
 
     let input_buffer = device.create_buffer_init(&BufferInitDescriptor {
@@ -68,7 +67,7 @@ pub(super) fn run(
 
     let output_buffer = device.create_buffer(&BufferDescriptor {
         label: Some("culling output"),
-        size: (objects.len() * CullingOutput::std430_size_static()) as _,
+        size: (objects.len() * mem::size_of::<CullingOutput>()) as _,
         usage: BufferUsage::STORAGE,
         mapped_at_creation: false,
     });
@@ -87,7 +86,7 @@ pub(super) fn run(
         BindingType::Buffer {
             ty: BufferBindingType::Storage { read_only: true },
             has_dynamic_offset: false,
-            min_binding_size: NonZeroU64::new(GPUCullingUniforms::std430_size_static() as _),
+            min_binding_size: NonZeroU64::new(mem::size_of::<GPUCullingUniforms>() as _),
         },
         None,
         BindingResource::Buffer {
@@ -101,7 +100,7 @@ pub(super) fn run(
         BindingType::Buffer {
             ty: BufferBindingType::Storage { read_only: false },
             has_dynamic_offset: false,
-            min_binding_size: NonZeroU64::new(CullingOutput::std430_size_static() as _),
+            min_binding_size: NonZeroU64::new(mem::size_of::<CullingOutput>() as _),
         },
         None,
         BindingResource::Buffer {
@@ -124,9 +123,9 @@ pub(super) fn run(
             size: None,
         },
     );
-    let (bgl, bg) = bgb.build_transient(&device, bind_group_cache);
+    let (bgl, bg) = bgb.build_transient(&device, ctx.bind_group_cache);
 
-    let pipeline = pipeline_cache.compute_pipeline(
+    let pipeline = ctx.pipeline_cache.compute_pipeline(
         device,
         &PipelineLayoutDescriptor {
             label: Some("cull"),
@@ -141,35 +140,48 @@ pub(super) fn run(
         },
     );
 
-    let mut cpass = encoder.begin_compute_pass(&ComputePassDescriptor { label: Some("compute") });
+    let mut cpass = encoder.begin_compute_pass(&ComputePassDescriptor {
+        label: Some("compute cull"),
+    });
 
     cpass.set_pipeline(&pipeline);
     cpass.set_bind_group(0, &bg, &[]);
-    cpass.dispatch((objects.len() / 256) as _, y, z);
+    cpass.dispatch((objects.len() / 256) as _, 1, 1);
 
     drop(cpass);
 
+    // let mut bgb = BindGroupBuilder::new("shader input");
+    // bgb.append(
+    //     ShaderStage::COMPUTE,
+    //     BindingType::Buffer {
+    //         ty: BufferBindingType::Storage { read_only: false },
+    //         has_dynamic_offset: false,
+    //         min_binding_size: NonZeroU64::new(CullingOutput::std430_size_static() as _),
+    //     },
+    //     None,
+    //     BindingResource::Buffer {
+    //         buffer: &output_buffer,
+    //         offset: 0,
+    //         size: None,
+    //     },
+    // );
+    // let (bgl, bg) = bgb.build_transient(&device, bind_group_cache);
 
-    let mut bgb = BindGroupBuilder::new("shader input");
-    bgb.append(
-        ShaderStage::COMPUTE,
-        BindingType::Buffer {
-            ty: BufferBindingType::Storage { read_only: false },
-            has_dynamic_offset: false,
-            min_binding_size: NonZeroU64::new(CullingOutput::std430_size_static() as _),
-        },
-        None,
-        BindingResource::Buffer {
-            buffer: &output_buffer,
-            offset: 0,
-            size: None,
-        },
-    );
-    let (bgl, bg) = bgb.build_transient(&device, bind_group_cache);
-
-
-    GpuCulledObjectSet {
-        indirect_buffer,
+    CulledObjectSet {
+        calls: ModeData::GPU(GPUIndirectData {
+            indirect_buffer,
+            count: objects.len(),
+        }),
         output_buffer,
     }
+}
+
+pub fn run<'rpass>(rpass: &mut RenderPass<'rpass>, indirect_data: &'rpass GPUIndirectData) {
+    rpass.multi_draw_indexed_indirect_count(
+        &indirect_data.indirect_buffer,
+        16,
+        &indirect_data.indirect_buffer,
+        0,
+        indirect_data.count as _,
+    );
 }

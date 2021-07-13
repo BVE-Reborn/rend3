@@ -1,50 +1,53 @@
-use crevice::{std140::AsStd140, std430::AsStd430};
+use glam::{Mat3A, Mat4};
 use wgpu::Buffer;
 
-use crate::{datatypes::MaterialHandle, util::math::IndexedDistance, ModeData};
+use crate::{datatypes::MaterialHandle, util::frustum::BoundingSphere, ModeData};
 
 mod cpu;
 mod gpu;
 
-struct CulledObjectSet {
-    data: ModeData<CpuCulledObjectSet, GpuCulledObjectSet>,
+pub struct CulledObjectSet {
+    pub calls: ModeData<Vec<CPUDrawCall>, GPUIndirectData>,
+    pub output_buffer: Buffer,
 }
 
-struct CpuCulledObjectSet {
-    call: Vec<CPUDrawCall>,
-    distance: Vec<IndexedDistance>,
-    output_buffer: Buffer,
-}
-
-struct GpuCulledObjectSet {
-    indirect_buffer: Buffer,
-    output_buffer: Buffer,
+pub struct GPUIndirectData {
+    pub indirect_buffer: Buffer,
+    pub count: usize,
 }
 
 #[derive(Debug, Copy, Clone)]
-struct CPUDrawCall {
+pub struct CPUDrawCall {
     pub start_idx: u32,
     pub count: u32,
     pub vertex_offset: i32,
     pub handle: MaterialHandle,
 }
 
-#[derive(Debug, Copy, Clone, AsStd430)]
-struct GPUCullingInput {
-    start_idx: u32,
-    count: u32,
-    vertex_offset: i32,
-    material_idx: u32,
-    transform: mint::ColumnMatrix4<f32>,
+#[repr(C, align(16))]
+#[derive(Debug, Copy, Clone)]
+pub struct GPUCullingInput {
+    pub start_idx: u32,
+    pub count: u32,
+    pub vertex_offset: i32,
+    pub material_idx: u32,
+    pub transform: Mat4,
     // xyz position; w radius
-    bounding_sphere: mint::Vector4<f32>,
+    pub bounding_sphere: BoundingSphere,
 }
 
-#[derive(Debug, Copy, Clone, AsStd430)]
-struct CullingOutput {
-    model_view: mint::ColumnMatrix4<f32>,
-    model_view_proj: mint::ColumnMatrix4<f32>,
-    inv_trans_model_view: mint::ColumnMatrix3<f32>,
+unsafe impl bytemuck::Pod for GPUCullingInput {}
+unsafe impl bytemuck::Zeroable for GPUCullingInput {}
+
+#[repr(C, align(16))]
+#[derive(Debug, Copy, Clone)]
+pub struct CullingOutput {
+    model_view: Mat4,
+    model_view_proj: Mat4,
+    inv_trans_model_view: Mat3A,
     // Unused in shader
     material_idx: u32,
 }
+
+unsafe impl bytemuck::Pod for CullingOutput {}
+unsafe impl bytemuck::Zeroable for CullingOutput {}
