@@ -7,12 +7,8 @@ use crate::{
     RendererMode,
 };
 use glam::{Vec3, Vec4};
-use std::{num::NonZeroU32, sync::Arc};
-use wgpu::{
-    util::{BufferInitDescriptor, DeviceExt},
-    BindGroup, BindingResource, BindingType, Buffer, BufferBindingType, BufferUsage, Device, Queue, ShaderStage,
-    TextureSampleType, TextureViewDimension,
-};
+use std::{mem::size_of, num::{NonZeroU32, NonZeroU64}, sync::Arc};
+use wgpu::{BindGroup, BindGroupLayout, BindingResource, BindingType, Buffer, BufferBindingType, BufferUsage, Device, Queue, ShaderStage, TextureSampleType, TextureViewDimension, util::{BufferInitDescriptor, DeviceExt}};
 
 #[repr(C, align(16))]
 #[derive(Debug, Copy, Clone)]
@@ -372,16 +368,18 @@ impl MaterialManager {
         }
     }
 
-    pub fn gpu_append_to_bgb<'a>(&'a self, visibility: ShaderStage, general_bgb: &mut BindGroupBuilder<'a>) {
-        general_bgb.append(
+    pub fn gpu_make_bg<'a>(&'a self, device: &Device, cache: &mut BindGroupCache, visibility: ShaderStage) -> (Arc<BindGroupLayout>, Arc<BindGroup>) {
+        let mut bgb = BindGroupBuilder::new("material data");
+        bgb.append(
             visibility,
             BindingType::Buffer {
                 ty: BufferBindingType::Storage { read_only: true },
                 has_dynamic_offset: false,
-                min_binding_size: None,
+                min_binding_size: NonZeroU64::new(size_of::<GPUShaderMaterial>() as _),
             },
             None,
             self.buffer.as_gpu().as_entire_binding(),
         );
+        bgb.build(device, cache)
     }
 }

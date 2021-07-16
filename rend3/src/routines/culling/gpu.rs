@@ -23,9 +23,9 @@ struct GPUCullingUniforms {
 unsafe impl bytemuck::Pod for GPUCullingUniforms {}
 unsafe impl bytemuck::Zeroable for GPUCullingUniforms {}
 
-pub(super) fn cull(
+pub fn cull(
     device: &Device,
-    ctx: CacheContext<'_>,
+    ctx: &mut CacheContext<'_>,
     encoder: &mut CommandEncoder,
     material: &MaterialManager,
     camera: &CameraManager,
@@ -149,23 +149,6 @@ pub(super) fn cull(
     cpass.dispatch((objects.len() / 256) as _, 1, 1);
 
     drop(cpass);
-
-    // let mut bgb = BindGroupBuilder::new("shader input");
-    // bgb.append(
-    //     ShaderStage::COMPUTE,
-    //     BindingType::Buffer {
-    //         ty: BufferBindingType::Storage { read_only: false },
-    //         has_dynamic_offset: false,
-    //         min_binding_size: NonZeroU64::new(CullingOutput::std430_size_static() as _),
-    //     },
-    //     None,
-    //     BindingResource::Buffer {
-    //         buffer: &output_buffer,
-    //         offset: 0,
-    //         size: None,
-    //     },
-    // );
-    // let (bgl, bg) = bgb.build_transient(&device, bind_group_cache);
 
     CulledObjectSet {
         calls: ModeData::GPU(GPUIndirectData {

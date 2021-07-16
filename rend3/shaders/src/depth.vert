@@ -20,9 +20,6 @@ layout(location = 3) flat out uint o_material;
 layout(set = 1, binding = 0, std430) restrict readonly buffer ObjectOutputDataBuffer {
     ObjectOutputData object_output[];
 };
-layout(set = 2, binding = 0) uniform UniformBuffer {
-    UniformData uniforms;
-};
 #ifdef CPU_MODE
 layout(push_constant) uniform PushConstant {
     uint i_object_idx;

@@ -8,3 +8,4 @@ pub struct CacheContext<'a> {
 
 mod culling;
 mod shadow;
+mod vertex;

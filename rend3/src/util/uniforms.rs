@@ -1,9 +1,13 @@
-use crate::{resources::CameraManager, util::frustum::ShaderFrustum};
+use crate::{
+    cache::BindGroupCache,
+    resources::CameraManager,
+    util::{bind_merge::BindGroupBuilder, frustum::ShaderFrustum},
+};
 use glam::{Mat4, Vec4};
-use std::mem::size_of;
+use std::{mem, num::NonZeroU64, sync::Arc};
 use wgpu::{
-    BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, Buffer, BufferAddress, BufferDescriptor,
-    BufferUsage, Device, Queue,
+    util::{BufferInitDescriptor, DeviceExt},
+    BindGroup, BindGroupLayout, BindingType, BufferBindingType, BufferUsage, Device, ShaderStage,
 };
 
 #[derive(Debug, Copy, Clone)]
@@ -20,47 +24,40 @@ pub struct ShaderCommonUniform {
 unsafe impl bytemuck::Zeroable for ShaderCommonUniform {}
 unsafe impl bytemuck::Pod for ShaderCommonUniform {}
 
-pub struct WrappedUniform {
-    buffer: Buffer,
-    pub uniform_bg: BindGroup,
-}
-impl WrappedUniform {
-    pub fn new(device: &Device, uniform_bgl: &BindGroupLayout) -> Self {
-        span_transfer!(_ -> new_span, WARN, "Creating WrappedUniform");
+pub fn shader_uniform(
+    device: &Device,
+    visibility: ShaderStage,
+    bind_group_cache: &mut BindGroupCache,
+    camera: &CameraManager,
+    ambient: Vec4,
+) -> (Arc<BindGroupLayout>, Arc<BindGroup>) {
+    let view = camera.view();
 
-        let buffer = device.create_buffer(&BufferDescriptor {
-            label: Some("uniform buffer"),
-            size: size_of::<ShaderCommonUniform>() as BufferAddress,
-            usage: BufferUsage::COPY_DST | BufferUsage::UNIFORM,
-            mapped_at_creation: false,
-        });
+    let uniforms = ShaderCommonUniform {
+        view,
+        view_proj: camera.view_proj(),
+        inv_view: view.inverse(),
+        inv_origin_view_proj: camera.origin_view_proj().inverse(),
+        frustum: ShaderFrustum::from_matrix(camera.proj()),
+        ambient,
+    };
 
-        let uniform_bg = device.create_bind_group(&BindGroupDescriptor {
-            label: Some("uniform bg"),
-            layout: uniform_bgl,
-            entries: &[BindGroupEntry {
-                binding: 0,
-                resource: buffer.as_entire_binding(),
-            }],
-        });
+    let buffer = device.create_buffer_init(&BufferInitDescriptor {
+        label: Some("shader uniform"),
+        contents: bytemuck::bytes_of(&uniforms),
+        usage: BufferUsage::UNIFORM,
+    });
 
-        Self { buffer, uniform_bg }
-    }
-
-    pub fn upload<'a>(&'a self, queue: &Queue, camera: &CameraManager, ambient: Vec4) {
-        span_transfer!(_ -> upload_span, WARN, "Uploading WrappedUniform");
-
-        let view = camera.view();
-
-        let uniforms = ShaderCommonUniform {
-            view,
-            view_proj: camera.view_proj(),
-            inv_view: view.inverse(),
-            inv_origin_view_proj: camera.origin_view_proj().inverse(),
-            frustum: ShaderFrustum::from_matrix(camera.proj()),
-            ambient,
-        };
-
-        queue.write_buffer(&self.buffer, 0, bytemuck::bytes_of(&uniforms));
-    }
+    let mut bgb = BindGroupBuilder::new("shader uniform");
+    bgb.append(
+        visibility,
+        BindingType::Buffer {
+            ty: BufferBindingType::Uniform,
+            has_dynamic_offset: false,
+            min_binding_size: NonZeroU64::new(mem::size_of::<ShaderCommonUniform>() as _),
+        },
+        None,
+        buffer.as_entire_binding(),
+    );
+    bgb.build_transient(device, bind_group_cache)
 }

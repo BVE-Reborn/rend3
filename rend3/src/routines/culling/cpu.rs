@@ -11,7 +11,7 @@ use crate::{
     ModeData,
 };
 
-pub fn cull(device: &Device, objects: &[InternalObject], camera: &CameraManager) -> CulledObjectSet {
+pub fn cull(device: &Device,  camera: &CameraManager, objects: &[InternalObject]) -> CulledObjectSet {
     let frustum = ShaderFrustum::from_matrix(camera.proj());
     let view = camera.view();
     let view_proj = camera.view_proj();
@@ -72,7 +72,7 @@ pub fn cull(device: &Device, objects: &[InternalObject], camera: &CameraManager)
 
 pub fn run<'rpass>(
     rpass: &mut RenderPass<'rpass>,
-    draws: &'rpass Vec<CPUDrawCall>,
+    draws: &'rpass [CPUDrawCall],
     materials: &'rpass MaterialManager,
     material_binding_index: u32,
 ) {

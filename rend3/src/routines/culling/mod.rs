@@ -3,8 +3,8 @@ use wgpu::Buffer;
 
 use crate::{datatypes::MaterialHandle, util::frustum::BoundingSphere, ModeData};
 
-mod cpu;
-mod gpu;
+pub mod cpu;
+pub mod gpu;
 
 pub struct CulledObjectSet {
     pub calls: ModeData<Vec<CPUDrawCall>, GPUIndirectData>,
