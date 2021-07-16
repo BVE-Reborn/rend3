@@ -1,7 +1,7 @@
 use glam::{Mat3, Vec4Swizzles};
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
-    BufferUsage, Device, RenderPass,
+    BufferUsage, Device, RenderPass, ShaderStage,
 };
 
 use crate::{
@@ -11,7 +11,7 @@ use crate::{
     ModeData,
 };
 
-pub fn cull(device: &Device,  camera: &CameraManager, objects: &[InternalObject]) -> CulledObjectSet {
+pub fn cull(device: &Device, camera: &CameraManager, objects: &[InternalObject]) -> CulledObjectSet {
     let frustum = ShaderFrustum::from_matrix(camera.proj());
     let view = camera.view();
     let view_proj = camera.view_proj();
@@ -76,7 +76,8 @@ pub fn run<'rpass>(
     materials: &'rpass MaterialManager,
     material_binding_index: u32,
 ) {
-    for draws in draws {
+    for (idx, draws) in draws.iter().enumerate() {
+        rpass.set_push_constants(ShaderStage::VERTEX, 0, &bytemuck::cast::<_, [u8; 4]>(idx as u32));
         rpass.set_bind_group(material_binding_index, materials.cpu_get_bind_group(draws.handle), &[]);
         rpass.draw_indexed(0..draws.count, draws.vertex_offset, 0..1);
     }

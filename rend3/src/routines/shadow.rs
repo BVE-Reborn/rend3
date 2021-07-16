@@ -39,6 +39,7 @@ pub fn shadow_pass_culling<'a, 'b>(mut args: ShadowPassCullingArgs<'a, 'b>) {
                 .gpu_make_bg(args.device, args.ctx.bind_group_cache, ShaderStage::FRAGMENT)
         },
     );
+
     for (idx, light) in args.lights.values().enumerate() {
         let culling_results = match args.mode {
             RendererMode::CPUPowered => culling::cpu::cull(args.device, &light.camera, args.objects),
@@ -108,7 +109,7 @@ pub fn shadow_pass_culling<'a, 'b>(mut args: ShadowPassCullingArgs<'a, 'b>) {
         let cpu_vertex_buffers = cpu_vertex_buffers();
         let gpu_vertex_buffers = gpu_vertex_buffers();
 
-        args.ctx.pipeline_cache.render_pipeline(
+        let pipeline = args.ctx.pipeline_cache.render_pipeline(
             args.device,
             &PipelineLayoutDescriptor {
                 label: Some("depth prepass"),
@@ -164,6 +165,7 @@ pub fn shadow_pass_culling<'a, 'b>(mut args: ShadowPassCullingArgs<'a, 'b>) {
                 stencil_ops: None,
             }),
         });
+        rpass.set_pipeline(&pipeline);
         rpass.set_bind_group(0, args.linear_sampler_bg, &[]);
         rpass.set_bind_group(1, &shader_object_bg, &[]);
 
