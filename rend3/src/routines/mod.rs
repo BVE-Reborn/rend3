@@ -7,5 +7,6 @@ pub struct CacheContext<'a> {
 }
 
 mod culling;
-mod shadow;
+mod directional;
 mod vertex;
+mod prepass;
