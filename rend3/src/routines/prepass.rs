@@ -1,8 +1,23 @@
 use std::{mem, num::NonZeroU64, sync::Arc};
 
-use wgpu::{BindGroup, BindingResource, BindingType, BufferBindingType, CompareFunction, CullMode, DepthBiasState, DepthStencilState, Device, FragmentState, FrontFace, MultisampleState, PipelineLayoutDescriptor, PolygonMode, PrimitiveState, PrimitiveTopology, RenderPass, RenderPipeline, RenderPipelineDescriptor, ShaderFlags, ShaderModuleDescriptor, ShaderStage, StencilState, TextureFormat, VertexState};
+use wgpu::{
+    BindGroup, BindingResource, BindingType, BufferBindingType, CompareFunction, CullMode, DepthBiasState,
+    DepthStencilState, Device, FragmentState, FrontFace, MultisampleState, PipelineLayoutDescriptor, PolygonMode,
+    PrimitiveState, PrimitiveTopology, RenderPass, RenderPipeline, RenderPipelineDescriptor, ShaderFlags,
+    ShaderModuleDescriptor, ShaderStage, StencilState, TextureFormat, VertexState,
+};
 
-use crate::{ModeData, RendererMode, resources::{CameraManager, MaterialManager}, routines::{CacheContext, culling::{self, CulledObjectSet, CullingOutput}, vertex::{cpu_vertex_buffers, gpu_vertex_buffers}}, shaders::SPIRV_SHADERS, util::bind_merge::BindGroupBuilder};
+use crate::{
+    resources::{CameraManager, MaterialManager},
+    routines::{
+        culling::{self, CulledObjectSet, CullingOutput},
+        vertex::{cpu_vertex_buffers, gpu_vertex_buffers},
+        CacheContext,
+    },
+    shaders::SPIRV_SHADERS,
+    util::bind_merge::BindGroupBuilder,
+    ModeData, RendererMode,
+};
 
 pub struct BuildDepthPassShaderArgs<'a, 'b> {
     pub mode: RendererMode,
@@ -130,9 +145,27 @@ pub struct DepthPrepassArgs<'a, 'b> {
     camera: &'a CameraManager,
     texture_array_bg: ModeData<(), &'a BindGroup>,
     linear_sampler_bg: &'a BindGroup,
-    objects: &'a CulledObjectSet,
+    culling_results: &'a CulledObjectSet,
 }
 
 pub fn depth_prepass<'a, 'b>(mut args: DepthPrepassArgs<'a, 'b>) {
-    
+    let depth_pass_data = build_depth_pass_shader(BuildDepthPassShaderArgs {
+        mode: args.mode,
+        device: args.device,
+        ctx: args.ctx,
+        culling_results: args.culling_results,
+    });
+
+    args.rpass.set_pipeline(&depth_pass_data.pipeline);
+    args.rpass.set_bind_group(0, args.linear_sampler_bg, &[]);
+    args.rpass.set_bind_group(1, &depth_pass_data.shader_objects_bg, &[]);
+
+    match args.culling_results.calls {
+        ModeData::CPU(ref draws) => culling::cpu::run(&mut rpass, &draws, args.materials, 2),
+        ModeData::GPU(ref data) => {
+            args.rpass.set_bind_group(2, &args.material_gpu_bg.as_gpu().1, &[]);
+            rpass.set_bind_group(3, args.texture_array_bg.as_gpu(), &[]);
+            culling::gpu::run(&mut rpass, data);
+        }
+    }
 }
