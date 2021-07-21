@@ -6,6 +6,7 @@ pub struct CacheContext<'a> {
     pub bind_group_cache: &'a mut BindGroupCache,
 }
 
+mod common;
 mod culling;
 mod directional;
 mod vertex;

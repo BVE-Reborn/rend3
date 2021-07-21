@@ -1,75 +1,31 @@
-use crate::{cache::BindGroupCache, util::typedefs::SsoString};
-use std::{num::NonZeroU32, sync::Arc};
-use wgpu::{
-    BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutEntry, BindingResource,
-    BindingType, Device, ShaderStage,
-};
+use crate::util::typedefs::SsoString;
+use wgpu::{BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindingResource, Device};
 
 pub struct BindGroupBuilder<'a> {
     label: Option<SsoString>,
-    bgl_entries: Vec<BindGroupLayoutEntry>,
     bg_entries: Vec<BindGroupEntry<'a>>,
 }
 impl<'a> BindGroupBuilder<'a> {
-    fn new_inner<L>(label: Option<L>) -> Self
-    where
-        SsoString: From<L>,
-    {
+    pub fn new(label: Option<&str>) -> Self {
         Self {
             label: label.map(SsoString::from),
-            bgl_entries: Vec::with_capacity(16),
             bg_entries: Vec::with_capacity(16),
         }
     }
 
-    pub fn new<L>(label: L) -> Self
-    where
-        SsoString: From<L>,
-    {
-        Self::new_inner(Some(label))
-    }
-
-    pub fn new_no_label() -> Self {
-        Self::new_inner::<&str>(None)
-    }
-
-    pub fn append(
-        &mut self,
-        visibility: ShaderStage,
-        ty: BindingType,
-        count: Option<NonZeroU32>,
-        resource: BindingResource<'a>,
-    ) {
-        let index = self.bgl_entries.len();
-        self.bgl_entries.push(BindGroupLayoutEntry {
-            binding: index as u32,
-            visibility,
-            ty,
-            count,
-        });
+    pub fn append(&mut self, resource: BindingResource<'a>) {
+        let index = self.bg_entries.len();
         self.bg_entries.push(BindGroupEntry {
             binding: index as u32,
             resource,
         });
     }
 
-    pub fn build_transient(
-        self,
-        device: &Device,
-        cache: &mut BindGroupCache,
-    ) -> (Arc<BindGroupLayout>, Arc<BindGroup>) {
-        let bgl = cache.bind_group_layout(device, self.label.as_deref(), &self.bgl_entries);
-
-        let bind_group = device.create_bind_group(&BindGroupDescriptor {
+    pub fn build(self, device: &Device, bgl: &BindGroupLayout) -> BindGroup {
+        device.create_bind_group(&BindGroupDescriptor {
+            label: self.label.as_deref(),
             layout: &bgl,
             entries: &self.bg_entries,
-            label: self.label.as_deref(),
-        });
-
-        (bgl, Arc::new(bind_group))
-    }
-
-    pub fn build(self, device: &Device, cache: &mut BindGroupCache) -> (Arc<BindGroupLayout>, Arc<BindGroup>) {
-        cache.bind_group(device, self.label.as_deref(), &self.bgl_entries, &self.bg_entries)
+        })
     }
 }

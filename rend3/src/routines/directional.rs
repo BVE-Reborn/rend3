@@ -8,9 +8,45 @@ use wgpu::{
     ShaderModuleDescriptor, ShaderStage, StencilState, TextureFormat, VertexState,
 };
 
-use crate::{ModeData, RendererMode, resources::{DirectionalLightManager, InternalObject, MaterialManager, TextureManager}, routines::{prepass::{BuildDepthPassShaderArgs, build_depth_pass_shader}, vertex::{cpu_vertex_buffers, gpu_vertex_buffers}}, shaders::SPIRV_SHADERS, util::bind_merge::BindGroupBuilder};
+use crate::{
+    resources::{DirectionalLightManager, InternalObject, MaterialManager, TextureManager},
+    routines::{
+        culling::{cpu::CpuCuller, gpu::GpuCuller, CulledObjectSet},
+        prepass::{build_depth_pass_shader, BuildDepthPassShaderArgs},
+        vertex::{cpu_vertex_buffers, gpu_vertex_buffers},
+    },
+    shaders::SPIRV_SHADERS,
+    util::bind_merge::BindGroupBuilder,
+    ModeData, RendererMode,
+};
 
 use super::{culling, CacheContext};
+
+pub struct DirectionalShadowPass {}
+
+impl DirectionalShadowPass {
+    pub fn new() -> Self {
+        Self {}
+    }
+
+    pub fn cull_lights(
+        &self,
+        device: &Device,
+        encoder: &mut CommandEncoder,
+        culler: ModeData<&CpuCuller, &GpuCuller>,
+        material_manager: &MaterialManager,
+        lights: &DirectionalLightManager,
+        objects: &[InternalObject],
+    ) -> Vec<CulledObjectSet> {
+        lights
+            .values()
+            .map(|light| match culler {
+                ModeData::CPU(cpu_culler) => cpu_culler.cull(device, &light.camera, objects),
+                ModeData::GPU(gpu_culler) => gpu_culler.cull(device, encoder, material_manager, &light.camera, objects),
+            })
+            .collect()
+    }
+}
 
 pub struct DirectionalShadowPassArgs<'a, 'b> {
     mode: RendererMode,
@@ -47,10 +83,10 @@ pub fn directional_shadow_pass<'a, 'b>(mut args: DirectionalShadowPassArgs<'a, '
             ),
         };
 
-        let depth_pass_data = build_depth_pass_shader(BuildDepthPassShaderArgs  {
+        let depth_pass_data = build_depth_pass_shader(BuildDepthPassShaderArgs {
             mode: args.mode,
             device: args.device,
-            ctx: args.ctx, 
+            ctx: args.ctx,
             culling_results: &culling_results,
         });
 
