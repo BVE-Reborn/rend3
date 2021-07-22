@@ -5,14 +5,13 @@ use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
     BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType, BufferBindingType,
     BufferDescriptor, BufferUsage, CommandEncoder, ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor,
-    Device, PipelineLayout, PipelineLayoutDescriptor, RenderPass, ShaderFlags, ShaderModuleDescriptor,
-    ShaderStage,
+    Device, PipelineLayout, PipelineLayoutDescriptor, RenderPass, ShaderFlags, ShaderModuleDescriptor, ShaderStage,
 };
 
 use super::{CulledObjectSet, GPUCullingInput, GPUIndirectData};
 use crate::{
     resources::{CameraManager, InternalObject, MaterialManager},
-    routines::{culling::CullingOutput},
+    routines::culling::PerObjectData,
     shaders::SPIRV_SHADERS,
     util::bind_merge::BindGroupBuilder,
     ModeData,
@@ -28,6 +27,14 @@ struct GPUCullingUniforms {
 
 unsafe impl bytemuck::Pod for GPUCullingUniforms {}
 unsafe impl bytemuck::Zeroable for GPUCullingUniforms {}
+
+pub struct GpuCullerCullArgs<'a> {
+    pub device: &'a Device,
+    pub encoder: &'a mut CommandEncoder,
+    pub materials: &'a MaterialManager,
+    pub camera: &'a CameraManager,
+    pub objects: &'a [InternalObject],
+}
 
 pub struct GpuCuller {
     bgl: BindGroupLayout,
@@ -55,7 +62,7 @@ impl GpuCuller {
                     ty: BindingType::Buffer {
                         ty: BufferBindingType::Storage { read_only: false },
                         has_dynamic_offset: false,
-                        min_binding_size: NonZeroU64::new(mem::size_of::<CullingOutput>() as _),
+                        min_binding_size: NonZeroU64::new(mem::size_of::<PerObjectData>() as _),
                     },
                     count: None,
                 },
@@ -96,48 +103,44 @@ impl GpuCuller {
 
     pub fn cull(
         &self,
-        device: &Device,
-        encoder: &mut CommandEncoder,
-        material: &MaterialManager,
-        camera: &CameraManager,
-        objects: &[InternalObject],
+        args: GpuCullerCullArgs<'_>
     ) -> CulledObjectSet {
         let mut data = Vec::<u8>::with_capacity(
-            mem::size_of::<GPUCullingUniforms>() + objects.len() * mem::size_of::<GPUCullingInput>(),
+            mem::size_of::<GPUCullingUniforms>() + args.objects.len() * mem::size_of::<GPUCullingInput>(),
         );
         data.extend(bytemuck::bytes_of(&GPUCullingUniforms {
-            view: camera.view().into(),
-            view_proj: camera.view_proj().into(),
-            object_count: objects.len() as u32,
+            view: args.camera.view().into(),
+            view_proj: args.camera.view_proj().into(),
+            object_count: args.objects.len() as u32,
         }));
-        for object in objects {
+        for object in args.objects {
             data.extend(bytemuck::bytes_of(&GPUCullingInput {
                 start_idx: object.start_idx,
                 count: object.count,
                 vertex_offset: object.vertex_offset,
-                material_idx: material.internal_index(object.material) as u32,
+                material_idx: args.materials.internal_index(object.material) as u32,
                 transform: object.transform.into(),
                 bounding_sphere: object.sphere.into(),
             }));
         }
 
-        let input_buffer = device.create_buffer_init(&BufferInitDescriptor {
+        let input_buffer = args.device.create_buffer_init(&BufferInitDescriptor {
             label: Some("culling inputs"),
             contents: &data,
             usage: BufferUsage::STORAGE,
         });
 
-        let output_buffer = device.create_buffer(&BufferDescriptor {
+        let output_buffer = args.device.create_buffer(&BufferDescriptor {
             label: Some("culling output"),
-            size: (objects.len() * mem::size_of::<CullingOutput>()) as _,
+            size: (args.objects.len() * mem::size_of::<PerObjectData>()) as _,
             usage: BufferUsage::STORAGE,
             mapped_at_creation: false,
         });
 
-        let indirect_buffer = device.create_buffer(&BufferDescriptor {
+        let indirect_buffer = args.device.create_buffer(&BufferDescriptor {
             label: Some("indirect buffer"),
             // 16 bytes for count, the rest for the indirect count
-            size: (objects.len() * 20 + 16) as _,
+            size: (args.objects.len() * 20 + 16) as _,
             usage: BufferUsage::STORAGE | BufferUsage::INDIRECT,
             mapped_at_creation: false,
         });
@@ -158,22 +161,22 @@ impl GpuCuller {
             offset: 0,
             size: None,
         });
-        let bg = bgb.build(&device, &self.bgl);
+        let bg = bgb.build(&args.device, &self.bgl);
 
-        let mut cpass = encoder.begin_compute_pass(&ComputePassDescriptor {
+        let mut cpass = args.encoder.begin_compute_pass(&ComputePassDescriptor {
             label: Some("compute cull"),
         });
 
         cpass.set_pipeline(&self.pipeline);
         cpass.set_bind_group(0, &bg, &[]);
-        cpass.dispatch((objects.len() / 256) as _, 1, 1);
+        cpass.dispatch((args.objects.len() / 256) as _, 1, 1);
 
         drop(cpass);
 
         CulledObjectSet {
             calls: ModeData::GPU(GPUIndirectData {
                 indirect_buffer,
-                count: objects.len(),
+                count: args.objects.len(),
             }),
             output_buffer,
         }

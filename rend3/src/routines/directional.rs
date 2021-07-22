@@ -1,17 +1,21 @@
-use std::{mem, num::NonZeroU64};
+use std::{mem, num::NonZeroU64, sync::Arc};
 
 use wgpu::{
     BindGroup, BindingResource, BindingType, BufferBindingType, CommandEncoder, CompareFunction, CullMode,
     DepthBiasState, DepthStencilState, Device, FragmentState, FrontFace, LoadOp, MultisampleState, Operations,
     PipelineLayoutDescriptor, PolygonMode, PrimitiveState, PrimitiveTopology, RenderPassColorAttachmentDescriptor,
     RenderPassDepthStencilAttachmentDescriptor, RenderPassDescriptor, RenderPipelineDescriptor, Sampler, ShaderFlags,
-    ShaderModuleDescriptor, ShaderStage, StencilState, TextureFormat, VertexState,
+    ShaderModuleDescriptor, ShaderStage, StencilState, TextureFormat, TextureView, VertexState,
 };
 
 use crate::{
     resources::{DirectionalLightManager, InternalObject, MaterialManager, TextureManager},
     routines::{
-        culling::{cpu::CpuCuller, gpu::GpuCuller, CulledObjectSet},
+        culling::{
+            cpu::{CpuCuller, CpuCullerCullArgs},
+            gpu::{GpuCuller, GpuCullerCullArgs},
+            CulledObjectSet,
+        },
         prepass::{build_depth_pass_shader, BuildDepthPassShaderArgs},
         vertex::{cpu_vertex_buffers, gpu_vertex_buffers},
     },
@@ -22,6 +26,29 @@ use crate::{
 
 use super::{culling, CacheContext};
 
+pub struct DirectionalShadowPassCullShadowsArgs<'a> {
+    pub device: &'a Device,
+    pub encoder: &'a mut CommandEncoder,
+
+    pub culler: ModeData<&'a CpuCuller, &'a GpuCuller>,
+    pub materials: &'a MaterialManager,
+
+    pub lights: &'a DirectionalLightManager,
+    pub objects: &'a [InternalObject],
+}
+
+pub struct CulledLightSet {
+    pub culled_objects: CulledObjectSet,
+    pub shadow_texture_arc: Arc<TextureView>,
+}
+
+pub struct DirectionalShadowPassDrawCulledShadowsArgs<'a> {
+    pub encoder: &'a mut CommandEncoder,
+    pub pipeline: BuildDepthPassShaderResult
+    
+    pub culled_lights: &'a [CulledLightSet],
+}
+
 pub struct DirectionalShadowPass {}
 
 impl DirectionalShadowPass {
@@ -29,22 +56,50 @@ impl DirectionalShadowPass {
         Self {}
     }
 
-    pub fn cull_lights(
-        &self,
-        device: &Device,
-        encoder: &mut CommandEncoder,
-        culler: ModeData<&CpuCuller, &GpuCuller>,
-        material_manager: &MaterialManager,
-        lights: &DirectionalLightManager,
-        objects: &[InternalObject],
-    ) -> Vec<CulledObjectSet> {
-        lights
+    pub fn cull_shadows(&self, args: DirectionalShadowPassCullShadowsArgs<'_>) -> Vec<CulledLightSet> {
+        args.lights
             .values()
-            .map(|light| match culler {
-                ModeData::CPU(cpu_culler) => cpu_culler.cull(device, &light.camera, objects),
-                ModeData::GPU(gpu_culler) => gpu_culler.cull(device, encoder, material_manager, &light.camera, objects),
+            .map(|light| {
+                let culled_objects = match args.culler {
+                    ModeData::CPU(cpu_culler) => cpu_culler.cull(CpuCullerCullArgs {
+                        device: args.device,
+                        camera: &light.camera,
+                        objects: args.objects,
+                    }),
+                    ModeData::GPU(gpu_culler) => gpu_culler.cull(GpuCullerCullArgs {
+                        device: args.device,
+                        encoder: args.encoder,
+                        materials: args.materials,
+                        camera: &light.camera,
+                        objects: args.objects,
+                    }),
+                };
+
+                let shadow_texture_arc = args.lights.get_layer_view_arc(light.shadow_tex);
+
+                CulledLightSet {
+                    culled_objects,
+                    shadow_texture_arc,
+                }
             })
             .collect()
+    }
+
+    pub fn draw_culled_shadows(&self, args: DirectionalShadowPassDrawCulledShadowsArgs<'_>) {
+
+
+        let mut rpass = args.render_encoder.begin_render_pass(&RenderPassDescriptor {
+            label: Some("culling pass"),
+            color_attachments: &[],
+            depth_stencil_attachment: Some(RenderPassDepthStencilAttachmentDescriptor {
+                attachment: &light_view,
+                depth_ops: Some(Operations {
+                    load: LoadOp::Clear(0.0),
+                    store: true,
+                }),
+                stencil_ops: None,
+            }),
+        });
     }
 }
 

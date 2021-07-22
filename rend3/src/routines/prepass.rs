@@ -10,7 +10,7 @@ use wgpu::{
 use crate::{
     resources::{CameraManager, MaterialManager},
     routines::{
-        culling::{self, CulledObjectSet, CullingOutput},
+        culling::{self, CulledObjectSet, PerObjectData},
         vertex::{cpu_vertex_buffers, gpu_vertex_buffers},
         CacheContext,
     },
@@ -39,7 +39,7 @@ pub fn build_depth_pass_shader(mut args: BuildDepthPassShaderArgs) -> BuildDepth
         BindingType::Buffer {
             ty: BufferBindingType::Storage { read_only: false },
             has_dynamic_offset: false,
-            min_binding_size: NonZeroU64::new(mem::size_of::<culling::CullingOutput>() as _),
+            min_binding_size: NonZeroU64::new(mem::size_of::<culling::PerObjectData>() as _),
         },
         None,
         BindingResource::Buffer {

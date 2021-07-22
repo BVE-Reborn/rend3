@@ -38,16 +38,3 @@ pub struct GPUCullingInput {
 
 unsafe impl bytemuck::Pod for GPUCullingInput {}
 unsafe impl bytemuck::Zeroable for GPUCullingInput {}
-
-#[repr(C, align(16))]
-#[derive(Debug, Copy, Clone)]
-pub struct CullingOutput {
-    model_view: Mat4,
-    model_view_proj: Mat4,
-    inv_trans_model_view: Mat3A,
-    // Unused in shader
-    material_idx: u32,
-}
-
-unsafe impl bytemuck::Pod for CullingOutput {}
-unsafe impl bytemuck::Zeroable for CullingOutput {}

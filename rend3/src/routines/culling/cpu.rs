@@ -6,10 +6,16 @@ use wgpu::{
 
 use crate::{
     resources::{CameraManager, InternalObject, MaterialManager},
-    routines::culling::{CPUDrawCall, CulledObjectSet, CullingOutput},
+    routines::culling::{CPUDrawCall, CulledObjectSet, PerObjectData},
     util::{frustum::ShaderFrustum, math::IndexedDistance},
     ModeData,
 };
+
+pub struct CpuCullerCullArgs<'a> {
+    device: &'a Device,
+    camera: &'a CameraManager,
+    objects: &'a [InternalObject],
+}
 
 pub struct CpuCuller {}
 
@@ -18,16 +24,16 @@ impl CpuCuller {
         Self {}
     }
 
-    pub fn cull(&self, device: &Device, camera: &CameraManager, objects: &[InternalObject]) -> CulledObjectSet {
-        let frustum = ShaderFrustum::from_matrix(camera.proj());
-        let view = camera.view();
-        let view_proj = camera.view_proj();
+    pub fn cull(&self, args: CpuCullerCullArgs<'_>) -> CulledObjectSet {
+        let frustum = ShaderFrustum::from_matrix(args.camera.proj());
+        let view = args.camera.view();
+        let view_proj = args.camera.view_proj();
 
-        let mut outputs = Vec::with_capacity(objects.len());
-        let mut calls = Vec::with_capacity(objects.len());
-        let mut _distances = Vec::with_capacity(objects.len());
+        let mut outputs = Vec::with_capacity(args.objects.len());
+        let mut calls = Vec::with_capacity(args.objects.len());
+        let mut _distances = Vec::with_capacity(args.objects.len());
 
-        for (index, object) in objects.into_iter().enumerate() {
+        for (index, object) in args.objects.iter().enumerate() {
             let model = object.transform;
             let model_view = view * model;
 
@@ -50,7 +56,7 @@ impl CpuCuller {
                 handle: object.material,
             });
 
-            outputs.push(CullingOutput {
+            outputs.push(PerObjectData {
                 model_view: model_view.into(),
                 model_view_proj: model_view_proj.into(),
                 inv_trans_model_view: inv_trans_model_view.into(),
@@ -65,7 +71,7 @@ impl CpuCuller {
         assert_eq!(calls.len(), outputs.len());
         assert_eq!(calls.len(), _distances.len());
 
-        let output_buffer = device.create_buffer_init(&BufferInitDescriptor {
+        let output_buffer = args.device.create_buffer_init(&BufferInitDescriptor {
             label: Some("culling output"),
             contents: bytemuck::cast_slice(&outputs),
             usage: BufferUsage::STORAGE,
