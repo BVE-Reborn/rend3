@@ -1,20 +1,18 @@
 use glam::{Mat3, Vec4Swizzles};
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
-    BufferUsage, Device, RenderPass, ShaderStage,
+    BindGroupDescriptor, BindGroupEntry, BufferUsage, Device, RenderPass, ShaderStage,
 };
 
-use crate::{
-    resources::{CameraManager, InternalObject, MaterialManager},
-    routines::culling::{CPUDrawCall, CulledObjectSet, PerObjectData},
-    util::{frustum::ShaderFrustum, math::IndexedDistance},
-    ModeData,
-};
+use crate::{ModeData, resources::{CameraManager, InternalObject, MaterialManager}, routines::{common::interfaces::{PerObjectData, ShaderInterfaces}, culling::{CPUDrawCall, CulledObjectSet}}, util::{frustum::ShaderFrustum, math::IndexedDistance}};
 
 pub struct CpuCullerCullArgs<'a> {
-    device: &'a Device,
-    camera: &'a CameraManager,
-    objects: &'a [InternalObject],
+    pub device: &'a Device,
+    pub camera: &'a CameraManager,
+
+    pub interfaces: &'a ShaderInterfaces,
+
+    pub objects: &'a [InternalObject],
 }
 
 pub struct CpuCuller {}
@@ -77,9 +75,18 @@ impl CpuCuller {
             usage: BufferUsage::STORAGE,
         });
 
+        let output_bg = args.device.create_bind_group(&BindGroupDescriptor {
+            label: Some("culling input bg"),
+            layout: &args.interfaces.culled_object_bgl,
+            entries: &[BindGroupEntry {
+                binding: 0,
+                resource: output_buffer.as_entire_binding(),
+            }],
+        });
+
         CulledObjectSet {
             calls: ModeData::CPU(calls),
-            output_buffer,
+            output_bg,
         }
     }
 }

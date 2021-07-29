@@ -80,7 +80,7 @@ impl CPUShaderMaterial {
 
 #[repr(C, align(16))]
 #[derive(Debug, Copy, Clone)]
-struct GPUShaderMaterial {
+pub struct GPUShaderMaterial {
     albedo: Vec4,
     emissive: Vec3,
     roughness: f32,

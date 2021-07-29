@@ -104,3 +104,12 @@ impl<C, G> ModeData<C, G> {
         }
     }
 }
+
+impl<T> ModeData<T, T> {
+    pub fn into_common(self) -> T {
+        match self {
+            Self::CPU(c) => c,
+            Self::GPU(g) => g,
+        }
+    }
+}

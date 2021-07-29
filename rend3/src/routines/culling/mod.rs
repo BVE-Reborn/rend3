@@ -1,5 +1,5 @@
 use glam::{Mat3A, Mat4};
-use wgpu::Buffer;
+use wgpu::{BindGroup, Buffer};
 
 use crate::{datatypes::MaterialHandle, util::frustum::BoundingSphere, ModeData};
 
@@ -8,7 +8,7 @@ pub mod gpu;
 
 pub struct CulledObjectSet {
     pub calls: ModeData<Vec<CPUDrawCall>, GPUIndirectData>,
-    pub output_buffer: Buffer,
+    pub output_bg: BindGroup,
 }
 
 pub struct GPUIndirectData {

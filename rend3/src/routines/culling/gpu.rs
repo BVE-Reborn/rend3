@@ -1,21 +1,10 @@
 use std::{mem, num::NonZeroU64};
 
 use glam::Mat4;
-use wgpu::{
-    util::{BufferInitDescriptor, DeviceExt},
-    BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType, BufferBindingType,
-    BufferDescriptor, BufferUsage, CommandEncoder, ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor,
-    Device, PipelineLayout, PipelineLayoutDescriptor, RenderPass, ShaderFlags, ShaderModuleDescriptor, ShaderStage,
-};
+use wgpu::{BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType, BufferBindingType, BufferDescriptor, BufferUsage, CommandEncoder, ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor, Device, PipelineLayout, PipelineLayoutDescriptor, RenderPass, ShaderFlags, ShaderModuleDescriptor, ShaderStage, util::{BufferInitDescriptor, DeviceExt}};
 
 use super::{CulledObjectSet, GPUCullingInput, GPUIndirectData};
-use crate::{
-    resources::{CameraManager, InternalObject, MaterialManager},
-    routines::culling::PerObjectData,
-    shaders::SPIRV_SHADERS,
-    util::bind_merge::BindGroupBuilder,
-    ModeData,
-};
+use crate::{ModeData, resources::{CameraManager, InternalObject, MaterialManager}, routines::common::interfaces::{PerObjectData, ShaderInterfaces}, shaders::SPIRV_SHADERS, util::bind_merge::BindGroupBuilder};
 
 #[repr(C, align(16))]
 #[derive(Debug, Copy, Clone)]
@@ -31,8 +20,12 @@ unsafe impl bytemuck::Zeroable for GPUCullingUniforms {}
 pub struct GpuCullerCullArgs<'a> {
     pub device: &'a Device,
     pub encoder: &'a mut CommandEncoder,
+    
+    pub interfaces: &'a ShaderInterfaces,
+
     pub materials: &'a MaterialManager,
     pub camera: &'a CameraManager,
+
     pub objects: &'a [InternalObject],
 }
 
@@ -173,12 +166,21 @@ impl GpuCuller {
 
         drop(cpass);
 
+        let output_bg = args.device.create_bind_group(&BindGroupDescriptor {
+            label: Some("culling input bg"),
+            layout: &args.interfaces.culled_object_bgl,
+            entries: &[BindGroupEntry {
+                binding: 0,
+                resource: output_buffer.as_entire_binding()
+            }],
+        });
+
         CulledObjectSet {
             calls: ModeData::GPU(GPUIndirectData {
                 indirect_buffer,
                 count: args.objects.len(),
             }),
-            output_buffer,
+            output_bg,
         }
     }
 }

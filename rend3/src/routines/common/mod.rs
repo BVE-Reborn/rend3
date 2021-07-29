@@ -1,2 +1,2 @@
-mod depth_pass;
-mod interfaces;
+pub mod depth_pass;
+pub mod interfaces;
