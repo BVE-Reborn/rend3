@@ -1,5 +1,4 @@
 use crate::{
-    cache::{BindGroupCache, PipelineCache},
     datatypes::{
         Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Material,
         MaterialChange, MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, Texture, TextureHandle,
@@ -57,9 +56,6 @@ where
     material_manager: RwLock<MaterialManager>,
     object_manager: RwLock<ObjectManager>,
     directional_light_manager: RwLock<DirectionalLightManager>,
-
-    pipeline_cache: RwLock<PipelineCache>,
-    bind_group_cache: RwLock<BindGroupCache>,
 
     options: RwLock<RendererOptions>,
 }

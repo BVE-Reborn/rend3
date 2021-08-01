@@ -35,8 +35,9 @@ impl WrappedPotBuffer {
         will_resize_inner(self.size, desired)
     }
 
-    pub fn write_to_buffer(&mut self, device: &Device, queue: &Queue, data: &[u8]) {
-        if let Some(size) = self.will_resize(data.len() as BufferAddress) {
+    pub fn write_to_buffer(&mut self, device: &Device, queue: &Queue, data: &[u8]) -> bool {
+        let resize = self.will_resize(data.len() as BufferAddress);
+        if let Some(size) = resize {
             self.size = size;
             self.inner = Arc::new(device.create_buffer(&BufferDescriptor {
                 label: self.label.as_deref(),
@@ -47,6 +48,8 @@ impl WrappedPotBuffer {
         }
 
         queue.write_buffer(&self.inner, 0, data);
+
+        resize.is_some()
     }
 }
 

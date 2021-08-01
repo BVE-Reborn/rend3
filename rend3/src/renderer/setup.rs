@@ -1,14 +1,13 @@
 use crate::{
-    cache::{BindGroupCache, PipelineCache},
     instruction::InstructionStreamPair,
-    resources::{
-        DirectionalLightManager, MaterialManager, MeshManager, ObjectManager, TextureManager, STARTING_2D_TEXTURES,
-        STARTING_CUBE_TEXTURES,
-    },
     renderer::{
         info::ExtendedAdapterInfo,
         limits::{check_features, check_limits},
         resources::RendererGlobalResources,
+    },
+    resources::{
+        DirectionalLightManager, MaterialManager, MeshManager, ObjectManager, TextureManager, STARTING_2D_TEXTURES,
+        STARTING_CUBE_TEXTURES,
     },
     JobPriorities, Renderer, RendererBuilder, RendererInitializationError, RendererMode,
 };
@@ -220,8 +219,6 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
     let material_manager = RwLock::new(MaterialManager::new(&device, mode));
     let object_manager = RwLock::new(ObjectManager::new(&device, mode));
     let directional_light_manager = RwLock::new(DirectionalLightManager::new(&device));
-    let pipeline_cache = RwLock::new(PipelineCache::new());
-    let bind_group_cache = RwLock::new(BindGroupCache::new());
 
     Ok(Arc::new(Renderer {
         yard: builder.yard.expect("The yard should be populated by the builder"),
@@ -242,9 +239,6 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
         material_manager,
         object_manager,
         directional_light_manager,
-
-        pipeline_cache,
-        bind_group_cache,
 
         options: RwLock::new(builder.options),
     }))

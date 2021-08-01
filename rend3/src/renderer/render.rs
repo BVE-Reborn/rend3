@@ -39,7 +39,6 @@ pub fn render_loop<TLD: 'static>(
         let mut texture_manager_cube = renderer.texture_manager_cube.write();
         let mut material_manager = renderer.material_manager.write();
         let mut object_manager = renderer.object_manager.write();
-        let mut bind_group_cache = renderer.bind_group_cache.write();
         let mut directional_light_manager = renderer.directional_light_manager.write();
         let mut global_resources = renderer.global_resources.write();
         let mut option_guard = renderer.options.write();
@@ -130,7 +129,6 @@ pub fn render_loop<TLD: 'static>(
                         &renderer.device,
                         renderer.mode,
                         &mut texture_manager_2d,
-                        &mut bind_group_cache,
                         handle,
                         material,
                     );
@@ -202,7 +200,6 @@ pub fn render_loop<TLD: 'static>(
             material_manager,
             object_manager,
             directional_light_manager,
-            bind_group_cache,
         ));
 
         let frame = output.acquire(&renderer.global_resources.read().swapchain);

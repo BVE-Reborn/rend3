@@ -171,7 +171,7 @@ impl MeshManager {
         self.registry.get(handle.0)
     }
 
-    pub fn reallocate_buffers(
+    fn reallocate_buffers(
         &mut self,
         device: &Device,
         encoder: &mut CommandEncoder,

@@ -1,4 +1,4 @@
-use glam::{Mat3A, Mat4};
+use glam::{Mat4};
 use wgpu::{BindGroup, Buffer};
 
 use crate::{datatypes::MaterialHandle, util::frustum::BoundingSphere, ModeData};

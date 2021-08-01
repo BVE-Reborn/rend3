@@ -76,7 +76,6 @@ macro_rules! span_transfer {
     };
 }
 
-pub mod cache;
 mod renderer;
 pub mod resources {
     mod camera;
@@ -103,7 +102,6 @@ pub mod util {
     pub mod output;
     pub mod registry;
     pub mod typedefs;
-    pub mod uniforms;
 }
 
 mod builder;

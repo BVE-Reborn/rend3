@@ -167,6 +167,7 @@ impl TextureManager {
 pub(crate) struct TextureManagerReadyOutput {
     pub bgl: ModeData<(), Arc<BindGroupLayout>>,
     pub bg: ModeData<(), Arc<BindGroup>>,
+    // TODO(0.10) https://github.com/gfx-rs/wgpu/issues/1635 will make this unneccisary.
     pub dirty: ModeData<(), bool>,
 }
 

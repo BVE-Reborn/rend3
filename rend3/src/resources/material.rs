@@ -1,5 +1,4 @@
 use crate::{
-    cache::BindGroupCache,
     datatypes::{Material, MaterialChange, MaterialFlags, MaterialHandle, TextureHandle},
     mode::ModeData,
     resources::TextureManager,
@@ -8,14 +7,14 @@ use crate::{
 };
 use glam::{Vec3, Vec4};
 use std::{
-    mem::size_of,
+    mem,
     num::{NonZeroU32, NonZeroU64},
-    sync::Arc,
 };
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
-    BindGroup, BindGroupLayout, BindingResource, BindingType, Buffer, BufferBindingType, BufferUsage, Device, Queue,
-    ShaderStage, TextureSampleType, TextureViewDimension,
+    BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
+    BindingResource, BindingType, Buffer, BufferBindingType, BufferUsage, Device, Queue, ShaderStage,
+    TextureSampleType, TextureViewDimension,
 };
 
 #[repr(C, align(16))]
@@ -171,6 +170,8 @@ struct InternalMaterial {
 }
 
 pub struct MaterialManager {
+    bgl: ModeData<BindGroupLayout, BindGroupLayout>,
+    bg: ModeData<(), BindGroup>,
     buffer: ModeData<(), WrappedPotBuffer>,
 
     registry: ResourceRegistry<InternalMaterial>,
@@ -180,13 +181,77 @@ impl MaterialManager {
     pub fn new(device: &Device, mode: RendererMode) -> Self {
         span_transfer!(_ -> new_span, INFO, "Creating Material Manager");
 
+        let bgl = mode.into_data(
+            || {
+                let texture_binding = |idx| BindGroupLayoutEntry {
+                    binding: idx,
+                    visibility: ShaderStage::FRAGMENT,
+                    ty: BindingType::Texture {
+                        sample_type: TextureSampleType::Float { filterable: true },
+                        view_dimension: TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
+                };
+
+                device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+                    label: Some("cpu material bgl"),
+                    entries: &[
+                        texture_binding(0),
+                        texture_binding(1),
+                        texture_binding(2),
+                        texture_binding(3),
+                        texture_binding(4),
+                        texture_binding(5),
+                        texture_binding(6),
+                        texture_binding(7),
+                        texture_binding(8),
+                        texture_binding(9),
+                        BindGroupLayoutEntry {
+                            binding: 10,
+                            visibility: ShaderStage::FRAGMENT,
+                            ty: BindingType::Buffer {
+                                ty: BufferBindingType::Uniform,
+                                has_dynamic_offset: false,
+                                min_binding_size: NonZeroU64::new(mem::size_of::<CPUShaderMaterial>() as _),
+                            },
+                            count: None,
+                        },
+                    ],
+                })
+            },
+            || {
+                device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+                    label: Some("gpu material bgl"),
+                    entries: &[BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: ShaderStage::FRAGMENT,
+                        ty: BindingType::Buffer {
+                            ty: BufferBindingType::Storage { read_only: true },
+                            has_dynamic_offset: false,
+                            min_binding_size: NonZeroU64::new(mem::size_of::<GPUShaderMaterial>() as _),
+                        },
+                        count: None,
+                    }],
+                })
+            },
+        );
+
         let buffer = mode.into_data(
             || (),
             || WrappedPotBuffer::new(device, 0, BufferUsage::STORAGE, Some("material buffer")),
         );
+
+        let bg = mode.into_data(|| (), || create_gpu_buffer_bg(device, bgl.as_gpu(), buffer.as_gpu()));
+
         let registry = ResourceRegistry::new();
 
-        Self { buffer, registry }
+        Self {
+            buffer,
+            registry,
+            bgl,
+            bg,
+        }
     }
 
     pub fn allocate(&self) -> MaterialHandle {
@@ -198,7 +263,6 @@ impl MaterialManager {
         device: &Device,
         mode: RendererMode,
         texture_manager_2d: &mut TextureManager,
-        bgl: &ShaderInterfaces,
         handle: MaterialHandle,
         material: Material,
     ) {
@@ -278,7 +342,7 @@ impl MaterialManager {
                             material.aomr_textures.to_ao_texture(lookup_fn).unwrap_or(null_tex),
                         ));
                         bgb.append(material_buffer.as_cpu().as_entire_binding());
-                        bgb.build(device /* BGL from where */)
+                        bgb.build(device, self.bgl.as_cpu())
                     },
                     || (),
                 ),
@@ -302,8 +366,16 @@ impl MaterialManager {
         }
     }
 
+    pub fn get_bind_group_layout(&self) -> &BindGroupLayout {
+        self.bgl.as_ref().into_common()
+    }
+
     pub fn cpu_get_bind_group(&self, handle: MaterialHandle) -> &BindGroup {
         self.registry.get(handle.0).bind_group.as_cpu()
+    }
+
+    pub fn gpu_get_bind_group(&self) -> &BindGroup {
+        self.bg.as_gpu()
     }
 
     pub fn internal_index(&self, handle: MaterialHandle) -> usize {
@@ -321,27 +393,26 @@ impl MaterialManager {
                 .map(|internal| GPUShaderMaterial::from_material(&internal.mat, &translate_texture))
                 .collect();
 
-            buffer.write_to_buffer(device, queue, bytemuck::cast_slice(&data));
+            let resized = buffer.write_to_buffer(device, queue, bytemuck::cast_slice(&data));
+
+            if resized {
+                *self.bg.as_gpu_mut() = create_gpu_buffer_bg(device, self.bgl.as_gpu_mut(), self.buffer.as_gpu_mut());
+            }
         }
     }
+}
 
-    pub fn gpu_make_bg<'a>(
-        &'a self,
-        device: &Device,
-        cache: &mut BindGroupCache,
-        visibility: ShaderStage,
-    ) -> (Arc<BindGroupLayout>, Arc<BindGroup>) {
-        let mut bgb = BindGroupBuilder::new("material data");
-        bgb.append(
-            visibility,
-            BindingType::Buffer {
-                ty: BufferBindingType::Storage { read_only: true },
-                has_dynamic_offset: false,
-                min_binding_size: NonZeroU64::new(size_of::<GPUShaderMaterial>() as _),
+fn create_gpu_buffer_bg(device: &Device, bgl: &BindGroupLayout, buffer: &Buffer) -> BindGroup {
+    device.create_bind_group(&BindGroupDescriptor {
+        label: Some("gpu material bg"),
+        layout: bgl,
+        entries: &[BindGroupEntry {
+            binding: 0,
+            resource: BindingResource::Buffer {
+                buffer,
+                offset: 0,
+                size: None,
             },
-            None,
-            self.buffer.as_gpu().as_entire_binding(),
-        );
-        bgb.build(device, cache)
-    }
+        }],
+    })
 }
