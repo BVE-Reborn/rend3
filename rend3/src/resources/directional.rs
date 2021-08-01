@@ -5,11 +5,15 @@ use crate::{
     INTERNAL_SHADOW_DEPTH_FORMAT, SHADOW_DIMENSIONS,
 };
 use glam::{Mat4, Vec3};
-use std::{mem::size_of, num::NonZeroU32, sync::Arc};
+use std::{
+    mem::{self, size_of},
+    num::{NonZeroU32, NonZeroU64},
+    sync::Arc,
+};
 use wgpu::{
-    BindingResource, BindingType, BufferBindingType, BufferUsage, Device, Extent3d, Queue, ShaderStage, TextureAspect,
-    TextureDescriptor, TextureDimension, TextureSampleType, TextureUsage, TextureView, TextureViewDescriptor,
-    TextureViewDimension,
+    BindGroup, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType, Buffer,
+    BufferBindingType, BufferUsage, Device, Extent3d, Queue, ShaderStage, TextureAspect, TextureDescriptor,
+    TextureDimension, TextureSampleType, TextureUsage, TextureView, TextureViewDescriptor, TextureViewDimension,
 };
 
 pub struct InternalDirectionalLight {
@@ -45,6 +49,9 @@ pub struct DirectionalLightManager {
     view: TextureView,
     layer_views: Vec<Arc<TextureView>>,
 
+    bgl: BindGroupLayout,
+    bg: BindGroup,
+
     registry: ResourceRegistry<InternalDirectionalLight>,
 }
 impl DirectionalLightManager {
@@ -55,11 +62,16 @@ impl DirectionalLightManager {
 
         let (view, layer_views) = create_shadow_texture(device, 1);
 
+        let bgl = create_shadow_bgl(device);
+        let bg = create_shadow_bg(device, &bgl, &buffer, &view);
+
         Self {
             buffer,
             view,
             layer_views,
             registry,
+            bgl,
+            bg,
         }
     }
 
@@ -98,7 +110,8 @@ impl DirectionalLightManager {
 
     pub fn ready(&mut self, device: &Device, queue: &Queue) {
         let registered_count = self.registry.count();
-        if registered_count != self.layer_views.len() && registered_count != 0 {
+        let recreate_view = registered_count != self.layer_views.len() && registered_count != 0;
+        if recreate_view {
             let (view, layer_views) = create_shadow_texture(device, registered_count as u32);
             self.view = view;
             self.layer_views = layer_views;
@@ -122,30 +135,11 @@ impl DirectionalLightManager {
             }));
         }
 
-        self.buffer.write_to_buffer(device, queue, &buffer);
-    }
+        let reallocated_buffer = self.buffer.write_to_buffer(device, queue, &buffer);
 
-    pub fn append_to_bgb<'a>(&'a self, visibility: ShaderStage, builder: &mut BindGroupBuilder<'a>) {
-        builder.append(
-            visibility,
-            BindingType::Buffer {
-                ty: BufferBindingType::Storage { read_only: true },
-                has_dynamic_offset: false,
-                min_binding_size: None,
-            },
-            None,
-            self.buffer.as_entire_binding(),
-        );
-        builder.append(
-            visibility,
-            BindingType::Texture {
-                view_dimension: TextureViewDimension::D2Array,
-                sample_type: TextureSampleType::Float { filterable: true },
-                multisampled: false,
-            },
-            None,
-            BindingResource::TextureView(&self.view),
-        );
+        if reallocated_buffer || recreate_view {
+            self.bg = create_shadow_bg(device, &self.bgl, &self.buffer, &self.view);
+        }
     }
 
     pub fn values(&self) -> impl Iterator<Item = &InternalDirectionalLight> {
@@ -195,4 +189,39 @@ fn create_shadow_texture(device: &Device, count: u32) -> (TextureView, Vec<Arc<T
         .collect();
 
     (primary_view, layer_views)
+}
+
+fn create_shadow_bgl(device: &Device) -> BindGroupLayout {
+    device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+        label: Some("shadow bgl"),
+        entries: &[
+            BindGroupLayoutEntry {
+                binding: 0,
+                visibility: ShaderStage::FRAGMENT,
+                ty: BindingType::Buffer {
+                    ty: BufferBindingType::Storage { read_only: true },
+                    has_dynamic_offset: false,
+                    min_binding_size: NonZeroU64::new(mem::size_of::<ShaderDirectionalLight>() as _),
+                },
+                count: None,
+            },
+            BindGroupLayoutEntry {
+                binding: 1,
+                visibility: ShaderStage::FRAGMENT,
+                ty: BindingType::Texture {
+                    sample_type: TextureSampleType::Depth,
+                    view_dimension: TextureViewDimension::D2Array,
+                    multisampled: false,
+                },
+                count: None,
+            },
+        ],
+    })
+}
+
+fn create_shadow_bg(device: &Device, bgl: &BindGroupLayout, buffer: &Buffer, view: &TextureView) -> BindGroup {
+    let mut builder = BindGroupBuilder::new(Some("shadow bg"));
+    builder.append(buffer.as_entire_binding());
+    builder.append(BindingResource::TextureView(view));
+    builder.build(device, bgl)
 }

@@ -217,7 +217,7 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
     ));
     let mesh_manager = RwLock::new(MeshManager::new(&device));
     let material_manager = RwLock::new(MaterialManager::new(&device, mode));
-    let object_manager = RwLock::new(ObjectManager::new(&device, mode));
+    let object_manager = RwLock::new(ObjectManager::new());
     let directional_light_manager = RwLock::new(DirectionalLightManager::new(&device));
 
     Ok(Arc::new(Renderer {

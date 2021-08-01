@@ -28,11 +28,11 @@ impl<T> ResourceRegistry<T> {
         (index, value)
     }
 
-    pub fn iter(&self) -> impl ExactSizeIterator<Item = (&usize, &T)> {
+    pub fn iter(&self) -> impl ExactSizeIterator<Item = (&usize, &T)> + Clone {
         self.mapping.iter()
     }
 
-    pub fn values(&self) -> impl ExactSizeIterator<Item = &T> {
+    pub fn values(&self) -> impl ExactSizeIterator<Item = &T> + Clone {
         self.mapping.values()
     }
 

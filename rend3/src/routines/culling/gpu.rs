@@ -1,10 +1,22 @@
 use std::{mem, num::NonZeroU64};
 
 use glam::Mat4;
-use wgpu::{BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType, BufferBindingType, BufferDescriptor, BufferUsage, CommandEncoder, ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor, Device, PipelineLayout, PipelineLayoutDescriptor, RenderPass, ShaderFlags, ShaderModuleDescriptor, ShaderStage, util::{BufferInitDescriptor, DeviceExt}};
+use wgpu::{
+    util::{BufferInitDescriptor, DeviceExt},
+    BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
+    BindingResource, BindingType, BufferBindingType, BufferDescriptor, BufferUsage, CommandEncoder,
+    ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor, Device, PipelineLayout,
+    PipelineLayoutDescriptor, RenderPass, ShaderFlags, ShaderModuleDescriptor, ShaderStage,
+};
 
 use super::{CulledObjectSet, GPUCullingInput, GPUIndirectData};
-use crate::{ModeData, resources::{CameraManager, InternalObject, MaterialManager}, routines::common::interfaces::{PerObjectData, ShaderInterfaces}, shaders::SPIRV_SHADERS, util::bind_merge::BindGroupBuilder};
+use crate::{
+    resources::{CameraManager, InternalObject, MaterialManager},
+    routines::common::interfaces::{PerObjectData, ShaderInterfaces},
+    shaders::SPIRV_SHADERS,
+    util::bind_merge::BindGroupBuilder,
+    ModeData,
+};
 
 #[repr(C, align(16))]
 #[derive(Debug, Copy, Clone)]
@@ -20,7 +32,7 @@ unsafe impl bytemuck::Zeroable for GPUCullingUniforms {}
 pub struct GpuCullerCullArgs<'a> {
     pub device: &'a Device,
     pub encoder: &'a mut CommandEncoder,
-    
+
     pub interfaces: &'a ShaderInterfaces,
 
     pub materials: &'a MaterialManager,
@@ -94,10 +106,7 @@ impl GpuCuller {
         Self { bgl, pll, pipeline }
     }
 
-    pub fn cull(
-        &self,
-        args: GpuCullerCullArgs<'_>
-    ) -> CulledObjectSet {
+    pub fn cull(&self, args: GpuCullerCullArgs<'_>) -> CulledObjectSet {
         let mut data = Vec::<u8>::with_capacity(
             mem::size_of::<GPUCullingUniforms>() + args.objects.len() * mem::size_of::<GPUCullingInput>(),
         );
@@ -171,7 +180,7 @@ impl GpuCuller {
             layout: &args.interfaces.culled_object_bgl,
             entries: &[BindGroupEntry {
                 binding: 0,
-                resource: output_buffer.as_entire_binding()
+                resource: output_buffer.as_entire_binding(),
             }],
         });
 

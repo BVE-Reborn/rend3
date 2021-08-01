@@ -152,14 +152,14 @@ impl TextureManager {
         self.null_tex_man.get_ref()
     }
 
-    pub fn gpu_bind_group_layout(&self) -> &BindGroupLayout {
+    pub fn gpu_bgl(&self) -> &BindGroupLayout {
         self.layout.as_gpu()
     }
 
     pub fn translation_fn(&self) -> impl Fn(TextureHandle) -> NonZeroU32 + Copy + '_ {
         move |v: TextureHandle| unsafe {
             // SAFETY: overflowing this number will panic
-            NonZeroU32::new_unchecked((self.internal_index(v) as u32).checked_add(1).unwrap())
+            NonZeroU32::new(self.internal_index(v) as u32 + 1).unwrap()
         }
     }
 }

@@ -11,11 +11,11 @@ use crate::routines::uniforms::ShaderCommonUniform;
 #[repr(C, align(16))]
 #[derive(Debug, Copy, Clone)]
 pub struct PerObjectData {
-    model_view: Mat4,
-    model_view_proj: Mat4,
-    inv_trans_model_view: Mat3A,
+    pub model_view: Mat4,
+    pub model_view_proj: Mat4,
+    pub inv_trans_model_view: Mat3A,
     // Unused in shader
-    material_idx: u32,
+    pub material_idx: u32,
 }
 
 unsafe impl bytemuck::Pod for PerObjectData {}

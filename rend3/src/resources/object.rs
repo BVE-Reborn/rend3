@@ -9,7 +9,10 @@ use crate::{
 };
 use glam::Mat4;
 use std::mem::size_of;
-use wgpu::{BindingType, BufferBindingType, BufferUsage, Device, Queue, ShaderStage};
+use wgpu::{
+    BindGroup, BindGroupLayout, BindGroupLayoutDescriptor, BindingType, BufferBindingType, BufferUsage, Device, Queue,
+    ShaderStage,
+};
 
 #[derive(Debug, Clone)]
 pub struct InternalObject {
@@ -21,42 +24,16 @@ pub struct InternalObject {
     pub vertex_offset: i32,
 }
 
-#[derive(Debug, Copy, Clone)]
-#[repr(C, align(16))]
-struct ShaderInputObject {
-    start_idx: u32,
-    count: u32,
-    vertex_offset: i32,
-    material_idx: u32,
-    transform: Mat4,
-    sphere: BoundingSphere,
-}
-
-unsafe impl bytemuck::Zeroable for ShaderInputObject {}
-unsafe impl bytemuck::Pod for ShaderInputObject {}
-
-const SHADER_OBJECT_SIZE: usize = size_of::<ShaderInputObject>();
-
 pub struct ObjectManager {
-    object_info_buffer: ModeData<(), WrappedPotBuffer>,
-
     registry: ResourceRegistry<InternalObject>,
 }
 impl ObjectManager {
-    pub fn new(device: &Device, mode: RendererMode) -> Self {
+    pub fn new() -> Self {
         span_transfer!(_ -> new_span, INFO, "Creating Object Manager");
-
-        let object_info_buffer = mode.into_data(
-            || (),
-            || WrappedPotBuffer::new(device, 0, BufferUsage::STORAGE, Some("object info buffer")),
-        );
 
         let registry = ResourceRegistry::new();
 
-        Self {
-            object_info_buffer,
-            registry,
-        }
+        Self { registry }
     }
 
     pub fn allocate(&self) -> ObjectHandle {
@@ -84,50 +61,10 @@ impl ObjectManager {
         self.registry.remove(handle.0);
     }
 
-    pub fn ready(&mut self, device: &Device, queue: &Queue, material_manager: &MaterialManager) -> usize {
+    pub fn ready(&mut self) -> Vec<InternalObject> {
         span_transfer!(_ -> ready_span, INFO, "Object Manager Ready");
 
-        let object_count = self.registry.count();
-
-        if object_count == 0 {
-            return object_count;
-        }
-
-        if let ModeData::GPU(ref mut obj_buffer) = self.object_info_buffer {
-            let data: Vec<_> = self
-                .registry
-                .values()
-                .map(|object| ShaderInputObject {
-                    start_idx: object.start_idx,
-                    count: object.count,
-                    vertex_offset: object.vertex_offset,
-                    material_idx: material_manager.internal_index(object.material) as u32,
-                    transform: object.transform,
-                    sphere: object.sphere,
-                })
-                .collect();
-
-            obj_buffer.write_to_buffer(device, queue, bytemuck::cast_slice(&data));
-        }
-
-        object_count
-    }
-
-    pub fn values(&self) -> impl Iterator<Item = &InternalObject> {
-        self.registry.values()
-    }
-
-    pub fn gpu_append_to_bgb<'a>(&'a self, visibility: ShaderStage, general_bgb: &mut BindGroupBuilder<'a>) {
-        general_bgb.append(
-            visibility,
-            BindingType::Buffer {
-                ty: BufferBindingType::Storage { read_only: true },
-                has_dynamic_offset: false,
-                min_binding_size: None,
-            },
-            None,
-            self.object_info_buffer.as_gpu().as_entire_binding(),
-        );
+        self.registry.values().cloned().collect()
     }
 
     pub fn set_object_transform(&mut self, handle: ObjectHandle, transform: Mat4) {

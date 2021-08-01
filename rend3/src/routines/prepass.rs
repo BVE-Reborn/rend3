@@ -16,7 +16,7 @@ pub struct DepthPrepassDrawDepthPrepassArgs<'rpass, 'a> {
     pub sampler_bg: &'rpass BindGroup,
     pub texture_bg: &'rpass BindGroup,
 
-    pub culled_objects: CulledObjectSet,
+    pub culled_objects: &'rpass CulledObjectSet,
 }
 
 pub struct DepthPrepass {
@@ -28,7 +28,7 @@ impl DepthPrepass {
         Self { pipeline }
     }
 
-    pub fn draw_depth_prepass<'rpass>(&'rpass self, args: DepthPrepassDrawDepthPrepassArgs<'rpass, '_>) {
+    pub fn draw_depth_prepass<'rpass>(&'rpass self, mut args: DepthPrepassDrawDepthPrepassArgs<'rpass, '_>) {
         args.rpass.set_pipeline(&self.pipeline);
         args.rpass.set_bind_group(0, args.sampler_bg, &[]);
         args.rpass.set_bind_group(1, &args.culled_objects.output_bg, &[]);
