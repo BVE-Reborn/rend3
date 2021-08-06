@@ -1,14 +1,14 @@
 use crate::{
     datatypes::{
-        Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Material,
-        MaterialChange, MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, Texture, TextureHandle,
+        Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Material, MaterialChange,
+        MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, Texture, TextureHandle,
     },
     instruction::{Instruction, InstructionStreamPair},
-    resources::{DirectionalLightManager, MaterialManager, MeshManager, ObjectManager, TextureManager},
     renderer::{info::ExtendedAdapterInfo, resources::RendererGlobalResources},
+    resources::{DirectionalLightManager, MaterialManager, MeshManager, ObjectManager, TextureManager},
     statistics::RendererStatistics,
     util::output::RendererOutput,
-    JobPriorities, RenderList, RendererBuilder, RendererInitializationError, RendererMode, RendererOptions,
+    JobPriorities, RenderRoutine, RendererBuilder, RendererInitializationError, RendererMode, RendererOptions,
 };
 use glam::Mat4;
 use parking_lot::RwLock;
@@ -42,20 +42,20 @@ where
     yard_priorites: JobPriorities,
     instructions: InstructionStreamPair,
 
-    mode: RendererMode,
-    adapter_info: ExtendedAdapterInfo,
-    instance: Arc<Instance>,
-    queue: Arc<Queue>,
-    device: Arc<Device>,
-    surface: Option<Surface>,
+    pub mode: RendererMode,
+    pub adapter_info: ExtendedAdapterInfo,
+    pub instance: Arc<Instance>,
+    pub queue: Arc<Queue>,
+    pub device: Arc<Device>,
+    pub surface: Option<Surface>,
 
-    global_resources: RwLock<RendererGlobalResources>,
-    mesh_manager: RwLock<MeshManager>,
-    texture_manager_2d: RwLock<TextureManager>,
-    texture_manager_cube: RwLock<TextureManager>,
-    material_manager: RwLock<MaterialManager>,
-    object_manager: RwLock<ObjectManager>,
-    directional_light_manager: RwLock<DirectionalLightManager>,
+    pub global_resources: RwLock<RendererGlobalResources>,
+    pub mesh_manager: RwLock<MeshManager>,
+    pub texture_manager_2d: RwLock<TextureManager>,
+    pub texture_manager_cube: RwLock<TextureManager>,
+    pub material_manager: RwLock<MaterialManager>,
+    pub object_manager: RwLock<ObjectManager>,
+    pub directional_light_manager: RwLock<DirectionalLightManager>,
 
     options: RwLock<RendererOptions>,
 }
@@ -238,7 +238,7 @@ impl<TLD: 'static> Renderer<TLD> {
 
     pub fn render(
         self: &Arc<Self>,
-        list: Arc<dyn RenderList<TLD>>,
+        list: Arc<dyn RenderRoutine<TLD>>,
         output: RendererOutput,
     ) -> JoinHandle<RendererStatistics> {
         let this = Arc::clone(self);

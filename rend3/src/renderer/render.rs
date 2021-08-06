@@ -3,7 +3,7 @@ use crate::{
     instruction::Instruction,
     statistics::RendererStatistics,
     util::output::RendererOutput,
-    RenderList, Renderer,
+    RenderRoutine, Renderer,
 };
 use std::{future::Future, sync::Arc};
 use tracing_futures::Instrument;
@@ -14,7 +14,7 @@ use wgpu::{
 
 pub fn render_loop<TLD: 'static>(
     renderer: Arc<Renderer<TLD>>,
-    list: Arc<dyn RenderList<TLD>>,
+    list: Arc<dyn RenderRoutine<TLD>>,
     output: RendererOutput,
 ) -> impl Future<Output = RendererStatistics> {
     span_transfer!(_ -> render_create_span, INFO, "Render Loop Creation");

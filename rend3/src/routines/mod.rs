@@ -1,6 +1,7 @@
-mod common;
-mod culling;
-mod directional;
-mod prepass;
-mod uniforms;
-mod vertex;
+pub mod common;
+pub mod culling;
+pub mod default;
+pub mod directional;
+pub mod prepass;
+pub mod uniforms;
+pub mod vertex;

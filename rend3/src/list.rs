@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{util::output::OutputFrame, Renderer};
 
-pub trait RenderList<TLD>: Send + Sync
+pub trait RenderRoutine<TLD>: Send + Sync
 where
     TLD: 'static,
 {

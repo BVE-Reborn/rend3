@@ -36,7 +36,6 @@ impl DepthPrepass {
         match args.culled_objects.calls {
             ModeData::CPU(ref draws) => culling::cpu::run(&mut args.rpass, &draws, args.materials, 2),
             ModeData::GPU(ref data) => {
-                // TODO(ref): Figure out how to get materials or textures.
                 args.rpass.set_bind_group(2, args.materials.gpu_get_bind_group(), &[]);
                 args.rpass.set_bind_group(3, args.texture_bg, &[]);
                 culling::gpu::run(&mut args.rpass, data);
