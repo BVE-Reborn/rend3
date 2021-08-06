@@ -61,7 +61,7 @@ impl ObjectManager {
         self.registry.remove(handle.0);
     }
 
-    pub fn ready(&mut self) -> Vec<InternalObject> {
+    pub fn ready(&self) -> Vec<InternalObject> {
         span_transfer!(_ -> ready_span, INFO, "Object Manager Ready");
 
         self.registry.values().cloned().collect()

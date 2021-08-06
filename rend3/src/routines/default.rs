@@ -46,5 +46,25 @@ impl DefaultRenderRoutine {
 }
 
 impl<TLD: 'static> RenderRoutine<TLD> for DefaultRenderRoutine {
-    fn render(&self, context: Arc<Renderer<TLD>>, frame: crate::util::output::OutputFrame) {}
+    fn render(&self, renderer: Arc<Renderer<TLD>>, frame: crate::util::output::OutputFrame) {
+        let mut encoder = renderer.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("primary encoder"),
+        });
+
+        let objects = renderer.object_manager.read().ready();
+
+        let culled_shadows = self
+            .shadow_passes
+            .cull_shadows(directional::DirectionalShadowPassCullShadowsArgs {
+                device: &renderer.device,
+                encoder: &mut encoder,
+                culler: self.gpu_culler.as_ref().map_cpu(|_| &self.cpu_culler),
+                materials: &renderer.material_manager.read(),
+                interfaces: &self.interfaces,
+                lights: &renderer.directional_light_manager.read(),
+                objects: &objects,
+            });
+
+            
+    }
 }

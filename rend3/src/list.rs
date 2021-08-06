@@ -6,5 +6,5 @@ pub trait RenderRoutine<TLD>: Send + Sync
 where
     TLD: 'static,
 {
-    fn render(&self, context: Arc<Renderer<TLD>>, frame: OutputFrame);
+    fn render(&self, renderer: Arc<Renderer<TLD>>, frame: OutputFrame);
 }
