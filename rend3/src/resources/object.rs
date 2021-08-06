@@ -1,18 +1,11 @@
 use crate::{
     datatypes::{MaterialHandle, Object, ObjectHandle},
-    mode::ModeData,
-    resources::{MaterialManager, MeshManager},
+    resources::{MeshManager},
     util::{
-        bind_merge::BindGroupBuilder, buffer::WrappedPotBuffer, frustum::BoundingSphere, registry::ResourceRegistry,
+        frustum::BoundingSphere, registry::ResourceRegistry,
     },
-    RendererMode,
 };
 use glam::Mat4;
-use std::mem::size_of;
-use wgpu::{
-    BindGroup, BindGroupLayout, BindGroupLayoutDescriptor, BindingType, BufferBindingType, BufferUsage, Device, Queue,
-    ShaderStage,
-};
 
 #[derive(Debug, Clone)]
 pub struct InternalObject {

@@ -157,10 +157,7 @@ impl TextureManager {
     }
 
     pub fn translation_fn(&self) -> impl Fn(TextureHandle) -> NonZeroU32 + Copy + '_ {
-        move |v: TextureHandle| unsafe {
-            // SAFETY: overflowing this number will panic
-            NonZeroU32::new(self.internal_index(v) as u32 + 1).unwrap()
-        }
+        move |v: TextureHandle| NonZeroU32::new(self.internal_index(v) as u32 + 1).unwrap()
     }
 }
 

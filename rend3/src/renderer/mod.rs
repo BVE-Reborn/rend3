@@ -51,8 +51,8 @@ where
 
     pub global_resources: RwLock<RendererGlobalResources>,
     pub mesh_manager: RwLock<MeshManager>,
-    pub texture_manager_2d: RwLock<TextureManager>,
-    pub texture_manager_cube: RwLock<TextureManager>,
+    pub d2_texture_manager: RwLock<TextureManager>,
+    pub d2c_texture_manager: RwLock<TextureManager>,
     pub material_manager: RwLock<MaterialManager>,
     pub object_manager: RwLock<ObjectManager>,
     pub directional_light_manager: RwLock<DirectionalLightManager>,
@@ -106,7 +106,7 @@ impl<TLD: 'static> Renderer<TLD> {
     }
 
     pub fn add_texture_2d(&self, texture: Texture) -> TextureHandle {
-        let handle = self.texture_manager_2d.read().allocate();
+        let handle = self.d2_texture_manager.read().allocate();
         self.instructions
             .producer
             .lock()
@@ -122,7 +122,7 @@ impl<TLD: 'static> Renderer<TLD> {
     }
 
     pub fn add_texture_cube(&self, texture: Texture) -> TextureHandle {
-        let handle = self.texture_manager_cube.read().allocate();
+        let handle = self.d2c_texture_manager.read().allocate();
         self.instructions
             .producer
             .lock()

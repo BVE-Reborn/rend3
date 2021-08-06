@@ -22,6 +22,7 @@ unsafe impl bytemuck::Pod for PerObjectData {}
 unsafe impl bytemuck::Zeroable for PerObjectData {}
 
 pub struct ShaderInterfaces {
+    // TODO: move this into samplers struct?
     pub samplers_bgl: BindGroupLayout,
     pub culled_object_bgl: BindGroupLayout,
     pub uniform_bgl: BindGroupLayout,
@@ -30,7 +31,7 @@ pub struct ShaderInterfaces {
 impl ShaderInterfaces {
     pub fn new(device: &Device) -> Self {
         let samplers_bgl = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-            label: Some("sampler bgl"),
+            label: Some("samplers bgl"),
             entries: &[
                 BindGroupLayoutEntry {
                     binding: 0,
@@ -47,6 +48,15 @@ impl ShaderInterfaces {
                     ty: BindingType::Sampler {
                         filtering: false,
                         comparison: false,
+                    },
+                    count: None,
+                },
+                BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: ShaderStage::FRAGMENT,
+                    ty: BindingType::Sampler {
+                        filtering: true,
+                        comparison: true,
                     },
                     count: None,
                 },

@@ -291,58 +291,39 @@ impl MaterialManager {
             InternalMaterial {
                 bind_group: mode.into_data(
                     || {
-                        let visibility = ShaderStage::VERTEX | ShaderStage::FRAGMENT | ShaderStage::COMPUTE;
-                        let ty = BindingType::Texture {
-                            view_dimension: TextureViewDimension::D2,
-                            sample_type: TextureSampleType::Float { filterable: true },
-                            multisampled: false,
-                        };
-
-                        let mut bgb = BindGroupBuilder::new(None);
-                        bgb.append(BindingResource::TextureView(
-                            material.albedo.to_texture(lookup_fn).unwrap_or(null_tex),
-                        ));
-                        bgb.append(BindingResource::TextureView(
-                            material.normal.to_texture(lookup_fn).unwrap_or(null_tex),
-                        ));
-                        bgb.append(BindingResource::TextureView(
-                            material
-                                .aomr_textures
-                                .to_roughness_texture(lookup_fn)
-                                .unwrap_or(null_tex),
-                        ));
-                        bgb.append(BindingResource::TextureView(
-                            material
-                                .aomr_textures
-                                .to_metallic_texture(lookup_fn)
-                                .unwrap_or(null_tex),
-                        ));
-                        bgb.append(BindingResource::TextureView(
-                            material.reflectance.to_texture(lookup_fn).unwrap_or(null_tex),
-                        ));
-                        bgb.append(BindingResource::TextureView(
-                            material
-                                .clearcoat_textures
-                                .to_clearcoat_texture(lookup_fn)
-                                .unwrap_or(null_tex),
-                        ));
-                        bgb.append(BindingResource::TextureView(
-                            material
-                                .clearcoat_textures
-                                .to_clearcoat_roughness_texture(lookup_fn)
-                                .unwrap_or(null_tex),
-                        ));
-                        bgb.append(BindingResource::TextureView(
-                            material.emissive.to_texture(lookup_fn).unwrap_or(null_tex),
-                        ));
-                        bgb.append(BindingResource::TextureView(
-                            material.anisotropy.to_texture(lookup_fn).unwrap_or(null_tex),
-                        ));
-                        bgb.append(BindingResource::TextureView(
-                            material.aomr_textures.to_ao_texture(lookup_fn).unwrap_or(null_tex),
-                        ));
-                        bgb.append(material_buffer.as_cpu().as_entire_binding());
-                        bgb.build(device, self.bgl.as_cpu())
+                        BindGroupBuilder::new(None)
+                            .with_texture_view(material.albedo.to_texture(lookup_fn).unwrap_or(null_tex))
+                            .with_texture_view(material.normal.to_texture(lookup_fn).unwrap_or(null_tex))
+                            .with_texture_view(
+                                material
+                                    .aomr_textures
+                                    .to_roughness_texture(lookup_fn)
+                                    .unwrap_or(null_tex),
+                            )
+                            .with_texture_view(
+                                material
+                                    .aomr_textures
+                                    .to_metallic_texture(lookup_fn)
+                                    .unwrap_or(null_tex),
+                            )
+                            .with_texture_view(material.reflectance.to_texture(lookup_fn).unwrap_or(null_tex))
+                            .with_texture_view(
+                                material
+                                    .clearcoat_textures
+                                    .to_clearcoat_texture(lookup_fn)
+                                    .unwrap_or(null_tex),
+                            )
+                            .with_texture_view(
+                                material
+                                    .clearcoat_textures
+                                    .to_clearcoat_roughness_texture(lookup_fn)
+                                    .unwrap_or(null_tex),
+                            )
+                            .with_texture_view(material.emissive.to_texture(lookup_fn).unwrap_or(null_tex))
+                            .with_texture_view(material.anisotropy.to_texture(lookup_fn).unwrap_or(null_tex))
+                            .with_texture_view(material.aomr_textures.to_ao_texture(lookup_fn).unwrap_or(null_tex))
+                            .with_buffer(material_buffer.as_cpu())
+                            .build(device, self.bgl.as_cpu())
                     },
                     || (),
                 ),

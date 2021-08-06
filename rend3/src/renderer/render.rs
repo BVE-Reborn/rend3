@@ -35,8 +35,8 @@ pub fn render_loop<TLD: 'static>(
         let mut new_options = None;
 
         let mut mesh_manager = renderer.mesh_manager.write();
-        let mut texture_manager_2d = renderer.texture_manager_2d.write();
-        let mut texture_manager_cube = renderer.texture_manager_cube.write();
+        let mut texture_manager_2d = renderer.d2_texture_manager.write();
+        let mut texture_manager_cube = renderer.d2c_texture_manager.write();
         let mut material_manager = renderer.material_manager.write();
         let mut object_manager = renderer.object_manager.write();
         let mut directional_light_manager = renderer.directional_light_manager.write();

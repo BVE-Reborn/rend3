@@ -234,8 +234,8 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
 
         global_resources,
         mesh_manager,
-        texture_manager_2d,
-        texture_manager_cube,
+        d2_texture_manager: texture_manager_2d,
+        d2c_texture_manager: texture_manager_cube,
         material_manager,
         object_manager,
         directional_light_manager,

@@ -201,8 +201,6 @@ impl MeshManager {
             let new_vert_range = new_vert_alloc.allocate_range(mesh.vertex_range.len()).unwrap();
             let new_index_range = new_index_alloc.allocate_range(mesh.index_range.len()).unwrap();
 
-            let vert_difference = new_vert_range.start as isize - mesh.vertex_range.start as isize;
-
             // TODO: This was once a function but borrowck wasn't happy with me, could I make it happy?
             macro_rules! copy_vert_fn {
                 ($src:expr, $dst:expr, $size:expr) => {

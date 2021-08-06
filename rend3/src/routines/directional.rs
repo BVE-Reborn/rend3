@@ -44,7 +44,7 @@ pub struct DirectionalShadowPassDrawCulledShadowsArgs<'a> {
     pub materials: &'a MaterialManager,
 
     pub sampler_bg: &'a BindGroup,
-    pub texture_bg: &'a BindGroup,
+    pub texture_bg: ModeData<(), &'a BindGroup>,
 
     pub culled_lights: &'a [CulledLightSet],
 }
@@ -112,7 +112,7 @@ impl DirectionalShadowPass {
                 ModeData::CPU(ref draws) => culling::cpu::run(&mut rpass, &draws, args.materials, 2),
                 ModeData::GPU(ref data) => {
                     rpass.set_bind_group(2, args.materials.gpu_get_bind_group(), &[]);
-                    rpass.set_bind_group(3, args.texture_bg, &[]);
+                    rpass.set_bind_group(3, args.texture_bg.as_gpu(), &[]);
                     culling::gpu::run(&mut rpass, data);
                 }
             }
