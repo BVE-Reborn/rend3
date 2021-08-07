@@ -104,6 +104,14 @@ impl DirectionalLightManager {
         Arc::clone(&self.layer_views[layer as usize])
     }
 
+    pub fn get_bgl(&self) -> &BindGroupLayout {
+        &self.bgl
+    }
+
+    pub fn get_bg(&self) -> &BindGroup {
+        &self.bg
+    }
+
     pub fn remove(&mut self, handle: DirectionalLightHandle) {
         self.registry.remove(handle.0);
     }

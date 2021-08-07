@@ -5,7 +5,7 @@ use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
     BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
     BindingResource, BindingType, BufferBindingType, BufferDescriptor, BufferUsage, CommandEncoder,
-    ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor, Device, PipelineLayout,
+    ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor, Device,
     PipelineLayoutDescriptor, RenderPass, ShaderFlags, ShaderModuleDescriptor, ShaderStage,
 };
 
@@ -43,7 +43,6 @@ pub struct GpuCullerCullArgs<'a> {
 
 pub struct GpuCuller {
     bgl: BindGroupLayout,
-    pll: PipelineLayout,
     pipeline: ComputePipeline,
 }
 impl GpuCuller {
@@ -103,13 +102,14 @@ impl GpuCuller {
             entry_point: "main",
         });
 
-        Self { bgl, pll, pipeline }
+        Self { bgl, pipeline }
     }
 
     pub fn cull(&self, args: GpuCullerCullArgs<'_>) -> CulledObjectSet {
         let mut data = Vec::<u8>::with_capacity(
             mem::size_of::<GPUCullingUniforms>() + args.objects.len() * mem::size_of::<GPUCullingInput>(),
         );
+        // TODO: Adjust this shader with new input/output
         data.extend(bytemuck::bytes_of(&GPUCullingUniforms {
             view: args.camera.view().into(),
             view_proj: args.camera.view_proj().into(),

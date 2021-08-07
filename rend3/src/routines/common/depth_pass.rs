@@ -26,7 +26,7 @@ pub struct BuildDepthPassShaderArgs<'a> {
     pub materials: &'a MaterialManager,
 }
 
-pub fn build_depth_pass_shader(mut args: BuildDepthPassShaderArgs) -> RenderPipeline {
+pub fn build_depth_pass_shader(args: BuildDepthPassShaderArgs) -> RenderPipeline {
     let depth_prepass_vert = args.device.create_shader_module(&ShaderModuleDescriptor {
         label: Some("depth pass vert"),
         source: wgpu::util::make_spirv(
@@ -84,7 +84,7 @@ pub fn build_depth_pass_shader(mut args: BuildDepthPassShaderArgs) -> RenderPipe
 
     let pipeline = args.device.create_render_pipeline(&RenderPipelineDescriptor {
         label: Some("depth prepass"),
-        layout: None,
+        layout: Some(&pll),
         vertex: VertexState {
             module: &depth_prepass_vert,
             entry_point: "main",

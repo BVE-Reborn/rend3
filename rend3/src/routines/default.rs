@@ -11,7 +11,7 @@ pub struct DefaultRenderRoutine {
     pub cpu_culler: culling::cpu::CpuCuller,
     pub gpu_culler: ModeData<(), culling::gpu::GpuCuller>,
     pub shadow_passes: directional::DirectionalShadowPass,
-    pub depth_prepass: prepass::DepthPrepass,
+    pub opaque_pass: opaque::OpaquePass,
 }
 
 impl DefaultRenderRoutine {
@@ -35,8 +35,15 @@ impl DefaultRenderRoutine {
                 materials: &renderer.material_manager.read(),
             },
         ));
+        let opaque_pipeline = Arc::new(common::opaque_pass::build_opaque_pass_shader(
+            common::opaque_pass::BuildOpaquePassShaderArgs {
+                mode,
+                device,
+                materials: &renderer.material_manager.read(),
+            },
+        ));
         let shadow_passes = directional::DirectionalShadowPass::new(Arc::clone(&depth_pipeline));
-        let depth_prepass = prepass::DepthPrepass::new(Arc::clone(&depth_pipeline));
+        let opaque_pass = opaque::OpaquePass::new(Arc::clone(&depth_pipeline), Arc::clone(&opaque_pipeline));
 
         Self {
             interfaces,
@@ -44,7 +51,7 @@ impl DefaultRenderRoutine {
             cpu_culler,
             gpu_culler,
             shadow_passes,
-            depth_prepass,
+            opaque_pass,
         }
     }
 }
@@ -61,7 +68,7 @@ impl<TLD: 'static> RenderRoutine<TLD> for DefaultRenderRoutine {
         let mut d2c_textures = renderer.d2c_texture_manager.write();
 
         let d2_texture_output = d2_textures.ready(&renderer.device);
-        let d2c_texture_output = d2c_textures.ready(&renderer.device);
+        let d2c_texture_output = d2_textures.ready(&renderer.device);
         let objects = renderer.object_manager.read().ready();
 
         let culled_lights = self
@@ -76,12 +83,13 @@ impl<TLD: 'static> RenderRoutine<TLD> for DefaultRenderRoutine {
                 objects: &objects,
             });
 
-        self.shadow_passes.draw_culled_shadows(directional::DirectionalShadowPassDrawCulledShadowsArgs {
-            encoder: &mut encoder,
-            materials: &materials,
-            sampler_bg: &self.samplers.bg,
-            texture_bg: d2_texture_output.bg.as_ref().map(|_|(), |a| &**a),
-            culled_lights: &culled_lights,
-        })
+        self.shadow_passes
+            .draw_culled_shadows(directional::DirectionalShadowPassDrawCulledShadowsArgs {
+                encoder: &mut encoder,
+                materials: &materials,
+                sampler_bg: &self.samplers.bg,
+                texture_bg: d2_texture_output.bg.as_ref().map(|_| (), |a| &**a),
+                culled_lights: &culled_lights,
+            })
     }
 }
