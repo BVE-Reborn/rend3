@@ -1,0 +1,52 @@
+#version 450
+
+#include "structures.glsl"
+
+layout(local_size_x = 256) in;
+
+struct CullingUniforms {
+    mat4 view;
+    mat4 view_proj;
+    uint object_count;
+};
+
+layout(set = 0, binding = 0, std430) restrict readonly buffer ObjectInputDataBuffer {
+    CullingUniforms uniforms;
+    ObjectInputData object_input[];
+};
+layout(set = 0, binding = 1, std430) restrict buffer ObjectOutputDataBuffer {
+    ObjectOutputData object_output[];
+};
+layout(set = 0, binding = 2, std430) restrict buffer IndirectBuffer {
+    uint draw_call_count;
+    IndirectCall indirect_call[];
+};
+
+void main() {
+    uint input_idx = gl_GlobalInvocationID.x;
+
+    if (input_idx >= uniforms.object_count) {
+        return;
+    }
+
+    uint output_idx = atomicAdd(draw_call_count, 1);
+
+    ObjectInputData in_data = object_input[input_idx];
+
+    ObjectOutputData out_data;
+
+    out_data.model_view = uniforms.view * in_data.transform;
+    out_data.model_view_proj = uniforms.view_proj * in_data.transform;
+    out_data.inv_trans_model_view = inverse(transpose(mat3(uniforms.view * in_data.transform)));
+    out_data.material_idx = in_data.material_idx;
+
+    object_output[output_idx] = out_data;
+
+    IndirectCall call;
+    call.vertex_count = in_data.count;
+    call.instance_count = 1;
+    call.base_index = in_data.start_idx;
+    call.vertex_offset = in_data.vertex_offset;
+    call.base_instance = output_idx;
+    indirect_call[output_idx] = call;
+}
