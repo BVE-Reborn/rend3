@@ -25,6 +25,7 @@ pub struct BuildDepthPassShaderArgs<'a> {
 
     pub materials: &'a MaterialManager,
 
+    /// TODO: How could this be better expressed
     pub include_color: bool,
 }
 
@@ -114,7 +115,15 @@ pub fn build_depth_pass_shader(args: BuildDepthPassShaderArgs) -> RenderPipeline
             depth_write_enabled: true,
             depth_compare: CompareFunction::GreaterEqual,
             stencil: StencilState::default(),
-            bias: DepthBiasState::default(),
+            bias: if args.include_color {
+                DepthBiasState::default()
+            } else {
+                DepthBiasState {
+                    constant: 2,
+                    slope_scale: 2.0,
+                    clamp: 0.0,
+                }
+            },
             clamp_depth: false,
         }),
         multisample: MultisampleState::default(),

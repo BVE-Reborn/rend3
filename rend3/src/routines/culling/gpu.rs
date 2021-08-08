@@ -76,7 +76,7 @@ impl GpuCuller {
                     ty: BindingType::Buffer {
                         ty: BufferBindingType::Storage { read_only: false },
                         has_dynamic_offset: false,
-                        min_binding_size: NonZeroU64::new(20),
+                        min_binding_size: NonZeroU64::new(16 + 20),
                     },
                     count: None,
                 },
@@ -109,7 +109,6 @@ impl GpuCuller {
         let mut data = Vec::<u8>::with_capacity(
             mem::size_of::<GPUCullingUniforms>() + args.objects.len() * mem::size_of::<GPUCullingInput>(),
         );
-        // TODO: Adjust this shader with new input/output
         data.extend(bytemuck::bytes_of(&GPUCullingUniforms {
             view: args.camera.view().into(),
             view_proj: args.camera.view_proj().into(),
@@ -143,27 +142,15 @@ impl GpuCuller {
             label: Some("indirect buffer"),
             // 16 bytes for count, the rest for the indirect count
             size: (args.objects.len() * 20 + 16) as _,
-            usage: BufferUsage::STORAGE | BufferUsage::INDIRECT,
+            usage: BufferUsage::STORAGE | BufferUsage::INDIRECT | BufferUsage::VERTEX,
             mapped_at_creation: false,
         });
 
-        let mut bgb = BindGroupBuilder::new(Some("gpu culling bg"));
-        bgb.append(BindingResource::Buffer {
-            buffer: &input_buffer,
-            offset: 0,
-            size: None,
-        });
-        bgb.append(BindingResource::Buffer {
-            buffer: &output_buffer,
-            offset: 0,
-            size: None,
-        });
-        bgb.append(BindingResource::Buffer {
-            buffer: &indirect_buffer,
-            offset: 0,
-            size: None,
-        });
-        let bg = bgb.build(&args.device, &self.bgl);
+        let bg = BindGroupBuilder::new(Some("gpu culling bg"))
+            .with_buffer(&input_buffer)
+            .with_buffer(&output_buffer)
+            .with_buffer(&indirect_buffer)
+            .build(&args.device, &self.bgl);
 
         let mut cpass = args.encoder.begin_compute_pass(&ComputePassDescriptor {
             label: Some("compute cull"),
@@ -171,7 +158,7 @@ impl GpuCuller {
 
         cpass.set_pipeline(&self.pipeline);
         cpass.set_bind_group(0, &bg, &[]);
-        cpass.dispatch((args.objects.len() / 256) as _, 1, 1);
+        cpass.dispatch(((args.objects.len() + 255) / 256) as _, 1, 1);
 
         drop(cpass);
 

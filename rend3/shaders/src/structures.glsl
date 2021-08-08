@@ -22,7 +22,7 @@ struct ObjectInputData {
     mat4 transform;
     // xyz position; w radius
     vec4 bounding_sphere;
-};
+}; 
 
 /// If you change this struct, change the object output size in culling.rs
 struct ObjectOutputData {

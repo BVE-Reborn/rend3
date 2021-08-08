@@ -17,19 +17,23 @@ layout(set = 0, binding = 0, std430) restrict readonly buffer ObjectInputDataBuf
 layout(set = 0, binding = 1, std430) restrict buffer ObjectOutputDataBuffer {
     ObjectOutputData object_output[];
 };
-layout(set = 0, binding = 2, std430) restrict buffer IndirectBuffer {
+layout(set = 0, binding = 2, std430) buffer IndirectBuffer {
     uint draw_call_count;
+    uint _2;
+    uint _3;
+    uint _4;
     IndirectCall indirect_call[];
 };
 
 void main() {
     uint input_idx = gl_GlobalInvocationID.x;
 
-    if (input_idx >= uniforms.object_count) {
+    if (input_idx >= 1) {
         return;
     }
 
     uint output_idx = atomicAdd(draw_call_count, 1);
+    uint output_idx = 0;
 
     ObjectInputData in_data = object_input[input_idx];
 

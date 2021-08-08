@@ -60,7 +60,7 @@ pub fn build_opaque_pass_shader(args: BuildOpaquePassShaderArgs<'_>) -> RenderPi
     let cpu_vertex_buffers = cpu_vertex_buffers();
     let gpu_vertex_buffers = gpu_vertex_buffers();
 
-    let mut bgls: ArrayVec<&BindGroupLayout, 5> = ArrayVec::new();
+    let mut bgls: ArrayVec<&BindGroupLayout, 6> = ArrayVec::new();
     bgls.push(&args.interfaces.samplers_bgl);
     bgls.push(&args.interfaces.culled_object_bgl);
     bgls.push(&args.directional_light_bgl);

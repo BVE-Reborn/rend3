@@ -30,6 +30,8 @@ impl WrappedPotBuffer {
             (size - 1).next_power_of_two()
         };
 
+        let usage = usage | BufferUsage::COPY_DST;
+
         Self {
             inner: Arc::new(device.create_buffer(&BufferDescriptor {
                 label: label.as_deref(),
@@ -94,18 +96,18 @@ mod test {
 
     #[test]
     fn automated_buffer_resize() {
-        assert_eq!(will_resize_inner(64, 128), Some(256));
-        assert_eq!(will_resize_inner(128, 128), None);
-        assert_eq!(will_resize_inner(256, 128), None);
+        assert_eq!(will_resize_inner(64, 128, 0), Some(256));
+        assert_eq!(will_resize_inner(128, 128, 0), None);
+        assert_eq!(will_resize_inner(256, 128, 0), None);
 
-        assert_eq!(will_resize_inner(64, 64), None);
-        assert_eq!(will_resize_inner(128, 64), None);
-        assert_eq!(will_resize_inner(256, 65), None);
-        assert_eq!(will_resize_inner(256, 64), Some(128));
-        assert_eq!(will_resize_inner(256, 63), Some(64));
+        assert_eq!(will_resize_inner(64, 64, 0), None);
+        assert_eq!(will_resize_inner(128, 64, 0), None);
+        assert_eq!(will_resize_inner(256, 65, 0), None);
+        assert_eq!(will_resize_inner(256, 64, 0), Some(128));
+        assert_eq!(will_resize_inner(256, 63, 0), Some(64));
 
-        assert_eq!(will_resize_inner(16, 16), None);
-        assert_eq!(will_resize_inner(16, 8), None);
-        assert_eq!(will_resize_inner(16, 4), None);
+        assert_eq!(will_resize_inner(16, 16, 0), None);
+        assert_eq!(will_resize_inner(16, 8, 0), None);
+        assert_eq!(will_resize_inner(16, 4, 0), None);
     }
 }

@@ -111,10 +111,12 @@ impl<TLD: 'static> RenderRoutine<TLD> for DefaultRenderRoutine {
         });
 
         let mesh_manager = renderer.mesh_manager.read();
-        let directional_light = renderer.directional_light_manager.read();
-        let materials = renderer.material_manager.read();
+        let mut directional_light = renderer.directional_light_manager.write();
+        let mut materials = renderer.material_manager.write();
         let mut d2_textures = renderer.d2_texture_manager.write();
 
+        directional_light.ready(&renderer.device, &renderer.queue);
+        materials.ready(&renderer.device, &renderer.queue, &d2_textures);
         let d2_texture_output = d2_textures.ready(&renderer.device);
         let objects = renderer.object_manager.read().ready();
 
