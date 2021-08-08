@@ -16,14 +16,10 @@ layout(location = 4) in vec4 i_color;
 layout(location = 5) flat in uint i_material;
 
 layout(location = 0) out vec4 o_color;
-layout(location = 1) out vec4 o_normal;
 
 layout(set = 0, binding = 0) uniform sampler linear_sampler;
 layout(set = 0, binding = 1) uniform sampler nearest_sampler;
 layout(set = 0, binding = 2) uniform samplerShadow shadow_sampler;
-layout(set = 1, binding = 0, std430) restrict readonly buffer ObjectOutputDataBuffer {
-    ObjectOutputData object_output[];
-};
 layout(set = 2, binding = 0) restrict readonly buffer DirectionalLightBuffer {
     DirectionalLightBufferHeader directional_light_header;
     DirectionalLight directional_lights[];
@@ -65,7 +61,7 @@ void main() {
 
     if (MATERIAL_FLAG(FLAGS_UNLIT)) {
         o_color = pixel.albedo;
-        o_normal = vec4(i_normal, 0.0);
+        // o_normal = vec4(i_normal, 0.0);
     } else {
         vec3 v = -normalize(i_view_position.xyz);
 
@@ -88,6 +84,6 @@ void main() {
         }
 
         o_color = max(vec4(color, 1.0), uniforms.ambient * pixel.albedo);
-        o_normal = vec4(pixel.normal, 0.0);
+        // o_normal = vec4(pixel.normal, 0.0);
     }
 }

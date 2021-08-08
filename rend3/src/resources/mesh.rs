@@ -5,7 +5,9 @@ use crate::{
 use glam::{Vec2, Vec3};
 use range_alloc::RangeAllocator;
 use std::{mem::size_of, ops::Range};
-use wgpu::{Buffer, BufferAddress, BufferDescriptor, BufferUsage, CommandEncoder, Device, Queue};
+use wgpu::{
+    Buffer, BufferAddress, BufferDescriptor, BufferUsage, CommandEncoder, Device, IndexFormat, Queue, RenderPass,
+};
 
 pub const VERTEX_POSITION_SIZE: usize = size_of::<Vec3>();
 pub const VERTEX_NORMAL_SIZE: usize = size_of::<Vec3>();
@@ -33,6 +35,18 @@ pub struct MeshBuffers {
     pub vertex_mat_index: Buffer,
 
     pub index: Buffer,
+}
+
+impl MeshBuffers {
+    pub fn bind<'rpass>(&'rpass self, rpass: &mut RenderPass<'rpass>) {
+        rpass.set_vertex_buffer(0, self.vertex_position.slice(..));
+        rpass.set_vertex_buffer(1, self.vertex_normal.slice(..));
+        rpass.set_vertex_buffer(2, self.vertex_tangent.slice(..));
+        rpass.set_vertex_buffer(3, self.vertex_uv.slice(..));
+        rpass.set_vertex_buffer(4, self.vertex_color.slice(..));
+        rpass.set_vertex_buffer(5, self.vertex_mat_index.slice(..));
+        rpass.set_index_buffer(self.index.slice(..), IndexFormat::Uint32);
+    }
 }
 
 pub struct MeshManager {

@@ -14,9 +14,9 @@ use wgpu::{
 
 pub fn render_loop<TLD: 'static>(
     renderer: Arc<Renderer<TLD>>,
-    list: Arc<dyn RenderRoutine<TLD>>,
+    list: &dyn RenderRoutine<TLD>,
     output: RendererOutput,
-) -> impl Future<Output = RendererStatistics> {
+) -> impl Future<Output = RendererStatistics> + '_ {
     span_transfer!(_ -> render_create_span, INFO, "Render Loop Creation");
 
     // blocks, do it before we async
@@ -188,7 +188,7 @@ pub fn render_loop<TLD: 'static>(
             global_resources.update(&renderer.device, renderer.surface.as_ref(), &mut *option_guard, new_opt);
             option_guard.clone()
         } else {
-            renderer.options.read().clone()
+            option_guard.clone()
         };
 
         drop((
@@ -208,7 +208,7 @@ pub fn render_loop<TLD: 'static>(
         let mut encoders = Vec::with_capacity(16);
         encoders.push(encoder.finish());
 
-        list.render(Arc::clone(&renderer), &mut encoders, frame);
+        list.render(Arc::clone(&renderer), &mut encoders, &frame);
 
         renderer.queue.submit(encoders);
 

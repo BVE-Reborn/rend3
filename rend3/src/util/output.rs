@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use wgpu::{SwapChain, SwapChainError, SwapChainFrame, TextureFormat, TextureView};
 
-pub const SWAPCHAIN_FORMAT: TextureFormat = TextureFormat::Bgra8Unorm;
+pub const SWAPCHAIN_FORMAT: TextureFormat = TextureFormat::Rgba8Unorm;
 
 #[derive(Clone)]
 pub enum OutputFrame {

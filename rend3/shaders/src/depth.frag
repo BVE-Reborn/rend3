@@ -12,9 +12,6 @@ layout(location = 2) in vec4 i_color;
 layout(location = 3) flat in uint i_material;
 
 layout(set = 0, binding = 0) uniform sampler linear_sampler;
-layout(set = 1, binding = 0, std430) restrict readonly buffer ObjectOutputDataBuffer {
-    ObjectOutputData object_output[];
-};
 #ifdef GPU_MODE
 layout(set = 2, binding = 0, std430) restrict readonly buffer MaterialBuffer {
     GPUMaterialData materials[];

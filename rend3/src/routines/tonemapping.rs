@@ -34,13 +34,13 @@ impl TonemappingPass {
     pub fn new(args: TonemappingPassNewArgs<'_>) -> Self {
         let blit_vert = args.device.create_shader_module(&ShaderModuleDescriptor {
             label: Some("tonemapping vert"),
-            source: wgpu::util::make_spirv(SPIRV_SHADERS.get_file("opaque.vert.spv").unwrap().contents()),
+            source: wgpu::util::make_spirv(SPIRV_SHADERS.get_file("blit.vert.spv").unwrap().contents()),
             flags: ShaderFlags::empty(),
         });
 
         let blit_frag = args.device.create_shader_module(&ShaderModuleDescriptor {
             label: Some("tonemapping frag"),
-            source: wgpu::util::make_spirv(SPIRV_SHADERS.get_file("opaque.frag.spv").unwrap().contents()),
+            source: wgpu::util::make_spirv(SPIRV_SHADERS.get_file("blit.frag.spv").unwrap().contents()),
             flags: ShaderFlags::empty(),
         });
 

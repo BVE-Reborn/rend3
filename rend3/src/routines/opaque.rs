@@ -3,7 +3,7 @@ use std::sync::Arc;
 use wgpu::{BindGroup, CommandEncoder, Device, RenderPass, RenderPipeline};
 
 use crate::{
-    resources::{CameraManager, InternalObject, MaterialManager},
+    resources::{CameraManager, InternalObject, MaterialManager, MeshBuffers},
     routines::{
         common::interfaces::ShaderInterfaces,
         culling::{
@@ -35,6 +35,7 @@ pub struct OpaquePassPrepassArgs<'rpass, 'b> {
 
     /// TODO: only pass in manager if you actually need it
     pub materials: &'rpass MaterialManager,
+    pub meshes: &'rpass MeshBuffers,
 
     pub sampler_bg: &'rpass BindGroup,
     pub texture_bg: ModeData<(), &'rpass BindGroup>,
@@ -47,6 +48,7 @@ pub struct OpaquePassDrawArgs<'rpass, 'b> {
 
     /// TODO: only pass in manager if you actually need it
     pub materials: &'rpass MaterialManager,
+    pub meshes: &'rpass MeshBuffers,
 
     pub sampler_bg: &'rpass BindGroup,
     pub directional_light_bg: &'rpass BindGroup,
@@ -89,6 +91,8 @@ impl OpaquePass {
     }
 
     pub fn prepass<'rpass>(&'rpass self, args: OpaquePassPrepassArgs<'rpass, '_>) {
+        args.meshes.bind(args.rpass);
+
         args.rpass.set_pipeline(&self.depth_pipeline);
         args.rpass.set_bind_group(0, args.sampler_bg, &[]);
         args.rpass.set_bind_group(1, &args.culled_objects.output_bg, &[]);
@@ -104,6 +108,8 @@ impl OpaquePass {
     }
 
     pub fn draw<'rpass>(&'rpass self, args: OpaquePassDrawArgs<'rpass, '_>) {
+        args.meshes.bind(args.rpass);
+
         args.rpass.set_pipeline(&self.opaque_pipeline);
         args.rpass.set_bind_group(0, args.sampler_bg, &[]);
         args.rpass.set_bind_group(1, &args.culled_objects.output_bg, &[]);

@@ -68,7 +68,7 @@ impl ShaderInterfaces {
             label: Some("culled object bgl"),
             entries: &[BindGroupLayoutEntry {
                 binding: 0,
-                visibility: ShaderStage::FRAGMENT,
+                visibility: ShaderStage::VERTEX,
                 ty: BindingType::Buffer {
                     ty: BufferBindingType::Storage { read_only: true },
                     has_dynamic_offset: false,

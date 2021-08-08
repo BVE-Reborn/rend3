@@ -63,8 +63,9 @@ pub fn build_opaque_pass_shader(args: BuildOpaquePassShaderArgs<'_>) -> RenderPi
     let mut bgls: ArrayVec<&BindGroupLayout, 5> = ArrayVec::new();
     bgls.push(&args.interfaces.samplers_bgl);
     bgls.push(&args.interfaces.culled_object_bgl);
-    bgls.push(&args.materials.get_bind_group_layout());
+    bgls.push(&args.directional_light_bgl);
     bgls.push(&args.interfaces.uniform_bgl);
+    bgls.push(&args.materials.get_bind_group_layout());
     match args.mode {
         RendererMode::GPUPowered => bgls.push(args.texture_bgl.as_gpu()),
         _ => {}
@@ -82,7 +83,7 @@ pub fn build_opaque_pass_shader(args: BuildOpaquePassShaderArgs<'_>) -> RenderPi
     let pll = args.device.create_pipeline_layout(&PipelineLayoutDescriptor {
         label: Some("depth prepass"),
         bind_group_layouts: &bgls,
-        push_constant_ranges: &[],
+        push_constant_ranges: &push_constants,
     });
 
     let pipeline = args.device.create_render_pipeline(&RenderPipelineDescriptor {
@@ -106,7 +107,7 @@ pub fn build_opaque_pass_shader(args: BuildOpaquePassShaderArgs<'_>) -> RenderPi
         depth_stencil: Some(DepthStencilState {
             format: TextureFormat::Depth32Float,
             depth_write_enabled: true,
-            depth_compare: CompareFunction::LessEqual,
+            depth_compare: CompareFunction::GreaterEqual,
             stencil: StencilState::default(),
             bias: DepthBiasState::default(),
             clamp_depth: false,

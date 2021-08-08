@@ -58,7 +58,7 @@ impl DirectionalLightManager {
     pub fn new(device: &Device) -> Self {
         let registry = ResourceRegistry::new();
 
-        let buffer = WrappedPotBuffer::new(device, 0, BufferUsage::STORAGE, Some("directional lights"));
+        let buffer = WrappedPotBuffer::new(device, 0, mem::size_of::<ShaderDirectionalLight>() as _, BufferUsage::STORAGE, Some("directional lights"));
 
         let (view, layer_views) = create_shadow_texture(device, 1);
 

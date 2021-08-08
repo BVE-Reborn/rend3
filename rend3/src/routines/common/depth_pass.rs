@@ -24,6 +24,8 @@ pub struct BuildDepthPassShaderArgs<'a> {
     pub texture_bgl: ModeData<(), &'a BindGroupLayout>,
 
     pub materials: &'a MaterialManager,
+
+    pub include_color: bool,
 }
 
 pub fn build_depth_pass_shader(args: BuildDepthPassShaderArgs) -> RenderPipeline {
@@ -79,8 +81,15 @@ pub fn build_depth_pass_shader(args: BuildDepthPassShaderArgs) -> RenderPipeline
     let pll = args.device.create_pipeline_layout(&PipelineLayoutDescriptor {
         label: Some("depth prepass"),
         bind_group_layouts: &bgls,
-        push_constant_ranges: &[],
+        push_constant_ranges: &push_constants,
     });
+
+    let color_state = [ColorTargetState {
+        format: TextureFormat::Rgba16Float,
+        alpha_blend: BlendState::REPLACE,
+        color_blend: BlendState::REPLACE,
+        write_mask: ColorWrite::empty(),
+    }];
 
     let pipeline = args.device.create_render_pipeline(&RenderPipelineDescriptor {
         label: Some("depth prepass"),
@@ -103,7 +112,7 @@ pub fn build_depth_pass_shader(args: BuildDepthPassShaderArgs) -> RenderPipeline
         depth_stencil: Some(DepthStencilState {
             format: TextureFormat::Depth32Float,
             depth_write_enabled: true,
-            depth_compare: CompareFunction::LessEqual,
+            depth_compare: CompareFunction::GreaterEqual,
             stencil: StencilState::default(),
             bias: DepthBiasState::default(),
             clamp_depth: false,
@@ -112,12 +121,7 @@ pub fn build_depth_pass_shader(args: BuildDepthPassShaderArgs) -> RenderPipeline
         fragment: Some(FragmentState {
             module: &depth_prepass_frag,
             entry_point: "main",
-            targets: &[ColorTargetState {
-                format: TextureFormat::Rgba16Float,
-                alpha_blend: BlendState::REPLACE,
-                color_blend: BlendState::REPLACE,
-                write_mask: ColorWrite::empty(),
-            }],
+            targets: if args.include_color { &color_state } else { &[] },
         }),
     });
 

@@ -14,7 +14,7 @@ use glam::Mat4;
 use parking_lot::RwLock;
 use raw_window_handle::HasRawWindowHandle;
 use std::{cmp::Ordering, future::Future, sync::Arc};
-use switchyard::{JoinHandle, Switchyard};
+use switchyard::Switchyard;
 use wgpu::{Device, Instance, Queue, Surface};
 
 pub mod error;
@@ -236,16 +236,11 @@ impl<TLD: 'static> Renderer<TLD> {
             .push(Instruction::ClearBackgroundTexture)
     }
 
-    pub fn render(
+    pub fn render<'a>(
         self: &Arc<Self>,
-        list: Arc<dyn RenderRoutine<TLD>>,
+        list: &'a dyn RenderRoutine<TLD>,
         output: RendererOutput,
-    ) -> JoinHandle<RendererStatistics> {
-        let this = Arc::clone(self);
-        self.yard.spawn_local(
-            self.yard_priorites.compute_pool,
-            self.yard_priorites.main_task_priority,
-            move |_| render::render_loop(this, list, output),
-        )
+    ) -> impl Future<Output = RendererStatistics> + 'a {
+        render::render_loop(Arc::clone(self), list, output)
     }
 }

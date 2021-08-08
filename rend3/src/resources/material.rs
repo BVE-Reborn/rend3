@@ -239,7 +239,15 @@ impl MaterialManager {
 
         let buffer = mode.into_data(
             || (),
-            || WrappedPotBuffer::new(device, 0, BufferUsage::STORAGE, Some("material buffer")),
+            || {
+                WrappedPotBuffer::new(
+                    device,
+                    0,
+                    mem::size_of::<GPUShaderMaterial>() as _,
+                    BufferUsage::STORAGE,
+                    Some("material buffer"),
+                )
+            },
         );
 
         let bg = mode.into_data(|| (), || create_gpu_buffer_bg(device, bgl.as_gpu(), buffer.as_gpu()));

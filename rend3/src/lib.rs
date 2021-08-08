@@ -92,6 +92,7 @@ pub mod resources {
     pub use object::*;
     pub use texture::*;
 }
+// TODO: Move this to rend3-routines
 pub mod routines;
 pub mod shaders;
 pub mod util {
@@ -108,6 +109,7 @@ mod builder;
 pub mod datatypes;
 mod instruction;
 mod jobs;
+// TODO: rename to routines
 mod list;
 mod mode;
 mod options;

@@ -195,6 +195,7 @@ impl GpuCuller {
 }
 
 pub fn run<'rpass>(rpass: &mut RenderPass<'rpass>, indirect_data: &'rpass GPUIndirectData) {
+    rpass.set_vertex_buffer(6, indirect_data.indirect_buffer.slice(16..));
     rpass.multi_draw_indexed_indirect_count(
         &indirect_data.indirect_buffer,
         16,

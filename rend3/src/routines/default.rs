@@ -40,13 +40,24 @@ impl DefaultRenderRoutine {
 
         let directional_light_manager = &renderer.directional_light_manager.read();
 
-        let depth_pipeline = Arc::new(common::depth_pass::build_depth_pass_shader(
+        let colorless_depth_pipeline = Arc::new(common::depth_pass::build_depth_pass_shader(
             common::depth_pass::BuildDepthPassShaderArgs {
                 mode,
                 device,
                 interfaces: &interfaces,
                 texture_bgl: gpu_d2_texture_bgl,
                 materials: &renderer.material_manager.read(),
+                include_color: false,
+            },
+        ));
+        let colored_depth_pipeline = Arc::new(common::depth_pass::build_depth_pass_shader(
+            common::depth_pass::BuildDepthPassShaderArgs {
+                mode,
+                device,
+                interfaces: &interfaces,
+                texture_bgl: gpu_d2_texture_bgl,
+                materials: &renderer.material_manager.read(),
+                include_color: true,
             },
         ));
         let opaque_pipeline = Arc::new(common::opaque_pass::build_opaque_pass_shader(
@@ -59,8 +70,8 @@ impl DefaultRenderRoutine {
                 materials: &renderer.material_manager.read(),
             },
         ));
-        let shadow_passes = directional::DirectionalShadowPass::new(Arc::clone(&depth_pipeline));
-        let opaque_pass = opaque::OpaquePass::new(Arc::clone(&depth_pipeline), Arc::clone(&opaque_pipeline));
+        let shadow_passes = directional::DirectionalShadowPass::new(Arc::clone(&colorless_depth_pipeline));
+        let opaque_pass = opaque::OpaquePass::new(Arc::clone(&colored_depth_pipeline), Arc::clone(&opaque_pipeline));
         let tonemapping_pass = tonemapping::TonemappingPass::new(tonemapping::TonemappingPassNewArgs {
             device: &device,
             interfaces: &interfaces,
@@ -93,12 +104,13 @@ impl<TLD: 'static> RenderRoutine<TLD> for DefaultRenderRoutine {
         &self,
         renderer: Arc<Renderer<TLD>>,
         encoders: &mut Vec<CommandBuffer>,
-        frame: crate::util::output::OutputFrame,
+        frame: &crate::util::output::OutputFrame,
     ) {
         let mut encoder = renderer.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("primary encoder"),
         });
 
+        let mesh_manager = renderer.mesh_manager.read();
         let directional_light = renderer.directional_light_manager.read();
         let materials = renderer.material_manager.read();
         let mut d2_textures = renderer.d2_texture_manager.write();
@@ -138,6 +150,7 @@ impl<TLD: 'static> RenderRoutine<TLD> for DefaultRenderRoutine {
             .draw_culled_shadows(directional::DirectionalShadowPassDrawCulledShadowsArgs {
                 encoder: &mut encoder,
                 materials: &materials,
+                meshes: mesh_manager.buffers(),
                 sampler_bg: &self.samplers.bg,
                 texture_bg: d2_texture_output_bg_ref,
                 culled_lights: &culled_lights,
@@ -173,6 +186,7 @@ impl<TLD: 'static> RenderRoutine<TLD> for DefaultRenderRoutine {
         self.opaque_pass.prepass(opaque::OpaquePassPrepassArgs {
             rpass: &mut rpass,
             materials: &materials,
+            meshes: mesh_manager.buffers(),
             sampler_bg: &self.samplers.bg,
             texture_bg: d2_texture_output_bg_ref,
             culled_objects: &culled_objects,
@@ -181,11 +195,12 @@ impl<TLD: 'static> RenderRoutine<TLD> for DefaultRenderRoutine {
         self.opaque_pass.draw(opaque::OpaquePassDrawArgs {
             rpass: &mut rpass,
             materials: &materials,
+            meshes: mesh_manager.buffers(),
             sampler_bg: &self.samplers.bg,
             directional_light_bg: directional_light.get_bg(),
             texture_bg: d2_texture_output_bg_ref,
-            culled_objects: &culled_objects,
             shader_uniform_bg: &primary_camera_uniform_bg,
+            culled_objects: &culled_objects,
         });
 
         drop(rpass);

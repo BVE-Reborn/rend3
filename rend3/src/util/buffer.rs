@@ -5,17 +5,30 @@ use wgpu::{Buffer, BufferAddress, BufferDescriptor, BufferUsage, Device, Queue};
 pub struct WrappedPotBuffer {
     inner: Arc<Buffer>,
     size: BufferAddress,
+    /// This field is assumed to be a power of 2.
+    minimum: BufferAddress,
     usage: BufferUsage,
     label: Option<SsoString>,
 }
 
 impl WrappedPotBuffer {
-    pub fn new<T>(device: &Device, size: BufferAddress, usage: BufferUsage, label: Option<T>) -> Self
+    pub fn new<T>(
+        device: &Device,
+        size: BufferAddress,
+        minimum: BufferAddress,
+        usage: BufferUsage,
+        label: Option<T>,
+    ) -> Self
     where
         SsoString: From<T>,
         T: Deref<Target = str>,
     {
-        let starting_size = if size <= 16 { 16 } else { (size - 1).next_power_of_two() };
+        let minimum_pot = (minimum - 1).next_power_of_two().max(16);
+        let starting_size = if size <= minimum_pot {
+            minimum_pot
+        } else {
+            (size - 1).next_power_of_two()
+        };
 
         Self {
             inner: Arc::new(device.create_buffer(&BufferDescriptor {
@@ -25,6 +38,7 @@ impl WrappedPotBuffer {
                 mapped_at_creation: false,
             })),
             size: starting_size,
+            minimum: minimum_pot,
             usage,
             label: label.map(SsoString::from),
         }
@@ -32,7 +46,7 @@ impl WrappedPotBuffer {
 
     /// Determines if the buffer will resize given the desired size.
     pub fn will_resize(&self, desired: BufferAddress) -> Option<BufferAddress> {
-        will_resize_inner(self.size, desired)
+        will_resize_inner(self.size, desired, self.minimum)
     }
 
     pub fn write_to_buffer(&mut self, device: &Device, queue: &Queue, data: &[u8]) -> bool {
@@ -61,9 +75,9 @@ impl Deref for WrappedPotBuffer {
     }
 }
 
-fn will_resize_inner(current: BufferAddress, desired: BufferAddress) -> Option<BufferAddress> {
+fn will_resize_inner(current: BufferAddress, desired: BufferAddress, minimum: BufferAddress) -> Option<BufferAddress> {
     assert!(current.is_power_of_two());
-    if current == 16 && desired <= 16 {
+    if current == minimum && desired <= minimum {
         return None;
     }
     let lower_bound = current / 4;

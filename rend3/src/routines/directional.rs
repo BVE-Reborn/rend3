@@ -6,7 +6,7 @@ use wgpu::{
 };
 
 use crate::{
-    resources::{DirectionalLightManager, InternalObject, MaterialManager},
+    resources::{DirectionalLightManager, InternalObject, MaterialManager, MeshBuffers},
     routines::{
         common::interfaces::ShaderInterfaces,
         culling::{
@@ -42,6 +42,7 @@ pub struct DirectionalShadowPassDrawCulledShadowsArgs<'a> {
     pub encoder: &'a mut CommandEncoder,
 
     pub materials: &'a MaterialManager,
+    pub meshes: &'a MeshBuffers,
 
     pub sampler_bg: &'a BindGroup,
     pub texture_bg: ModeData<(), &'a BindGroup>,
@@ -103,6 +104,8 @@ impl DirectionalShadowPass {
                     stencil_ops: None,
                 }),
             });
+
+            args.meshes.bind(&mut rpass);
 
             rpass.set_pipeline(&self.pipeline);
             rpass.set_bind_group(0, args.sampler_bg, &[]);
