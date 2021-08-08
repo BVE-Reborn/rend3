@@ -37,4 +37,3 @@ impl Ord for IndexedDistance {
         self.partial_cmp(&other).unwrap()
     }
 }
-

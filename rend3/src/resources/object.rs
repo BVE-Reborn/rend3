@@ -1,9 +1,7 @@
 use crate::{
     datatypes::{MaterialHandle, Object, ObjectHandle},
-    resources::{MeshManager},
-    util::{
-        frustum::BoundingSphere, registry::ResourceRegistry,
-    },
+    resources::MeshManager,
+    util::{frustum::BoundingSphere, registry::ResourceRegistry},
 };
 use glam::Mat4;
 

@@ -1,6 +1,6 @@
 use wgpu::{Device, RenderPipeline};
 
-use crate::{RendererMode, resources::MaterialManager};
+use crate::{resources::MaterialManager, RendererMode};
 
 pub struct BuildOpaquePassShaderArgs<'a> {
     pub mode: RendererMode,

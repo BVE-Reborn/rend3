@@ -24,12 +24,12 @@ unsafe impl bytemuck::Zeroable for ShaderCommonUniform {}
 unsafe impl bytemuck::Pod for ShaderCommonUniform {}
 
 pub struct CreateShaderUniformArgs<'a> {
-    device: &'a Device,
-    camera: &'a CameraManager,
+    pub device: &'a Device,
+    pub camera: &'a CameraManager,
 
-    interfaces: &'a ShaderInterfaces,
+    pub interfaces: &'a ShaderInterfaces,
 
-    ambient: Vec4,
+    pub ambient: Vec4,
 }
 
 pub fn create_shader_uniform(args: CreateShaderUniformArgs<'_>) -> BindGroup {

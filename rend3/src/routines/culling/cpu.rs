@@ -4,7 +4,15 @@ use wgpu::{
     BindGroupDescriptor, BindGroupEntry, BufferUsage, Device, RenderPass, ShaderStage,
 };
 
-use crate::{ModeData, resources::{CameraManager, InternalObject, MaterialManager}, routines::{common::interfaces::{PerObjectData, ShaderInterfaces}, culling::{CPUDrawCall, CulledObjectSet}}, util::{frustum::ShaderFrustum, math::IndexedDistance}};
+use crate::{
+    resources::{CameraManager, InternalObject, MaterialManager},
+    routines::{
+        common::interfaces::{PerObjectData, ShaderInterfaces},
+        culling::{CPUDrawCall, CulledObjectSet},
+    },
+    util::{frustum::ShaderFrustum, math::IndexedDistance},
+    ModeData,
+};
 
 pub struct CpuCullerCullArgs<'a> {
     pub device: &'a Device,

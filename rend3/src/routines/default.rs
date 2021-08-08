@@ -1,9 +1,13 @@
 use std::sync::Arc;
 
-use crate::routines::*;
-use crate::ModeData;
-use crate::RenderRoutine;
-use crate::Renderer;
+use glam::{UVec2, Vec4};
+use wgpu::{
+    Color, Device, Extent3d, LoadOp, Operations, RenderPassColorAttachmentDescriptor,
+    RenderPassDepthStencilAttachmentDescriptor, RenderPassDescriptor, TextureDescriptor, TextureDimension,
+    TextureFormat, TextureUsage, TextureView, TextureViewDescriptor,
+};
+
+use crate::{routines::*, ModeData, RenderRoutine, Renderer};
 
 pub struct DefaultRenderRoutine {
     pub interfaces: common::interfaces::ShaderInterfaces,
@@ -12,10 +16,13 @@ pub struct DefaultRenderRoutine {
     pub gpu_culler: ModeData<(), culling::gpu::GpuCuller>,
     pub shadow_passes: directional::DirectionalShadowPass,
     pub opaque_pass: opaque::OpaquePass,
+
+    pub internal_buffer: TextureView,
+    pub internal_depth_buffer: TextureView,
 }
 
 impl DefaultRenderRoutine {
-    pub fn new(renderer: &Renderer) -> Self {
+    pub fn new(renderer: &Renderer, resolution: UVec2) -> Self {
         let device = renderer.device();
         let mode = renderer.mode();
         let interfaces = common::interfaces::ShaderInterfaces::new(device);
@@ -45,6 +52,9 @@ impl DefaultRenderRoutine {
         let shadow_passes = directional::DirectionalShadowPass::new(Arc::clone(&depth_pipeline));
         let opaque_pass = opaque::OpaquePass::new(Arc::clone(&depth_pipeline), Arc::clone(&opaque_pipeline));
 
+        let internal_buffer = create_internal_buffer(device, resolution);
+        let internal_depth_buffer = create_internal_depth_buffer(device, resolution);
+
         Self {
             interfaces,
             samplers,
@@ -52,7 +62,14 @@ impl DefaultRenderRoutine {
             gpu_culler,
             shadow_passes,
             opaque_pass,
+            internal_buffer,
+            internal_depth_buffer,
         }
+    }
+
+    pub fn resize(&mut self, device: &Device, resolution: UVec2) {
+        self.internal_buffer = create_internal_buffer(device, resolution);
+        self.internal_depth_buffer = create_internal_depth_buffer(device, resolution);
     }
 }
 
@@ -71,25 +88,125 @@ impl<TLD: 'static> RenderRoutine<TLD> for DefaultRenderRoutine {
         let d2c_texture_output = d2_textures.ready(&renderer.device);
         let objects = renderer.object_manager.read().ready();
 
+        let culler = self.gpu_culler.as_ref().map_cpu(|_| &self.cpu_culler);
+
         let culled_lights = self
             .shadow_passes
             .cull_shadows(directional::DirectionalShadowPassCullShadowsArgs {
                 device: &renderer.device,
                 encoder: &mut encoder,
-                culler: self.gpu_culler.as_ref().map_cpu(|_| &self.cpu_culler),
+                culler,
                 materials: &materials,
                 interfaces: &self.interfaces,
                 lights: &directional_light,
                 objects: &objects,
             });
 
+        let global_resources = renderer.global_resources.read();
+
+        let culled_objects = self.opaque_pass.cull_opaque(opaque::OpaquePassCullArgs {
+            device: &renderer.device,
+            encoder: &mut encoder,
+            culler,
+            materials: &materials,
+            interfaces: &self.interfaces,
+            camera: &global_resources.camera,
+            objects: &objects,
+        });
+
+        let d2_texture_output_bg_ref = d2_texture_output.bg.as_ref().map(|_| (), |a| &**a);
+
         self.shadow_passes
             .draw_culled_shadows(directional::DirectionalShadowPassDrawCulledShadowsArgs {
                 encoder: &mut encoder,
                 materials: &materials,
                 sampler_bg: &self.samplers.bg,
-                texture_bg: d2_texture_output.bg.as_ref().map(|_| (), |a| &**a),
+                texture_bg: d2_texture_output_bg_ref,
                 culled_lights: &culled_lights,
-            })
+            });
+
+        let primary_camera_uniform_bg = uniforms::create_shader_uniform(uniforms::CreateShaderUniformArgs {
+            device: &renderer.device,
+            camera: &global_resources.camera,
+            interfaces: &self.interfaces,
+            ambient: Vec4::new(0.0, 0.0, 0.0, 1.0),
+        });
+
+        let mut rpass = encoder.begin_render_pass(&RenderPassDescriptor {
+            label: Some("primary renderpass"),
+            color_attachments: &[RenderPassColorAttachmentDescriptor {
+                attachment: &self.internal_buffer,
+                resolve_target: None,
+                ops: Operations {
+                    load: LoadOp::Clear(Color::BLACK),
+                    store: true,
+                },
+            }],
+            depth_stencil_attachment: Some(RenderPassDepthStencilAttachmentDescriptor {
+                attachment: &self.internal_depth_buffer,
+                depth_ops: Some(Operations {
+                    load: LoadOp::Clear(0.0),
+                    store: true,
+                }),
+                stencil_ops: None,
+            }),
+        });
+
+        self.opaque_pass.prepass(opaque::OpaquePassPrepassArgs {
+            rpass: &mut rpass,
+            materials: &materials,
+            sampler_bg: &self.samplers.bg,
+            texture_bg: d2_texture_output_bg_ref,
+            culled_objects: &culled_objects,
+        });
+
+        self.opaque_pass.draw(opaque::OpaquePassDrawArgs {
+            rpass: &mut rpass,
+            materials: &materials,
+            sampler_bg: &self.samplers.bg,
+            directional_light_bg: directional_light.get_bg(),
+            texture_bg: d2_texture_output_bg_ref,
+            culled_objects: &culled_objects,
+            shader_uniform_bg: &primary_camera_uniform_bg,
+        });
+
+        drop(rpass);
+        drop(primary_camera_uniform_bg);
     }
+}
+
+fn create_internal_buffer(device: &Device, resolution: UVec2) -> TextureView {
+    device
+        .create_texture(&TextureDescriptor {
+            label: Some("internal renderbuffer"),
+            size: Extent3d {
+                width: resolution.x,
+                height: resolution.y,
+                depth: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: TextureDimension::D2,
+            format: TextureFormat::Rgba16Float,
+            usage: TextureUsage::RENDER_ATTACHMENT | TextureUsage::SAMPLED | TextureUsage::COPY_SRC,
+        })
+        .create_view(&TextureViewDescriptor::default())
+}
+
+fn create_internal_depth_buffer(device: &Device, resolution: UVec2) -> TextureView {
+    device
+        .create_texture(&TextureDescriptor {
+            label: Some("internal depth renderbuffer"),
+            size: Extent3d {
+                width: resolution.x,
+                height: resolution.y,
+                depth: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: TextureDimension::D2,
+            format: TextureFormat::Depth32Float,
+            usage: TextureUsage::RENDER_ATTACHMENT,
+        })
+        .create_view(&TextureViewDescriptor::default())
 }

@@ -1,12 +1,9 @@
 use std::sync::Arc;
 
-use wgpu::{
-    BindGroup, CommandEncoder, Device, LoadOp, Operations, RenderPass, RenderPassDepthStencilAttachmentDescriptor,
-    RenderPassDescriptor, RenderPipeline, TextureView,
-};
+use wgpu::{BindGroup, CommandEncoder, Device, RenderPass, RenderPipeline};
 
 use crate::{
-    resources::{CameraManager, DirectionalLightManager, InternalObject, MaterialManager},
+    resources::{CameraManager, InternalObject, MaterialManager},
     routines::{
         common::interfaces::ShaderInterfaces,
         culling::{
@@ -40,9 +37,7 @@ pub struct OpaquePassPrepassArgs<'rpass, 'b> {
     pub materials: &'rpass MaterialManager,
 
     pub sampler_bg: &'rpass BindGroup,
-    pub directional_light_bg: &'rpass BindGroup,
     pub texture_bg: ModeData<(), &'rpass BindGroup>,
-    pub shader_uniform_bg: &'rpass BindGroup,
 
     pub culled_objects: &'rpass CulledObjectSet,
 }
@@ -68,7 +63,10 @@ pub struct OpaquePass {
 
 impl OpaquePass {
     pub fn new(depth_pipeline: Arc<RenderPipeline>, opaque_pipeline: Arc<RenderPipeline>) -> Self {
-        Self { depth_pipeline, opaque_pipeline }
+        Self {
+            depth_pipeline,
+            opaque_pipeline,
+        }
     }
 
     pub fn cull_opaque(&self, args: OpaquePassCullArgs<'_>) -> CulledObjectSet {

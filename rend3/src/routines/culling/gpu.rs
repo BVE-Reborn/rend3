@@ -5,8 +5,8 @@ use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
     BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
     BindingResource, BindingType, BufferBindingType, BufferDescriptor, BufferUsage, CommandEncoder,
-    ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor, Device,
-    PipelineLayoutDescriptor, RenderPass, ShaderFlags, ShaderModuleDescriptor, ShaderStage,
+    ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor, Device, PipelineLayoutDescriptor, RenderPass,
+    ShaderFlags, ShaderModuleDescriptor, ShaderStage,
 };
 
 use super::{CulledObjectSet, GPUCullingInput, GPUIndirectData};
