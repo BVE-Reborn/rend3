@@ -32,13 +32,19 @@ impl DefaultRenderRoutine {
         let cpu_culler = culling::cpu::CpuCuller::new();
         let gpu_culler = mode.into_data(|| (), || culling::gpu::GpuCuller::new(device));
 
-        let gpu_texture_manager_guard = mode.into_data(|| (), || renderer.d2_texture_manager.read());
+        let gpu_d2_texture_manager_guard = mode.into_data(|| (), || renderer.d2_texture_manager.read());
+        let gpu_d2_texture_bgl = gpu_d2_texture_manager_guard
+            .as_ref()
+            .map(|_| (), |guard| guard.gpu_bgl());
+
+        let directional_light_manager = &renderer.directional_light_manager.read();
+
         let depth_pipeline = Arc::new(common::depth_pass::build_depth_pass_shader(
             common::depth_pass::BuildDepthPassShaderArgs {
                 mode,
                 device,
                 interfaces: &interfaces,
-                texture_bgl: gpu_texture_manager_guard.as_ref().map(|_| (), |guard| guard.gpu_bgl()),
+                texture_bgl: gpu_d2_texture_bgl,
                 materials: &renderer.material_manager.read(),
             },
         ));
@@ -46,6 +52,9 @@ impl DefaultRenderRoutine {
             common::opaque_pass::BuildOpaquePassShaderArgs {
                 mode,
                 device,
+                interfaces: &interfaces,
+                directional_light_bgl: directional_light_manager.get_bgl(),
+                texture_bgl: gpu_d2_texture_bgl,
                 materials: &renderer.material_manager.read(),
             },
         ));
@@ -171,7 +180,6 @@ impl<TLD: 'static> RenderRoutine<TLD> for DefaultRenderRoutine {
         });
 
         drop(rpass);
-        drop(primary_camera_uniform_bg);
     }
 }
 

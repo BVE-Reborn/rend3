@@ -1,9 +1,9 @@
 use arrayvec::ArrayVec;
 use wgpu::{
-    BindGroupLayout, CompareFunction, CullMode, DepthBiasState, DepthStencilState, Device, FragmentState, FrontFace,
-    MultisampleState, PipelineLayoutDescriptor, PolygonMode, PrimitiveState, PrimitiveTopology, PushConstantRange,
-    RenderPipeline, RenderPipelineDescriptor, ShaderFlags, ShaderModuleDescriptor, ShaderStage, StencilState,
-    TextureFormat, VertexState,
+    BindGroupLayout, BlendState, ColorTargetState, ColorWrite, CompareFunction, CullMode, DepthBiasState,
+    DepthStencilState, Device, FragmentState, FrontFace, MultisampleState, PipelineLayoutDescriptor, PolygonMode,
+    PrimitiveState, PrimitiveTopology, PushConstantRange, RenderPipeline, RenderPipelineDescriptor, ShaderFlags,
+    ShaderModuleDescriptor, ShaderStage, StencilState, TextureFormat, VertexState,
 };
 
 use crate::{
@@ -112,7 +112,12 @@ pub fn build_depth_pass_shader(args: BuildDepthPassShaderArgs) -> RenderPipeline
         fragment: Some(FragmentState {
             module: &depth_prepass_frag,
             entry_point: "main",
-            targets: &[],
+            targets: &[ColorTargetState {
+                format: TextureFormat::Rgba16Float,
+                alpha_blend: BlendState::REPLACE,
+                color_blend: BlendState::REPLACE,
+                write_mask: ColorWrite::empty(),
+            }],
         }),
     });
 
