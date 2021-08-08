@@ -2,7 +2,7 @@ use crate::{
     datatypes::{Camera, TextureHandle},
     resources::CameraManager,
     util::output::SWAPCHAIN_FORMAT,
-    RendererMode, RendererOptions, VSyncMode,
+    RendererOptions, VSyncMode,
 };
 use wgpu::{Device, PresentMode, Surface, SwapChain, SwapChainDescriptor, TextureUsage};
 
@@ -13,7 +13,7 @@ pub struct RendererGlobalResources {
     pub background_texture: Option<TextureHandle>,
 }
 impl RendererGlobalResources {
-    pub fn new(device: &Device, surface: Option<&Surface>, mode: RendererMode, options: &RendererOptions) -> Self {
+    pub fn new(device: &Device, surface: Option<&Surface>, options: &RendererOptions) -> Self {
         let swapchain = surface.map(|surface| create_swapchain(device, surface, options.size, options.vsync));
 
         let camera = CameraManager::new(Camera::default(), Some(options.aspect_ratio()));

@@ -204,7 +204,13 @@ pub fn render_loop<TLD: 'static>(
 
         let frame = output.acquire(&renderer.global_resources.read().swapchain);
 
-        list.render(Arc::clone(&renderer), frame);
+        // 16 encoders is a reasonable default
+        let mut encoders = Vec::with_capacity(16);
+        encoders.push(encoder.finish());
+
+        list.render(Arc::clone(&renderer), &mut encoders, frame);
+
+        renderer.queue.submit(encoders);
 
         RendererStatistics {}
     }

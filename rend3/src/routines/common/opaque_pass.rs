@@ -44,7 +44,7 @@ pub fn build_opaque_pass_shader(args: BuildOpaquePassShaderArgs<'_>) -> RenderPi
     });
 
     let opaque_prepass_frag = args.device.create_shader_module(&ShaderModuleDescriptor {
-        label: Some("depth pass frag"),
+        label: Some("opaque pass frag"),
         source: wgpu::util::make_spirv(
             SPIRV_SHADERS
                 .get_file(match args.mode {

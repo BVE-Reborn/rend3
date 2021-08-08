@@ -3,7 +3,7 @@ use std::{mem, num::NonZeroU64};
 use glam::{Mat3A, Mat4};
 use wgpu::{
     BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, BufferBindingType, Device,
-    ShaderStage,
+    ShaderStage, TextureSampleType, TextureViewDimension,
 };
 
 use crate::routines::uniforms::ShaderCommonUniform;
@@ -26,6 +26,7 @@ pub struct ShaderInterfaces {
     pub samplers_bgl: BindGroupLayout,
     pub culled_object_bgl: BindGroupLayout,
     pub uniform_bgl: BindGroupLayout,
+    pub blit_bgl: BindGroupLayout,
 }
 
 impl ShaderInterfaces {
@@ -91,10 +92,25 @@ impl ShaderInterfaces {
             }],
         });
 
+        let blit_bgl = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+            label: Some("blit bgl"),
+            entries: &[BindGroupLayoutEntry {
+                binding: 0,
+                visibility: ShaderStage::FRAGMENT,
+                ty: BindingType::Texture {
+                    sample_type: TextureSampleType::Float { filterable: true },
+                    view_dimension: TextureViewDimension::D2,
+                    multisampled: false,
+                },
+                count: None,
+            }],
+        });
+
         Self {
             samplers_bgl,
             culled_object_bgl,
             uniform_bgl,
+            blit_bgl,
         }
     }
 }

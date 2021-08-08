@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use glam::{UVec2, Vec4};
 use wgpu::{
-    Color, Device, Extent3d, LoadOp, Operations, RenderPassColorAttachmentDescriptor,
+    Color, CommandBuffer, Device, Extent3d, LoadOp, Operations, RenderPassColorAttachmentDescriptor,
     RenderPassDepthStencilAttachmentDescriptor, RenderPassDescriptor, TextureDescriptor, TextureDimension,
     TextureFormat, TextureUsage, TextureView, TextureViewDescriptor,
 };
@@ -16,6 +16,7 @@ pub struct DefaultRenderRoutine {
     pub gpu_culler: ModeData<(), culling::gpu::GpuCuller>,
     pub shadow_passes: directional::DirectionalShadowPass,
     pub opaque_pass: opaque::OpaquePass,
+    pub tonemapping_pass: tonemapping::TonemappingPass,
 
     pub internal_buffer: TextureView,
     pub internal_depth_buffer: TextureView,
@@ -60,6 +61,10 @@ impl DefaultRenderRoutine {
         ));
         let shadow_passes = directional::DirectionalShadowPass::new(Arc::clone(&depth_pipeline));
         let opaque_pass = opaque::OpaquePass::new(Arc::clone(&depth_pipeline), Arc::clone(&opaque_pipeline));
+        let tonemapping_pass = tonemapping::TonemappingPass::new(tonemapping::TonemappingPassNewArgs {
+            device: &device,
+            interfaces: &interfaces,
+        });
 
         let internal_buffer = create_internal_buffer(device, resolution);
         let internal_depth_buffer = create_internal_depth_buffer(device, resolution);
@@ -71,6 +76,7 @@ impl DefaultRenderRoutine {
             gpu_culler,
             shadow_passes,
             opaque_pass,
+            tonemapping_pass,
             internal_buffer,
             internal_depth_buffer,
         }
@@ -83,7 +89,12 @@ impl DefaultRenderRoutine {
 }
 
 impl<TLD: 'static> RenderRoutine<TLD> for DefaultRenderRoutine {
-    fn render(&self, renderer: Arc<Renderer<TLD>>, frame: crate::util::output::OutputFrame) {
+    fn render(
+        &self,
+        renderer: Arc<Renderer<TLD>>,
+        encoders: &mut Vec<CommandBuffer>,
+        frame: crate::util::output::OutputFrame,
+    ) {
         let mut encoder = renderer.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("primary encoder"),
         });
@@ -91,10 +102,8 @@ impl<TLD: 'static> RenderRoutine<TLD> for DefaultRenderRoutine {
         let directional_light = renderer.directional_light_manager.read();
         let materials = renderer.material_manager.read();
         let mut d2_textures = renderer.d2_texture_manager.write();
-        let mut d2c_textures = renderer.d2c_texture_manager.write();
 
         let d2_texture_output = d2_textures.ready(&renderer.device);
-        let d2c_texture_output = d2_textures.ready(&renderer.device);
         let objects = renderer.object_manager.read().ready();
 
         let culler = self.gpu_culler.as_ref().map_cpu(|_| &self.cpu_culler);
@@ -180,6 +189,17 @@ impl<TLD: 'static> RenderRoutine<TLD> for DefaultRenderRoutine {
         });
 
         drop(rpass);
+
+        self.tonemapping_pass.blit(tonemapping::TonemappingPassBlitArgs {
+            device: &renderer.device,
+            encoder: &mut encoder,
+            interfaces: &self.interfaces,
+            samplers_bg: &self.samplers.bg,
+            source: &self.internal_buffer,
+            target: frame.as_view(),
+        });
+
+        encoders.push(encoder.finish())
     }
 }
 

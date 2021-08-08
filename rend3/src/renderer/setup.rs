@@ -199,7 +199,6 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
     let global_resources = RwLock::new(RendererGlobalResources::new(
         &device,
         surface.as_ref(),
-        mode,
         &builder.options,
     ));
 

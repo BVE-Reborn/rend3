@@ -120,7 +120,7 @@ where
                 let object_handle = renderer.add_object(dt::Object {
                     mesh: prim.handle,
                     material: *mat,
-                    transform: AffineTransform { transform },
+                    transform,
                 });
                 objects.push(object_handle);
             }
