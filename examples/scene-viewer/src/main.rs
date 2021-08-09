@@ -74,7 +74,7 @@ fn load_gltf(renderer: &Renderer, location: String) -> rend3_gltf::LoadedGltfSce
             let tex_path = tex_path.to_owned();
             async move {
                 let tex_resolved = parent.join(&tex_path);
-                async_std::fs::read(tex_resolved).await
+                std::fs::read(tex_resolved)
             }
         },
     ))
