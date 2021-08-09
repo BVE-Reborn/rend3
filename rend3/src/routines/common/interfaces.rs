@@ -3,7 +3,7 @@ use std::{mem, num::NonZeroU64};
 use glam::{Mat3A, Mat4};
 use wgpu::{
     BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, BufferBindingType, Device,
-    ShaderStage, TextureSampleType, TextureViewDimension,
+    ShaderStages, TextureSampleType, TextureViewDimension,
 };
 
 use crate::routines::uniforms::ShaderCommonUniform;
@@ -36,7 +36,7 @@ impl ShaderInterfaces {
             entries: &[
                 BindGroupLayoutEntry {
                     binding: 0,
-                    visibility: ShaderStage::FRAGMENT,
+                    visibility: ShaderStages::FRAGMENT,
                     ty: BindingType::Sampler {
                         filtering: true,
                         comparison: false,
@@ -45,7 +45,7 @@ impl ShaderInterfaces {
                 },
                 BindGroupLayoutEntry {
                     binding: 1,
-                    visibility: ShaderStage::FRAGMENT,
+                    visibility: ShaderStages::FRAGMENT,
                     ty: BindingType::Sampler {
                         filtering: false,
                         comparison: false,
@@ -54,7 +54,7 @@ impl ShaderInterfaces {
                 },
                 BindGroupLayoutEntry {
                     binding: 2,
-                    visibility: ShaderStage::FRAGMENT,
+                    visibility: ShaderStages::FRAGMENT,
                     ty: BindingType::Sampler {
                         filtering: true,
                         comparison: true,
@@ -68,7 +68,7 @@ impl ShaderInterfaces {
             label: Some("culled object bgl"),
             entries: &[BindGroupLayoutEntry {
                 binding: 0,
-                visibility: ShaderStage::VERTEX,
+                visibility: ShaderStages::VERTEX,
                 ty: BindingType::Buffer {
                     ty: BufferBindingType::Storage { read_only: true },
                     has_dynamic_offset: false,
@@ -82,7 +82,7 @@ impl ShaderInterfaces {
             label: Some("uniform bgl"),
             entries: &[BindGroupLayoutEntry {
                 binding: 0,
-                visibility: ShaderStage::VERTEX | ShaderStage::FRAGMENT,
+                visibility: ShaderStages::VERTEX | ShaderStages::FRAGMENT,
                 ty: BindingType::Buffer {
                     ty: BufferBindingType::Uniform,
                     has_dynamic_offset: false,
@@ -96,7 +96,7 @@ impl ShaderInterfaces {
             label: Some("blit bgl"),
             entries: &[BindGroupLayoutEntry {
                 binding: 0,
-                visibility: ShaderStage::FRAGMENT,
+                visibility: ShaderStages::FRAGMENT,
                 ty: BindingType::Texture {
                     sample_type: TextureSampleType::Float { filterable: true },
                     view_dimension: TextureViewDimension::D2,

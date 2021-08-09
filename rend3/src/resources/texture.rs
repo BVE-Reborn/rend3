@@ -7,8 +7,8 @@ use crate::{
 use std::{mem, num::NonZeroU32, sync::Arc};
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
-    BindingResource, BindingType, Device, Extent3d, ShaderStage, Texture, TextureDescriptor, TextureDimension,
-    TextureFormat, TextureSampleType, TextureUsage, TextureView, TextureViewDescriptor, TextureViewDimension,
+    BindingResource, BindingType, Device, Extent3d, ShaderStages, Texture, TextureDescriptor, TextureDimension,
+    TextureFormat, TextureSampleType, TextureUsages, TextureView, TextureViewDescriptor, TextureViewDimension,
 };
 
 pub const STARTING_2D_TEXTURES: usize = 1 << 7;
@@ -188,7 +188,7 @@ fn create_bind_group_layout(device: &Device, count: u32, view_dimension: Texture
         label: Some(&*format!("{:?} texture bgl", view_dimension)),
         entries: &[BindGroupLayoutEntry {
             binding: 0,
-            visibility: ShaderStage::FRAGMENT,
+            visibility: ShaderStages::FRAGMENT,
             ty: BindingType::Texture {
                 view_dimension,
                 sample_type: TextureSampleType::Float { filterable: true },
@@ -228,7 +228,7 @@ impl NullTextureManager {
             size: Extent3d {
                 width: 1,
                 height: 1,
-                depth: match dimension {
+                depth_or_array_layers: match dimension {
                     TextureViewDimension::Cube | TextureViewDimension::CubeArray => 6,
                     _ => 1,
                 },
@@ -244,7 +244,7 @@ impl NullTextureManager {
                 TextureViewDimension::D3 => TextureDimension::D3,
             },
             format: TextureFormat::R8Unorm,
-            usage: TextureUsage::SAMPLED,
+            usage: TextureUsages::TEXTURE_BINDING,
         });
 
         Self {

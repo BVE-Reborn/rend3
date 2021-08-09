@@ -12,8 +12,8 @@ use std::{
 };
 use wgpu::{
     BindGroup, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType, Buffer,
-    BufferBindingType, BufferUsage, Device, Extent3d, Queue, ShaderStage, TextureAspect, TextureDescriptor,
-    TextureDimension, TextureSampleType, TextureUsage, TextureView, TextureViewDescriptor, TextureViewDimension,
+    BufferBindingType, BufferUsages, Device, Extent3d, Queue, ShaderStages, TextureAspect, TextureDescriptor,
+    TextureDimension, TextureSampleType, TextureUsages, TextureView, TextureViewDescriptor, TextureViewDimension,
 };
 
 pub struct InternalDirectionalLight {
@@ -58,7 +58,13 @@ impl DirectionalLightManager {
     pub fn new(device: &Device) -> Self {
         let registry = ResourceRegistry::new();
 
-        let buffer = WrappedPotBuffer::new(device, 0, mem::size_of::<ShaderDirectionalLight>() as _, BufferUsage::STORAGE, Some("directional lights"));
+        let buffer = WrappedPotBuffer::new(
+            device,
+            0,
+            mem::size_of::<ShaderDirectionalLight>() as _,
+            BufferUsages::STORAGE,
+            Some("directional lights"),
+        );
 
         let (view, layer_views) = create_shadow_texture(device, 1);
 
@@ -161,13 +167,13 @@ fn create_shadow_texture(device: &Device, count: u32) -> (TextureView, Vec<Arc<T
         size: Extent3d {
             width: SHADOW_DIMENSIONS,
             height: SHADOW_DIMENSIONS,
-            depth: count,
+            depth_or_array_layers: count,
         },
         mip_level_count: 1,
         sample_count: 1,
         dimension: TextureDimension::D2,
         format: INTERNAL_SHADOW_DEPTH_FORMAT,
-        usage: TextureUsage::RENDER_ATTACHMENT | TextureUsage::SAMPLED,
+        usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
     });
 
     let primary_view = texture.create_view(&TextureViewDescriptor {
@@ -176,7 +182,7 @@ fn create_shadow_texture(device: &Device, count: u32) -> (TextureView, Vec<Arc<T
         dimension: Some(TextureViewDimension::D2Array),
         aspect: TextureAspect::All,
         base_mip_level: 0,
-        level_count: None,
+        mip_level_count: None,
         base_array_layer: 0,
         array_layer_count: None,
     });
@@ -189,7 +195,7 @@ fn create_shadow_texture(device: &Device, count: u32) -> (TextureView, Vec<Arc<T
                 dimension: Some(TextureViewDimension::D2),
                 aspect: TextureAspect::All,
                 base_mip_level: 0,
-                level_count: None,
+                mip_level_count: None,
                 base_array_layer: idx,
                 array_layer_count: NonZeroU32::new(1),
             }))
@@ -205,7 +211,7 @@ fn create_shadow_bgl(device: &Device) -> BindGroupLayout {
         entries: &[
             BindGroupLayoutEntry {
                 binding: 0,
-                visibility: ShaderStage::FRAGMENT,
+                visibility: ShaderStages::FRAGMENT,
                 ty: BindingType::Buffer {
                     ty: BufferBindingType::Storage { read_only: true },
                     has_dynamic_offset: false,
@@ -215,7 +221,7 @@ fn create_shadow_bgl(device: &Device) -> BindGroupLayout {
             },
             BindGroupLayoutEntry {
                 binding: 1,
-                visibility: ShaderStage::FRAGMENT,
+                visibility: ShaderStages::FRAGMENT,
                 ty: BindingType::Texture {
                     sample_type: TextureSampleType::Depth,
                     view_dimension: TextureViewDimension::D2Array,

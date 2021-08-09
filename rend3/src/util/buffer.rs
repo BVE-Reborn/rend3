@@ -1,13 +1,13 @@
 use crate::util::typedefs::SsoString;
 use std::{ops::Deref, sync::Arc};
-use wgpu::{Buffer, BufferAddress, BufferDescriptor, BufferUsage, Device, Queue};
+use wgpu::{Buffer, BufferAddress, BufferDescriptor, BufferUsages, Device, Queue};
 
 pub struct WrappedPotBuffer {
     inner: Arc<Buffer>,
     size: BufferAddress,
     /// This field is assumed to be a power of 2.
     minimum: BufferAddress,
-    usage: BufferUsage,
+    usage: BufferUsages,
     label: Option<SsoString>,
 }
 
@@ -16,7 +16,7 @@ impl WrappedPotBuffer {
         device: &Device,
         size: BufferAddress,
         minimum: BufferAddress,
-        usage: BufferUsage,
+        usage: BufferUsages,
         label: Option<T>,
     ) -> Self
     where
@@ -30,7 +30,7 @@ impl WrappedPotBuffer {
             (size - 1).next_power_of_two()
         };
 
-        let usage = usage | BufferUsage::COPY_DST;
+        let usage = usage | BufferUsages::COPY_DST;
 
         Self {
             inner: Arc::new(device.create_buffer(&BufferDescriptor {

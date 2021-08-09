@@ -12,9 +12,8 @@ use std::{
 };
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
-    BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
-    BindingResource, BindingType, Buffer, BufferBindingType, BufferUsage, Device, Queue, ShaderStage,
-    TextureSampleType, TextureViewDimension,
+    BindGroup, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, Buffer,
+    BufferBindingType, BufferUsages, Device, Queue, ShaderStages, TextureSampleType, TextureViewDimension,
 };
 
 #[repr(C, align(16))]
@@ -185,7 +184,7 @@ impl MaterialManager {
             || {
                 let texture_binding = |idx| BindGroupLayoutEntry {
                     binding: idx,
-                    visibility: ShaderStage::FRAGMENT,
+                    visibility: ShaderStages::FRAGMENT,
                     ty: BindingType::Texture {
                         sample_type: TextureSampleType::Float { filterable: true },
                         view_dimension: TextureViewDimension::D2,
@@ -209,7 +208,7 @@ impl MaterialManager {
                         texture_binding(9),
                         BindGroupLayoutEntry {
                             binding: 10,
-                            visibility: ShaderStage::FRAGMENT,
+                            visibility: ShaderStages::FRAGMENT,
                             ty: BindingType::Buffer {
                                 ty: BufferBindingType::Uniform,
                                 has_dynamic_offset: false,
@@ -225,7 +224,7 @@ impl MaterialManager {
                     label: Some("gpu material bgl"),
                     entries: &[BindGroupLayoutEntry {
                         binding: 0,
-                        visibility: ShaderStage::FRAGMENT,
+                        visibility: ShaderStages::FRAGMENT,
                         ty: BindingType::Buffer {
                             ty: BufferBindingType::Storage { read_only: true },
                             has_dynamic_offset: false,
@@ -244,7 +243,7 @@ impl MaterialManager {
                     device,
                     0,
                     mem::size_of::<GPUShaderMaterial>() as _,
-                    BufferUsage::STORAGE,
+                    BufferUsages::STORAGE,
                     Some("material buffer"),
                 )
             },
@@ -286,7 +285,7 @@ impl MaterialManager {
                 device.create_buffer_init(&BufferInitDescriptor {
                     label: None,
                     contents: bytemuck::bytes_of(&data),
-                    usage: BufferUsage::COPY_DST | BufferUsage::UNIFORM,
+                    usage: BufferUsages::COPY_DST | BufferUsages::UNIFORM,
                 })
             },
             || (),
@@ -392,16 +391,7 @@ impl MaterialManager {
 }
 
 fn create_gpu_buffer_bg(device: &Device, bgl: &BindGroupLayout, buffer: &Buffer) -> BindGroup {
-    device.create_bind_group(&BindGroupDescriptor {
-        label: Some("gpu material bg"),
-        layout: bgl,
-        entries: &[BindGroupEntry {
-            binding: 0,
-            resource: BindingResource::Buffer {
-                buffer,
-                offset: 0,
-                size: None,
-            },
-        }],
-    })
+    BindGroupBuilder::new(Some("gpu material bg"))
+        .with_buffer(buffer)
+        .build(device, bgl)
 }

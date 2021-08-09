@@ -9,7 +9,7 @@ use std::{future::Future, sync::Arc};
 use tracing_futures::Instrument;
 use wgpu::{
     util::DeviceExt, CommandEncoderDescriptor, Extent3d, TextureAspect, TextureDescriptor, TextureDimension,
-    TextureUsage, TextureViewDescriptor, TextureViewDimension,
+    TextureUsages, TextureViewDescriptor, TextureViewDimension,
 };
 
 pub fn render_loop<TLD: 'static>(
@@ -55,7 +55,7 @@ pub fn render_loop<TLD: 'static>(
                     let size = Extent3d {
                         width: texture.width,
                         height: texture.height,
-                        depth: 1,
+                        depth_or_array_layers: 1,
                     };
 
                     assert!(texture.mip_levels > 0, "Mipmap levels must be greater than 0");
@@ -69,7 +69,7 @@ pub fn render_loop<TLD: 'static>(
                             sample_count: 1,
                             dimension: TextureDimension::D2,
                             format: texture.format.into(),
-                            usage: TextureUsage::SAMPLED | TextureUsage::COPY_DST,
+                            usage: TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST,
                         },
                         &texture.data,
                     );
@@ -87,7 +87,7 @@ pub fn render_loop<TLD: 'static>(
                     let size = Extent3d {
                         width: texture.width,
                         height: texture.height,
-                        depth: 6,
+                        depth_or_array_layers: 6,
                     };
 
                     assert!(texture.mip_levels > 0, "Mipmap levels must be greater than 0");
@@ -101,7 +101,7 @@ pub fn render_loop<TLD: 'static>(
                             sample_count: 1,
                             dimension: TextureDimension::D2,
                             format: texture.format.into(),
-                            usage: TextureUsage::SAMPLED | TextureUsage::COPY_DST,
+                            usage: TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST,
                         },
                         &texture.data,
                     );
@@ -114,7 +114,7 @@ pub fn render_loop<TLD: 'static>(
                             dimension: Some(TextureViewDimension::Cube),
                             aspect: TextureAspect::All,
                             base_mip_level: 0,
-                            level_count: None,
+                            mip_level_count: None,
                             base_array_layer: 0,
                             array_layer_count: None,
                         }),

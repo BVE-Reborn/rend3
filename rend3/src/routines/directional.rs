@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use wgpu::{
-    BindGroup, CommandEncoder, Device, LoadOp, Operations, RenderPassDepthStencilAttachmentDescriptor,
-    RenderPassDescriptor, RenderPipeline, TextureView,
+    BindGroup, CommandEncoder, Device, LoadOp, Operations, RenderPassDepthStencilAttachment, RenderPassDescriptor,
+    RenderPipeline, TextureView,
 };
 
 use crate::{
@@ -95,8 +95,8 @@ impl DirectionalShadowPass {
             let mut rpass = args.encoder.begin_render_pass(&RenderPassDescriptor {
                 label: Some("culling pass"),
                 color_attachments: &[],
-                depth_stencil_attachment: Some(RenderPassDepthStencilAttachmentDescriptor {
-                    attachment: &light.shadow_texture_arc,
+                depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
+                    view: &light.shadow_texture_arc,
                     depth_ops: Some(Operations {
                         load: LoadOp::Clear(0.0),
                         store: true,

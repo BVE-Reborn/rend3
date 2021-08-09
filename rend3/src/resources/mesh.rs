@@ -6,7 +6,7 @@ use glam::{Vec2, Vec3};
 use range_alloc::RangeAllocator;
 use std::{mem::size_of, ops::Range};
 use wgpu::{
-    Buffer, BufferAddress, BufferDescriptor, BufferUsage, CommandEncoder, Device, IndexFormat, Queue, RenderPass,
+    Buffer, BufferAddress, BufferDescriptor, BufferUsages, CommandEncoder, Device, IndexFormat, Queue, RenderPass,
 };
 
 pub const VERTEX_POSITION_SIZE: usize = size_of::<Vec3>();
@@ -291,49 +291,49 @@ fn create_buffers(device: &Device, vertex_count: usize, index_count: usize) -> M
     let vertex_position = device.create_buffer(&BufferDescriptor {
         label: Some("position vertex buffer"),
         size: position_bytes as BufferAddress,
-        usage: BufferUsage::COPY_DST | BufferUsage::VERTEX | BufferUsage::STORAGE,
+        usage: BufferUsages::COPY_DST | BufferUsages::VERTEX | BufferUsages::STORAGE,
         mapped_at_creation: false,
     });
 
     let vertex_normal = device.create_buffer(&BufferDescriptor {
         label: Some("normal vertex buffer"),
         size: normal_bytes as BufferAddress,
-        usage: BufferUsage::COPY_DST | BufferUsage::VERTEX | BufferUsage::STORAGE,
+        usage: BufferUsages::COPY_DST | BufferUsages::VERTEX | BufferUsages::STORAGE,
         mapped_at_creation: false,
     });
 
     let vertex_tangent = device.create_buffer(&BufferDescriptor {
         label: Some("tangent vertex buffer"),
         size: tangent_bytes as BufferAddress,
-        usage: BufferUsage::COPY_DST | BufferUsage::VERTEX | BufferUsage::STORAGE,
+        usage: BufferUsages::COPY_DST | BufferUsages::VERTEX | BufferUsages::STORAGE,
         mapped_at_creation: false,
     });
 
     let vertex_uv = device.create_buffer(&BufferDescriptor {
         label: Some("uv vertex buffer"),
         size: uv_bytes as BufferAddress,
-        usage: BufferUsage::COPY_DST | BufferUsage::VERTEX | BufferUsage::STORAGE,
+        usage: BufferUsages::COPY_DST | BufferUsages::VERTEX | BufferUsages::STORAGE,
         mapped_at_creation: false,
     });
 
     let vertex_color = device.create_buffer(&BufferDescriptor {
         label: Some("color vertex buffer"),
         size: color_bytes as BufferAddress,
-        usage: BufferUsage::COPY_DST | BufferUsage::VERTEX | BufferUsage::STORAGE,
+        usage: BufferUsages::COPY_DST | BufferUsages::VERTEX | BufferUsages::STORAGE,
         mapped_at_creation: false,
     });
 
     let vertex_mat_index = device.create_buffer(&BufferDescriptor {
         label: Some("material index vertex buffer"),
         size: mat_index_bytes as BufferAddress,
-        usage: BufferUsage::COPY_DST | BufferUsage::VERTEX | BufferUsage::STORAGE,
+        usage: BufferUsages::COPY_DST | BufferUsages::VERTEX | BufferUsages::STORAGE,
         mapped_at_creation: false,
     });
 
     let index = device.create_buffer(&BufferDescriptor {
         label: Some("index buffer"),
         size: index_bytes as BufferAddress,
-        usage: BufferUsage::COPY_DST | BufferUsage::INDEX | BufferUsage::STORAGE,
+        usage: BufferUsages::COPY_DST | BufferUsages::INDEX | BufferUsages::STORAGE,
         mapped_at_creation: false,
     });
 

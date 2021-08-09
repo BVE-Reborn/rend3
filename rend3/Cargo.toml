@@ -56,4 +56,4 @@ switchyard = "0.2"
 thiserror = "1"
 tracing = { version = "0.1", default-features = false, features = ["std"] }
 tracing-futures = "0.2"
-wgpu = "0.7"
+wgpu = { version = "0.9", git = "https://github.com/gfx-rs/wgpu.git", rev = "7798534d428100145f10de1fac4bd35c38737806" }

@@ -17,7 +17,7 @@ use parking_lot::RwLock;
 use raw_window_handle::HasRawWindowHandle;
 use std::sync::Arc;
 use wgpu::{
-    Adapter, AdapterInfo, Backend, BackendBit, DeviceDescriptor, DeviceType, Features, Instance, Limits,
+    Adapter, AdapterInfo, Backend, Backends, DeviceDescriptor, DeviceType, Features, Instance, Limits,
     TextureViewDimension,
 };
 
@@ -45,6 +45,9 @@ impl<T> PotentialAdapter<T> {
         if (features.is_err() || limits.is_err() || desired_mode == Some(RendererMode::CPUPowered))
             && desired_mode != Some(RendererMode::GPUPowered)
         {
+            dbg!(features);
+            dbg!(limits);
+
             features = check_features(RendererMode::CPUPowered, inner_features);
             limits = check_limits(RendererMode::CPUPowered, &inner_limits);
             mode = RendererMode::CPUPowered;
@@ -65,7 +68,7 @@ pub fn create_adapter(
     desired_device: Option<String>,
     desired_mode: Option<RendererMode>,
 ) -> Result<(Instance, PotentialAdapter<Adapter>), RendererInitializationError> {
-    let backend_bits = BackendBit::VULKAN | BackendBit::DX12 | BackendBit::DX11 | BackendBit::METAL;
+    let backend_bits = Backends::VULKAN | Backends::DX12 | Backends::DX11 | Backends::METAL;
     let default_backend_order = [Backend::Vulkan, Backend::Metal, Backend::Dx12, Backend::Dx11];
 
     let instance = Instance::new(backend_bits);
@@ -73,7 +76,7 @@ pub fn create_adapter(
     let mut valid_adapters = FnvHashMap::default();
 
     for backend in &default_backend_order {
-        let adapters = instance.enumerate_adapters(BackendBit::from(*backend));
+        let adapters = instance.enumerate_adapters(Backends::from(*backend));
 
         let mut potential_adapters = ArrayVec::<PotentialAdapter<Adapter>, 4>::new();
         for (idx, adapter) in adapters.enumerate() {

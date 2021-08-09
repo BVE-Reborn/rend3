@@ -1,8 +1,8 @@
 use wgpu::{
-    BindGroup, BlendState, Color, ColorTargetState, ColorWrite, CommandEncoder, CullMode, Device, FragmentState,
-    FrontFace, LoadOp, MultisampleState, Operations, PipelineLayoutDescriptor, PolygonMode, PrimitiveState,
-    PrimitiveTopology, RenderPassColorAttachmentDescriptor, RenderPassDescriptor, RenderPipeline,
-    RenderPipelineDescriptor, ShaderFlags, ShaderModuleDescriptor, TextureFormat, TextureView, VertexState,
+    BindGroup, Color, ColorTargetState, ColorWrites, CommandEncoder, Device, FragmentState, FrontFace, LoadOp,
+    MultisampleState, Operations, PipelineLayoutDescriptor, PolygonMode, PrimitiveState, PrimitiveTopology,
+    RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor,
+    ShaderModuleDescriptorSpirV, TextureFormat, TextureView, VertexState,
 };
 
 use crate::{
@@ -32,17 +32,19 @@ pub struct TonemappingPass {
 }
 impl TonemappingPass {
     pub fn new(args: TonemappingPassNewArgs<'_>) -> Self {
-        let blit_vert = args.device.create_shader_module(&ShaderModuleDescriptor {
-            label: Some("tonemapping vert"),
-            source: wgpu::util::make_spirv(SPIRV_SHADERS.get_file("blit.vert.spv").unwrap().contents()),
-            flags: ShaderFlags::empty(),
-        });
+        let blit_vert = unsafe {
+            args.device.create_shader_module_spirv(&ShaderModuleDescriptorSpirV {
+                label: Some("tonemapping vert"),
+                source: wgpu::util::make_spirv_raw(SPIRV_SHADERS.get_file("blit.vert.spv").unwrap().contents()),
+            })
+        };
 
-        let blit_frag = args.device.create_shader_module(&ShaderModuleDescriptor {
-            label: Some("tonemapping frag"),
-            source: wgpu::util::make_spirv(SPIRV_SHADERS.get_file("blit.frag.spv").unwrap().contents()),
-            flags: ShaderFlags::empty(),
-        });
+        let blit_frag = unsafe {
+            args.device.create_shader_module_spirv(&ShaderModuleDescriptorSpirV {
+                label: Some("tonemapping frag"),
+                source: wgpu::util::make_spirv_raw(SPIRV_SHADERS.get_file("blit.frag.spv").unwrap().contents()),
+            })
+        };
 
         let pll = args.device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: Some("tonemapping pass"),
@@ -62,8 +64,10 @@ impl TonemappingPass {
                 topology: PrimitiveTopology::TriangleList,
                 strip_index_format: None,
                 front_face: FrontFace::Cw,
-                cull_mode: CullMode::None,
+                cull_mode: None,
+                clamp_depth: false,
                 polygon_mode: PolygonMode::Fill,
+                conservative: false,
             },
             depth_stencil: None,
             multisample: MultisampleState::default(),
@@ -72,9 +76,8 @@ impl TonemappingPass {
                 entry_point: "main",
                 targets: &[ColorTargetState {
                     format: TextureFormat::Rgba8Unorm,
-                    alpha_blend: BlendState::REPLACE,
-                    color_blend: BlendState::REPLACE,
-                    write_mask: ColorWrite::all(),
+                    blend: None,
+                    write_mask: ColorWrites::all(),
                 }],
             }),
         });
@@ -89,8 +92,8 @@ impl TonemappingPass {
 
         let mut rpass = args.encoder.begin_render_pass(&RenderPassDescriptor {
             label: Some("tonemapping pass"),
-            color_attachments: &[RenderPassColorAttachmentDescriptor {
-                attachment: args.target,
+            color_attachments: &[RenderPassColorAttachment {
+                view: args.target,
                 resolve_target: None,
                 ops: Operations {
                     load: LoadOp::Clear(Color::BLACK),

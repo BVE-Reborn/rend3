@@ -1,10 +1,5 @@
 use arrayvec::ArrayVec;
-use wgpu::{
-    BindGroupLayout, BlendState, ColorTargetState, ColorWrite, CompareFunction, CullMode, DepthBiasState,
-    DepthStencilState, Device, FragmentState, FrontFace, MultisampleState, PipelineLayoutDescriptor, PolygonMode,
-    PrimitiveState, PrimitiveTopology, PushConstantRange, RenderPipeline, RenderPipelineDescriptor, ShaderFlags,
-    ShaderModuleDescriptor, ShaderStage, StencilState, TextureFormat, VertexState,
-};
+use wgpu::{BindGroupLayout, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState, DepthStencilState, Device, Face, FragmentState, FrontFace, MultisampleState, PipelineLayoutDescriptor, PolygonMode, PrimitiveState, PrimitiveTopology, PushConstantRange, RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptorSpirV, ShaderStages, StencilState, TextureFormat, VertexState};
 
 use crate::{
     resources::MaterialManager,
@@ -29,33 +24,35 @@ pub struct BuildOpaquePassShaderArgs<'a> {
 }
 
 pub fn build_opaque_pass_shader(args: BuildOpaquePassShaderArgs<'_>) -> RenderPipeline {
-    let opaque_prepass_vert = args.device.create_shader_module(&ShaderModuleDescriptor {
-        label: Some("opaque pass vert"),
-        source: wgpu::util::make_spirv(
-            SPIRV_SHADERS
-                .get_file(match args.mode {
-                    RendererMode::CPUPowered => "opaque.vert.cpu.spv",
-                    RendererMode::GPUPowered => "opaque.vert.gpu.spv",
-                })
-                .unwrap()
-                .contents(),
-        ),
-        flags: ShaderFlags::empty(),
-    });
+    let opaque_prepass_vert = unsafe {
+        args.device.create_shader_module_spirv(&ShaderModuleDescriptorSpirV {
+            label: Some("opaque pass vert"),
+            source: wgpu::util::make_spirv_raw(
+                SPIRV_SHADERS
+                    .get_file(match args.mode {
+                        RendererMode::CPUPowered => "opaque.vert.cpu.spv",
+                        RendererMode::GPUPowered => "opaque.vert.gpu.spv",
+                    })
+                    .unwrap()
+                    .contents(),
+            ),
+        })
+    };
 
-    let opaque_prepass_frag = args.device.create_shader_module(&ShaderModuleDescriptor {
-        label: Some("opaque pass frag"),
-        source: wgpu::util::make_spirv(
-            SPIRV_SHADERS
-                .get_file(match args.mode {
-                    RendererMode::CPUPowered => "opaque.frag.cpu.spv",
-                    RendererMode::GPUPowered => "opaque.frag.gpu.spv",
-                })
-                .unwrap()
-                .contents(),
-        ),
-        flags: ShaderFlags::empty(),
-    });
+    let opaque_prepass_frag = unsafe {
+        args.device.create_shader_module_spirv(&ShaderModuleDescriptorSpirV {
+            label: Some("opaque pass frag"),
+            source: wgpu::util::make_spirv_raw(
+                SPIRV_SHADERS
+                    .get_file(match args.mode {
+                        RendererMode::CPUPowered => "opaque.frag.cpu.spv",
+                        RendererMode::GPUPowered => "opaque.frag.gpu.spv",
+                    })
+                    .unwrap()
+                    .contents(),
+            ),
+        })
+    };
 
     let cpu_vertex_buffers = cpu_vertex_buffers();
     let gpu_vertex_buffers = gpu_vertex_buffers();
@@ -75,7 +72,7 @@ pub fn build_opaque_pass_shader(args: BuildOpaquePassShaderArgs<'_>) -> RenderPi
     match args.mode {
         RendererMode::CPUPowered => push_constants.push(PushConstantRange {
             range: 0..4,
-            stages: ShaderStage::VERTEX,
+            stages: ShaderStages::VERTEX,
         }),
         _ => {}
     };
@@ -101,8 +98,10 @@ pub fn build_opaque_pass_shader(args: BuildOpaquePassShaderArgs<'_>) -> RenderPi
             topology: PrimitiveTopology::TriangleList,
             strip_index_format: None,
             front_face: FrontFace::Cw,
-            cull_mode: CullMode::Back,
+            cull_mode: Some(Face::Back),
+            clamp_depth: false,
             polygon_mode: PolygonMode::Fill,
+            conservative: false,
         },
         depth_stencil: Some(DepthStencilState {
             format: TextureFormat::Depth32Float,
@@ -110,7 +109,6 @@ pub fn build_opaque_pass_shader(args: BuildOpaquePassShaderArgs<'_>) -> RenderPi
             depth_compare: CompareFunction::GreaterEqual,
             stencil: StencilState::default(),
             bias: DepthBiasState::default(),
-            clamp_depth: false,
         }),
         multisample: MultisampleState::default(),
         fragment: Some(FragmentState {
@@ -118,9 +116,8 @@ pub fn build_opaque_pass_shader(args: BuildOpaquePassShaderArgs<'_>) -> RenderPi
             entry_point: "main",
             targets: &[ColorTargetState {
                 format: TextureFormat::Rgba16Float,
-                alpha_blend: BlendState::REPLACE,
-                color_blend: BlendState::REPLACE,
-                write_mask: ColorWrite::all(),
+                blend: None,
+                write_mask: ColorWrites::all(),
             }],
         }),
     });

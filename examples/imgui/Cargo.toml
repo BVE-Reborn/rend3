@@ -19,12 +19,12 @@ glam = "0.17"
 rend3 = { path = "../../rend3", version = "^0.0.5"}
 # imgui and integrations
 imgui = "0.7"
-imgui-winit-support = "0.7"
-imgui-wgpu = "0.14"
+# imgui-winit-support = "0.7"
+# imgui-wgpu = "0.14"
 # Provides `block_on` to wait for futures from sync code
 pollster = "0.2"
 # core rendering api used by rend3 etc
-wgpu = "0.7"
+wgpu = { version = "0.9", git = "https://github.com/gfx-rs/wgpu.git", rev = "7798534d428100145f10de1fac4bd35c38737806" }
 # wgpu-aware logging
 wgpu-subscriber = "0.1"
 # windowing

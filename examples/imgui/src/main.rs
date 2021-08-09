@@ -80,7 +80,7 @@ fn main() {
     let mut swapchain = renderer.device().create_swap_chain(
         &surface,
         &wgpu::SwapChainDescriptor {
-            usage: wgpu::TextureUsage::RENDER_ATTACHMENT,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: rend3::SWAPCHAIN_FORMAT,
             width: window_size.width,
             height: window_size.height,
@@ -185,7 +185,7 @@ fn main() {
                 swapchain = renderer.device().create_swap_chain(
                     &surface,
                     &wgpu::SwapChainDescriptor {
-                        usage: wgpu::TextureUsage::RENDER_ATTACHMENT,
+                        usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
                         format: rend3::SWAPCHAIN_FORMAT,
                         width: size.width,
                         height: size.height,
@@ -251,7 +251,7 @@ fn main() {
                 // Create a renderpass to render imgui onto
                 let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     label: None,
-                    color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+                    color_attachments: &[wgpu::RenderPassColorAttachment {
                         attachment: &image.output.view,
                         resolve_target: None,
                         ops: wgpu::Operations {

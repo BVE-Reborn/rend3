@@ -3,10 +3,9 @@ use std::{mem, num::NonZeroU64};
 use glam::Mat4;
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
-    BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
-    BindingResource, BindingType, BufferBindingType, BufferDescriptor, BufferUsage, CommandEncoder,
-    ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor, Device, PipelineLayoutDescriptor, RenderPass,
-    ShaderFlags, ShaderModuleDescriptor, ShaderStage,
+    BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType,
+    BufferBindingType, BufferDescriptor, BufferUsages, CommandEncoder, ComputePassDescriptor, ComputePipeline,
+    ComputePipelineDescriptor, Device, PipelineLayoutDescriptor, RenderPass, ShaderModuleDescriptorSpirV, ShaderStages,
 };
 
 use super::{CulledObjectSet, GPUCullingInput, GPUIndirectData};
@@ -52,7 +51,7 @@ impl GpuCuller {
             entries: &[
                 BindGroupLayoutEntry {
                     binding: 0,
-                    visibility: ShaderStage::COMPUTE,
+                    visibility: ShaderStages::COMPUTE,
                     ty: BindingType::Buffer {
                         ty: BufferBindingType::Storage { read_only: true },
                         has_dynamic_offset: false,
@@ -62,7 +61,7 @@ impl GpuCuller {
                 },
                 BindGroupLayoutEntry {
                     binding: 1,
-                    visibility: ShaderStage::COMPUTE,
+                    visibility: ShaderStages::COMPUTE,
                     ty: BindingType::Buffer {
                         ty: BufferBindingType::Storage { read_only: false },
                         has_dynamic_offset: false,
@@ -72,7 +71,7 @@ impl GpuCuller {
                 },
                 BindGroupLayoutEntry {
                     binding: 2,
-                    visibility: ShaderStage::COMPUTE,
+                    visibility: ShaderStages::COMPUTE,
                     ty: BindingType::Buffer {
                         ty: BufferBindingType::Storage { read_only: false },
                         has_dynamic_offset: false,
@@ -89,11 +88,12 @@ impl GpuCuller {
             push_constant_ranges: &[],
         });
 
-        let sm = device.create_shader_module(&ShaderModuleDescriptor {
-            label: Some("cull"),
-            source: wgpu::util::make_spirv(SPIRV_SHADERS.get_file("cull.comp.spv").unwrap().contents()),
-            flags: ShaderFlags::empty(),
-        });
+        let sm = unsafe {
+            device.create_shader_module_spirv(&ShaderModuleDescriptorSpirV {
+                label: Some("cull"),
+                source: wgpu::util::make_spirv_raw(SPIRV_SHADERS.get_file("cull.comp.spv").unwrap().contents()),
+            })
+        };
 
         let pipeline = device.create_compute_pipeline(&ComputePipelineDescriptor {
             label: Some("gpu culling pl"),
@@ -128,13 +128,13 @@ impl GpuCuller {
         let input_buffer = args.device.create_buffer_init(&BufferInitDescriptor {
             label: Some("culling inputs"),
             contents: &data,
-            usage: BufferUsage::STORAGE,
+            usage: BufferUsages::STORAGE,
         });
 
         let output_buffer = args.device.create_buffer(&BufferDescriptor {
             label: Some("culling output"),
             size: (args.objects.len() * mem::size_of::<PerObjectData>()) as _,
-            usage: BufferUsage::STORAGE,
+            usage: BufferUsages::STORAGE,
             mapped_at_creation: false,
         });
 
@@ -142,7 +142,7 @@ impl GpuCuller {
             label: Some("indirect buffer"),
             // 16 bytes for count, the rest for the indirect count
             size: (args.objects.len() * 20 + 16) as _,
-            usage: BufferUsage::STORAGE | BufferUsage::INDIRECT | BufferUsage::VERTEX,
+            usage: BufferUsages::STORAGE | BufferUsages::INDIRECT | BufferUsages::VERTEX,
             mapped_at_creation: false,
         });
 

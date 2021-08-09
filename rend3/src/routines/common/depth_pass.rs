@@ -1,9 +1,9 @@
 use arrayvec::ArrayVec;
 use wgpu::{
-    BindGroupLayout, BlendState, ColorTargetState, ColorWrite, CompareFunction, CullMode, DepthBiasState,
-    DepthStencilState, Device, FragmentState, FrontFace, MultisampleState, PipelineLayoutDescriptor, PolygonMode,
-    PrimitiveState, PrimitiveTopology, PushConstantRange, RenderPipeline, RenderPipelineDescriptor, ShaderFlags,
-    ShaderModuleDescriptor, ShaderStage, StencilState, TextureFormat, VertexState,
+    BindGroupLayout, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState, DepthStencilState, Device, Face,
+    FragmentState, FrontFace, MultisampleState, PipelineLayoutDescriptor, PolygonMode, PrimitiveState,
+    PrimitiveTopology, PushConstantRange, RenderPipeline, RenderPipelineDescriptor,
+    ShaderModuleDescriptorSpirV, ShaderStages, StencilState, TextureFormat, VertexState,
 };
 
 use crate::{
@@ -30,33 +30,35 @@ pub struct BuildDepthPassShaderArgs<'a> {
 }
 
 pub fn build_depth_pass_shader(args: BuildDepthPassShaderArgs) -> RenderPipeline {
-    let depth_prepass_vert = args.device.create_shader_module(&ShaderModuleDescriptor {
-        label: Some("depth pass vert"),
-        source: wgpu::util::make_spirv(
-            SPIRV_SHADERS
-                .get_file(match args.mode {
-                    RendererMode::CPUPowered => "depth.vert.cpu.spv",
-                    RendererMode::GPUPowered => "depth.vert.gpu.spv",
-                })
-                .unwrap()
-                .contents(),
-        ),
-        flags: ShaderFlags::empty(),
-    });
+    let depth_prepass_vert = unsafe {
+        args.device.create_shader_module_spirv(&ShaderModuleDescriptorSpirV {
+            label: Some("depth pass vert"),
+            source: wgpu::util::make_spirv_raw(
+                SPIRV_SHADERS
+                    .get_file(match args.mode {
+                        RendererMode::CPUPowered => "depth.vert.cpu.spv",
+                        RendererMode::GPUPowered => "depth.vert.gpu.spv",
+                    })
+                    .unwrap()
+                    .contents(),
+            ),
+        })
+    };
 
-    let depth_prepass_frag = args.device.create_shader_module(&ShaderModuleDescriptor {
-        label: Some("depth pass frag"),
-        source: wgpu::util::make_spirv(
-            SPIRV_SHADERS
-                .get_file(match args.mode {
-                    RendererMode::CPUPowered => "depth.frag.cpu.spv",
-                    RendererMode::GPUPowered => "depth.frag.gpu.spv",
-                })
-                .unwrap()
-                .contents(),
-        ),
-        flags: ShaderFlags::empty(),
-    });
+    let depth_prepass_frag = unsafe {
+        args.device.create_shader_module_spirv(&ShaderModuleDescriptorSpirV {
+            label: Some("depth pass frag"),
+            source: wgpu::util::make_spirv_raw(
+                SPIRV_SHADERS
+                    .get_file(match args.mode {
+                        RendererMode::CPUPowered => "depth.frag.cpu.spv",
+                        RendererMode::GPUPowered => "depth.frag.gpu.spv",
+                    })
+                    .unwrap()
+                    .contents(),
+            ),
+        })
+    };
 
     let cpu_vertex_buffers = cpu_vertex_buffers();
     let gpu_vertex_buffers = gpu_vertex_buffers();
@@ -74,7 +76,7 @@ pub fn build_depth_pass_shader(args: BuildDepthPassShaderArgs) -> RenderPipeline
     match args.mode {
         RendererMode::CPUPowered => push_constants.push(PushConstantRange {
             range: 0..4,
-            stages: ShaderStage::VERTEX,
+            stages: ShaderStages::VERTEX,
         }),
         _ => {}
     };
@@ -87,9 +89,8 @@ pub fn build_depth_pass_shader(args: BuildDepthPassShaderArgs) -> RenderPipeline
 
     let color_state = [ColorTargetState {
         format: TextureFormat::Rgba16Float,
-        alpha_blend: BlendState::REPLACE,
-        color_blend: BlendState::REPLACE,
-        write_mask: ColorWrite::empty(),
+        blend: None,
+        write_mask: ColorWrites::empty(),
     }];
 
     let pipeline = args.device.create_render_pipeline(&RenderPipelineDescriptor {
@@ -107,8 +108,10 @@ pub fn build_depth_pass_shader(args: BuildDepthPassShaderArgs) -> RenderPipeline
             topology: PrimitiveTopology::TriangleList,
             strip_index_format: None,
             front_face: FrontFace::Cw,
-            cull_mode: CullMode::Back,
+            cull_mode: Some(Face::Back),
+            clamp_depth: false,
             polygon_mode: PolygonMode::Fill,
+            conservative: false,
         },
         depth_stencil: Some(DepthStencilState {
             format: TextureFormat::Depth32Float,
@@ -124,7 +127,6 @@ pub fn build_depth_pass_shader(args: BuildDepthPassShaderArgs) -> RenderPipeline
                     clamp: 0.0,
                 }
             },
-            clamp_depth: false,
         }),
         multisample: MultisampleState::default(),
         fragment: Some(FragmentState {

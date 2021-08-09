@@ -2,9 +2,9 @@ use std::sync::Arc;
 
 use glam::{UVec2, Vec4};
 use wgpu::{
-    Color, CommandBuffer, Device, Extent3d, LoadOp, Operations, RenderPassColorAttachmentDescriptor,
-    RenderPassDepthStencilAttachmentDescriptor, RenderPassDescriptor, TextureDescriptor, TextureDimension,
-    TextureFormat, TextureUsage, TextureView, TextureViewDescriptor,
+    Color, CommandBuffer, Device, Extent3d, LoadOp, Operations, RenderPassColorAttachment,
+    RenderPassDepthStencilAttachment, RenderPassDescriptor, TextureDescriptor, TextureDimension, TextureFormat,
+    TextureUsages, TextureView, TextureViewDescriptor,
 };
 
 use crate::{routines::*, ModeData, RenderRoutine, Renderer};
@@ -167,16 +167,16 @@ impl<TLD: 'static> RenderRoutine<TLD> for DefaultRenderRoutine {
 
         let mut rpass = encoder.begin_render_pass(&RenderPassDescriptor {
             label: Some("primary renderpass"),
-            color_attachments: &[RenderPassColorAttachmentDescriptor {
-                attachment: &self.internal_buffer,
+            color_attachments: &[RenderPassColorAttachment {
+                view: &self.internal_buffer,
                 resolve_target: None,
                 ops: Operations {
                     load: LoadOp::Clear(Color::BLACK),
                     store: true,
                 },
             }],
-            depth_stencil_attachment: Some(RenderPassDepthStencilAttachmentDescriptor {
-                attachment: &self.internal_depth_buffer,
+            depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
+                view: &self.internal_depth_buffer,
                 depth_ops: Some(Operations {
                     load: LoadOp::Clear(0.0),
                     store: true,
@@ -227,13 +227,13 @@ fn create_internal_buffer(device: &Device, resolution: UVec2) -> TextureView {
             size: Extent3d {
                 width: resolution.x,
                 height: resolution.y,
-                depth: 1,
+                depth_or_array_layers: 1,
             },
             mip_level_count: 1,
             sample_count: 1,
             dimension: TextureDimension::D2,
             format: TextureFormat::Rgba16Float,
-            usage: TextureUsage::RENDER_ATTACHMENT | TextureUsage::SAMPLED | TextureUsage::COPY_SRC,
+            usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_SRC,
         })
         .create_view(&TextureViewDescriptor::default())
 }
@@ -245,13 +245,13 @@ fn create_internal_depth_buffer(device: &Device, resolution: UVec2) -> TextureVi
             size: Extent3d {
                 width: resolution.x,
                 height: resolution.y,
-                depth: 1,
+                depth_or_array_layers: 1,
             },
             mip_level_count: 1,
             sample_count: 1,
             dimension: TextureDimension::D2,
             format: TextureFormat::Depth32Float,
-            usage: TextureUsage::RENDER_ATTACHMENT,
+            usage: TextureUsages::RENDER_ATTACHMENT,
         })
         .create_view(&TextureViewDescriptor::default())
 }

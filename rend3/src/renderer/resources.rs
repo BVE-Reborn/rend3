@@ -4,7 +4,7 @@ use crate::{
     util::output::SWAPCHAIN_FORMAT,
     RendererOptions, VSyncMode,
 };
-use wgpu::{Device, PresentMode, Surface, SwapChain, SwapChainDescriptor, TextureUsage};
+use wgpu::{Device, PresentMode, Surface, SwapChain, SwapChainDescriptor, TextureUsages};
 
 pub struct RendererGlobalResources {
     pub swapchain: Option<SwapChain>,
@@ -74,7 +74,7 @@ fn create_swapchain(device: &Device, surface: &Surface, size: [u32; 2], vsync: V
         &SwapChainDescriptor {
             width: size[0],
             height: size[1],
-            usage: TextureUsage::RENDER_ATTACHMENT,
+            usage: TextureUsages::RENDER_ATTACHMENT,
             format: SWAPCHAIN_FORMAT,
             present_mode: match vsync {
                 VSyncMode::On => PresentMode::Fifo,
