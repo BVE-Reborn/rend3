@@ -8,13 +8,12 @@ use crate::{
     resources::{DirectionalLightManager, MaterialManager, MeshManager, ObjectManager, TextureManager},
     statistics::RendererStatistics,
     util::output::RendererOutput,
-    JobPriorities, RenderRoutine, RendererBuilder, RendererInitializationError, RendererMode, RendererOptions,
+    RenderRoutine, RendererBuilder, RendererInitializationError, RendererMode, RendererOptions,
 };
 use glam::Mat4;
 use parking_lot::RwLock;
 use raw_window_handle::HasRawWindowHandle;
 use std::{cmp::Ordering, future::Future, sync::Arc};
-use switchyard::Switchyard;
 use wgpu::{Device, Instance, Queue, Surface};
 
 pub mod error;
@@ -34,12 +33,7 @@ impl Ord for OrdEqFloat {
     }
 }
 
-pub struct Renderer<TLD = ()>
-where
-    TLD: 'static,
-{
-    yard: Arc<Switchyard<TLD>>,
-    yard_priorites: JobPriorities,
+pub struct Renderer {
     instructions: InstructionStreamPair,
 
     pub mode: RendererMode,
@@ -59,10 +53,10 @@ where
 
     options: RwLock<RendererOptions>,
 }
-impl<TLD: 'static> Renderer<TLD> {
+impl Renderer {
     /// Use [`RendererBuilder`](crate::RendererBuilder) to create a renderer.
     pub(crate) fn new<W: HasRawWindowHandle>(
-        builder: RendererBuilder<'_, W, TLD>,
+        builder: RendererBuilder<'_, W>,
     ) -> impl Future<Output = Result<Arc<Self>, RendererInitializationError>> + '_ {
         setup::create_renderer(builder)
     }
@@ -238,9 +232,9 @@ impl<TLD: 'static> Renderer<TLD> {
 
     pub fn render<'a>(
         self: &Arc<Self>,
-        list: &'a dyn RenderRoutine<TLD>,
+        list: &'a dyn RenderRoutine,
         output: RendererOutput,
-    ) -> impl Future<Output = RendererStatistics> + 'a {
+    ) -> RendererStatistics {
         render::render_loop(Arc::clone(self), list, output)
     }
 }

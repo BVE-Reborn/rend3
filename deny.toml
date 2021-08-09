@@ -14,9 +14,8 @@ multiple-versions = "deny"
 wildcards = "allow"
 skip = [
     # everything
-    { name = "arrayvec", version = "0.5.2" },
     { name = "cfg-if", version = "0.1.10" },
-    { name = "slotmap", version = "0.4.0" },
+    { name = "hashbrown", version = "0.9.1" },
     # graphics
     { name = "core-foundation", version = "0.7.0" }, # winit uses old version
     { name = "core-foundation-sys", version = "0.7.0" }, # winit uses old version
@@ -24,7 +23,7 @@ skip = [
     # image
     { name = "miniz_oxide", version = "0.3.7" }, # png uses old version
     # winit
-    { name = "winapi", version = "0.2.8" }, # winit -> mio-extras -> mio requires this
+    { name = "proc-macro-crate", version = "0.1.5" }, # ndk
     { name = "dlib", version = "0.4.2" }, # wayland
     { name = "libloading", version = "0.6.7" }, # everything but wayland
     { name = "nix", version = "0.18.0" }, # wayland
@@ -35,7 +34,6 @@ skip = [
 vulnerability = "warn"
 unmaintained = "warn"
 ignore = [
-    'RUSTSEC-2020-0016'
 ]
 
 [sources]

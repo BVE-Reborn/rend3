@@ -28,4 +28,4 @@ wgpu = { version = "0.9", git = "https://github.com/gfx-rs/wgpu.git", rev = "779
 # wgpu-aware logging
 wgpu-subscriber = "0.1"
 # windowing
-winit = "0.24"
+winit = "0.25"

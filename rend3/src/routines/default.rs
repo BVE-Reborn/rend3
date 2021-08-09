@@ -99,10 +99,10 @@ impl DefaultRenderRoutine {
     }
 }
 
-impl<TLD: 'static> RenderRoutine<TLD> for DefaultRenderRoutine {
+impl RenderRoutine for DefaultRenderRoutine {
     fn render(
         &self,
-        renderer: Arc<Renderer<TLD>>,
+        renderer: Arc<Renderer>,
         encoders: &mut Vec<CommandBuffer>,
         frame: &crate::util::output::OutputFrame,
     ) {

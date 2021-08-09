@@ -1,5 +1,4 @@
 use glam::{Mat3, Mat4, Vec2, Vec3, Vec3A, Vec4};
-use itertools::Itertools;
 use std::mem;
 use wgpu::TextureFormat;
 pub use wgpu::{Color as ClearColor, LoadOp as PipelineLoadOp};
@@ -339,8 +338,8 @@ pub struct Mesh {
 impl Mesh {
     /// Validates that all vertex attributes have the same length.
     pub fn validate(&self) -> bool {
+        let position_lenth = self.vertex_positions.len();
         [
-            self.vertex_positions.len(),
             self.vertex_normals.len(),
             self.vertex_tangents.len(),
             self.vertex_uvs.len(),
@@ -348,7 +347,7 @@ impl Mesh {
             self.vertex_material_indices.len(),
         ]
         .iter()
-        .all_equal()
+        .all(|v| *v == position_lenth)
     }
 
     /// Calculate normals for the given mesh, assuming smooth shading and per-vertex normals.

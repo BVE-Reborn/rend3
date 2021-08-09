@@ -105,7 +105,7 @@ fn extract_mode(value: &str) -> Result<rend3::RendererMode, &'static str> {
 }
 
 fn main() {
-    wgpu_subscriber::initialize_default_subscriber(None);
+    env_logger::init();
 
     let mut args = Arguments::from_env();
     let desired_backend = args.value_from_fn(["-b", "--backend"], extract_backend).ok();
@@ -116,20 +116,13 @@ fn main() {
     let desired_mode = args.value_from_fn(["-m", "--mode"], extract_mode).ok();
     let file_to_load: Option<String> = args.free_from_str().ok();
 
-    rend3::span_transfer!(_ -> main_thread_span, INFO, "Main Thread Setup");
-    rend3::span_transfer!(_ -> event_loop_span, INFO, "Building Event Loop");
-
     let event_loop = EventLoop::new();
-
-    rend3::span_transfer!(event_loop_span -> window_span, INFO, "Building Window");
 
     let window = {
         let mut builder = WindowBuilder::new();
         builder = builder.with_title("scene-viewer");
         builder.build(&event_loop).expect("Could not build window")
     };
-
-    rend3::span_transfer!(window_span -> renderer_span, INFO, "Building Renderer");
 
     let window_size = window.inner_size();
 
@@ -153,8 +146,6 @@ fn main() {
         UVec2::new(window_size.width, window_size.height),
     );
 
-    rend3::span_transfer!(renderer_span -> loading_span, INFO, "Loading resources");
-
     load_gltf(
         &renderer,
         file_to_load.unwrap_or_else(|| concat!(env!("CARGO_MANIFEST_DIR"), "/data/scene.gltf").to_owned()),
@@ -166,9 +157,6 @@ fn main() {
         intensity: 10.0,
         direction: Vec3::new(-1.0, -1.0, 0.0),
     });
-    rend3::span_transfer!(loading_span -> _);
-    rend3::span_transfer!(main_thread_span -> _);
-
     let mut scancode_status = HashMap::with_hasher(FnvBuildHasher::default());
 
     let mut camera_location = Camera::default();
@@ -295,16 +283,11 @@ fn main() {
             *control = ControlFlow::Exit;
         }
         Event::RedrawRequested(_) => {
-            rend3::span_transfer!(_ -> redraw_span, INFO, "Redraw");
-
             renderer.set_camera_data(camera_location);
             renderer.set_options(options.clone());
             // Dispatch a render!
-            let dynref: &dyn RenderRoutine<()> = &routine;
-            let handle = renderer.render(dynref, rend3::util::output::RendererOutput::InternalSwapchain);
-
-            // Wait until it's done
-            pollster::block_on(handle);
+            let dynref: &dyn RenderRoutine = &routine;
+            let _stats = renderer.render(dynref, rend3::util::output::RendererOutput::InternalSwapchain);
         }
         _ => {}
     })

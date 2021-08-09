@@ -55,7 +55,7 @@ fn create_mesh() -> rend3::datatypes::Mesh {
 
 fn main() {
     // Setup logging
-    wgpu_subscriber::initialize_default_subscriber(None);
+    env_logger::init();
 
     // Create event loop and window
     let event_loop = winit::event_loop::EventLoop::new();
@@ -141,11 +141,8 @@ fn main() {
         // Render!
         winit::event::Event::MainEventsCleared => {
             // Dispatch a render!
-            let dynref: &dyn RenderRoutine<()> = &routine;
-            let handle = renderer.render(dynref, rend3::util::output::RendererOutput::InternalSwapchain);
-
-            // Wait until it's done
-            pollster::block_on(handle);
+            let dynref: &dyn RenderRoutine = &routine;
+            let _stats = renderer.render(dynref, rend3::util::output::RendererOutput::InternalSwapchain);
         }
         // Other events we don't care about
         _ => {}

@@ -13,13 +13,13 @@ path = "src/main.rs"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+# logging
+env_logger = "0.9"
 # Linear algebra library
 glam = "0.17"
 # Renderer
 rend3 = { path = "../../rend3", version = "^0.0.5"}
 # Provides `block_on` to wait for futures from sync code
 pollster = "0.2"
-# wgpu-aware logging
-wgpu-subscriber = "0.1"
 # windowing
-winit = "0.24"
+winit = "0.25"

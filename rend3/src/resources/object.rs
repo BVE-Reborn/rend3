@@ -20,8 +20,6 @@ pub struct ObjectManager {
 }
 impl ObjectManager {
     pub fn new() -> Self {
-        span_transfer!(_ -> new_span, INFO, "Creating Object Manager");
-
         let registry = ResourceRegistry::new();
 
         Self { registry }
@@ -32,8 +30,6 @@ impl ObjectManager {
     }
 
     pub fn fill(&mut self, handle: ObjectHandle, object: Object, mesh_manager: &MeshManager) {
-        span_transfer!(_ -> fill_span, INFO, "Object Manager Fill");
-
         let mesh = mesh_manager.internal_data(object.mesh);
 
         let shader_object = InternalObject {
@@ -53,8 +49,6 @@ impl ObjectManager {
     }
 
     pub fn ready(&self) -> Vec<InternalObject> {
-        span_transfer!(_ -> ready_span, INFO, "Object Manager Ready");
-
         self.registry.values().cloned().collect()
     }
 

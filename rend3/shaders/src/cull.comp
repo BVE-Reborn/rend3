@@ -7,6 +7,7 @@ layout(local_size_x = 256) in;
 struct CullingUniforms {
     mat4 view;
     mat4 view_proj;
+    Frustum frustum;
     uint object_count;
 };
 
@@ -25,6 +26,40 @@ layout(set = 0, binding = 2, std430) buffer IndirectBuffer {
     IndirectCall indirect_call[];
 };
 
+float plane_distance(Plane plane, vec3 location) {
+    return dot(plane.inner.xyz, location) + plane.inner.w;
+}
+
+bool frustum_contains_sphere(Frustum frustum, vec4 sphere) {
+    vec3 location = sphere.xyz;
+    float neg_radius = -sphere.w;
+
+    if (!(plane_distance(frustum.left, location) >= neg_radius)) {
+        return false;
+    }
+    if (!(plane_distance(frustum.right, location) >= neg_radius)) {
+        return false;
+    }
+    if (!(plane_distance(frustum.top, location) >= neg_radius)) {
+        return false;
+    }
+    if (!(plane_distance(frustum.bottom, location) >= neg_radius)) {
+        return false;
+    }
+    if (!(plane_distance(frustum.near, location) >= neg_radius)) {
+        return false;
+    }
+
+    return true;
+}
+
+vec4 transform_sphere(vec4 sphere, mat4 transform) {
+    float max_scale = max(max(length(transform[0].xyz), length(transform[1].xyz)), length(transform[2].xyz));
+    vec4 center = transform * vec4(sphere.xyz, 1.0);
+
+    return vec4(center.xyz, sphere.w * max_scale);
+}
+
 void main() {
     uint input_idx = gl_GlobalInvocationID.x;
 
@@ -32,9 +67,18 @@ void main() {
         return;
     }
 
-    uint output_idx = atomicAdd(draw_call_count, 1);
-
     ObjectInputData in_data = object_input[input_idx];
+
+    mat4 model_view = uniforms.view * in_data.transform;
+    vec4 mesh_sphere = transform_sphere(in_data.bounding_sphere, model_view);
+
+    bool visible = frustum_contains_sphere(uniforms.frustum, mesh_sphere);
+
+    if (!visible) {
+        return;
+    }
+
+    uint output_idx = atomicAdd(draw_call_count, 1);
 
     ObjectOutputData out_data;
 

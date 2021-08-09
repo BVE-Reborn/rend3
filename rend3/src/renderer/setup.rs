@@ -9,7 +9,7 @@ use crate::{
         DirectionalLightManager, MaterialManager, MeshManager, ObjectManager, TextureManager, STARTING_2D_TEXTURES,
         STARTING_CUBE_TEXTURES,
     },
-    JobPriorities, Renderer, RendererBuilder, RendererInitializationError, RendererMode,
+    Renderer, RendererBuilder, RendererInitializationError, RendererMode,
 };
 use arrayvec::ArrayVec;
 use fnv::FnvHashMap;
@@ -82,7 +82,7 @@ pub fn create_adapter(
             let features = adapter.features();
             let potential = PotentialAdapter::new(adapter, info, limits, features, desired_mode);
 
-            tracing::debug!(
+            log::debug!(
                 "{:?} Adapter {}: {:#?}",
                 backend,
                 idx,
@@ -99,10 +99,10 @@ pub fn create_adapter(
             };
 
             if let (Ok(potential), true) = (potential, desired) {
-                tracing::debug!("Adapter usable in {:?} mode", potential.mode);
+                log::debug!("Adapter usable in {:?} mode", potential.mode);
                 potential_adapters.push(potential)
             } else {
-                tracing::debug!("Adapter not usable");
+                log::debug!("Adapter not usable");
             }
         }
         valid_adapters.insert(*backend, potential_adapters);
@@ -121,7 +121,7 @@ pub fn create_adapter(
     for backend in &default_backend_order {
         if let Some(desired_backend) = desired_backend {
             if desired_backend != *backend {
-                tracing::debug!("Skipping unwanted backend {:?}", backend);
+                log::debug!("Skipping unwanted backend {:?}", backend);
                 continue;
             }
         }
@@ -130,10 +130,10 @@ pub fn create_adapter(
             valid_adapters.remove(backend).and_then(|arr| arr.into_iter().next());
 
         if let Some(adapter) = adapter {
-            tracing::debug!("Chosen adapter: {:#?}", adapter.info);
-            tracing::debug!("Chosen backend: {:?}", backend);
-            tracing::debug!("Chosen features: {:#?}", adapter.features);
-            tracing::debug!("Chosen limits: {:#?}", adapter.limits);
+            log::debug!("Chosen adapter: {:#?}", adapter.info);
+            log::debug!("Chosen backend: {:?}", backend);
+            log::debug!("Chosen features: {:#?}", adapter.features);
+            log::debug!("Chosen limits: {:#?}", adapter.limits);
             return Ok((instance, adapter));
         }
     }
@@ -141,9 +141,9 @@ pub fn create_adapter(
     Err(RendererInitializationError::MissingAdapter)
 }
 
-pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
-    builder: RendererBuilder<'_, W, TLD>,
-) -> Result<Arc<Renderer<TLD>>, RendererInitializationError> {
+pub async fn create_renderer<W: HasRawWindowHandle>(
+    builder: RendererBuilder<'_, W>,
+) -> Result<Arc<Renderer>, RendererInitializationError> {
     let (instance, surface, device, queue, adapter_info, mode) = if let Some(crate::CustomDevice {
         instance,
         queue,
@@ -220,8 +220,6 @@ pub async fn create_renderer<W: HasRawWindowHandle, TLD: 'static>(
     let directional_light_manager = RwLock::new(DirectionalLightManager::new(&device));
 
     Ok(Arc::new(Renderer {
-        yard: builder.yard.expect("The yard should be populated by the builder"),
-        yard_priorites: builder.priorities.unwrap_or_else(JobPriorities::default),
         instructions: InstructionStreamPair::new(),
 
         mode,

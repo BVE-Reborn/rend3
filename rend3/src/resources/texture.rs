@@ -34,8 +34,6 @@ pub struct TextureManager {
 }
 impl TextureManager {
     pub fn new(device: &Device, mode: RendererMode, starting_textures: usize, dimension: TextureViewDimension) -> Self {
-        span_transfer!(_ -> new_span, INFO, "Creating Texture Manager");
-
         let mut null_tex_man = NullTextureManager::new(device, dimension);
 
         let view_count = starting_textures;
@@ -68,8 +66,6 @@ impl TextureManager {
     }
 
     pub fn fill(&mut self, handle: TextureHandle, texture: TextureView, format: Option<RendererTextureFormat>) {
-        span_transfer!(_ -> fill_span, INFO, "Texture Manager Fill");
-
         self.group_dirty = self.group_dirty.map_gpu(|_| true);
 
         let index = self.registry.insert(handle.0, InternalTexture { format });
@@ -87,8 +83,6 @@ impl TextureManager {
     }
 
     pub fn remove(&mut self, handle: TextureHandle) {
-        span_transfer!(_ -> remove_span, INFO, "Material Manager Remove");
-
         let (index, _) = self.registry.remove(handle.0);
 
         let active_count = self.registry.count();
@@ -106,8 +100,6 @@ impl TextureManager {
     }
 
     pub(crate) fn ready(&mut self, device: &Device) -> TextureManagerReadyOutput {
-        span_transfer!(_ -> ready_span, INFO, "Material Manager Ready");
-
         if let ModeData::GPU(_) = self.layout_dirty {
             let layout_dirty = self.layout_dirty;
 
@@ -174,8 +166,6 @@ fn fill_to_size(
     dimension: TextureViewDimension,
     size: usize,
 ) {
-    span_transfer!(_ -> fill_span, INFO, "fill to size");
-
     let to_add = size.saturating_sub(views.len());
 
     for _ in 0..to_add {
@@ -221,8 +211,6 @@ struct NullTextureManager {
 }
 impl NullTextureManager {
     pub fn new(device: &Device, dimension: TextureViewDimension) -> Self {
-        span_transfer!(_ -> new_span, INFO, "Material Manager Ready");
-
         let null_tex = device.create_texture(&TextureDescriptor {
             label: Some(&*format!("null {:?} texture", dimension)),
             size: Extent3d {
@@ -263,8 +251,6 @@ impl NullTextureManager {
     }
 
     pub fn get(&mut self, dimension: TextureViewDimension) -> TextureView {
-        span_transfer!(_ -> get_span, INFO, "Null Texture Manager Get");
-
         self.ensure_at_least_one(dimension);
 
         self.inner.pop().unwrap()

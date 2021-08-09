@@ -13,7 +13,7 @@ use crate::{
     resources::{CameraManager, InternalObject, MaterialManager},
     routines::common::interfaces::{PerObjectData, ShaderInterfaces},
     shaders::SPIRV_SHADERS,
-    util::bind_merge::BindGroupBuilder,
+    util::{bind_merge::BindGroupBuilder, frustum::ShaderFrustum},
     ModeData,
 };
 
@@ -22,6 +22,7 @@ use crate::{
 struct GPUCullingUniforms {
     view: Mat4,
     view_proj: Mat4,
+    frustum: ShaderFrustum,
     object_count: u32,
 }
 
@@ -112,6 +113,7 @@ impl GpuCuller {
         data.extend(bytemuck::bytes_of(&GPUCullingUniforms {
             view: args.camera.view().into(),
             view_proj: args.camera.view_proj().into(),
+            frustum: ShaderFrustum::from_matrix(args.camera.proj()),
             object_count: args.objects.len() as u32,
         }));
         for object in args.objects {

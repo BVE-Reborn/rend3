@@ -178,8 +178,6 @@ pub struct MaterialManager {
 
 impl MaterialManager {
     pub fn new(device: &Device, mode: RendererMode) -> Self {
-        span_transfer!(_ -> new_span, INFO, "Creating Material Manager");
-
         let bgl = mode.into_data(
             || {
                 let texture_binding = |idx| BindGroupLayoutEntry {
@@ -273,8 +271,6 @@ impl MaterialManager {
         handle: MaterialHandle,
         material: Material,
     ) {
-        span_transfer!(_ -> fill_span, INFO, "Material Manager Fill");
-
         texture_manager_2d.ensure_null_view();
         let null_tex = texture_manager_2d.get_null_view();
 
@@ -371,8 +367,6 @@ impl MaterialManager {
     }
 
     pub fn ready(&mut self, device: &Device, queue: &Queue, texture_manager: &TextureManager) {
-        span_transfer!(_ -> ready_span, INFO, "Material Manager Ready");
-
         if let ModeData::GPU(ref mut buffer) = self.buffer {
             let translate_texture = texture_manager.translation_fn();
             let data: Vec<_> = self

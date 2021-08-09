@@ -63,8 +63,6 @@ pub struct MeshManager {
 
 impl MeshManager {
     pub fn new(device: &Device) -> Self {
-        span_transfer!(_ -> new_span, INFO, "Creating Mesh Manager");
-
         let buffers = create_buffers(device, STARTING_VERTICES, STARTING_INDICES);
 
         let vertex_count = STARTING_VERTICES;
@@ -97,8 +95,6 @@ impl MeshManager {
         handle: MeshHandle,
         mesh: Mesh,
     ) {
-        span_transfer!(_ -> fill_span, INFO, "Mesh Manager Fill");
-
         assert!(mesh.validate());
 
         let vertex_count = mesh.vertex_positions.len();
@@ -195,12 +191,12 @@ impl MeshManager {
         let new_vert_count = (self.vertex_count + needed_verts as usize).next_power_of_two();
         let new_index_count = (self.index_count + needed_indices as usize).next_power_of_two();
 
-        tracing::debug!(
+        log::debug!(
             "Recreating vertex buffer from {} to {}",
             self.vertex_count,
             new_vert_count
         );
-        tracing::debug!(
+        log::debug!(
             "Recreating index buffer from {} to {}",
             self.index_count,
             new_index_count
