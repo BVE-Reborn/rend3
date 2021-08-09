@@ -28,12 +28,11 @@ layout(set = 0, binding = 2, std430) buffer IndirectBuffer {
 void main() {
     uint input_idx = gl_GlobalInvocationID.x;
 
-    if (input_idx >= 1) {
+    if (input_idx >= uniforms.object_count) {
         return;
     }
 
     uint output_idx = atomicAdd(draw_call_count, 1);
-    uint output_idx = 0;
 
     ObjectInputData in_data = object_input[input_idx];
 

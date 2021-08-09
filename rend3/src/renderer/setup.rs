@@ -45,9 +45,6 @@ impl<T> PotentialAdapter<T> {
         if (features.is_err() || limits.is_err() || desired_mode == Some(RendererMode::CPUPowered))
             && desired_mode != Some(RendererMode::GPUPowered)
         {
-            dbg!(features);
-            dbg!(limits);
-
             features = check_features(RendererMode::CPUPowered, inner_features);
             limits = check_limits(RendererMode::CPUPowered, &inner_limits);
             mode = RendererMode::CPUPowered;

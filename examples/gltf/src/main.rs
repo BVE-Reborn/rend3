@@ -1,3 +1,5 @@
+use glam::UVec2;
+
 fn load_gltf(
     renderer: &rend3::Renderer,
     path: &'static str,
@@ -69,10 +71,10 @@ fn main() {
     let renderer = pollster::block_on(rend3::RendererBuilder::new(options.clone()).window(&window).build()).unwrap();
 
     // Create the default set of shaders and pipelines
-    let pipelines = pollster::block_on(async {
-        let shaders = rend3_list::DefaultShaders::new(&renderer).await;
-        rend3_list::DefaultPipelines::new(&renderer, &shaders).await
-    });
+    let mut routine = rend3::routines::default::DefaultRenderRoutine::new(
+        &renderer,
+        UVec2::new(window_size.width, window_size.height),
+    );
 
     // Create mesh and calculate smooth normals based on vertices
     let (mesh, material) = load_gltf(&renderer, concat!(env!("CARGO_MANIFEST_DIR"), "/data.glb"));
@@ -81,10 +83,7 @@ fn main() {
     let object = rend3::datatypes::Object {
         mesh,
         material,
-        transform: rend3::datatypes::AffineTransform {
-            // Need to flip gltf's coords and winding order
-            transform: glam::Mat4::from_scale(glam::Vec3::new(1.0, 1.0, -1.0)),
-        },
+        transform: glam::Mat4::from_scale(glam::Vec3::new(1.0, 1.0, -1.0)),
     };
     let _object_handle = renderer.add_object(object);
 
@@ -122,21 +121,13 @@ fn main() {
         } => {
             options.size = [size.width, size.height];
             renderer.set_options(options.clone());
+            routine.resize(&renderer.device, UVec2::new(size.width, size.height))
         }
         // Render!
         winit::event::Event::MainEventsCleared => {
-            // Size of the internal buffers used for rendering.
-            //
-            // This can be different from the size of the swapchain,
-            // it will be scaled to the swapchain size when being
-            // rendered onto the swapchain.
-            let internal_renderbuffer_size = options.size;
-
-            // Default set of rendering commands using the default shaders.
-            let render_list = rend3_list::default_render_list(renderer.mode(), internal_renderbuffer_size, &pipelines);
-
             // Dispatch a render!
-            let handle = renderer.render(render_list, rend3::RendererOutput::InternalSwapchain);
+            let dynref: &dyn rend3::RenderRoutine<()> = &routine;
+            let handle = renderer.render(dynref, rend3::util::output::RendererOutput::InternalSwapchain);
 
             // Wait until it's done
             pollster::block_on(handle);

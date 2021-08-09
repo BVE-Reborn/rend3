@@ -1,11 +1,7 @@
 use fnv::FnvBuildHasher;
-use glam::{Vec3, Vec3A};
+use glam::{UVec2, Vec3, Vec3A};
 use pico_args::Arguments;
-use rend3::{
-    datatypes::{Camera, CameraProjection, DirectionalLight, RendererTextureFormat, Texture},
-    Renderer,
-};
-use rend3_list::{DefaultPipelines, DefaultShaders};
+use rend3::{RenderRoutine, Renderer, datatypes::{Camera, CameraProjection, DirectionalLight, RendererTextureFormat, Texture}};
 use std::{
     collections::HashMap,
     hash::BuildHasher,
@@ -151,10 +147,11 @@ fn main() {
     )
     .unwrap();
 
-    let pipelines = pollster::block_on(async {
-        let shaders = DefaultShaders::new(&renderer).await;
-        DefaultPipelines::new(&renderer, &shaders).await
-    });
+    // Create the default set of shaders and pipelines
+    let mut routine = rend3::routines::default::DefaultRenderRoutine::new(
+        &renderer,
+        UVec2::new(window_size.width, window_size.height),
+    );
 
     rend3::span_transfer!(renderer_span -> loading_span, INFO, "Loading resources");
 
@@ -289,6 +286,7 @@ fn main() {
             ..
         } => {
             options.size = [size.width, size.height];
+            routine.resize(&renderer.device, UVec2::new(size.width, size.height))
         }
         Event::WindowEvent {
             event: WindowEvent::CloseRequested,
@@ -301,18 +299,11 @@ fn main() {
 
             renderer.set_camera_data(camera_location);
             renderer.set_options(options.clone());
+            // Dispatch a render!
+            let dynref: &dyn RenderRoutine<()> = &routine;
+            let handle = renderer.render(dynref, rend3::util::output::RendererOutput::InternalSwapchain);
 
-            let list = rend3_list::default_render_list(
-                renderer.mode(),
-                [
-                    (options.size[0] as f32 * 1.0) as u32,
-                    (options.size[1] as f32 * 1.0) as u32,
-                ],
-                &pipelines,
-            );
-            let handle = renderer.render(list, rend3::RendererOutput::InternalSwapchain);
-
-            rend3::span_transfer!(redraw_span -> render_wait_span, INFO, "Waiting for render");
+            // Wait until it's done
             pollster::block_on(handle);
         }
         _ => {}
