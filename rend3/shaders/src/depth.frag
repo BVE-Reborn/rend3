@@ -1,4 +1,4 @@
-#version 450
+#version 440
 
 #ifdef GPU_MODE
 #extension GL_EXT_nonuniform_qualifier : require
@@ -43,9 +43,12 @@ void main() {
 
     bool has_albedo = HAS_ALBEDO_TEXTURE;
 
+    vec2 coords = vec2(material.uv_transform * vec3(i_coords, 1.0));
+    vec2 uvdx = dFdx(coords);
+    vec2 uvdy = dFdy(coords);
+
     if (has_albedo) {
-        vec2 coords = vec2(material.uv_transform * vec3(i_coords, 1.0));
-        vec4 albedo = texture(sampler2D(ALBEDO_TEXTURE, linear_sampler), coords);
+        vec4 albedo = textureGrad(sampler2D(ALBEDO_TEXTURE, linear_sampler), coords, uvdx, uvdy);
 
         if (albedo.a <= 0.5) {
             discard;

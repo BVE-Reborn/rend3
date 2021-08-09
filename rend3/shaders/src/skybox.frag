@@ -1,4 +1,4 @@
-#version 450
+#version 440
 
 #extension GL_EXT_nonuniform_qualifier : require
 

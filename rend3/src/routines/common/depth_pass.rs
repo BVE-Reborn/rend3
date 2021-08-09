@@ -2,17 +2,16 @@ use arrayvec::ArrayVec;
 use wgpu::{
     BindGroupLayout, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState, DepthStencilState, Device, Face,
     FragmentState, FrontFace, MultisampleState, PipelineLayoutDescriptor, PolygonMode, PrimitiveState,
-    PrimitiveTopology, PushConstantRange, RenderPipeline, RenderPipelineDescriptor,
-    ShaderModuleDescriptorSpirV, ShaderStages, StencilState, TextureFormat, VertexState,
+    PrimitiveTopology, PushConstantRange, RenderPipeline, RenderPipelineDescriptor, ShaderStages, StencilState,
+    TextureFormat, VertexState,
 };
 
 use crate::{
     resources::MaterialManager,
     routines::{
-        common::interfaces::ShaderInterfaces,
+        common::{interfaces::ShaderInterfaces, shaders::mode_safe_shader},
         vertex::{cpu_vertex_buffers, gpu_vertex_buffers},
     },
-    shaders::SPIRV_SHADERS,
     ModeData, RendererMode,
 };
 
@@ -31,33 +30,23 @@ pub struct BuildDepthPassShaderArgs<'a> {
 
 pub fn build_depth_pass_shader(args: BuildDepthPassShaderArgs) -> RenderPipeline {
     let depth_prepass_vert = unsafe {
-        args.device.create_shader_module_spirv(&ShaderModuleDescriptorSpirV {
-            label: Some("depth pass vert"),
-            source: wgpu::util::make_spirv_raw(
-                SPIRV_SHADERS
-                    .get_file(match args.mode {
-                        RendererMode::CPUPowered => "depth.vert.cpu.spv",
-                        RendererMode::GPUPowered => "depth.vert.gpu.spv",
-                    })
-                    .unwrap()
-                    .contents(),
-            ),
-        })
+        mode_safe_shader(
+            &args.device,
+            args.mode,
+            "depth pass vert",
+            "depth.vert.cpu.spv",
+            "depth.vert.gpu.spv",
+        )
     };
 
     let depth_prepass_frag = unsafe {
-        args.device.create_shader_module_spirv(&ShaderModuleDescriptorSpirV {
-            label: Some("depth pass frag"),
-            source: wgpu::util::make_spirv_raw(
-                SPIRV_SHADERS
-                    .get_file(match args.mode {
-                        RendererMode::CPUPowered => "depth.frag.cpu.spv",
-                        RendererMode::GPUPowered => "depth.frag.gpu.spv",
-                    })
-                    .unwrap()
-                    .contents(),
-            ),
-        })
+        mode_safe_shader(
+            &args.device,
+            args.mode,
+            "depth pass frag",
+            "depth.frag.cpu.spv",
+            "depth.frag.gpu.spv",
+        )
     };
 
     let cpu_vertex_buffers = cpu_vertex_buffers();

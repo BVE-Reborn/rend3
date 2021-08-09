@@ -1,4 +1,4 @@
-#version 450
+#version 440
 
 layout(location = 0) out vec2 tex_coords;
 
