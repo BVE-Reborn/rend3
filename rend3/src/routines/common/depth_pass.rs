@@ -36,6 +36,7 @@ pub fn build_depth_pass_shader(args: BuildDepthPassShaderArgs) -> RenderPipeline
             "depth pass vert",
             "depth.vert.cpu.spv",
             "depth.vert.gpu.spv",
+            true,
         )
     };
 
@@ -46,6 +47,7 @@ pub fn build_depth_pass_shader(args: BuildDepthPassShaderArgs) -> RenderPipeline
             "depth pass frag",
             "depth.frag.cpu.spv",
             "depth.frag.gpu.spv",
+            false,
         )
     };
 
@@ -105,7 +107,11 @@ pub fn build_depth_pass_shader(args: BuildDepthPassShaderArgs) -> RenderPipeline
         depth_stencil: Some(DepthStencilState {
             format: TextureFormat::Depth32Float,
             depth_write_enabled: true,
-            depth_compare: CompareFunction::GreaterEqual,
+            depth_compare: if args.include_color {
+                CompareFunction::GreaterEqual
+            } else {
+                CompareFunction::LessEqual
+            },
             stencil: StencilState::default(),
             bias: if args.include_color {
                 DepthBiasState::default()

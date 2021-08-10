@@ -98,7 +98,7 @@ impl DirectionalShadowPass {
                 depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
                     view: &light.shadow_texture_arc,
                     depth_ops: Some(Operations {
-                        load: LoadOp::Clear(0.0),
+                        load: LoadOp::Clear(1.0),
                         store: true,
                     }),
                     stencil_ops: None,
