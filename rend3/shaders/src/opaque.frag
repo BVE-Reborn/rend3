@@ -1,7 +1,5 @@
 #version 440
 
-#extension GL_GOOGLE_include_directive : require
-
 #ifdef GPU_MODE
 #extension GL_EXT_nonuniform_qualifier : require
 #endif
@@ -74,10 +72,9 @@ void main() {
             vec4 shadow_shadow_coords = vec4(shadow_flipped.x, 1 - shadow_flipped.y, light.shadow_tex, shadow_ndc.z);
 
             float shadow_value;
+            shadow_value = texture(sampler2DArrayShadow(shadow, shadow_sampler), shadow_shadow_coords);
             if (shadow_shadow_coords.x < 0 || shadow_shadow_coords.x > 1 || shadow_shadow_coords.y < 0 || shadow_shadow_coords.y > 1) {
                 shadow_value = 1.0;
-            } else {
-                shadow_value = texture(sampler2DArrayShadow(shadow, shadow_sampler), shadow_shadow_coords);
             }
 
             color += surface_shading(directional_lights[i], pixel, v, shadow_value * pixel.ambient_occlusion);

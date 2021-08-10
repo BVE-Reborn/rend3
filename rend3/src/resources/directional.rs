@@ -215,7 +215,10 @@ fn create_shadow_bgl(device: &Device) -> BindGroupLayout {
                 ty: BindingType::Buffer {
                     ty: BufferBindingType::Storage { read_only: true },
                     has_dynamic_offset: false,
-                    min_binding_size: NonZeroU64::new(mem::size_of::<ShaderDirectionalLight>() as _),
+                    min_binding_size: NonZeroU64::new(
+                        (mem::size_of::<ShaderDirectionalLightBufferHeader>()
+                            + mem::size_of::<ShaderDirectionalLight>()) as _,
+                    ),
                 },
                 count: None,
             },

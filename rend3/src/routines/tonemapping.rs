@@ -5,9 +5,7 @@ use wgpu::{
     TextureFormat, TextureView, VertexState,
 };
 
-use crate::{
-    routines::common::interfaces::ShaderInterfaces, shaders::SPIRV_SHADERS, util::bind_merge::BindGroupBuilder,
-};
+use crate::{routines::common::interfaces::ShaderInterfaces, shaders::SPIRV_SHADERS, util::{bind_merge::BindGroupBuilder, output::SWAPCHAIN_FORMAT}};
 
 pub struct TonemappingPassNewArgs<'a> {
     pub device: &'a Device,
@@ -71,7 +69,7 @@ impl TonemappingPass {
                 module: &blit_frag,
                 entry_point: "main",
                 targets: &[ColorTargetState {
-                    format: TextureFormat::Rgba8Unorm,
+                    format: SWAPCHAIN_FORMAT,
                     blend: None,
                     write_mask: ColorWrites::all(),
                 }],

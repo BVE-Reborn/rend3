@@ -1,13 +1,17 @@
 use arrayvec::ArrayVec;
-use wgpu::{BindGroupLayout, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState, DepthStencilState, Device, Face, FragmentState, FrontFace, MultisampleState, PipelineLayoutDescriptor, PolygonMode, PrimitiveState, PrimitiveTopology, PushConstantRange, RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptorSpirV, ShaderStages, StencilState, TextureFormat, VertexState};
+use wgpu::{
+    BindGroupLayout, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState, DepthStencilState, Device, Face,
+    FragmentState, FrontFace, MultisampleState, PipelineLayoutDescriptor, PolygonMode, PrimitiveState,
+    PrimitiveTopology, PushConstantRange, RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptorSpirV,
+    ShaderStages, StencilState, TextureFormat, VertexState,
+};
 
 use crate::{
     resources::MaterialManager,
     routines::{
-        common::interfaces::ShaderInterfaces,
+        common::{interfaces::ShaderInterfaces, shaders::mode_safe_shader},
         vertex::{cpu_vertex_buffers, gpu_vertex_buffers},
     },
-    shaders::SPIRV_SHADERS,
     ModeData, RendererMode,
 };
 
@@ -24,34 +28,26 @@ pub struct BuildOpaquePassShaderArgs<'a> {
 }
 
 pub fn build_opaque_pass_shader(args: BuildOpaquePassShaderArgs<'_>) -> RenderPipeline {
-    let opaque_prepass_vert = unsafe {
-        args.device.create_shader_module_spirv(&ShaderModuleDescriptorSpirV {
-            label: Some("opaque pass vert"),
-            source: wgpu::util::make_spirv_raw(
-                SPIRV_SHADERS
-                    .get_file(match args.mode {
-                        RendererMode::CPUPowered => "opaque.vert.cpu.spv",
-                        RendererMode::GPUPowered => "opaque.vert.gpu.spv",
-                    })
-                    .unwrap()
-                    .contents(),
-            ),
-        })
+    let opaque_pass_vert = unsafe {
+        mode_safe_shader(
+            &args.device,
+            args.mode,
+            "opaque pass vert",
+            "opaque.vert.cpu.spv",
+            "opaque.vert.gpu.spv",
+            false,
+        )
     };
 
-    let opaque_prepass_frag = unsafe {
-        args.device.create_shader_module_spirv(&ShaderModuleDescriptorSpirV {
-            label: Some("opaque pass frag"),
-            source: wgpu::util::make_spirv_raw(
-                SPIRV_SHADERS
-                    .get_file(match args.mode {
-                        RendererMode::CPUPowered => "opaque.frag.cpu.spv",
-                        RendererMode::GPUPowered => "opaque.frag.gpu.spv",
-                    })
-                    .unwrap()
-                    .contents(),
-            ),
-        })
+    let opaque_pass_frag = unsafe {
+        mode_safe_shader(
+            &args.device,
+            args.mode,
+            "depth pass frag",
+            "opaque.frag.cpu.spv",
+            "opaque.frag.gpu.spv",
+            false,
+        )
     };
 
     let cpu_vertex_buffers = cpu_vertex_buffers();
@@ -78,16 +74,16 @@ pub fn build_opaque_pass_shader(args: BuildOpaquePassShaderArgs<'_>) -> RenderPi
     };
 
     let pll = args.device.create_pipeline_layout(&PipelineLayoutDescriptor {
-        label: Some("depth prepass"),
+        label: Some("opaque pass"),
         bind_group_layouts: &bgls,
         push_constant_ranges: &push_constants,
     });
 
     let pipeline = args.device.create_render_pipeline(&RenderPipelineDescriptor {
-        label: Some("depth prepass"),
+        label: Some("opaque pass"),
         layout: Some(&pll),
         vertex: VertexState {
-            module: &opaque_prepass_vert,
+            module: &opaque_pass_vert,
             entry_point: "main",
             buffers: match args.mode {
                 RendererMode::CPUPowered => &cpu_vertex_buffers,
@@ -112,7 +108,7 @@ pub fn build_opaque_pass_shader(args: BuildOpaquePassShaderArgs<'_>) -> RenderPi
         }),
         multisample: MultisampleState::default(),
         fragment: Some(FragmentState {
-            module: &opaque_prepass_frag,
+            module: &opaque_pass_frag,
             entry_point: "main",
             targets: &[ColorTargetState {
                 format: TextureFormat::Rgba16Float,

@@ -36,7 +36,7 @@ pub fn build_depth_pass_shader(args: BuildDepthPassShaderArgs) -> RenderPipeline
             "depth pass vert",
             "depth.vert.cpu.spv",
             "depth.vert.gpu.spv",
-            true,
+            false,
         )
     };
 

@@ -13,7 +13,7 @@ layout(location = 3) flat in uint i_material;
 
 layout(set = 0, binding = 0) uniform sampler linear_sampler;
 #ifdef GPU_MODE
-layout(set = 2, binding = 0, std430) restrict readonly buffer MaterialBuffer {
+layout(set = 2, binding = 0, std430) readonly buffer MaterialBuffer {
     GPUMaterialData materials[];
 };
 layout(set = 3, binding = 0) uniform texture2D textures[];

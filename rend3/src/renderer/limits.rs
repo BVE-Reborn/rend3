@@ -16,7 +16,7 @@ pub fn gpu_required_features() -> Features {
 }
 
 pub fn cpu_required_features() -> Features {
-    wgpu::Features::PUSH_CONSTANTS | wgpu::Features::SPIRV_SHADER_PASSTHROUGH
+    wgpu::Features::PUSH_CONSTANTS
 }
 
 pub fn optional_features() -> Features {
