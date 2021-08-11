@@ -20,14 +20,13 @@ layout(location = 3) flat out uint o_material;
 layout(set = 1, binding = 0, std430) readonly buffer ObjectOutputDataBuffer {
     ObjectOutputData object_output[];
 };
-#ifdef CPU_MODE
-layout(push_constant) uniform PushConstant {
-    uint i_object_idx;
-};
-#endif
 
 void main() {
+    #ifdef CPU_MODE
+    uint object_idx = gl_InstanceIndex;
+    #else
     uint object_idx = i_object_idx;
+    #endif
 
     ObjectOutputData data = object_output[object_idx];
 

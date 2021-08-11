@@ -2,7 +2,7 @@ use wgpu::{
     BindGroup, Color, ColorTargetState, ColorWrites, CommandEncoder, Device, FragmentState, FrontFace, LoadOp,
     MultisampleState, Operations, PipelineLayoutDescriptor, PolygonMode, PrimitiveState, PrimitiveTopology,
     RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptor,
-    TextureFormat, TextureView, VertexState,
+    TextureView, VertexState,
 };
 
 use crate::{routines::common::interfaces::ShaderInterfaces, shaders::SPIRV_SHADERS, util::{bind_merge::BindGroupBuilder, output::SWAPCHAIN_FORMAT}};

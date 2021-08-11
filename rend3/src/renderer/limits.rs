@@ -16,7 +16,7 @@ pub fn gpu_required_features() -> Features {
 }
 
 pub fn cpu_required_features() -> Features {
-    wgpu::Features::PUSH_CONSTANTS
+    Features::empty()
 }
 
 pub fn optional_features() -> Features {
@@ -76,7 +76,7 @@ pub const CPU_REQUIRED_LIMITS: Limits = Limits {
     max_vertex_buffer_array_stride: 128,
     max_vertex_buffers: 6,
     max_vertex_attributes: 6,
-    max_push_constant_size: 128,
+    max_push_constant_size: 0,
 };
 
 fn check_limit_unlimited(d: u32, r: u32, ty: LimitType) -> Result<u32, RendererInitializationError> {

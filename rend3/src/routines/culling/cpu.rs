@@ -1,7 +1,7 @@
 use glam::{Mat3, Vec4Swizzles};
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
-    BindGroupDescriptor, BindGroupEntry, BufferUsages, Device, RenderPass, ShaderStages,
+    BindGroupDescriptor, BindGroupEntry, BufferUsages, Device, RenderPass,
 };
 
 use crate::{
@@ -106,8 +106,8 @@ pub fn run<'rpass>(
     material_binding_index: u32,
 ) {
     for (idx, draws) in draws.iter().enumerate() {
-        rpass.set_push_constants(ShaderStages::VERTEX, 0, &bytemuck::cast::<_, [u8; 4]>(idx as u32));
         rpass.set_bind_group(material_binding_index, materials.cpu_get_bind_group(draws.handle), &[]);
-        rpass.draw_indexed(0..draws.count, draws.vertex_offset, 0..1);
+        let idx = idx as u32;
+        rpass.draw_indexed(0..draws.count, draws.vertex_offset, idx..idx + 1);
     }
 }

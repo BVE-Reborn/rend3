@@ -2,8 +2,7 @@ use arrayvec::ArrayVec;
 use wgpu::{
     BindGroupLayout, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState, DepthStencilState, Device, Face,
     FragmentState, FrontFace, MultisampleState, PipelineLayoutDescriptor, PolygonMode, PrimitiveState,
-    PrimitiveTopology, PushConstantRange, RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptorSpirV,
-    ShaderStages, StencilState, TextureFormat, VertexState,
+    PrimitiveTopology, RenderPipeline, RenderPipelineDescriptor, StencilState, TextureFormat, VertexState,
 };
 
 use crate::{
@@ -64,19 +63,10 @@ pub fn build_opaque_pass_shader(args: BuildOpaquePassShaderArgs<'_>) -> RenderPi
         _ => {}
     };
 
-    let mut push_constants: ArrayVec<PushConstantRange, 1> = ArrayVec::new();
-    match args.mode {
-        RendererMode::CPUPowered => push_constants.push(PushConstantRange {
-            range: 0..4,
-            stages: ShaderStages::VERTEX,
-        }),
-        _ => {}
-    };
-
     let pll = args.device.create_pipeline_layout(&PipelineLayoutDescriptor {
         label: Some("opaque pass"),
         bind_group_layouts: &bgls,
-        push_constant_ranges: &push_constants,
+        push_constant_ranges: &[],
     });
 
     let pipeline = args.device.create_render_pipeline(&RenderPipelineDescriptor {

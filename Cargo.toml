@@ -12,3 +12,6 @@ members = [
 [profile.release]
 debug = true
 lto = "thin"
+
+[patch.'https://github.com/gfx-rs/naga.git']
+naga = { path = "../naga" }

@@ -65,8 +65,14 @@ pub fn create_adapter(
     desired_device: Option<String>,
     desired_mode: Option<RendererMode>,
 ) -> Result<(Instance, PotentialAdapter<Adapter>), RendererInitializationError> {
-    let backend_bits = Backends::VULKAN | Backends::DX12 | Backends::DX11 | Backends::METAL;
-    let default_backend_order = [Backend::Vulkan, Backend::Metal, Backend::Dx12, Backend::Dx11];
+    let backend_bits = Backends::VULKAN | Backends::DX12 | Backends::DX11 | Backends::METAL | Backends::GL;
+    let default_backend_order = [
+        Backend::Vulkan,
+        Backend::Metal,
+        Backend::Dx12,
+        Backend::Dx11,
+        Backend::Gl,
+    ];
 
     let instance = Instance::new(backend_bits);
 
