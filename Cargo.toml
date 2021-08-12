@@ -15,3 +15,7 @@ lto = "thin"
 
 [patch.'https://github.com/gfx-rs/naga.git']
 naga = { path = "../naga" }
+
+
+[patch.'https://github.com/gfx-rs/wgpu.git']
+wgpu = { path = "../wgpu/wgpu" }

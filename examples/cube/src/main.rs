@@ -142,7 +142,7 @@ fn main() {
         winit::event::Event::MainEventsCleared => {
             // Dispatch a render!
             let dynref: &dyn RenderRoutine = &routine;
-            let _stats = renderer.render(dynref, rend3::util::output::RendererOutput::InternalSwapchain);
+            let _stats = renderer.render(dynref, rend3::util::output::RendererOutput::InternalSurface);
         }
         // Other events we don't care about
         _ => {}

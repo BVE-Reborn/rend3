@@ -287,7 +287,7 @@ fn main() {
             renderer.set_options(options.clone());
             // Dispatch a render!
             let dynref: &dyn RenderRoutine = &routine;
-            let _stats = renderer.render(dynref, rend3::util::output::RendererOutput::InternalSwapchain);
+            let _stats = renderer.render(dynref, rend3::util::output::RendererOutput::InternalSurface);
         }
         _ => {}
     })

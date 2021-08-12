@@ -194,7 +194,7 @@ pub fn render_loop(
         directional_light_manager,
     ));
 
-    let frame = output.acquire(&renderer.global_resources.read().swapchain);
+    let frame = output.acquire(&renderer.surface);
 
     // 16 encoders is a reasonable default
     let mut encoders = Vec::with_capacity(16);
