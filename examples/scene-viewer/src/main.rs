@@ -1,7 +1,10 @@
 use fnv::FnvBuildHasher;
 use glam::{UVec2, Vec3, Vec3A};
 use pico_args::Arguments;
-use rend3::{RenderRoutine, Renderer, datatypes::{Camera, CameraProjection, DirectionalLight, RendererTextureFormat, Texture}};
+use rend3::{
+    datatypes::{Camera, CameraProjection, DirectionalLight, RendererTextureFormat, Texture},
+    RenderRoutine, Renderer,
+};
 use std::{
     collections::HashMap,
     hash::BuildHasher,
@@ -36,15 +39,15 @@ fn load_skybox(renderer: &Renderer) -> Result<(), Box<dyn std::error::Error>> {
     }
     drop(prepared);
 
-    let handle = renderer.add_texture_cube(Texture {
-        format: RendererTextureFormat::Bc7Srgb,
-        width: image_info.width,
-        height: image_info.height,
-        data: image,
-        label: Some("background".into()),
-        mip_levels: mips,
-    });
-    renderer.set_background_texture(handle);
+    // let handle = renderer.add_texture_cube(Texture {
+    //     format: RendererTextureFormat::Bc7Srgb,
+    //     width: image_info.width,
+    //     height: image_info.height,
+    //     data: image,
+    //     label: Some("background".into()),
+    //     mip_levels: mips,
+    // });
+    // renderer.set_background_texture(handle);
     Ok(())
 }
 

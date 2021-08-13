@@ -51,4 +51,4 @@ raw-window-handle = "0.3"
 smallvec = "1"
 smartstring = "0.2"
 thiserror = "1"
-wgpu = { version = "0.9", git = "https://github.com/gfx-rs/wgpu.git", rev = "7798534d428100145f10de1fac4bd35c38737806", features = ["spirv", "webgl"] }
+wgpu = { version = "0.9", git = "https://github.com/gfx-rs/wgpu.git", rev = "1e7d86b655cedc0f463f675848f3fd6410c8f8c1", features = ["spirv", "webgl"] }

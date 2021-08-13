@@ -8,7 +8,7 @@ pub fn gpu_required_features() -> Features {
         | wgpu::Features::TEXTURE_COMPRESSION_BC
         | wgpu::Features::DEPTH_CLAMPING
         | wgpu::Features::TEXTURE_BINDING_ARRAY
-        // | wgpu::Features::RESOURCE_BINDING_ARRAY_NON_UNIFORM_INDEXING
+        | wgpu::Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING
         | wgpu::Features::UNSIZED_BINDING_ARRAY
         | wgpu::Features::MULTI_DRAW_INDIRECT
         | wgpu::Features::MULTI_DRAW_INDIRECT_COUNT

@@ -42,7 +42,7 @@ impl<T> PotentialAdapter<T> {
         let mut limits = check_limits(RendererMode::GPUPowered, &inner_limits);
         let mut mode = RendererMode::GPUPowered;
 
-        if (features.is_err() || limits.is_err() || desired_mode == Some(RendererMode::CPUPowered))
+        if (features.is_err() || limits.is_err() || dbg!(desired_mode) == Some(RendererMode::CPUPowered))
             && desired_mode != Some(RendererMode::GPUPowered)
         {
             features = check_features(RendererMode::CPUPowered, inner_features);
@@ -140,6 +140,7 @@ pub fn create_adapter(
             log::debug!("Chosen backend: {:?}", backend);
             log::debug!("Chosen features: {:#?}", adapter.features);
             log::debug!("Chosen limits: {:#?}", adapter.limits);
+            log::debug!("Chosen mode: {:#?}", adapter.mode);
             return Ok((instance, adapter));
         }
     }

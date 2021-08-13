@@ -5,8 +5,8 @@ pub const SURFACE_FORMAT: TextureFormat = TextureFormat::Bgra8Unorm;
 
 pub enum OutputFrame {
     Surface {
-        surface: Arc<SurfaceFrame>,
         view: TextureView,
+        surface: Arc<SurfaceFrame>,
     },
     View(Arc<TextureView>),
 }

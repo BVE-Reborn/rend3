@@ -1,7 +1,5 @@
 #version 440
 
-#extension GL_EXT_nonuniform_qualifier : require
-
 #include "structures.glsl"
 
 layout(location = 0) in vec2 i_clip_position;

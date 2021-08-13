@@ -24,6 +24,6 @@ pollster = "0.2"
 rend3 = { path = "../../rend3", version = "^0.0.5"}
 rend3-gltf = { path = "../../rend3-gltf", version = "^0.0.5"}
 smallvec = "1"
-wgpu = { version = "0.9", git = "https://github.com/gfx-rs/wgpu.git", rev = "7798534d428100145f10de1fac4bd35c38737806" }
+wgpu = { version = "0.9", git = "https://github.com/gfx-rs/wgpu.git", rev = "1e7d86b655cedc0f463f675848f3fd6410c8f8c1" }
 winit = "0.25"
 
