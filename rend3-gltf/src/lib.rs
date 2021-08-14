@@ -238,7 +238,7 @@ fn load_default_material(renderer: &Renderer, loaded: &mut LoadedGltfScene) {
             alpha_cutout: None,
             transform: Mat3::IDENTITY,
             unlit: false,
-            sample_type: false,
+            sample_type: dt::SampleType::Linear,
         }),
     );
 }
@@ -268,7 +268,11 @@ where
 
         let nearest = albedo
             .as_ref()
-            .map(|i| i.texture().sampler().mag_filter() == Some(gltf::texture::MagFilter::Nearest))
+            .map(|i| match i.texture().sampler().mag_filter() {
+                Some(gltf::texture::MagFilter::Nearest) => dt::SampleType::Nearest,
+                Some(gltf::texture::MagFilter::Linear) => dt::SampleType::Linear,
+                None => dt::SampleType::Linear,
+            })
             .unwrap_or_default();
 
         let albedo_tex =

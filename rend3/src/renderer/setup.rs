@@ -15,7 +15,7 @@ use arrayvec::ArrayVec;
 use fnv::FnvHashMap;
 use parking_lot::RwLock;
 use raw_window_handle::HasRawWindowHandle;
-use std::{path::Path, sync::Arc};
+use std::sync::Arc;
 use wgpu::{
     Adapter, AdapterInfo, Backend, Backends, DeviceDescriptor, DeviceType, Features, Instance, Limits,
     TextureViewDimension,
@@ -189,7 +189,7 @@ pub async fn create_renderer<W: HasRawWindowHandle>(
                     features: chosen_adapter.features,
                     limits: chosen_adapter.limits,
                 },
-                Some(Path::new("trace")),
+                None,
             )
             .await
             .map_err(|_| RendererInitializationError::RequestDeviceFailed)?;

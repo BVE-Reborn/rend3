@@ -4,7 +4,7 @@ use wgpu::{
     AddressMode, BindGroup, BindGroupLayout, CompareFunction, Device, FilterMode, Sampler, SamplerDescriptor,
 };
 
-use crate::{renderer::info::Workarounds, util::bind_merge::BindGroupBuilder};
+use crate::{ModeData, RendererMode, util::bind_merge::BindGroupBuilder};
 
 pub struct Samplers {
     pub linear: Sampler,
@@ -13,11 +13,11 @@ pub struct Samplers {
 
     pub linear_nearest_bg: BindGroup,
     // OpenGL doesn't allow runtime switching of samplers, so we swap them out cpu side.
-    pub nearest_linear_bg: Option<BindGroup>,
+    pub nearest_linear_bg: ModeData<BindGroup, ()>,
 }
 
 impl Samplers {
-    pub fn new(device: &Device, workarounds: Workarounds, samplers_bgl: &BindGroupLayout) -> Self {
+    pub fn new(device: &Device, mode: RendererMode, samplers_bgl: &BindGroupLayout) -> Self {
         let linear = create_sampler(device, FilterMode::Linear, None);
         let nearest = create_sampler(device, FilterMode::Nearest, None);
         let shadow = create_sampler(device, FilterMode::Linear, Some(CompareFunction::LessEqual));
@@ -28,17 +28,11 @@ impl Samplers {
             .with_sampler(&shadow)
             .build(device, samplers_bgl);
 
-        let nearest_linear_bg = if workarounds.intersects(Workarounds::COMBINED_SAMPLERS) {
-            Some(
-                BindGroupBuilder::new(Some("samplers"))
-                    .with_sampler(&nearest) // Swapped
+        let nearest_linear_bg = mode.into_data(|| BindGroupBuilder::new(Some("samplers"))
+                    .with_sampler(&nearest) 
                     .with_sampler(&linear)
                     .with_sampler(&shadow)
-                    .build(device, samplers_bgl),
-            )
-        } else {
-            None
-        };
+                    .build(device, samplers_bgl), ||());
 
         Self {
             linear,

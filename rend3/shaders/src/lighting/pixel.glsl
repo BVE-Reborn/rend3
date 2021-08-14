@@ -217,6 +217,7 @@ PixelData get_per_pixel_data_sampled(MATERIAL_TYPE material, sampler s) {
     return pixel;
 }
 
+#ifdef GPU_MODE
 PixelData get_per_pixel_data(MATERIAL_TYPE material) {
     if (MATERIAL_FLAG(FLAGS_NEAREST)) {
         return get_per_pixel_data_sampled(material, nearest_sampler);
@@ -224,5 +225,14 @@ PixelData get_per_pixel_data(MATERIAL_TYPE material) {
         return get_per_pixel_data_sampled(material, linear_sampler);
     }
 }
+#endif
+
+#ifdef CPU_MODE
+// In CPU mode the primary sampler gets switched out for what we need, so we don't switch in the shader.
+// This is because OpenGL can't deal with any texture being used with multiple different samplers. 
+PixelData get_per_pixel_data(MATERIAL_TYPE material) {
+    return get_per_pixel_data_sampled(material, linear_sampler);
+}
+#endif
 
 #endif

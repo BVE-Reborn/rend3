@@ -3,7 +3,6 @@ use std::sync::Arc;
 use wgpu::{BindGroup, CommandEncoder, Device, RenderPass, RenderPipeline};
 
 use crate::{
-    renderer::info::Workarounds,
     resources::{CameraManager, InternalObject, MaterialManager, MeshBuffers},
     routines::{
         common::{interfaces::ShaderInterfaces, samplers::Samplers},
@@ -38,8 +37,6 @@ pub struct OpaquePassPrepassArgs<'rpass, 'b> {
     pub materials: &'rpass MaterialManager,
     pub meshes: &'rpass MeshBuffers,
 
-    pub workarounds: Workarounds,
-
     pub samplers: &'rpass Samplers,
     pub texture_bg: ModeData<(), &'rpass BindGroup>,
 
@@ -52,8 +49,6 @@ pub struct OpaquePassDrawArgs<'rpass, 'b> {
     /// TODO: only pass in manager if you actually need it
     pub materials: &'rpass MaterialManager,
     pub meshes: &'rpass MeshBuffers,
-
-    pub workarounds: Workarounds,
 
     pub samplers: &'rpass Samplers,
     pub directional_light_bg: &'rpass BindGroup,
@@ -106,7 +101,6 @@ impl OpaquePass {
             ModeData::CPU(ref draws) => culling::cpu::run(
                 args.rpass,
                 &draws,
-                args.workarounds,
                 args.samplers,
                 0,
                 args.materials,
@@ -133,7 +127,6 @@ impl OpaquePass {
             ModeData::CPU(ref draws) => culling::cpu::run(
                 args.rpass,
                 &draws,
-                args.workarounds,
                 args.samplers,
                 0,
                 args.materials,

@@ -26,10 +26,9 @@ impl DefaultRenderRoutine {
     pub fn new(renderer: &Renderer, resolution: UVec2) -> Self {
         let device = renderer.device();
         let mode = renderer.mode();
-        let info = renderer.adapter_info();
         let interfaces = common::interfaces::ShaderInterfaces::new(device);
 
-        let samplers = common::samplers::Samplers::new(device, info.workarounds, &interfaces.samplers_bgl);
+        let samplers = common::samplers::Samplers::new(device, mode, &interfaces.samplers_bgl);
 
         let cpu_culler = culling::cpu::CpuCuller::new();
         let gpu_culler = mode.into_data(|| (), || culling::gpu::GpuCuller::new(device));
@@ -154,7 +153,6 @@ impl RenderRoutine for DefaultRenderRoutine {
                 encoder: &mut encoder,
                 materials: &materials,
                 meshes: mesh_manager.buffers(),
-                workarounds: renderer.adapter_info.workarounds,
                 samplers: &self.samplers,
                 texture_bg: d2_texture_output_bg_ref,
                 culled_lights: &culled_lights,
@@ -191,7 +189,6 @@ impl RenderRoutine for DefaultRenderRoutine {
             rpass: &mut rpass,
             materials: &materials,
             meshes: mesh_manager.buffers(),
-            workarounds: renderer.adapter_info.workarounds,
             samplers: &self.samplers,
             texture_bg: d2_texture_output_bg_ref,
             culled_objects: &culled_objects,
@@ -201,7 +198,6 @@ impl RenderRoutine for DefaultRenderRoutine {
             rpass: &mut rpass,
             materials: &materials,
             meshes: mesh_manager.buffers(),
-            workarounds: renderer.adapter_info.workarounds,
             samplers: &self.samplers,
             directional_light_bg: directional_light.get_bg(),
             texture_bg: d2_texture_output_bg_ref,

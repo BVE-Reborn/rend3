@@ -6,7 +6,6 @@ use wgpu::{
 
 use crate::{
     datatypes::SampleType,
-    renderer::info::Workarounds,
     resources::{CameraManager, InternalObject, MaterialManager},
     routines::{
         common::{
@@ -107,30 +106,24 @@ impl CpuCuller {
 pub fn run<'rpass>(
     rpass: &mut RenderPass<'rpass>,
     draws: &'rpass [CPUDrawCall],
-    workarounds: Workarounds,
     samplers: &'rpass Samplers,
     samplers_binding_index: u32,
     materials: &'rpass MaterialManager,
     material_binding_index: u32,
 ) {
-    let mut state_sample_type = if workarounds.intersects(Workarounds::COMBINED_SAMPLERS) {
-        Some(SampleType::Linear)
-    } else {
-        None
-    };
+    let mut state_sample_type = SampleType::Linear;
+
     for (idx, draws) in draws.iter().enumerate() {
         let (material_bind_group, sample_type) = materials.cpu_get_bind_group(draws.handle);
 
         // As a workaround for OpenGL's combined samplers, we need to manually swap the linear and nearest samplers so that shader code can think it's always using linear.
-        if let Some(ref mut state_sample_type) = state_sample_type {
-            if *state_sample_type != sample_type {
-                let bg = match sample_type {
-                    SampleType::Nearest => samplers.nearest_linear_bg.as_ref().unwrap(),
-                    SampleType::Linear => &samplers.linear_nearest_bg,
-                };
-                *state_sample_type = sample_type;
-                rpass.set_bind_group(samplers_binding_index, bg, &[]);
-            }
+        if state_sample_type != sample_type {
+            let bg = match sample_type {
+                SampleType::Nearest => samplers.nearest_linear_bg.as_ref().as_cpu(),
+                SampleType::Linear => &samplers.linear_nearest_bg,
+            };
+            state_sample_type = sample_type;
+            rpass.set_bind_group(samplers_binding_index, bg, &[]);
         }
 
         rpass.set_bind_group(material_binding_index, material_bind_group, &[]);

@@ -6,7 +6,6 @@ use wgpu::{
 };
 
 use crate::{
-    renderer::info::Workarounds,
     resources::{DirectionalLightManager, InternalObject, MaterialManager, MeshBuffers},
     routines::{
         common::{interfaces::ShaderInterfaces, samplers::Samplers},
@@ -44,8 +43,6 @@ pub struct DirectionalShadowPassDrawCulledShadowsArgs<'a> {
 
     pub materials: &'a MaterialManager,
     pub meshes: &'a MeshBuffers,
-
-    pub workarounds: Workarounds,
 
     pub samplers: &'a Samplers,
     pub texture_bg: ModeData<(), &'a BindGroup>,
@@ -118,7 +115,6 @@ impl DirectionalShadowPass {
                 ModeData::CPU(ref draws) => culling::cpu::run(
                     &mut rpass,
                     &draws,
-                    args.workarounds,
                     args.samplers,
                     0,
                     args.materials,
