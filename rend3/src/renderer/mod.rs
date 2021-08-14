@@ -202,6 +202,7 @@ impl Renderer {
             .push(Instruction::RemoveDirectionalLight { handle })
     }
 
+    // TODO: Parts of this should be the property of the render routine
     pub fn set_options(&self, options: RendererOptions) {
         self.instructions
             .producer
@@ -209,6 +210,7 @@ impl Renderer {
             .push(Instruction::SetOptions { options })
     }
 
+    // TODO: This should be a property of the render routine
     pub fn set_camera_data(&self, data: Camera) {
         self.instructions
             .producer
@@ -216,6 +218,7 @@ impl Renderer {
             .push(Instruction::SetCameraData { data })
     }
 
+    // TODO: This should be a property of the render routine
     pub fn set_background_texture(&self, handle: TextureHandle) {
         self.instructions
             .producer
@@ -223,6 +226,7 @@ impl Renderer {
             .push(Instruction::SetBackgroundTexture { handle })
     }
 
+    // TODO: This should be a property of the render routine
     pub fn clear_background_texture(&self) {
         self.instructions
             .producer
