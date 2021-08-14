@@ -23,6 +23,8 @@ pub struct ExtendedAdapterInfo {
     pub device_type: DeviceType,
     /// Backend used for device
     pub backend: Backend,
+    /// Workarounds
+    pub workarounds: Workarounds,
 }
 impl From<AdapterInfo> for ExtendedAdapterInfo {
     fn from(info: AdapterInfo) -> Self {
@@ -40,6 +42,11 @@ impl From<AdapterInfo> for ExtendedAdapterInfo {
             device: info.device,
             device_type: info.device_type,
             backend: info.backend,
+            workarounds: {
+                let mut workarounds = Workarounds::empty();
+                workarounds.set(Workarounds::COMBINED_SAMPLERS, info.backend == Backend::Gl);
+                workarounds
+            },
         }
     }
 }
@@ -52,5 +59,12 @@ impl ExtendedAdapterInfo {
             Vendor::Intel | Vendor::NV => 32,
             Vendor::AMD | Vendor::Qualcomm | Vendor::Unknown(_) => 64,
         }
+    }
+}
+
+// This should be routine-local
+bitflags::bitflags! {
+    pub struct Workarounds: u64 {
+        const COMBINED_SAMPLERS = 1 << 0;
     }
 }

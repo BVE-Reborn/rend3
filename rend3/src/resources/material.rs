@@ -1,5 +1,5 @@
 use crate::{
-    datatypes::{Material, MaterialChange, MaterialFlags, MaterialHandle, TextureHandle},
+    datatypes::{Material, MaterialChange, MaterialFlags, MaterialHandle, SampleType, TextureHandle},
     mode::ModeData,
     resources::TextureManager,
     util::{bind_merge::BindGroupBuilder, buffer::WrappedPotBuffer, registry::ResourceRegistry},
@@ -77,7 +77,13 @@ impl CPUShaderMaterial {
                 flags |= material.clearcoat_textures.to_flags();
                 flags.set(MaterialFlags::ALPHA_CUTOUT, material.alpha_cutout.is_some());
                 flags.set(MaterialFlags::UNLIT, material.unlit);
-                flags.set(MaterialFlags::NEAREST, material.nearest);
+                flags.set(
+                    MaterialFlags::NEAREST,
+                    match material.sample_type {
+                        SampleType::Nearest => true,
+                        SampleType::Linear => false,
+                    },
+                );
                 flags
             },
         }
@@ -155,7 +161,13 @@ impl GPUShaderMaterial {
                 flags |= material.clearcoat_textures.to_flags();
                 flags.set(MaterialFlags::ALPHA_CUTOUT, material.alpha_cutout.is_some());
                 flags.set(MaterialFlags::UNLIT, material.unlit);
-                flags.set(MaterialFlags::NEAREST, material.nearest);
+                flags.set(
+                    MaterialFlags::NEAREST,
+                    match material.sample_type {
+                        SampleType::Nearest => true,
+                        SampleType::Linear => false,
+                    },
+                );
                 flags
             },
         }
@@ -354,8 +366,9 @@ impl MaterialManager {
         self.bgl.as_ref().into_common()
     }
 
-    pub fn cpu_get_bind_group(&self, handle: MaterialHandle) -> &BindGroup {
-        self.registry.get(handle.0).bind_group.as_cpu()
+    pub fn cpu_get_bind_group(&self, handle: MaterialHandle) -> (&BindGroup, SampleType) {
+        let material = self.registry.get(handle.0);
+        (material.bind_group.as_cpu(), material.mat.sample_type)
     }
 
     pub fn gpu_get_bind_group(&self) -> &BindGroup {

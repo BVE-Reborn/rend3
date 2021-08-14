@@ -17,7 +17,7 @@ use std::{cmp::Ordering, future::Future, sync::Arc};
 use wgpu::{Device, Instance, Queue, Surface};
 
 pub mod error;
-mod info;
+pub mod info;
 pub mod limits;
 mod render;
 mod resources;

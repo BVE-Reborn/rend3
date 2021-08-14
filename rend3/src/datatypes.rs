@@ -844,6 +844,17 @@ impl Default for ClearcoatTextures {
     }
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum SampleType {
+    Nearest,
+    Linear,
+}
+impl Default for SampleType {
+    fn default() -> Self {
+        Self::Linear
+    }
+}
+
 // Consider:
 //
 // - Green screen value
@@ -866,7 +877,7 @@ changeable_struct! {
         pub transform: Mat3,
         // TODO: Determine how to make this a clearer part of the type system, esp. with the changable_struct macro.
         pub unlit: bool,
-        pub nearest: bool,
+        pub sample_type: SampleType,
     }
 }
 

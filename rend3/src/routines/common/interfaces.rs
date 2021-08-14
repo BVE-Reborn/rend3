@@ -47,7 +47,7 @@ impl ShaderInterfaces {
                     binding: 1,
                     visibility: ShaderStages::FRAGMENT,
                     ty: BindingType::Sampler {
-                        filtering: false,
+                        filtering: true,
                         comparison: false,
                     },
                     count: None,

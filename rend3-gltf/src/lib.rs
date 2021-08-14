@@ -238,7 +238,7 @@ fn load_default_material(renderer: &Renderer, loaded: &mut LoadedGltfScene) {
             alpha_cutout: None,
             transform: Mat3::IDENTITY,
             unlit: false,
-            nearest: false,
+            sample_type: false,
         }),
     );
 }
@@ -322,7 +322,7 @@ where
                 None => dt::MaterialComponent::Value(Vec3::from(emissive_factor)),
             },
             unlit: material.unlit(),
-            nearest,
+            sample_type: nearest,
             ..dt::Material::default()
         });
 

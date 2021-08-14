@@ -6,9 +6,10 @@ use wgpu::{
 };
 
 use crate::{
+    renderer::info::Workarounds,
     resources::{DirectionalLightManager, InternalObject, MaterialManager, MeshBuffers},
     routines::{
-        common::interfaces::ShaderInterfaces,
+        common::{interfaces::ShaderInterfaces, samplers::Samplers},
         culling::{
             cpu::{CpuCuller, CpuCullerCullArgs},
             gpu::{GpuCuller, GpuCullerCullArgs},
@@ -44,7 +45,9 @@ pub struct DirectionalShadowPassDrawCulledShadowsArgs<'a> {
     pub materials: &'a MaterialManager,
     pub meshes: &'a MeshBuffers,
 
-    pub sampler_bg: &'a BindGroup,
+    pub workarounds: Workarounds,
+
+    pub samplers: &'a Samplers,
     pub texture_bg: ModeData<(), &'a BindGroup>,
 
     pub culled_lights: &'a [CulledLightSet],
@@ -108,11 +111,19 @@ impl DirectionalShadowPass {
             args.meshes.bind(&mut rpass);
 
             rpass.set_pipeline(&self.pipeline);
-            rpass.set_bind_group(0, args.sampler_bg, &[]);
+            rpass.set_bind_group(0, &args.samplers.linear_nearest_bg, &[]);
             rpass.set_bind_group(1, &light.culled_objects.output_bg, &[]);
 
             match light.culled_objects.calls {
-                ModeData::CPU(ref draws) => culling::cpu::run(&mut rpass, &draws, args.materials, 2),
+                ModeData::CPU(ref draws) => culling::cpu::run(
+                    &mut rpass,
+                    &draws,
+                    args.workarounds,
+                    args.samplers,
+                    0,
+                    args.materials,
+                    2,
+                ),
                 ModeData::GPU(ref data) => {
                     rpass.set_bind_group(2, args.materials.gpu_get_bind_group(), &[]);
                     rpass.set_bind_group(3, args.texture_bg.as_gpu(), &[]);

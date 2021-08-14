@@ -68,6 +68,9 @@ name = "arrayvec"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "be4dc07131ffa69b8072d35f5007352af944213cde02545e2103680baed38fcd"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "ash"
@@ -100,6 +103,12 @@ name = "base64"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3441f0f7b02788e948e47f457ca01f1d7e6d92c693bc132c22b087d3141c03ff"
+
+[[package]]
+name = "base64"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "904dfeac50f3cdaba28fc6f57fdcddb75f49ed61346676a78c4ffe55877802fd"
 
 [[package]]
 name = "basis"
@@ -661,7 +670,7 @@ version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ff38b75359a0096dd0a8599b6e4f37a6ee41d5df300cc7669e62aafa697f7a2"
 dependencies = [
- "base64",
+ "base64 0.12.3",
  "byteorder",
  "gltf-json",
  "image",
@@ -1094,6 +1103,7 @@ dependencies = [
  "num-traits",
  "petgraph",
  "rose_tree",
+ "serde",
  "spirv_headers",
  "thiserror",
 ]
@@ -1625,6 +1635,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f1382d1f0a252c4bf97dc20d979a2fdd05b024acd7c2ed0f7595d7817666a157"
 
 [[package]]
+name = "ron"
+version = "0.6.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "064ea8613fb712a19faf920022ec8ddf134984f100090764a4e1d768f3827f1f"
+dependencies = [
+ "base64 0.13.0",
+ "bitflags",
+ "serde",
+]
+
+[[package]]
 name = "rose_tree"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1681,6 +1702,9 @@ name = "serde"
 version = "1.0.127"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f03b9878abf6d14e6779d3f24f07b2cfa90352cfec4acc5aab8f1ac7f146fae8"
+dependencies = [
+ "serde_derive",
+]
 
 [[package]]
 name = "serde_derive"
@@ -2137,6 +2161,7 @@ dependencies = [
  "naga",
  "parking_lot",
  "raw-window-handle",
+ "serde",
  "smallvec",
  "wasm-bindgen",
  "wasm-bindgen-futures",
@@ -2161,6 +2186,8 @@ dependencies = [
  "parking_lot",
  "profiling",
  "raw-window-handle",
+ "ron",
+ "serde",
  "smallvec",
  "thiserror",
  "wgpu-hal",
@@ -2219,6 +2246,7 @@ version = "0.9.0"
 source = "git+https://github.com/gfx-rs/wgpu.git?rev=1e7d86b655cedc0f463f675848f3fd6410c8f8c1#1e7d86b655cedc0f463f675848f3fd6410c8f8c1"
 dependencies = [
  "bitflags",
+ "serde",
 ]
 
 [[package]]

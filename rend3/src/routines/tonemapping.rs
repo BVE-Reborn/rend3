@@ -1,11 +1,15 @@
 use wgpu::{
-    BindGroup, Color, ColorTargetState, ColorWrites, CommandEncoder, Device, FragmentState, FrontFace, LoadOp,
+    Color, ColorTargetState, ColorWrites, CommandEncoder, Device, FragmentState, FrontFace, LoadOp,
     MultisampleState, Operations, PipelineLayoutDescriptor, PolygonMode, PrimitiveState, PrimitiveTopology,
     RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptor,
     TextureView, VertexState,
 };
 
-use crate::{routines::common::interfaces::ShaderInterfaces, shaders::SPIRV_SHADERS, util::{bind_merge::BindGroupBuilder, output::SURFACE_FORMAT}};
+use crate::{
+    routines::common::{interfaces::ShaderInterfaces, samplers::Samplers},
+    shaders::SPIRV_SHADERS,
+    util::{bind_merge::BindGroupBuilder, output::SURFACE_FORMAT},
+};
 
 pub struct TonemappingPassNewArgs<'a> {
     pub device: &'a Device,
@@ -19,7 +23,7 @@ pub struct TonemappingPassBlitArgs<'a> {
 
     pub interfaces: &'a ShaderInterfaces,
 
-    pub samplers_bg: &'a BindGroup,
+    pub samplers: &'a Samplers,
 
     pub source: &'a TextureView,
     pub target: &'a TextureView,
@@ -98,7 +102,7 @@ impl TonemappingPass {
         });
 
         rpass.set_pipeline(&self.pipeline);
-        rpass.set_bind_group(0, &args.samplers_bg, &[]);
+        rpass.set_bind_group(0, &args.samplers.linear_nearest_bg, &[]);
         rpass.set_bind_group(1, &blit_src_bg, &[]);
         rpass.draw(0..3, 0..1);
     }

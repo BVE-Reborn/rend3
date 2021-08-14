@@ -1,34 +1,51 @@
 use std::num::NonZeroU8;
 
-use wgpu::{AddressMode, BindGroup, BindGroupLayout, CompareFunction, Device, FilterMode, Sampler, SamplerDescriptor};
+use wgpu::{
+    AddressMode, BindGroup, BindGroupLayout, CompareFunction, Device, FilterMode, Sampler, SamplerDescriptor,
+};
 
-use crate::util::bind_merge::BindGroupBuilder;
+use crate::{renderer::info::Workarounds, util::bind_merge::BindGroupBuilder};
 
 pub struct Samplers {
     pub linear: Sampler,
     pub nearest: Sampler,
     pub shadow: Sampler,
 
-    pub bg: BindGroup,
+    pub linear_nearest_bg: BindGroup,
+    // OpenGL doesn't allow runtime switching of samplers, so we swap them out cpu side.
+    pub nearest_linear_bg: Option<BindGroup>,
 }
 
 impl Samplers {
-    pub fn new(device: &Device, samplers_bgl: &BindGroupLayout) -> Self {
+    pub fn new(device: &Device, workarounds: Workarounds, samplers_bgl: &BindGroupLayout) -> Self {
         let linear = create_sampler(device, FilterMode::Linear, None);
         let nearest = create_sampler(device, FilterMode::Nearest, None);
         let shadow = create_sampler(device, FilterMode::Linear, Some(CompareFunction::LessEqual));
 
-        let bg = BindGroupBuilder::new(Some("samplers"))
+        let linear_nearest_bg = BindGroupBuilder::new(Some("linear-nearest samplers"))
             .with_sampler(&linear)
             .with_sampler(&nearest)
             .with_sampler(&shadow)
             .build(device, samplers_bgl);
 
+        let nearest_linear_bg = if workarounds.intersects(Workarounds::COMBINED_SAMPLERS) {
+            Some(
+                BindGroupBuilder::new(Some("samplers"))
+                    .with_sampler(&nearest) // Swapped
+                    .with_sampler(&linear)
+                    .with_sampler(&shadow)
+                    .build(device, samplers_bgl),
+            )
+        } else {
+            None
+        };
+
         Self {
             linear,
             nearest,
             shadow,
-            bg,
+            linear_nearest_bg,
+            nearest_linear_bg,
         }
     }
 }
