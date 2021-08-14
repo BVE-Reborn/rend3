@@ -5,7 +5,7 @@
 layout(location = 0) in vec2 i_clip_position;
 layout(location = 0) out vec4 o_color;
 
-layout(set = 0, binding = 0) uniform sampler linear_sampler;
+layout(set = 0, binding = 0) uniform sampler primary_sampler;
 layout(set = 1, binding = 0) uniform textureCube skybox;
 layout(set = 2, binding = 0) uniform UniformBuffer {
     UniformData uniforms;
@@ -19,7 +19,7 @@ void main() {
     world.xyz /= world.w;
     vec3 world_dir = normalize(vec3(world));
 
-    vec3 background = texture(samplerCube(skybox, linear_sampler), world_dir).rgb;
+    vec3 background = texture(samplerCube(skybox, primary_sampler), world_dir).rgb;
 
     o_color = vec4(background, 1.0);
 }

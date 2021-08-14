@@ -11,7 +11,7 @@ layout(location = 1) in vec2 i_coords;
 layout(location = 2) in vec4 i_color;
 layout(location = 3) flat in uint i_material;
 
-layout(set = 0, binding = 0) uniform sampler linear_sampler;
+layout(set = 0, binding = 0) uniform sampler primary_sampler;
 #ifdef GPU_MODE
 layout(set = 2, binding = 0, std430) readonly buffer MaterialBuffer {
     GPUMaterialData materials[];
@@ -48,7 +48,7 @@ void main() {
     vec2 uvdy = dFdy(coords);
 
     if (has_albedo) {
-        vec4 albedo = textureGrad(sampler2D(ALBEDO_TEXTURE, linear_sampler), coords, uvdx, uvdy);
+        vec4 albedo = textureGrad(sampler2D(ALBEDO_TEXTURE, primary_sampler), coords, uvdx, uvdy);
 
         if (albedo.a <= 0.5) {
             discard;

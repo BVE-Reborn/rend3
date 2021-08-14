@@ -222,7 +222,7 @@ PixelData get_per_pixel_data(MATERIAL_TYPE material) {
     if (MATERIAL_FLAG(FLAGS_NEAREST)) {
         return get_per_pixel_data_sampled(material, nearest_sampler);
     } else {
-        return get_per_pixel_data_sampled(material, linear_sampler);
+        return get_per_pixel_data_sampled(material, primary_sampler);
     }
 }
 #endif
@@ -231,7 +231,7 @@ PixelData get_per_pixel_data(MATERIAL_TYPE material) {
 // In CPU mode the primary sampler gets switched out for what we need, so we don't switch in the shader.
 // This is because OpenGL can't deal with any texture being used with multiple different samplers. 
 PixelData get_per_pixel_data(MATERIAL_TYPE material) {
-    return get_per_pixel_data_sampled(material, linear_sampler);
+    return get_per_pixel_data_sampled(material, primary_sampler);
 }
 #endif
 

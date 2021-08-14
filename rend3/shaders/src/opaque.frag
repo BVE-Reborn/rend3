@@ -15,7 +15,7 @@ layout(location = 5) flat in uint i_material;
 
 layout(location = 0) out vec4 o_color;
 
-layout(set = 0, binding = 0) uniform sampler linear_sampler;
+layout(set = 0, binding = 0) uniform sampler primary_sampler;
 layout(set = 0, binding = 1) uniform sampler nearest_sampler;
 layout(set = 0, binding = 2) uniform samplerShadow shadow_sampler;
 layout(set = 2, binding = 0) restrict readonly buffer DirectionalLightBuffer {

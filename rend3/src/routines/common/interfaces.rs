@@ -22,7 +22,7 @@ unsafe impl bytemuck::Pod for PerObjectData {}
 unsafe impl bytemuck::Zeroable for PerObjectData {}
 
 pub struct ShaderInterfaces {
-    // TODO: move this into samplers struct?
+    // TODO: move this into samplers struct, in cpu mode this should only bind 2 samplers
     pub samplers_bgl: BindGroupLayout,
     pub culled_object_bgl: BindGroupLayout,
     pub uniform_bgl: BindGroupLayout,
