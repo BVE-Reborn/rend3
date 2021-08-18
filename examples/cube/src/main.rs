@@ -76,7 +76,7 @@ fn main() {
     let renderer = pollster::block_on(rend3::RendererBuilder::new(options.clone()).window(&window).build()).unwrap();
 
     // Create the default set of shaders and pipelines
-    let mut routine = rend3::routines::default::DefaultRenderRoutine::new(
+    let mut routine = rend3_pbr::default::DefaultRenderRoutine::new(
         &renderer,
         UVec2::new(window_size.width, window_size.height),
     );

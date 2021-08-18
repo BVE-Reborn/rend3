@@ -5,7 +5,7 @@ pub enum RendererMode {
 }
 
 impl RendererMode {
-    pub(crate) fn into_data<C, G>(self, cpu: impl FnOnce() -> C, gpu: impl FnOnce() -> G) -> ModeData<C, G> {
+    pub fn into_data<C, G>(self, cpu: impl FnOnce() -> C, gpu: impl FnOnce() -> G) -> ModeData<C, G> {
         match self {
             Self::CPUPowered => ModeData::CPU(cpu()),
             Self::GPUPowered => ModeData::GPU(gpu()),

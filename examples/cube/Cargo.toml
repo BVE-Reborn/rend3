@@ -17,8 +17,10 @@ path = "src/main.rs"
 env_logger = "0.9"
 # Linear algebra library
 glam = "0.17"
-# Renderer
-rend3 = { path = "../../rend3", version = "^0.0.5"}
+# Renderer core
+rend3 = { path = "../../rend3" }
+# Programmable render list that dictates how the scene renders
+rend3-pbr = { path = "../../rend3-pbr" }
 # Provides `block_on` to wait for futures from sync code
 pollster = "0.2"
 # windowing

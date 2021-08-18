@@ -21,8 +21,9 @@ image = { version = "0.23", default-features = false, features = ["png", "jpeg",
 histogram = "0.6"
 pico-args = "0.4"
 pollster = "0.2"
-rend3 = { path = "../../rend3", version = "^0.0.5"}
-rend3-gltf = { path = "../../rend3-gltf", version = "^0.0.5"}
+rend3 = { path = "../../rend3" }
+rend3-gltf = { path = "../../rend3-gltf" }
+rend3-pbr = { path = "../../rend3-pbr" }
 smallvec = "1"
 wgpu = { version = "0.9", git = "https://github.com/gfx-rs/wgpu.git", rev = "a222e6eb11dc6520414b2eb2f9a9604c3f2d3620" }
 winit = "0.25"

@@ -42,7 +42,6 @@ bytemuck = "1"
 flume = "0.10"
 fnv = "1"
 glam = { version = "0.17", features = ["bytemuck"] }
-include_dir = "0.6"
 log = "0.4"
 indexmap = "1"
 parking_lot = { version = "0.11" }

@@ -51,9 +51,6 @@ pub mod resources {
     pub use object::*;
     pub use texture::*;
 }
-// TODO: Move this to rend3-routines
-pub mod routines;
-pub mod shaders;
 pub mod util {
     pub mod bind_merge;
     pub mod buffer;

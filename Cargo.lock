@@ -59,9 +59,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.42"
+version = "1.0.43"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "595d3cfa7a60d4555cb5067b99f07142a08ea778de5cf993f7b75c7d8fabc486"
+checksum = "28ae2b3dec75a406790005a200b1bd89785afc02517a00ca99ecfe093ee9e6cf"
 
 [[package]]
 name = "arrayvec"
@@ -1548,7 +1548,6 @@ dependencies = [
  "flume",
  "fnv",
  "glam",
- "include_dir",
  "indexmap",
  "log",
  "parking_lot",
@@ -1569,6 +1568,7 @@ dependencies = [
  "glam",
  "pollster",
  "rend3",
+ "rend3-pbr",
  "winit",
 ]
 
@@ -1593,6 +1593,7 @@ dependencies = [
  "gltf",
  "pollster",
  "rend3",
+ "rend3-pbr",
  "winit",
 ]
 
@@ -1610,6 +1611,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "rend3-pbr"
+version = "0.0.5"
+dependencies = [
+ "arrayvec",
+ "bytemuck",
+ "glam",
+ "include_dir",
+ "log",
+ "rend3",
+ "wgpu",
+]
+
+[[package]]
 name = "rend3-scene-viewer-example"
 version = "0.0.5"
 dependencies = [
@@ -1623,6 +1637,7 @@ dependencies = [
  "pollster",
  "rend3",
  "rend3-gltf",
+ "rend3-pbr",
  "smallvec",
  "wgpu",
  "winit",

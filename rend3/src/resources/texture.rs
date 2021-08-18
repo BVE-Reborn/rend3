@@ -94,7 +94,7 @@ impl TextureManager {
         self.registry.get_index_of(handle.0)
     }
 
-    pub(crate) fn ready(&mut self, device: &Device) -> TextureManagerReadyOutput {
+    pub fn ready(&mut self, device: &Device) -> TextureManagerReadyOutput {
         if let ModeData::GPU(_) = self.layout_dirty {
             let layout_dirty = self.layout_dirty;
 
@@ -148,7 +148,7 @@ impl TextureManager {
     }
 }
 
-pub(crate) struct TextureManagerReadyOutput {
+pub struct TextureManagerReadyOutput {
     pub bgl: ModeData<(), Arc<BindGroupLayout>>,
     pub bg: ModeData<(), Arc<BindGroup>>,
     // TODO(0.10) https://github.com/gfx-rs/wgpu/issues/1635 will make this unneccisary.
