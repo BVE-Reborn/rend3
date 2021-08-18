@@ -1,4 +1,4 @@
-use glam::{Mat3, Vec4Swizzles};
+use glam::{Mat3, Mat3A, Mat4, Vec4Swizzles};
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
     BindGroupDescriptor, BindGroupEntry, BufferUsages, Device, RenderPass,
@@ -80,6 +80,16 @@ impl CpuCuller {
 
         assert_eq!(calls.len(), outputs.len());
         assert_eq!(calls.len(), _distances.len());
+
+        if outputs.is_empty() {
+            // Dummy data
+            outputs.push(PerObjectData {
+                model_view: Mat4::ZERO,
+                model_view_proj: Mat4::ZERO,
+                inv_trans_model_view: Mat3A::ZERO,
+                material_idx: 0,
+            });
+        }
 
         let output_buffer = args.device.create_buffer_init(&BufferInitDescriptor {
             label: Some("culling output"),

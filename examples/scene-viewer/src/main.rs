@@ -162,7 +162,15 @@ fn main() {
     });
     let mut scancode_status = HashMap::with_hasher(FnvBuildHasher::default());
 
-    let mut camera_location = Camera::default();
+    let mut camera_location = Camera {
+        projection: CameraProjection::Projection {
+            vfov: 60.0,
+            near: 0.1,
+            pitch:  std::f32::consts::FRAC_PI_4,
+            yaw: -std::f32::consts::FRAC_PI_4,
+        },
+        location: Vec3A::new(20.0, 20.0, -20.0),
+    };
 
     let mut timestamp_last_second = Instant::now();
     let mut timestamp_last_frame = Instant::now();
