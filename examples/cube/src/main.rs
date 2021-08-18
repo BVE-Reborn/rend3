@@ -5,7 +5,7 @@ fn vertex(pos: [f32; 3]) -> glam::Vec3 {
     glam::Vec3::from(pos)
 }
 
-fn create_mesh() -> rend3::datatypes::Mesh {
+fn create_mesh() -> rend3::types::Mesh {
     let vertex_positions = [
         // far side (0.0, 0.0, 1.0)
         vertex([-1.0, -1.0, 1.0]),
@@ -48,7 +48,7 @@ fn create_mesh() -> rend3::datatypes::Mesh {
         20, 21, 22, 22, 23, 20, // bottom
     ];
 
-    rend3::datatypes::MeshBuilder::new(vertex_positions.to_vec())
+    rend3::types::MeshBuilder::new(vertex_positions.to_vec())
         .with_indices(index_data.to_vec())
         .build()
 }
@@ -88,14 +88,14 @@ fn main() {
     let mesh_handle = renderer.add_mesh(mesh);
 
     // Add basic material with all defaults except a single color.
-    let material = rend3::datatypes::Material {
-        albedo: rend3::datatypes::AlbedoComponent::Value(glam::Vec4::new(0.0, 0.5, 0.5, 1.0)),
-        ..rend3::datatypes::Material::default()
+    let material = rend3::types::Material {
+        albedo: rend3::types::AlbedoComponent::Value(glam::Vec4::new(0.0, 0.5, 0.5, 1.0)),
+        ..rend3::types::Material::default()
     };
     let material_handle = renderer.add_material(material);
 
     // Combine the mesh and the material with a location to give an object.
-    let object = rend3::datatypes::Object {
+    let object = rend3::types::Object {
         mesh: mesh_handle,
         material: material_handle,
         transform: glam::Mat4::IDENTITY,
@@ -103,8 +103,8 @@ fn main() {
     let _object_handle = renderer.add_object(object);
 
     // Set camera's location
-    renderer.set_camera_data(rend3::datatypes::Camera {
-        projection: rend3::datatypes::CameraProjection::Projection {
+    renderer.set_camera_data(rend3::types::Camera {
+        projection: rend3::types::CameraProjection::Projection {
             vfov: 60.0,
             near: 0.1,
             pitch: 0.5,
@@ -114,7 +114,7 @@ fn main() {
     });
 
     // Create a single directional light
-    renderer.add_directional_light(rend3::datatypes::DirectionalLight {
+    renderer.add_directional_light(rend3::types::DirectionalLight {
         color: glam::Vec3::ONE,
         intensity: 10.0,
         // Direction will be normalized

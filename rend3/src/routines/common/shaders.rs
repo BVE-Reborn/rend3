@@ -2,7 +2,14 @@ use wgpu::{Device, ShaderModule, ShaderModuleDescriptor, ShaderModuleDescriptorS
 
 use crate::{shaders::SPIRV_SHADERS, RendererMode};
 
-pub unsafe fn mode_safe_shader(device: &Device, mode: RendererMode, label: &str, cpu_source: &str, gpu_source: &str, unsafe_override: bool) -> ShaderModule {
+pub unsafe fn mode_safe_shader(
+    device: &Device,
+    mode: RendererMode,
+    label: &str,
+    cpu_source: &str,
+    gpu_source: &str,
+    unsafe_override: bool,
+) -> ShaderModule {
     let source = SPIRV_SHADERS
         .get_file(match mode {
             RendererMode::CPUPowered => cpu_source,

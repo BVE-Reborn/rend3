@@ -1,6 +1,6 @@
 use fnv::FnvHashMap;
 use glam::{Mat3, Mat4, Vec2, Vec3, Vec4, Vec4Swizzles};
-use rend3::{datatypes as dt, datatypes::MeshBuilder, Renderer};
+use rend3::{types as dt, types::MeshBuilder, Renderer};
 use std::future::Future;
 use thiserror::Error;
 
@@ -366,8 +366,8 @@ where
         let handle = renderer.add_texture_2d(dt::Texture {
             label: image.name().map(str::to_owned),
             format: match srgb {
-                true => dt::RendererTextureFormat::Rgba8Srgb,
-                false => dt::RendererTextureFormat::Rgba8Linear,
+                true => dt::TextureFormat::Rgba8UnormSrgb,
+                false => dt::TextureFormat::Rgba8Unorm,
             },
             width: rgba.width(),
             height: rgba.height(),

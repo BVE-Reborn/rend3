@@ -65,7 +65,6 @@ pub mod util {
 }
 
 mod builder;
-pub mod datatypes;
 mod instruction;
 // TODO: rename to routines
 mod list;
@@ -77,6 +76,7 @@ pub use builder::*;
 pub use list::*;
 pub use mode::*;
 pub use options::*;
+pub use rend3_types as types;
 pub use renderer::{error::*, Renderer};
 pub use statistics::*;
 

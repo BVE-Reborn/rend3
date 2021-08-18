@@ -1,5 +1,5 @@
 use crate::{
-    datatypes::{Mesh, MeshHandle},
+    types::{Mesh, MeshHandle},
     util::{frustum::BoundingSphere, registry::ResourceRegistry},
 };
 use glam::{Vec2, Vec3};

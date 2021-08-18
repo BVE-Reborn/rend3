@@ -1,4 +1,4 @@
-use wgpu::{VertexStepMode, VertexAttribute, VertexBufferLayout, VertexFormat};
+use wgpu::{VertexAttribute, VertexBufferLayout, VertexFormat, VertexStepMode};
 
 pub const fn cpu_vertex_buffers() -> [VertexBufferLayout<'static>; 6] {
     [

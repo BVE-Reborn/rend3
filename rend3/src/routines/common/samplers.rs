@@ -1,10 +1,8 @@
 use std::num::NonZeroU8;
 
-use wgpu::{
-    AddressMode, BindGroup, BindGroupLayout, CompareFunction, Device, FilterMode, Sampler, SamplerDescriptor,
-};
+use wgpu::{AddressMode, BindGroup, BindGroupLayout, CompareFunction, Device, FilterMode, Sampler, SamplerDescriptor};
 
-use crate::{ModeData, RendererMode, util::bind_merge::BindGroupBuilder};
+use crate::{util::bind_merge::BindGroupBuilder, ModeData, RendererMode};
 
 pub struct Samplers {
     pub linear: Sampler,
@@ -28,11 +26,16 @@ impl Samplers {
             .with_sampler(&shadow)
             .build(device, samplers_bgl);
 
-        let nearest_linear_bg = mode.into_data(|| BindGroupBuilder::new(Some("samplers"))
-                    .with_sampler(&nearest) 
+        let nearest_linear_bg = mode.into_data(
+            || {
+                BindGroupBuilder::new(Some("samplers"))
+                    .with_sampler(&nearest)
                     .with_sampler(&linear)
                     .with_sampler(&shadow)
-                    .build(device, samplers_bgl), ||());
+                    .build(device, samplers_bgl)
+            },
+            || (),
+        );
 
         Self {
             linear,

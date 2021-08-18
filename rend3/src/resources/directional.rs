@@ -1,6 +1,6 @@
 use crate::{
-    datatypes::{Camera, CameraProjection, DirectionalLight, DirectionalLightHandle},
     resources::CameraManager,
+    types::{Camera, CameraProjection, DirectionalLight, DirectionalLightHandle},
     util::{bind_merge::BindGroupBuilder, buffer::WrappedPotBuffer, registry::ResourceRegistry},
     INTERNAL_SHADOW_DEPTH_FORMAT, SHADOW_DIMENSIONS,
 };

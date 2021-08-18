@@ -1,5 +1,5 @@
 use crate::{
-    datatypes::{
+    types::{
         Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Material, MaterialChange,
         MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, Texture, TextureHandle,
     },

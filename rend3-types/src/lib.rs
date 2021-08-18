@@ -1,14 +1,12 @@
 use glam::{Mat3, Mat4, Vec2, Vec3, Vec3A, Vec4};
 use std::mem;
-use wgpu::TextureFormat;
-pub use wgpu::{Color as ClearColor, LoadOp as PipelineLoadOp};
 
 #[macro_export]
 #[doc(hidden)]
 macro_rules! declare_handle {
     ($($name:ident),*) => {$(
         #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-        pub struct $name(pub(crate) usize);
+        pub struct $name(pub usize);
 
         impl $name {
             pub fn get(&self) -> usize {
@@ -76,72 +74,7 @@ macro_rules! changeable_struct {
     };
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum RendererTextureFormat {
-    Rgba8Srgb,
-    Rgba8Linear,
-    Bc1Linear,
-    Bc1Srgb,
-    Bc3Linear,
-    Bc3Srgb,
-    Bc4Linear,
-    Bc5Normal,
-    Bc6Signed,
-    Bc6Unsigned,
-    Bc7Linear,
-    Bc7Srgb,
-}
-
-impl RendererTextureFormat {
-    pub fn pixels_per_block(&self) -> u32 {
-        match self {
-            RendererTextureFormat::Rgba8Srgb | RendererTextureFormat::Rgba8Linear => 1,
-            RendererTextureFormat::Bc1Linear
-            | RendererTextureFormat::Bc1Srgb
-            | RendererTextureFormat::Bc3Linear
-            | RendererTextureFormat::Bc3Srgb
-            | RendererTextureFormat::Bc4Linear
-            | RendererTextureFormat::Bc5Normal
-            | RendererTextureFormat::Bc6Signed
-            | RendererTextureFormat::Bc6Unsigned
-            | RendererTextureFormat::Bc7Linear
-            | RendererTextureFormat::Bc7Srgb => 4,
-        }
-    }
-
-    pub fn bytes_per_block(&self) -> u32 {
-        match self {
-            RendererTextureFormat::Rgba8Srgb | RendererTextureFormat::Rgba8Linear => 4,
-            RendererTextureFormat::Bc1Linear | RendererTextureFormat::Bc1Srgb | RendererTextureFormat::Bc4Linear => 8,
-            RendererTextureFormat::Bc3Linear
-            | RendererTextureFormat::Bc3Srgb
-            | RendererTextureFormat::Bc5Normal
-            | RendererTextureFormat::Bc6Signed
-            | RendererTextureFormat::Bc6Unsigned
-            | RendererTextureFormat::Bc7Linear
-            | RendererTextureFormat::Bc7Srgb => 16,
-        }
-    }
-}
-
-impl From<RendererTextureFormat> for wgpu::TextureFormat {
-    fn from(other: RendererTextureFormat) -> Self {
-        match other {
-            RendererTextureFormat::Rgba8Linear => TextureFormat::Rgba8Unorm,
-            RendererTextureFormat::Rgba8Srgb => TextureFormat::Rgba8UnormSrgb,
-            RendererTextureFormat::Bc1Linear => TextureFormat::Bc1RgbaUnorm,
-            RendererTextureFormat::Bc1Srgb => TextureFormat::Bc1RgbaUnormSrgb,
-            RendererTextureFormat::Bc3Linear => TextureFormat::Bc3RgbaUnorm,
-            RendererTextureFormat::Bc3Srgb => TextureFormat::Bc3RgbaUnormSrgb,
-            RendererTextureFormat::Bc4Linear => TextureFormat::Bc4RUnorm,
-            RendererTextureFormat::Bc5Normal => TextureFormat::Bc5RgUnorm,
-            RendererTextureFormat::Bc6Signed => TextureFormat::Bc6hRgbSfloat,
-            RendererTextureFormat::Bc6Unsigned => TextureFormat::Bc6hRgbUfloat,
-            RendererTextureFormat::Bc7Linear => TextureFormat::Bc7RgbaUnorm,
-            RendererTextureFormat::Bc7Srgb => TextureFormat::Bc7RgbaUnormSrgb,
-        }
-    }
-}
+pub type TextureFormat = wgt::TextureFormat;
 
 // Consider:
 //
@@ -493,7 +426,7 @@ impl Mesh {
 #[derive(Debug, Clone)]
 pub struct Texture {
     pub data: Vec<u8>,
-    pub format: RendererTextureFormat,
+    pub format: TextureFormat,
     pub width: u32,
     pub height: u32,
     pub label: Option<String>,
@@ -501,7 +434,7 @@ pub struct Texture {
 }
 
 bitflags::bitflags! {
-    pub(crate) struct MaterialFlags : u32 {
+    pub struct MaterialFlags : u32 {
         const ALBEDO_ACTIVE =      0b0000_0000_0000_0001;
         const ALBEDO_BLEND =       0b0000_0000_0000_0010;
         const ALBEDO_VERTEX_SRGB = 0b0000_0000_0000_0100;
@@ -557,7 +490,7 @@ impl Default for AlbedoComponent {
 }
 
 impl AlbedoComponent {
-    pub(crate) fn to_value(&self) -> Vec4 {
+    pub fn to_value(&self) -> Vec4 {
         match *self {
             Self::Value(value) => value,
             Self::ValueVertex { value, .. } => value,
@@ -566,7 +499,7 @@ impl AlbedoComponent {
         }
     }
 
-    pub(crate) fn to_flags(&self) -> MaterialFlags {
+    pub fn to_flags(&self) -> MaterialFlags {
         match *self {
             Self::None => MaterialFlags::empty(),
             Self::Value(_) | Self::Texture(_) | Self::TextureValue { .. } => MaterialFlags::ALBEDO_ACTIVE,
@@ -581,14 +514,14 @@ impl AlbedoComponent {
         }
     }
 
-    pub(crate) fn is_texture(&self) -> bool {
+    pub fn is_texture(&self) -> bool {
         matches!(
             *self,
             Self::Texture(..) | Self::TextureVertex { .. } | Self::TextureValue { .. }
         )
     }
 
-    pub(crate) fn to_texture<Func, Out>(&self, func: Func) -> Option<Out>
+    pub fn to_texture<Func, Out>(&self, func: Func) -> Option<Out>
     where
         Func: FnOnce(TextureHandle) -> Out,
     {
@@ -616,18 +549,18 @@ impl<T> Default for MaterialComponent<T> {
 }
 
 impl<T: Copy> MaterialComponent<T> {
-    pub(crate) fn to_value(&self, default: T) -> T {
+    pub fn to_value(&self, default: T) -> T {
         match *self {
             Self::Value(value) | Self::TextureValue { value, .. } => value,
             Self::None | Self::Texture(_) => default,
         }
     }
 
-    pub(crate) fn is_texture(&self) -> bool {
+    pub fn is_texture(&self) -> bool {
         matches!(*self, Self::Texture(..) | Self::TextureValue { .. })
     }
 
-    pub(crate) fn to_texture<Func, Out>(&self, func: Func) -> Option<Out>
+    pub fn to_texture<Func, Out>(&self, func: Func) -> Option<Out>
     where
         Func: FnOnce(TextureHandle) -> Out,
     {
@@ -657,7 +590,7 @@ impl Default for NormalTexture {
 }
 
 impl NormalTexture {
-    pub(crate) fn to_texture<Func, Out>(&self, func: Func) -> Option<Out>
+    pub fn to_texture<Func, Out>(&self, func: Func) -> Option<Out>
     where
         Func: FnOnce(TextureHandle) -> Out,
     {
@@ -669,7 +602,7 @@ impl NormalTexture {
         }
     }
 
-    pub(crate) fn to_flags(&self) -> MaterialFlags {
+    pub fn to_flags(&self) -> MaterialFlags {
         match self {
             Self::None => MaterialFlags::empty(),
             Self::Tricomponent(..) => MaterialFlags::empty(),
@@ -703,7 +636,7 @@ pub enum AoMRTextures {
 }
 
 impl AoMRTextures {
-    pub(crate) fn to_roughness_texture<Func, Out>(&self, func: Func) -> Option<Out>
+    pub fn to_roughness_texture<Func, Out>(&self, func: Func) -> Option<Out>
     where
         Func: FnOnce(TextureHandle) -> Out,
     {
@@ -721,7 +654,7 @@ impl AoMRTextures {
         }
     }
 
-    pub(crate) fn to_metallic_texture<Func, Out>(&self, func: Func) -> Option<Out>
+    pub fn to_metallic_texture<Func, Out>(&self, func: Func) -> Option<Out>
     where
         Func: FnOnce(TextureHandle) -> Out,
     {
@@ -736,7 +669,7 @@ impl AoMRTextures {
         }
     }
 
-    pub(crate) fn to_ao_texture<Func, Out>(&self, func: Func) -> Option<Out>
+    pub fn to_ao_texture<Func, Out>(&self, func: Func) -> Option<Out>
     where
         Func: FnOnce(TextureHandle) -> Out,
     {
@@ -754,7 +687,7 @@ impl AoMRTextures {
         }
     }
 
-    pub(crate) fn to_flags(&self) -> MaterialFlags {
+    pub fn to_flags(&self) -> MaterialFlags {
         match self {
             Self::GltfCombined { .. } => MaterialFlags::AOMR_GLTF_COMBINED,
             Self::GltfSplit { .. } => MaterialFlags::AOMR_GLTF_SPLIT,
@@ -792,7 +725,7 @@ pub enum ClearcoatTextures {
 }
 
 impl ClearcoatTextures {
-    pub(crate) fn to_clearcoat_texture<Func, Out>(&self, func: Func) -> Option<Out>
+    pub fn to_clearcoat_texture<Func, Out>(&self, func: Func) -> Option<Out>
     where
         Func: FnOnce(TextureHandle) -> Out,
     {
@@ -810,7 +743,7 @@ impl ClearcoatTextures {
         }
     }
 
-    pub(crate) fn to_clearcoat_roughness_texture<Func, Out>(&self, func: Func) -> Option<Out>
+    pub fn to_clearcoat_roughness_texture<Func, Out>(&self, func: Func) -> Option<Out>
     where
         Func: FnOnce(TextureHandle) -> Out,
     {
@@ -828,7 +761,7 @@ impl ClearcoatTextures {
         }
     }
 
-    pub(crate) fn to_flags(&self) -> MaterialFlags {
+    pub fn to_flags(&self) -> MaterialFlags {
         match self {
             Self::GltfCombined { .. } => MaterialFlags::CC_GLTF_COMBINED,
             Self::GltfSplit { .. } => MaterialFlags::CC_GLTF_SPLIT,

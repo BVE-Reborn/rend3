@@ -5,7 +5,6 @@ use wgpu::{
 };
 
 use crate::{
-    datatypes::SampleType,
     resources::{CameraManager, InternalObject, MaterialManager},
     routines::{
         common::{
@@ -14,6 +13,7 @@ use crate::{
         },
         culling::{CPUDrawCall, CulledObjectSet},
     },
+    types::SampleType,
     util::{frustum::ShaderFrustum, math::IndexedDistance},
     ModeData,
 };

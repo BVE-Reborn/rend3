@@ -2,7 +2,7 @@ use fnv::FnvBuildHasher;
 use glam::{UVec2, Vec3, Vec3A};
 use pico_args::Arguments;
 use rend3::{
-    datatypes::{Camera, CameraProjection, DirectionalLight, RendererTextureFormat, Texture},
+    types::{Camera, CameraProjection, DirectionalLight, Texture, TextureFormat},
     RenderRoutine, Renderer,
 };
 use std::{
@@ -40,7 +40,7 @@ fn load_skybox(renderer: &Renderer) -> Result<(), Box<dyn std::error::Error>> {
     drop(prepared);
 
     // let handle = renderer.add_texture_cube(Texture {
-    //     format: RendererTextureFormat::Bc7Srgb,
+    //     format: TextureFormat::Bc7Srgb,
     //     width: image_info.width,
     //     height: image_info.height,
     //     data: image,
@@ -166,7 +166,7 @@ fn main() {
         projection: CameraProjection::Projection {
             vfov: 60.0,
             near: 0.1,
-            pitch:  std::f32::consts::FRAC_PI_4,
+            pitch: std::f32::consts::FRAC_PI_4,
             yaw: -std::f32::consts::FRAC_PI_4,
         },
         location: Vec3A::new(20.0, 20.0, -20.0),

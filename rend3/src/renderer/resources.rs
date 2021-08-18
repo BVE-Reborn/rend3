@@ -1,6 +1,6 @@
 use crate::{
-    datatypes::{Camera, TextureHandle},
     resources::CameraManager,
+    types::{Camera, TextureHandle},
     util::output::SURFACE_FORMAT,
     RendererOptions, VSyncMode,
 };

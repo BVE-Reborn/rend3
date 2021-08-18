@@ -1,12 +1,12 @@
 use crate::{
-    datatypes::{
-        Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Material, MaterialChange,
-        MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, Texture, TextureHandle,
-    },
     instruction::{Instruction, InstructionStreamPair},
     renderer::{info::ExtendedAdapterInfo, resources::RendererGlobalResources},
     resources::{DirectionalLightManager, MaterialManager, MeshManager, ObjectManager, TextureManager},
     statistics::RendererStatistics,
+    types::{
+        Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Material, MaterialChange,
+        MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, Texture, TextureHandle,
+    },
     util::output::RendererOutput,
     RenderRoutine, RendererBuilder, RendererInitializationError, RendererMode, RendererOptions,
 };
@@ -234,11 +234,7 @@ impl Renderer {
             .push(Instruction::ClearBackgroundTexture)
     }
 
-    pub fn render<'a>(
-        self: &Arc<Self>,
-        list: &'a dyn RenderRoutine,
-        output: RendererOutput,
-    ) -> RendererStatistics {
+    pub fn render<'a>(self: &Arc<Self>, list: &'a dyn RenderRoutine, output: RendererOutput) -> RendererStatistics {
         render::render_loop(Arc::clone(self), list, output)
     }
 }

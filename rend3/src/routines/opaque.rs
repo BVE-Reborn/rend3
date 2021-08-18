@@ -98,14 +98,7 @@ impl OpaquePass {
         args.rpass.set_bind_group(1, &args.culled_objects.output_bg, &[]);
 
         match args.culled_objects.calls {
-            ModeData::CPU(ref draws) => culling::cpu::run(
-                args.rpass,
-                &draws,
-                args.samplers,
-                0,
-                args.materials,
-                2,
-            ),
+            ModeData::CPU(ref draws) => culling::cpu::run(args.rpass, &draws, args.samplers, 0, args.materials, 2),
             ModeData::GPU(ref data) => {
                 args.rpass.set_bind_group(2, args.materials.gpu_get_bind_group(), &[]);
                 args.rpass.set_bind_group(3, args.texture_bg.as_gpu(), &[]);
@@ -124,14 +117,7 @@ impl OpaquePass {
         args.rpass.set_bind_group(3, &args.shader_uniform_bg, &[]);
 
         match args.culled_objects.calls {
-            ModeData::CPU(ref draws) => culling::cpu::run(
-                args.rpass,
-                &draws,
-                args.samplers,
-                0,
-                args.materials,
-                4,
-            ),
+            ModeData::CPU(ref draws) => culling::cpu::run(args.rpass, &draws, args.samplers, 0, args.materials, 4),
             ModeData::GPU(ref data) => {
                 args.rpass.set_bind_group(4, args.materials.gpu_get_bind_group(), &[]);
                 args.rpass.set_bind_group(5, args.texture_bg.as_gpu(), &[]);

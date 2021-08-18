@@ -3,7 +3,7 @@ use glam::UVec2;
 fn load_gltf(
     renderer: &rend3::Renderer,
     path: &'static str,
-) -> (rend3::datatypes::MeshHandle, rend3::datatypes::MaterialHandle) {
+) -> (rend3::types::MeshHandle, rend3::types::MaterialHandle) {
     let (doc, datas, _) = gltf::import(path).unwrap();
     let mesh_data = doc.meshes().next().expect("no meshes in data.glb");
 
@@ -26,7 +26,7 @@ fn load_gltf(
         .collect();
     let indices = reader.read_indices().unwrap().into_u32().collect();
 
-    let mesh = rend3::datatypes::MeshBuilder::new(vertex_positions.to_vec())
+    let mesh = rend3::types::MeshBuilder::new(vertex_positions.to_vec())
         .with_vertex_normals(vertex_normals)
         .with_vertex_tangents(vertex_tangents)
         .with_vertex_uvs(vertex_uvs)
@@ -40,8 +40,8 @@ fn load_gltf(
     // Add basic material with all defaults except a single color.
     let material = primitive.material();
     let metallic_roughness = material.pbr_metallic_roughness();
-    let material_handle = renderer.add_material(rend3::datatypes::Material {
-        albedo: rend3::datatypes::AlbedoComponent::Value(metallic_roughness.base_color_factor().into()),
+    let material_handle = renderer.add_material(rend3::types::Material {
+        albedo: rend3::types::AlbedoComponent::Value(metallic_roughness.base_color_factor().into()),
         ..Default::default()
     });
 
@@ -80,7 +80,7 @@ fn main() {
     let (mesh, material) = load_gltf(&renderer, concat!(env!("CARGO_MANIFEST_DIR"), "/data.glb"));
 
     // Combine the mesh and the material with a location to give an object.
-    let object = rend3::datatypes::Object {
+    let object = rend3::types::Object {
         mesh,
         material,
         transform: glam::Mat4::from_scale(glam::Vec3::new(1.0, 1.0, -1.0)),
@@ -88,8 +88,8 @@ fn main() {
     let _object_handle = renderer.add_object(object);
 
     // Set camera's location
-    renderer.set_camera_data(rend3::datatypes::Camera {
-        projection: rend3::datatypes::CameraProjection::Projection {
+    renderer.set_camera_data(rend3::types::Camera {
+        projection: rend3::types::CameraProjection::Projection {
             vfov: 60.0,
             near: 0.1,
             pitch: 0.43,
@@ -99,7 +99,7 @@ fn main() {
     });
 
     // Create a single directional light
-    renderer.add_directional_light(rend3::datatypes::DirectionalLight {
+    renderer.add_directional_light(rend3::types::DirectionalLight {
         color: glam::Vec3::ONE,
         intensity: 10.0,
         // Direction will be normalized

@@ -1,21 +1,17 @@
 use crate::{
-    datatypes::{Camera, CameraProjection},
     instruction::Instruction,
     statistics::RendererStatistics,
+    types::{Camera, CameraProjection},
     util::output::RendererOutput,
     RenderRoutine, Renderer,
 };
-use std::{sync::Arc};
+use std::sync::Arc;
 use wgpu::{
     util::DeviceExt, CommandEncoderDescriptor, Extent3d, TextureAspect, TextureDescriptor, TextureDimension,
     TextureUsages, TextureViewDescriptor, TextureViewDimension,
 };
 
-pub fn render_loop(
-    renderer: Arc<Renderer>,
-    list: &dyn RenderRoutine,
-    output: RendererOutput,
-) -> RendererStatistics {
+pub fn render_loop(renderer: Arc<Renderer>, list: &dyn RenderRoutine, output: RendererOutput) -> RendererStatistics {
     renderer.instructions.swap();
 
     let mut instructions = renderer.instructions.consumer.lock();
@@ -60,7 +56,7 @@ pub fn render_loop(
                         mip_level_count: texture.mip_levels,
                         sample_count: 1,
                         dimension: TextureDimension::D2,
-                        format: texture.format.into(),
+                        format: texture.format,
                         usage: TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST,
                     },
                     &texture.data,

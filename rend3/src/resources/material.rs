@@ -1,7 +1,7 @@
 use crate::{
-    datatypes::{Material, MaterialChange, MaterialFlags, MaterialHandle, SampleType, TextureHandle},
     mode::ModeData,
     resources::TextureManager,
+    types::{Material, MaterialChange, MaterialFlags, MaterialHandle, SampleType, TextureHandle},
     util::{bind_merge::BindGroupBuilder, buffer::WrappedPotBuffer, registry::ResourceRegistry},
     RendererMode,
 };

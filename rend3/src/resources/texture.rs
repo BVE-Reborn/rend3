@@ -1,9 +1,4 @@
-use crate::{
-    datatypes::{RendererTextureFormat, TextureHandle},
-    mode::ModeData,
-    util::registry::ResourceRegistry,
-    RendererMode,
-};
+use crate::{mode::ModeData, types::TextureHandle, util::registry::ResourceRegistry, RendererMode};
 use std::{mem, num::NonZeroU32, sync::Arc};
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
@@ -15,7 +10,7 @@ pub const STARTING_2D_TEXTURES: usize = 1 << 7;
 pub const STARTING_CUBE_TEXTURES: usize = 1 << 3;
 
 pub struct InternalTexture {
-    pub format: Option<RendererTextureFormat>,
+    pub format: Option<TextureFormat>,
 }
 
 pub struct TextureManager {
@@ -65,7 +60,7 @@ impl TextureManager {
         TextureHandle(self.registry.allocate())
     }
 
-    pub fn fill(&mut self, handle: TextureHandle, texture: TextureView, format: Option<RendererTextureFormat>) {
+    pub fn fill(&mut self, handle: TextureHandle, texture: TextureView, format: Option<TextureFormat>) {
         self.group_dirty = self.group_dirty.map_gpu(|_| true);
 
         let index = self.registry.insert(handle.0, InternalTexture { format });

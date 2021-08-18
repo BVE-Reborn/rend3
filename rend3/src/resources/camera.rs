@@ -1,4 +1,4 @@
-use crate::datatypes::{Camera, CameraProjection};
+use crate::types::{Camera, CameraProjection};
 use glam::{Mat3A, Mat4, Vec3, Vec3A};
 
 #[derive(Clone)]

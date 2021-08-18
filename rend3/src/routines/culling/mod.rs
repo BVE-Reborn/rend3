@@ -1,7 +1,7 @@
 use glam::Mat4;
 use wgpu::{BindGroup, Buffer};
 
-use crate::{datatypes::MaterialHandle, util::frustum::BoundingSphere, ModeData};
+use crate::{types::MaterialHandle, util::frustum::BoundingSphere, ModeData};
 
 pub mod cpu;
 pub mod gpu;
