@@ -3,7 +3,6 @@ resolver = "2"
 members = [
     "examples/cube",
     "examples/gltf",
-    "examples/imgui",
     "examples/scene-viewer",
     "rend3",
     "rend3-gltf",

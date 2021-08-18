@@ -17,7 +17,7 @@ pub mod tonemapping;
 pub mod uniforms;
 pub mod vertex;
 
-pub struct DefaultRenderRoutine {
+pub struct PbrRenderRoutine {
     pub interfaces: common::interfaces::ShaderInterfaces,
     pub samplers: common::samplers::Samplers,
     pub cpu_culler: culling::cpu::CpuCuller,
@@ -30,7 +30,7 @@ pub struct DefaultRenderRoutine {
     pub internal_depth_buffer: TextureView,
 }
 
-impl DefaultRenderRoutine {
+impl PbrRenderRoutine {
     pub fn new(renderer: &Renderer, resolution: UVec2) -> Self {
         let device = renderer.device();
         let mode = renderer.mode();
@@ -107,7 +107,7 @@ impl DefaultRenderRoutine {
     }
 }
 
-impl RenderRoutine for DefaultRenderRoutine {
+impl RenderRoutine for PbrRenderRoutine {
     fn render(&self, renderer: Arc<Renderer>, encoders: &mut Vec<CommandBuffer>, frame: &OutputFrame) {
         let mut encoder = renderer.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("primary encoder"),
