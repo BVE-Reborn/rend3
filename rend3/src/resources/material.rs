@@ -266,7 +266,7 @@ impl MaterialManager {
         Self {
             bgl,
             bg,
-            
+
             buffer,
             registry,
         }

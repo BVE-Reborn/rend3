@@ -76,7 +76,7 @@ impl DirectionalLightManager {
             buffer,
             view,
             layer_views,
-            
+
             bgl,
             bg,
 
