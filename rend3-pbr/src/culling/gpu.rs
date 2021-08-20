@@ -13,9 +13,9 @@ use wgpu::{
     ComputePipelineDescriptor, Device, PipelineLayoutDescriptor, RenderPass, ShaderModuleDescriptorSpirV, ShaderStages,
 };
 
-use crate::culling::{CulledObjectSet, GPUCullingInput, GPUIndirectData};
 use crate::{
     common::interfaces::{PerObjectData, ShaderInterfaces},
+    culling::{CulledObjectSet, GPUCullingInput, GPUIndirectData},
     shaders::SPIRV_SHADERS,
 };
 

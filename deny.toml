@@ -14,6 +14,7 @@ multiple-versions = "deny"
 wildcards = "allow"
 skip = [
     # everything
+    { name = "base64", version = "0.12.3" }, # gltf uses old version
     { name = "cfg-if", version = "0.1.10" },
     { name = "hashbrown", version = "0.9.1" },
     # graphics
@@ -27,7 +28,6 @@ skip = [
     { name = "dlib", version = "0.4.2" }, # wayland
     { name = "libloading", version = "0.6.7" }, # everything but wayland
     { name = "nix", version = "0.18.0" }, # wayland
-    { name = "redox_syscall", version = "0.1.57" }, # ...
 ]
 
 [advisories]

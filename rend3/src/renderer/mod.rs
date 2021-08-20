@@ -8,7 +8,7 @@ use crate::{
         MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, Texture, TextureHandle,
     },
     util::output::RendererOutput,
-    RenderRoutine, RendererBuilder, RendererInitializationError, RendererMode, InternalSurfaceOptions,
+    InternalSurfaceOptions, RenderRoutine, RendererBuilder, RendererInitializationError, RendererMode,
 };
 use glam::Mat4;
 use parking_lot::RwLock;

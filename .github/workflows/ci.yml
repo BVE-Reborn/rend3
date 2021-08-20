@@ -62,7 +62,7 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: ${{ matrix.rust_version }}
+          toolchain: stable
           components: rustfmt
           default: true
           override: true

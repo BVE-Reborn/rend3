@@ -1,4 +1,4 @@
-use crate::{Renderer, RendererInitializationError, RendererMode, InternalSurfaceOptions};
+use crate::{InternalSurfaceOptions, Renderer, RendererInitializationError, RendererMode};
 use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
 use std::{future::Future, sync::Arc};
 use wgpu::{AdapterInfo, Backend, Device, Instance, Queue};

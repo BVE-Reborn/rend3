@@ -1,7 +1,10 @@
 use fnv::FnvBuildHasher;
 use glam::{UVec2, Vec3, Vec3A};
 use pico_args::Arguments;
-use rend3::{RenderRoutine, Renderer, types::{Backend, Camera, CameraProjection, DirectionalLight, Texture, TextureFormat}};
+use rend3::{
+    types::{Backend, Camera, CameraProjection, DirectionalLight, Texture, TextureFormat},
+    RenderRoutine, Renderer,
+};
 use rend3_pbr::PbrRenderRoutine;
 use std::{
     collections::HashMap,

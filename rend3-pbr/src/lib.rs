@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use glam::{UVec2, Vec4};
-use rend3::{ModeData, RenderRoutine, Renderer, types::TextureHandle, util::output::OutputFrame};
+use rend3::{types::TextureHandle, util::output::OutputFrame, ModeData, RenderRoutine, Renderer};
 use wgpu::{
     Color, CommandBuffer, Device, Extent3d, LoadOp, Operations, RenderPassColorAttachment,
     RenderPassDepthStencilAttachment, RenderPassDescriptor, TextureDescriptor, TextureDimension, TextureFormat,

@@ -1,13 +1,10 @@
 use crate::{
-    instruction::Instruction,
-    statistics::RendererStatistics,
-    util::output::RendererOutput,
-    RenderRoutine, Renderer,
+    instruction::Instruction, statistics::RendererStatistics, util::output::RendererOutput, RenderRoutine, Renderer,
 };
 use std::sync::Arc;
 use wgpu::{
-    util::DeviceExt, CommandEncoderDescriptor, Extent3d, TextureDescriptor, TextureDimension,
-    TextureUsages, TextureViewDescriptor, TextureViewDimension,
+    util::DeviceExt, CommandEncoderDescriptor, Extent3d, TextureDescriptor, TextureDimension, TextureUsages,
+    TextureViewDescriptor, TextureViewDimension,
 };
 
 pub fn render_loop(renderer: Arc<Renderer>, list: &dyn RenderRoutine, output: RendererOutput) -> RendererStatistics {

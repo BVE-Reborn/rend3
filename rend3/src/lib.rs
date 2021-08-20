@@ -63,17 +63,17 @@ pub mod util {
 
 mod builder;
 mod instruction;
-mod routine;
 mod mode;
 mod options;
+mod routine;
 mod statistics;
 
 pub use builder::*;
-pub use routine::*;
 pub use mode::*;
 pub use options::*;
 pub use rend3_types as types;
 pub use renderer::{error::*, Renderer};
+pub use routine::*;
 pub use statistics::*;
 
 pub const INTERNAL_SHADOW_DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;

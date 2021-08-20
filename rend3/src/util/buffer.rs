@@ -108,6 +108,6 @@ mod test {
 
         assert_eq!(will_resize_inner(16, 16, 0), None);
         assert_eq!(will_resize_inner(16, 8, 0), None);
-        assert_eq!(will_resize_inner(16, 4, 0), None);
+        assert_eq!(will_resize_inner(16, 4, 0), Some(8));
     }
 }
