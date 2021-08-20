@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use glam::{UVec2, Vec4};
-use rend3::{util::output::OutputFrame, ModeData, RenderRoutine, Renderer};
+use rend3::{ModeData, RenderRoutine, Renderer, types::TextureHandle, util::output::OutputFrame};
 use wgpu::{
     Color, CommandBuffer, Device, Extent3d, LoadOp, Operations, RenderPassColorAttachment,
     RenderPassDepthStencilAttachment, RenderPassDescriptor, TextureDescriptor, TextureDimension, TextureFormat,
@@ -25,6 +25,8 @@ pub struct PbrRenderRoutine {
     pub shadow_passes: directional::DirectionalShadowPass,
     pub opaque_pass: opaque::OpaquePass,
     pub tonemapping_pass: tonemapping::TonemappingPass,
+
+    pub background_texture: Option<TextureHandle>,
 
     pub internal_buffer: TextureView,
     pub internal_depth_buffer: TextureView,
@@ -96,9 +98,16 @@ impl PbrRenderRoutine {
             shadow_passes,
             opaque_pass,
             tonemapping_pass,
+
+            background_texture: None,
+
             internal_buffer,
             internal_depth_buffer,
         }
+    }
+
+    pub fn set_background_texture(&mut self, handle: Option<TextureHandle>) {
+        self.background_texture = handle;
     }
 
     pub fn resize(&mut self, device: &Device, resolution: UVec2) {

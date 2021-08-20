@@ -56,3 +56,9 @@ impl ObjectManager {
         self.registry.get_mut(handle.0).transform = transform;
     }
 }
+
+impl Default for ObjectManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}

@@ -211,44 +211,53 @@ impl MeshManager {
             let new_vert_range = new_vert_alloc.allocate_range(mesh.vertex_range.len()).unwrap();
             let new_index_range = new_index_alloc.allocate_range(mesh.index_range.len()).unwrap();
 
-            // TODO: This was once a function but borrowck wasn't happy with me, could I make it happy?
-            macro_rules! copy_vert_fn {
-                ($src:expr, $dst:expr, $size:expr) => {
-                    // Copy verts over to new buffer
-                    let vert_copy_start = (mesh.vertex_range.start * $size);
-                    let vert_copy_size = (mesh.vertex_range.end * $size) - vert_copy_start;
-                    let vert_output = (new_vert_range.start * $size);
-                    encoder.copy_buffer_to_buffer(
-                        $src,
-                        vert_copy_start as u64,
-                        $dst,
-                        vert_output as u64,
-                        vert_copy_size as u64,
-                    );
-                };
-            }
-
-            copy_vert_fn!(
+            copy_vert(
+                encoder,
                 &self.buffers.vertex_position,
                 &new_buffers.vertex_position,
-                VERTEX_POSITION_SIZE
+                mesh,
+                &new_vert_range,
+                VERTEX_POSITION_SIZE,
             );
-            copy_vert_fn!(
+            copy_vert(
+                encoder,
                 &self.buffers.vertex_normal,
                 &new_buffers.vertex_normal,
-                VERTEX_NORMAL_SIZE
+                mesh,
+                &new_vert_range,
+                VERTEX_NORMAL_SIZE,
             );
-            copy_vert_fn!(
+            copy_vert(
+                encoder,
                 &self.buffers.vertex_tangent,
                 &new_buffers.vertex_tangent,
-                VERTEX_TANGENT_SIZE
+                mesh,
+                &new_vert_range,
+                VERTEX_TANGENT_SIZE,
             );
-            copy_vert_fn!(&self.buffers.vertex_uv, &new_buffers.vertex_uv, VERTEX_UV_SIZE);
-            copy_vert_fn!(&self.buffers.vertex_color, &new_buffers.vertex_color, VERTEX_COLOR_SIZE);
-            copy_vert_fn!(
+            copy_vert(
+                encoder,
+                &self.buffers.vertex_uv,
+                &new_buffers.vertex_uv,
+                mesh,
+                &new_vert_range,
+                VERTEX_UV_SIZE,
+            );
+            copy_vert(
+                encoder,
+                &self.buffers.vertex_color,
+                &new_buffers.vertex_color,
+                mesh,
+                &new_vert_range,
+                VERTEX_COLOR_SIZE,
+            );
+            copy_vert(
+                encoder,
                 &self.buffers.vertex_mat_index,
                 &new_buffers.vertex_mat_index,
-                VERTEX_MATERIAL_INDEX_SIZE
+                mesh,
+                &new_vert_range,
+                VERTEX_MATERIAL_INDEX_SIZE,
             );
 
             // Copy indices over to new buffer, adjusting their value by the difference
@@ -273,6 +282,26 @@ impl MeshManager {
         self.vertex_alloc = new_vert_alloc;
         self.index_alloc = new_index_alloc;
     }
+}
+
+fn copy_vert(
+    encoder: &mut CommandEncoder,
+    src: &Buffer,
+    dst: &Buffer,
+    mesh: &InternalMesh,
+    new_vert_range: &Range<usize>,
+    size: usize,
+) {
+    let vert_copy_start = mesh.vertex_range.start * size;
+    let vert_copy_size = (mesh.vertex_range.end * size) - vert_copy_start;
+    let vert_output = new_vert_range.start * size;
+    encoder.copy_buffer_to_buffer(
+        src,
+        vert_copy_start as u64,
+        dst,
+        vert_output as u64,
+        vert_copy_size as u64,
+    );
 }
 
 fn create_buffers(device: &Device, vertex_count: usize, index_count: usize) -> MeshBuffers {

@@ -113,8 +113,8 @@ impl GpuCuller {
             mem::size_of::<GPUCullingUniforms>() + args.objects.len() * mem::size_of::<GPUCullingInput>(),
         );
         data.extend(bytemuck::bytes_of(&GPUCullingUniforms {
-            view: args.camera.view().into(),
-            view_proj: args.camera.view_proj().into(),
+            view: args.camera.view(),
+            view_proj: args.camera.view_proj(),
             frustum: ShaderFrustum::from_matrix(args.camera.proj()),
             object_count: args.objects.len() as u32,
         }));
@@ -124,8 +124,8 @@ impl GpuCuller {
                 count: object.count,
                 vertex_offset: object.vertex_offset,
                 material_idx: args.materials.internal_index(object.material) as u32,
-                transform: object.transform.into(),
-                bounding_sphere: object.sphere.into(),
+                transform: object.transform,
+                bounding_sphere: object.sphere,
             }));
         }
 

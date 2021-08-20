@@ -1,4 +1,4 @@
-use crate::{Renderer, RendererInitializationError, RendererMode, RendererOptions};
+use crate::{Renderer, RendererInitializationError, RendererMode, InternalSurfaceOptions};
 use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
 use std::{future::Future, sync::Arc};
 use wgpu::{AdapterInfo, Backend, Device, Instance, Queue};
@@ -23,14 +23,14 @@ where
     W: HasRawWindowHandle,
 {
     pub(crate) window: Option<&'a W>,
-    pub(crate) options: RendererOptions,
+    pub(crate) options: InternalSurfaceOptions,
     pub(crate) device: Option<CustomDevice>,
     pub(crate) desired_backend: Option<Backend>,
     pub(crate) desired_device_name: Option<String>,
     pub(crate) desired_mode: Option<RendererMode>,
 }
 impl<'a> RendererBuilder<'a, DummyWindow> {
-    pub fn new(options: RendererOptions) -> Self {
+    pub fn new(options: InternalSurfaceOptions) -> Self {
         Self {
             window: None,
             options,

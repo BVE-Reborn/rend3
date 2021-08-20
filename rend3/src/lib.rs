@@ -63,14 +63,13 @@ pub mod util {
 
 mod builder;
 mod instruction;
-// TODO: rename to routines
-mod list;
+mod routine;
 mod mode;
 mod options;
 mod statistics;
 
 pub use builder::*;
-pub use list::*;
+pub use routine::*;
 pub use mode::*;
 pub use options::*;
 pub use rend3_types as types;

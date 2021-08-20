@@ -5,6 +5,7 @@ use crate::{
     INTERNAL_SHADOW_DEPTH_FORMAT, SHADOW_DIMENSIONS,
 };
 use glam::{Mat4, Vec3};
+use rend3_types::DirectionalLightChange;
 use std::{
     mem::{self, size_of},
     num::{NonZeroU32, NonZeroU64},
@@ -75,9 +76,11 @@ impl DirectionalLightManager {
             buffer,
             view,
             layer_views,
-            registry,
+            
             bgl,
             bg,
+
+            registry,
         }
     }
 
@@ -108,6 +111,20 @@ impl DirectionalLightManager {
 
     pub fn get_layer_view_arc(&self, layer: u32) -> Arc<TextureView> {
         Arc::clone(&self.layer_views[layer as usize])
+    }
+
+    pub fn update_directional_light(&mut self, handle: DirectionalLightHandle, change: DirectionalLightChange) {
+        let internal = self.registry.get_mut(handle.0);
+        internal.inner.update_from_changes(change);
+        if let Some(direction) = change.direction {
+            internal.camera.set_data(
+                Camera {
+                    projection: CameraProjection::from_orthographic_direction(direction.into()),
+                    ..Camera::default()
+                },
+                None,
+            );
+        }
     }
 
     pub fn get_bgl(&self) -> &BindGroupLayout {

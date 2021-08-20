@@ -33,7 +33,6 @@ pub struct OpaquePassCullArgs<'a> {
 pub struct OpaquePassPrepassArgs<'rpass, 'b> {
     pub rpass: &'b mut RenderPass<'rpass>,
 
-    /// TODO: only pass in manager if you actually need it
     pub materials: &'rpass MaterialManager,
     pub meshes: &'rpass MeshBuffers,
 
@@ -46,7 +45,6 @@ pub struct OpaquePassPrepassArgs<'rpass, 'b> {
 pub struct OpaquePassDrawArgs<'rpass, 'b> {
     pub rpass: &'b mut RenderPass<'rpass>,
 
-    /// TODO: only pass in manager if you actually need it
     pub materials: &'rpass MaterialManager,
     pub meshes: &'rpass MeshBuffers,
 

@@ -3,7 +3,7 @@ use crate::{
         Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Material, MaterialChange,
         MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, Texture, TextureHandle,
     },
-    RendererOptions,
+    InternalSurfaceOptions,
 };
 use glam::Mat4;
 use parking_lot::Mutex;
@@ -64,16 +64,12 @@ pub enum Instruction {
     RemoveDirectionalLight {
         handle: DirectionalLightHandle,
     },
-    SetOptions {
-        options: RendererOptions,
+    SetInternalSurfaceOptions {
+        options: InternalSurfaceOptions,
     },
     SetCameraData {
         data: Camera,
     },
-    SetBackgroundTexture {
-        handle: TextureHandle,
-    },
-    ClearBackgroundTexture,
 }
 
 pub struct InstructionStreamPair {

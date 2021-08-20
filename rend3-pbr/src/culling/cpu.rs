@@ -67,8 +67,8 @@ impl CpuCuller {
             });
 
             outputs.push(PerObjectData {
-                model_view: model_view.into(),
-                model_view_proj: model_view_proj.into(),
+                model_view,
+                model_view_proj,
                 inv_trans_model_view: inv_trans_model_view.into(),
                 material_idx: 0,
             });
@@ -110,6 +110,12 @@ impl CpuCuller {
             calls: ModeData::CPU(calls),
             output_bg,
         }
+    }
+}
+
+impl Default for CpuCuller {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

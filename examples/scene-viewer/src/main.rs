@@ -1,10 +1,8 @@
 use fnv::FnvBuildHasher;
 use glam::{UVec2, Vec3, Vec3A};
 use pico_args::Arguments;
-use rend3::{
-    types::{Camera, CameraProjection, DirectionalLight, Texture, TextureFormat},
-    RenderRoutine, Renderer,
-};
+use rend3::{RenderRoutine, Renderer, types::{Backend, Camera, CameraProjection, DirectionalLight, Texture, TextureFormat}};
+use rend3_pbr::PbrRenderRoutine;
 use std::{
     collections::HashMap,
     hash::BuildHasher,
@@ -19,7 +17,7 @@ use winit::{
 
 mod platform;
 
-fn load_skybox(renderer: &Renderer) -> Result<(), Box<dyn std::error::Error>> {
+fn load_skybox(renderer: &Renderer, routine: &mut PbrRenderRoutine) -> Result<(), Box<dyn std::error::Error>> {
     let name = concat!(env!("CARGO_MANIFEST_DIR"), "/data/skybox.basis");
     let file = std::fs::read(name).unwrap_or_else(|_| panic!("Could not read skybox {}", name));
 
@@ -34,20 +32,20 @@ fn load_skybox(renderer: &Renderer) -> Result<(), Box<dyn std::error::Error>> {
     let mut image = Vec::with_capacity(image_info.total_blocks as usize * 16 * 6);
     for i in 0..6 {
         for mip in 0..mips {
-            image.extend_from_slice(&prepared.transcode_image_level(i, mip, basis::TargetTextureFormat::Bc7Rgba)?);
+            image.extend_from_slice(&prepared.transcode_image_level(i, mip, basis::TargetTextureFormat::Rgba32)?);
         }
     }
     drop(prepared);
 
-    // let handle = renderer.add_texture_cube(Texture {
-    //     format: TextureFormat::Bc7Srgb,
-    //     width: image_info.width,
-    //     height: image_info.height,
-    //     data: image,
-    //     label: Some("background".into()),
-    //     mip_levels: mips,
-    // });
-    // renderer.set_background_texture(handle);
+    let handle = renderer.add_texture_cube(Texture {
+        format: TextureFormat::Rgba8UnormSrgb,
+        width: image_info.width,
+        height: image_info.height,
+        data: image,
+        label: Some("background".into()),
+        mip_levels: mips,
+    });
+    routine.set_background_texture(Some(handle));
     Ok(())
 }
 
@@ -88,13 +86,13 @@ fn button_pressed<Hash: BuildHasher>(map: &HashMap<u32, bool, Hash>, key: u32) -
     map.get(&key).map_or(false, |b| *b)
 }
 
-fn extract_backend(value: &str) -> Result<wgpu::Backend, &'static str> {
+fn extract_backend(value: &str) -> Result<Backend, &'static str> {
     Ok(match value.to_lowercase().as_str() {
-        "vulkan" | "vk" => wgpu::Backend::Vulkan,
-        "dx12" | "12" => wgpu::Backend::Dx12,
-        "dx11" | "11" => wgpu::Backend::Dx11,
-        "metal" | "mtl" => wgpu::Backend::Metal,
-        "opengl" | "gl" => wgpu::Backend::Gl,
+        "vulkan" | "vk" => Backend::Vulkan,
+        "dx12" | "12" => Backend::Dx12,
+        "dx11" | "11" => Backend::Dx11,
+        "metal" | "mtl" => Backend::Metal,
+        "opengl" | "gl" => Backend::Gl,
         _ => return Err("backend requested but not found"),
     })
 }
@@ -129,10 +127,9 @@ fn main() {
 
     let window_size = window.inner_size();
 
-    let mut options = rend3::RendererOptions {
+    let mut options = rend3::InternalSurfaceOptions {
         vsync: rend3::VSyncMode::Off,
-        size: [window_size.width, window_size.height],
-        ambient: glam::Vec4::default(),
+        size: UVec2::new(window_size.width, window_size.height),
     };
 
     let renderer = pollster::block_on(
@@ -144,16 +141,13 @@ fn main() {
     .unwrap();
 
     // Create the default set of shaders and pipelines
-    let mut routine = rend3_pbr::PbrRenderRoutine::new(
-        &renderer,
-        UVec2::new(window_size.width, window_size.height),
-    );
+    let mut routine = rend3_pbr::PbrRenderRoutine::new(&renderer, UVec2::new(window_size.width, window_size.height));
 
     load_gltf(
         &renderer,
         file_to_load.unwrap_or_else(|| concat!(env!("CARGO_MANIFEST_DIR"), "/data/scene.gltf").to_owned()),
     );
-    load_skybox(&renderer).unwrap();
+    load_skybox(&renderer, &mut routine).unwrap();
 
     renderer.add_directional_light(DirectionalLight {
         color: Vec3::ONE,
@@ -284,7 +278,7 @@ fn main() {
             event: WindowEvent::Resized(size),
             ..
         } => {
-            options.size = [size.width, size.height];
+            options.size = UVec2::new(window_size.width, window_size.height);
             routine.resize(&renderer.device, UVec2::new(size.width, size.height))
         }
         Event::WindowEvent {
@@ -295,7 +289,7 @@ fn main() {
         }
         Event::RedrawRequested(_) => {
             renderer.set_camera_data(camera_location);
-            renderer.set_options(options.clone());
+            renderer.set_internal_surface_options(options.clone());
             // Dispatch a render!
             let dynref: &dyn RenderRoutine = &routine;
             let _stats = renderer.render(dynref, rend3::util::output::RendererOutput::InternalSurface);

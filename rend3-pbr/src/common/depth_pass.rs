@@ -54,10 +54,9 @@ pub fn build_depth_pass_shader(args: BuildDepthPassShaderArgs) -> RenderPipeline
     bgls.push(&args.interfaces.samplers_bgl);
     bgls.push(&args.interfaces.culled_object_bgl);
     bgls.push(&args.materials.get_bind_group_layout());
-    match args.mode {
-        RendererMode::GPUPowered => bgls.push(args.texture_bgl.as_gpu()),
-        _ => {}
-    };
+    if args.mode == RendererMode::GPUPowered {
+        bgls.push(args.texture_bgl.as_gpu())
+    }
 
     let pll = args.device.create_pipeline_layout(&PipelineLayoutDescriptor {
         label: Some("depth prepass"),
@@ -71,7 +70,7 @@ pub fn build_depth_pass_shader(args: BuildDepthPassShaderArgs) -> RenderPipeline
         write_mask: ColorWrites::empty(),
     }];
 
-    let pipeline = args.device.create_render_pipeline(&RenderPipelineDescriptor {
+    args.device.create_render_pipeline(&RenderPipelineDescriptor {
         label: Some("depth prepass"),
         layout: Some(&pll),
         vertex: VertexState {
@@ -116,7 +115,5 @@ pub fn build_depth_pass_shader(args: BuildDepthPassShaderArgs) -> RenderPipeline
             entry_point: "main",
             targets: if args.include_color { &color_state } else { &[] },
         }),
-    });
-
-    pipeline
+    })
 }

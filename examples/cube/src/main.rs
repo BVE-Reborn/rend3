@@ -67,17 +67,15 @@ fn main() {
 
     let window_size = window.inner_size();
 
-    let mut options = rend3::RendererOptions {
+    let mut options = rend3::InternalSurfaceOptions {
         vsync: rend3::VSyncMode::On,
-        size: [window_size.width, window_size.height],
-        ambient: glam::Vec4::default(),
+        size: UVec2::new(window_size.width, window_size.height),
     };
 
     let renderer = pollster::block_on(rend3::RendererBuilder::new(options.clone()).window(&window).build()).unwrap();
 
     // Create the default set of shaders and pipelines
-    let mut routine =
-        rend3_pbr::PbrRenderRoutine::new(&renderer, UVec2::new(window_size.width, window_size.height));
+    let mut routine = rend3_pbr::PbrRenderRoutine::new(&renderer, UVec2::new(window_size.width, window_size.height));
 
     // Create mesh and calculate smooth normals based on vertices
     let mesh = create_mesh();
@@ -132,8 +130,8 @@ fn main() {
             event: winit::event::WindowEvent::Resized(size),
             ..
         } => {
-            options.size = [size.width, size.height];
-            renderer.set_options(options.clone());
+            options.size = UVec2::new(window_size.width, window_size.height);
+            renderer.set_internal_surface_options(options.clone());
             routine.resize(&renderer.device, UVec2::new(size.width, size.height))
         }
         // Render!

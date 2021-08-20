@@ -74,7 +74,10 @@ macro_rules! changeable_struct {
     };
 }
 
+// WGPU REXPORTS
 pub type TextureFormat = wgt::TextureFormat;
+pub type Backend = wgt::Backend;
+pub type Backends = wgt::Backends;
 
 // Consider:
 //
@@ -452,7 +455,7 @@ bitflags::bitflags! {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub enum AlbedoComponent {
     /// No albedo color
     None,
@@ -534,7 +537,7 @@ impl AlbedoComponent {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub enum MaterialComponent<T> {
     None,
     Value(T),
@@ -571,7 +574,7 @@ impl<T: Copy> MaterialComponent<T> {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub enum NormalTexture {
     /// No normal texture
     None,
@@ -612,7 +615,7 @@ impl NormalTexture {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub enum AoMRTextures {
     None,
     GltfCombined {
@@ -703,7 +706,7 @@ impl Default for AoMRTextures {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub enum ClearcoatTextures {
     GltfCombined {
         /// Texture with Clearcoat in R, and Clearcoat Roughness in G
@@ -792,7 +795,7 @@ impl Default for SampleType {
 //
 // - Green screen value
 changeable_struct! {
-    #[derive(Debug, Default, Copy, Clone)]
+    #[derive(Debug, Default, Clone)]
     pub struct Material <- nodefault MaterialChange {
         pub albedo: AlbedoComponent,
         pub normal: NormalTexture,

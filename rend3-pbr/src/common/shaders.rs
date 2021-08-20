@@ -3,6 +3,9 @@ use wgpu::{Device, ShaderModule, ShaderModuleDescriptor, ShaderModuleDescriptorS
 
 use crate::shaders::SPIRV_SHADERS;
 
+/// # Safety
+///
+/// The shader must be valid, match all the respective definitions, and otherwise meet wgpu's validation requirements
 pub unsafe fn mode_safe_shader(
     device: &Device,
     mode: RendererMode,

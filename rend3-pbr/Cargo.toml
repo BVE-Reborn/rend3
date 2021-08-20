@@ -17,5 +17,5 @@ include_dir = "0.6"
 glam = { version = "0.17", features = ["bytemuck"] }
 log = "0.4"
 rend3 = { path = "../rend3" }
-wgpu = { version = "0.9", git = "https://github.com/gfx-rs/wgpu.git", rev = "a222e6eb11dc6520414b2eb2f9a9604c3f2d3620", features = ["trace", "spirv", "webgl"] }
+wgpu = { version = "0.10", features = ["trace", "spirv", "webgl"] }
 

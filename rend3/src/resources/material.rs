@@ -264,10 +264,11 @@ impl MaterialManager {
         let registry = ResourceRegistry::new();
 
         Self {
-            buffer,
-            registry,
             bgl,
             bg,
+            
+            buffer,
+            registry,
         }
     }
 

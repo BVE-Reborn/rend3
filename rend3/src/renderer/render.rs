@@ -1,13 +1,12 @@
 use crate::{
     instruction::Instruction,
     statistics::RendererStatistics,
-    types::{Camera, CameraProjection},
     util::output::RendererOutput,
     RenderRoutine, Renderer,
 };
 use std::sync::Arc;
 use wgpu::{
-    util::DeviceExt, CommandEncoderDescriptor, Extent3d, TextureAspect, TextureDescriptor, TextureDimension,
+    util::DeviceExt, CommandEncoderDescriptor, Extent3d, TextureDescriptor, TextureDimension,
     TextureUsages, TextureViewDescriptor, TextureViewDimension,
 };
 
@@ -20,7 +19,7 @@ pub fn render_loop(renderer: Arc<Renderer>, list: &dyn RenderRoutine, output: Re
         label: Some("primary encoder"),
     });
 
-    let mut new_options = None;
+    let mut new_surface_options = None;
 
     let mut mesh_manager = renderer.mesh_manager.write();
     let mut texture_manager_2d = renderer.d2_texture_manager.write();
@@ -88,7 +87,7 @@ pub fn render_loop(renderer: Arc<Renderer>, list: &dyn RenderRoutine, output: Re
                         mip_level_count: texture.mip_levels,
                         sample_count: 1,
                         dimension: TextureDimension::D2,
-                        format: texture.format.into(),
+                        format: texture.format,
                         usage: TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST,
                     },
                     &texture.data,
@@ -97,14 +96,8 @@ pub fn render_loop(renderer: Arc<Renderer>, list: &dyn RenderRoutine, output: Re
                 texture_manager_cube.fill(
                     handle,
                     uploaded_tex.create_view(&TextureViewDescriptor {
-                        label: None,
-                        format: Some(texture.format.into()),
                         dimension: Some(TextureViewDimension::Cube),
-                        aspect: TextureAspect::All,
-                        base_mip_level: 0,
-                        mip_level_count: None,
-                        base_array_layer: 0,
-                        array_layer_count: None,
+                        ..TextureViewDescriptor::default()
                     }),
                     Some(texture.format),
                 );
@@ -143,40 +136,20 @@ pub fn render_loop(renderer: Arc<Renderer>, list: &dyn RenderRoutine, output: Re
                 directional_light_manager.fill(handle, light);
             }
             Instruction::ChangeDirectionalLight { handle, change } => {
-                // TODO: Move these inside the managers
-                let value = directional_light_manager.get_mut(handle);
-                value.inner.update_from_changes(change);
-                if let Some(direction) = change.direction {
-                    value.camera.set_data(
-                        Camera {
-                            projection: CameraProjection::from_orthographic_direction(direction.into()),
-                            ..Camera::default()
-                        },
-                        None,
-                    );
-                }
+                directional_light_manager.update_directional_light(handle, change);
             }
             Instruction::RemoveDirectionalLight { handle } => directional_light_manager.remove(handle),
-            Instruction::SetOptions { options } => new_options = Some(options),
+            Instruction::SetInternalSurfaceOptions { options } => new_surface_options = Some(options),
             Instruction::SetCameraData { data } => {
                 global_resources
                     .camera
                     .set_data(data, Some(option_guard.aspect_ratio()));
             }
-            Instruction::SetBackgroundTexture { handle } => {
-                global_resources.background_texture = Some(handle);
-            }
-            Instruction::ClearBackgroundTexture => {
-                global_resources.background_texture = None;
-            }
         }
     }
 
-    let current_options = if let Some(new_opt) = new_options {
+    if let Some(new_opt) = new_surface_options {
         global_resources.update(&renderer.device, renderer.surface.as_ref(), &mut *option_guard, new_opt);
-        option_guard.clone()
-    } else {
-        option_guard.clone()
     };
 
     drop((

@@ -8,7 +8,7 @@ use crate::{
         MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, Texture, TextureHandle,
     },
     util::output::RendererOutput,
-    RenderRoutine, RendererBuilder, RendererInitializationError, RendererMode, RendererOptions,
+    RenderRoutine, RendererBuilder, RendererInitializationError, RendererMode, InternalSurfaceOptions,
 };
 use glam::Mat4;
 use parking_lot::RwLock;
@@ -51,7 +51,7 @@ pub struct Renderer {
     pub object_manager: RwLock<ObjectManager>,
     pub directional_light_manager: RwLock<DirectionalLightManager>,
 
-    options: RwLock<RendererOptions>,
+    options: RwLock<InternalSurfaceOptions>,
 }
 impl Renderer {
     /// Use [`RendererBuilder`](crate::RendererBuilder) to create a renderer.
@@ -202,15 +202,13 @@ impl Renderer {
             .push(Instruction::RemoveDirectionalLight { handle })
     }
 
-    // TODO: Parts of this should be the property of the render routine
-    pub fn set_options(&self, options: RendererOptions) {
+    pub fn set_internal_surface_options(&self, options: InternalSurfaceOptions) {
         self.instructions
             .producer
             .lock()
-            .push(Instruction::SetOptions { options })
+            .push(Instruction::SetInternalSurfaceOptions { options })
     }
 
-    // TODO: This should be a property of the render routine
     pub fn set_camera_data(&self, data: Camera) {
         self.instructions
             .producer
@@ -218,23 +216,7 @@ impl Renderer {
             .push(Instruction::SetCameraData { data })
     }
 
-    // TODO: This should be a property of the render routine
-    pub fn set_background_texture(&self, handle: TextureHandle) {
-        self.instructions
-            .producer
-            .lock()
-            .push(Instruction::SetBackgroundTexture { handle })
-    }
-
-    // TODO: This should be a property of the render routine
-    pub fn clear_background_texture(&self) {
-        self.instructions
-            .producer
-            .lock()
-            .push(Instruction::ClearBackgroundTexture)
-    }
-
-    pub fn render<'a>(self: &Arc<Self>, list: &'a dyn RenderRoutine, output: RendererOutput) -> RendererStatistics {
+    pub fn render(self: &Arc<Self>, list: &dyn RenderRoutine, output: RendererOutput) -> RendererStatistics {
         render::render_loop(Arc::clone(self), list, output)
     }
 }

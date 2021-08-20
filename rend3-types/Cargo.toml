@@ -14,4 +14,4 @@ categories = ["game-development", "graphics", "rendering", "rendering::engine"]
 [dependencies]
 bitflags = "1"
 glam = { version = "0.17" }
-wgt = { package = "wgpu-types", version = "0.9", git = "https://github.com/gfx-rs/wgpu.git", rev = "a222e6eb11dc6520414b2eb2f9a9604c3f2d3620" }
+wgt = { package = "wgpu-types", version = "0.10" }

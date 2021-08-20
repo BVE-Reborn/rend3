@@ -56,3 +56,9 @@ impl<T> ResourceRegistry<T> {
         self.mapping.len()
     }
 }
+
+impl<T> Default for ResourceRegistry<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}

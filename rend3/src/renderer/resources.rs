@@ -2,8 +2,9 @@ use crate::{
     resources::CameraManager,
     types::{Camera, TextureHandle},
     util::output::SURFACE_FORMAT,
-    RendererOptions, VSyncMode,
+    InternalSurfaceOptions, VSyncMode,
 };
+use glam::UVec2;
 use wgpu::{Device, PresentMode, Surface, SurfaceConfiguration, TextureUsages};
 
 pub struct RendererGlobalResources {
@@ -11,8 +12,10 @@ pub struct RendererGlobalResources {
     pub background_texture: Option<TextureHandle>,
 }
 impl RendererGlobalResources {
-    pub fn new(device: &Device, surface: Option<&Surface>, options: &RendererOptions) -> Self {
-        surface.map(|surface| configure_surface(device, surface, options.size, options.vsync));
+    pub fn new(device: &Device, surface: Option<&Surface>, options: &InternalSurfaceOptions) -> Self {
+        if let Some(surface) = surface {
+            configure_surface(device, surface, options.size, options.vsync)
+        }
 
         let camera = CameraManager::new(Camera::default(), Some(options.aspect_ratio()));
 
@@ -26,13 +29,15 @@ impl RendererGlobalResources {
         &mut self,
         device: &Device,
         surface: Option<&Surface>,
-        old_options: &mut RendererOptions,
-        new_options: RendererOptions,
+        old_options: &mut InternalSurfaceOptions,
+        new_options: InternalSurfaceOptions,
     ) {
         let dirty = determine_dirty(old_options, &new_options);
 
         if dirty.contains(DirtyResources::SWAPCHAIN) {
-            surface.map(|surface| configure_surface(device, surface, new_options.size, new_options.vsync));
+            if let Some(surface) = surface {
+                configure_surface(device, surface, new_options.size, new_options.vsync)
+            }
         }
         if dirty.contains(DirtyResources::CAMERA) {
             self.camera.set_aspect_ratio(Some(new_options.aspect_ratio()));
@@ -49,7 +54,7 @@ bitflags::bitflags! {
     }
 }
 
-fn determine_dirty(current: &RendererOptions, new: &RendererOptions) -> DirtyResources {
+fn determine_dirty(current: &InternalSurfaceOptions, new: &InternalSurfaceOptions) -> DirtyResources {
     let mut dirty = DirtyResources::empty();
 
     if current.size != new.size {
@@ -64,15 +69,14 @@ fn determine_dirty(current: &RendererOptions, new: &RendererOptions) -> DirtyRes
     dirty
 }
 
-/// TODO: use UVec2
-fn configure_surface(device: &Device, surface: &Surface, size: [u32; 2], vsync: VSyncMode) {
+fn configure_surface(device: &Device, surface: &Surface, size: UVec2, vsync: VSyncMode) {
     surface.configure(
         device,
         &SurfaceConfiguration {
             usage: TextureUsages::RENDER_ATTACHMENT,
             format: SURFACE_FORMAT,
-            width: size[0],
-            height: size[1],
+            width: size.x,
+            height: size.y,
             present_mode: match vsync {
                 VSyncMode::On => PresentMode::Mailbox,
                 VSyncMode::Off => PresentMode::Immediate,

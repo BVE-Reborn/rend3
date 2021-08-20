@@ -44,10 +44,10 @@ impl From<AdapterInfo> for ExtendedAdapterInfo {
     }
 }
 impl ExtendedAdapterInfo {
+    /// TODO: need info from wgpu
     pub fn subgroup_size(&self) -> u32 {
         match self.vendor {
             Vendor::Microsoft => 4,
-            // TODO: buy a rpi4 and verify
             Vendor::Broadcom => 16,
             Vendor::Intel | Vendor::NV => 32,
             Vendor::AMD | Vendor::Qualcomm | Vendor::Unknown(_) => 64,

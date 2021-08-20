@@ -15,8 +15,8 @@ debug = true
 lto = "thin"
 
 [patch."https://github.com/gfx-rs/wgpu.git"]
-wgpu = { path = "../wgpu/wgpu" }
-wgpu-types = { path = "../wgpu/wgpu-types" }
+# wgpu = { path = "../wgpu/wgpu" }
+# wgpu-types = { path = "../wgpu/wgpu-types" }
 
 [patch."https://github.com/gfx-rs/naga.git"]
-naga = { path = "../naga" }
+# naga = { path = "../naga" }

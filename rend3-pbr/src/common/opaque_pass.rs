@@ -55,10 +55,9 @@ pub fn build_opaque_pass_shader(args: BuildOpaquePassShaderArgs<'_>) -> RenderPi
     bgls.push(&args.directional_light_bgl);
     bgls.push(&args.interfaces.uniform_bgl);
     bgls.push(&args.materials.get_bind_group_layout());
-    match args.mode {
-        RendererMode::GPUPowered => bgls.push(args.texture_bgl.as_gpu()),
-        _ => {}
-    };
+    if args.mode == RendererMode::GPUPowered {
+        bgls.push(args.texture_bgl.as_gpu())
+    }
 
     let pll = args.device.create_pipeline_layout(&PipelineLayoutDescriptor {
         label: Some("opaque pass"),
@@ -66,7 +65,7 @@ pub fn build_opaque_pass_shader(args: BuildOpaquePassShaderArgs<'_>) -> RenderPi
         push_constant_ranges: &[],
     });
 
-    let pipeline = args.device.create_render_pipeline(&RenderPipelineDescriptor {
+    args.device.create_render_pipeline(&RenderPipelineDescriptor {
         label: Some("opaque pass"),
         layout: Some(&pll),
         vertex: VertexState {
@@ -103,7 +102,5 @@ pub fn build_opaque_pass_shader(args: BuildOpaquePassShaderArgs<'_>) -> RenderPi
                 write_mask: ColorWrites::all(),
             }],
         }),
-    });
-
-    pipeline
+    })
 }
