@@ -1,10 +1,7 @@
 use fnv::FnvBuildHasher;
 use glam::{UVec2, Vec3, Vec3A};
 use pico_args::Arguments;
-use rend3::{
-    types::{Backend, Camera, CameraProjection, DirectionalLight, Texture, TextureFormat},
-    RenderRoutine, Renderer,
-};
+use rend3::{InternalSurfaceOptions, RenderRoutine, Renderer, types::{Backend, Camera, CameraProjection, DirectionalLight, Texture, TextureFormat}};
 use rend3_pbr::PbrRenderRoutine;
 use std::{
     collections::HashMap,
@@ -132,7 +129,7 @@ fn main() {
 
     let window_size = window.inner_size();
 
-    let mut options = rend3::InternalSurfaceOptions {
+    let options = rend3::InternalSurfaceOptions {
         vsync: rend3::VSyncMode::Off,
         size: UVec2::new(window_size.width, window_size.height),
     };
@@ -283,8 +280,12 @@ fn main() {
             event: WindowEvent::Resized(size),
             ..
         } => {
-            options.size = UVec2::new(window_size.width, window_size.height);
-            routine.resize(&renderer.device, UVec2::new(size.width, size.height))
+            let size = UVec2::new(size.width, size.height);
+            renderer.set_internal_surface_options(InternalSurfaceOptions {
+                vsync: rend3::VSyncMode::Off,
+                size,
+            });
+            routine.resize(&renderer.device, size);
         }
         Event::WindowEvent {
             event: WindowEvent::CloseRequested,
@@ -294,7 +295,6 @@ fn main() {
         }
         Event::RedrawRequested(_) => {
             renderer.set_camera_data(camera_location);
-            renderer.set_internal_surface_options(options.clone());
             // Dispatch a render!
             let dynref: &mut dyn RenderRoutine = &mut routine;
             let _stats = renderer.render(dynref, rend3::util::output::RendererOutput::InternalSurface);
