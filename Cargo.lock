@@ -1499,6 +1499,7 @@ dependencies = [
  "glam",
  "include_dir",
  "log",
+ "parking_lot",
  "rend3",
  "wgpu",
 ]

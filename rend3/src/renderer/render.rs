@@ -7,7 +7,11 @@ use wgpu::{
     TextureViewDescriptor, TextureViewDimension,
 };
 
-pub fn render_loop(renderer: Arc<Renderer>, list: &dyn RenderRoutine, output: RendererOutput) -> RendererStatistics {
+pub fn render_loop(
+    renderer: Arc<Renderer>,
+    list: &mut dyn RenderRoutine,
+    output: RendererOutput,
+) -> RendererStatistics {
     renderer.instructions.swap();
 
     let mut instructions = renderer.instructions.consumer.lock();

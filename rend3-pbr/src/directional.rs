@@ -112,7 +112,7 @@ impl DirectionalShadowPass {
             rpass.set_bind_group(1, &light.culled_objects.output_bg, &[]);
 
             match light.culled_objects.calls {
-                ModeData::CPU(ref draws) => culling::cpu::run(&mut rpass, &draws, args.samplers, 0, args.materials, 2),
+                ModeData::CPU(ref draws) => culling::cpu::run(&mut rpass, draws, args.samplers, 0, args.materials, 2),
                 ModeData::GPU(ref data) => {
                     rpass.set_bind_group(2, args.materials.gpu_get_bind_group(), &[]);
                     rpass.set_bind_group(3, args.texture_bg.as_gpu(), &[]);

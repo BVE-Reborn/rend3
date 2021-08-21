@@ -35,7 +35,9 @@ fn load_skybox(renderer: &Renderer, routine: &mut PbrRenderRoutine) -> Result<()
     let mut image = Vec::with_capacity(image_info.total_blocks as usize * 16 * 6);
     for i in 0..6 {
         for mip in 0..mips {
-            image.extend_from_slice(&prepared.transcode_image_level(i, mip, basis::TargetTextureFormat::Rgba32)?);
+            let mip_info = transcoder.get_image_level_info(&file, 0, mip).unwrap();
+            let data = prepared.transcode_image_level(i, mip, basis::TargetTextureFormat::Rgba32)?;
+            image.extend_from_slice(&data[0..(mip_info.orig_width * mip_info.orig_height * 4) as usize]);
         }
     }
     drop(prepared);
@@ -294,7 +296,7 @@ fn main() {
             renderer.set_camera_data(camera_location);
             renderer.set_internal_surface_options(options.clone());
             // Dispatch a render!
-            let dynref: &dyn RenderRoutine = &routine;
+            let dynref: &mut dyn RenderRoutine = &mut routine;
             let _stats = renderer.render(dynref, rend3::util::output::RendererOutput::InternalSurface);
         }
         _ => {}

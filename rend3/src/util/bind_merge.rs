@@ -16,7 +16,6 @@ impl<'a> BindGroupBuilder<'a> {
         }
     }
 
-    // TODO: remove usages of this in favor of with
     pub fn append(&mut self, resource: BindingResource<'a>) {
         let index = self.bg_entries.len();
         self.bg_entries.push(BindGroupEntry {
@@ -53,7 +52,7 @@ impl<'a> BindGroupBuilder<'a> {
     pub fn build(self, device: &Device, bgl: &BindGroupLayout) -> BindGroup {
         device.create_bind_group(&BindGroupDescriptor {
             label: self.label.as_deref(),
-            layout: &bgl,
+            layout: bgl,
             entries: &self.bg_entries,
         })
     }

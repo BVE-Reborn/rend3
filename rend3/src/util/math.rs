@@ -19,6 +19,6 @@ impl PartialOrd for IndexedDistance {
 
 impl Ord for IndexedDistance {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.partial_cmp(&other).unwrap()
+        self.partial_cmp(other).unwrap()
     }
 }

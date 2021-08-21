@@ -13,6 +13,7 @@ pub mod culling;
 pub mod directional;
 pub mod opaque;
 pub mod shaders;
+pub mod skybox;
 pub mod tonemapping;
 pub mod uniforms;
 pub mod vertex;
@@ -23,10 +24,11 @@ pub struct PbrRenderRoutine {
     pub cpu_culler: culling::cpu::CpuCuller,
     pub gpu_culler: ModeData<(), culling::gpu::GpuCuller>,
     pub shadow_passes: directional::DirectionalShadowPass,
+    pub skybox_pass: skybox::SkyboxPass,
     pub opaque_pass: opaque::OpaquePass,
     pub tonemapping_pass: tonemapping::TonemappingPass,
 
-    pub background_texture: Option<TextureHandle>,
+    pub skybox_texture: Option<TextureHandle>,
 
     pub internal_buffer: TextureView,
     pub internal_depth_buffer: TextureView,
@@ -70,6 +72,11 @@ impl PbrRenderRoutine {
                 include_color: true,
             },
         ));
+        let skybox_pipeline = common::skybox_pass::build_skybox_shader(common::skybox_pass::BuildSkyboxShaderArgs {
+            mode,
+            device,
+            interfaces: &interfaces,
+        });
         let opaque_pipeline = Arc::new(common::opaque_pass::build_opaque_pass_shader(
             common::opaque_pass::BuildOpaquePassShaderArgs {
                 mode,
@@ -81,9 +88,10 @@ impl PbrRenderRoutine {
             },
         ));
         let shadow_passes = directional::DirectionalShadowPass::new(Arc::clone(&colorless_depth_pipeline));
+        let skybox_pass = skybox::SkyboxPass::new(skybox_pipeline);
         let opaque_pass = opaque::OpaquePass::new(Arc::clone(&colored_depth_pipeline), Arc::clone(&opaque_pipeline));
         let tonemapping_pass = tonemapping::TonemappingPass::new(tonemapping::TonemappingPassNewArgs {
-            device: &device,
+            device,
             interfaces: &interfaces,
         });
 
@@ -96,10 +104,11 @@ impl PbrRenderRoutine {
             cpu_culler,
             gpu_culler,
             shadow_passes,
+            skybox_pass,
             opaque_pass,
             tonemapping_pass,
 
-            background_texture: None,
+            skybox_texture: None,
 
             internal_buffer,
             internal_depth_buffer,
@@ -107,7 +116,7 @@ impl PbrRenderRoutine {
     }
 
     pub fn set_background_texture(&mut self, handle: Option<TextureHandle>) {
-        self.background_texture = handle;
+        self.skybox_texture = handle;
     }
 
     pub fn resize(&mut self, device: &Device, resolution: UVec2) {
@@ -117,7 +126,7 @@ impl PbrRenderRoutine {
 }
 
 impl RenderRoutine for PbrRenderRoutine {
-    fn render(&self, renderer: Arc<Renderer>, encoders: &mut Vec<CommandBuffer>, frame: &OutputFrame) {
+    fn render(&mut self, renderer: Arc<Renderer>, encoders: &mut Vec<CommandBuffer>, frame: &OutputFrame) {
         let mut encoder = renderer.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("primary encoder"),
         });
@@ -126,11 +135,20 @@ impl RenderRoutine for PbrRenderRoutine {
         let mut directional_light = renderer.directional_light_manager.write();
         let mut materials = renderer.material_manager.write();
         let mut d2_textures = renderer.d2_texture_manager.write();
+        let mut d2c_textures = renderer.d2c_texture_manager.write();
 
         directional_light.ready(&renderer.device, &renderer.queue);
         materials.ready(&renderer.device, &renderer.queue, &d2_textures);
         let d2_texture_output = d2_textures.ready(&renderer.device);
+        let _d2c_texture_output = d2c_textures.ready(&renderer.device);
         let objects = renderer.object_manager.read().ready();
+
+        self.skybox_pass.update_skybox(skybox::UpdateSkyboxArgs {
+            device: &renderer.device,
+            d2c_texture_manager: &d2c_textures,
+            interfaces: &self.interfaces,
+            new_skybox_handle: self.skybox_texture,
+        });
 
         let culler = self.gpu_culler.as_ref().map_cpu(|_| &self.cpu_culler);
 
@@ -204,6 +222,12 @@ impl RenderRoutine for PbrRenderRoutine {
             samplers: &self.samplers,
             texture_bg: d2_texture_output_bg_ref,
             culled_objects: &culled_objects,
+        });
+
+        self.skybox_pass.draw_skybox(skybox::SkyboxPassDrawArgs {
+            rpass: &mut rpass,
+            samplers: &self.samplers,
+            shader_uniform_bg: &primary_camera_uniform_bg,
         });
 
         self.opaque_pass.draw(opaque::OpaquePassDrawArgs {

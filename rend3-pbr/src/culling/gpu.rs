@@ -154,7 +154,7 @@ impl GpuCuller {
             .with_buffer(&input_buffer)
             .with_buffer(&output_buffer)
             .with_buffer(&indirect_buffer)
-            .build(&args.device, &self.bgl);
+            .build(args.device, &self.bgl);
 
         let mut cpass = args.encoder.begin_compute_pass(&ComputePassDescriptor {
             label: Some("compute cull"),

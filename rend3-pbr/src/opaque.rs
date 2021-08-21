@@ -73,7 +73,7 @@ impl OpaquePass {
         match args.culler {
             ModeData::CPU(cpu_culler) => cpu_culler.cull(CpuCullerCullArgs {
                 device: args.device,
-                camera: &args.camera,
+                camera: args.camera,
                 interfaces: args.interfaces,
                 objects: args.objects,
             }),
@@ -82,7 +82,7 @@ impl OpaquePass {
                 encoder: args.encoder,
                 interfaces: args.interfaces,
                 materials: args.materials,
-                camera: &args.camera,
+                camera: args.camera,
                 objects: args.objects,
             }),
         }
@@ -96,7 +96,7 @@ impl OpaquePass {
         args.rpass.set_bind_group(1, &args.culled_objects.output_bg, &[]);
 
         match args.culled_objects.calls {
-            ModeData::CPU(ref draws) => culling::cpu::run(args.rpass, &draws, args.samplers, 0, args.materials, 2),
+            ModeData::CPU(ref draws) => culling::cpu::run(args.rpass, draws, args.samplers, 0, args.materials, 2),
             ModeData::GPU(ref data) => {
                 args.rpass.set_bind_group(2, args.materials.gpu_get_bind_group(), &[]);
                 args.rpass.set_bind_group(3, args.texture_bg.as_gpu(), &[]);
@@ -111,11 +111,11 @@ impl OpaquePass {
         args.rpass.set_pipeline(&self.opaque_pipeline);
         args.rpass.set_bind_group(0, &args.samplers.linear_nearest_bg, &[]);
         args.rpass.set_bind_group(1, &args.culled_objects.output_bg, &[]);
-        args.rpass.set_bind_group(2, &args.directional_light_bg, &[]);
-        args.rpass.set_bind_group(3, &args.shader_uniform_bg, &[]);
+        args.rpass.set_bind_group(2, args.directional_light_bg, &[]);
+        args.rpass.set_bind_group(3, args.shader_uniform_bg, &[]);
 
         match args.culled_objects.calls {
-            ModeData::CPU(ref draws) => culling::cpu::run(args.rpass, &draws, args.samplers, 0, args.materials, 4),
+            ModeData::CPU(ref draws) => culling::cpu::run(args.rpass, draws, args.samplers, 0, args.materials, 4),
             ModeData::GPU(ref data) => {
                 args.rpass.set_bind_group(4, args.materials.gpu_get_bind_group(), &[]);
                 args.rpass.set_bind_group(5, args.texture_bg.as_gpu(), &[]);

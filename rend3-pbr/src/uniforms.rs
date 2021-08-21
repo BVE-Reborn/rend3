@@ -51,7 +51,7 @@ pub fn create_shader_uniform(args: CreateShaderUniformArgs<'_>) -> BindGroup {
         usage: BufferUsages::UNIFORM,
     });
 
-    let mut bgb = BindGroupBuilder::new(Some("shader uniform"));
-    bgb.append(buffer.as_entire_binding());
-    bgb.build(args.device, &args.interfaces.uniform_bgl)
+    BindGroupBuilder::new(Some("shader uniform"))
+        .with_buffer(&buffer)
+        .build(args.device, &args.interfaces.uniform_bgl)
 }

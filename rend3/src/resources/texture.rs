@@ -192,7 +192,7 @@ fn create_bind_group(
 ) -> Arc<BindGroup> {
     Arc::new(device.create_bind_group(&BindGroupDescriptor {
         label: Some(&*format!("{:?} texture bg", dimension)),
-        layout: &layout,
+        layout,
         entries: &[BindGroupEntry {
             binding: 0,
             resource: BindingResource::TextureViewArray(views),

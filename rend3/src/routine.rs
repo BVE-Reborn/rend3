@@ -5,5 +5,5 @@ use wgpu::CommandBuffer;
 use crate::{util::output::OutputFrame, Renderer};
 
 pub trait RenderRoutine: Send + Sync {
-    fn render(&self, renderer: Arc<Renderer>, encoders: &mut Vec<CommandBuffer>, frame: &OutputFrame);
+    fn render(&mut self, renderer: Arc<Renderer>, encoders: &mut Vec<CommandBuffer>, frame: &OutputFrame);
 }

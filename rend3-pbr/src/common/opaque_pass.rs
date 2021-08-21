@@ -26,7 +26,7 @@ pub struct BuildOpaquePassShaderArgs<'a> {
 pub fn build_opaque_pass_shader(args: BuildOpaquePassShaderArgs<'_>) -> RenderPipeline {
     let opaque_pass_vert = unsafe {
         mode_safe_shader(
-            &args.device,
+            args.device,
             args.mode,
             "opaque pass vert",
             "opaque.vert.cpu.spv",
@@ -37,7 +37,7 @@ pub fn build_opaque_pass_shader(args: BuildOpaquePassShaderArgs<'_>) -> RenderPi
 
     let opaque_pass_frag = unsafe {
         mode_safe_shader(
-            &args.device,
+            args.device,
             args.mode,
             "depth pass frag",
             "opaque.frag.cpu.spv",
@@ -52,9 +52,9 @@ pub fn build_opaque_pass_shader(args: BuildOpaquePassShaderArgs<'_>) -> RenderPi
     let mut bgls: ArrayVec<&BindGroupLayout, 6> = ArrayVec::new();
     bgls.push(&args.interfaces.samplers_bgl);
     bgls.push(&args.interfaces.culled_object_bgl);
-    bgls.push(&args.directional_light_bgl);
+    bgls.push(args.directional_light_bgl);
     bgls.push(&args.interfaces.uniform_bgl);
-    bgls.push(&args.materials.get_bind_group_layout());
+    bgls.push(args.materials.get_bind_group_layout());
     if args.mode == RendererMode::GPUPowered {
         bgls.push(args.texture_bgl.as_gpu())
     }

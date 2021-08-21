@@ -254,8 +254,8 @@ fn create_shadow_bgl(device: &Device) -> BindGroupLayout {
 }
 
 fn create_shadow_bg(device: &Device, bgl: &BindGroupLayout, buffer: &Buffer, view: &TextureView) -> BindGroup {
-    let mut builder = BindGroupBuilder::new(Some("shadow bg"));
-    builder.append(buffer.as_entire_binding());
-    builder.append(BindingResource::TextureView(view));
-    builder.build(device, bgl)
+    BindGroupBuilder::new(Some("shadow bg"))
+        .with_buffer(&buffer)
+        .with_texture_view(view)
+        .build(device, bgl)
 }

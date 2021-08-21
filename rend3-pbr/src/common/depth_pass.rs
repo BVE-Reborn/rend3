@@ -27,7 +27,7 @@ pub struct BuildDepthPassShaderArgs<'a> {
 pub fn build_depth_pass_shader(args: BuildDepthPassShaderArgs) -> RenderPipeline {
     let depth_prepass_vert = unsafe {
         mode_safe_shader(
-            &args.device,
+            args.device,
             args.mode,
             "depth pass vert",
             "depth.vert.cpu.spv",
@@ -38,7 +38,7 @@ pub fn build_depth_pass_shader(args: BuildDepthPassShaderArgs) -> RenderPipeline
 
     let depth_prepass_frag = unsafe {
         mode_safe_shader(
-            &args.device,
+            args.device,
             args.mode,
             "depth pass frag",
             "depth.frag.cpu.spv",
@@ -53,7 +53,7 @@ pub fn build_depth_pass_shader(args: BuildDepthPassShaderArgs) -> RenderPipeline
     let mut bgls: ArrayVec<&BindGroupLayout, 4> = ArrayVec::new();
     bgls.push(&args.interfaces.samplers_bgl);
     bgls.push(&args.interfaces.culled_object_bgl);
-    bgls.push(&args.materials.get_bind_group_layout());
+    bgls.push(args.materials.get_bind_group_layout());
     if args.mode == RendererMode::GPUPowered {
         bgls.push(args.texture_bgl.as_gpu())
     }

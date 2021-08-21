@@ -27,6 +27,7 @@ pub struct ShaderInterfaces {
     pub culled_object_bgl: BindGroupLayout,
     pub uniform_bgl: BindGroupLayout,
     pub blit_bgl: BindGroupLayout,
+    pub skybox_bgl: BindGroupLayout,
 }
 
 impl ShaderInterfaces {
@@ -106,11 +107,26 @@ impl ShaderInterfaces {
             }],
         });
 
+        let skybox_bgl = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+            label: Some("skybox bgl"),
+            entries: &[BindGroupLayoutEntry {
+                binding: 0,
+                visibility: ShaderStages::FRAGMENT,
+                ty: BindingType::Texture {
+                    sample_type: TextureSampleType::Float { filterable: true },
+                    view_dimension: TextureViewDimension::Cube,
+                    multisampled: false,
+                },
+                count: None,
+            }],
+        });
+
         Self {
             samplers_bgl,
             culled_object_bgl,
             uniform_bgl,
             blit_bgl,
+            skybox_bgl,
         }
     }
 }
