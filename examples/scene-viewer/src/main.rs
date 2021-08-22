@@ -1,7 +1,10 @@
 use fnv::FnvBuildHasher;
 use glam::{UVec2, Vec3, Vec3A};
 use pico_args::Arguments;
-use rend3::{InternalSurfaceOptions, RenderRoutine, Renderer, types::{Backend, Camera, CameraProjection, DirectionalLight, Texture, TextureFormat}};
+use rend3::{
+    types::{Backend, Camera, CameraProjection, DirectionalLight, Texture, TextureFormat},
+    InternalSurfaceOptions, RenderRoutine, Renderer,
+};
 use rend3_pbr::PbrRenderRoutine;
 use std::{
     collections::HashMap,
@@ -135,7 +138,7 @@ fn main() {
     };
 
     let renderer = pollster::block_on(
-        rend3::RendererBuilder::new(options.clone())
+        rend3::RendererBuilder::new(options)
             .window(&window)
             .desired_device(desired_backend, desired_device_name, desired_mode)
             .build(),

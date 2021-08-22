@@ -255,7 +255,7 @@ fn create_shadow_bgl(device: &Device) -> BindGroupLayout {
 
 fn create_shadow_bg(device: &Device, bgl: &BindGroupLayout, buffer: &Buffer, view: &TextureView) -> BindGroup {
     BindGroupBuilder::new(Some("shadow bg"))
-        .with_buffer(&buffer)
+        .with_buffer(buffer)
         .with_texture_view(view)
         .build(device, bgl)
 }
