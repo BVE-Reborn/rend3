@@ -1,12 +1,12 @@
 use fnv::FnvHashMap;
 use glam::{Mat3, Mat4, Vec2, Vec3, Vec4, Vec4Swizzles};
-use rend3::{types as dt, types::MeshBuilder, Renderer};
+use rend3::{types, types::MeshBuilder, Renderer};
 use std::future::Future;
 use thiserror::Error;
 
 #[derive(Debug)]
 pub struct MeshPrimitive {
-    pub handle: dt::MeshHandle,
+    pub handle: types::MeshHandle,
     pub material: Option<usize>,
 }
 
@@ -19,8 +19,8 @@ pub struct Mesh {
 pub struct Node {
     pub children: Vec<Node>,
     pub local_transform: Mat4,
-    pub objects: Vec<dt::ObjectHandle>,
-    pub light: Option<dt::DirectionalLightHandle>,
+    pub objects: Vec<types::ObjectHandle>,
+    pub light: Option<types::DirectionalLightHandle>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -32,8 +32,8 @@ pub struct ImageKey {
 #[derive(Debug, Default)]
 pub struct LoadedGltfScene {
     pub meshes: FnvHashMap<usize, Mesh>,
-    pub materials: FnvHashMap<Option<usize>, dt::MaterialHandle>,
-    pub images: FnvHashMap<ImageKey, dt::TextureHandle>,
+    pub materials: FnvHashMap<Option<usize>, types::MaterialHandle>,
+    pub images: FnvHashMap<ImageKey, types::TextureHandle>,
     pub nodes: Vec<Node>,
 }
 
@@ -113,7 +113,7 @@ fn load_gltf_impl<'a, E: std::error::Error + 'static>(
                     .materials
                     .get(&mat_idx)
                     .ok_or_else(|| GltfLoadError::MissingMaterial(mat_idx.expect("Could not find default material")))?;
-                let object_handle = renderer.add_object(dt::Object {
+                let object_handle = renderer.add_object(types::Object {
                     mesh: prim.handle,
                     material: *mat,
                     transform,
@@ -126,7 +126,7 @@ fn load_gltf_impl<'a, E: std::error::Error + 'static>(
             match light.kind() {
                 gltf::khr_lights_punctual::Kind::Directional => {
                     let direction = (transform * (-Vec3::Z).extend(1.0)).xyz();
-                    Some(renderer.add_directional_light(dt::DirectionalLight {
+                    Some(renderer.add_directional_light(types::DirectionalLight {
                         color: Vec3::from(light.color()),
                         intensity: light.intensity(),
                         direction,
@@ -222,23 +222,23 @@ fn load_meshes<'a, E: std::error::Error + 'static>(
 fn load_default_material(renderer: &Renderer, loaded: &mut LoadedGltfScene) {
     loaded.materials.insert(
         None,
-        renderer.add_material(dt::Material {
-            albedo: dt::AlbedoComponent::Value(Vec4::splat(1.0)),
-            normal: dt::NormalTexture::None,
-            aomr_textures: dt::AoMRTextures::None,
+        renderer.add_material(types::Material {
+            albedo: types::AlbedoComponent::Value(Vec4::splat(1.0)),
+            normal: types::NormalTexture::None,
+            aomr_textures: types::AoMRTextures::None,
             ao_factor: Some(1.0),
             metallic_factor: Some(1.0),
             roughness_factor: Some(1.0),
-            clearcoat_textures: dt::ClearcoatTextures::None,
+            clearcoat_textures: types::ClearcoatTextures::None,
             clearcoat_factor: Some(1.0),
             clearcoat_roughness_factor: Some(1.0),
-            emissive: dt::MaterialComponent::None,
-            reflectance: dt::MaterialComponent::None,
-            anisotropy: dt::MaterialComponent::None,
+            emissive: types::MaterialComponent::None,
+            reflectance: types::MaterialComponent::None,
+            anisotropy: types::MaterialComponent::None,
             alpha_cutout: None,
             transform: Mat3::IDENTITY,
             unlit: false,
-            sample_type: dt::SampleType::Linear,
+            sample_type: types::SampleType::Linear,
         }),
     );
 }
@@ -269,9 +269,9 @@ where
         let nearest = albedo
             .as_ref()
             .map(|i| match i.texture().sampler().mag_filter() {
-                Some(gltf::texture::MagFilter::Nearest) => dt::SampleType::Nearest,
-                Some(gltf::texture::MagFilter::Linear) => dt::SampleType::Linear,
-                None => dt::SampleType::Linear,
+                Some(gltf::texture::MagFilter::Nearest) => types::SampleType::Nearest,
+                Some(gltf::texture::MagFilter::Linear) => types::SampleType::Linear,
+                None => types::SampleType::Linear,
             })
             .unwrap_or_default();
 
@@ -297,21 +297,21 @@ where
         .await
         .transpose()?;
 
-        let handle = renderer.add_material(dt::Material {
+        let handle = renderer.add_material(types::Material {
             albedo: match albedo_tex {
-                Some(tex) => dt::AlbedoComponent::TextureValue {
+                Some(tex) => types::AlbedoComponent::TextureValue {
                     handle: tex,
                     value: Vec4::from(albedo_factor),
                 },
-                None => dt::AlbedoComponent::Value(Vec4::from(albedo_factor)),
+                None => types::AlbedoComponent::Value(Vec4::from(albedo_factor)),
             },
             normal: match normals_tex {
-                Some(tex) => dt::NormalTexture::Tricomponent(tex),
-                None => dt::NormalTexture::None,
+                Some(tex) => types::NormalTexture::Tricomponent(tex),
+                None => types::NormalTexture::None,
             },
             aomr_textures: match (metallic_roughness_tex, occlusion_tex) {
-                (Some(mr), Some(ao)) if mr == ao => dt::AoMRTextures::GltfCombined { texture: Some(mr) },
-                (mr, ao) => dt::AoMRTextures::GltfSplit {
+                (Some(mr), Some(ao)) if mr == ao => types::AoMRTextures::GltfCombined { texture: Some(mr) },
+                (mr, ao) => types::AoMRTextures::GltfSplit {
                     mr_texture: mr,
                     ao_texture: ao,
                 },
@@ -319,15 +319,15 @@ where
             roughness_factor: Some(roughness_factor),
             metallic_factor: Some(metallic_factor),
             emissive: match emissive_tex {
-                Some(tex) => dt::MaterialComponent::TextureValue {
+                Some(tex) => types::MaterialComponent::TextureValue {
                     handle: tex,
                     value: Vec3::from(emissive_factor),
                 },
-                None => dt::MaterialComponent::Value(Vec3::from(emissive_factor)),
+                None => types::MaterialComponent::Value(Vec3::from(emissive_factor)),
             },
             unlit: material.unlit(),
             sample_type: nearest,
-            ..dt::Material::default()
+            ..types::Material::default()
         });
 
         loaded
@@ -344,7 +344,7 @@ async fn load_image<F, Fut, E>(
     image: gltf::Image<'_>,
     srgb: bool,
     texture_func: &mut F,
-) -> Result<dt::TextureHandle, GltfLoadError<E>>
+) -> Result<types::TextureHandle, GltfLoadError<E>>
 where
     F: FnMut(&str) -> Fut,
     Fut: Future<Output = Result<Vec<u8>, E>>,
@@ -363,11 +363,11 @@ where
             .map_err(|e| GltfLoadError::TextureIo(uri.to_string(), e))?;
         let parsed = image::load_from_memory(&data).map_err(|e| GltfLoadError::TextureLoad(uri.to_string(), e))?;
         let rgba = parsed.to_rgba8();
-        let handle = renderer.add_texture_2d(dt::Texture {
+        let handle = renderer.add_texture_2d(types::Texture {
             label: image.name().map(str::to_owned),
             format: match srgb {
-                true => dt::TextureFormat::Rgba8UnormSrgb,
-                false => dt::TextureFormat::Rgba8Unorm,
+                true => types::TextureFormat::Rgba8UnormSrgb,
+                false => types::TextureFormat::Rgba8Unorm,
             },
             width: rgba.width(),
             height: rgba.height(),

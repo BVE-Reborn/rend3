@@ -10,12 +10,11 @@
 
 Easy to use, customizable, efficient 3D renderer library built on wgpu.
 
-Library is currently under heavy development and the api will rapidly change
-as things are factored. While it's still in development, rend3 is able to be
-used to build programs.
+Library is currently under heavy development. While the render routine api
+will likely have signifgant changes, the `Renderer` api has stayed
+very similar throughout development.
 
-Rend3 is not currently release on crates.io, to use it add the following
-to your Cargo.toml:
+To use rend3 add the following to your Cargo.toml:
 
 ```
 rend3 = "0.0.5"

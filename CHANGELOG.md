@@ -15,6 +15,30 @@ and this project adheres to cargo's version of [Semantic Versioning](https://sem
 
 ## Unreleased
 
+### Added
+- `rend3_types` crate with all datatypes.
+
+### Changed
+- `rend3::datatypes` is now renamed to `rend3::types`. It is a reexport of `rend3_types`.
+- `rend3::types::TextureFormat` is a reexport of `wgpu_types::TextureFormat`.
+- Replaced Renderlists with Render Routines
+  - `rend3_list` crate is now `rend3_pbr`.
+  - `Swapchain` mentions are now `Surface`.
+  - `set_options` is now `set_internal_surface_options`
+  - The following are now functions of the render routine:
+    - `resize` is on both.
+    - `set_background_texture` now takes an `Option<TextureHandle>` and there is no `clear_background_texture`.
+- `log` is now used for logging as opposed to `tracing`, so `env_logger` should be used over `wgpu_subscriber`.
+
+### Updated
+- `wgpu` 0.7 -> 0.10
+- `glam` 0.13 -> 0.17
+
+### Removed
+- `span` and `span_transfer`, due to `tracing`'s removal.
+- All ties to `switchyard`.
+- Shader compiling infrastructure is gone, shaders must be wgsl or pre-compiled to spirv.
+
 ## v0.0.5
 
 Released 2021-03-10
