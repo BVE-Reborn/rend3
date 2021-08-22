@@ -21,9 +21,9 @@ image = { version = "0.23", default-features = false, features = ["png", "jpeg",
 histogram = "0.6"
 pico-args = "0.4"
 pollster = "0.2"
-rend3 = { path = "../../rend3" }
-rend3-gltf = { path = "../../rend3-gltf" }
-rend3-pbr = { path = "../../rend3-pbr" }
+rend3 = { version = "^0.0.6", path = "../../rend3" }
+rend3-gltf = { version = "^0.0.6", path = "../../rend3-gltf" }
+rend3-pbr = { version = "^0.0.6", path = "../../rend3-pbr" }
 smallvec = "1"
 winit = "0.25"
 

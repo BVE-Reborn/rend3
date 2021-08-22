@@ -46,7 +46,7 @@ log = "0.4"
 indexmap = "1"
 parking_lot = { version = "0.11" }
 range-alloc = "0.1"
-rend3-types = { path = "../rend3-types" }
+rend3-types = { version = "^0.0.6", path = "../rend3-types" }
 raw-window-handle = "0.3"
 smallvec = "1"
 smartstring = "0.2"
