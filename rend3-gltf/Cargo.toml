@@ -1,6 +1,6 @@
 [package]
 name = "rend3-gltf"
-version = "0.0.5"
+version = "0.0.6"
 authors = ["Connor Fitzgerald <connorwadefitzgerald@gmail.com>"]
 edition = "2018"
 description = "gltf scene and model loader for rend3"

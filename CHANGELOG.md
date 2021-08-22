@@ -6,6 +6,7 @@ The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/
 and this project adheres to cargo's version of [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - [Unreleased](#unreleased)
+- [v0.0.6](#v006)
 - [v0.0.5](#v005)
 - [v0.0.4](#v004)
 - [v0.0.3](#v003)
@@ -14,6 +15,10 @@ and this project adheres to cargo's version of [Semantic Versioning](https://sem
 - [Diffs](#diffs)
 
 ## Unreleased
+
+## v0.0.6
+
+Released 2021-08-22
 
 ### Added
 - `rend3_types` crate with all datatypes.
@@ -78,7 +83,8 @@ Released 2021-03-06
 
 ## Diffs
 
-- [Unreleased](https://github.com/BVE-Reborn/rend3/compare/v0.0.5...HEAD)
+- [Unreleased](https://github.com/BVE-Reborn/rend3/compare/v0.0.6...HEAD)
+- [v0.0.6](https://github.com/BVE-Reborn/rend3/compare/v0.0.5...v0.0.6)
 - [v0.0.5](https://github.com/BVE-Reborn/rend3/compare/v0.0.4...v0.0.5)
 - [v0.0.4](https://github.com/BVE-Reborn/rend3/compare/v0.0.3...v0.0.4)
 - [v0.0.3](https://github.com/BVE-Reborn/rend3/compare/v0.0.2...v0.0.3)
