@@ -14,5 +14,5 @@ gltf = { version = "0.16", default-features = false, features = ["KHR_lights_pun
 glam = "0.17"
 fnv = "1"
 image = "0.23"
-rend3 = { version = "^0.0.5", path = "../rend3" }
+rend3 = { path = "../rend3" }
 thiserror = "1"
