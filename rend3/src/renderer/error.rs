@@ -1,5 +1,3 @@
-use crate::list::SourceShaderDescriptor;
-use std::io;
 use thiserror::Error;
 use wgpu::Features;
 
@@ -8,13 +6,21 @@ pub enum LimitType {
     BindGroups,
     DynamicUniformBuffersPerPipelineLayout,
     DynamicStorageBuffersPerPipelineLayout,
-    SampledTexturesPerShaderStage,
-    SamplersPerShaderStage,
-    StorageBuffersPerShaderStage,
-    StorageTexturesPerShaderStage,
-    UniformBuffersPerShaderStage,
+    SampledTexturesPerShaderStages,
+    SamplersPerShaderStages,
+    StorageBuffersPerShaderStages,
+    StorageTexturesPerShaderStages,
+    UniformBuffersPerShaderStages,
     UniformBufferBindingSize,
     PushConstantSize,
+    MaxTextureDimension1d,
+    MaxTextureDimension2d,
+    MaxTextureDimension3d,
+    MaxTextureArrayLayers,
+    MaxStorageBufferBindingSize,
+    MaxVertexBuffers,
+    MaxVertexAttributes,
+    MaxVertexBufferArrayStride,
 }
 
 #[derive(Error, Debug)]
@@ -36,14 +42,4 @@ pub enum RendererInitializationError {
     MissingDeviceFeatures { features: Features },
     #[error("Requesting a device failed")]
     RequestDeviceFailed,
-}
-
-#[derive(Error, Debug)]
-pub enum ShaderError {
-    #[error("IO error while loading shader {1:?}: {0}")]
-    FileError(#[source] io::Error, SourceShaderDescriptor),
-    #[error("Error locating a builtin shader {0:?}")]
-    Builtin(SourceShaderDescriptor),
-    #[error("Compilation error with shader args: {1:?}: {0}")]
-    CompileError(#[source] shaderc::Error, SourceShaderDescriptor),
 }

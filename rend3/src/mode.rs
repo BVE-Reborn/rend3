@@ -5,7 +5,7 @@ pub enum RendererMode {
 }
 
 impl RendererMode {
-    pub(crate) fn into_data<C, G>(self, cpu: impl FnOnce() -> C, gpu: impl FnOnce() -> G) -> ModeData<C, G> {
+    pub fn into_data<C, G>(self, cpu: impl FnOnce() -> C, gpu: impl FnOnce() -> G) -> ModeData<C, G> {
         match self {
             Self::CPUPowered => ModeData::CPU(cpu()),
             Self::GPUPowered => ModeData::GPU(gpu()),
@@ -14,7 +14,7 @@ impl RendererMode {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub(crate) enum ModeData<C, G> {
+pub enum ModeData<C, G> {
     CPU(C),
     GPU(G),
 }
@@ -101,6 +101,15 @@ impl<C, G> ModeData<C, G> {
         match self {
             Self::CPU(c) => ModeData::CPU(cpu_func(c)),
             Self::GPU(g) => ModeData::GPU(gpu_func(g)),
+        }
+    }
+}
+
+impl<T> ModeData<T, T> {
+    pub fn into_common(self) -> T {
+        match self {
+            Self::CPU(c) => c,
+            Self::GPU(g) => g,
         }
     }
 }

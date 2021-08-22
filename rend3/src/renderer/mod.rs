@@ -1,60 +1,27 @@
 use crate::{
-    datatypes::{
-        AffineTransform, Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Material,
-        MaterialChange, MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, Pipeline, PipelineHandle, ShaderHandle,
-        Texture, TextureHandle,
-    },
     instruction::{Instruction, InstructionStreamPair},
-    list::{RenderList, SourceShaderDescriptor},
-    renderer::{
-        info::ExtendedAdapterInfo, material::MaterialManager, mesh::MeshManager, object::ObjectManager,
-        pipeline::PipelineManager, resources::RendererGlobalResources, shaders::ShaderManager, texture::TextureManager,
-    },
+    renderer::{info::ExtendedAdapterInfo, resources::RendererGlobalResources},
+    resources::{DirectionalLightManager, MaterialManager, MeshManager, ObjectManager, TextureManager},
     statistics::RendererStatistics,
-    JobPriorities, RendererBuilder, RendererInitializationError, RendererMode, RendererOptions, RendererOutput,
+    types::{
+        Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Material, MaterialChange,
+        MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, Texture, TextureHandle,
+    },
+    util::output::RendererOutput,
+    InternalSurfaceOptions, RenderRoutine, RendererBuilder, RendererInitializationError, RendererMode,
 };
-use bitflags::_core::cmp::Ordering;
-use parking_lot::{Mutex, RwLock};
+use glam::Mat4;
+use parking_lot::RwLock;
 use raw_window_handle::HasRawWindowHandle;
-use std::{future::Future, sync::Arc};
-use switchyard::{JoinHandle, Switchyard};
-use wgpu::{Device, Instance, Queue, Surface, TextureFormat};
-use wgpu_conveyor::AutomatedBufferManager;
+use std::{cmp::Ordering, future::Future, sync::Arc};
+use wgpu::{Device, Instance, Queue, Surface};
 
-#[macro_use]
-mod util;
-
-mod camera;
-mod copy;
-mod culling;
 pub mod error;
-mod frustum;
-mod info;
-mod light {
-    pub mod directional;
-
-    pub use directional::*;
-}
+pub mod info;
 pub mod limits;
-mod list {
-    mod cache;
-    mod forward;
-    mod resource;
-
-    pub(crate) use cache::*;
-    pub(crate) use forward::*;
-    pub use resource::*;
-}
-mod material;
-mod mesh;
-mod object;
-mod pipeline;
 mod render;
 mod resources;
 mod setup;
-mod shaders;
-mod texture;
-mod uniforms;
 
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
 pub struct OrdEqFloat(pub f32);
@@ -66,47 +33,30 @@ impl Ord for OrdEqFloat {
     }
 }
 
-const INTERNAL_SHADOW_DEPTH_FORMAT: TextureFormat = TextureFormat::Depth32Float;
-
-const SHADOW_DIMENSIONS: u32 = 2048;
-
-pub struct Renderer<TLD = ()>
-where
-    TLD: 'static,
-{
-    yard: Arc<Switchyard<TLD>>,
-    yard_priorites: JobPriorities,
+pub struct Renderer {
     instructions: InstructionStreamPair,
 
-    mode: RendererMode,
-    adapter_info: ExtendedAdapterInfo,
-    instance: Arc<Instance>,
-    queue: Arc<Queue>,
-    device: Arc<Device>,
-    surface: Option<Surface>,
+    pub mode: RendererMode,
+    pub adapter_info: ExtendedAdapterInfo,
+    pub instance: Arc<Instance>,
+    pub queue: Arc<Queue>,
+    pub device: Arc<Device>,
+    pub surface: Option<Surface>,
 
-    buffer_manager: Mutex<AutomatedBufferManager>,
-    global_resources: RwLock<RendererGlobalResources>,
-    shader_manager: Arc<ShaderManager>,
-    pipeline_manager: Arc<PipelineManager>,
-    mesh_manager: RwLock<MeshManager>,
-    texture_manager_2d: RwLock<TextureManager>,
-    texture_manager_cube: RwLock<TextureManager>,
-    material_manager: RwLock<MaterialManager>,
-    object_manager: RwLock<ObjectManager>,
-    directional_light_manager: RwLock<light::DirectionalLightManager>,
-    render_list_cache: RwLock<list::RenderListCache>,
+    pub global_resources: RwLock<RendererGlobalResources>,
+    pub mesh_manager: RwLock<MeshManager>,
+    pub d2_texture_manager: RwLock<TextureManager>,
+    pub d2c_texture_manager: RwLock<TextureManager>,
+    pub material_manager: RwLock<MaterialManager>,
+    pub object_manager: RwLock<ObjectManager>,
+    pub directional_light_manager: RwLock<DirectionalLightManager>,
 
-    gpu_copy: copy::GpuCopy,
-    culling_pass: culling::CullingPass,
-
-    // _imgui_renderer: imgui_wgpu::Renderer,
-    options: RwLock<RendererOptions>,
+    options: RwLock<InternalSurfaceOptions>,
 }
-impl<TLD: 'static> Renderer<TLD> {
+impl Renderer {
     /// Use [`RendererBuilder`](crate::RendererBuilder) to create a renderer.
     pub(crate) fn new<W: HasRawWindowHandle>(
-        builder: RendererBuilder<'_, W, TLD>,
+        builder: RendererBuilder<'_, W>,
     ) -> impl Future<Output = Result<Arc<Self>, RendererInitializationError>> + '_ {
         setup::create_renderer(builder)
     }
@@ -150,7 +100,7 @@ impl<TLD: 'static> Renderer<TLD> {
     }
 
     pub fn add_texture_2d(&self, texture: Texture) -> TextureHandle {
-        let handle = self.texture_manager_2d.read().allocate();
+        let handle = self.d2_texture_manager.read().allocate();
         self.instructions
             .producer
             .lock()
@@ -166,7 +116,7 @@ impl<TLD: 'static> Renderer<TLD> {
     }
 
     pub fn add_texture_cube(&self, texture: Texture) -> TextureHandle {
-        let handle = self.texture_manager_cube.read().allocate();
+        let handle = self.d2c_texture_manager.read().allocate();
         self.instructions
             .producer
             .lock()
@@ -213,7 +163,7 @@ impl<TLD: 'static> Renderer<TLD> {
         handle
     }
 
-    pub fn set_object_transform(&self, handle: ObjectHandle, transform: AffineTransform) {
+    pub fn set_object_transform(&self, handle: ObjectHandle, transform: Mat4) {
         self.instructions
             .producer
             .lock()
@@ -252,44 +202,11 @@ impl<TLD: 'static> Renderer<TLD> {
             .push(Instruction::RemoveDirectionalLight { handle })
     }
 
-    pub fn add_binary_shader(&self, shader: Vec<u32>) -> ShaderHandle {
-        let handle = self.shader_manager.allocate();
-
+    pub fn set_internal_surface_options(&self, options: InternalSurfaceOptions) {
         self.instructions
             .producer
             .lock()
-            .push(Instruction::AddBinaryShader { handle, shader });
-
-        handle
-    }
-
-    pub fn add_source_shader(&self, shader: SourceShaderDescriptor) -> impl Future<Output = ShaderHandle> {
-        self.shader_manager.allocate_async_insert(shader)
-    }
-
-    pub fn remove_shader(&self, handle: ShaderHandle) {
-        self.instructions
-            .producer
-            .lock()
-            .push(Instruction::RemoveShader { handle });
-    }
-
-    pub fn add_pipeline(self: &Arc<Self>, pipeline: Pipeline) -> impl Future<Output = PipelineHandle> {
-        self.pipeline_manager.allocate_async_insert(Arc::clone(self), pipeline)
-    }
-
-    pub fn remove_pipeline(&self, handle: PipelineHandle) {
-        self.instructions
-            .producer
-            .lock()
-            .push(Instruction::RemovePipeline { handle });
-    }
-
-    pub fn set_options(&self, options: RendererOptions) {
-        self.instructions
-            .producer
-            .lock()
-            .push(Instruction::SetOptions { options })
+            .push(Instruction::SetInternalSurfaceOptions { options })
     }
 
     pub fn set_camera_data(&self, data: Camera) {
@@ -299,26 +216,7 @@ impl<TLD: 'static> Renderer<TLD> {
             .push(Instruction::SetCameraData { data })
     }
 
-    pub fn set_background_texture(&self, handle: TextureHandle) {
-        self.instructions
-            .producer
-            .lock()
-            .push(Instruction::SetBackgroundTexture { handle })
-    }
-
-    pub fn clear_background_texture(&self) {
-        self.instructions
-            .producer
-            .lock()
-            .push(Instruction::ClearBackgroundTexture)
-    }
-
-    pub fn render(self: &Arc<Self>, list: RenderList, output: RendererOutput) -> JoinHandle<RendererStatistics> {
-        let this = Arc::clone(self);
-        self.yard.spawn_local(
-            self.yard_priorites.compute_pool,
-            self.yard_priorites.main_task_priority,
-            move |_| render::render_loop(this, list, output),
-        )
+    pub fn render(self: &Arc<Self>, list: &mut dyn RenderRoutine, output: RendererOutput) -> RendererStatistics {
+        render::render_loop(Arc::clone(self), list, output)
     }
 }

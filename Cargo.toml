@@ -1,14 +1,22 @@
 [workspace]
+resolver = "2"
 members = [
     "examples/cube",
     "examples/gltf",
-    "examples/imgui",
     "examples/scene-viewer",
     "rend3",
     "rend3-gltf",
-    "rend3-list"
+    "rend3-pbr",
+    "rend3-types"
 ]
 
 [profile.release]
 debug = true
 lto = "thin"
+
+[patch."https://github.com/gfx-rs/wgpu.git"]
+# wgpu = { path = "../wgpu/wgpu" }
+# wgpu-types = { path = "../wgpu/wgpu-types" }
+
+[patch."https://github.com/gfx-rs/naga.git"]
+# naga = { path = "../naga" }

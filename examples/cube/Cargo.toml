@@ -13,14 +13,15 @@ path = "src/main.rs"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+# logging
+env_logger = { version = "0.9", default-features = false, features = ["termcolor", "atty"] }
 # Linear algebra library
 glam = "0.17"
-# Renderer
-rend3 = { path = "../../rend3", version = "^0.0.5"}
-rend3-list = { path = "../../rend3-list", version = "^0.0.5"}
+# Renderer core
+rend3 = { path = "../../rend3" }
+# Programmable render list that dictates how the scene renders
+rend3-pbr = { path = "../../rend3-pbr" }
 # Provides `block_on` to wait for futures from sync code
 pollster = "0.2"
-# wgpu-aware logging
-wgpu-subscriber = "0.1"
 # windowing
 winit = "0.25"

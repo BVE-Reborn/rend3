@@ -1,0 +1,99 @@
+#version 440
+
+#include "structures.glsl"
+
+layout(local_size_x = 256) in;
+
+struct CullingUniforms {
+    mat4 view;
+    mat4 view_proj;
+    Frustum frustum;
+    uint object_count;
+};
+
+layout(set = 0, binding = 0, std430) restrict readonly buffer ObjectInputDataBuffer {
+    CullingUniforms uniforms;
+    ObjectInputData object_input[];
+};
+layout(set = 0, binding = 1, std430) restrict buffer ObjectOutputDataBuffer {
+    ObjectOutputData object_output[];
+};
+layout(set = 0, binding = 2, std430) buffer IndirectBuffer {
+    uint draw_call_count;
+    uint _2;
+    uint _3;
+    uint _4;
+    IndirectCall indirect_call[];
+};
+
+float plane_distance(Plane plane, vec3 location) {
+    return dot(plane.inner.xyz, location) + plane.inner.w;
+}
+
+bool frustum_contains_sphere(Frustum frustum, vec4 sphere) {
+    vec3 location = sphere.xyz;
+    float neg_radius = -sphere.w;
+
+    if (!(plane_distance(frustum.left, location) >= neg_radius)) {
+        return false;
+    }
+    if (!(plane_distance(frustum.right, location) >= neg_radius)) {
+        return false;
+    }
+    if (!(plane_distance(frustum.top, location) >= neg_radius)) {
+        return false;
+    }
+    if (!(plane_distance(frustum.bottom, location) >= neg_radius)) {
+        return false;
+    }
+    if (!(plane_distance(frustum.near, location) >= neg_radius)) {
+        return false;
+    }
+
+    return true;
+}
+
+vec4 transform_sphere(vec4 sphere, mat4 transform) {
+    float max_scale = max(max(length(transform[0].xyz), length(transform[1].xyz)), length(transform[2].xyz));
+    vec4 center = transform * vec4(sphere.xyz, 1.0);
+
+    return vec4(center.xyz, sphere.w * max_scale);
+}
+
+void main() {
+    uint input_idx = gl_GlobalInvocationID.x;
+
+    if (input_idx >= uniforms.object_count) {
+        return;
+    }
+
+    ObjectInputData in_data = object_input[input_idx];
+
+    mat4 model_view = uniforms.view * in_data.transform;
+    vec4 mesh_sphere = transform_sphere(in_data.bounding_sphere, model_view);
+
+    bool visible = frustum_contains_sphere(uniforms.frustum, mesh_sphere);
+
+    if (!visible) {
+        return;
+    }
+
+    uint output_idx = atomicAdd(draw_call_count, 1);
+
+    ObjectOutputData out_data;
+
+    out_data.model_view = uniforms.view * in_data.transform;
+    out_data.model_view_proj = uniforms.view_proj * in_data.transform;
+    out_data.inv_trans_model_view = inverse(transpose(mat3(uniforms.view * in_data.transform)));
+    out_data.material_idx = in_data.material_idx;
+
+    object_output[output_idx] = out_data;
+
+    IndirectCall call;
+    call.vertex_count = in_data.count;
+    call.instance_count = 1;
+    call.base_index = in_data.start_idx;
+    call.vertex_offset = in_data.vertex_offset;
+    call.base_instance = output_idx;
+    indirect_call[output_idx] = call;
+}

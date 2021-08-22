@@ -1,11 +1,11 @@
 use crate::{
-    datatypes::{
-        AffineTransform, Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Material,
-        MaterialChange, MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, PipelineHandle, ShaderHandle, Texture,
-        TextureHandle,
+    types::{
+        Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Material, MaterialChange,
+        MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, Texture, TextureHandle,
     },
-    RendererOptions,
+    InternalSurfaceOptions,
 };
+use glam::Mat4;
 use parking_lot::Mutex;
 use std::mem;
 
@@ -48,7 +48,7 @@ pub enum Instruction {
     },
     SetObjectTransform {
         handle: ObjectHandle,
-        transform: AffineTransform,
+        transform: Mat4,
     },
     RemoveObject {
         handle: ObjectHandle,
@@ -64,26 +64,12 @@ pub enum Instruction {
     RemoveDirectionalLight {
         handle: DirectionalLightHandle,
     },
-    AddBinaryShader {
-        handle: ShaderHandle,
-        shader: Vec<u32>,
-    },
-    RemoveShader {
-        handle: ShaderHandle,
-    },
-    RemovePipeline {
-        handle: PipelineHandle,
-    },
-    SetOptions {
-        options: RendererOptions,
+    SetInternalSurfaceOptions {
+        options: InternalSurfaceOptions,
     },
     SetCameraData {
         data: Camera,
     },
-    SetBackgroundTexture {
-        handle: TextureHandle,
-    },
-    ClearBackgroundTexture,
 }
 
 pub struct InstructionStreamPair {

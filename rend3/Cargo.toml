@@ -39,23 +39,16 @@ replace = "[Unreleased](https://github.com/BVE-Reborn/rend3/compare/v{{version}}
 arrayvec = "0.7"
 bitflags = "1"
 bytemuck = "1"
-glam = { version = "0.17", features = ["bytemuck"] }
-include_dir = "0.6"
-indexmap = "1"
-itertools = "0.10"
 flume = "0.10"
 fnv = "1"
-futures = { version = "0.3", default-features = false, features = ["std", "async-await"] }
-futures-intrusive = "0.4"
-parking_lot = { version = "0.11", features = ["send_guard"] }
-path-dedot = "3"
-raw-window-handle = "0.3"
+glam = { version = "0.17", features = ["bytemuck"] }
+log = "0.4"
+indexmap = "1"
+parking_lot = { version = "0.11" }
 range-alloc = "0.1"
-shaderc = "0.7.2"
+rend3-types = { path = "../rend3-types" }
+raw-window-handle = "0.3"
 smallvec = "1"
-switchyard = "0.2"
-tracing = { version = "0.1", default-features = false, features = ["std"] }
-tracing-futures = "0.2"
+smartstring = "0.2"
 thiserror = "1"
-wgpu = "0.7"
-wgpu-conveyor = "0.2"
+wgpu = { version = "0.10", features = ["trace", "spirv", "webgl"] }

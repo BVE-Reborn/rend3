@@ -2,8 +2,8 @@ use wgpu::{AdapterInfo, Backend, DeviceType};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Vendor {
-    NV,
-    AMD,
+    Nv,
+    Amd,
     Intel,
     Microsoft,
     Broadcom,
@@ -29,8 +29,8 @@ impl From<AdapterInfo> for ExtendedAdapterInfo {
         Self {
             name: info.name,
             vendor: match info.vendor {
-                0x1002 => Vendor::AMD,
-                0x10DE => Vendor::NV,
+                0x1002 => Vendor::Amd,
+                0x10DE => Vendor::Nv,
                 0x1414 => Vendor::Microsoft,
                 0x14E4 => Vendor::Broadcom,
                 0x5143 => Vendor::Qualcomm,
@@ -44,13 +44,13 @@ impl From<AdapterInfo> for ExtendedAdapterInfo {
     }
 }
 impl ExtendedAdapterInfo {
+    /// TODO: need info from wgpu
     pub fn subgroup_size(&self) -> u32 {
         match self.vendor {
             Vendor::Microsoft => 4,
-            // TODO: buy a rpi4 and verify
             Vendor::Broadcom => 16,
-            Vendor::Intel | Vendor::NV => 32,
-            Vendor::AMD | Vendor::Qualcomm | Vendor::Unknown(_) => 64,
+            Vendor::Intel | Vendor::Nv => 32,
+            Vendor::Amd | Vendor::Qualcomm | Vendor::Unknown(_) => 64,
         }
     }
 }

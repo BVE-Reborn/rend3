@@ -1,11 +1,11 @@
 use fnv::FnvBuildHasher;
-use glam::{Vec3, Vec3A};
+use glam::{UVec2, Vec3, Vec3A};
 use pico_args::Arguments;
 use rend3::{
-    datatypes::{Camera, CameraProjection, DirectionalLight, RendererTextureFormat, Texture},
-    Renderer,
+    types::{Backend, Camera, CameraProjection, DirectionalLight, Texture, TextureFormat},
+    InternalSurfaceOptions, RenderRoutine, Renderer,
 };
-use rend3_list::{DefaultPipelines, DefaultShaders};
+use rend3_pbr::PbrRenderRoutine;
 use std::{
     collections::HashMap,
     hash::BuildHasher,
@@ -20,7 +20,7 @@ use winit::{
 
 mod platform;
 
-fn load_skybox(renderer: &Renderer) -> Result<(), Box<dyn std::error::Error>> {
+fn load_skybox(renderer: &Renderer, routine: &mut PbrRenderRoutine) -> Result<(), Box<dyn std::error::Error>> {
     let name = concat!(env!("CARGO_MANIFEST_DIR"), "/data/skybox.basis");
     let file = std::fs::read(name).unwrap_or_else(|_| panic!("Could not read skybox {}", name));
 
@@ -35,20 +35,22 @@ fn load_skybox(renderer: &Renderer) -> Result<(), Box<dyn std::error::Error>> {
     let mut image = Vec::with_capacity(image_info.total_blocks as usize * 16 * 6);
     for i in 0..6 {
         for mip in 0..mips {
-            image.extend_from_slice(&prepared.transcode_image_level(i, mip, basis::TargetTextureFormat::Bc7Rgba)?);
+            let mip_info = transcoder.get_image_level_info(&file, 0, mip).unwrap();
+            let data = prepared.transcode_image_level(i, mip, basis::TargetTextureFormat::Rgba32)?;
+            image.extend_from_slice(&data[0..(mip_info.orig_width * mip_info.orig_height * 4) as usize]);
         }
     }
     drop(prepared);
 
     let handle = renderer.add_texture_cube(Texture {
-        format: RendererTextureFormat::Bc7Srgb,
+        format: TextureFormat::Rgba8UnormSrgb,
         width: image_info.width,
         height: image_info.height,
         data: image,
         label: Some("background".into()),
         mip_levels: mips,
     });
-    renderer.set_background_texture(handle);
+    routine.set_background_texture(Some(handle));
     Ok(())
 }
 
@@ -78,7 +80,7 @@ fn load_gltf(renderer: &Renderer, location: String) -> rend3_gltf::LoadedGltfSce
             let tex_path = tex_path.to_owned();
             async move {
                 let tex_resolved = parent.join(&tex_path);
-                async_std::fs::read(tex_resolved).await
+                std::fs::read(tex_resolved)
             }
         },
     ))
@@ -89,13 +91,13 @@ fn button_pressed<Hash: BuildHasher>(map: &HashMap<u32, bool, Hash>, key: u32) -
     map.get(&key).map_or(false, |b| *b)
 }
 
-fn extract_backend(value: &str) -> Result<wgpu::Backend, &'static str> {
+fn extract_backend(value: &str) -> Result<Backend, &'static str> {
     Ok(match value.to_lowercase().as_str() {
-        "vulkan" | "vk" => wgpu::Backend::Vulkan,
-        "dx12" | "12" => wgpu::Backend::Dx12,
-        "dx11" | "11" => wgpu::Backend::Dx11,
-        "metal" | "mtl" => wgpu::Backend::Metal,
-        "opengl" | "gl" => wgpu::Backend::Gl,
+        "vulkan" | "vk" => Backend::Vulkan,
+        "dx12" | "12" => Backend::Dx12,
+        "dx11" | "11" => Backend::Dx11,
+        "metal" | "mtl" => Backend::Metal,
+        "opengl" | "gl" => Backend::Gl,
         _ => return Err("backend requested but not found"),
     })
 }
@@ -109,7 +111,7 @@ fn extract_mode(value: &str) -> Result<rend3::RendererMode, &'static str> {
 }
 
 fn main() {
-    wgpu_subscriber::initialize_default_subscriber(None);
+    env_logger::init();
 
     let mut args = Arguments::from_env();
     let desired_backend = args.value_from_fn(["-b", "--backend"], extract_backend).ok();
@@ -120,12 +122,7 @@ fn main() {
     let desired_mode = args.value_from_fn(["-m", "--mode"], extract_mode).ok();
     let file_to_load: Option<String> = args.free_from_str().ok();
 
-    rend3::span_transfer!(_ -> main_thread_span, INFO, "Main Thread Setup");
-    rend3::span_transfer!(_ -> event_loop_span, INFO, "Building Event Loop");
-
     let event_loop = EventLoop::new();
-
-    rend3::span_transfer!(event_loop_span -> window_span, INFO, "Building Window");
 
     let window = {
         let mut builder = WindowBuilder::new();
@@ -133,48 +130,46 @@ fn main() {
         builder.build(&event_loop).expect("Could not build window")
     };
 
-    rend3::span_transfer!(window_span -> renderer_span, INFO, "Building Renderer");
-
     let window_size = window.inner_size();
 
-    let mut options = rend3::RendererOptions {
+    let options = rend3::InternalSurfaceOptions {
         vsync: rend3::VSyncMode::Off,
-        size: [window_size.width, window_size.height],
-        ambient: glam::Vec4::default(),
+        size: UVec2::new(window_size.width, window_size.height),
     };
 
     let renderer = pollster::block_on(
-        rend3::RendererBuilder::new(options.clone())
+        rend3::RendererBuilder::new(options)
             .window(&window)
             .desired_device(desired_backend, desired_device_name, desired_mode)
             .build(),
     )
     .unwrap();
 
-    let pipelines = pollster::block_on(async {
-        let shaders = DefaultShaders::new(&renderer).await;
-        DefaultPipelines::new(&renderer, &shaders).await
-    });
-
-    rend3::span_transfer!(renderer_span -> loading_span, INFO, "Loading resources");
+    // Create the default set of shaders and pipelines
+    let mut routine = rend3_pbr::PbrRenderRoutine::new(&renderer, UVec2::new(window_size.width, window_size.height));
 
     load_gltf(
         &renderer,
         file_to_load.unwrap_or_else(|| concat!(env!("CARGO_MANIFEST_DIR"), "/data/scene.gltf").to_owned()),
     );
-    load_skybox(&renderer).unwrap();
+    load_skybox(&renderer, &mut routine).unwrap();
 
     renderer.add_directional_light(DirectionalLight {
         color: Vec3::ONE,
         intensity: 10.0,
         direction: Vec3::new(-1.0, -1.0, 0.0),
     });
-    rend3::span_transfer!(loading_span -> _);
-    rend3::span_transfer!(main_thread_span -> _);
-
     let mut scancode_status = HashMap::with_hasher(FnvBuildHasher::default());
 
-    let mut camera_location = Camera::default();
+    let mut camera_location = Camera {
+        projection: CameraProjection::Projection {
+            vfov: 60.0,
+            near: 0.1,
+            pitch: std::f32::consts::FRAC_PI_4,
+            yaw: -std::f32::consts::FRAC_PI_4,
+        },
+        location: Vec3A::new(20.0, 20.0, -20.0),
+    };
 
     let mut timestamp_last_second = Instant::now();
     let mut timestamp_last_frame = Instant::now();
@@ -288,7 +283,12 @@ fn main() {
             event: WindowEvent::Resized(size),
             ..
         } => {
-            options.size = [size.width, size.height];
+            let size = UVec2::new(size.width, size.height);
+            renderer.set_internal_surface_options(InternalSurfaceOptions {
+                vsync: rend3::VSyncMode::Off,
+                size,
+            });
+            routine.resize(&renderer.device, size);
         }
         Event::WindowEvent {
             event: WindowEvent::CloseRequested,
@@ -297,23 +297,10 @@ fn main() {
             *control = ControlFlow::Exit;
         }
         Event::RedrawRequested(_) => {
-            rend3::span_transfer!(_ -> redraw_span, INFO, "Redraw");
-
             renderer.set_camera_data(camera_location);
-            renderer.set_options(options.clone());
-
-            let list = rend3_list::default_render_list(
-                renderer.mode(),
-                [
-                    (options.size[0] as f32 * 1.0) as u32,
-                    (options.size[1] as f32 * 1.0) as u32,
-                ],
-                &pipelines,
-            );
-            let handle = renderer.render(list, rend3::RendererOutput::InternalSwapchain);
-
-            rend3::span_transfer!(redraw_span -> render_wait_span, INFO, "Waiting for render");
-            pollster::block_on(handle);
+            // Dispatch a render!
+            let dynref: &mut dyn RenderRoutine = &mut routine;
+            let _stats = renderer.render(dynref, rend3::util::output::RendererOutput::InternalSurface);
         }
         _ => {}
     })

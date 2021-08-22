@@ -1,11 +1,6 @@
 use fnv::FnvHashMap;
-use futures_util::future::OptionFuture;
 use glam::{Mat3, Mat4, Vec2, Vec3, Vec4, Vec4Swizzles};
-use rend3::{
-    datatypes as dt,
-    datatypes::{AffineTransform, MeshBuilder},
-    Renderer,
-};
+use rend3::{types as dt, types::MeshBuilder, Renderer};
 use std::future::Future;
 use thiserror::Error;
 
@@ -43,11 +38,11 @@ pub struct LoadedGltfScene {
 }
 
 #[derive(Debug, Error)]
-pub enum GltfLoadError {
+pub enum GltfLoadError<E: std::error::Error + 'static> {
     #[error("Gltf parsing or validation error")]
     Gltf(#[from] gltf::Error),
     #[error("Texture {0} failed to be loaded from the fs")]
-    TextureIo(String, #[source] async_std::io::Error),
+    TextureIo(String, #[source] E),
     #[error("Texture {0} failed to be loaded as an image")]
     TextureLoad(String, #[source] image::ImageError),
     #[error("Gltf file must have at least one scene")]
@@ -62,16 +57,16 @@ pub enum GltfLoadError {
     UnsupportedPrimitiveMode(usize, usize, gltf::mesh::Mode),
 }
 
-pub async fn load_gltf<TLD, F, Fut>(
-    renderer: &Renderer<TLD>,
+pub async fn load_gltf<F, Fut, E>(
+    renderer: &Renderer,
     data: &[u8],
     binary: &[u8],
     mut texture_func: F,
-) -> Result<LoadedGltfScene, GltfLoadError>
+) -> Result<LoadedGltfScene, GltfLoadError<E>>
 where
-    TLD: 'static,
     F: FnMut(&str) -> Fut,
-    Fut: Future<Output = Result<Vec<u8>, async_std::io::Error>>,
+    Fut: Future<Output = Result<Vec<u8>, E>>,
+    E: std::error::Error + 'static,
 {
     let file = gltf::Gltf::from_slice_without_validation(data)?;
 
@@ -95,15 +90,12 @@ where
     Ok(loaded)
 }
 
-fn load_gltf_impl<'a, TLD>(
-    renderer: &Renderer<TLD>,
+fn load_gltf_impl<'a, E: std::error::Error + 'static>(
+    renderer: &Renderer,
     loaded: &mut LoadedGltfScene,
     nodes: impl Iterator<Item = gltf::Node<'a>>,
     parent_transform: Mat4,
-) -> Result<Vec<Node>, GltfLoadError>
-where
-    TLD: 'static,
-{
+) -> Result<Vec<Node>, GltfLoadError<E>> {
     let mut final_nodes = Vec::new();
     for node in nodes {
         let local_transform = Mat4::from_cols_array_2d(&node.transform().matrix());
@@ -124,7 +116,7 @@ where
                 let object_handle = renderer.add_object(dt::Object {
                     mesh: prim.handle,
                     material: *mat,
-                    transform: AffineTransform { transform },
+                    transform,
                 });
                 objects.push(object_handle);
             }
@@ -158,15 +150,12 @@ where
     Ok(final_nodes)
 }
 
-fn load_meshes<'a, TLD>(
-    renderer: &Renderer<TLD>,
+fn load_meshes<'a, E: std::error::Error + 'static>(
+    renderer: &Renderer,
     loaded: &mut LoadedGltfScene,
     meshes: impl Iterator<Item = gltf::Mesh<'a>>,
     binary: &[u8],
-) -> Result<(), GltfLoadError>
-where
-    TLD: 'static,
-{
+) -> Result<(), GltfLoadError<E>> {
     for mesh in meshes {
         let mut res_prims = Vec::new();
         for prim in mesh.primitives() {
@@ -230,7 +219,7 @@ where
     Ok(())
 }
 
-fn load_default_material<TLD>(renderer: &Renderer<TLD>, loaded: &mut LoadedGltfScene) {
+fn load_default_material(renderer: &Renderer, loaded: &mut LoadedGltfScene) {
     loaded.materials.insert(
         None,
         renderer.add_material(dt::Material {
@@ -249,21 +238,21 @@ fn load_default_material<TLD>(renderer: &Renderer<TLD>, loaded: &mut LoadedGltfS
             alpha_cutout: None,
             transform: Mat3::IDENTITY,
             unlit: false,
-            nearest: false,
+            sample_type: dt::SampleType::Linear,
         }),
     );
 }
 
-async fn load_materials_and_textures<'a, TLD, F, Fut>(
-    renderer: &Renderer<TLD>,
+async fn load_materials_and_textures<'a, F, Fut, E>(
+    renderer: &Renderer,
     loaded: &mut LoadedGltfScene,
     materials: impl Iterator<Item = gltf::Material<'a>>,
     texture_func: &mut F,
-) -> Result<(), GltfLoadError>
+) -> Result<(), GltfLoadError<E>>
 where
-    TLD: 'static,
     F: FnMut(&str) -> Fut,
-    Fut: Future<Output = Result<Vec<u8>, async_std::io::Error>>,
+    Fut: Future<Output = Result<Vec<u8>, E>>,
+    E: std::error::Error + 'static,
 {
     for material in materials {
         let pbr = material.pbr_metallic_roughness();
@@ -279,29 +268,30 @@ where
 
         let nearest = albedo
             .as_ref()
-            .map(|i| i.texture().sampler().mag_filter() == Some(gltf::texture::MagFilter::Nearest))
+            .map(|i| match i.texture().sampler().mag_filter() {
+                Some(gltf::texture::MagFilter::Nearest) => dt::SampleType::Nearest,
+                Some(gltf::texture::MagFilter::Linear) => dt::SampleType::Linear,
+                None => dt::SampleType::Linear,
+            })
             .unwrap_or_default();
 
         let albedo_tex =
-            OptionFuture::from(albedo.map(|i| load_image(renderer, loaded, i.texture().source(), true, texture_func)))
+            option_resolve(albedo.map(|i| load_image(renderer, loaded, i.texture().source(), true, texture_func)))
                 .await
                 .transpose()?;
-        let occlusion_tex = OptionFuture::from(
-            occlusion.map(|i| load_image(renderer, loaded, i.texture().source(), false, texture_func)),
-        )
-        .await
-        .transpose()?;
-        let emissive_tex = OptionFuture::from(
-            emissive.map(|i| load_image(renderer, loaded, i.texture().source(), true, texture_func)),
-        )
-        .await
-        .transpose()?;
-        let normals_tex = OptionFuture::from(
-            normals.map(|i| load_image(renderer, loaded, i.texture().source(), false, texture_func)),
-        )
-        .await
-        .transpose()?;
-        let metallic_roughness_tex = OptionFuture::from(
+        let occlusion_tex =
+            option_resolve(occlusion.map(|i| load_image(renderer, loaded, i.texture().source(), false, texture_func)))
+                .await
+                .transpose()?;
+        let emissive_tex =
+            option_resolve(emissive.map(|i| load_image(renderer, loaded, i.texture().source(), true, texture_func)))
+                .await
+                .transpose()?;
+        let normals_tex =
+            option_resolve(normals.map(|i| load_image(renderer, loaded, i.texture().source(), false, texture_func)))
+                .await
+                .transpose()?;
+        let metallic_roughness_tex = option_resolve(
             metallic_roughness.map(|i| load_image(renderer, loaded, i.texture().source(), false, texture_func)),
         )
         .await
@@ -336,7 +326,7 @@ where
                 None => dt::MaterialComponent::Value(Vec3::from(emissive_factor)),
             },
             unlit: material.unlit(),
-            nearest,
+            sample_type: nearest,
             ..dt::Material::default()
         });
 
@@ -348,17 +338,17 @@ where
     Ok(())
 }
 
-async fn load_image<TLD, F, Fut>(
-    renderer: &Renderer<TLD>,
+async fn load_image<F, Fut, E>(
+    renderer: &Renderer,
     loaded: &mut LoadedGltfScene,
     image: gltf::Image<'_>,
     srgb: bool,
     texture_func: &mut F,
-) -> Result<dt::TextureHandle, GltfLoadError>
+) -> Result<dt::TextureHandle, GltfLoadError<E>>
 where
-    TLD: 'static,
     F: FnMut(&str) -> Fut,
-    Fut: Future<Output = Result<Vec<u8>, async_std::io::Error>>,
+    Fut: Future<Output = Result<Vec<u8>, E>>,
+    E: std::error::Error + 'static,
 {
     // TODO: Address format detection for compressed texs
     // TODO: Allow embedded images
@@ -376,8 +366,8 @@ where
         let handle = renderer.add_texture_2d(dt::Texture {
             label: image.name().map(str::to_owned),
             format: match srgb {
-                true => dt::RendererTextureFormat::Rgba8Srgb,
-                false => dt::RendererTextureFormat::Rgba8Linear,
+                true => dt::TextureFormat::Rgba8UnormSrgb,
+                false => dt::TextureFormat::Rgba8Unorm,
             },
             width: rgba.width(),
             height: rgba.height(),
@@ -391,5 +381,13 @@ where
         Ok(handle)
     } else {
         unimplemented!()
+    }
+}
+
+pub async fn option_resolve<F: Future>(fut: Option<F>) -> Option<F::Output> {
+    if let Some(f) = fut {
+        Some(f.await)
+    } else {
+        None
     }
 }

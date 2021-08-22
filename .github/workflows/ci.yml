@@ -16,23 +16,41 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-    - uses: actions/checkout@v2
-    - uses: seanmiddleditch/gha-setup-ninja@master
+      - uses: actions/checkout@v2
+      - uses: seanmiddleditch/gha-setup-ninja@master
 
-    - name: Set up Rust toolchain
-      run: |
-        rustup default ${{ matrix.rust_version }}
-        rustup component add clippy
+      - name: Set up Rust toolchain
+        id: setup-rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ matrix.rust_version }}
+          components: clippy
+          default: true
+          override: true
 
-    - name: Build and test
-      run: |
-        cargo build --verbose
-        cargo test --verbose
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ matrix.os }}-${{ steps.setup-rust.outputs.rustc_hash }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ matrix.os }}-${{ steps.setup-rust.outputs.rustc_hash }}
 
-#    - name: Clippy
-#      run: |
-#        cargo clippy -- -D warnings
-#      if: matrix.rust_version == 'stable'
+      - uses: actions-rs/cargo@v1
+        with:
+          command: build
+
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+
+      - uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+        if: matrix.rust_version == 'stable'
 
   cargo-fmt:
     runs-on: ubuntu-latest
@@ -40,12 +58,19 @@ jobs:
       - uses: actions/checkout@v2
 
       - name: Set up Rust toolchain
-        run: |
-          rustup component add rustfmt
+        id: setup-rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          components: rustfmt
+          default: true
+          override: true
 
-      - name: Rustfmt
-        run: |
-          cargo fmt -- --check
+      - uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: -- --check
 
   cargo-deny:
     runs-on: ubuntu-latest

@@ -4,8 +4,7 @@
 //! as things are factored. While it's still in development, rend3 is able to be
 //! used to build programs.
 //!
-//! Rend3 is not currently release on crates.io, to use it add the following
-//! to your Cargo.toml:
+//! To use rend3 add the following to your Cargo.toml:
 //!
 //! ```text
 //! rend3 = "0.0.5"
@@ -36,64 +35,47 @@
 //!
 //! [enhancement]: https://github.com/BVE-Reborn/rend3/labels/enhancement
 
-#[macro_export]
-macro_rules! span {
-    ($guard_name:tt, $level:ident, $name:expr, $($fields:tt)*) => {
-        let span = tracing::span!(tracing::Level::$level, $name, $($fields)*);
-        let $guard_name = span.enter();
-    };
-    ($guard_name:tt, $level:ident, $name:expr) => {
-        let span = tracing::span!(tracing::Level::$level, $name);
-        let $guard_name = span.enter();
-    };
+mod renderer;
+pub mod resources {
+    mod camera;
+    mod directional;
+    mod material;
+    mod mesh;
+    mod object;
+    mod texture;
+
+    pub use camera::*;
+    pub use directional::*;
+    pub use material::*;
+    pub use mesh::*;
+    pub use object::*;
+    pub use texture::*;
+}
+pub mod util {
+    pub mod bind_merge;
+    pub mod buffer;
+    pub mod frustum;
+    pub mod math;
+    pub mod output;
+    pub mod registry;
+    pub mod typedefs;
 }
 
-#[macro_export]
-macro_rules! span_transfer {
-    (_ -> $guard_name:tt, $level:ident, $name:expr, $($fields:tt)*) => {
-        let span = tracing::span!(tracing::Level::$level, $name, $($fields)*);
-        #[allow(unused_variables)]
-        let $guard_name = span.enter();
-    };
-    (_ -> $guard_name:tt, $level:ident, $name:expr) => {
-        let span = tracing::span!(tracing::Level::$level, $name);
-        #[allow(unused_variables)]
-        let $guard_name = span.enter();
-    };
-    ($old_guard:tt -> _) => {
-        drop($old_guard);
-    };
-    ($old_guard:tt -> $guard_name:tt, $level:ident, $name:expr, $($fields:tt)*) => {
-        drop($old_guard);
-        let span = tracing::span!(tracing::Level::$level, $name, $($fields)*)
-        #[allow(unused_variables)]
-        let $guard_name = span.enter();
-    };
-    ($old_guard:tt -> $guard_name:tt, $level:ident, $name:expr) => {
-        drop($old_guard);
-        let span = tracing::span!(tracing::Level::$level, $name);
-        #[allow(unused_variables)]
-        let $guard_name = span.enter();
-    };
-}
-
-mod bind_merge;
 mod builder;
-pub mod datatypes;
 mod instruction;
-mod jobs;
-pub mod list;
 mod mode;
 mod options;
-mod output;
-mod registry;
-mod renderer;
+mod routine;
 mod statistics;
 
 pub use builder::*;
-pub use jobs::*;
 pub use mode::*;
 pub use options::*;
-pub use output::*;
+pub use rend3_types as types;
 pub use renderer::{error::*, Renderer};
+pub use routine::*;
 pub use statistics::*;
+
+pub const INTERNAL_SHADOW_DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
+// This needs to be dynamic
+pub const SHADOW_DIMENSIONS: u32 = 2048;

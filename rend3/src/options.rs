@@ -1,4 +1,4 @@
-use glam::Vec4;
+use glam::UVec2;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum VSyncMode {
@@ -7,14 +7,12 @@ pub enum VSyncMode {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct RendererOptions {
+pub struct InternalSurfaceOptions {
     pub vsync: VSyncMode,
-    pub size: [u32; 2],
-    /// A temporary minimum linear color value used to compensate for the lack of IBL currently. The result of lighting is combined like so `max(lighting, ambient * albedo)`. Set to zero to ignore ambient.
-    pub ambient: Vec4,
+    pub size: UVec2,
 }
-impl RendererOptions {
+impl InternalSurfaceOptions {
     pub fn aspect_ratio(&self) -> f32 {
-        self.size[0] as f32 / self.size[1] as f32
+        self.size.x as f32 / self.size.y as f32
     }
 }

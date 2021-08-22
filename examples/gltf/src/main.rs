@@ -1,7 +1,9 @@
+use glam::UVec2;
+
 fn load_gltf(
     renderer: &rend3::Renderer,
     path: &'static str,
-) -> (rend3::datatypes::MeshHandle, rend3::datatypes::MaterialHandle) {
+) -> (rend3::types::MeshHandle, rend3::types::MaterialHandle) {
     let (doc, datas, _) = gltf::import(path).unwrap();
     let mesh_data = doc.meshes().next().expect("no meshes in data.glb");
 
@@ -24,7 +26,7 @@ fn load_gltf(
         .collect();
     let indices = reader.read_indices().unwrap().into_u32().collect();
 
-    let mesh = rend3::datatypes::MeshBuilder::new(vertex_positions.to_vec())
+    let mesh = rend3::types::MeshBuilder::new(vertex_positions.to_vec())
         .with_vertex_normals(vertex_normals)
         .with_vertex_tangents(vertex_tangents)
         .with_vertex_uvs(vertex_uvs)
@@ -38,8 +40,8 @@ fn load_gltf(
     // Add basic material with all defaults except a single color.
     let material = primitive.material();
     let metallic_roughness = material.pbr_metallic_roughness();
-    let material_handle = renderer.add_material(rend3::datatypes::Material {
-        albedo: rend3::datatypes::AlbedoComponent::Value(metallic_roughness.base_color_factor().into()),
+    let material_handle = renderer.add_material(rend3::types::Material {
+        albedo: rend3::types::AlbedoComponent::Value(metallic_roughness.base_color_factor().into()),
         ..Default::default()
     });
 
@@ -48,7 +50,7 @@ fn load_gltf(
 
 fn main() {
     // Setup logging
-    wgpu_subscriber::initialize_default_subscriber(None);
+    env_logger::init();
 
     // Create event loop and window
     let event_loop = winit::event_loop::EventLoop::new();
@@ -60,37 +62,33 @@ fn main() {
 
     let window_size = window.inner_size();
 
-    let mut options = rend3::RendererOptions {
-        vsync: rend3::VSyncMode::On,
-        size: [window_size.width, window_size.height],
-        ambient: glam::Vec4::default(),
-    };
-
-    let renderer = pollster::block_on(rend3::RendererBuilder::new(options.clone()).window(&window).build()).unwrap();
+    let renderer = pollster::block_on(
+        rend3::RendererBuilder::new(rend3::InternalSurfaceOptions {
+            vsync: rend3::VSyncMode::On,
+            size: UVec2::new(window_size.width, window_size.height),
+        })
+        .window(&window)
+        .build(),
+    )
+    .unwrap();
 
     // Create the default set of shaders and pipelines
-    let pipelines = pollster::block_on(async {
-        let shaders = rend3_list::DefaultShaders::new(&renderer).await;
-        rend3_list::DefaultPipelines::new(&renderer, &shaders).await
-    });
+    let mut routine = rend3_pbr::PbrRenderRoutine::new(&renderer, UVec2::new(window_size.width, window_size.height));
 
     // Create mesh and calculate smooth normals based on vertices
     let (mesh, material) = load_gltf(&renderer, concat!(env!("CARGO_MANIFEST_DIR"), "/data.glb"));
 
     // Combine the mesh and the material with a location to give an object.
-    let object = rend3::datatypes::Object {
+    let object = rend3::types::Object {
         mesh,
         material,
-        transform: rend3::datatypes::AffineTransform {
-            // Need to flip gltf's coords and winding order
-            transform: glam::Mat4::from_scale(glam::Vec3::new(1.0, 1.0, -1.0)),
-        },
+        transform: glam::Mat4::from_scale(glam::Vec3::new(1.0, 1.0, -1.0)),
     };
     let _object_handle = renderer.add_object(object);
 
     // Set camera's location
-    renderer.set_camera_data(rend3::datatypes::Camera {
-        projection: rend3::datatypes::CameraProjection::Projection {
+    renderer.set_camera_data(rend3::types::Camera {
+        projection: rend3::types::CameraProjection::Projection {
             vfov: 60.0,
             near: 0.1,
             pitch: 0.43,
@@ -100,7 +98,7 @@ fn main() {
     });
 
     // Create a single directional light
-    renderer.add_directional_light(rend3::datatypes::DirectionalLight {
+    renderer.add_directional_light(rend3::types::DirectionalLight {
         color: glam::Vec3::ONE,
         intensity: 10.0,
         // Direction will be normalized
@@ -120,26 +118,18 @@ fn main() {
             event: winit::event::WindowEvent::Resized(size),
             ..
         } => {
-            options.size = [size.width, size.height];
-            renderer.set_options(options.clone());
+            let size = UVec2::new(size.width, size.height);
+            renderer.set_internal_surface_options(rend3::InternalSurfaceOptions {
+                vsync: rend3::VSyncMode::Off,
+                size,
+            });
+            routine.resize(&renderer.device, size);
         }
         // Render!
         winit::event::Event::MainEventsCleared => {
-            // Size of the internal buffers used for rendering.
-            //
-            // This can be different from the size of the swapchain,
-            // it will be scaled to the swapchain size when being
-            // rendered onto the swapchain.
-            let internal_renderbuffer_size = options.size;
-
-            // Default set of rendering commands using the default shaders.
-            let render_list = rend3_list::default_render_list(renderer.mode(), internal_renderbuffer_size, &pipelines);
-
             // Dispatch a render!
-            let handle = renderer.render(render_list, rend3::RendererOutput::InternalSwapchain);
-
-            // Wait until it's done
-            pollster::block_on(handle);
+            let dynref: &mut dyn rend3::RenderRoutine = &mut routine;
+            let _stats = renderer.render(dynref, rend3::util::output::RendererOutput::InternalSurface);
         }
         // Other events we don't care about
         _ => {}
