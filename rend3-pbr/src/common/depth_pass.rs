@@ -12,6 +12,12 @@ use crate::{
     SampleCount,
 };
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DepthPassType {
+    Shadow,
+    Prepass,
+}
+
 pub struct BuildDepthPassShaderArgs<'a> {
     pub mode: RendererMode,
     pub device: &'a Device,
@@ -22,8 +28,7 @@ pub struct BuildDepthPassShaderArgs<'a> {
     pub materials: &'a MaterialManager,
 
     pub samples: SampleCount,
-    /// TODO: How could this be better expressed
-    pub include_color: bool,
+    pub ty: DepthPassType,
 }
 
 pub fn build_depth_pass_shader(args: BuildDepthPassShaderArgs) -> RenderPipeline {
@@ -87,7 +92,10 @@ pub fn build_depth_pass_shader(args: BuildDepthPassShaderArgs) -> RenderPipeline
             topology: PrimitiveTopology::TriangleList,
             strip_index_format: None,
             front_face: FrontFace::Cw,
-            cull_mode: Some(Face::Back),
+            cull_mode: Some(match args.ty {
+                DepthPassType::Shadow => Face::Front,
+                DepthPassType::Prepass => Face::Back,
+            }),
             clamp_depth: false,
             polygon_mode: PolygonMode::Fill,
             conservative: false,
@@ -95,20 +103,18 @@ pub fn build_depth_pass_shader(args: BuildDepthPassShaderArgs) -> RenderPipeline
         depth_stencil: Some(DepthStencilState {
             format: TextureFormat::Depth32Float,
             depth_write_enabled: true,
-            depth_compare: if args.include_color {
-                CompareFunction::GreaterEqual
-            } else {
-                CompareFunction::LessEqual
+            depth_compare: match args.ty {
+                DepthPassType::Shadow => CompareFunction::GreaterEqual,
+                DepthPassType::Prepass => CompareFunction::LessEqual,
             },
             stencil: StencilState::default(),
-            bias: if args.include_color {
-                DepthBiasState::default()
-            } else {
-                DepthBiasState {
+            bias: match args.ty {
+                DepthPassType::Shadow => DepthBiasState::default(),
+                DepthPassType::Prepass => DepthBiasState {
                     constant: 2,
                     slope_scale: 2.0,
                     clamp: 0.0,
-                }
+                },
             },
         }),
         multisample: MultisampleState {
@@ -118,7 +124,10 @@ pub fn build_depth_pass_shader(args: BuildDepthPassShaderArgs) -> RenderPipeline
         fragment: Some(FragmentState {
             module: &depth_prepass_frag,
             entry_point: "main",
-            targets: if args.include_color { &color_state } else { &[] },
+            targets: match args.ty {
+                DepthPassType::Prepass => &color_state,
+                DepthPassType::Shadow => &[],
+            },
         }),
     })
 }

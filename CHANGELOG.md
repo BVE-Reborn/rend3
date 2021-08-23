@@ -16,6 +16,9 @@ and this project adheres to cargo's version of [Semantic Versioning](https://sem
 
 ## Unreleased
 
+### Fixed
+- rend3-pbr: Shadow artifacting due to incorrect face culling when rendering shadow passes
+
 ### Added
 - Multisampling support in PBR render routine.
 
