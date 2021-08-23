@@ -231,7 +231,7 @@ impl PrimaryPasses {
 
         let material_manager = renderer.material_manager.read();
         let directional_light_manager = renderer.directional_light_manager.read();
-        let colorless_depth_pipeline = Arc::new(common::depth_pass::build_depth_pass_shader(
+        let shadow_pipeline = Arc::new(common::depth_pass::build_depth_pass_shader(
             common::depth_pass::BuildDepthPassShaderArgs {
                 mode: renderer.mode,
                 device: &renderer.device,
@@ -239,10 +239,10 @@ impl PrimaryPasses {
                 texture_bgl: gpu_d2_texture_bgl,
                 materials: &material_manager,
                 samples: SampleCount::One,
-                include_color: false,
+                ty: common::depth_pass::DepthPassType::Shadow,
             },
         ));
-        let colored_depth_pipeline = Arc::new(common::depth_pass::build_depth_pass_shader(
+        let depth_pipeline = Arc::new(common::depth_pass::build_depth_pass_shader(
             common::depth_pass::BuildDepthPassShaderArgs {
                 mode: renderer.mode,
                 device: &renderer.device,
@@ -250,7 +250,7 @@ impl PrimaryPasses {
                 texture_bgl: gpu_d2_texture_bgl,
                 materials: &material_manager,
                 samples,
-                include_color: true,
+                ty: common::depth_pass::DepthPassType::Prepass,
             },
         ));
         let skybox_pipeline = common::skybox_pass::build_skybox_shader(common::skybox_pass::BuildSkyboxShaderArgs {
@@ -271,9 +271,9 @@ impl PrimaryPasses {
             },
         ));
         Self {
-            shadow_passes: directional::DirectionalShadowPass::new(Arc::clone(&colorless_depth_pipeline)),
+            shadow_passes: directional::DirectionalShadowPass::new(Arc::clone(&shadow_pipeline)),
             skybox_pass: skybox::SkyboxPass::new(skybox_pipeline),
-            opaque_pass: opaque::OpaquePass::new(Arc::clone(&colored_depth_pipeline), Arc::clone(&opaque_pipeline)),
+            opaque_pass: opaque::OpaquePass::new(Arc::clone(&depth_pipeline), Arc::clone(&opaque_pipeline)),
         }
     }
 }
