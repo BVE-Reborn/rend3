@@ -72,8 +72,14 @@ fn main() {
     )
     .unwrap();
 
-    // Create the default set of shaders and pipelines
-    let mut routine = rend3_pbr::PbrRenderRoutine::new(&renderer, UVec2::new(window_size.width, window_size.height));
+    // Create the pbr pipeline with the same internal resolution and 4x multisampling
+    let mut routine = rend3_pbr::PbrRenderRoutine::new(
+        &renderer,
+        rend3_pbr::RenderTextureOptions {
+            resolution: UVec2::new(window_size.width, window_size.height),
+            samples: rend3_pbr::SampleCount::Four,
+        },
+    );
 
     // Create mesh and calculate smooth normals based on vertices
     let (mesh, material) = load_gltf(&renderer, concat!(env!("CARGO_MANIFEST_DIR"), "/data.glb"));
@@ -123,7 +129,13 @@ fn main() {
                 vsync: rend3::VSyncMode::Off,
                 size,
             });
-            routine.resize(&renderer.device, size);
+            routine.resize(
+                &renderer,
+                rend3_pbr::RenderTextureOptions {
+                    resolution: size,
+                    samples: rend3_pbr::SampleCount::Four,
+                },
+            );
         }
         // Render!
         winit::event::Event::MainEventsCleared => {
