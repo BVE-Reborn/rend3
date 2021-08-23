@@ -9,6 +9,7 @@ use wgpu::{
 use crate::{
     common::{interfaces::ShaderInterfaces, shaders::mode_safe_shader},
     vertex::{cpu_vertex_buffers, gpu_vertex_buffers},
+    SampleCount,
 };
 
 pub struct BuildDepthPassShaderArgs<'a> {
@@ -20,6 +21,7 @@ pub struct BuildDepthPassShaderArgs<'a> {
 
     pub materials: &'a MaterialManager,
 
+    pub samples: SampleCount,
     /// TODO: How could this be better expressed
     pub include_color: bool,
 }
@@ -109,7 +111,10 @@ pub fn build_depth_pass_shader(args: BuildDepthPassShaderArgs) -> RenderPipeline
                 }
             },
         }),
-        multisample: MultisampleState::default(),
+        multisample: MultisampleState {
+            count: args.samples as u32,
+            ..Default::default()
+        },
         fragment: Some(FragmentState {
             module: &depth_prepass_frag,
             entry_point: "main",

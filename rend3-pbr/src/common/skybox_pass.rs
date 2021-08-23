@@ -5,13 +5,15 @@ use wgpu::{
     RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptor, StencilState, TextureFormat, VertexState,
 };
 
-use crate::{common::interfaces::ShaderInterfaces, shaders::SPIRV_SHADERS};
+use crate::{common::interfaces::ShaderInterfaces, shaders::SPIRV_SHADERS, SampleCount};
 
 pub struct BuildSkyboxShaderArgs<'a> {
     pub mode: RendererMode,
     pub device: &'a Device,
 
     pub interfaces: &'a ShaderInterfaces,
+
+    pub samples: SampleCount,
 }
 
 pub fn build_skybox_shader(args: BuildSkyboxShaderArgs<'_>) -> RenderPipeline {
@@ -58,7 +60,10 @@ pub fn build_skybox_shader(args: BuildSkyboxShaderArgs<'_>) -> RenderPipeline {
             stencil: StencilState::default(),
             bias: DepthBiasState::default(),
         }),
-        multisample: MultisampleState::default(),
+        multisample: MultisampleState {
+            count: args.samples as u32,
+            ..Default::default()
+        },
         fragment: Some(FragmentState {
             module: &skybox_pass_frag,
             entry_point: "main",

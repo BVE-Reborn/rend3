@@ -16,6 +16,12 @@ and this project adheres to cargo's version of [Semantic Versioning](https://sem
 
 ## Unreleased
 
+### Added
+- Multisampling support in PBR render routine.
+
+### Changed
+- PBR render routine creation and resizing's `resolution` argument replaced with options containing resolution and sample count.
+
 ## v0.0.6
 
 Released 2021-08-22

@@ -9,6 +9,7 @@ use wgpu::{
 use crate::{
     common::{interfaces::ShaderInterfaces, shaders::mode_safe_shader},
     vertex::{cpu_vertex_buffers, gpu_vertex_buffers},
+    SampleCount,
 };
 
 pub struct BuildOpaquePassShaderArgs<'a> {
@@ -21,6 +22,8 @@ pub struct BuildOpaquePassShaderArgs<'a> {
     pub texture_bgl: ModeData<(), &'a BindGroupLayout>,
 
     pub materials: &'a MaterialManager,
+
+    pub samples: SampleCount,
 }
 
 pub fn build_opaque_pass_shader(args: BuildOpaquePassShaderArgs<'_>) -> RenderPipeline {
@@ -92,7 +95,10 @@ pub fn build_opaque_pass_shader(args: BuildOpaquePassShaderArgs<'_>) -> RenderPi
             stencil: StencilState::default(),
             bias: DepthBiasState::default(),
         }),
-        multisample: MultisampleState::default(),
+        multisample: MultisampleState {
+            count: args.samples as u32,
+            ..Default::default()
+        },
         fragment: Some(FragmentState {
             module: &opaque_pass_frag,
             entry_point: "main",
