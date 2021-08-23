@@ -104,13 +104,13 @@ pub fn build_depth_pass_shader(args: BuildDepthPassShaderArgs) -> RenderPipeline
             format: TextureFormat::Depth32Float,
             depth_write_enabled: true,
             depth_compare: match args.ty {
-                DepthPassType::Shadow => CompareFunction::GreaterEqual,
-                DepthPassType::Prepass => CompareFunction::LessEqual,
+                DepthPassType::Shadow => CompareFunction::LessEqual,
+                DepthPassType::Prepass => CompareFunction::GreaterEqual,
             },
             stencil: StencilState::default(),
             bias: match args.ty {
-                DepthPassType::Shadow => DepthBiasState::default(),
-                DepthPassType::Prepass => DepthBiasState {
+                DepthPassType::Prepass => DepthBiasState::default(),
+                DepthPassType::Shadow => DepthBiasState {
                     constant: 2,
                     slope_scale: 2.0,
                     clamp: 0.0,

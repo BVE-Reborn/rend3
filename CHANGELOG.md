@@ -16,14 +16,14 @@ and this project adheres to cargo's version of [Semantic Versioning](https://sem
 
 ## Unreleased
 
-### Fixed
-- rend3-pbr: Shadow artifacting due to incorrect face culling when rendering shadow passes
-
 ### Added
-- Multisampling support in PBR render routine.
+- rend3-pbr: Multisampling support
 
 ### Changed
-- PBR render routine creation and resizing's `resolution` argument replaced with options containing resolution and sample count.
+- rend3-pbr: creation and resizing's `resolution` argument replaced with options containing resolution and sample count.
+
+### Fixed
+- rend3-pbr: Shadow artifacting due to incorrect face culling when rendering shadow passes
 
 ## v0.0.6
 
