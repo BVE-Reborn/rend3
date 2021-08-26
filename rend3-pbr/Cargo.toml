@@ -13,7 +13,7 @@ categories = ["game-development", "graphics", "rendering", "rendering::engine"]
 [dependencies]
 arrayvec = "0.7"
 bytemuck = "1"
-glam = { version = "0.17", features = ["bytemuck"] }
+glam = { version = "0.18", features = ["bytemuck"] }
 include_dir = "0.6"
 log = "0.4"
 parking_lot = { version = "0.11" }
