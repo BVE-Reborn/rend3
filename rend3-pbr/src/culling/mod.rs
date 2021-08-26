@@ -18,7 +18,7 @@ pub struct GPUIndirectData {
 #[derive(Debug, Copy, Clone)]
 pub struct CPUDrawCall {
     pub start_idx: u32,
-    pub count: u32,
+    pub end_idx: u32,
     pub vertex_offset: i32,
     pub handle: MaterialHandle,
 }

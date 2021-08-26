@@ -24,6 +24,7 @@ and this project adheres to cargo's version of [Semantic Versioning](https://sem
 
 ### Fixed
 - rend3-pbr: Shadow artifacting due to incorrect face culling when rendering shadow passes
+- rend3-pbr: CPU mode drawing failed to account for proper vertex offsets
 
 ## v0.0.6
 
