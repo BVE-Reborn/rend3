@@ -11,7 +11,7 @@ categories = ["game-development", "graphics", "parser-implementations", "renderi
 
 [dependencies]
 gltf = { version = "0.16", default-features = false, features = ["KHR_lights_punctual", "KHR_materials_unlit", "extras", "names", "utils"] }
-glam = "0.17"
+glam = "0.18"
 fnv = "1"
 image = "0.23"
 rend3 = { version = "^0.0.6", path = "../rend3" }
