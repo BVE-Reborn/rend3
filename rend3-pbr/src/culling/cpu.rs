@@ -61,7 +61,7 @@ impl CpuCuller {
 
             calls.push(CPUDrawCall {
                 start_idx: object.start_idx,
-                count: object.count,
+                end_idx: object.start_idx + object.count,
                 vertex_offset: object.vertex_offset,
                 handle: object.material,
             });
@@ -129,8 +129,8 @@ pub fn run<'rpass>(
 ) {
     let mut state_sample_type = SampleType::Linear;
 
-    for (idx, draws) in draws.iter().enumerate() {
-        let (material_bind_group, sample_type) = materials.cpu_get_bind_group(draws.handle);
+    for (idx, draw) in draws.iter().enumerate() {
+        let (material_bind_group, sample_type) = materials.cpu_get_bind_group(draw.handle);
 
         // As a workaround for OpenGL's combined samplers, we need to manually swap the linear and nearest samplers so that shader code can think it's always using linear.
         if state_sample_type != sample_type {
@@ -144,6 +144,6 @@ pub fn run<'rpass>(
 
         rpass.set_bind_group(material_binding_index, material_bind_group, &[]);
         let idx = idx as u32;
-        rpass.draw_indexed(0..draws.count, draws.vertex_offset, idx..idx + 1);
+        rpass.draw_indexed(draw.start_idx..draw.end_idx, draw.vertex_offset, idx..idx + 1);
     }
 }
