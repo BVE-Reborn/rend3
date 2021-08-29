@@ -84,59 +84,38 @@ impl Renderer {
     pub fn add_mesh(&self, mesh: Mesh) -> MeshHandle {
         let handle = self.mesh_manager.read().allocate();
 
-        self.instructions
-            .producer
-            .lock()
-            .push(Instruction::AddMesh { handle, mesh });
+        self.instructions.producer.lock().push(Instruction::AddMesh {
+            handle: handle.clone(),
+            mesh,
+        });
 
         handle
-    }
-
-    pub fn remove_mesh(&self, handle: MeshHandle) {
-        self.instructions
-            .producer
-            .lock()
-            .push(Instruction::RemoveMesh { handle });
     }
 
     pub fn add_texture_2d(&self, texture: Texture) -> TextureHandle {
         let handle = self.d2_texture_manager.read().allocate();
-        self.instructions
-            .producer
-            .lock()
-            .push(Instruction::AddTexture2D { handle, texture });
+        self.instructions.producer.lock().push(Instruction::AddTexture2D {
+            handle: handle.clone(),
+            texture,
+        });
         handle
-    }
-
-    pub fn remove_texture_2d(&self, handle: TextureHandle) {
-        self.instructions
-            .producer
-            .lock()
-            .push(Instruction::RemoveTexture2D { handle })
     }
 
     pub fn add_texture_cube(&self, texture: Texture) -> TextureHandle {
         let handle = self.d2c_texture_manager.read().allocate();
-        self.instructions
-            .producer
-            .lock()
-            .push(Instruction::AddTextureCube { handle, texture });
+        self.instructions.producer.lock().push(Instruction::AddTextureCube {
+            handle: handle.clone(),
+            texture,
+        });
         handle
-    }
-
-    pub fn remove_texture_cube(&self, handle: TextureHandle) {
-        self.instructions
-            .producer
-            .lock()
-            .push(Instruction::RemoveTextureCube { handle })
     }
 
     pub fn add_material(&self, material: Material) -> MaterialHandle {
         let handle = self.material_manager.read().allocate();
-        self.instructions
-            .producer
-            .lock()
-            .push(Instruction::AddMaterial { handle, material });
+        self.instructions.producer.lock().push(Instruction::AddMaterial {
+            handle: handle.clone(),
+            material,
+        });
         handle
     }
 
@@ -147,19 +126,12 @@ impl Renderer {
             .push(Instruction::ChangeMaterial { handle, change })
     }
 
-    pub fn remove_material(&self, handle: MaterialHandle) {
-        self.instructions
-            .producer
-            .lock()
-            .push(Instruction::RemoveMaterial { handle });
-    }
-
     pub fn add_object(&self, object: Object) -> ObjectHandle {
         let handle = self.object_manager.read().allocate();
-        self.instructions
-            .producer
-            .lock()
-            .push(Instruction::AddObject { handle, object });
+        self.instructions.producer.lock().push(Instruction::AddObject {
+            handle: handle.clone(),
+            object,
+        });
         handle
     }
 
@@ -170,20 +142,13 @@ impl Renderer {
             .push(Instruction::SetObjectTransform { handle, transform });
     }
 
-    pub fn remove_object(&self, handle: ObjectHandle) {
-        self.instructions
-            .producer
-            .lock()
-            .push(Instruction::RemoveObject { handle })
-    }
-
     pub fn add_directional_light(&self, light: DirectionalLight) -> DirectionalLightHandle {
         let handle = self.directional_light_manager.read().allocate();
 
         self.instructions
             .producer
             .lock()
-            .push(Instruction::AddDirectionalLight { handle, light });
+            .push(Instruction::AddDirectionalLight { handle: handle.clone(), light });
 
         handle
     }
@@ -193,13 +158,6 @@ impl Renderer {
             .producer
             .lock()
             .push(Instruction::ChangeDirectionalLight { handle, change })
-    }
-
-    pub fn remove_directional_light(&self, handle: DirectionalLightHandle) {
-        self.instructions
-            .producer
-            .lock()
-            .push(Instruction::RemoveDirectionalLight { handle })
     }
 
     pub fn set_internal_surface_options(&self, options: InternalSurfaceOptions) {

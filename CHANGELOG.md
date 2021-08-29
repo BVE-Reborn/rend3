@@ -21,6 +21,12 @@ and this project adheres to cargo's version of [Semantic Versioning](https://sem
 
 ### Changed
 - rend3-pbr: creation and resizing's `resolution` argument replaced with options containing resolution and sample count.
+- rend3: **SUBTLE** All handles are now refcounted.
+  - Handles are now `!Copy`.
+  - All resources are removed the `render()` after they are deleted.
+  - If you want to keep something alive, you need to keep the handle to it alive.
+  - `Object`s will keep `Material`s/`Mesh`s alive.
+  - `Material`s will keep `Texture`s alive.
 
 ### Updated
 - Dependencies:
@@ -29,6 +35,9 @@ and this project adheres to cargo's version of [Semantic Versioning](https://sem
 ### Fixed
 - rend3-pbr: Shadow artifacting due to incorrect face culling when rendering shadow passes
 - rend3-pbr: CPU mode drawing failed to account for proper vertex offsets
+
+### Removed
+- rend3: `Renderer::delete_*` functions were removed in favor of refcounting.
 
 ## v0.0.6
 

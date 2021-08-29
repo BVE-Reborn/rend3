@@ -58,7 +58,7 @@ pub struct MeshManager {
     index_count: usize,
     index_alloc: RangeAllocator<usize>,
 
-    registry: ResourceRegistry<InternalMesh>,
+    registry: ResourceRegistry<InternalMesh, Mesh>,
 }
 
 impl MeshManager {
@@ -84,7 +84,7 @@ impl MeshManager {
     }
 
     pub fn allocate(&self) -> MeshHandle {
-        MeshHandle(self.registry.allocate())
+        self.registry.allocate()
     }
 
     pub fn fill(
@@ -92,7 +92,7 @@ impl MeshManager {
         device: &Device,
         queue: &Queue,
         encoder: &mut CommandEncoder,
-        handle: MeshHandle,
+        handle: &MeshHandle,
         mesh: Mesh,
     ) {
         assert!(mesh.validate());
@@ -163,22 +163,24 @@ impl MeshManager {
             bounding_sphere,
         };
 
-        self.registry.insert(handle.0, mesh);
-    }
-
-    pub fn remove(&mut self, handle: MeshHandle) {
-        let mesh = self.registry.remove(handle.0).1;
-
-        self.vertex_alloc.free_range(mesh.vertex_range);
-        self.index_alloc.free_range(mesh.index_range);
+        self.registry.insert(handle, mesh);
     }
 
     pub fn buffers(&self) -> &MeshBuffers {
         &self.buffers
     }
 
-    pub fn internal_data(&self, handle: MeshHandle) -> &InternalMesh {
-        self.registry.get(handle.0)
+    pub fn internal_data(&self, handle: &MeshHandle) -> &InternalMesh {
+        self.registry.get(handle)
+    }
+
+    pub fn ready(&mut self) {
+        let vertex_alloc = &mut self.vertex_alloc;
+        let index_alloc = &mut self.index_alloc;
+        self.registry.remove_all_dead(|_, _, mesh| {
+            vertex_alloc.free_range(mesh.vertex_range);
+            index_alloc.free_range(mesh.index_range);
+        });
     }
 
     fn reallocate_buffers(

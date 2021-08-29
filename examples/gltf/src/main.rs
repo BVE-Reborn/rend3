@@ -81,7 +81,9 @@ fn main() {
         },
     );
 
-    // Create mesh and calculate smooth normals based on vertices
+    // Create mesh and calculate smooth normals based on vertices.
+    //
+    // We do not need to keep these handles alive once we make the object
     let (mesh, material) = load_gltf(&renderer, concat!(env!("CARGO_MANIFEST_DIR"), "/data.glb"));
 
     // Combine the mesh and the material with a location to give an object.
@@ -90,6 +92,7 @@ fn main() {
         material,
         transform: glam::Mat4::from_scale(glam::Vec3::new(1.0, 1.0, -1.0)),
     };
+    // We need to keep the object alive.
     let _object_handle = renderer.add_object(object);
 
     // Set camera's location
@@ -104,7 +107,9 @@ fn main() {
     });
 
     // Create a single directional light
-    renderer.add_directional_light(rend3::types::DirectionalLight {
+    //
+    // We need to keep the handle alive.
+    let _directional_handle = renderer.add_directional_light(rend3::types::DirectionalLight {
         color: glam::Vec3::ONE,
         intensity: 10.0,
         // Direction will be normalized

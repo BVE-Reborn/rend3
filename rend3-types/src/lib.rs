@@ -1,27 +1,53 @@
 use glam::{Mat3, Mat4, Vec2, Vec3, Vec3A, Vec4};
-use std::mem;
+use std::{marker::PhantomData, mem, sync::{Arc, Weak}};
+
+#[derive(Debug, Clone)]
+pub struct ResourceHandle<T> {
+    refcount: Arc<()>,
+    idx: usize,
+    _phantom: PhantomData<T>,
+}
+
+impl<T> PartialEq for ResourceHandle<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.idx == other.idx
+    }
+}
+
+impl<T> Eq for ResourceHandle<T> {}
+
+impl<T> ResourceHandle<T> {
+    pub fn new(idx: usize) -> Self {
+        Self {
+            refcount: Arc::new(()),
+            idx,
+            _phantom: PhantomData,
+        }
+    }
+
+    pub fn get(&self) -> usize {
+        self.idx
+    }
+
+    pub fn get_weak_refcount(&self) -> Weak<()> {
+        Arc::downgrade(&self.refcount)
+    }
+}
 
 #[macro_export]
 #[doc(hidden)]
 macro_rules! declare_handle {
-    ($($name:ident),*) => {$(
-        #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-        pub struct $name(pub usize);
-
-        impl $name {
-            pub fn get(&self) -> usize {
-                self.0
-            }
-        }
+    ($($name:ident<$ty:ty>),*) => {$(
+        pub type $name = ResourceHandle<$ty>;
     )*};
 }
 
 declare_handle!(
-    MeshHandle,
-    TextureHandle,
-    MaterialHandle,
-    ObjectHandle,
-    DirectionalLightHandle
+    MeshHandle<Mesh>,
+    TextureHandle<Texture>,
+    MaterialHandle<Material>,
+    ObjectHandle<Object>,
+    DirectionalLightHandle<DirectionalLight>
 );
 
 macro_rules! changeable_struct {
@@ -477,13 +503,13 @@ pub enum AlbedoComponent {
     /// Albedo color is loaded from the given texture, then multiplied
     /// by the vertex color;
     TextureVertex {
-        handle: TextureHandle,
+        texture: TextureHandle,
         /// Vertex should be converted from srgb -> linear before multiplication
         srgb: bool,
     },
     /// Albedo color is loaded from given texture, then multiplied
     /// by the given value.
-    TextureValue { handle: TextureHandle, value: Vec4 },
+    TextureValue { texture: TextureHandle, value: Vec4 },
 }
 
 impl Default for AlbedoComponent {
@@ -526,12 +552,12 @@ impl AlbedoComponent {
 
     pub fn to_texture<Func, Out>(&self, func: Func) -> Option<Out>
     where
-        Func: FnOnce(TextureHandle) -> Out,
+        Func: FnOnce(&TextureHandle) -> Out,
     {
         match *self {
             Self::None | Self::Vertex { .. } | Self::Value(_) | Self::ValueVertex { .. } => None,
-            Self::Texture(handle) | Self::TextureVertex { handle, .. } | Self::TextureValue { handle, .. } => {
-                Some(func(handle))
+            Self::Texture(ref texture) | Self::TextureVertex { ref texture, .. } | Self::TextureValue { ref texture, .. } => {
+                Some(func(texture))
             }
         }
     }
@@ -542,7 +568,7 @@ pub enum MaterialComponent<T> {
     None,
     Value(T),
     Texture(TextureHandle),
-    TextureValue { handle: TextureHandle, value: T },
+    TextureValue { texture: TextureHandle, value: T },
 }
 
 impl<T> Default for MaterialComponent<T> {
@@ -565,11 +591,11 @@ impl<T: Copy> MaterialComponent<T> {
 
     pub fn to_texture<Func, Out>(&self, func: Func) -> Option<Out>
     where
-        Func: FnOnce(TextureHandle) -> Out,
+        Func: FnOnce(&TextureHandle) -> Out,
     {
         match *self {
             Self::None | Self::Value(_) => None,
-            Self::Texture(handle) | Self::TextureValue { handle, .. } => Some(func(handle)),
+            Self::Texture(ref texture) | Self::TextureValue { ref texture, .. } => Some(func(texture)),
         }
     }
 }
@@ -595,13 +621,13 @@ impl Default for NormalTexture {
 impl NormalTexture {
     pub fn to_texture<Func, Out>(&self, func: Func) -> Option<Out>
     where
-        Func: FnOnce(TextureHandle) -> Out,
+        Func: FnOnce(&TextureHandle) -> Out,
     {
         match *self {
             Self::None => None,
-            Self::Tricomponent(handle) | Self::Bicomponent(handle) | Self::BicomponentSwizzled(handle) => {
-                Some(func(handle))
-            }
+            Self::Tricomponent(ref texture)
+            | Self::Bicomponent(ref texture)
+            | Self::BicomponentSwizzled(ref texture) => Some(func(texture)),
         }
     }
 
@@ -641,16 +667,18 @@ pub enum AoMRTextures {
 impl AoMRTextures {
     pub fn to_roughness_texture<Func, Out>(&self, func: Func) -> Option<Out>
     where
-        Func: FnOnce(TextureHandle) -> Out,
+        Func: FnOnce(&TextureHandle) -> Out,
     {
         match *self {
-            Self::GltfCombined { texture: Some(texture) } => Some(func(texture)),
+            Self::GltfCombined {
+                texture: Some(ref texture),
+            } => Some(func(texture)),
             Self::GltfSplit {
-                mr_texture: Some(texture),
+                mr_texture: Some(ref texture),
                 ..
             } => Some(func(texture)),
             Self::BWSplit {
-                r_texture: Some(texture),
+                r_texture: Some(ref texture),
                 ..
             } => Some(func(texture)),
             _ => None,
@@ -659,13 +687,13 @@ impl AoMRTextures {
 
     pub fn to_metallic_texture<Func, Out>(&self, func: Func) -> Option<Out>
     where
-        Func: FnOnce(TextureHandle) -> Out,
+        Func: FnOnce(&TextureHandle) -> Out,
     {
         match *self {
             Self::GltfCombined { .. } => None,
             Self::GltfSplit { .. } => None,
             Self::BWSplit {
-                m_texture: Some(texture),
+                m_texture: Some(ref texture),
                 ..
             } => Some(func(texture)),
             _ => None,
@@ -674,16 +702,16 @@ impl AoMRTextures {
 
     pub fn to_ao_texture<Func, Out>(&self, func: Func) -> Option<Out>
     where
-        Func: FnOnce(TextureHandle) -> Out,
+        Func: FnOnce(&TextureHandle) -> Out,
     {
         match *self {
             Self::GltfCombined { .. } => None,
             Self::GltfSplit {
-                ao_texture: Some(texture),
+                ao_texture: Some(ref texture),
                 ..
             } => Some(func(texture)),
             Self::BWSplit {
-                ao_texture: Some(texture),
+                ao_texture: Some(ref texture),
                 ..
             } => Some(func(texture)),
             _ => None,
@@ -730,16 +758,18 @@ pub enum ClearcoatTextures {
 impl ClearcoatTextures {
     pub fn to_clearcoat_texture<Func, Out>(&self, func: Func) -> Option<Out>
     where
-        Func: FnOnce(TextureHandle) -> Out,
+        Func: FnOnce(&TextureHandle) -> Out,
     {
         match *self {
-            Self::GltfCombined { texture: Some(texture) } => Some(func(texture)),
+            Self::GltfCombined {
+                texture: Some(ref texture),
+            } => Some(func(texture)),
             Self::GltfSplit {
-                clearcoat_texture: Some(texture),
+                clearcoat_texture: Some(ref texture),
                 ..
             } => Some(func(texture)),
             Self::BWSplit {
-                clearcoat_texture: Some(texture),
+                clearcoat_texture: Some(ref texture),
                 ..
             } => Some(func(texture)),
             _ => None,
@@ -748,16 +778,16 @@ impl ClearcoatTextures {
 
     pub fn to_clearcoat_roughness_texture<Func, Out>(&self, func: Func) -> Option<Out>
     where
-        Func: FnOnce(TextureHandle) -> Out,
+        Func: FnOnce(&TextureHandle) -> Out,
     {
         match *self {
             Self::GltfCombined { .. } => None,
             Self::GltfSplit {
-                clearcoat_roughness_texture: Some(texture),
+                clearcoat_roughness_texture: Some(ref texture),
                 ..
             } => Some(func(texture)),
             Self::BWSplit {
-                clearcoat_roughness_texture: Some(texture),
+                clearcoat_roughness_texture: Some(ref texture),
                 ..
             } => Some(func(texture)),
             _ => None,

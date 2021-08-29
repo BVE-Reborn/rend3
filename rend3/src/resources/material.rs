@@ -125,7 +125,7 @@ unsafe impl bytemuck::Zeroable for GPUShaderMaterial {}
 unsafe impl bytemuck::Pod for GPUShaderMaterial {}
 
 impl GPUShaderMaterial {
-    pub fn from_material(material: &Material, translate_texture: &impl Fn(TextureHandle) -> NonZeroU32) -> Self {
+    pub fn from_material(material: &Material, translate_texture: &impl Fn(&TextureHandle) -> NonZeroU32) -> Self {
         Self {
             albedo: material.albedo.to_value(),
             emissive: material.emissive.to_value(Vec3::ZERO),
@@ -185,7 +185,7 @@ pub struct MaterialManager {
     bg: ModeData<(), BindGroup>,
     buffer: ModeData<(), WrappedPotBuffer>,
 
-    registry: ResourceRegistry<InternalMaterial>,
+    registry: ResourceRegistry<InternalMaterial, Material>,
 }
 
 impl MaterialManager {
@@ -273,7 +273,7 @@ impl MaterialManager {
     }
 
     pub fn allocate(&self) -> MaterialHandle {
-        MaterialHandle(self.registry.allocate())
+        self.registry.allocate()
     }
 
     pub fn fill(
@@ -281,7 +281,7 @@ impl MaterialManager {
         device: &Device,
         mode: RendererMode,
         texture_manager_2d: &mut TextureManager,
-        handle: MaterialHandle,
+        handle: &MaterialHandle,
         material: Material,
     ) {
         texture_manager_2d.ensure_null_view();
@@ -300,10 +300,10 @@ impl MaterialManager {
             || (),
         );
 
-        let lookup_fn = |handle: TextureHandle| texture_manager_2d.get_view(handle);
+        let lookup_fn = |handle: &TextureHandle| texture_manager_2d.get_view(handle);
 
         self.registry.insert(
-            handle.0,
+            handle,
             InternalMaterial {
                 bind_group: mode.into_data(
                     || {
@@ -349,12 +349,8 @@ impl MaterialManager {
         );
     }
 
-    pub fn remove(&mut self, handle: MaterialHandle) {
-        self.registry.remove(handle.0);
-    }
-
-    pub fn update_from_changes(&mut self, queue: &Queue, handle: MaterialHandle, change: MaterialChange) {
-        let material = self.registry.get_mut(handle.0);
+    pub fn update_from_changes(&mut self, queue: &Queue, handle: &MaterialHandle, change: MaterialChange) {
+        let material = self.registry.get_mut(handle);
         material.mat.update_from_changes(change);
 
         if let ModeData::CPU(ref mut mat_buffer) = material.material_buffer {
@@ -367,8 +363,8 @@ impl MaterialManager {
         self.bgl.as_ref().into_common()
     }
 
-    pub fn cpu_get_bind_group(&self, handle: MaterialHandle) -> (&BindGroup, SampleType) {
-        let material = self.registry.get(handle.0);
+    pub fn cpu_get_bind_group(&self, handle: &usize) -> (&BindGroup, SampleType) {
+        let material = self.registry.get_raw(handle);
         (material.bind_group.as_cpu(), material.mat.sample_type)
     }
 
@@ -376,11 +372,13 @@ impl MaterialManager {
         self.bg.as_gpu()
     }
 
-    pub fn internal_index(&self, handle: MaterialHandle) -> usize {
-        self.registry.get_index_of(handle.0)
+    pub fn internal_index(&self, handle: &MaterialHandle) -> usize {
+        self.registry.get_index_of(handle)
     }
 
     pub fn ready(&mut self, device: &Device, queue: &Queue, texture_manager: &TextureManager) {
+        self.registry.remove_all_dead(|_, _, _| ());
+
         if let ModeData::GPU(ref mut buffer) = self.buffer {
             let translate_texture = texture_manager.translation_fn();
             let data: Vec<_> = self

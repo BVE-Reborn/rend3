@@ -89,7 +89,9 @@ fn main() {
     // Create mesh and calculate smooth normals based on vertices
     let mesh = create_mesh();
 
-    // Add mesh to renderer's world
+    // Add mesh to renderer's world.
+    // 
+    // All handles are refcounted, so we only need to hang onto the handle until we make an object.
     let mesh_handle = renderer.add_mesh(mesh);
 
     // Add basic material with all defaults except a single color.
@@ -105,6 +107,10 @@ fn main() {
         material: material_handle,
         transform: glam::Mat4::IDENTITY,
     };
+    // Creating an object will hold onto both the mesh and the material
+    // even if they are deleted.
+    //
+    // We need to keep the object handle alive.
     let _object_handle = renderer.add_object(object);
 
     // Set camera's location
@@ -119,7 +125,9 @@ fn main() {
     });
 
     // Create a single directional light
-    renderer.add_directional_light(rend3::types::DirectionalLight {
+    //
+    // We need to keep the directional light handle alive.
+    let _directional_handle = renderer.add_directional_light(rend3::types::DirectionalLight {
         color: glam::Vec3::ONE,
         intensity: 10.0,
         // Direction will be normalized

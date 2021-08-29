@@ -23,7 +23,7 @@ pub struct TextureManager {
     null_tex_man: NullTextureManager,
 
     views: Vec<TextureView>,
-    registry: ResourceRegistry<InternalTexture>,
+    registry: ResourceRegistry<InternalTexture, rend3_types::Texture>,
 
     dimension: TextureViewDimension,
 }
@@ -57,13 +57,13 @@ impl TextureManager {
     }
 
     pub fn allocate(&self) -> TextureHandle {
-        TextureHandle(self.registry.allocate())
+        self.registry.allocate()
     }
 
-    pub fn fill(&mut self, handle: TextureHandle, texture: TextureView, format: Option<TextureFormat>) {
+    pub fn fill(&mut self, handle: &TextureHandle, texture: TextureView, format: Option<TextureFormat>) {
         self.group_dirty = self.group_dirty.map_gpu(|_| true);
 
-        let index = self.registry.insert(handle.0, InternalTexture { format });
+        let index = self.registry.insert(handle, InternalTexture { format });
 
         if index >= self.views.len() {
             self.layout_dirty = self.layout_dirty.map_gpu(|_| true);
@@ -77,24 +77,25 @@ impl TextureManager {
         self.null_tex_man.put(old_null);
     }
 
-    pub fn remove(&mut self, handle: TextureHandle) {
-        let (index, _) = self.registry.remove(handle.0);
-
-        let active_count = self.registry.count();
-
-        // Do the same swap remove move as the registry did
-        if active_count > 1 {
-            self.views.swap(index, active_count);
-        }
-        // Overwrite the last item with the null tex
-        self.views[active_count] = self.null_tex_man.get(self.dimension);
-    }
-
-    pub fn internal_index(&self, handle: TextureHandle) -> usize {
-        self.registry.get_index_of(handle.0)
+    pub fn internal_index(&self, handle: &TextureHandle) -> usize {
+        self.registry.get_index_of(handle)
     }
 
     pub fn ready(&mut self, device: &Device) -> TextureManagerReadyOutput {
+        let dimension = self.dimension;
+        let null_tex_man = &mut self.null_tex_man;
+        let views = &mut self.views;
+        self.registry.remove_all_dead(|registry, index, _| {
+            let active_count = registry.count();
+
+            // Do the same swap remove move as the registry did
+            if active_count > 1 {
+                views.swap(index, active_count);
+            }
+            // Overwrite the last item with the null tex
+            views[active_count] = null_tex_man.get(dimension);
+        });
+
         if let ModeData::GPU(_) = self.layout_dirty {
             let layout_dirty = self.layout_dirty;
 
@@ -127,8 +128,8 @@ impl TextureManager {
         }
     }
 
-    pub fn get_view(&self, handle: TextureHandle) -> &TextureView {
-        &self.views[self.registry.get_index_of(handle.0)]
+    pub fn get_view(&self, handle: &TextureHandle) -> &TextureView {
+        &self.views[self.registry.get_index_of(handle)]
     }
 
     pub fn ensure_null_view(&mut self) {
@@ -143,8 +144,8 @@ impl TextureManager {
         self.layout.as_gpu()
     }
 
-    pub fn translation_fn(&self) -> impl Fn(TextureHandle) -> NonZeroU32 + Copy + '_ {
-        move |v: TextureHandle| NonZeroU32::new(self.internal_index(v) as u32 + 1).unwrap()
+    pub fn translation_fn(&self) -> impl Fn(&TextureHandle) -> NonZeroU32 + Copy + '_ {
+        move |v: &TextureHandle| NonZeroU32::new(self.internal_index(v) as u32 + 1).unwrap()
     }
 }
 

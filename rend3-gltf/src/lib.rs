@@ -114,8 +114,8 @@ fn load_gltf_impl<'a, E: std::error::Error + 'static>(
                     .get(&mat_idx)
                     .ok_or_else(|| GltfLoadError::MissingMaterial(mat_idx.expect("Could not find default material")))?;
                 let object_handle = renderer.add_object(types::Object {
-                    mesh: prim.handle,
-                    material: *mat,
+                    mesh: prim.handle.clone(),
+                    material: mat.clone(),
                     transform,
                 });
                 objects.push(object_handle);
@@ -300,7 +300,7 @@ where
         let handle = renderer.add_material(types::Material {
             albedo: match albedo_tex {
                 Some(tex) => types::AlbedoComponent::TextureValue {
-                    handle: tex,
+                    texture: tex,
                     value: Vec4::from(albedo_factor),
                 },
                 None => types::AlbedoComponent::Value(Vec4::from(albedo_factor)),
@@ -320,7 +320,7 @@ where
             metallic_factor: Some(metallic_factor),
             emissive: match emissive_tex {
                 Some(tex) => types::MaterialComponent::TextureValue {
-                    handle: tex,
+                    texture: tex,
                     value: Vec3::from(emissive_factor),
                 },
                 None => types::MaterialComponent::Value(Vec3::from(emissive_factor)),
@@ -376,7 +376,7 @@ where
             mip_levels: 1,
         });
 
-        loaded.images.insert(key, handle);
+        loaded.images.insert(key, handle.clone());
 
         Ok(handle)
     } else {

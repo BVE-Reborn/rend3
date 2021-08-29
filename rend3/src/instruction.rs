@@ -14,22 +14,13 @@ pub enum Instruction {
         handle: MeshHandle,
         mesh: Mesh,
     },
-    RemoveMesh {
-        handle: MeshHandle,
-    },
     AddTexture2D {
         handle: TextureHandle,
         texture: Texture,
     },
-    RemoveTexture2D {
-        handle: TextureHandle,
-    },
     AddTextureCube {
         handle: TextureHandle,
         texture: Texture,
-    },
-    RemoveTextureCube {
-        handle: TextureHandle,
     },
     AddMaterial {
         handle: MaterialHandle,
@@ -39,9 +30,6 @@ pub enum Instruction {
         handle: MaterialHandle,
         change: MaterialChange,
     },
-    RemoveMaterial {
-        handle: MaterialHandle,
-    },
     AddObject {
         handle: ObjectHandle,
         object: Object,
@@ -50,9 +38,6 @@ pub enum Instruction {
         handle: ObjectHandle,
         transform: Mat4,
     },
-    RemoveObject {
-        handle: ObjectHandle,
-    },
     AddDirectionalLight {
         handle: DirectionalLightHandle,
         light: DirectionalLight,
@@ -60,9 +45,6 @@ pub enum Instruction {
     ChangeDirectionalLight {
         handle: DirectionalLightHandle,
         change: DirectionalLightChange,
-    },
-    RemoveDirectionalLight {
-        handle: DirectionalLightHandle,
     },
     SetInternalSurfaceOptions {
         options: InternalSurfaceOptions,
