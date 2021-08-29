@@ -34,7 +34,6 @@ skip = [
 vulnerability = "warn"
 unmaintained = "warn"
 ignore = [
-    "RUSTSEC-2021-0090" # ash: read-spirv
 ]
 
 [sources]
