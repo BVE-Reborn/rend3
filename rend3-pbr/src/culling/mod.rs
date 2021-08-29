@@ -1,5 +1,5 @@
 use glam::Mat4;
-use rend3::{util::frustum::BoundingSphere, ModeData};
+use rend3::{ModeData, types::RawMaterialHandle, util::frustum::BoundingSphere};
 use wgpu::{BindGroup, Buffer};
 
 pub mod cpu;
@@ -20,7 +20,7 @@ pub struct CPUDrawCall {
     pub start_idx: u32,
     pub end_idx: u32,
     pub vertex_offset: i32,
-    pub material_handle: usize,
+    pub material_handle: RawMaterialHandle,
 }
 
 #[repr(C, align(16))]

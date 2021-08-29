@@ -1,5 +1,6 @@
 use crate::{mode::ModeData, types::TextureHandle, util::registry::ResourceRegistry, RendererMode};
 use std::{mem, num::NonZeroU32, sync::Arc};
+use rend3_types::RawTextureHandle;
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
     BindingResource, BindingType, Device, Extent3d, ShaderStages, Texture, TextureDescriptor, TextureDimension,
@@ -77,7 +78,7 @@ impl TextureManager {
         self.null_tex_man.put(old_null);
     }
 
-    pub fn internal_index(&self, handle: &TextureHandle) -> usize {
+    pub fn internal_index(&self, handle: RawTextureHandle) -> usize {
         self.registry.get_index_of(handle)
     }
 
@@ -128,7 +129,7 @@ impl TextureManager {
         }
     }
 
-    pub fn get_view(&self, handle: &TextureHandle) -> &TextureView {
+    pub fn get_view(&self, handle: RawTextureHandle) -> &TextureView {
         &self.views[self.registry.get_index_of(handle)]
     }
 
@@ -145,7 +146,7 @@ impl TextureManager {
     }
 
     pub fn translation_fn(&self) -> impl Fn(&TextureHandle) -> NonZeroU32 + Copy + '_ {
-        move |v: &TextureHandle| NonZeroU32::new(self.internal_index(v) as u32 + 1).unwrap()
+        move |v: &TextureHandle| NonZeroU32::new(self.internal_index(v.get_raw()) as u32 + 1).unwrap()
     }
 }
 

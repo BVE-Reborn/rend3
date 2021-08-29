@@ -6,6 +6,7 @@ use crate::{
     RendererMode,
 };
 use glam::{Vec3, Vec4};
+use rend3_types::RawMaterialHandle;
 use std::{
     mem,
     num::{NonZeroU32, NonZeroU64},
@@ -300,7 +301,7 @@ impl MaterialManager {
             || (),
         );
 
-        let lookup_fn = |handle: &TextureHandle| texture_manager_2d.get_view(handle);
+        let lookup_fn = |handle: &TextureHandle| texture_manager_2d.get_view(handle.get_raw());
 
         self.registry.insert(
             handle,
@@ -349,7 +350,7 @@ impl MaterialManager {
         );
     }
 
-    pub fn update_from_changes(&mut self, queue: &Queue, handle: &MaterialHandle, change: MaterialChange) {
+    pub fn update_from_changes(&mut self, queue: &Queue, handle: RawMaterialHandle, change: MaterialChange) {
         let material = self.registry.get_mut(handle);
         material.mat.update_from_changes(change);
 
@@ -363,8 +364,8 @@ impl MaterialManager {
         self.bgl.as_ref().into_common()
     }
 
-    pub fn cpu_get_bind_group(&self, handle: &usize) -> (&BindGroup, SampleType) {
-        let material = self.registry.get_raw(handle);
+    pub fn cpu_get_bind_group(&self, handle: RawMaterialHandle) -> (&BindGroup, SampleType) {
+        let material = self.registry.get(handle);
         (material.bind_group.as_cpu(), material.mat.sample_type)
     }
 
@@ -372,7 +373,7 @@ impl MaterialManager {
         self.bg.as_gpu()
     }
 
-    pub fn internal_index(&self, handle: &MaterialHandle) -> usize {
+    pub fn internal_index(&self, handle: RawMaterialHandle) -> usize {
         self.registry.get_index_of(handle)
     }
 

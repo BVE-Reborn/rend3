@@ -1,6 +1,6 @@
 use fnv::FnvBuildHasher;
 use indexmap::map::IndexMap;
-use rend3_types::ResourceHandle;
+use rend3_types::{RawResourceHandle, ResourceHandle};
 use std::{
     marker::PhantomData,
     sync::{
@@ -39,7 +39,7 @@ impl<T, HandleType> ResourceRegistry<T, HandleType> {
     pub fn insert(&mut self, handle: &ResourceHandle<HandleType>, data: T) -> usize {
         self.mapping
             .insert_full(
-                handle.get(),
+                handle.get_raw().idx,
                 ResourceStorage {
                     refcount: handle.get_weak_refcount(),
                     data,
@@ -72,20 +72,16 @@ impl<T, HandleType> ResourceRegistry<T, HandleType> {
         self.mapping.values_mut().map(|ResourceStorage { data, .. }| data)
     }
 
-    pub fn get(&self, handle: &ResourceHandle<HandleType>) -> &T {
-        &self.mapping.get(&handle.get()).unwrap().data
+    pub fn get(&self, handle: RawResourceHandle<HandleType>) -> &T {
+        &self.mapping.get(&handle.idx).unwrap().data
     }
 
-    pub fn get_raw(&self, handle: &usize) -> &T {
-        &self.mapping.get(handle).unwrap().data
+    pub fn get_mut(&mut self, handle: RawResourceHandle<HandleType>) -> &mut T {
+        &mut self.mapping.get_mut(&handle.idx).unwrap().data
     }
 
-    pub fn get_mut(&mut self, handle: &ResourceHandle<HandleType>) -> &mut T {
-        &mut self.mapping.get_mut(&handle.get()).unwrap().data
-    }
-
-    pub fn get_index_of(&self, handle: &ResourceHandle<HandleType>) -> usize {
-        self.mapping.get_index_of(&handle.get()).unwrap()
+    pub fn get_index_of(&self, handle: RawResourceHandle<HandleType>) -> usize {
+        self.mapping.get_index_of(&handle.idx).unwrap()
     }
 
     pub fn count(&self) -> usize {

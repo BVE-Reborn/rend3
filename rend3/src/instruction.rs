@@ -1,12 +1,13 @@
 use crate::{
     types::{
         Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Material, MaterialChange,
-        MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, Texture, TextureHandle,
+        RawMaterialHandle, Mesh, Object, RawObjectHandle, Texture,
     },
     InternalSurfaceOptions,
 };
 use glam::Mat4;
 use parking_lot::Mutex;
+use rend3_types::{MaterialHandle, MeshHandle, ObjectHandle, RawDirectionalLightHandle, TextureHandle};
 use std::mem;
 
 pub enum Instruction {
@@ -27,7 +28,7 @@ pub enum Instruction {
         material: Material,
     },
     ChangeMaterial {
-        handle: MaterialHandle,
+        handle: RawMaterialHandle,
         change: MaterialChange,
     },
     AddObject {
@@ -35,7 +36,7 @@ pub enum Instruction {
         object: Object,
     },
     SetObjectTransform {
-        handle: ObjectHandle,
+        handle: RawObjectHandle,
         transform: Mat4,
     },
     AddDirectionalLight {
@@ -43,7 +44,7 @@ pub enum Instruction {
         light: DirectionalLight,
     },
     ChangeDirectionalLight {
-        handle: DirectionalLightHandle,
+        handle: RawDirectionalLightHandle,
         change: DirectionalLightChange,
     },
     SetInternalSurfaceOptions {

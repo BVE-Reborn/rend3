@@ -4,6 +4,7 @@ use crate::{
     util::{frustum::BoundingSphere, registry::ResourceRegistry},
 };
 use glam::Mat4;
+use rend3_types::RawObjectHandle;
 
 #[derive(Debug, Clone)]
 pub struct InternalObject {
@@ -30,7 +31,7 @@ impl ObjectManager {
     }
 
     pub fn fill(&mut self, handle: &ObjectHandle, object: Object, mesh_manager: &MeshManager) {
-        let mesh = mesh_manager.internal_data(&object.mesh);
+        let mesh = mesh_manager.internal_data(object.mesh.get_raw());
 
         let shader_object = InternalObject {
             material: object.material,
@@ -49,7 +50,7 @@ impl ObjectManager {
         self.registry.values().cloned().collect()
     }
 
-    pub fn set_object_transform(&mut self, handle: &ObjectHandle, transform: Mat4) {
+    pub fn set_object_transform(&mut self, handle: RawObjectHandle, transform: Mat4) {
         self.registry.get_mut(handle).transform = transform;
     }
 }

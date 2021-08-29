@@ -1,6 +1,36 @@
 use glam::{Mat3, Mat4, Vec2, Vec3, Vec3A, Vec4};
-use std::{marker::PhantomData, mem, sync::{Arc, Weak}};
+use std::{
+    fmt::Debug,
+    marker::PhantomData,
+    mem,
+    sync::{Arc, Weak},
+};
 
+/// Non-owning resource handle. Not part of rend3's external interface, but needed to interface with rend3's internal datastructures if writing your own structures or render routines.
+pub struct RawResourceHandle<T> {
+    pub idx: usize,
+    _phantom: PhantomData<T>,
+}
+
+// Need Debug/Copy/Clone impls that don't require T: Trait.
+impl<T> Debug for RawResourceHandle<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RawResourceHandle").field("idx", &self.idx).finish()
+    }
+}
+
+impl<T> Copy for RawResourceHandle<T> {}
+
+impl<T> Clone for RawResourceHandle<T> {
+    fn clone(&self) -> Self {
+        Self {
+            idx: self.idx,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+/// Owning resource handle. Used as part of rend3's interface.
 #[derive(Debug, Clone)]
 pub struct ResourceHandle<T> {
     refcount: Arc<()>,
@@ -17,6 +47,9 @@ impl<T> PartialEq for ResourceHandle<T> {
 impl<T> Eq for ResourceHandle<T> {}
 
 impl<T> ResourceHandle<T> {
+    /// Create a new resource handle from an index. 
+    ///
+    /// Part of rend3's internal interface, use `Renderer::add_*` instead.
     pub fn new(idx: usize) -> Self {
         Self {
             refcount: Arc::new(()),
@@ -25,10 +58,19 @@ impl<T> ResourceHandle<T> {
         }
     }
 
-    pub fn get(&self) -> usize {
-        self.idx
+    /// Gets the equivalent raw handle for this owning handle.
+    ///
+    /// Part of rend3's internal interface for accessing internal resrouces
+    pub fn get_raw(&self) -> RawResourceHandle<T> {
+        RawResourceHandle {
+            idx: self.idx,
+            _phantom: PhantomData,
+        }
     }
 
+    /// Get the weak refcount for this owned handle.
+    ///
+    /// Part of rend3's internal interface.
     pub fn get_weak_refcount(&self) -> Weak<()> {
         Arc::downgrade(&self.refcount)
     }
@@ -48,6 +90,22 @@ declare_handle!(
     MaterialHandle<Material>,
     ObjectHandle<Object>,
     DirectionalLightHandle<DirectionalLight>
+);
+
+#[macro_export]
+#[doc(hidden)]
+macro_rules! declare_raw_handle {
+    ($($name:ident<$ty:ty>),*) => {$(
+        pub type $name = RawResourceHandle<$ty>;
+    )*};
+}
+
+declare_raw_handle!(
+    RawMeshHandle<Mesh>,
+    RawTextureHandle<Texture>,
+    RawMaterialHandle<Material>,
+    RawObjectHandle<Object>,
+    RawDirectionalLightHandle<DirectionalLight>
 );
 
 macro_rules! changeable_struct {
@@ -556,9 +614,9 @@ impl AlbedoComponent {
     {
         match *self {
             Self::None | Self::Vertex { .. } | Self::Value(_) | Self::ValueVertex { .. } => None,
-            Self::Texture(ref texture) | Self::TextureVertex { ref texture, .. } | Self::TextureValue { ref texture, .. } => {
-                Some(func(texture))
-            }
+            Self::Texture(ref texture)
+            | Self::TextureVertex { ref texture, .. }
+            | Self::TextureValue { ref texture, .. } => Some(func(texture)),
         }
     }
 }

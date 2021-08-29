@@ -107,19 +107,19 @@ pub fn render_loop(
                 );
             }
             Instruction::ChangeMaterial { handle, change } => {
-                material_manager.update_from_changes(&renderer.queue, &handle, change);
+                material_manager.update_from_changes(&renderer.queue, handle, change);
             }
             Instruction::AddObject { handle, object } => {
                 object_manager.fill(&handle, object, &mesh_manager);
             }
             Instruction::SetObjectTransform { handle, transform } => {
-                object_manager.set_object_transform(&handle, transform);
+                object_manager.set_object_transform(handle, transform);
             }
             Instruction::AddDirectionalLight { handle, light } => {
                 directional_light_manager.fill(&handle, light);
             }
             Instruction::ChangeDirectionalLight { handle, change } => {
-                directional_light_manager.update_directional_light(&handle, change);
+                directional_light_manager.update_directional_light(handle, change);
             }
             Instruction::SetInternalSurfaceOptions { options } => new_surface_options = Some(options),
             Instruction::SetCameraData { data } => {

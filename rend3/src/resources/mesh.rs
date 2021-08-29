@@ -4,6 +4,7 @@ use crate::{
 };
 use glam::{Vec2, Vec3};
 use range_alloc::RangeAllocator;
+use rend3_types::RawMeshHandle;
 use std::{mem::size_of, ops::Range};
 use wgpu::{
     Buffer, BufferAddress, BufferDescriptor, BufferUsages, CommandEncoder, Device, IndexFormat, Queue, RenderPass,
@@ -170,7 +171,7 @@ impl MeshManager {
         &self.buffers
     }
 
-    pub fn internal_data(&self, handle: &MeshHandle) -> &InternalMesh {
+    pub fn internal_data(&self, handle: RawMeshHandle) -> &InternalMesh {
         self.registry.get(handle)
     }
 

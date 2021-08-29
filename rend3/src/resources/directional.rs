@@ -5,7 +5,7 @@ use crate::{
     INTERNAL_SHADOW_DEPTH_FORMAT, SHADOW_DIMENSIONS,
 };
 use glam::{Mat4, Vec3};
-use rend3_types::DirectionalLightChange;
+use rend3_types::{DirectionalLightChange, RawDirectionalLightHandle};
 use std::{
     mem::{self, size_of},
     num::{NonZeroU32, NonZeroU64},
@@ -105,7 +105,7 @@ impl DirectionalLightManager {
         );
     }
 
-    pub fn get_mut(&mut self, handle: &DirectionalLightHandle) -> &mut InternalDirectionalLight {
+    pub fn get_mut(&mut self, handle: RawDirectionalLightHandle) -> &mut InternalDirectionalLight {
         self.registry.get_mut(handle)
     }
 
@@ -113,7 +113,7 @@ impl DirectionalLightManager {
         Arc::clone(&self.layer_views[layer as usize])
     }
 
-    pub fn update_directional_light(&mut self, handle: &DirectionalLightHandle, change: DirectionalLightChange) {
+    pub fn update_directional_light(&mut self, handle: RawDirectionalLightHandle, change: DirectionalLightChange) {
         let internal = self.registry.get_mut(handle);
         internal.inner.update_from_changes(change);
         if let Some(direction) = change.direction {
