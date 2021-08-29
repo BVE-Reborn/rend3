@@ -63,7 +63,8 @@ impl CpuCuller {
                 start_idx: object.start_idx,
                 end_idx: object.start_idx + object.count,
                 vertex_offset: object.vertex_offset,
-                handle: object.material,
+                // TODO: Elide these clones?
+                material_handle: object.material.get_raw(),
             });
 
             outputs.push(PerObjectData {
@@ -130,7 +131,7 @@ pub fn run<'rpass>(
     let mut state_sample_type = SampleType::Linear;
 
     for (idx, draw) in draws.iter().enumerate() {
-        let (material_bind_group, sample_type) = materials.cpu_get_bind_group(draw.handle);
+        let (material_bind_group, sample_type) = materials.cpu_get_bind_group(draw.material_handle);
 
         // As a workaround for OpenGL's combined samplers, we need to manually swap the linear and nearest samplers so that shader code can think it's always using linear.
         if state_sample_type != sample_type {

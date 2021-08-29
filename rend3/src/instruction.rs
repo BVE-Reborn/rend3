@@ -1,12 +1,13 @@
 use crate::{
     types::{
-        Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Material, MaterialChange,
-        MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, Texture, TextureHandle,
+        Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Material, MaterialChange, Mesh,
+        Object, RawMaterialHandle, RawObjectHandle, Texture,
     },
     InternalSurfaceOptions,
 };
 use glam::Mat4;
 use parking_lot::Mutex;
+use rend3_types::{MaterialHandle, MeshHandle, ObjectHandle, RawDirectionalLightHandle, TextureHandle};
 use std::mem;
 
 pub enum Instruction {
@@ -14,55 +15,37 @@ pub enum Instruction {
         handle: MeshHandle,
         mesh: Mesh,
     },
-    RemoveMesh {
-        handle: MeshHandle,
-    },
     AddTexture2D {
         handle: TextureHandle,
         texture: Texture,
     },
-    RemoveTexture2D {
-        handle: TextureHandle,
-    },
     AddTextureCube {
         handle: TextureHandle,
         texture: Texture,
-    },
-    RemoveTextureCube {
-        handle: TextureHandle,
     },
     AddMaterial {
         handle: MaterialHandle,
         material: Material,
     },
     ChangeMaterial {
-        handle: MaterialHandle,
+        handle: RawMaterialHandle,
         change: MaterialChange,
-    },
-    RemoveMaterial {
-        handle: MaterialHandle,
     },
     AddObject {
         handle: ObjectHandle,
         object: Object,
     },
     SetObjectTransform {
-        handle: ObjectHandle,
+        handle: RawObjectHandle,
         transform: Mat4,
-    },
-    RemoveObject {
-        handle: ObjectHandle,
     },
     AddDirectionalLight {
         handle: DirectionalLightHandle,
         light: DirectionalLight,
     },
     ChangeDirectionalLight {
-        handle: DirectionalLightHandle,
+        handle: RawDirectionalLightHandle,
         change: DirectionalLightChange,
-    },
-    RemoveDirectionalLight {
-        handle: DirectionalLightHandle,
     },
     SetInternalSurfaceOptions {
         options: InternalSurfaceOptions,

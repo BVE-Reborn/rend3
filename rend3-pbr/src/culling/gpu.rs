@@ -123,21 +123,15 @@ impl GpuCuller {
                 start_idx: object.start_idx,
                 count: object.count,
                 vertex_offset: object.vertex_offset,
-                material_idx: args.materials.internal_index(object.material) as u32,
+                material_idx: args.materials.internal_index(object.material.get_raw()) as u32,
                 transform: object.transform,
                 bounding_sphere: object.sphere,
             }));
         }
 
-        let input_buffer = args.device.create_buffer_init(&BufferInitDescriptor {
-            label: Some("culling inputs"),
-            contents: &data,
-            usage: BufferUsages::STORAGE,
-        });
-
         let output_buffer = args.device.create_buffer(&BufferDescriptor {
             label: Some("culling output"),
-            size: (args.objects.len() * mem::size_of::<PerObjectData>()) as _,
+            size: (args.objects.len().max(1) * mem::size_of::<PerObjectData>()) as _,
             usage: BufferUsages::STORAGE,
             mapped_at_creation: false,
         });
@@ -150,21 +144,29 @@ impl GpuCuller {
             mapped_at_creation: false,
         });
 
-        let bg = BindGroupBuilder::new(Some("gpu culling bg"))
-            .with_buffer(&input_buffer)
-            .with_buffer(&output_buffer)
-            .with_buffer(&indirect_buffer)
-            .build(args.device, &self.bgl);
+        if !args.objects.is_empty() {
+            let input_buffer = args.device.create_buffer_init(&BufferInitDescriptor {
+                label: Some("culling inputs"),
+                contents: &data,
+                usage: BufferUsages::STORAGE,
+            });
 
-        let mut cpass = args.encoder.begin_compute_pass(&ComputePassDescriptor {
-            label: Some("compute cull"),
-        });
+            let bg = BindGroupBuilder::new(Some("gpu culling bg"))
+                .with_buffer(&input_buffer)
+                .with_buffer(&output_buffer)
+                .with_buffer(&indirect_buffer)
+                .build(args.device, &self.bgl);
 
-        cpass.set_pipeline(&self.pipeline);
-        cpass.set_bind_group(0, &bg, &[]);
-        cpass.dispatch(((args.objects.len() + 255) / 256) as _, 1, 1);
+            let mut cpass = args.encoder.begin_compute_pass(&ComputePassDescriptor {
+                label: Some("compute cull"),
+            });
 
-        drop(cpass);
+            cpass.set_pipeline(&self.pipeline);
+            cpass.set_bind_group(0, &bg, &[]);
+            cpass.dispatch(((args.objects.len() + 255) / 256) as _, 1, 1);
+
+            drop(cpass);
+        }
 
         let output_bg = args.device.create_bind_group(&BindGroupDescriptor {
             label: Some("culling input bg"),
@@ -186,12 +188,14 @@ impl GpuCuller {
 }
 
 pub fn run<'rpass>(rpass: &mut RenderPass<'rpass>, indirect_data: &'rpass GPUIndirectData) {
-    rpass.set_vertex_buffer(6, indirect_data.indirect_buffer.slice(16..));
-    rpass.multi_draw_indexed_indirect_count(
-        &indirect_data.indirect_buffer,
-        16,
-        &indirect_data.indirect_buffer,
-        0,
-        indirect_data.count as _,
-    );
+    if indirect_data.count != 0 {
+        rpass.set_vertex_buffer(6, indirect_data.indirect_buffer.slice(16..));
+        rpass.multi_draw_indexed_indirect_count(
+            &indirect_data.indirect_buffer,
+            16,
+            &indirect_data.indirect_buffer,
+            0,
+            indirect_data.count as _,
+        );
+    }
 }

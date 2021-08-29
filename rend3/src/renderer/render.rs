@@ -34,10 +34,7 @@ pub fn render_loop(
     for cmd in instructions.drain(..) {
         match cmd {
             Instruction::AddMesh { handle, mesh } => {
-                mesh_manager.fill(&renderer.device, &renderer.queue, &mut encoder, handle, mesh);
-            }
-            Instruction::RemoveMesh { handle } => {
-                mesh_manager.remove(handle);
+                mesh_manager.fill(&renderer.device, &renderer.queue, &mut encoder, &handle, mesh);
             }
             Instruction::AddTexture2D { handle, texture } => {
                 let size = Extent3d {
@@ -63,13 +60,10 @@ pub fn render_loop(
                 );
 
                 texture_manager_2d.fill(
-                    handle,
+                    &handle,
                     uploaded_tex.create_view(&TextureViewDescriptor::default()),
                     Some(texture.format),
                 );
-            }
-            Instruction::RemoveTexture2D { handle } => {
-                texture_manager_2d.remove(handle);
             }
             Instruction::AddTextureCube { handle, texture } => {
                 let size = Extent3d {
@@ -95,7 +89,7 @@ pub fn render_loop(
                 );
 
                 texture_manager_cube.fill(
-                    handle,
+                    &handle,
                     uploaded_tex.create_view(&TextureViewDescriptor {
                         dimension: Some(TextureViewDimension::Cube),
                         ..TextureViewDescriptor::default()
@@ -103,43 +97,30 @@ pub fn render_loop(
                     Some(texture.format),
                 );
             }
-            Instruction::RemoveTextureCube { handle } => {
-                texture_manager_cube.remove(handle);
-            }
             Instruction::AddMaterial { handle, material } => {
                 material_manager.fill(
                     &renderer.device,
                     renderer.mode,
                     &mut texture_manager_2d,
-                    handle,
+                    &handle,
                     material,
                 );
             }
             Instruction::ChangeMaterial { handle, change } => {
                 material_manager.update_from_changes(&renderer.queue, handle, change);
             }
-            Instruction::RemoveMaterial { handle } => {
-                material_manager.remove(handle);
-            }
             Instruction::AddObject { handle, object } => {
-                object_manager.fill(handle, object, &mesh_manager);
+                object_manager.fill(&handle, object, &mesh_manager);
             }
-            Instruction::SetObjectTransform {
-                handle: object,
-                transform,
-            } => {
-                object_manager.set_object_transform(object, transform);
-            }
-            Instruction::RemoveObject { handle } => {
-                object_manager.remove(handle);
+            Instruction::SetObjectTransform { handle, transform } => {
+                object_manager.set_object_transform(handle, transform);
             }
             Instruction::AddDirectionalLight { handle, light } => {
-                directional_light_manager.fill(handle, light);
+                directional_light_manager.fill(&handle, light);
             }
             Instruction::ChangeDirectionalLight { handle, change } => {
                 directional_light_manager.update_directional_light(handle, change);
             }
-            Instruction::RemoveDirectionalLight { handle } => directional_light_manager.remove(handle),
             Instruction::SetInternalSurfaceOptions { options } => new_surface_options = Some(options),
             Instruction::SetCameraData { data } => {
                 global_resources

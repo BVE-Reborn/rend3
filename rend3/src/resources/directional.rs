@@ -5,7 +5,7 @@ use crate::{
     INTERNAL_SHADOW_DEPTH_FORMAT, SHADOW_DIMENSIONS,
 };
 use glam::{Mat4, Vec3};
-use rend3_types::DirectionalLightChange;
+use rend3_types::{DirectionalLightChange, RawDirectionalLightHandle};
 use std::{
     mem::{self, size_of},
     num::{NonZeroU32, NonZeroU64},
@@ -53,7 +53,7 @@ pub struct DirectionalLightManager {
     bgl: BindGroupLayout,
     bg: BindGroup,
 
-    registry: ResourceRegistry<InternalDirectionalLight>,
+    registry: ResourceRegistry<InternalDirectionalLight, DirectionalLight>,
 }
 impl DirectionalLightManager {
     pub fn new(device: &Device) -> Self {
@@ -85,12 +85,12 @@ impl DirectionalLightManager {
     }
 
     pub fn allocate(&self) -> DirectionalLightHandle {
-        DirectionalLightHandle(self.registry.allocate())
+        self.registry.allocate()
     }
 
-    pub fn fill(&mut self, handle: DirectionalLightHandle, light: DirectionalLight) {
+    pub fn fill(&mut self, handle: &DirectionalLightHandle, light: DirectionalLight) {
         self.registry.insert(
-            handle.0,
+            handle,
             InternalDirectionalLight {
                 inner: light,
                 camera: CameraManager::new(
@@ -105,16 +105,16 @@ impl DirectionalLightManager {
         );
     }
 
-    pub fn get_mut(&mut self, handle: DirectionalLightHandle) -> &mut InternalDirectionalLight {
-        self.registry.get_mut(handle.0)
+    pub fn get_mut(&mut self, handle: RawDirectionalLightHandle) -> &mut InternalDirectionalLight {
+        self.registry.get_mut(handle)
     }
 
     pub fn get_layer_view_arc(&self, layer: u32) -> Arc<TextureView> {
         Arc::clone(&self.layer_views[layer as usize])
     }
 
-    pub fn update_directional_light(&mut self, handle: DirectionalLightHandle, change: DirectionalLightChange) {
-        let internal = self.registry.get_mut(handle.0);
+    pub fn update_directional_light(&mut self, handle: RawDirectionalLightHandle, change: DirectionalLightChange) {
+        let internal = self.registry.get_mut(handle);
         internal.inner.update_from_changes(change);
         if let Some(direction) = change.direction {
             internal.camera.set_data(
@@ -135,11 +135,9 @@ impl DirectionalLightManager {
         &self.bg
     }
 
-    pub fn remove(&mut self, handle: DirectionalLightHandle) {
-        self.registry.remove(handle.0);
-    }
-
     pub fn ready(&mut self, device: &Device, queue: &Queue) {
+        self.registry.remove_all_dead(|_, _, _| ());
+
         let registered_count = self.registry.count();
         let recreate_view = registered_count != self.layer_views.len() && registered_count != 0;
         if recreate_view {

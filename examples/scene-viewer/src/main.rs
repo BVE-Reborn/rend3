@@ -153,13 +153,13 @@ fn main() {
         },
     );
 
-    load_gltf(
+    let _loaded_gltf = load_gltf(
         &renderer,
         file_to_load.unwrap_or_else(|| concat!(env!("CARGO_MANIFEST_DIR"), "/data/scene.gltf").to_owned()),
     );
     load_skybox(&renderer, &mut routine).unwrap();
 
-    renderer.add_directional_light(DirectionalLight {
+    let _directional_light = renderer.add_directional_light(DirectionalLight {
         color: Vec3::ONE,
         intensity: 10.0,
         direction: Vec3::new(-1.0, -1.0, 0.0),

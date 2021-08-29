@@ -4,6 +4,7 @@ use crate::{
     util::{frustum::BoundingSphere, registry::ResourceRegistry},
 };
 use glam::Mat4;
+use rend3_types::RawObjectHandle;
 
 #[derive(Debug, Clone)]
 pub struct InternalObject {
@@ -16,7 +17,7 @@ pub struct InternalObject {
 }
 
 pub struct ObjectManager {
-    registry: ResourceRegistry<InternalObject>,
+    registry: ResourceRegistry<InternalObject, Object>,
 }
 impl ObjectManager {
     pub fn new() -> Self {
@@ -26,11 +27,11 @@ impl ObjectManager {
     }
 
     pub fn allocate(&self) -> ObjectHandle {
-        ObjectHandle(self.registry.allocate())
+        self.registry.allocate()
     }
 
-    pub fn fill(&mut self, handle: ObjectHandle, object: Object, mesh_manager: &MeshManager) {
-        let mesh = mesh_manager.internal_data(object.mesh);
+    pub fn fill(&mut self, handle: &ObjectHandle, object: Object, mesh_manager: &MeshManager) {
+        let mesh = mesh_manager.internal_data(object.mesh.get_raw());
 
         let shader_object = InternalObject {
             material: object.material,
@@ -41,19 +42,16 @@ impl ObjectManager {
             vertex_offset: mesh.vertex_range.start as i32,
         };
 
-        self.registry.insert(handle.0, shader_object);
+        self.registry.insert(handle, shader_object);
     }
 
-    pub fn remove(&mut self, handle: ObjectHandle) {
-        self.registry.remove(handle.0);
-    }
-
-    pub fn ready(&self) -> Vec<InternalObject> {
+    pub fn ready(&mut self) -> Vec<InternalObject> {
+        self.registry.remove_all_dead(|_, _, _| ());
         self.registry.values().cloned().collect()
     }
 
-    pub fn set_object_transform(&mut self, handle: ObjectHandle, transform: Mat4) {
-        self.registry.get_mut(handle.0).transform = transform;
+    pub fn set_object_transform(&mut self, handle: RawObjectHandle, transform: Mat4) {
+        self.registry.get_mut(handle).transform = transform;
     }
 }
 

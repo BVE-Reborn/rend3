@@ -85,23 +85,31 @@ impl RenderRoutine for PbrRenderRoutine {
             label: Some("primary encoder"),
         });
 
-        let mesh_manager = renderer.mesh_manager.read();
+        let mut mesh_manager = renderer.mesh_manager.write();
+        let mut object_manager = renderer.object_manager.write();
         let mut directional_light = renderer.directional_light_manager.write();
         let mut materials = renderer.material_manager.write();
         let mut d2_textures = renderer.d2_texture_manager.write();
         let mut d2c_textures = renderer.d2c_texture_manager.write();
 
-        directional_light.ready(&renderer.device, &renderer.queue);
+        // Do these in dependency order
+        // Level 2
+        let objects = object_manager.ready();
+
+        // Level 1
         materials.ready(&renderer.device, &renderer.queue, &d2_textures);
+
+        // Level 0
         let d2_texture_output = d2_textures.ready(&renderer.device);
         let _d2c_texture_output = d2c_textures.ready(&renderer.device);
-        let objects = renderer.object_manager.read().ready();
+        directional_light.ready(&renderer.device, &renderer.queue);
+        mesh_manager.ready();
 
         self.primary_passes.skybox_pass.update_skybox(skybox::UpdateSkyboxArgs {
             device: &renderer.device,
             d2c_texture_manager: &d2c_textures,
             interfaces: &self.interfaces,
-            new_skybox_handle: self.skybox_texture,
+            new_skybox_handle: self.skybox_texture.clone(),
         });
 
         let culler = self.gpu_culler.as_ref().map_cpu(|_| &self.cpu_culler);

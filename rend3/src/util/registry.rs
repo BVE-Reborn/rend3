@@ -1,55 +1,87 @@
 use fnv::FnvBuildHasher;
 use indexmap::map::IndexMap;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use rend3_types::{RawResourceHandle, ResourceHandle};
+use std::{
+    marker::PhantomData,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Weak,
+    },
+};
 
 #[derive(Debug)]
-pub struct ResourceRegistry<T> {
-    mapping: IndexMap<usize, T, FnvBuildHasher>,
-    current_idx: AtomicUsize,
+struct ResourceStorage<T> {
+    refcount: Weak<()>,
+    data: T,
 }
-impl<T> ResourceRegistry<T> {
+
+#[derive(Debug)]
+pub struct ResourceRegistry<T, HandleType> {
+    mapping: IndexMap<usize, ResourceStorage<T>, FnvBuildHasher>,
+    current_idx: AtomicUsize,
+    _phantom: PhantomData<HandleType>,
+}
+impl<T, HandleType> ResourceRegistry<T, HandleType> {
     pub fn new() -> Self {
         Self {
             mapping: IndexMap::with_hasher(FnvBuildHasher::default()),
             current_idx: AtomicUsize::new(0),
+            _phantom: PhantomData,
         }
     }
 
-    pub fn allocate(&self) -> usize {
-        self.current_idx.fetch_add(1, Ordering::Relaxed)
+    pub fn allocate(&self) -> ResourceHandle<HandleType> {
+        let idx = self.current_idx.fetch_add(1, Ordering::Relaxed);
+
+        ResourceHandle::new(idx)
     }
 
-    pub fn insert(&mut self, handle: usize, data: T) -> usize {
-        self.mapping.insert_full(handle, data).0
+    pub fn insert(&mut self, handle: &ResourceHandle<HandleType>, data: T) -> usize {
+        self.mapping
+            .insert_full(
+                handle.get_raw().idx,
+                ResourceStorage {
+                    refcount: handle.get_weak_refcount(),
+                    data,
+                },
+            )
+            .0
     }
 
-    pub fn remove(&mut self, handle: usize) -> (usize, T) {
-        let (index, _key, value) = self.mapping.swap_remove_full(&handle).expect("Invalid handle");
-        (index, value)
+    pub fn remove_all_dead(&mut self, mut func: impl FnMut(&mut Self, usize, T)) {
+        for idx in (0..self.mapping.len()).rev() {
+            let element = self.mapping.get_index(idx).unwrap().1;
+            if element.refcount.strong_count() == 0 {
+                let (_, value) = self.mapping.swap_remove_index(idx).unwrap();
+                func(self, idx, value.data)
+            }
+        }
     }
 
     pub fn iter(&self) -> impl ExactSizeIterator<Item = (&usize, &T)> + Clone {
-        self.mapping.iter()
+        self.mapping
+            .iter()
+            .map(|(idx, ResourceStorage { data, .. })| (idx, data))
     }
 
     pub fn values(&self) -> impl ExactSizeIterator<Item = &T> + Clone {
-        self.mapping.values()
+        self.mapping.values().map(|ResourceStorage { data, .. }| data)
     }
 
     pub fn values_mut(&mut self) -> impl ExactSizeIterator<Item = &mut T> {
-        self.mapping.values_mut()
+        self.mapping.values_mut().map(|ResourceStorage { data, .. }| data)
     }
 
-    pub fn get(&self, handle: usize) -> &T {
-        self.mapping.get(&handle).unwrap()
+    pub fn get(&self, handle: RawResourceHandle<HandleType>) -> &T {
+        &self.mapping.get(&handle.idx).unwrap().data
     }
 
-    pub fn get_mut(&mut self, handle: usize) -> &mut T {
-        self.mapping.get_mut(&handle).unwrap()
+    pub fn get_mut(&mut self, handle: RawResourceHandle<HandleType>) -> &mut T {
+        &mut self.mapping.get_mut(&handle.idx).unwrap().data
     }
 
-    pub fn get_index_of(&self, handle: usize) -> usize {
-        self.mapping.get_index_of(&handle).unwrap()
+    pub fn get_index_of(&self, handle: RawResourceHandle<HandleType>) -> usize {
+        self.mapping.get_index_of(&handle.idx).unwrap()
     }
 
     pub fn count(&self) -> usize {
@@ -57,7 +89,7 @@ impl<T> ResourceRegistry<T> {
     }
 }
 
-impl<T> Default for ResourceRegistry<T> {
+impl<T, HandleType> Default for ResourceRegistry<T, HandleType> {
     fn default() -> Self {
         Self::new()
     }
