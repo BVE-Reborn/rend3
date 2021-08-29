@@ -1,6 +1,6 @@
 use crate::{mode::ModeData, types::TextureHandle, util::registry::ResourceRegistry, RendererMode};
-use std::{mem, num::NonZeroU32, sync::Arc};
 use rend3_types::RawTextureHandle;
+use std::{mem, num::NonZeroU32, sync::Arc};
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
     BindingResource, BindingType, Device, Extent3d, ShaderStages, Texture, TextureDescriptor, TextureDimension,

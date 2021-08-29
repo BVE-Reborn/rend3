@@ -90,7 +90,7 @@ fn main() {
     let mesh = create_mesh();
 
     // Add mesh to renderer's world.
-    // 
+    //
     // All handles are refcounted, so we only need to hang onto the handle until we make an object.
     let mesh_handle = renderer.add_mesh(mesh);
 

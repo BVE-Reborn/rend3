@@ -47,7 +47,7 @@ impl<T> PartialEq for ResourceHandle<T> {
 impl<T> Eq for ResourceHandle<T> {}
 
 impl<T> ResourceHandle<T> {
-    /// Create a new resource handle from an index. 
+    /// Create a new resource handle from an index.
     ///
     /// Part of rend3's internal interface, use `Renderer::add_*` instead.
     pub fn new(idx: usize) -> Self {

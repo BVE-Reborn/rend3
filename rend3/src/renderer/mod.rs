@@ -120,10 +120,10 @@ impl Renderer {
     }
 
     pub fn update_material(&self, handle: &MaterialHandle, change: MaterialChange) {
-        self.instructions
-            .producer
-            .lock()
-            .push(Instruction::ChangeMaterial { handle: handle.get_raw(), change })
+        self.instructions.producer.lock().push(Instruction::ChangeMaterial {
+            handle: handle.get_raw(),
+            change,
+        })
     }
 
     pub fn add_object(&self, object: Object) -> ObjectHandle {
@@ -136,10 +136,10 @@ impl Renderer {
     }
 
     pub fn set_object_transform(&self, handle: &ObjectHandle, transform: Mat4) {
-        self.instructions
-            .producer
-            .lock()
-            .push(Instruction::SetObjectTransform { handle: handle.get_raw(), transform });
+        self.instructions.producer.lock().push(Instruction::SetObjectTransform {
+            handle: handle.get_raw(),
+            transform,
+        });
     }
 
     pub fn add_directional_light(&self, light: DirectionalLight) -> DirectionalLightHandle {
@@ -148,7 +148,10 @@ impl Renderer {
         self.instructions
             .producer
             .lock()
-            .push(Instruction::AddDirectionalLight { handle: handle.clone(), light });
+            .push(Instruction::AddDirectionalLight {
+                handle: handle.clone(),
+                light,
+            });
 
         handle
     }
@@ -157,7 +160,10 @@ impl Renderer {
         self.instructions
             .producer
             .lock()
-            .push(Instruction::ChangeDirectionalLight { handle: handle.get_raw(), change })
+            .push(Instruction::ChangeDirectionalLight {
+                handle: handle.get_raw(),
+                change,
+            })
     }
 
     pub fn set_internal_surface_options(&self, options: InternalSurfaceOptions) {

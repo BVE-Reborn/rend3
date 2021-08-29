@@ -1,5 +1,5 @@
 use glam::Mat4;
-use rend3::{ModeData, types::RawMaterialHandle, util::frustum::BoundingSphere};
+use rend3::{types::RawMaterialHandle, util::frustum::BoundingSphere, ModeData};
 use wgpu::{BindGroup, Buffer};
 
 pub mod cpu;

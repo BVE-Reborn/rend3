@@ -1,7 +1,7 @@
 use crate::{
     types::{
-        Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Material, MaterialChange,
-        RawMaterialHandle, Mesh, Object, RawObjectHandle, Texture,
+        Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Material, MaterialChange, Mesh,
+        Object, RawMaterialHandle, RawObjectHandle, Texture,
     },
     InternalSurfaceOptions,
 };
