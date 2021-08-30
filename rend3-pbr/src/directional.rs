@@ -59,7 +59,10 @@ pub struct DirectionalShadowPass {
 
 impl DirectionalShadowPass {
     pub fn new(cutout_pipeline: Arc<RenderPipeline>, opaque_pipeline: Arc<RenderPipeline>) -> Self {
-        Self { cutout_pipeline, opaque_pipeline }
+        Self {
+            cutout_pipeline,
+            opaque_pipeline,
+        }
     }
 
     pub fn cull_shadows(&self, args: DirectionalShadowPassCullShadowsArgs<'_>) -> Vec<CulledLightSet> {

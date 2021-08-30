@@ -36,7 +36,6 @@ struct PixelData {
     float clear_coat_perceptual_roughness;
     float anisotropy;
     float ambient_occlusion;
-    float alpha_cutout;
     uint material_flags;
 };
 
@@ -211,7 +210,6 @@ PixelData get_per_pixel_data_sampled(MATERIAL_TYPE material, sampler s) {
         }
     }
 
-    pixel.alpha_cutout = material.alpha_cutout;
     pixel.material_flags = material.material_flags;
 
     return pixel;

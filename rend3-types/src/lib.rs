@@ -525,7 +525,7 @@ bitflags::bitflags! {
         const ALBEDO_ACTIVE =      0b0000_0000_0000_0001;
         const ALBEDO_BLEND =       0b0000_0000_0000_0010;
         const ALBEDO_VERTEX_SRGB = 0b0000_0000_0000_0100;
-        const ALPHA_CUTOUT =       0b0000_0000_0000_1000;
+        /// TODO hole
         const BICOMPONENT_NORMAL = 0b0000_0000_0001_0000;
         const SWIZZLED_NORMAL =    0b0000_0000_0010_0000;
         const AOMR_GLTF_COMBINED = 0b0000_0000_0100_0000;
@@ -879,13 +879,43 @@ impl Default for SampleType {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum TransparencyType {
     Opaque,
     Cutout,
     Blend,
 }
-impl Default for TransparencyType {
+impl From<Transparency> for TransparencyType {
+    fn from(t: Transparency) -> Self {
+        match t {
+            Transparency::Opaque => Self::Opaque,
+            Transparency::Cutout { .. } => Self::Cutout,
+            Transparency::Blend => Self::Blend,
+        }
+    }
+}
+
+#[allow(clippy::cmp_owned)] // This thinks making a temporary TransparencyType is the end of the world
+impl PartialEq<Transparency> for TransparencyType {
+    fn eq(&self, other: &Transparency) -> bool {
+        *self == Self::from(*other)
+    }
+}
+
+#[allow(clippy::cmp_owned)]
+impl PartialEq<TransparencyType> for Transparency {
+    fn eq(&self, other: &TransparencyType) -> bool {
+        TransparencyType::from(*self) == *other
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum Transparency {
+    Opaque,
+    Cutout { cutout: f32 },
+    Blend,
+}
+impl Default for Transparency {
     fn default() -> Self {
         Self::Opaque
     }
@@ -898,7 +928,7 @@ changeable_struct! {
     #[derive(Debug, Default, Clone)]
     pub struct Material <- nodefault MaterialChange {
         pub albedo: AlbedoComponent,
-        pub transparency: TransparencyType,
+        pub transparency: Transparency,
         pub normal: NormalTexture,
         pub aomr_textures: AoMRTextures,
         pub ao_factor: Option<f32>,
@@ -910,7 +940,6 @@ changeable_struct! {
         pub emissive: MaterialComponent<Vec3>,
         pub reflectance: MaterialComponent<f32>,
         pub anisotropy: MaterialComponent<f32>,
-        pub alpha_cutout: Option<f32>,
         pub transform: Mat3,
         // TODO: Determine how to make this a clearer part of the type system, esp. with the changable_struct macro.
         pub unlit: bool,

@@ -56,7 +56,10 @@ impl CPUShaderMaterial {
             emissive: material.emissive.to_value(Vec3::ZERO),
             anisotropy: material.anisotropy.to_value(0.0),
             ambient_occlusion: material.ao_factor.unwrap_or(1.0),
-            alpha_cutout: material.alpha_cutout.unwrap_or(0.0),
+            alpha_cutout: match material.transparency {
+                rend3_types::Transparency::Cutout { cutout } => cutout,
+                _ => 0.0,
+            },
             texture_enable: material.albedo.is_texture() as u32
                 | (material.normal.to_texture(|_| ()).is_some() as u32) << 1
                 | (material.aomr_textures.to_roughness_texture(|_| ()).is_some() as u32) << 2
@@ -76,7 +79,6 @@ impl CPUShaderMaterial {
                 flags |= material.normal.to_flags();
                 flags |= material.aomr_textures.to_flags();
                 flags |= material.clearcoat_textures.to_flags();
-                flags.set(MaterialFlags::ALPHA_CUTOUT, material.alpha_cutout.is_some());
                 flags.set(MaterialFlags::UNLIT, material.unlit);
                 flags.set(
                     MaterialFlags::NEAREST,
@@ -137,7 +139,10 @@ impl GPUShaderMaterial {
             clear_coat_roughness: material.clearcoat_roughness_factor.unwrap_or(0.0),
             anisotropy: material.anisotropy.to_value(0.0),
             ambient_occlusion: material.ao_factor.unwrap_or(1.0),
-            alpha_cutout: material.alpha_cutout.unwrap_or(0.0),
+            alpha_cutout: match material.transparency {
+                rend3_types::Transparency::Cutout { cutout } => cutout,
+                _ => 0.0,
+            },
 
             uv_transform_row0: material.transform.x_axis.extend(0.0),
             uv_transform_row1: material.transform.y_axis.extend(0.0),
@@ -160,7 +165,6 @@ impl GPUShaderMaterial {
                 flags |= material.normal.to_flags();
                 flags |= material.aomr_textures.to_flags();
                 flags |= material.clearcoat_textures.to_flags();
-                flags.set(MaterialFlags::ALPHA_CUTOUT, material.alpha_cutout.is_some());
                 flags.set(MaterialFlags::UNLIT, material.unlit);
                 flags.set(
                     MaterialFlags::NEAREST,

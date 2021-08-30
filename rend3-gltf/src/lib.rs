@@ -1,7 +1,7 @@
 use fnv::FnvHashMap;
 use glam::{Mat3, Mat4, Vec2, Vec3, Vec4, Vec4Swizzles};
 use rend3::{
-    types::{self, MeshBuilder, TransparencyType},
+    types::{self, MeshBuilder, Transparency},
     Renderer,
 };
 use std::future::Future;
@@ -227,7 +227,7 @@ fn load_default_material(renderer: &Renderer, loaded: &mut LoadedGltfScene) {
         None,
         renderer.add_material(types::Material {
             albedo: types::AlbedoComponent::Value(Vec4::splat(1.0)),
-            transparency: TransparencyType::Opaque,
+            transparency: Transparency::Opaque,
             normal: types::NormalTexture::None,
             aomr_textures: types::AoMRTextures::None,
             ao_factor: Some(1.0),
@@ -239,7 +239,6 @@ fn load_default_material(renderer: &Renderer, loaded: &mut LoadedGltfScene) {
             emissive: types::MaterialComponent::None,
             reflectance: types::MaterialComponent::None,
             anisotropy: types::MaterialComponent::None,
-            alpha_cutout: None,
             transform: Mat3::IDENTITY,
             unlit: false,
             sample_type: types::SampleType::Linear,
@@ -310,9 +309,11 @@ where
                 None => types::AlbedoComponent::Value(Vec4::from(albedo_factor)),
             },
             transparency: match material.alpha_mode() {
-                gltf::material::AlphaMode::Opaque => types::TransparencyType::Opaque,
-                gltf::material::AlphaMode::Mask => types::TransparencyType::Cutout,
-                gltf::material::AlphaMode::Blend => types::TransparencyType::Blend,
+                gltf::material::AlphaMode::Opaque => types::Transparency::Opaque,
+                gltf::material::AlphaMode::Mask => types::Transparency::Cutout {
+                    cutout: material.alpha_cutoff().unwrap_or(0.5),
+                },
+                gltf::material::AlphaMode::Blend => types::Transparency::Blend,
             },
             normal: match normals_tex {
                 Some(tex) => types::NormalTexture::Tricomponent(tex),

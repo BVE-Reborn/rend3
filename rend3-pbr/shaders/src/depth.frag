@@ -51,7 +51,7 @@ void main() {
     if (has_albedo) {
         vec4 albedo = textureGrad(sampler2D(ALBEDO_TEXTURE, primary_sampler), coords, uvdx, uvdy);
 
-        if (albedo.a <= 0.5) {
+        if (albedo.a <= material.alpha_cutout) {
             discard;
         }
     }
