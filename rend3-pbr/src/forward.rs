@@ -43,7 +43,7 @@ pub struct ForwardPassPrepassArgs<'rpass, 'b> {
     pub culled_objects: &'rpass CulledObjectSet,
 }
 
-pub struct OpaquePassDrawArgs<'rpass, 'b> {
+pub struct ForwardPassDrawArgs<'rpass, 'b> {
     pub rpass: &'b mut RenderPass<'rpass>,
 
     pub materials: &'rpass MaterialManager,
@@ -115,7 +115,7 @@ impl ForwardPass {
         }
     }
 
-    pub fn draw<'rpass>(&'rpass self, args: OpaquePassDrawArgs<'rpass, '_>) {
+    pub fn draw<'rpass>(&'rpass self, args: ForwardPassDrawArgs<'rpass, '_>) {
         args.meshes.bind(args.rpass);
 
         args.rpass.set_pipeline(&self.forward_pipeline);

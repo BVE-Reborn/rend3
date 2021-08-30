@@ -82,8 +82,8 @@ fn build_forward_pass_inner(
     args.device.create_render_pipeline(&RenderPipelineDescriptor {
         label: Some(match args.transparency {
             TransparencyType::Opaque => "opaque pass",
+            TransparencyType::Cutout => "cutout pass",
             TransparencyType::Blend => "blend forward pass",
-            _ => unimplemented!(),
         }),
         layout: Some(&pll),
         vertex: VertexState {
@@ -106,7 +106,10 @@ fn build_forward_pass_inner(
         depth_stencil: Some(DepthStencilState {
             format: TextureFormat::Depth32Float,
             depth_write_enabled: true,
-            depth_compare: CompareFunction::GreaterEqual,
+            depth_compare: match args.transparency {
+                TransparencyType::Opaque | TransparencyType::Cutout => CompareFunction::Equal,
+                TransparencyType::Blend => CompareFunction::GreaterEqual,
+            },
             stencil: StencilState::default(),
             bias: DepthBiasState::default(),
         }),

@@ -143,6 +143,16 @@ impl RenderRoutine for PbrRenderRoutine {
             objects: &objects,
         });
 
+        let cutout_culled_objects = self.primary_passes.cutout_pass.cull(forward::ForwardPassCullArgs {
+            device: &renderer.device,
+            encoder: &mut encoder,
+            culler,
+            materials: &materials,
+            interfaces: &self.interfaces,
+            camera: &global_resources.camera,
+            objects: &objects,
+        });
+
         let opaque_culled_objects = self.primary_passes.opaque_pass.cull(forward::ForwardPassCullArgs {
             device: &renderer.device,
             encoder: &mut encoder,
@@ -204,13 +214,24 @@ impl RenderRoutine for PbrRenderRoutine {
                 culled_objects: &opaque_culled_objects,
             });
 
+        self.primary_passes
+            .cutout_pass
+            .prepass(forward::ForwardPassPrepassArgs {
+                rpass: &mut rpass,
+                materials: &materials,
+                meshes: mesh_manager.buffers(),
+                samplers: &self.samplers,
+                texture_bg: d2_texture_output_bg_ref,
+                culled_objects: &cutout_culled_objects,
+            });
+
         self.primary_passes.skybox_pass.draw_skybox(skybox::SkyboxPassDrawArgs {
             rpass: &mut rpass,
             samplers: &self.samplers,
             shader_uniform_bg: &primary_camera_uniform_bg,
         });
 
-        self.primary_passes.opaque_pass.draw(forward::OpaquePassDrawArgs {
+        self.primary_passes.opaque_pass.draw(forward::ForwardPassDrawArgs {
             rpass: &mut rpass,
             materials: &materials,
             meshes: mesh_manager.buffers(),
@@ -221,7 +242,18 @@ impl RenderRoutine for PbrRenderRoutine {
             culled_objects: &opaque_culled_objects,
         });
 
-        self.primary_passes.transparent_pass.draw(forward::OpaquePassDrawArgs {
+        self.primary_passes.cutout_pass.draw(forward::ForwardPassDrawArgs {
+            rpass: &mut rpass,
+            materials: &materials,
+            meshes: mesh_manager.buffers(),
+            samplers: &self.samplers,
+            directional_light_bg: directional_light.get_bg(),
+            texture_bg: d2_texture_output_bg_ref,
+            shader_uniform_bg: &primary_camera_uniform_bg,
+            culled_objects: &cutout_culled_objects,
+        });
+
+        self.primary_passes.transparent_pass.draw(forward::ForwardPassDrawArgs {
             rpass: &mut rpass,
             materials: &materials,
             meshes: mesh_manager.buffers(),
@@ -256,6 +288,7 @@ pub struct PrimaryPasses {
     pub shadow_passes: directional::DirectionalShadowPass,
     pub skybox_pass: skybox::SkyboxPass,
     pub opaque_pass: forward::ForwardPass,
+    pub cutout_pass: forward::ForwardPass,
     pub transparent_pass: forward::ForwardPass,
 }
 impl PrimaryPasses {
@@ -267,8 +300,8 @@ impl PrimaryPasses {
 
         let material_manager = renderer.material_manager.read();
         let directional_light_manager = renderer.directional_light_manager.read();
-        let shadow_pipeline = Arc::new(common::depth_pass::build_depth_pass_shader(
-            common::depth_pass::BuildDepthPassShaderArgs {
+        let shadow_pipelines =
+            common::depth_pass::build_depth_pass_shader(common::depth_pass::BuildDepthPassShaderArgs {
                 mode: renderer.mode,
                 device: &renderer.device,
                 interfaces,
@@ -276,10 +309,9 @@ impl PrimaryPasses {
                 materials: &material_manager,
                 samples: SampleCount::One,
                 ty: common::depth_pass::DepthPassType::Shadow,
-            },
-        ));
-        let depth_pipeline = Arc::new(common::depth_pass::build_depth_pass_shader(
-            common::depth_pass::BuildDepthPassShaderArgs {
+            });
+        let depth_pipelines =
+            common::depth_pass::build_depth_pass_shader(common::depth_pass::BuildDepthPassShaderArgs {
                 mode: renderer.mode,
                 device: &renderer.device,
                 interfaces,
@@ -287,8 +319,7 @@ impl PrimaryPasses {
                 materials: &material_manager,
                 samples,
                 ty: common::depth_pass::DepthPassType::Prepass,
-            },
-        ));
+            });
         let skybox_pipeline = common::skybox_pass::build_skybox_shader(common::skybox_pass::BuildSkyboxShaderArgs {
             mode: renderer.mode,
             device: &renderer.device,
@@ -308,6 +339,12 @@ impl PrimaryPasses {
         let opaque_pipeline = Arc::new(common::forward_pass::build_forward_pass_shader(
             forward_pass_args.clone(),
         ));
+        let cutout_pipeline = Arc::new(common::forward_pass::build_forward_pass_shader(
+            common::forward_pass::BuildForwardPassShaderArgs {
+                transparency: TransparencyType::Cutout,
+                ..forward_pass_args.clone()
+            },
+        ));
         let transparent_pipeline = Arc::new(common::forward_pass::build_forward_pass_shader(
             common::forward_pass::BuildForwardPassShaderArgs {
                 transparency: TransparencyType::Blend,
@@ -315,16 +352,24 @@ impl PrimaryPasses {
             },
         ));
         Self {
-            shadow_passes: directional::DirectionalShadowPass::new(Arc::clone(&shadow_pipeline)),
+            shadow_passes: directional::DirectionalShadowPass::new(
+                Arc::clone(&shadow_pipelines.cutout),
+                Arc::clone(&shadow_pipelines.opaque),
+            ),
             skybox_pass: skybox::SkyboxPass::new(skybox_pipeline),
             transparent_pass: forward::ForwardPass::new(
-                Arc::clone(&depth_pipeline),
-                Arc::clone(&transparent_pipeline),
+                Arc::clone(&depth_pipelines.opaque),
+                transparent_pipeline,
                 TransparencyType::Blend,
             ),
+            cutout_pass: forward::ForwardPass::new(
+                Arc::clone(&depth_pipelines.cutout),
+                cutout_pipeline,
+                TransparencyType::Cutout,
+            ),
             opaque_pass: forward::ForwardPass::new(
-                Arc::clone(&depth_pipeline),
-                Arc::clone(&opaque_pipeline),
+                Arc::clone(&depth_pipelines.opaque),
+                opaque_pipeline,
                 TransparencyType::Opaque,
             ),
         }

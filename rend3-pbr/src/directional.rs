@@ -35,7 +35,8 @@ pub struct DirectionalShadowPassCullShadowsArgs<'a> {
 }
 
 pub struct CulledLightSet {
-    pub culled_objects: CulledObjectSet,
+    pub opaque_culled_objects: CulledObjectSet,
+    pub cutout_culled_objects: CulledObjectSet,
     pub shadow_texture_arc: Arc<TextureView>,
 }
 
@@ -52,26 +53,28 @@ pub struct DirectionalShadowPassDrawCulledShadowsArgs<'a> {
 }
 
 pub struct DirectionalShadowPass {
-    pipeline: Arc<RenderPipeline>,
+    cutout_pipeline: Arc<RenderPipeline>,
+    opaque_pipeline: Arc<RenderPipeline>,
 }
 
 impl DirectionalShadowPass {
-    pub fn new(pipeline: Arc<RenderPipeline>) -> Self {
-        Self { pipeline }
+    pub fn new(cutout_pipeline: Arc<RenderPipeline>, opaque_pipeline: Arc<RenderPipeline>) -> Self {
+        Self { cutout_pipeline, opaque_pipeline }
     }
 
     pub fn cull_shadows(&self, args: DirectionalShadowPassCullShadowsArgs<'_>) -> Vec<CulledLightSet> {
         args.lights
             .values()
-            .map(|light| {
-                let culled_objects = match args.culler {
+            .map(|light| -> CulledLightSet {
+                // TODO: This is hella duplicated
+                let opaque_culled_objects = match args.culler {
                     ModeData::CPU(cpu_culler) => cpu_culler.cull(CpuCullerCullArgs {
                         device: args.device,
                         camera: &light.camera,
                         interfaces: args.interfaces,
                         materials: args.materials,
                         objects: args.objects,
-                        filter: |_, mat| mat.transparency != TransparencyType::Blend,
+                        filter: |_, mat| mat.transparency == TransparencyType::Opaque,
                     }),
                     ModeData::GPU(gpu_culler) => gpu_culler.cull(GpuCullerCullArgs {
                         device: args.device,
@@ -80,14 +83,35 @@ impl DirectionalShadowPass {
                         materials: args.materials,
                         camera: &light.camera,
                         objects: args.objects,
-                        filter: |_, mat| mat.transparency != TransparencyType::Blend,
+                        filter: |_, mat| mat.transparency == TransparencyType::Opaque,
+                    }),
+                };
+
+                let cutout_culled_objects = match args.culler {
+                    ModeData::CPU(cpu_culler) => cpu_culler.cull(CpuCullerCullArgs {
+                        device: args.device,
+                        camera: &light.camera,
+                        interfaces: args.interfaces,
+                        materials: args.materials,
+                        objects: args.objects,
+                        filter: |_, mat| mat.transparency == TransparencyType::Cutout,
+                    }),
+                    ModeData::GPU(gpu_culler) => gpu_culler.cull(GpuCullerCullArgs {
+                        device: args.device,
+                        encoder: args.encoder,
+                        interfaces: args.interfaces,
+                        materials: args.materials,
+                        camera: &light.camera,
+                        objects: args.objects,
+                        filter: |_, mat| mat.transparency == TransparencyType::Cutout,
                     }),
                 };
 
                 let shadow_texture_arc = args.lights.get_layer_view_arc(light.shadow_tex);
 
                 CulledLightSet {
-                    culled_objects,
+                    opaque_culled_objects,
+                    cutout_culled_objects,
                     shadow_texture_arc,
                 }
             })
@@ -111,15 +135,25 @@ impl DirectionalShadowPass {
 
             args.meshes.bind(&mut rpass);
 
-            rpass.set_pipeline(&self.pipeline);
+            rpass.set_pipeline(&self.opaque_pipeline);
             rpass.set_bind_group(0, &args.samplers.linear_nearest_bg, &[]);
-            rpass.set_bind_group(1, &light.culled_objects.output_bg, &[]);
+            rpass.set_bind_group(1, &light.opaque_culled_objects.output_bg, &[]);
 
-            match light.culled_objects.calls {
+            match light.opaque_culled_objects.calls {
                 ModeData::CPU(ref draws) => culling::cpu::run(&mut rpass, draws, args.samplers, 0, args.materials, 2),
                 ModeData::GPU(ref data) => {
                     rpass.set_bind_group(2, args.materials.gpu_get_bind_group(), &[]);
                     rpass.set_bind_group(3, args.texture_bg.as_gpu(), &[]);
+                    culling::gpu::run(&mut rpass, data);
+                }
+            }
+
+            rpass.set_pipeline(&self.cutout_pipeline);
+            rpass.set_bind_group(1, &light.opaque_culled_objects.output_bg, &[]);
+
+            match light.cutout_culled_objects.calls {
+                ModeData::CPU(ref draws) => culling::cpu::run(&mut rpass, draws, args.samplers, 0, args.materials, 2),
+                ModeData::GPU(ref data) => {
                     culling::gpu::run(&mut rpass, data);
                 }
             }

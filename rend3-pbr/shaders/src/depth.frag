@@ -4,6 +4,7 @@
 #extension GL_EXT_nonuniform_qualifier : require
 #endif
 
+#ifdef ALPHA_CUTOUT
 #include "structures.glsl"
 
 layout(location = 0) in vec4 i_position;
@@ -55,3 +56,6 @@ void main() {
         }
     }
 }
+#else // ALPHA_CUTOUT
+void main() {}
+#endif // ALPHA_CUTOUT
