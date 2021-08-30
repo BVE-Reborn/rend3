@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use rend3::{
     resources::{DirectionalLightManager, InternalObject, MaterialManager, MeshBuffers},
+    types::TransparencyType,
     ModeData,
 };
 use wgpu::{
@@ -68,7 +69,9 @@ impl DirectionalShadowPass {
                         device: args.device,
                         camera: &light.camera,
                         interfaces: args.interfaces,
+                        materials: args.materials,
                         objects: args.objects,
+                        filter: |_, mat| mat.transparency != TransparencyType::Blend,
                     }),
                     ModeData::GPU(gpu_culler) => gpu_culler.cull(GpuCullerCullArgs {
                         device: args.device,
@@ -77,6 +80,7 @@ impl DirectionalShadowPass {
                         materials: args.materials,
                         camera: &light.camera,
                         objects: args.objects,
+                        filter: |_, mat| mat.transparency != TransparencyType::Blend,
                     }),
                 };
 

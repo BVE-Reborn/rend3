@@ -1,7 +1,7 @@
 use glam::{Mat3, Mat3A, Mat4, Vec4Swizzles};
 use rend3::{
     resources::{CameraManager, InternalObject, MaterialManager},
-    types::SampleType,
+    types::{Material, SampleType},
     util::{frustum::ShaderFrustum, math::IndexedDistance},
     ModeData,
 };
@@ -18,13 +18,19 @@ use crate::{
     culling::{CPUDrawCall, CulledObjectSet},
 };
 
-pub struct CpuCullerCullArgs<'a> {
+pub struct CpuCullerCullArgs<'a, FilterFn>
+where
+    FilterFn: FnMut(&InternalObject, &Material) -> bool,
+{
     pub device: &'a Device,
     pub camera: &'a CameraManager,
 
     pub interfaces: &'a ShaderInterfaces,
 
+    pub materials: &'a MaterialManager,
+
     pub objects: &'a [InternalObject],
+    pub filter: FilterFn,
 }
 
 pub struct CpuCuller {}
@@ -34,7 +40,10 @@ impl CpuCuller {
         Self {}
     }
 
-    pub fn cull(&self, args: CpuCullerCullArgs<'_>) -> CulledObjectSet {
+    pub fn cull<FilterFn>(&self, mut args: CpuCullerCullArgs<'_, FilterFn>) -> CulledObjectSet
+    where
+        FilterFn: FnMut(&InternalObject, &Material) -> bool,
+    {
         let frustum = ShaderFrustum::from_matrix(args.camera.proj());
         let view = args.camera.view();
         let view_proj = args.camera.view_proj();
@@ -44,6 +53,10 @@ impl CpuCuller {
         let mut _distances = Vec::with_capacity(args.objects.len());
 
         for (index, object) in args.objects.iter().enumerate() {
+            if !(args.filter)(object, args.materials.get_material(object.material.get_raw())) {
+                continue;
+            }
+
             let model = object.transform;
             let model_view = view * model;
 

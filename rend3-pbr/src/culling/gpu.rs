@@ -3,6 +3,7 @@ use std::{mem, num::NonZeroU64};
 use glam::Mat4;
 use rend3::{
     resources::{CameraManager, InternalObject, MaterialManager},
+    types::Material,
     util::{bind_merge::BindGroupBuilder, frustum::ShaderFrustum},
     ModeData,
 };
@@ -31,7 +32,10 @@ struct GPUCullingUniforms {
 unsafe impl bytemuck::Pod for GPUCullingUniforms {}
 unsafe impl bytemuck::Zeroable for GPUCullingUniforms {}
 
-pub struct GpuCullerCullArgs<'a> {
+pub struct GpuCullerCullArgs<'a, FilterFn>
+where
+    FilterFn: FnMut(&InternalObject, &Material) -> bool,
+{
     pub device: &'a Device,
     pub encoder: &'a mut CommandEncoder,
 
@@ -41,6 +45,7 @@ pub struct GpuCullerCullArgs<'a> {
     pub camera: &'a CameraManager,
 
     pub objects: &'a [InternalObject],
+    pub filter: FilterFn,
 }
 
 pub struct GpuCuller {
@@ -108,7 +113,10 @@ impl GpuCuller {
         Self { bgl, pipeline }
     }
 
-    pub fn cull(&self, args: GpuCullerCullArgs<'_>) -> CulledObjectSet {
+    pub fn cull<FilterFn>(&self, mut args: GpuCullerCullArgs<'_, FilterFn>) -> CulledObjectSet
+    where
+        FilterFn: FnMut(&InternalObject, &Material) -> bool,
+    {
         let mut data = Vec::<u8>::with_capacity(
             mem::size_of::<GPUCullingUniforms>() + args.objects.len() * mem::size_of::<GPUCullingInput>(),
         );
@@ -119,6 +127,10 @@ impl GpuCuller {
             object_count: args.objects.len() as u32,
         }));
         for object in args.objects {
+            if !(args.filter)(object, args.materials.get_material(object.material.get_raw())) {
+                continue;
+            }
+
             data.extend(bytemuck::bytes_of(&GPUCullingInput {
                 start_idx: object.start_idx,
                 count: object.count,

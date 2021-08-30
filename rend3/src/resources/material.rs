@@ -360,6 +360,10 @@ impl MaterialManager {
         }
     }
 
+    pub fn get_material(&self, handle: RawMaterialHandle) -> &Material {
+        &self.registry.get(handle).mat
+    }
+
     pub fn get_bind_group_layout(&self) -> &BindGroupLayout {
         self.bgl.as_ref().into_common()
     }

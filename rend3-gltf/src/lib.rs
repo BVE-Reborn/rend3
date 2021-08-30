@@ -1,6 +1,9 @@
 use fnv::FnvHashMap;
 use glam::{Mat3, Mat4, Vec2, Vec3, Vec4, Vec4Swizzles};
-use rend3::{types, types::MeshBuilder, Renderer};
+use rend3::{
+    types::{self, MeshBuilder, TransparencyType},
+    Renderer,
+};
 use std::future::Future;
 use thiserror::Error;
 
@@ -224,6 +227,7 @@ fn load_default_material(renderer: &Renderer, loaded: &mut LoadedGltfScene) {
         None,
         renderer.add_material(types::Material {
             albedo: types::AlbedoComponent::Value(Vec4::splat(1.0)),
+            transparency: TransparencyType::Opaque,
             normal: types::NormalTexture::None,
             aomr_textures: types::AoMRTextures::None,
             ao_factor: Some(1.0),
@@ -304,6 +308,11 @@ where
                     value: Vec4::from(albedo_factor),
                 },
                 None => types::AlbedoComponent::Value(Vec4::from(albedo_factor)),
+            },
+            transparency: match material.alpha_mode() {
+                gltf::material::AlphaMode::Opaque => types::TransparencyType::Opaque,
+                gltf::material::AlphaMode::Mask => types::TransparencyType::Cutout,
+                gltf::material::AlphaMode::Blend => types::TransparencyType::Blend,
             },
             normal: match normals_tex {
                 Some(tex) => types::NormalTexture::Tricomponent(tex),

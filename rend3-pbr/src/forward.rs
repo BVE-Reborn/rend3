@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use rend3::{
     resources::{CameraManager, InternalObject, MaterialManager, MeshBuffers},
+    types::TransparencyType,
     ModeData,
 };
 use wgpu::{BindGroup, CommandEncoder, Device, RenderPass, RenderPipeline};
@@ -17,7 +18,7 @@ use crate::{
 
 use super::culling;
 
-pub struct OpaquePassCullArgs<'a> {
+pub struct ForwardPassCullArgs<'a> {
     pub device: &'a Device,
     pub encoder: &'a mut CommandEncoder,
 
@@ -30,7 +31,7 @@ pub struct OpaquePassCullArgs<'a> {
     pub objects: &'a [InternalObject],
 }
 
-pub struct OpaquePassPrepassArgs<'rpass, 'b> {
+pub struct ForwardPassPrepassArgs<'rpass, 'b> {
     pub rpass: &'b mut RenderPass<'rpass>,
 
     pub materials: &'rpass MaterialManager,
@@ -56,26 +57,34 @@ pub struct OpaquePassDrawArgs<'rpass, 'b> {
     pub culled_objects: &'rpass CulledObjectSet,
 }
 
-pub struct OpaquePass {
+pub struct ForwardPass {
     depth_pipeline: Arc<RenderPipeline>,
-    opaque_pipeline: Arc<RenderPipeline>,
+    forward_pipeline: Arc<RenderPipeline>,
+    transparency: TransparencyType,
 }
 
-impl OpaquePass {
-    pub fn new(depth_pipeline: Arc<RenderPipeline>, opaque_pipeline: Arc<RenderPipeline>) -> Self {
+impl ForwardPass {
+    pub fn new(
+        depth_pipeline: Arc<RenderPipeline>,
+        forward_pipeline: Arc<RenderPipeline>,
+        transparency: TransparencyType,
+    ) -> Self {
         Self {
             depth_pipeline,
-            opaque_pipeline,
+            forward_pipeline,
+            transparency,
         }
     }
 
-    pub fn cull_opaque(&self, args: OpaquePassCullArgs<'_>) -> CulledObjectSet {
+    pub fn cull(&self, args: ForwardPassCullArgs<'_>) -> CulledObjectSet {
         match args.culler {
             ModeData::CPU(cpu_culler) => cpu_culler.cull(CpuCullerCullArgs {
                 device: args.device,
                 camera: args.camera,
                 interfaces: args.interfaces,
+                materials: args.materials,
                 objects: args.objects,
+                filter: |_, m| m.transparency == self.transparency,
             }),
             ModeData::GPU(gpu_culler) => gpu_culler.cull(GpuCullerCullArgs {
                 device: args.device,
@@ -84,11 +93,12 @@ impl OpaquePass {
                 materials: args.materials,
                 camera: args.camera,
                 objects: args.objects,
+                filter: |_, m| m.transparency == self.transparency,
             }),
         }
     }
 
-    pub fn prepass<'rpass>(&'rpass self, args: OpaquePassPrepassArgs<'rpass, '_>) {
+    pub fn prepass<'rpass>(&'rpass self, args: ForwardPassPrepassArgs<'rpass, '_>) {
         args.meshes.bind(args.rpass);
 
         args.rpass.set_pipeline(&self.depth_pipeline);
@@ -108,7 +118,7 @@ impl OpaquePass {
     pub fn draw<'rpass>(&'rpass self, args: OpaquePassDrawArgs<'rpass, '_>) {
         args.meshes.bind(args.rpass);
 
-        args.rpass.set_pipeline(&self.opaque_pipeline);
+        args.rpass.set_pipeline(&self.forward_pipeline);
         args.rpass.set_bind_group(0, &args.samplers.linear_nearest_bg, &[]);
         args.rpass.set_bind_group(1, &args.culled_objects.output_bg, &[]);
         args.rpass.set_bind_group(2, args.directional_light_bg, &[]);

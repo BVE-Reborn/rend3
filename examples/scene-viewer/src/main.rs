@@ -162,7 +162,7 @@ fn main() {
     let _directional_light = renderer.add_directional_light(DirectionalLight {
         color: Vec3::ONE,
         intensity: 10.0,
-        direction: Vec3::new(-1.0, -1.0, 0.0),
+        direction: Vec3::new(-1.0, -1.0, 1.0),
     });
     let mut scancode_status = HashMap::with_hasher(FnvBuildHasher::default());
 

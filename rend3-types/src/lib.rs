@@ -879,6 +879,18 @@ impl Default for SampleType {
     }
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum TransparencyType {
+    Opaque,
+    Cutout,
+    Blend,
+}
+impl Default for TransparencyType {
+    fn default() -> Self {
+        Self::Opaque
+    }
+}
+
 // Consider:
 //
 // - Green screen value
@@ -886,6 +898,7 @@ changeable_struct! {
     #[derive(Debug, Default, Clone)]
     pub struct Material <- nodefault MaterialChange {
         pub albedo: AlbedoComponent,
+        pub transparency: TransparencyType,
         pub normal: NormalTexture,
         pub aomr_textures: AoMRTextures,
         pub ao_factor: Option<f32>,
