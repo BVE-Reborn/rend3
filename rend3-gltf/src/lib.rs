@@ -1,9 +1,6 @@
 use fnv::FnvHashMap;
 use glam::{Mat3, Mat4, Vec2, Vec3, Vec4, Vec4Swizzles};
-use rend3::{
-    types::{self, MeshBuilder, Transparency},
-    Renderer,
-};
+use rend3::{types, Renderer};
 use std::future::Future;
 use thiserror::Error;
 
@@ -184,7 +181,7 @@ fn load_meshes<'a, E: std::error::Error + 'static>(
                 .collect();
 
             // glTF models are right handed, so we must flip their winding order
-            let mut builder = MeshBuilder::new(vertex_positions).with_right_handed();
+            let mut builder = types::MeshBuilder::new(vertex_positions).with_right_handed();
 
             if let Some(normals) = reader.read_normals() {
                 builder = builder.with_vertex_normals(normals.map(Vec3::from).collect())
@@ -227,7 +224,7 @@ fn load_default_material(renderer: &Renderer, loaded: &mut LoadedGltfScene) {
         None,
         renderer.add_material(types::Material {
             albedo: types::AlbedoComponent::Value(Vec4::splat(1.0)),
-            transparency: Transparency::Opaque,
+            transparency: types::Transparency::Opaque,
             normal: types::NormalTexture::None,
             aomr_textures: types::AoMRTextures::None,
             ao_factor: Some(1.0),
