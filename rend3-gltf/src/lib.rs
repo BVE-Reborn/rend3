@@ -1,7 +1,7 @@
 use fnv::FnvHashMap;
 use glam::{Mat3, Mat4, Vec2, Vec3, Vec4, Vec4Swizzles};
 use rend3::{types, Renderer};
-use std::future::Future;
+use std::{collections::hash_map::Entry, future::Future};
 use thiserror::Error;
 
 #[derive(Debug)]
@@ -275,6 +275,18 @@ where
             })
             .unwrap_or_default();
 
+        let uv_transform = albedo
+            .as_ref()
+            .and_then(|i| {
+                let transform = i.texture_transform()?;
+                Some(Mat3::from_scale_angle_translation(
+                    transform.scale().into(),
+                    transform.rotation(),
+                    transform.offset().into(),
+                ))
+            })
+            .unwrap_or(Mat3::IDENTITY);
+
         let albedo_tex =
             option_resolve(albedo.map(|i| load_image(renderer, loaded, i.texture().source(), true, texture_func)))
                 .await
@@ -324,8 +336,8 @@ where
                     ao_texture: ao,
                 },
             },
-            roughness_factor: Some(roughness_factor),
             metallic_factor: Some(metallic_factor),
+            roughness_factor: Some(roughness_factor),
             emissive: match emissive_tex {
                 Some(tex) => types::MaterialComponent::TextureValue {
                     texture: tex,
@@ -333,6 +345,7 @@ where
                 },
                 None => types::MaterialComponent::Value(Vec3::from(emissive_factor)),
             },
+            transform: uv_transform,
             unlit: material.unlit(),
             sample_type: nearest,
             ..types::Material::default()
@@ -358,14 +371,19 @@ where
     Fut: Future<Output = Result<Vec<u8>, E>>,
     E: std::error::Error + 'static,
 {
+    let key = ImageKey {
+        index: image.index(),
+        srgb,
+    };
+
+    let entry = match loaded.images.entry(key) {
+        Entry::Occupied(handle) => return Ok(handle.get().clone()),
+        Entry::Vacant(v) => v,
+    };
+
     // TODO: Address format detection for compressed texs
     // TODO: Allow embedded images
     if let gltf::image::Source::Uri { uri, .. } = image.source() {
-        let key = ImageKey {
-            index: image.index(),
-            srgb,
-        };
-
         let data = texture_func(uri)
             .await
             .map_err(|e| GltfLoadError::TextureIo(uri.to_string(), e))?;
@@ -384,7 +402,7 @@ where
             mip_levels: 1,
         });
 
-        loaded.images.insert(key, handle.clone());
+        entry.insert(handle.clone());
 
         Ok(handle)
     } else {
