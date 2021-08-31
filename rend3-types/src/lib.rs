@@ -315,7 +315,7 @@ impl MeshBuilder {
             vertex_normals: self.vertex_normals.unwrap_or_else(|| vec![Vec3::ZERO; length]),
             vertex_tangents: self.vertex_tangents.unwrap_or_else(|| vec![Vec3::ZERO; length]),
             vertex_uvs: self.vertex_uvs.unwrap_or_else(|| vec![Vec2::ZERO; length]),
-            vertex_colors: self.vertex_colors.unwrap_or_else(|| vec![[0; 4]; length]),
+            vertex_colors: self.vertex_colors.unwrap_or_else(|| vec![[255; 4]; length]),
             vertex_material_indices: self.vertex_material_indices.unwrap_or_else(|| vec![0; length]),
             indices: self.indices.unwrap_or_else(|| (0..length as u32).collect()),
         };
@@ -568,6 +568,14 @@ pub enum AlbedoComponent {
     /// Albedo color is loaded from given texture, then multiplied
     /// by the given value.
     TextureValue { texture: TextureHandle, value: Vec4 },
+    /// Albedo color is loaded from the given texture, then multiplied
+    /// by the vertex color and the given value.
+    TextureVertexValue {
+        texture: TextureHandle,
+        /// Vertex should be converted from srgb -> linear before multiplication
+        srgb: bool,
+        value: Vec4,
+    },
 }
 
 impl Default for AlbedoComponent {
@@ -592,10 +600,14 @@ impl AlbedoComponent {
             Self::Value(_) | Self::Texture(_) | Self::TextureValue { .. } => MaterialFlags::ALBEDO_ACTIVE,
             Self::Vertex { srgb: false }
             | Self::ValueVertex { srgb: false, .. }
-            | Self::TextureVertex { srgb: false, .. } => MaterialFlags::ALBEDO_ACTIVE | MaterialFlags::ALBEDO_BLEND,
+            | Self::TextureVertex { srgb: false, .. }
+            | Self::TextureVertexValue { srgb: false, .. } => {
+                MaterialFlags::ALBEDO_ACTIVE | MaterialFlags::ALBEDO_BLEND
+            }
             Self::Vertex { srgb: true }
             | Self::ValueVertex { srgb: true, .. }
-            | Self::TextureVertex { srgb: true, .. } => {
+            | Self::TextureVertex { srgb: true, .. }
+            | Self::TextureVertexValue { srgb: true, .. } => {
                 MaterialFlags::ALBEDO_ACTIVE | MaterialFlags::ALBEDO_BLEND | MaterialFlags::ALBEDO_VERTEX_SRGB
             }
         }
@@ -616,7 +628,8 @@ impl AlbedoComponent {
             Self::None | Self::Vertex { .. } | Self::Value(_) | Self::ValueVertex { .. } => None,
             Self::Texture(ref texture)
             | Self::TextureVertex { ref texture, .. }
-            | Self::TextureValue { ref texture, .. } => Some(func(texture)),
+            | Self::TextureValue { ref texture, .. }
+            | Self::TextureVertexValue { ref texture, .. } => Some(func(texture)),
         }
     }
 }

@@ -299,9 +299,10 @@ where
 
         let handle = renderer.add_material(types::Material {
             albedo: match albedo_tex {
-                Some(tex) => types::AlbedoComponent::TextureValue {
+                Some(tex) => types::AlbedoComponent::TextureVertexValue {
                     texture: tex,
                     value: Vec4::from(albedo_factor),
+                    srgb: false,
                 },
                 None => types::AlbedoComponent::Value(Vec4::from(albedo_factor)),
             },
