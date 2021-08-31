@@ -616,7 +616,10 @@ impl AlbedoComponent {
     pub fn is_texture(&self) -> bool {
         matches!(
             *self,
-            Self::Texture(..) | Self::TextureVertex { .. } | Self::TextureValue { .. }
+            Self::Texture(..)
+                | Self::TextureVertex { .. }
+                | Self::TextureValue { .. }
+                | Self::TextureVertexValue { .. }
         )
     }
 

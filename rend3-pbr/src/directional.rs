@@ -78,6 +78,7 @@ impl DirectionalShadowPass {
                         materials: args.materials,
                         objects: args.objects,
                         filter: |_, mat| mat.transparency == TransparencyType::Opaque,
+                        sort: None,
                     }),
                     ModeData::GPU(gpu_culler) => gpu_culler.cull(GpuCullerCullArgs {
                         device: args.device,
@@ -98,6 +99,7 @@ impl DirectionalShadowPass {
                         materials: args.materials,
                         objects: args.objects,
                         filter: |_, mat| mat.transparency == TransparencyType::Cutout,
+                        sort: None,
                     }),
                     ModeData::GPU(gpu_culler) => gpu_culler.cull(GpuCullerCullArgs {
                         device: args.device,

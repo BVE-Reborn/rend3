@@ -12,7 +12,7 @@ use crate::{
     culling::{
         cpu::{CpuCuller, CpuCullerCullArgs},
         gpu::{GpuCuller, GpuCullerCullArgs},
-        CulledObjectSet,
+        CulledObjectSet, Sorting,
     },
 };
 
@@ -77,6 +77,12 @@ impl ForwardPass {
     }
 
     pub fn cull(&self, args: ForwardPassCullArgs<'_>) -> CulledObjectSet {
+        let sort = if self.transparency == TransparencyType::Blend {
+            Some(Sorting::BackToFront)
+        } else {
+            None
+        };
+        
         match args.culler {
             ModeData::CPU(cpu_culler) => cpu_culler.cull(CpuCullerCullArgs {
                 device: args.device,
@@ -85,6 +91,7 @@ impl ForwardPass {
                 materials: args.materials,
                 objects: args.objects,
                 filter: |_, m| m.transparency == self.transparency,
+                sort,
             }),
             ModeData::GPU(gpu_culler) => gpu_culler.cull(GpuCullerCullArgs {
                 device: args.device,
