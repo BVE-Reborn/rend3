@@ -1,6 +1,7 @@
 use glam::{Mat3, Mat4, UVec2, Vec2, Vec3, Vec3A, Vec4};
 use std::{
     fmt::Debug,
+    hash::Hash,
     marker::PhantomData,
     mem,
     sync::{Arc, Weak},
@@ -45,6 +46,12 @@ impl<T> PartialEq for ResourceHandle<T> {
 }
 
 impl<T> Eq for ResourceHandle<T> {}
+
+impl<T> Hash for ResourceHandle<T> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.idx.hash(state);
+    }
+}
 
 impl<T> ResourceHandle<T> {
     /// Create a new resource handle from an index.
