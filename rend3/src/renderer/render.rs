@@ -38,8 +38,8 @@ pub fn render_loop(
             }
             Instruction::AddTexture2D { handle, texture } => {
                 let size = Extent3d {
-                    width: texture.width,
-                    height: texture.height,
+                    width: texture.size.x,
+                    height: texture.size.y,
                     depth_or_array_layers: 1,
                 };
 
@@ -67,8 +67,8 @@ pub fn render_loop(
             }
             Instruction::AddTextureCube { handle, texture } => {
                 let size = Extent3d {
-                    width: texture.width,
-                    height: texture.height,
+                    width: texture.size.x,
+                    height: texture.size.y,
                     depth_or_array_layers: 6,
                 };
 

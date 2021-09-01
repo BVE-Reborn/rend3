@@ -1,4 +1,4 @@
-use glam::{Mat3, Mat4, Vec2, Vec3, Vec3A, Vec4};
+use glam::{Mat3, Mat4, UVec2, Vec2, Vec3, Vec3A, Vec4};
 use std::{
     fmt::Debug,
     marker::PhantomData,
@@ -514,8 +514,7 @@ impl Mesh {
 pub struct Texture {
     pub data: Vec<u8>,
     pub format: TextureFormat,
-    pub width: u32,
-    pub height: u32,
+    pub size: UVec2,
     pub label: Option<String>,
     pub mip_levels: u32,
 }

@@ -1,5 +1,5 @@
 use fnv::FnvHashMap;
-use glam::{Mat3, Mat4, Vec2, Vec3, Vec4, Vec4Swizzles};
+use glam::{Mat3, Mat4, UVec2, Vec2, Vec3, Vec4, Vec4Swizzles};
 use rend3::{types, Renderer};
 use std::{collections::hash_map::Entry, future::Future};
 use thiserror::Error;
@@ -395,8 +395,7 @@ where
                 true => types::TextureFormat::Rgba8UnormSrgb,
                 false => types::TextureFormat::Rgba8Unorm,
             },
-            width: rgba.width(),
-            height: rgba.height(),
+            size: UVec2::new(rgba.width(), rgba.height()),
             data: rgba.into_raw(),
             /// TODO: automatic mipmapping (#53)
             mip_levels: 1,

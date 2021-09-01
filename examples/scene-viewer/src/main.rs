@@ -44,8 +44,7 @@ fn load_skybox(renderer: &Renderer, routine: &mut PbrRenderRoutine) -> Result<()
 
     let handle = renderer.add_texture_cube(Texture {
         format: TextureFormat::Rgba8UnormSrgb,
-        width: image_info.width,
-        height: image_info.height,
+        size: UVec2::new(image_info.width, image_info.height),
         data: image,
         label: Some("background".into()),
         mip_levels: mips,
