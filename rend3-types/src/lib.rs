@@ -910,6 +910,15 @@ impl From<Transparency> for TransparencyType {
         }
     }
 }
+impl TransparencyType {
+    pub fn to_debug_str(&self) -> &'static str {
+        match self {
+            TransparencyType::Opaque => "opaque",
+            TransparencyType::Cutout => "cutout",
+            TransparencyType::Blend => "blend",
+        }
+    }
+}
 
 #[allow(clippy::cmp_owned)] // This thinks making a temporary TransparencyType is the end of the world
 impl PartialEq<Transparency> for TransparencyType {

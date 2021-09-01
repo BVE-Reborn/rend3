@@ -18,7 +18,7 @@ pub struct GPUIndirectData {
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Sorting {
     FrontToBack,
-    BackToFront
+    BackToFront,
 }
 
 #[derive(Debug, Clone)]

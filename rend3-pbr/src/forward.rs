@@ -82,7 +82,7 @@ impl ForwardPass {
         } else {
             None
         };
-        
+
         match args.culler {
             ModeData::CPU(cpu_culler) => cpu_culler.cull(CpuCullerCullArgs {
                 device: args.device,
@@ -106,6 +106,8 @@ impl ForwardPass {
     }
 
     pub fn prepass<'rpass>(&'rpass self, args: ForwardPassPrepassArgs<'rpass, '_>) {
+        args.rpass.push_debug_group(self.transparency.to_debug_str());
+
         args.meshes.bind(args.rpass);
 
         args.rpass.set_pipeline(&self.depth_pipeline);
@@ -120,9 +122,12 @@ impl ForwardPass {
                 culling::gpu::run(args.rpass, data);
             }
         }
+        args.rpass.pop_debug_group();
     }
 
     pub fn draw<'rpass>(&'rpass self, args: ForwardPassDrawArgs<'rpass, '_>) {
+        args.rpass.push_debug_group(self.transparency.to_debug_str());
+
         args.meshes.bind(args.rpass);
 
         args.rpass.set_pipeline(&self.forward_pipeline);
@@ -139,5 +144,7 @@ impl ForwardPass {
                 culling::gpu::run(args.rpass, data);
             }
         }
+
+        args.rpass.pop_debug_group();
     }
 }

@@ -1,8 +1,9 @@
-use std::sync::Arc;
+use std::{fmt::Write, sync::Arc};
 
 use rend3::{
     resources::{DirectionalLightManager, InternalObject, MaterialManager, MeshBuffers},
     types::TransparencyType,
+    util::typedefs::SsoString,
     ModeData,
 };
 use wgpu::{
@@ -124,9 +125,12 @@ impl DirectionalShadowPass {
     }
 
     pub fn draw_culled_shadows(&self, args: DirectionalShadowPassDrawCulledShadowsArgs<'_>) {
-        for light in args.culled_lights {
+        for (idx, light) in args.culled_lights.iter().enumerate() {
+            let mut label = SsoString::new();
+            write!(label, "shadow pass {}", idx).unwrap();
+
             let mut rpass = args.encoder.begin_render_pass(&RenderPassDescriptor {
-                label: Some("culling pass"),
+                label: Some(&label),
                 color_attachments: &[],
                 depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
                     view: &light.shadow_texture_arc,
@@ -137,6 +141,8 @@ impl DirectionalShadowPass {
                     stencil_ops: None,
                 }),
             });
+
+            rpass.push_debug_group(TransparencyType::Opaque.to_debug_str());
 
             args.meshes.bind(&mut rpass);
 
@@ -153,6 +159,9 @@ impl DirectionalShadowPass {
                 }
             }
 
+            rpass.pop_debug_group();
+            rpass.push_debug_group(TransparencyType::Cutout.to_debug_str());
+
             rpass.set_pipeline(&self.cutout_pipeline);
             rpass.set_bind_group(1, &light.opaque_culled_objects.output_bg, &[]);
 
@@ -162,6 +171,8 @@ impl DirectionalShadowPass {
                     culling::gpu::run(&mut rpass, data);
                 }
             }
+
+            rpass.pop_debug_group();
         }
     }
 }

@@ -203,6 +203,7 @@ impl RenderRoutine for PbrRenderRoutine {
             }),
         });
 
+        rpass.push_debug_group("depth prepass");
         self.primary_passes
             .opaque_pass
             .prepass(forward::ForwardPassPrepassArgs {
@@ -225,11 +226,17 @@ impl RenderRoutine for PbrRenderRoutine {
                 culled_objects: &cutout_culled_objects,
             });
 
+        rpass.pop_debug_group();
+        rpass.push_debug_group("skybox");
+
         self.primary_passes.skybox_pass.draw_skybox(skybox::SkyboxPassDrawArgs {
             rpass: &mut rpass,
             samplers: &self.samplers,
             shader_uniform_bg: &primary_camera_uniform_bg,
         });
+
+        rpass.pop_debug_group();
+        rpass.push_debug_group("forward");
 
         self.primary_passes.opaque_pass.draw(forward::ForwardPassDrawArgs {
             rpass: &mut rpass,
@@ -263,6 +270,8 @@ impl RenderRoutine for PbrRenderRoutine {
             shader_uniform_bg: &primary_camera_uniform_bg,
             culled_objects: &transparent_culled_objects,
         });
+
+        rpass.pop_debug_group();
 
         drop(rpass);
 
