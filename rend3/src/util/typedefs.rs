@@ -6,7 +6,7 @@ pub type FastHashSet<K> = fnv::FnvHashSet<K>;
 macro_rules! format_sso {
     ($($arg:tt)*) => {{
         use std::fmt::Write as _;
-        let mut buffer = $crate::util::typedefs::SsoString::new();   
+        let mut buffer = $crate::util::typedefs::SsoString::new();
         write!(buffer, $($arg)*).expect("unexpected formatting error");
         buffer
     }};
