@@ -10,7 +10,7 @@ keywords = ["3d", "graphics", "gltf", "loading", "rend3"]
 categories = ["game-development", "graphics", "parser-implementations", "rendering", "rendering::engine"]
 
 [dependencies]
-gltf = { version = "0.16", default-features = false, features = ["KHR_lights_punctual", "KHR_materials_unlit", "extras", "names", "utils"] }
+gltf = { version = "0.16", default-features = false, features = ["KHR_lights_punctual", "KHR_texture_transform", "KHR_materials_unlit", "extras", "names", "utils"] }
 glam = "0.18"
 fnv = "1"
 image = "0.23"

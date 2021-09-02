@@ -1,7 +1,11 @@
 use std::sync::Arc;
 
 use glam::Vec4;
-use rend3::{types::TextureHandle, util::output::OutputFrame, ModeData, RenderRoutine, Renderer};
+use rend3::{
+    types::{TextureHandle, TransparencyType},
+    util::output::OutputFrame,
+    ModeData, RenderRoutine, Renderer,
+};
 use wgpu::{
     Color, CommandBuffer, LoadOp, Operations, RenderPassColorAttachment, RenderPassDepthStencilAttachment,
     RenderPassDescriptor,
@@ -12,7 +16,7 @@ pub use utils::*;
 pub mod common;
 pub mod culling;
 pub mod directional;
-pub mod opaque;
+pub mod forward;
 pub mod shaders;
 pub mod skybox;
 pub mod tonemapping;
@@ -129,7 +133,27 @@ impl RenderRoutine for PbrRenderRoutine {
 
         let global_resources = renderer.global_resources.read();
 
-        let culled_objects = self.primary_passes.opaque_pass.cull_opaque(opaque::OpaquePassCullArgs {
+        let transparent_culled_objects = self.primary_passes.transparent_pass.cull(forward::ForwardPassCullArgs {
+            device: &renderer.device,
+            encoder: &mut encoder,
+            culler,
+            materials: &materials,
+            interfaces: &self.interfaces,
+            camera: &global_resources.camera,
+            objects: &objects,
+        });
+
+        let cutout_culled_objects = self.primary_passes.cutout_pass.cull(forward::ForwardPassCullArgs {
+            device: &renderer.device,
+            encoder: &mut encoder,
+            culler,
+            materials: &materials,
+            interfaces: &self.interfaces,
+            camera: &global_resources.camera,
+            objects: &objects,
+        });
+
+        let opaque_culled_objects = self.primary_passes.opaque_pass.cull(forward::ForwardPassCullArgs {
             device: &renderer.device,
             encoder: &mut encoder,
             culler,
@@ -179,14 +203,31 @@ impl RenderRoutine for PbrRenderRoutine {
             }),
         });
 
-        self.primary_passes.opaque_pass.prepass(opaque::OpaquePassPrepassArgs {
-            rpass: &mut rpass,
-            materials: &materials,
-            meshes: mesh_manager.buffers(),
-            samplers: &self.samplers,
-            texture_bg: d2_texture_output_bg_ref,
-            culled_objects: &culled_objects,
-        });
+        rpass.push_debug_group("depth prepass");
+        self.primary_passes
+            .opaque_pass
+            .prepass(forward::ForwardPassPrepassArgs {
+                rpass: &mut rpass,
+                materials: &materials,
+                meshes: mesh_manager.buffers(),
+                samplers: &self.samplers,
+                texture_bg: d2_texture_output_bg_ref,
+                culled_objects: &opaque_culled_objects,
+            });
+
+        self.primary_passes
+            .cutout_pass
+            .prepass(forward::ForwardPassPrepassArgs {
+                rpass: &mut rpass,
+                materials: &materials,
+                meshes: mesh_manager.buffers(),
+                samplers: &self.samplers,
+                texture_bg: d2_texture_output_bg_ref,
+                culled_objects: &cutout_culled_objects,
+            });
+
+        rpass.pop_debug_group();
+        rpass.push_debug_group("skybox");
 
         self.primary_passes.skybox_pass.draw_skybox(skybox::SkyboxPassDrawArgs {
             rpass: &mut rpass,
@@ -194,7 +235,10 @@ impl RenderRoutine for PbrRenderRoutine {
             shader_uniform_bg: &primary_camera_uniform_bg,
         });
 
-        self.primary_passes.opaque_pass.draw(opaque::OpaquePassDrawArgs {
+        rpass.pop_debug_group();
+        rpass.push_debug_group("forward");
+
+        self.primary_passes.opaque_pass.draw(forward::ForwardPassDrawArgs {
             rpass: &mut rpass,
             materials: &materials,
             meshes: mesh_manager.buffers(),
@@ -202,8 +246,32 @@ impl RenderRoutine for PbrRenderRoutine {
             directional_light_bg: directional_light.get_bg(),
             texture_bg: d2_texture_output_bg_ref,
             shader_uniform_bg: &primary_camera_uniform_bg,
-            culled_objects: &culled_objects,
+            culled_objects: &opaque_culled_objects,
         });
+
+        self.primary_passes.cutout_pass.draw(forward::ForwardPassDrawArgs {
+            rpass: &mut rpass,
+            materials: &materials,
+            meshes: mesh_manager.buffers(),
+            samplers: &self.samplers,
+            directional_light_bg: directional_light.get_bg(),
+            texture_bg: d2_texture_output_bg_ref,
+            shader_uniform_bg: &primary_camera_uniform_bg,
+            culled_objects: &cutout_culled_objects,
+        });
+
+        self.primary_passes.transparent_pass.draw(forward::ForwardPassDrawArgs {
+            rpass: &mut rpass,
+            materials: &materials,
+            meshes: mesh_manager.buffers(),
+            samplers: &self.samplers,
+            directional_light_bg: directional_light.get_bg(),
+            texture_bg: d2_texture_output_bg_ref,
+            shader_uniform_bg: &primary_camera_uniform_bg,
+            culled_objects: &transparent_culled_objects,
+        });
+
+        rpass.pop_debug_group();
 
         drop(rpass);
 
@@ -228,7 +296,9 @@ pub struct SampleDependantPassesNewArgs<'a> {
 pub struct PrimaryPasses {
     pub shadow_passes: directional::DirectionalShadowPass,
     pub skybox_pass: skybox::SkyboxPass,
-    pub opaque_pass: opaque::OpaquePass,
+    pub opaque_pass: forward::ForwardPass,
+    pub cutout_pass: forward::ForwardPass,
+    pub transparent_pass: forward::ForwardPass,
 }
 impl PrimaryPasses {
     pub fn new(renderer: &Renderer, interfaces: &common::interfaces::ShaderInterfaces, samples: SampleCount) -> Self {
@@ -239,8 +309,8 @@ impl PrimaryPasses {
 
         let material_manager = renderer.material_manager.read();
         let directional_light_manager = renderer.directional_light_manager.read();
-        let shadow_pipeline = Arc::new(common::depth_pass::build_depth_pass_shader(
-            common::depth_pass::BuildDepthPassShaderArgs {
+        let shadow_pipelines =
+            common::depth_pass::build_depth_pass_shader(common::depth_pass::BuildDepthPassShaderArgs {
                 mode: renderer.mode,
                 device: &renderer.device,
                 interfaces,
@@ -248,10 +318,9 @@ impl PrimaryPasses {
                 materials: &material_manager,
                 samples: SampleCount::One,
                 ty: common::depth_pass::DepthPassType::Shadow,
-            },
-        ));
-        let depth_pipeline = Arc::new(common::depth_pass::build_depth_pass_shader(
-            common::depth_pass::BuildDepthPassShaderArgs {
+            });
+        let depth_pipelines =
+            common::depth_pass::build_depth_pass_shader(common::depth_pass::BuildDepthPassShaderArgs {
                 mode: renderer.mode,
                 device: &renderer.device,
                 interfaces,
@@ -259,29 +328,59 @@ impl PrimaryPasses {
                 materials: &material_manager,
                 samples,
                 ty: common::depth_pass::DepthPassType::Prepass,
-            },
-        ));
+            });
         let skybox_pipeline = common::skybox_pass::build_skybox_shader(common::skybox_pass::BuildSkyboxShaderArgs {
             mode: renderer.mode,
             device: &renderer.device,
             interfaces,
             samples,
         });
-        let opaque_pipeline = Arc::new(common::opaque_pass::build_opaque_pass_shader(
-            common::opaque_pass::BuildOpaquePassShaderArgs {
-                mode: renderer.mode,
-                device: &renderer.device,
-                interfaces,
-                directional_light_bgl: directional_light_manager.get_bgl(),
-                texture_bgl: gpu_d2_texture_bgl,
-                materials: &material_manager,
-                samples,
+        let forward_pass_args = common::forward_pass::BuildForwardPassShaderArgs {
+            mode: renderer.mode,
+            device: &renderer.device,
+            interfaces,
+            directional_light_bgl: directional_light_manager.get_bgl(),
+            texture_bgl: gpu_d2_texture_bgl,
+            materials: &material_manager,
+            samples,
+            transparency: TransparencyType::Opaque,
+        };
+        let opaque_pipeline = Arc::new(common::forward_pass::build_forward_pass_shader(
+            forward_pass_args.clone(),
+        ));
+        let cutout_pipeline = Arc::new(common::forward_pass::build_forward_pass_shader(
+            common::forward_pass::BuildForwardPassShaderArgs {
+                transparency: TransparencyType::Cutout,
+                ..forward_pass_args.clone()
+            },
+        ));
+        let transparent_pipeline = Arc::new(common::forward_pass::build_forward_pass_shader(
+            common::forward_pass::BuildForwardPassShaderArgs {
+                transparency: TransparencyType::Blend,
+                ..forward_pass_args.clone()
             },
         ));
         Self {
-            shadow_passes: directional::DirectionalShadowPass::new(Arc::clone(&shadow_pipeline)),
+            shadow_passes: directional::DirectionalShadowPass::new(
+                Arc::clone(&shadow_pipelines.cutout),
+                Arc::clone(&shadow_pipelines.opaque),
+            ),
             skybox_pass: skybox::SkyboxPass::new(skybox_pipeline),
-            opaque_pass: opaque::OpaquePass::new(Arc::clone(&depth_pipeline), Arc::clone(&opaque_pipeline)),
+            transparent_pass: forward::ForwardPass::new(
+                Arc::clone(&depth_pipelines.opaque),
+                transparent_pipeline,
+                TransparencyType::Blend,
+            ),
+            cutout_pass: forward::ForwardPass::new(
+                Arc::clone(&depth_pipelines.cutout),
+                cutout_pipeline,
+                TransparencyType::Cutout,
+            ),
+            opaque_pass: forward::ForwardPass::new(
+                Arc::clone(&depth_pipelines.opaque),
+                opaque_pipeline,
+                TransparencyType::Opaque,
+            ),
         }
     }
 }

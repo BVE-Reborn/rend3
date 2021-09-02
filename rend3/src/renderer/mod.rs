@@ -180,7 +180,7 @@ impl Renderer {
             .push(Instruction::SetCameraData { data })
     }
 
-    pub fn render(self: &Arc<Self>, list: &mut dyn RenderRoutine, output: RendererOutput) -> RendererStatistics {
-        render::render_loop(Arc::clone(self), list, output)
+    pub fn render(self: &Arc<Self>, routine: &mut dyn RenderRoutine, output: RendererOutput) -> RendererStatistics {
+        render::render_loop(Arc::clone(self), routine, output)
     }
 }

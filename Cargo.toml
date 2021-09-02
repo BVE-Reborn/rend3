@@ -14,9 +14,7 @@ members = [
 debug = true
 lto = "thin"
 
-[patch."https://github.com/gfx-rs/wgpu.git"]
+[patch.crates-io]
 # wgpu = { path = "../wgpu/wgpu" }
 # wgpu-types = { path = "../wgpu/wgpu-types" }
-
-[patch."https://github.com/gfx-rs/naga.git"]
 # naga = { path = "../naga" }

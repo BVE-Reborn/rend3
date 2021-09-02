@@ -11,14 +11,30 @@ struct CullingUniforms {
     uint object_count;
 };
 
+#ifdef ATOMIC_CULL
+#define OBJECT_OUTPUT_DATA_BUFFER_BINDING 1
+#define INDIRECT_BUFFER_BINDING 2
+#else // ATOMIC_CULL
+#define OBJECT_OUTPUT_DATA_BUFFER_BINDING 3
+#define INDIRECT_BUFFER_BINDING 4
+#endif // ATOMIC_CULL
+
 layout(set = 0, binding = 0, std430) restrict readonly buffer ObjectInputDataBuffer {
     CullingUniforms uniforms;
     ObjectInputData object_input[];
 };
-layout(set = 0, binding = 1, std430) restrict buffer ObjectOutputDataBuffer {
+#ifndef ATOMIC_CULL
+layout(set = 0, binding = 1, std430) restrict buffer IntermediateBufferA {
+    uint result_index_a[];
+};
+layout(set = 0, binding = 2, std430) restrict buffer IntermediateBufferB {
+    uint result_index_b[];
+};
+#endif
+layout(set = 0, binding = OBJECT_OUTPUT_DATA_BUFFER_BINDING, std430) restrict buffer ObjectOutputDataBuffer {
     ObjectOutputData object_output[];
 };
-layout(set = 0, binding = 2, std430) buffer IndirectBuffer {
+layout(set = 0, binding = INDIRECT_BUFFER_BINDING, std430) restrict buffer IndirectBuffer {
     uint draw_call_count;
     uint _2;
     uint _3;
@@ -60,6 +76,26 @@ vec4 transform_sphere(vec4 sphere, mat4 transform) {
     return vec4(center.xyz, sphere.w * max_scale);
 }
 
+void write_output(ObjectInputData in_data, uint index) {
+    ObjectOutputData out_data;
+
+    out_data.model_view = uniforms.view * in_data.transform;
+    out_data.model_view_proj = uniforms.view_proj * in_data.transform;
+    out_data.inv_trans_model_view = inverse(transpose(mat3(uniforms.view * in_data.transform)));
+    out_data.material_idx = in_data.material_idx;
+
+    object_output[index] = out_data;
+
+    IndirectCall call;
+    call.vertex_count = in_data.count;
+    call.instance_count = 1;
+    call.base_index = in_data.start_idx;
+    call.vertex_offset = in_data.vertex_offset;
+    call.base_instance = index;
+    indirect_call[index] = call;
+}
+
+#ifdef ATOMIC_CULL
 void main() {
     uint input_idx = gl_GlobalInvocationID.x;
 
@@ -80,20 +116,80 @@ void main() {
 
     uint output_idx = atomicAdd(draw_call_count, 1);
 
-    ObjectOutputData out_data;
-
-    out_data.model_view = uniforms.view * in_data.transform;
-    out_data.model_view_proj = uniforms.view_proj * in_data.transform;
-    out_data.inv_trans_model_view = inverse(transpose(mat3(uniforms.view * in_data.transform)));
-    out_data.material_idx = in_data.material_idx;
-
-    object_output[output_idx] = out_data;
-
-    IndirectCall call;
-    call.vertex_count = in_data.count;
-    call.instance_count = 1;
-    call.base_index = in_data.start_idx;
-    call.vertex_offset = in_data.vertex_offset;
-    call.base_instance = output_idx;
-    indirect_call[output_idx] = call;
+    write_output(in_data, output_idx);
 }
+#endif // ATOMIC_CULL
+
+#ifdef PREFIX_CULL
+void main() {
+    uint input_idx = gl_GlobalInvocationID.x;
+
+    if (input_idx >= uniforms.object_count) {
+        return;
+    }
+
+    ObjectInputData in_data = object_input[input_idx];
+
+    mat4 model_view = uniforms.view * in_data.transform;
+    vec4 mesh_sphere = transform_sphere(in_data.bounding_sphere, model_view);
+
+    bool visible = frustum_contains_sphere(uniforms.frustum, mesh_sphere);
+
+    uint result_index_1 = bitfieldInsert(0, uint(visible), 31, 1);
+    uint result_index_2 = bitfieldInsert(result_index_1, uint(visible), 0, 31);
+
+    result_index_a[input_idx] = result_index_2;
+}
+#endif // PREFIX_CULL
+
+#ifdef PREFIX_SUM
+layout(push_constant) uniform PushConstants {
+    uint stride;
+};
+
+void main() {
+    uint my_idx = gl_GlobalInvocationID.x;
+
+    if (my_idx >= uniforms.object_count) {
+        return;
+    }
+
+    if (my_idx < stride) {
+        result_index_b[my_idx] = result_index_a[my_idx];
+        return;
+    }
+
+    uint other_idx = my_idx - stride;
+
+    uint me = result_index_a[my_idx];
+    uint other = result_index_a[other_idx];
+    uint result = me;
+    result = bitfieldInsert(result, bitfieldExtract(me, 0, 31) + bitfieldExtract(other, 0, 31), 0, 31);
+    result_index_b[my_idx] = result;
+}
+#endif // PREFIX_SUM
+
+#ifdef PREFIX_OUTPUT
+void main() {
+    uint input_idx = gl_GlobalInvocationID.x;
+
+    if (input_idx >= uniforms.object_count) {
+        return;
+    }
+
+    uint result = result_index_a[input_idx];
+    uint objects_before = bitfieldExtract(result, 0, 31);
+    uint output_idx = objects_before - 1;
+    bool enabled = bool(bitfieldExtract(result, 31, 1));
+
+    if (input_idx == uniforms.object_count - 1) {
+        draw_call_count = objects_before;
+    }
+
+    if (!enabled) {
+        return;
+    }
+
+    write_output(object_input[input_idx], output_idx);
+}
+#endif

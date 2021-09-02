@@ -1,5 +1,4 @@
 use glam::UVec2;
-use rend3::RenderRoutine;
 
 fn vertex(pos: [f32; 3]) -> glam::Vec3 {
     glam::Vec3::from(pos)
@@ -163,8 +162,7 @@ fn main() {
         // Render!
         winit::event::Event::MainEventsCleared => {
             // Dispatch a render!
-            let dynref: &mut dyn RenderRoutine = &mut routine;
-            let _stats = renderer.render(dynref, rend3::util::output::RendererOutput::InternalSurface);
+            let _stats = renderer.render(&mut routine, rend3::util::output::RendererOutput::InternalSurface);
         }
         // Other events we don't care about
         _ => {}

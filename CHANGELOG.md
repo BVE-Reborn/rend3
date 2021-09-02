@@ -17,16 +17,22 @@ and this project adheres to cargo's version of [Semantic Versioning](https://sem
 ## Unreleased
 
 ### Added
+- rend3: Materials now have a `Transparency` field that supports Opaque, Cutout, and Blend transparency modes.
+- rend3: `AlbedoComponent::TextureVertexValue` to represent `texture * vertex * constant`
+- rend3-pbr: All major rendering spans are labeled and show up in renderdoc
 - rend3-pbr: Multisampling support
+- rend3-pbr: Support for transparency as well as stable gpu-culling to preserve transparency sort order.
+
 
 ### Changed
-- rend3-pbr: creation and resizing's `resolution` argument replaced with options containing resolution and sample count.
 - rend3: **SUBTLE** All handles are now refcounted.
   - Handles are now `!Copy`. Functions taking handles now accept a reference to a handle.
   - If you want to keep something alive, you need to keep the handle to it alive.
   - `Object`s will keep `Material`s/`Mesh`s alive.
   - `Material`s will keep `Texture`s alive.
   - All resources are removed the `render()` after they are deleted.
+- rend3: `Texture::width` and `Texture::height` replaced with `Texture::size`
+- rend3-pbr: creation and resizing's `resolution` argument replaced with options containing resolution and sample count.
   
 ### Updated
 - Dependencies:
@@ -35,6 +41,8 @@ and this project adheres to cargo's version of [Semantic Versioning](https://sem
 ### Fixed
 - rend3-pbr: Shadow artifacting due to incorrect face culling when rendering shadow passes
 - rend3-pbr: CPU mode drawing failed to account for proper vertex offsets
+- rend3-gltf: albedo-texture UV transform is now respected
+- rend3-gltf: image loading now properly caches images
 
 ### Removed
 - rend3: `Renderer::delete_*` functions were removed in favor of refcounting.

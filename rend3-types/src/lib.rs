@@ -1,6 +1,7 @@
-use glam::{Mat3, Mat4, Vec2, Vec3, Vec3A, Vec4};
+use glam::{Mat3, Mat4, UVec2, Vec2, Vec3, Vec3A, Vec4};
 use std::{
     fmt::Debug,
+    hash::Hash,
     marker::PhantomData,
     mem,
     sync::{Arc, Weak},
@@ -45,6 +46,12 @@ impl<T> PartialEq for ResourceHandle<T> {
 }
 
 impl<T> Eq for ResourceHandle<T> {}
+
+impl<T> Hash for ResourceHandle<T> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.idx.hash(state);
+    }
+}
 
 impl<T> ResourceHandle<T> {
     /// Create a new resource handle from an index.
@@ -315,7 +322,7 @@ impl MeshBuilder {
             vertex_normals: self.vertex_normals.unwrap_or_else(|| vec![Vec3::ZERO; length]),
             vertex_tangents: self.vertex_tangents.unwrap_or_else(|| vec![Vec3::ZERO; length]),
             vertex_uvs: self.vertex_uvs.unwrap_or_else(|| vec![Vec2::ZERO; length]),
-            vertex_colors: self.vertex_colors.unwrap_or_else(|| vec![[0; 4]; length]),
+            vertex_colors: self.vertex_colors.unwrap_or_else(|| vec![[255; 4]; length]),
             vertex_material_indices: self.vertex_material_indices.unwrap_or_else(|| vec![0; length]),
             indices: self.indices.unwrap_or_else(|| (0..length as u32).collect()),
         };
@@ -514,8 +521,7 @@ impl Mesh {
 pub struct Texture {
     pub data: Vec<u8>,
     pub format: TextureFormat,
-    pub width: u32,
-    pub height: u32,
+    pub size: UVec2,
     pub label: Option<String>,
     pub mip_levels: u32,
 }
@@ -525,7 +531,7 @@ bitflags::bitflags! {
         const ALBEDO_ACTIVE =      0b0000_0000_0000_0001;
         const ALBEDO_BLEND =       0b0000_0000_0000_0010;
         const ALBEDO_VERTEX_SRGB = 0b0000_0000_0000_0100;
-        const ALPHA_CUTOUT =       0b0000_0000_0000_1000;
+        /// TODO hole
         const BICOMPONENT_NORMAL = 0b0000_0000_0001_0000;
         const SWIZZLED_NORMAL =    0b0000_0000_0010_0000;
         const AOMR_GLTF_COMBINED = 0b0000_0000_0100_0000;
@@ -568,6 +574,14 @@ pub enum AlbedoComponent {
     /// Albedo color is loaded from given texture, then multiplied
     /// by the given value.
     TextureValue { texture: TextureHandle, value: Vec4 },
+    /// Albedo color is loaded from the given texture, then multiplied
+    /// by the vertex color and the given value.
+    TextureVertexValue {
+        texture: TextureHandle,
+        /// Vertex should be converted from srgb -> linear before multiplication
+        srgb: bool,
+        value: Vec4,
+    },
 }
 
 impl Default for AlbedoComponent {
@@ -592,10 +606,14 @@ impl AlbedoComponent {
             Self::Value(_) | Self::Texture(_) | Self::TextureValue { .. } => MaterialFlags::ALBEDO_ACTIVE,
             Self::Vertex { srgb: false }
             | Self::ValueVertex { srgb: false, .. }
-            | Self::TextureVertex { srgb: false, .. } => MaterialFlags::ALBEDO_ACTIVE | MaterialFlags::ALBEDO_BLEND,
+            | Self::TextureVertex { srgb: false, .. }
+            | Self::TextureVertexValue { srgb: false, .. } => {
+                MaterialFlags::ALBEDO_ACTIVE | MaterialFlags::ALBEDO_BLEND
+            }
             Self::Vertex { srgb: true }
             | Self::ValueVertex { srgb: true, .. }
-            | Self::TextureVertex { srgb: true, .. } => {
+            | Self::TextureVertex { srgb: true, .. }
+            | Self::TextureVertexValue { srgb: true, .. } => {
                 MaterialFlags::ALBEDO_ACTIVE | MaterialFlags::ALBEDO_BLEND | MaterialFlags::ALBEDO_VERTEX_SRGB
             }
         }
@@ -604,7 +622,10 @@ impl AlbedoComponent {
     pub fn is_texture(&self) -> bool {
         matches!(
             *self,
-            Self::Texture(..) | Self::TextureVertex { .. } | Self::TextureValue { .. }
+            Self::Texture(..)
+                | Self::TextureVertex { .. }
+                | Self::TextureValue { .. }
+                | Self::TextureVertexValue { .. }
         )
     }
 
@@ -616,7 +637,8 @@ impl AlbedoComponent {
             Self::None | Self::Vertex { .. } | Self::Value(_) | Self::ValueVertex { .. } => None,
             Self::Texture(ref texture)
             | Self::TextureVertex { ref texture, .. }
-            | Self::TextureValue { ref texture, .. } => Some(func(texture)),
+            | Self::TextureValue { ref texture, .. }
+            | Self::TextureVertexValue { ref texture, .. } => Some(func(texture)),
         }
     }
 }
@@ -879,6 +901,57 @@ impl Default for SampleType {
     }
 }
 
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum TransparencyType {
+    Opaque,
+    Cutout,
+    Blend,
+}
+impl From<Transparency> for TransparencyType {
+    fn from(t: Transparency) -> Self {
+        match t {
+            Transparency::Opaque => Self::Opaque,
+            Transparency::Cutout { .. } => Self::Cutout,
+            Transparency::Blend => Self::Blend,
+        }
+    }
+}
+impl TransparencyType {
+    pub fn to_debug_str(self) -> &'static str {
+        match self {
+            TransparencyType::Opaque => "opaque",
+            TransparencyType::Cutout => "cutout",
+            TransparencyType::Blend => "blend",
+        }
+    }
+}
+
+#[allow(clippy::cmp_owned)] // This thinks making a temporary TransparencyType is the end of the world
+impl PartialEq<Transparency> for TransparencyType {
+    fn eq(&self, other: &Transparency) -> bool {
+        *self == Self::from(*other)
+    }
+}
+
+#[allow(clippy::cmp_owned)]
+impl PartialEq<TransparencyType> for Transparency {
+    fn eq(&self, other: &TransparencyType) -> bool {
+        TransparencyType::from(*self) == *other
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum Transparency {
+    Opaque,
+    Cutout { cutout: f32 },
+    Blend,
+}
+impl Default for Transparency {
+    fn default() -> Self {
+        Self::Opaque
+    }
+}
+
 // Consider:
 //
 // - Green screen value
@@ -886,6 +959,7 @@ changeable_struct! {
     #[derive(Debug, Default, Clone)]
     pub struct Material <- nodefault MaterialChange {
         pub albedo: AlbedoComponent,
+        pub transparency: Transparency,
         pub normal: NormalTexture,
         pub aomr_textures: AoMRTextures,
         pub ao_factor: Option<f32>,
@@ -897,7 +971,6 @@ changeable_struct! {
         pub emissive: MaterialComponent<Vec3>,
         pub reflectance: MaterialComponent<f32>,
         pub anisotropy: MaterialComponent<f32>,
-        pub alpha_cutout: Option<f32>,
         pub transform: Mat3,
         // TODO: Determine how to make this a clearer part of the type system, esp. with the changable_struct macro.
         pub unlit: bool,

@@ -1,8 +1,9 @@
-use glam::{Mat3, Mat3A, Mat4, Vec4Swizzles};
+use glam::{Mat3, Mat3A, Mat4};
+use ordered_float::OrderedFloat;
 use rend3::{
     resources::{CameraManager, InternalObject, MaterialManager},
-    types::SampleType,
-    util::{frustum::ShaderFrustum, math::IndexedDistance},
+    types::{Material, SampleType},
+    util::frustum::ShaderFrustum,
     ModeData,
 };
 use wgpu::{
@@ -15,16 +16,24 @@ use crate::{
         interfaces::{PerObjectData, ShaderInterfaces},
         samplers::Samplers,
     },
-    culling::{CPUDrawCall, CulledObjectSet},
+    culling::{CPUDrawCall, CulledObjectSet, Sorting},
 };
 
-pub struct CpuCullerCullArgs<'a> {
+pub struct CpuCullerCullArgs<'a, FilterFn>
+where
+    FilterFn: FnMut(&InternalObject, &Material) -> bool,
+{
     pub device: &'a Device,
     pub camera: &'a CameraManager,
 
     pub interfaces: &'a ShaderInterfaces,
 
+    pub materials: &'a MaterialManager,
+
     pub objects: &'a [InternalObject],
+    pub filter: FilterFn,
+
+    pub sort: Option<Sorting>,
 }
 
 pub struct CpuCuller {}
@@ -34,53 +43,53 @@ impl CpuCuller {
         Self {}
     }
 
-    pub fn cull(&self, args: CpuCullerCullArgs<'_>) -> CulledObjectSet {
+    pub fn cull<FilterFn>(&self, mut args: CpuCullerCullArgs<'_, FilterFn>) -> CulledObjectSet
+    where
+        FilterFn: FnMut(&InternalObject, &Material) -> bool,
+    {
         let frustum = ShaderFrustum::from_matrix(args.camera.proj());
         let view = args.camera.view();
         let view_proj = args.camera.view_proj();
 
-        let mut outputs = Vec::with_capacity(args.objects.len());
-        let mut calls = Vec::with_capacity(args.objects.len());
-        let mut _distances = Vec::with_capacity(args.objects.len());
+        let (mut outputs, calls) = if let Some(sorting) = args.sort {
+            let mut objects: Vec<_> = args
+                .objects
+                .iter()
+                .map(|o| {
+                    let distance = args.camera.get_data().location.distance_squared(o.location);
+                    (o, OrderedFloat(distance))
+                })
+                .collect();
 
-        for (index, object) in args.objects.iter().enumerate() {
-            let model = object.transform;
-            let model_view = view * model;
-
-            let transformed = object.sphere.apply_transform(model_view);
-            if !frustum.contains_sphere(transformed) {
-                continue;
+            match sorting {
+                Sorting::FrontToBack => {
+                    objects.sort_unstable_by(|(_, lh_distance), (_, rh_distance)| lh_distance.cmp(rh_distance))
+                }
+                Sorting::BackToFront => {
+                    objects.sort_unstable_by(|(_, lh_distance), (_, rh_distance)| rh_distance.cmp(lh_distance))
+                }
             }
 
-            let view_position = (model_view * object.sphere.center.extend(1.0)).xyz();
-            let distance = view_position.length_squared();
-
-            let model_view_proj = view_proj * model;
-
-            let inv_trans_model_view = Mat3::from_mat4(model_view.inverse().transpose());
-
-            calls.push(CPUDrawCall {
-                start_idx: object.start_idx,
-                end_idx: object.start_idx + object.count,
-                vertex_offset: object.vertex_offset,
-                // TODO: Elide these clones?
-                material_handle: object.material.get_raw(),
-            });
-
-            outputs.push(PerObjectData {
-                model_view,
-                model_view_proj,
-                inv_trans_model_view: inv_trans_model_view.into(),
-                material_idx: 0,
-            });
-
-            _distances.push(IndexedDistance { distance, index });
-        }
-
-        // TODO: Sorting
+            cull_internal(
+                &args.materials,
+                &mut args.filter,
+                objects.into_iter().map(|(o, _)| o),
+                frustum,
+                view,
+                view_proj,
+            )
+        } else {
+            cull_internal(
+                &args.materials,
+                &mut args.filter,
+                args.objects.iter(),
+                frustum,
+                view,
+                view_proj,
+            )
+        };
 
         assert_eq!(calls.len(), outputs.len());
-        assert_eq!(calls.len(), _distances.len());
 
         if outputs.is_empty() {
             // Dummy data
@@ -118,6 +127,56 @@ impl Default for CpuCuller {
     fn default() -> Self {
         Self::new()
     }
+}
+
+pub fn cull_internal<'a, FilterFn>(
+    materials: &MaterialManager,
+    filter: &mut FilterFn,
+    objects: impl ExactSizeIterator<Item = &'a InternalObject>,
+    frustum: ShaderFrustum,
+    view: Mat4,
+    view_proj: Mat4,
+) -> (Vec<PerObjectData>, Vec<CPUDrawCall>)
+where
+    FilterFn: FnMut(&InternalObject, &Material) -> bool,
+{
+    let mut outputs = Vec::with_capacity(objects.len());
+    let mut calls = Vec::with_capacity(objects.len());
+
+    for object in objects.into_iter() {
+        if !filter(object, materials.get_material(object.material.get_raw())) {
+            continue;
+        }
+
+        let model = object.transform;
+        let model_view = view * model;
+
+        let transformed = object.sphere.apply_transform(model_view);
+        if !frustum.contains_sphere(transformed) {
+            continue;
+        }
+
+        let model_view_proj = view_proj * model;
+
+        let inv_trans_model_view = Mat3::from_mat4(model_view.inverse().transpose());
+
+        calls.push(CPUDrawCall {
+            start_idx: object.start_idx,
+            end_idx: object.start_idx + object.count,
+            vertex_offset: object.vertex_offset,
+            // TODO: Elide these clones?
+            material_handle: object.material.get_raw(),
+        });
+
+        outputs.push(PerObjectData {
+            model_view,
+            model_view_proj,
+            inv_trans_model_view: inv_trans_model_view.into(),
+            material_idx: 0,
+        });
+    }
+
+    (outputs, calls)
 }
 
 pub fn run<'rpass>(

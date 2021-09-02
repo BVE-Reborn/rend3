@@ -15,6 +15,12 @@ pub struct GPUIndirectData {
     pub count: usize,
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum Sorting {
+    FrontToBack,
+    BackToFront,
+}
+
 #[derive(Debug, Clone)]
 pub struct CPUDrawCall {
     pub start_idx: u32,

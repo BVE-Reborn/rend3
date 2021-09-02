@@ -4,6 +4,7 @@
 #extension GL_EXT_nonuniform_qualifier : require
 #endif
 
+#ifdef ALPHA_CUTOUT
 #include "structures.glsl"
 
 layout(location = 0) in vec4 i_position;
@@ -50,8 +51,11 @@ void main() {
     if (has_albedo) {
         vec4 albedo = textureGrad(sampler2D(ALBEDO_TEXTURE, primary_sampler), coords, uvdx, uvdy);
 
-        if (albedo.a <= 0.5) {
+        if (albedo.a <= material.alpha_cutout) {
             discard;
         }
     }
 }
+#else // ALPHA_CUTOUT
+void main() {}
+#endif // ALPHA_CUTOUT

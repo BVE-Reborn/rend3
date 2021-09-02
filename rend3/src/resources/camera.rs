@@ -33,6 +33,10 @@ impl CameraManager {
         self.data = data;
     }
 
+    pub fn get_data(&self) -> Camera {
+        self.data
+    }
+
     pub fn set_aspect_ratio(&mut self, aspect_ratio: Option<f32>) {
         self.set_data(self.data, aspect_ratio)
     }

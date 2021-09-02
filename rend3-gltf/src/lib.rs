@@ -1,7 +1,7 @@
 use fnv::FnvHashMap;
-use glam::{Mat3, Mat4, Vec2, Vec3, Vec4, Vec4Swizzles};
-use rend3::{types, types::MeshBuilder, Renderer};
-use std::future::Future;
+use glam::{Mat3, Mat4, UVec2, Vec2, Vec3, Vec4, Vec4Swizzles};
+use rend3::{types, Renderer};
+use std::{collections::hash_map::Entry, future::Future};
 use thiserror::Error;
 
 #[derive(Debug)]
@@ -181,7 +181,7 @@ fn load_meshes<'a, E: std::error::Error + 'static>(
                 .collect();
 
             // glTF models are right handed, so we must flip their winding order
-            let mut builder = MeshBuilder::new(vertex_positions).with_right_handed();
+            let mut builder = types::MeshBuilder::new(vertex_positions).with_right_handed();
 
             if let Some(normals) = reader.read_normals() {
                 builder = builder.with_vertex_normals(normals.map(Vec3::from).collect())
@@ -224,6 +224,7 @@ fn load_default_material(renderer: &Renderer, loaded: &mut LoadedGltfScene) {
         None,
         renderer.add_material(types::Material {
             albedo: types::AlbedoComponent::Value(Vec4::splat(1.0)),
+            transparency: types::Transparency::Opaque,
             normal: types::NormalTexture::None,
             aomr_textures: types::AoMRTextures::None,
             ao_factor: Some(1.0),
@@ -235,7 +236,6 @@ fn load_default_material(renderer: &Renderer, loaded: &mut LoadedGltfScene) {
             emissive: types::MaterialComponent::None,
             reflectance: types::MaterialComponent::None,
             anisotropy: types::MaterialComponent::None,
-            alpha_cutout: None,
             transform: Mat3::IDENTITY,
             unlit: false,
             sample_type: types::SampleType::Linear,
@@ -275,6 +275,18 @@ where
             })
             .unwrap_or_default();
 
+        let uv_transform = albedo
+            .as_ref()
+            .and_then(|i| {
+                let transform = i.texture_transform()?;
+                Some(Mat3::from_scale_angle_translation(
+                    transform.scale().into(),
+                    transform.rotation(),
+                    transform.offset().into(),
+                ))
+            })
+            .unwrap_or(Mat3::IDENTITY);
+
         let albedo_tex =
             option_resolve(albedo.map(|i| load_image(renderer, loaded, i.texture().source(), true, texture_func)))
                 .await
@@ -299,11 +311,19 @@ where
 
         let handle = renderer.add_material(types::Material {
             albedo: match albedo_tex {
-                Some(tex) => types::AlbedoComponent::TextureValue {
+                Some(tex) => types::AlbedoComponent::TextureVertexValue {
                     texture: tex,
                     value: Vec4::from(albedo_factor),
+                    srgb: false,
                 },
                 None => types::AlbedoComponent::Value(Vec4::from(albedo_factor)),
+            },
+            transparency: match material.alpha_mode() {
+                gltf::material::AlphaMode::Opaque => types::Transparency::Opaque,
+                gltf::material::AlphaMode::Mask => types::Transparency::Cutout {
+                    cutout: material.alpha_cutoff().unwrap_or(0.5),
+                },
+                gltf::material::AlphaMode::Blend => types::Transparency::Blend,
             },
             normal: match normals_tex {
                 Some(tex) => types::NormalTexture::Tricomponent(tex),
@@ -316,8 +336,8 @@ where
                     ao_texture: ao,
                 },
             },
-            roughness_factor: Some(roughness_factor),
             metallic_factor: Some(metallic_factor),
+            roughness_factor: Some(roughness_factor),
             emissive: match emissive_tex {
                 Some(tex) => types::MaterialComponent::TextureValue {
                     texture: tex,
@@ -325,6 +345,7 @@ where
                 },
                 None => types::MaterialComponent::Value(Vec3::from(emissive_factor)),
             },
+            transform: uv_transform,
             unlit: material.unlit(),
             sample_type: nearest,
             ..types::Material::default()
@@ -350,14 +371,19 @@ where
     Fut: Future<Output = Result<Vec<u8>, E>>,
     E: std::error::Error + 'static,
 {
+    let key = ImageKey {
+        index: image.index(),
+        srgb,
+    };
+
+    let entry = match loaded.images.entry(key) {
+        Entry::Occupied(handle) => return Ok(handle.get().clone()),
+        Entry::Vacant(v) => v,
+    };
+
     // TODO: Address format detection for compressed texs
     // TODO: Allow embedded images
     if let gltf::image::Source::Uri { uri, .. } = image.source() {
-        let key = ImageKey {
-            index: image.index(),
-            srgb,
-        };
-
         let data = texture_func(uri)
             .await
             .map_err(|e| GltfLoadError::TextureIo(uri.to_string(), e))?;
@@ -369,14 +395,13 @@ where
                 true => types::TextureFormat::Rgba8UnormSrgb,
                 false => types::TextureFormat::Rgba8Unorm,
             },
-            width: rgba.width(),
-            height: rgba.height(),
+            size: UVec2::new(rgba.width(), rgba.height()),
             data: rgba.into_raw(),
             /// TODO: automatic mipmapping (#53)
             mip_levels: 1,
         });
 
-        loaded.images.insert(key, handle.clone());
+        entry.insert(handle.clone());
 
         Ok(handle)
     } else {

@@ -9,7 +9,7 @@ use wgpu::{
 
 pub fn render_loop(
     renderer: Arc<Renderer>,
-    list: &mut dyn RenderRoutine,
+    routine: &mut dyn RenderRoutine,
     output: RendererOutput,
 ) -> RendererStatistics {
     renderer.instructions.swap();
@@ -38,8 +38,8 @@ pub fn render_loop(
             }
             Instruction::AddTexture2D { handle, texture } => {
                 let size = Extent3d {
-                    width: texture.width,
-                    height: texture.height,
+                    width: texture.size.x,
+                    height: texture.size.y,
                     depth_or_array_layers: 1,
                 };
 
@@ -67,8 +67,8 @@ pub fn render_loop(
             }
             Instruction::AddTextureCube { handle, texture } => {
                 let size = Extent3d {
-                    width: texture.width,
-                    height: texture.height,
+                    width: texture.size.x,
+                    height: texture.size.y,
                     depth_or_array_layers: 6,
                 };
 
@@ -151,7 +151,7 @@ pub fn render_loop(
     let mut encoders = Vec::with_capacity(16);
     encoders.push(encoder.finish());
 
-    list.render(Arc::clone(&renderer), &mut encoders, &frame);
+    routine.render(Arc::clone(&renderer), &mut encoders, &frame);
 
     renderer.queue.submit(encoders);
 

@@ -3,7 +3,7 @@ use glam::{UVec2, Vec3, Vec3A};
 use pico_args::Arguments;
 use rend3::{
     types::{Backend, Camera, CameraProjection, DirectionalLight, Texture, TextureFormat},
-    InternalSurfaceOptions, RenderRoutine, Renderer,
+    InternalSurfaceOptions, Renderer,
 };
 use rend3_pbr::PbrRenderRoutine;
 use std::{
@@ -44,8 +44,7 @@ fn load_skybox(renderer: &Renderer, routine: &mut PbrRenderRoutine) -> Result<()
 
     let handle = renderer.add_texture_cube(Texture {
         format: TextureFormat::Rgba8UnormSrgb,
-        width: image_info.width,
-        height: image_info.height,
+        size: UVec2::new(image_info.width, image_info.height),
         data: image,
         label: Some("background".into()),
         mip_levels: mips,
@@ -162,7 +161,7 @@ fn main() {
     let _directional_light = renderer.add_directional_light(DirectionalLight {
         color: Vec3::ONE,
         intensity: 10.0,
-        direction: Vec3::new(-1.0, -1.0, 0.0),
+        direction: Vec3::new(-1.0, -1.0, 1.0),
     });
     let mut scancode_status = HashMap::with_hasher(FnvBuildHasher::default());
 
@@ -310,8 +309,7 @@ fn main() {
         Event::RedrawRequested(_) => {
             renderer.set_camera_data(camera_location);
             // Dispatch a render!
-            let dynref: &mut dyn RenderRoutine = &mut routine;
-            let _stats = renderer.render(dynref, rend3::util::output::RendererOutput::InternalSurface);
+            let _stats = renderer.render(&mut routine, rend3::util::output::RendererOutput::InternalSurface);
         }
         _ => {}
     })

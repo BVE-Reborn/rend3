@@ -4,17 +4,22 @@ default_to_workspace = false
 [tasks.shaders]
 script_runner = "@shell"
 script = '''
-glslc rend3-pbr/shaders/src/blit.vert -O -g -o rend3-pbr/shaders/spirv/blit.vert.spv
-glslc rend3-pbr/shaders/src/blit.frag -O -g -o rend3-pbr/shaders/spirv/blit.frag.spv
-glslc rend3-pbr/shaders/src/cull.comp -O -g -o rend3-pbr/shaders/spirv/cull.comp.spv
-glslc rend3-pbr/shaders/src/depth.vert -DCPU_MODE -O -g -o rend3-pbr/shaders/spirv/depth.vert.cpu.spv
-glslc rend3-pbr/shaders/src/depth.frag -DCPU_MODE -O -g -o rend3-pbr/shaders/spirv/depth.frag.cpu.spv
-glslc rend3-pbr/shaders/src/depth.vert -DGPU_MODE -O -g -o rend3-pbr/shaders/spirv/depth.vert.gpu.spv
-glslc rend3-pbr/shaders/src/depth.frag -DGPU_MODE -O -g -o rend3-pbr/shaders/spirv/depth.frag.gpu.spv
-glslc rend3-pbr/shaders/src/opaque.vert -DCPU_MODE -O -g -o rend3-pbr/shaders/spirv/opaque.vert.cpu.spv
-glslc rend3-pbr/shaders/src/opaque.frag -DCPU_MODE -O -g -o rend3-pbr/shaders/spirv/opaque.frag.cpu.spv
-glslc rend3-pbr/shaders/src/opaque.vert -DGPU_MODE -O -g -o rend3-pbr/shaders/spirv/opaque.vert.gpu.spv
-glslc rend3-pbr/shaders/src/opaque.frag -DGPU_MODE -O -g -o rend3-pbr/shaders/spirv/opaque.frag.gpu.spv
-glslc rend3-pbr/shaders/src/skybox.vert -O -g -o rend3-pbr/shaders/spirv/skybox.vert.spv
-glslc rend3-pbr/shaders/src/skybox.frag -O -g -o rend3-pbr/shaders/spirv/skybox.frag.spv
+glslc rend3-pbr/shaders/src/blit.vert                             -O -g -o rend3-pbr/shaders/spirv/blit.vert.spv
+glslc rend3-pbr/shaders/src/blit.frag                             -O -g -o rend3-pbr/shaders/spirv/blit.frag.spv
+glslc rend3-pbr/shaders/src/cull.comp   -DATOMIC_CULL             -O -g -o rend3-pbr/shaders/spirv/cull-atomic-cull.comp.spv
+glslc rend3-pbr/shaders/src/cull.comp   -DPREFIX_CULL             -O -g -o rend3-pbr/shaders/spirv/cull-prefix-cull.comp.spv
+glslc rend3-pbr/shaders/src/cull.comp   -DPREFIX_SUM              -O -g -o rend3-pbr/shaders/spirv/cull-prefix-sum.comp.spv
+glslc rend3-pbr/shaders/src/cull.comp   -DPREFIX_OUTPUT           -O -g -o rend3-pbr/shaders/spirv/cull-prefix-output.comp.spv
+glslc rend3-pbr/shaders/src/depth.vert  -DCPU_MODE                -O -g -o rend3-pbr/shaders/spirv/depth.vert.cpu.spv
+glslc rend3-pbr/shaders/src/depth.frag  -DCPU_MODE                -O -g -o rend3-pbr/shaders/spirv/depth-opaque.frag.cpu.spv
+glslc rend3-pbr/shaders/src/depth.frag  -DCPU_MODE -DALPHA_CUTOUT -O -g -o rend3-pbr/shaders/spirv/depth-cutout.frag.cpu.spv
+glslc rend3-pbr/shaders/src/depth.vert  -DGPU_MODE                -O -g -o rend3-pbr/shaders/spirv/depth.vert.gpu.spv
+glslc rend3-pbr/shaders/src/depth.frag  -DGPU_MODE                -O -g -o rend3-pbr/shaders/spirv/depth-opaque.frag.gpu.spv
+glslc rend3-pbr/shaders/src/depth.frag  -DGPU_MODE -DALPHA_CUTOUT -O -g -o rend3-pbr/shaders/spirv/depth-cutout.frag.gpu.spv
+glslc rend3-pbr/shaders/src/opaque.vert -DCPU_MODE                -O -g -o rend3-pbr/shaders/spirv/opaque.vert.cpu.spv
+glslc rend3-pbr/shaders/src/opaque.frag -DCPU_MODE                -O -g -o rend3-pbr/shaders/spirv/opaque.frag.cpu.spv
+glslc rend3-pbr/shaders/src/opaque.vert -DGPU_MODE                -O -g -o rend3-pbr/shaders/spirv/opaque.vert.gpu.spv
+glslc rend3-pbr/shaders/src/opaque.frag -DGPU_MODE                -O -g -o rend3-pbr/shaders/spirv/opaque.frag.gpu.spv
+glslc rend3-pbr/shaders/src/skybox.vert                           -O -g -o rend3-pbr/shaders/spirv/skybox.vert.spv
+glslc rend3-pbr/shaders/src/skybox.frag                           -O -g -o rend3-pbr/shaders/spirv/skybox.frag.spv
 '''

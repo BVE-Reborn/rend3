@@ -1,8 +1,8 @@
 use arrayvec::ArrayVec;
-use rend3::{resources::MaterialManager, ModeData, RendererMode};
+use rend3::{resources::MaterialManager, types::TransparencyType, ModeData, RendererMode};
 use wgpu::{
-    BindGroupLayout, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState, DepthStencilState, Device, Face,
-    FragmentState, FrontFace, MultisampleState, PipelineLayoutDescriptor, PolygonMode, PrimitiveState,
+    BindGroupLayout, BlendState, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState, DepthStencilState,
+    Device, Face, FragmentState, FrontFace, MultisampleState, PipelineLayoutDescriptor, PolygonMode, PrimitiveState,
     PrimitiveTopology, RenderPipeline, RenderPipelineDescriptor, StencilState, TextureFormat, VertexState,
 };
 
@@ -12,7 +12,8 @@ use crate::{
     SampleCount,
 };
 
-pub struct BuildOpaquePassShaderArgs<'a> {
+#[derive(Clone)]
+pub struct BuildForwardPassShaderArgs<'a> {
     pub mode: RendererMode,
     pub device: &'a Device,
 
@@ -24,33 +25,31 @@ pub struct BuildOpaquePassShaderArgs<'a> {
     pub materials: &'a MaterialManager,
 
     pub samples: SampleCount,
+    pub transparency: TransparencyType,
 }
 
-pub fn build_opaque_pass_shader(args: BuildOpaquePassShaderArgs<'_>) -> RenderPipeline {
-    let opaque_pass_vert = unsafe {
+pub fn build_forward_pass_shader(args: BuildForwardPassShaderArgs<'_>) -> RenderPipeline {
+    let forward_pass_vert = unsafe {
         mode_safe_shader(
             args.device,
             args.mode,
-            "opaque pass vert",
+            "forward pass vert",
             "opaque.vert.cpu.spv",
             "opaque.vert.gpu.spv",
             false,
         )
     };
 
-    let opaque_pass_frag = unsafe {
+    let forward_pass_frag = unsafe {
         mode_safe_shader(
             args.device,
             args.mode,
-            "depth pass frag",
+            "forward pass frag",
             "opaque.frag.cpu.spv",
             "opaque.frag.gpu.spv",
             false,
         )
     };
-
-    let cpu_vertex_buffers = cpu_vertex_buffers();
-    let gpu_vertex_buffers = gpu_vertex_buffers();
 
     let mut bgls: ArrayVec<&BindGroupLayout, 6> = ArrayVec::new();
     bgls.push(&args.interfaces.samplers_bgl);
@@ -68,11 +67,27 @@ pub fn build_opaque_pass_shader(args: BuildOpaquePassShaderArgs<'_>) -> RenderPi
         push_constant_ranges: &[],
     });
 
+    build_forward_pass_inner(args, pll, forward_pass_vert, forward_pass_frag)
+}
+
+fn build_forward_pass_inner(
+    args: BuildForwardPassShaderArgs,
+    pll: wgpu::PipelineLayout,
+    forward_pass_vert: wgpu::ShaderModule,
+    forward_pass_frag: wgpu::ShaderModule,
+) -> RenderPipeline {
+    let cpu_vertex_buffers = cpu_vertex_buffers();
+    let gpu_vertex_buffers = gpu_vertex_buffers();
+
     args.device.create_render_pipeline(&RenderPipelineDescriptor {
-        label: Some("opaque pass"),
+        label: Some(match args.transparency {
+            TransparencyType::Opaque => "opaque pass",
+            TransparencyType::Cutout => "cutout pass",
+            TransparencyType::Blend => "blend forward pass",
+        }),
         layout: Some(&pll),
         vertex: VertexState {
-            module: &opaque_pass_vert,
+            module: &forward_pass_vert,
             entry_point: "main",
             buffers: match args.mode {
                 RendererMode::CPUPowered => &cpu_vertex_buffers,
@@ -91,7 +106,10 @@ pub fn build_opaque_pass_shader(args: BuildOpaquePassShaderArgs<'_>) -> RenderPi
         depth_stencil: Some(DepthStencilState {
             format: TextureFormat::Depth32Float,
             depth_write_enabled: true,
-            depth_compare: CompareFunction::GreaterEqual,
+            depth_compare: match args.transparency {
+                TransparencyType::Opaque | TransparencyType::Cutout => CompareFunction::Equal,
+                TransparencyType::Blend => CompareFunction::GreaterEqual,
+            },
             stencil: StencilState::default(),
             bias: DepthBiasState::default(),
         }),
@@ -100,11 +118,14 @@ pub fn build_opaque_pass_shader(args: BuildOpaquePassShaderArgs<'_>) -> RenderPi
             ..Default::default()
         },
         fragment: Some(FragmentState {
-            module: &opaque_pass_frag,
+            module: &forward_pass_frag,
             entry_point: "main",
             targets: &[ColorTargetState {
                 format: TextureFormat::Rgba16Float,
-                blend: None,
+                blend: match args.transparency {
+                    TransparencyType::Opaque | TransparencyType::Cutout => None,
+                    TransparencyType::Blend => Some(BlendState::ALPHA_BLENDING),
+                },
                 write_mask: ColorWrites::all(),
             }],
         }),
