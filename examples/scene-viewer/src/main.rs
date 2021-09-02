@@ -309,8 +309,7 @@ fn main() {
         Event::RedrawRequested(_) => {
             renderer.set_camera_data(camera_location);
             // Dispatch a render!
-            let dynref: &mut dyn RenderRoutine = &mut routine;
-            let _stats = renderer.render(dynref, rend3::util::output::RendererOutput::InternalSurface);
+            let _stats = renderer.render(&mut routine, rend3::util::output::RendererOutput::InternalSurface);
         }
         _ => {}
     })
