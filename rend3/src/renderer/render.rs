@@ -9,7 +9,7 @@ use wgpu::{
 
 pub fn render_loop(
     renderer: Arc<Renderer>,
-    list: &mut dyn RenderRoutine,
+    routine: &mut dyn RenderRoutine,
     output: RendererOutput,
 ) -> RendererStatistics {
     renderer.instructions.swap();
@@ -151,7 +151,7 @@ pub fn render_loop(
     let mut encoders = Vec::with_capacity(16);
     encoders.push(encoder.finish());
 
-    list.render(Arc::clone(&renderer), &mut encoders, &frame);
+    routine.render(Arc::clone(&renderer), &mut encoders, &frame);
 
     renderer.queue.submit(encoders);
 
