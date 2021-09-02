@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use rend3::{
+    format_sso,
     resources::{CameraManager, InternalObject, MaterialManager, MeshBuffers},
     types::TransparencyType,
     ModeData,
@@ -93,16 +94,22 @@ impl ForwardPass {
                 filter: |_, m| m.transparency == self.transparency,
                 sort,
             }),
-            ModeData::GPU(gpu_culler) => gpu_culler.cull(GpuCullerCullArgs {
-                device: args.device,
-                encoder: args.encoder,
-                interfaces: args.interfaces,
-                materials: args.materials,
-                camera: args.camera,
-                objects: args.objects,
-                filter: |_, m| m.transparency == self.transparency,
-                sort,
-            }),
+            ModeData::GPU(gpu_culler) => {
+                args.encoder
+                    .push_debug_group(&format_sso!("forward cull {}", self.transparency.to_debug_str()));
+                let culled = gpu_culler.cull(GpuCullerCullArgs {
+                    device: args.device,
+                    encoder: args.encoder,
+                    interfaces: args.interfaces,
+                    materials: args.materials,
+                    camera: args.camera,
+                    objects: args.objects,
+                    filter: |_, m| m.transparency == self.transparency,
+                    sort,
+                });
+                args.encoder.pop_debug_group();
+                culled
+            }
         }
     }
 

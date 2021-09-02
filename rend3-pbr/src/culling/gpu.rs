@@ -356,7 +356,7 @@ impl GpuCuller {
                     .build(args.device, &self.prefix_bgl);
 
                 let mut cpass = args.encoder.begin_compute_pass(&ComputePassDescriptor {
-                    label: Some("prefix compute cull"),
+                    label: Some("prefix cull"),
                 });
 
                 cpass.set_pipeline(&self.prefix_cull_pipeline);
@@ -388,7 +388,7 @@ impl GpuCuller {
                     .build(args.device, &self.atomic_bgl);
 
                 let mut cpass = args.encoder.begin_compute_pass(&ComputePassDescriptor {
-                    label: Some("atomic compute cull"),
+                    label: Some("atomic cull"),
                 });
 
                 cpass.set_pipeline(&self.atomic_pipeline);
