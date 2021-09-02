@@ -11,20 +11,30 @@ struct CullingUniforms {
     uint object_count;
 };
 
+#ifdef ATOMIC_CULL
+#define OBJECT_OUTPUT_DATA_BUFFER_BINDING 1
+#define INDIRECT_BUFFER_BINDING 2
+#else // ATOMIC_CULL
+#define OBJECT_OUTPUT_DATA_BUFFER_BINDING 3
+#define INDIRECT_BUFFER_BINDING 4
+#endif // ATOMIC_CULL
+
 layout(set = 0, binding = 0, std430) restrict readonly buffer ObjectInputDataBuffer {
     CullingUniforms uniforms;
     ObjectInputData object_input[];
 };
+#ifndef ATOMIC_CULL
 layout(set = 0, binding = 1, std430) restrict buffer IntermediateBufferA {
     uint result_index_a[];
 };
 layout(set = 0, binding = 2, std430) restrict buffer IntermediateBufferB {
     uint result_index_b[];
 };
-layout(set = 0, binding = 3, std430) restrict buffer ObjectOutputDataBuffer {
+#endif
+layout(set = 0, binding = OBJECT_OUTPUT_DATA_BUFFER_BINDING, std430) restrict buffer ObjectOutputDataBuffer {
     ObjectOutputData object_output[];
 };
-layout(set = 0, binding = 4, std430) restrict buffer IndirectBuffer {
+layout(set = 0, binding = INDIRECT_BUFFER_BINDING, std430) restrict buffer IndirectBuffer {
     uint draw_call_count;
     uint _2;
     uint _3;
@@ -125,7 +135,7 @@ void main() {
 
     bool visible = frustum_contains_sphere(uniforms.frustum, mesh_sphere);
 
-    uint result_index_1 = bitfieldInsert(0, uint(visible), 30, 1);
+    uint result_index_1 = bitfieldInsert(0, uint(visible), 31, 1);
     uint result_index_2 = bitfieldInsert(result_index_1, uint(visible), 0, 31);
 
     result_index_a[input_idx] = result_index_2;
@@ -151,8 +161,10 @@ void main() {
 
     uint other_idx = my_idx - stride;
 
-    uint result = result_index_b[my_idx];
-    result = bitfieldInsert(result, bitfieldExtract(result_index_a[my_idx], 0, 31) + bitfieldExtract(result_index_a[other_idx], 0, 31), 0, 31);
+    uint me = result_index_a[my_idx];
+    uint other = result_index_a[other_idx];
+    uint result = me;
+    result = bitfieldInsert(result, bitfieldExtract(me, 0, 31) + bitfieldExtract(other, 0, 31), 0, 31);
     result_index_b[my_idx] = result;
 }
 #endif // PREFIX_SUM
@@ -166,13 +178,18 @@ void main() {
     }
 
     uint result = result_index_a[input_idx];
-    bool enabled = bool(bitfieldExtract(result, 30, 1));
+    uint objects_before = bitfieldExtract(result, 0, 31);
+    uint output_idx = objects_before - 1;
+    bool enabled = bool(bitfieldExtract(result, 31, 1));
+
+    if (input_idx == uniforms.object_count - 1) {
+        draw_call_count = objects_before;
+    }
 
     if (!enabled) {
         return;
     }
 
-    uint output_idx = bitfieldExtract(result, 0, 31);
     write_output(object_input[input_idx], output_idx);
 }
 #endif

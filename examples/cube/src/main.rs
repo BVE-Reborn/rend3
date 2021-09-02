@@ -1,5 +1,4 @@
 use glam::UVec2;
-use rend3::RenderRoutine;
 
 fn vertex(pos: [f32; 3]) -> glam::Vec3 {
     glam::Vec3::from(pos)

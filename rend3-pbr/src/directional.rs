@@ -89,6 +89,7 @@ impl DirectionalShadowPass {
                         camera: &light.camera,
                         objects: args.objects,
                         filter: |_, mat| mat.transparency == TransparencyType::Opaque,
+                        sort: None,
                     }),
                 };
 
@@ -110,6 +111,7 @@ impl DirectionalShadowPass {
                         camera: &light.camera,
                         objects: args.objects,
                         filter: |_, mat| mat.transparency == TransparencyType::Cutout,
+                        sort: None,
                     }),
                 };
 

@@ -917,7 +917,7 @@ impl From<Transparency> for TransparencyType {
     }
 }
 impl TransparencyType {
-    pub fn to_debug_str(&self) -> &'static str {
+    pub fn to_debug_str(self) -> &'static str {
         match self {
             TransparencyType::Opaque => "opaque",
             TransparencyType::Cutout => "cutout",

@@ -101,6 +101,7 @@ impl ForwardPass {
                 camera: args.camera,
                 objects: args.objects,
                 filter: |_, m| m.transparency == self.transparency,
+                sort,
             }),
         }
     }

@@ -3,7 +3,7 @@ use glam::{UVec2, Vec3, Vec3A};
 use pico_args::Arguments;
 use rend3::{
     types::{Backend, Camera, CameraProjection, DirectionalLight, Texture, TextureFormat},
-    InternalSurfaceOptions, RenderRoutine, Renderer,
+    InternalSurfaceOptions, Renderer,
 };
 use rend3_pbr::PbrRenderRoutine;
 use std::{
