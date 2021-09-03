@@ -424,7 +424,7 @@ pub fn build_cull_data<'a, FilterFn>(
 where
     FilterFn: FnMut(&InternalObject, &Material) -> bool,
 {
-    let length = objects.len();
+    let mut count = 0;
     for object in objects {
         if !filter(object, materials.get_material(object.material.get_raw())) {
             continue;
@@ -438,8 +438,9 @@ where
             transform: object.transform,
             bounding_sphere: object.sphere,
         }));
+        count += 1;
     }
-    length
+    count
 }
 
 pub fn run<'rpass>(rpass: &mut RenderPass<'rpass>, indirect_data: &'rpass GPUIndirectData) {
