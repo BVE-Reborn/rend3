@@ -42,12 +42,13 @@ bytemuck = "1"
 flume = "0.10"
 fnv = "1"
 glam = { version = "0.18", features = ["bytemuck"] }
-log = "0.4"
 indexmap = "1"
+log = "0.4"
 parking_lot = { version = "0.11" }
+profiling = {version = "1", default-features = false }
 range-alloc = "0.1"
-rend3-types = { version = "^0.0.6", path = "../rend3-types" }
 raw-window-handle = "0.3"
+rend3-types = { version = "^0.0.6", path = "../rend3-types" }
 smallvec = "1"
 smartstring = "0.2"
 thiserror = "1"

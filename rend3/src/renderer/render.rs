@@ -12,6 +12,8 @@ pub fn render_loop(
     routine: &mut dyn RenderRoutine,
     output: RendererOutput,
 ) -> RendererStatistics {
+    profiling::scope!("render_loop");
+
     renderer.instructions.swap();
 
     let mut instructions = renderer.instructions.consumer.lock();

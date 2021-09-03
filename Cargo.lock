@@ -1388,6 +1388,20 @@ name = "profiling"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "87dfd5592a8eed7e74f56ad7b125f8234763b805c30f0c7c95c486920026a6ec"
+dependencies = [
+ "profiling-procmacros",
+ "tracy-client",
+]
+
+[[package]]
+name = "profiling-procmacros"
+version = "1.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b9dc92bed14cc1433694b0ee18dfb3c219bf182019b0daf7b017f7a9f1e280ac"
+dependencies = [
+ "quote",
+ "syn",
+]
 
 [[package]]
 name = "quote"
@@ -1460,6 +1474,7 @@ dependencies = [
  "indexmap",
  "log",
  "parking_lot",
+ "profiling",
  "range-alloc",
  "raw-window-handle",
  "rend3-types",
@@ -1533,10 +1548,12 @@ dependencies = [
  "image",
  "pico-args",
  "pollster",
+ "profiling",
  "rend3",
  "rend3-gltf",
  "rend3-pbr",
  "smallvec",
+ "tracy-client",
  "winit",
 ]
 
@@ -1781,6 +1798,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a31142970826733df8241ef35dc040ef98c679ab14d7c3e54d827099b3acecaa"
 dependencies = [
  "serde",
+]
+
+[[package]]
+name = "tracy-client"
+version = "0.12.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c444a124cacac6811008dd67cd76af8af2f0c48dfd61e734f9e537bcfb5ff4e2"
+dependencies = [
+ "tracy-client-sys",
+]
+
+[[package]]
+name = "tracy-client-sys"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6226e4e77f0d46ce7ebb0a4b1daa82790035248b75bbf605b932a1d7b3b22b6d"
+dependencies = [
+ "cc",
 ]
 
 [[package]]

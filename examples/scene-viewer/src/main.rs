@@ -310,6 +310,8 @@ fn main() {
             renderer.set_camera_data(camera_location);
             // Dispatch a render!
             let _stats = renderer.render(&mut routine, rend3::util::output::RendererOutput::InternalSurface);
+
+            profiling::finish_frame!();
         }
         _ => {}
     })
