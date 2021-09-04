@@ -7,6 +7,7 @@ use rend3::{
     ModeData,
 };
 use wgpu::{BindGroup, CommandEncoder, Device, RenderPass, RenderPipeline};
+use wgpu_profiler::GpuProfiler;
 
 use crate::{
     common::{interfaces::ShaderInterfaces, samplers::Samplers},
@@ -21,6 +22,7 @@ use super::culling;
 
 pub struct ForwardPassCullArgs<'a> {
     pub device: &'a Device,
+    pub profiler: &'a mut GpuProfiler,
     pub encoder: &'a mut CommandEncoder,
 
     pub culler: ModeData<&'a CpuCuller, &'a GpuCuller>,
@@ -33,6 +35,8 @@ pub struct ForwardPassCullArgs<'a> {
 }
 
 pub struct ForwardPassPrepassArgs<'rpass, 'b> {
+    pub device: &'b Device,
+    pub profiler: &'b mut GpuProfiler,
     pub rpass: &'b mut RenderPass<'rpass>,
 
     pub materials: &'rpass MaterialManager,
@@ -45,6 +49,8 @@ pub struct ForwardPassPrepassArgs<'rpass, 'b> {
 }
 
 pub struct ForwardPassDrawArgs<'rpass, 'b> {
+    pub device: &'b Device,
+    pub profiler: &'b mut GpuProfiler,
     pub rpass: &'b mut RenderPass<'rpass>,
 
     pub materials: &'rpass MaterialManager,
@@ -98,7 +104,7 @@ impl ForwardPass {
                 sort,
             }),
             ModeData::GPU(gpu_culler) => {
-                args.encoder.push_debug_group(&label);
+                args.profiler.begin_scope(&label, args.encoder, args.device);
                 let culled = gpu_culler.cull(GpuCullerCullArgs {
                     device: args.device,
                     encoder: args.encoder,
@@ -109,7 +115,7 @@ impl ForwardPass {
                     filter: |_, m| m.transparency == self.transparency,
                     sort,
                 });
-                args.encoder.pop_debug_group();
+                args.profiler.end_scope(args.encoder);
                 culled
             }
         }
@@ -118,7 +124,7 @@ impl ForwardPass {
     pub fn prepass<'rpass>(&'rpass self, args: ForwardPassPrepassArgs<'rpass, '_>) {
         let label = self.transparency.to_debug_str();
         profiling::scope!(label);
-        args.rpass.push_debug_group(label);
+        args.profiler.begin_scope(label, args.rpass, args.device);
 
         args.meshes.bind(args.rpass);
 
@@ -134,13 +140,13 @@ impl ForwardPass {
                 culling::gpu::run(args.rpass, data);
             }
         }
-        args.rpass.pop_debug_group();
+        args.profiler.end_scope(args.rpass);
     }
 
     pub fn draw<'rpass>(&'rpass self, args: ForwardPassDrawArgs<'rpass, '_>) {
         let label = self.transparency.to_debug_str();
         profiling::scope!(label);
-        args.rpass.push_debug_group(label);
+        args.profiler.begin_scope(label, args.rpass, args.device);
 
         args.meshes.bind(args.rpass);
 
@@ -159,6 +165,6 @@ impl ForwardPass {
             }
         }
 
-        args.rpass.pop_debug_group();
+        args.profiler.end_scope(args.rpass);
     }
 }

@@ -2,6 +2,8 @@ pub type SsoString = smartstring::SmartString<smartstring::LazyCompact>;
 pub type FastHashMap<K, V> = fnv::FnvHashMap<K, V>;
 pub type FastHashSet<K> = fnv::FnvHashSet<K>;
 
+pub type RendererStatistics = Vec<wgpu_profiler::GpuTimerScopeResult>;
+
 #[macro_export]
 macro_rules! format_sso {
     ($($arg:tt)*) => {{

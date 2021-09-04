@@ -21,4 +21,4 @@ profiling = {version = "1", default-features = false }
 ordered-float = "2"
 rend3 = { version = "^0.0.6", path = "../rend3" }
 wgpu = { version = "0.10", features = ["trace", "spirv", "webgl"] }
-
+wgpu-profiler = { version = "0.6", git = "https://github.com/Wumpf/wgpu-profiler.git", rev = "a39653c398f40cf29ef43a0bcd29ce8f64bfa262" }

@@ -1,5 +1,7 @@
 use crate::{
-    instruction::Instruction, statistics::RendererStatistics, util::output::RendererOutput, RenderRoutine, Renderer,
+    instruction::Instruction,
+    util::{output::RendererOutput, typedefs::RendererStatistics},
+    RenderRoutine, Renderer,
 };
 use std::sync::Arc;
 use wgpu::{
@@ -11,7 +13,7 @@ pub fn render_loop(
     renderer: Arc<Renderer>,
     routine: &mut dyn RenderRoutine,
     output: RendererOutput,
-) -> RendererStatistics {
+) -> Option<RendererStatistics> {
     profiling::scope!("render_loop");
 
     renderer.instructions.swap();
@@ -38,7 +40,12 @@ pub fn render_loop(
             match cmd {
                 Instruction::AddMesh { handle, mesh } => {
                     profiling::scope!("Add Mesh");
+                    renderer
+                        .profiler
+                        .lock()
+                        .begin_scope("Add Mesh", &mut encoder, &renderer.device);
                     mesh_manager.fill(&renderer.device, &renderer.queue, &mut encoder, &handle, mesh);
+                    renderer.profiler.lock().end_scope(&mut encoder);
                 }
                 Instruction::AddTexture2D { handle, texture } => {
                     profiling::scope!("Add Texture 2D");
@@ -154,6 +161,7 @@ pub fn render_loop(
     ));
 
     let frame = output.acquire(&renderer.surface);
+    renderer.profiler.lock().resolve_queries(&mut encoder);
 
     // 16 encoders is a reasonable default
     let mut encoders = Vec::with_capacity(16);
@@ -163,5 +171,7 @@ pub fn render_loop(
 
     renderer.queue.submit(encoders);
 
-    RendererStatistics {}
+    let mut profiler = renderer.profiler.lock();
+    profiler.end_frame().unwrap();
+    profiler.process_finished_frame()
 }

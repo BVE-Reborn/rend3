@@ -10,6 +10,7 @@ use wgpu::{
     BindGroup, CommandEncoder, Device, LoadOp, Operations, RenderPassDepthStencilAttachment, RenderPassDescriptor,
     RenderPipeline, TextureView,
 };
+use wgpu_profiler::GpuProfiler;
 
 use crate::{
     common::{interfaces::ShaderInterfaces, samplers::Samplers},
@@ -24,6 +25,7 @@ use super::culling;
 
 pub struct DirectionalShadowPassCullShadowsArgs<'a> {
     pub device: &'a Device,
+    pub profiler: &'a mut GpuProfiler,
     pub encoder: &'a mut CommandEncoder,
 
     pub culler: ModeData<&'a CpuCuller, &'a GpuCuller>,
@@ -42,6 +44,8 @@ pub struct CulledLightSet {
 }
 
 pub struct DirectionalShadowPassDrawCulledShadowsArgs<'a> {
+    pub device: &'a Device,
+    pub profiler: &'a mut GpuProfiler,
     pub encoder: &'a mut CommandEncoder,
 
     pub materials: &'a MaterialManager,
@@ -88,8 +92,8 @@ impl DirectionalShadowPass {
                             sort: None,
                         }),
                         ModeData::GPU(gpu_culler) => {
-                            args.encoder.push_debug_group(&label);
-                            args.encoder.push_debug_group(&"opaque");
+                            args.profiler.begin_scope(&label, args.encoder, args.device);
+                            args.profiler.begin_scope("opaque", args.encoder, args.device);
                             let culled = gpu_culler.cull(GpuCullerCullArgs {
                                 device: args.device,
                                 encoder: args.encoder,
@@ -100,7 +104,7 @@ impl DirectionalShadowPass {
                                 filter: |_, mat| mat.transparency == TransparencyType::Opaque,
                                 sort: None,
                             });
-                            args.encoder.pop_debug_group();
+                            args.profiler.end_scope(args.encoder);
                             culled
                         }
                     }
@@ -119,7 +123,7 @@ impl DirectionalShadowPass {
                             sort: None,
                         }),
                         ModeData::GPU(gpu_culler) => {
-                            args.encoder.push_debug_group(&"cutout");
+                            args.profiler.begin_scope("cutout", args.encoder, args.device);
                             let culled = gpu_culler.cull(GpuCullerCullArgs {
                                 device: args.device,
                                 encoder: args.encoder,
@@ -130,8 +134,8 @@ impl DirectionalShadowPass {
                                 filter: |_, mat| mat.transparency == TransparencyType::Cutout,
                                 sort: None,
                             });
-                            args.encoder.pop_debug_group();
-                            args.encoder.pop_debug_group();
+                            args.profiler.end_scope(args.encoder);
+                            args.profiler.end_scope(args.encoder);
                             culled
                         }
                     }
@@ -166,7 +170,8 @@ impl DirectionalShadowPass {
                 }),
             });
 
-            rpass.push_debug_group(TransparencyType::Opaque.to_debug_str());
+            args.profiler
+                .begin_scope(TransparencyType::Opaque.to_debug_str(), &mut rpass, args.device);
 
             args.meshes.bind(&mut rpass);
 
@@ -183,8 +188,9 @@ impl DirectionalShadowPass {
                 }
             }
 
-            rpass.pop_debug_group();
-            rpass.push_debug_group(TransparencyType::Cutout.to_debug_str());
+            args.profiler.end_scope(&mut rpass);
+            args.profiler
+                .begin_scope(TransparencyType::Cutout.to_debug_str(), &mut rpass, args.device);
 
             rpass.set_pipeline(&self.cutout_pipeline);
             rpass.set_bind_group(1, &light.opaque_culled_objects.output_bg, &[]);
@@ -196,7 +202,7 @@ impl DirectionalShadowPass {
                 }
             }
 
-            rpass.pop_debug_group();
+            args.profiler.end_scope(&mut rpass);
         }
     }
 }

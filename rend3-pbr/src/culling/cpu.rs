@@ -73,7 +73,7 @@ impl CpuCuller {
             }
 
             cull_internal(
-                &args.materials,
+                args.materials,
                 &mut args.filter,
                 objects.into_iter().map(|(o, _)| o),
                 frustum,
@@ -82,7 +82,7 @@ impl CpuCuller {
             )
         } else {
             cull_internal(
-                &args.materials,
+                args.materials,
                 &mut args.filter,
                 args.objects.iter(),
                 frustum,

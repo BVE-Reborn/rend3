@@ -13,7 +13,7 @@ use crate::{
 };
 use arrayvec::ArrayVec;
 use fnv::FnvHashMap;
-use parking_lot::RwLock;
+use parking_lot::{Mutex, RwLock};
 use raw_window_handle::HasRawWindowHandle;
 use std::sync::Arc;
 use wgpu::{
@@ -226,6 +226,11 @@ pub async fn create_renderer<W: HasRawWindowHandle>(
     let object_manager = RwLock::new(ObjectManager::new());
     let directional_light_manager = RwLock::new(DirectionalLightManager::new(&device));
 
+    let mut profiler = wgpu_profiler::GpuProfiler::new(4, queue.get_timestamp_period());
+    profiler.enable_timer = device
+        .features()
+        .contains(wgpu_profiler::GpuProfiler::REQUIRED_WGPU_FEATURES);
+
     Ok(Arc::new(Renderer {
         instructions: InstructionStreamPair::new(),
 
@@ -243,6 +248,8 @@ pub async fn create_renderer<W: HasRawWindowHandle>(
         material_manager,
         object_manager,
         directional_light_manager,
+
+        profiler: Mutex::new(profiler),
 
         options: RwLock::new(builder.options),
     }))
