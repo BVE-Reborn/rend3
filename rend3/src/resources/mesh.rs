@@ -176,6 +176,8 @@ impl MeshManager {
     }
 
     pub fn ready(&mut self) {
+        profiling::scope!("Mesh Manager Ready");
+
         let vertex_alloc = &mut self.vertex_alloc;
         let index_alloc = &mut self.index_alloc;
         self.registry.remove_all_dead(|_, _, mesh| {

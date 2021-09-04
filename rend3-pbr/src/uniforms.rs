@@ -34,6 +34,8 @@ pub struct CreateShaderUniformArgs<'a> {
 }
 
 pub fn create_shader_uniform(args: CreateShaderUniformArgs<'_>) -> BindGroup {
+    profiling::scope!("create uniforms");
+
     let view = args.camera.view();
 
     let uniforms = ShaderCommonUniform {

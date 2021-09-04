@@ -35,6 +35,7 @@ pub enum RendererOutput {
 }
 impl RendererOutput {
     pub(crate) fn acquire(self, internal: &Option<Surface>) -> OutputFrame {
+        profiling::scope!("Acquire Output");
         match self {
             RendererOutput::InternalSurface => {
                 let surface = internal
@@ -42,6 +43,7 @@ impl RendererOutput {
                     .expect("Must setup renderer with a window in order to use internal surface");
                 let mut retrieved_frame = None;
                 for _ in 0..10 {
+                    profiling::scope!("Inner Acquire Loop");
                     match surface.get_current_frame() {
                         Ok(frame) => {
                             retrieved_frame = Some(frame);

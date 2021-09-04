@@ -67,64 +67,73 @@ impl DirectionalShadowPass {
     }
 
     pub fn cull_shadows(&self, args: DirectionalShadowPassCullShadowsArgs<'_>) -> Vec<CulledLightSet> {
+        profiling::scope!("Cull Shadows");
         args.lights
             .values()
             .enumerate()
             .map(|(idx, light)| -> CulledLightSet {
+                let label = format_sso!("shadow cull {}", idx);
+                profiling::scope!(&label);
                 // TODO: This is hella duplicated
-                let opaque_culled_objects = match args.culler {
-                    ModeData::CPU(cpu_culler) => cpu_culler.cull(CpuCullerCullArgs {
-                        device: args.device,
-                        camera: &light.camera,
-                        interfaces: args.interfaces,
-                        materials: args.materials,
-                        objects: args.objects,
-                        filter: |_, mat| mat.transparency == TransparencyType::Opaque,
-                        sort: None,
-                    }),
-                    ModeData::GPU(gpu_culler) => {
-                        args.encoder.push_debug_group(&format_sso!("shadow cull {}", idx));
-                        args.encoder.push_debug_group(&"opaque");
-                        let culled = gpu_culler.cull(GpuCullerCullArgs {
+                let opaque_culled_objects = {
+                    profiling::scope!("opaque");
+                    match args.culler {
+                        ModeData::CPU(cpu_culler) => cpu_culler.cull(CpuCullerCullArgs {
                             device: args.device,
-                            encoder: args.encoder,
+                            camera: &light.camera,
                             interfaces: args.interfaces,
                             materials: args.materials,
-                            camera: &light.camera,
                             objects: args.objects,
                             filter: |_, mat| mat.transparency == TransparencyType::Opaque,
                             sort: None,
-                        });
-                        args.encoder.pop_debug_group();
-                        culled
+                        }),
+                        ModeData::GPU(gpu_culler) => {
+                            args.encoder.push_debug_group(&label);
+                            args.encoder.push_debug_group(&"opaque");
+                            let culled = gpu_culler.cull(GpuCullerCullArgs {
+                                device: args.device,
+                                encoder: args.encoder,
+                                interfaces: args.interfaces,
+                                materials: args.materials,
+                                camera: &light.camera,
+                                objects: args.objects,
+                                filter: |_, mat| mat.transparency == TransparencyType::Opaque,
+                                sort: None,
+                            });
+                            args.encoder.pop_debug_group();
+                            culled
+                        }
                     }
                 };
 
-                let cutout_culled_objects = match args.culler {
-                    ModeData::CPU(cpu_culler) => cpu_culler.cull(CpuCullerCullArgs {
-                        device: args.device,
-                        camera: &light.camera,
-                        interfaces: args.interfaces,
-                        materials: args.materials,
-                        objects: args.objects,
-                        filter: |_, mat| mat.transparency == TransparencyType::Cutout,
-                        sort: None,
-                    }),
-                    ModeData::GPU(gpu_culler) => {
-                        args.encoder.push_debug_group(&"cutout");
-                        let culled = gpu_culler.cull(GpuCullerCullArgs {
+                let cutout_culled_objects = {
+                    profiling::scope!("cutout");
+                    match args.culler {
+                        ModeData::CPU(cpu_culler) => cpu_culler.cull(CpuCullerCullArgs {
                             device: args.device,
-                            encoder: args.encoder,
+                            camera: &light.camera,
                             interfaces: args.interfaces,
                             materials: args.materials,
-                            camera: &light.camera,
                             objects: args.objects,
                             filter: |_, mat| mat.transparency == TransparencyType::Cutout,
                             sort: None,
-                        });
-                        args.encoder.pop_debug_group();
-                        args.encoder.pop_debug_group();
-                        culled
+                        }),
+                        ModeData::GPU(gpu_culler) => {
+                            args.encoder.push_debug_group(&"cutout");
+                            let culled = gpu_culler.cull(GpuCullerCullArgs {
+                                device: args.device,
+                                encoder: args.encoder,
+                                interfaces: args.interfaces,
+                                materials: args.materials,
+                                camera: &light.camera,
+                                objects: args.objects,
+                                filter: |_, mat| mat.transparency == TransparencyType::Cutout,
+                                sort: None,
+                            });
+                            args.encoder.pop_debug_group();
+                            args.encoder.pop_debug_group();
+                            culled
+                        }
                     }
                 };
 
@@ -142,6 +151,7 @@ impl DirectionalShadowPass {
     pub fn draw_culled_shadows(&self, args: DirectionalShadowPassDrawCulledShadowsArgs<'_>) {
         for (idx, light) in args.culled_lights.iter().enumerate() {
             let label = format_sso!("shadow pass {}", idx);
+            profiling::scope!(&label);
 
             let mut rpass = args.encoder.begin_render_pass(&RenderPassDescriptor {
                 label: Some(&label),

@@ -38,7 +38,13 @@ impl SkyboxPass {
     }
 
     pub fn update_skybox(&mut self, args: UpdateSkyboxArgs<'_>) {
+        profiling::scope!("Update Skybox");
+
         if let Some(handle) = args.new_skybox_handle {
+            if self.current_skybox.as_ref().map(|s| &s.handle) == Some(&handle) {
+                return;
+            }
+
             let bg = BindGroupBuilder::new(Some("skybox"))
                 .with_texture_view(args.d2c_texture_manager.get_view(handle.get_raw()))
                 .build(args.device, &args.interfaces.skybox_bgl);

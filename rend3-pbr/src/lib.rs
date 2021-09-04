@@ -85,6 +85,8 @@ impl PbrRenderRoutine {
 
 impl RenderRoutine for PbrRenderRoutine {
     fn render(&mut self, renderer: Arc<Renderer>, encoders: &mut Vec<CommandBuffer>, frame: &OutputFrame) {
+        profiling::scope!("PBR Render Routine");
+
         let mut encoder = renderer.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("primary encoder"),
         });
@@ -183,97 +185,101 @@ impl RenderRoutine for PbrRenderRoutine {
             ambient: Vec4::new(0.0, 0.0, 0.0, 1.0),
         });
 
-        let mut rpass = encoder.begin_render_pass(&RenderPassDescriptor {
-            label: Some("primary renderpass"),
-            color_attachments: &[RenderPassColorAttachment {
-                view: &self.render_textures.color,
-                resolve_target: self.render_textures.resolve.as_ref(),
-                ops: Operations {
-                    load: LoadOp::Clear(Color::BLACK),
-                    store: true,
-                },
-            }],
-            depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
-                view: &self.render_textures.depth,
-                depth_ops: Some(Operations {
-                    load: LoadOp::Clear(0.0),
-                    store: true,
-                }),
-                stencil_ops: None,
-            }),
-        });
+        {
+            profiling::scope!("priamry renderpass");
 
-        rpass.push_debug_group("depth prepass");
-        self.primary_passes
-            .opaque_pass
-            .prepass(forward::ForwardPassPrepassArgs {
+            let mut rpass = encoder.begin_render_pass(&RenderPassDescriptor {
+                label: Some("primary renderpass"),
+                color_attachments: &[RenderPassColorAttachment {
+                    view: &self.render_textures.color,
+                    resolve_target: self.render_textures.resolve.as_ref(),
+                    ops: Operations {
+                        load: LoadOp::Clear(Color::BLACK),
+                        store: true,
+                    },
+                }],
+                depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
+                    view: &self.render_textures.depth,
+                    depth_ops: Some(Operations {
+                        load: LoadOp::Clear(0.0),
+                        store: true,
+                    }),
+                    stencil_ops: None,
+                }),
+            });
+
+            rpass.push_debug_group("depth prepass");
+            self.primary_passes
+                .opaque_pass
+                .prepass(forward::ForwardPassPrepassArgs {
+                    rpass: &mut rpass,
+                    materials: &materials,
+                    meshes: mesh_manager.buffers(),
+                    samplers: &self.samplers,
+                    texture_bg: d2_texture_output_bg_ref,
+                    culled_objects: &opaque_culled_objects,
+                });
+
+            self.primary_passes
+                .cutout_pass
+                .prepass(forward::ForwardPassPrepassArgs {
+                    rpass: &mut rpass,
+                    materials: &materials,
+                    meshes: mesh_manager.buffers(),
+                    samplers: &self.samplers,
+                    texture_bg: d2_texture_output_bg_ref,
+                    culled_objects: &cutout_culled_objects,
+                });
+
+            rpass.pop_debug_group();
+            rpass.push_debug_group("skybox");
+
+            self.primary_passes.skybox_pass.draw_skybox(skybox::SkyboxPassDrawArgs {
+                rpass: &mut rpass,
+                samplers: &self.samplers,
+                shader_uniform_bg: &primary_camera_uniform_bg,
+            });
+
+            rpass.pop_debug_group();
+            rpass.push_debug_group("forward");
+
+            self.primary_passes.opaque_pass.draw(forward::ForwardPassDrawArgs {
                 rpass: &mut rpass,
                 materials: &materials,
                 meshes: mesh_manager.buffers(),
                 samplers: &self.samplers,
+                directional_light_bg: directional_light.get_bg(),
                 texture_bg: d2_texture_output_bg_ref,
+                shader_uniform_bg: &primary_camera_uniform_bg,
                 culled_objects: &opaque_culled_objects,
             });
 
-        self.primary_passes
-            .cutout_pass
-            .prepass(forward::ForwardPassPrepassArgs {
+            self.primary_passes.cutout_pass.draw(forward::ForwardPassDrawArgs {
                 rpass: &mut rpass,
                 materials: &materials,
                 meshes: mesh_manager.buffers(),
                 samplers: &self.samplers,
+                directional_light_bg: directional_light.get_bg(),
                 texture_bg: d2_texture_output_bg_ref,
+                shader_uniform_bg: &primary_camera_uniform_bg,
                 culled_objects: &cutout_culled_objects,
             });
 
-        rpass.pop_debug_group();
-        rpass.push_debug_group("skybox");
+            self.primary_passes.transparent_pass.draw(forward::ForwardPassDrawArgs {
+                rpass: &mut rpass,
+                materials: &materials,
+                meshes: mesh_manager.buffers(),
+                samplers: &self.samplers,
+                directional_light_bg: directional_light.get_bg(),
+                texture_bg: d2_texture_output_bg_ref,
+                shader_uniform_bg: &primary_camera_uniform_bg,
+                culled_objects: &transparent_culled_objects,
+            });
 
-        self.primary_passes.skybox_pass.draw_skybox(skybox::SkyboxPassDrawArgs {
-            rpass: &mut rpass,
-            samplers: &self.samplers,
-            shader_uniform_bg: &primary_camera_uniform_bg,
-        });
+            rpass.pop_debug_group();
 
-        rpass.pop_debug_group();
-        rpass.push_debug_group("forward");
-
-        self.primary_passes.opaque_pass.draw(forward::ForwardPassDrawArgs {
-            rpass: &mut rpass,
-            materials: &materials,
-            meshes: mesh_manager.buffers(),
-            samplers: &self.samplers,
-            directional_light_bg: directional_light.get_bg(),
-            texture_bg: d2_texture_output_bg_ref,
-            shader_uniform_bg: &primary_camera_uniform_bg,
-            culled_objects: &opaque_culled_objects,
-        });
-
-        self.primary_passes.cutout_pass.draw(forward::ForwardPassDrawArgs {
-            rpass: &mut rpass,
-            materials: &materials,
-            meshes: mesh_manager.buffers(),
-            samplers: &self.samplers,
-            directional_light_bg: directional_light.get_bg(),
-            texture_bg: d2_texture_output_bg_ref,
-            shader_uniform_bg: &primary_camera_uniform_bg,
-            culled_objects: &cutout_culled_objects,
-        });
-
-        self.primary_passes.transparent_pass.draw(forward::ForwardPassDrawArgs {
-            rpass: &mut rpass,
-            materials: &materials,
-            meshes: mesh_manager.buffers(),
-            samplers: &self.samplers,
-            directional_light_bg: directional_light.get_bg(),
-            texture_bg: d2_texture_output_bg_ref,
-            shader_uniform_bg: &primary_camera_uniform_bg,
-            culled_objects: &transparent_culled_objects,
-        });
-
-        rpass.pop_debug_group();
-
-        drop(rpass);
+            drop(rpass);
+        }
 
         self.tonemapping_pass.blit(tonemapping::TonemappingPassBlitArgs {
             device: &renderer.device,

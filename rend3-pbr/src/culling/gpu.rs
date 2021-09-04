@@ -256,6 +256,8 @@ impl GpuCuller {
     where
         FilterFn: FnMut(&InternalObject, &Material) -> bool,
     {
+        profiling::scope!("Record GPU Culling");
+
         let uniform_size = mem::size_of::<GPUCullingUniforms>();
 
         let mut data = Vec::<u8>::with_capacity(args.objects.len() * mem::size_of::<GPUCullingInput>());
@@ -264,6 +266,7 @@ impl GpuCuller {
         data.resize(uniform_size, 0);
 
         let count = if let Some(sorting) = args.sort {
+            profiling::scope!("Sorting");
             let mut objects: Vec<_> = args
                 .objects
                 .iter()
@@ -424,6 +427,8 @@ pub fn build_cull_data<'a, FilterFn>(
 where
     FilterFn: FnMut(&InternalObject, &Material) -> bool,
 {
+    profiling::scope!("Filtering Building Input Data");
+
     let mut count = 0;
     for object in objects {
         if !filter(object, materials.get_material(object.material.get_raw())) {

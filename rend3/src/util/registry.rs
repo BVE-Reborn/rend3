@@ -49,6 +49,7 @@ impl<T, HandleType> ResourceRegistry<T, HandleType> {
     }
 
     pub fn remove_all_dead(&mut self, mut func: impl FnMut(&mut Self, usize, T)) {
+        profiling::scope!("ResourceRegistry::remove_all_dead");
         for idx in (0..self.mapping.len()).rev() {
             let element = self.mapping.get_index(idx).unwrap().1;
             if element.refcount.strong_count() == 0 {

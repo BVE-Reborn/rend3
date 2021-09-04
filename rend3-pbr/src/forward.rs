@@ -78,6 +78,9 @@ impl ForwardPass {
     }
 
     pub fn cull(&self, args: ForwardPassCullArgs<'_>) -> CulledObjectSet {
+        let label = format_sso!("forward cull {}", self.transparency.to_debug_str());
+        profiling::scope!(&label);
+
         let sort = if self.transparency == TransparencyType::Blend {
             Some(Sorting::BackToFront)
         } else {
@@ -95,8 +98,7 @@ impl ForwardPass {
                 sort,
             }),
             ModeData::GPU(gpu_culler) => {
-                args.encoder
-                    .push_debug_group(&format_sso!("forward cull {}", self.transparency.to_debug_str()));
+                args.encoder.push_debug_group(&label);
                 let culled = gpu_culler.cull(GpuCullerCullArgs {
                     device: args.device,
                     encoder: args.encoder,
@@ -114,7 +116,9 @@ impl ForwardPass {
     }
 
     pub fn prepass<'rpass>(&'rpass self, args: ForwardPassPrepassArgs<'rpass, '_>) {
-        args.rpass.push_debug_group(self.transparency.to_debug_str());
+        let label = self.transparency.to_debug_str();
+        profiling::scope!(label);
+        args.rpass.push_debug_group(label);
 
         args.meshes.bind(args.rpass);
 
@@ -134,7 +138,9 @@ impl ForwardPass {
     }
 
     pub fn draw<'rpass>(&'rpass self, args: ForwardPassDrawArgs<'rpass, '_>) {
-        args.rpass.push_debug_group(self.transparency.to_debug_str());
+        let label = self.transparency.to_debug_str();
+        profiling::scope!(label);
+        args.rpass.push_debug_group(label);
 
         args.meshes.bind(args.rpass);
 

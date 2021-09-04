@@ -47,11 +47,13 @@ impl CpuCuller {
     where
         FilterFn: FnMut(&InternalObject, &Material) -> bool,
     {
+        profiling::scope!("CPU Culling");
         let frustum = ShaderFrustum::from_matrix(args.camera.proj());
         let view = args.camera.view();
         let view_proj = args.camera.view_proj();
 
         let (mut outputs, calls) = if let Some(sorting) = args.sort {
+            profiling::scope!("Sorting");
             let mut objects: Vec<_> = args
                 .objects
                 .iter()

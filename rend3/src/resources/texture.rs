@@ -83,6 +83,7 @@ impl TextureManager {
     }
 
     pub fn ready(&mut self, device: &Device) -> TextureManagerReadyOutput {
+        profiling::scope!("D2 Texture Manager Ready");
         let dimension = self.dimension;
         let null_tex_man = &mut self.null_tex_man;
         let views = &mut self.views;
@@ -98,6 +99,7 @@ impl TextureManager {
         });
 
         if let ModeData::GPU(_) = self.layout_dirty {
+            profiling::scope!("Update GPU Texture Arrays");
             let layout_dirty = self.layout_dirty;
 
             if self.layout_dirty.into_gpu() {
