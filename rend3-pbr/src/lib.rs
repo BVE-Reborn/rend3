@@ -186,7 +186,7 @@ impl RenderRoutine for PbrRenderRoutine {
         });
 
         {
-            profiling::scope!("priamry renderpass");
+            profiling::scope!("primary renderpass");
 
             let mut rpass = encoder.begin_render_pass(&RenderPassDescriptor {
                 label: Some("primary renderpass"),
