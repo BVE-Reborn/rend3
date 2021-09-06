@@ -48,6 +48,7 @@ impl ObjectManager {
     }
 
     pub fn ready(&mut self) -> Vec<InternalObject> {
+        profiling::scope!("Object Manager Ready");
         self.registry.remove_all_dead(|_, _, _| ());
         self.registry.values().cloned().collect()
     }

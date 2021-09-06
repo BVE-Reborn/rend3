@@ -17,7 +17,8 @@ glam = { version = "0.18", features = ["bytemuck"] }
 include_dir = "0.6"
 log = "0.4"
 parking_lot = { version = "0.11" }
+profiling = {version = "1", default-features = false }
 ordered-float = "2"
 rend3 = { version = "^0.0.6", path = "../rend3" }
 wgpu = { version = "0.10", features = ["trace", "spirv", "webgl"] }
-
+wgpu-profiler = "0.6.1"

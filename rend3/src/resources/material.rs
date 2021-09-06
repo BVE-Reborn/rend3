@@ -386,9 +386,11 @@ impl MaterialManager {
     }
 
     pub fn ready(&mut self, device: &Device, queue: &Queue, texture_manager: &TextureManager) {
+        profiling::scope!("Material Ready");
         self.registry.remove_all_dead(|_, _, _| ());
 
         if let ModeData::GPU(ref mut buffer) = self.buffer {
+            profiling::scope!("Update GPU Material Buffer");
             let translate_texture = texture_manager.translation_fn();
             let data: Vec<_> = self
                 .registry

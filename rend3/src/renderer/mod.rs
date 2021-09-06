@@ -2,19 +2,19 @@ use crate::{
     instruction::{Instruction, InstructionStreamPair},
     renderer::{info::ExtendedAdapterInfo, resources::RendererGlobalResources},
     resources::{DirectionalLightManager, MaterialManager, MeshManager, ObjectManager, TextureManager},
-    statistics::RendererStatistics,
     types::{
         Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Material, MaterialChange,
         MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, Texture, TextureHandle,
     },
-    util::output::RendererOutput,
+    util::{output::RendererOutput, typedefs::RendererStatistics},
     InternalSurfaceOptions, RenderRoutine, RendererBuilder, RendererInitializationError, RendererMode,
 };
 use glam::Mat4;
-use parking_lot::RwLock;
+use parking_lot::{Mutex, RwLock};
 use raw_window_handle::HasRawWindowHandle;
 use std::{cmp::Ordering, future::Future, sync::Arc};
 use wgpu::{Device, Instance, Queue, Surface};
+use wgpu_profiler::GpuProfiler;
 
 pub mod error;
 pub mod info;
@@ -51,6 +51,8 @@ pub struct Renderer {
     pub object_manager: RwLock<ObjectManager>,
     pub directional_light_manager: RwLock<DirectionalLightManager>,
 
+    pub profiler: Mutex<GpuProfiler>,
+
     options: RwLock<InternalSurfaceOptions>,
 }
 impl Renderer {
@@ -59,26 +61,6 @@ impl Renderer {
         builder: RendererBuilder<'_, W>,
     ) -> impl Future<Output = Result<Arc<Self>, RendererInitializationError>> + '_ {
         setup::create_renderer(builder)
-    }
-
-    pub fn mode(&self) -> RendererMode {
-        self.mode
-    }
-
-    pub fn instance(&self) -> &Arc<Instance> {
-        &self.instance
-    }
-
-    pub fn device(&self) -> &Arc<Device> {
-        &self.device
-    }
-
-    pub fn queue(&self) -> &Arc<Queue> {
-        &self.queue
-    }
-
-    pub fn adapter_info(&self) -> ExtendedAdapterInfo {
-        self.adapter_info.clone()
     }
 
     pub fn add_mesh(&self, mesh: Mesh) -> MeshHandle {
@@ -180,7 +162,14 @@ impl Renderer {
             .push(Instruction::SetCameraData { data })
     }
 
-    pub fn render(self: &Arc<Self>, routine: &mut dyn RenderRoutine, output: RendererOutput) -> RendererStatistics {
+    /// Render a frame of the scene onto the given output, using the given RenderRoutine.
+    ///
+    /// The RendererStatistics may not be the results from this frame, but might be the results from multiple frames ago.
+    pub fn render(
+        self: &Arc<Self>,
+        routine: &mut dyn RenderRoutine,
+        output: RendererOutput,
+    ) -> Option<RendererStatistics> {
         render::render_loop(Arc::clone(self), routine, output)
     }
 }

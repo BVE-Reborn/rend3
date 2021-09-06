@@ -136,6 +136,8 @@ impl DirectionalLightManager {
     }
 
     pub fn ready(&mut self, device: &Device, queue: &Queue) {
+        profiling::scope!("Directional Light Ready");
+
         self.registry.remove_all_dead(|_, _, _| ());
 
         let registered_count = self.registry.count();

@@ -17,13 +17,15 @@ basis = { version = "0.1.0", git = "https://github.com/BVE-Reborn/basis-rs.git",
 env_logger = { version = "0.9", default-features = false, features = ["termcolor", "atty"] }
 fnv = "1"
 glam = "0.18"
-image = { version = "0.23", default-features = false, features = ["png", "jpeg", "tiff"]}
 histogram = "0.6"
+image = { version = "0.23", default-features = false, features = ["png", "jpeg", "tiff"]}
 pico-args = "0.4"
 pollster = "0.2"
+profiling = { version = "1", default-features = false, features = ["profile-with-tracy"] }
 rend3 = { version = "^0.0.6", path = "../../rend3" }
 rend3-gltf = { version = "^0.0.6", path = "../../rend3-gltf" }
 rend3-pbr = { version = "^0.0.6", path = "../../rend3-pbr" }
 smallvec = "1"
+tracy-client = "0.12"
 winit = "0.25"
-
+wgpu-profiler = "0.6.1"

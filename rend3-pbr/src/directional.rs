@@ -10,6 +10,7 @@ use wgpu::{
     BindGroup, CommandEncoder, Device, LoadOp, Operations, RenderPassDepthStencilAttachment, RenderPassDescriptor,
     RenderPipeline, TextureView,
 };
+use wgpu_profiler::GpuProfiler;
 
 use crate::{
     common::{interfaces::ShaderInterfaces, samplers::Samplers},
@@ -24,6 +25,7 @@ use super::culling;
 
 pub struct DirectionalShadowPassCullShadowsArgs<'a> {
     pub device: &'a Device,
+    pub profiler: &'a mut GpuProfiler,
     pub encoder: &'a mut CommandEncoder,
 
     pub culler: ModeData<&'a CpuCuller, &'a GpuCuller>,
@@ -42,6 +44,8 @@ pub struct CulledLightSet {
 }
 
 pub struct DirectionalShadowPassDrawCulledShadowsArgs<'a> {
+    pub device: &'a Device,
+    pub profiler: &'a mut GpuProfiler,
     pub encoder: &'a mut CommandEncoder,
 
     pub materials: &'a MaterialManager,
@@ -67,64 +71,73 @@ impl DirectionalShadowPass {
     }
 
     pub fn cull_shadows(&self, args: DirectionalShadowPassCullShadowsArgs<'_>) -> Vec<CulledLightSet> {
+        profiling::scope!("Cull Shadows");
         args.lights
             .values()
             .enumerate()
             .map(|(idx, light)| -> CulledLightSet {
+                let label = format_sso!("shadow cull {}", idx);
+                profiling::scope!(&label);
                 // TODO: This is hella duplicated
-                let opaque_culled_objects = match args.culler {
-                    ModeData::CPU(cpu_culler) => cpu_culler.cull(CpuCullerCullArgs {
-                        device: args.device,
-                        camera: &light.camera,
-                        interfaces: args.interfaces,
-                        materials: args.materials,
-                        objects: args.objects,
-                        filter: |_, mat| mat.transparency == TransparencyType::Opaque,
-                        sort: None,
-                    }),
-                    ModeData::GPU(gpu_culler) => {
-                        args.encoder.push_debug_group(&format_sso!("shadow cull {}", idx));
-                        args.encoder.push_debug_group(&"opaque");
-                        let culled = gpu_culler.cull(GpuCullerCullArgs {
+                let opaque_culled_objects = {
+                    profiling::scope!("opaque");
+                    match args.culler {
+                        ModeData::CPU(cpu_culler) => cpu_culler.cull(CpuCullerCullArgs {
                             device: args.device,
-                            encoder: args.encoder,
+                            camera: &light.camera,
                             interfaces: args.interfaces,
                             materials: args.materials,
-                            camera: &light.camera,
                             objects: args.objects,
                             filter: |_, mat| mat.transparency == TransparencyType::Opaque,
                             sort: None,
-                        });
-                        args.encoder.pop_debug_group();
-                        culled
+                        }),
+                        ModeData::GPU(gpu_culler) => {
+                            args.profiler.begin_scope(&label, args.encoder, args.device);
+                            args.profiler.begin_scope("opaque", args.encoder, args.device);
+                            let culled = gpu_culler.cull(GpuCullerCullArgs {
+                                device: args.device,
+                                encoder: args.encoder,
+                                interfaces: args.interfaces,
+                                materials: args.materials,
+                                camera: &light.camera,
+                                objects: args.objects,
+                                filter: |_, mat| mat.transparency == TransparencyType::Opaque,
+                                sort: None,
+                            });
+                            args.profiler.end_scope(args.encoder);
+                            culled
+                        }
                     }
                 };
 
-                let cutout_culled_objects = match args.culler {
-                    ModeData::CPU(cpu_culler) => cpu_culler.cull(CpuCullerCullArgs {
-                        device: args.device,
-                        camera: &light.camera,
-                        interfaces: args.interfaces,
-                        materials: args.materials,
-                        objects: args.objects,
-                        filter: |_, mat| mat.transparency == TransparencyType::Cutout,
-                        sort: None,
-                    }),
-                    ModeData::GPU(gpu_culler) => {
-                        args.encoder.push_debug_group(&"cutout");
-                        let culled = gpu_culler.cull(GpuCullerCullArgs {
+                let cutout_culled_objects = {
+                    profiling::scope!("cutout");
+                    match args.culler {
+                        ModeData::CPU(cpu_culler) => cpu_culler.cull(CpuCullerCullArgs {
                             device: args.device,
-                            encoder: args.encoder,
+                            camera: &light.camera,
                             interfaces: args.interfaces,
                             materials: args.materials,
-                            camera: &light.camera,
                             objects: args.objects,
                             filter: |_, mat| mat.transparency == TransparencyType::Cutout,
                             sort: None,
-                        });
-                        args.encoder.pop_debug_group();
-                        args.encoder.pop_debug_group();
-                        culled
+                        }),
+                        ModeData::GPU(gpu_culler) => {
+                            args.profiler.begin_scope("cutout", args.encoder, args.device);
+                            let culled = gpu_culler.cull(GpuCullerCullArgs {
+                                device: args.device,
+                                encoder: args.encoder,
+                                interfaces: args.interfaces,
+                                materials: args.materials,
+                                camera: &light.camera,
+                                objects: args.objects,
+                                filter: |_, mat| mat.transparency == TransparencyType::Cutout,
+                                sort: None,
+                            });
+                            args.profiler.end_scope(args.encoder);
+                            args.profiler.end_scope(args.encoder);
+                            culled
+                        }
                     }
                 };
 
@@ -142,9 +155,12 @@ impl DirectionalShadowPass {
     pub fn draw_culled_shadows(&self, args: DirectionalShadowPassDrawCulledShadowsArgs<'_>) {
         for (idx, light) in args.culled_lights.iter().enumerate() {
             let label = format_sso!("shadow pass {}", idx);
+            profiling::scope!(&label);
+
+            args.profiler.begin_scope(&label, args.encoder, args.device);
 
             let mut rpass = args.encoder.begin_render_pass(&RenderPassDescriptor {
-                label: Some(&label),
+                label: None,
                 color_attachments: &[],
                 depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
                     view: &light.shadow_texture_arc,
@@ -156,7 +172,8 @@ impl DirectionalShadowPass {
                 }),
             });
 
-            rpass.push_debug_group(TransparencyType::Opaque.to_debug_str());
+            args.profiler
+                .begin_scope(TransparencyType::Opaque.to_debug_str(), &mut rpass, args.device);
 
             args.meshes.bind(&mut rpass);
 
@@ -173,8 +190,9 @@ impl DirectionalShadowPass {
                 }
             }
 
-            rpass.pop_debug_group();
-            rpass.push_debug_group(TransparencyType::Cutout.to_debug_str());
+            args.profiler.end_scope(&mut rpass);
+            args.profiler
+                .begin_scope(TransparencyType::Cutout.to_debug_str(), &mut rpass, args.device);
 
             rpass.set_pipeline(&self.cutout_pipeline);
             rpass.set_bind_group(1, &light.opaque_culled_objects.output_bg, &[]);
@@ -186,7 +204,9 @@ impl DirectionalShadowPass {
                 }
             }
 
-            rpass.pop_debug_group();
+            args.profiler.end_scope(&mut rpass);
+            drop(rpass);
+            args.profiler.end_scope(args.encoder);
         }
     }
 }

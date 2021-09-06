@@ -12,6 +12,7 @@ use std::{
     path::Path,
     time::{Duration, Instant},
 };
+use wgpu_profiler::GpuTimerScopeResult;
 use winit::{
     event::{DeviceEvent, ElementState, Event, KeyboardInput, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
@@ -175,6 +176,8 @@ fn main() {
         location: Vec3A::new(20.0, 20.0, -20.0),
     };
 
+    let mut previous_profiling_stats: Option<Vec<GpuTimerScopeResult>> = None;
+
     let mut timestamp_last_second = Instant::now();
     let mut timestamp_last_frame = Instant::now();
 
@@ -238,6 +241,16 @@ fn main() {
             }
             if button_pressed(&scancode_status, platform::Scancodes::Z) {
                 camera_location.location -= up * velocity * delta_time.as_secs_f32();
+            }
+
+            if button_pressed(&scancode_status, platform::Scancodes::P) {
+                // write out gpu side performance info into a trace readable by chrome://tracing
+                if let Some(ref stats) = previous_profiling_stats {
+                    println!("Outputing gpu timing chrome trace to profile.json");
+                    wgpu_profiler::chrometrace::write_chrometrace(Path::new("profile.json"), stats).unwrap();
+                } else {
+                    println!("No gpu timing trace available, either timestamp queries are unsupported or not enough frames have elapsed yet!");
+                }
             }
 
             window.request_redraw();
@@ -309,7 +322,10 @@ fn main() {
         Event::RedrawRequested(_) => {
             renderer.set_camera_data(camera_location);
             // Dispatch a render!
-            let _stats = renderer.render(&mut routine, rend3::util::output::RendererOutput::InternalSurface);
+            previous_profiling_stats = renderer.render(&mut routine, rend3::util::output::RendererOutput::InternalSurface);
+
+            // mark the end of the frame for tracy/other profilers
+            profiling::finish_frame!();
         }
         _ => {}
     })

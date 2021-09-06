@@ -20,7 +20,7 @@ pub fn cpu_required_features() -> Features {
 }
 
 pub fn optional_features() -> Features {
-    wgpu::Features::TEXTURE_COMPRESSION_BC
+    wgpu::Features::TEXTURE_COMPRESSION_BC | wgpu::Features::TIMESTAMP_QUERY
 }
 
 pub fn check_features(mode: RendererMode, device: Features) -> Result<Features, RendererInitializationError> {

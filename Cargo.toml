@@ -15,6 +15,7 @@ debug = true
 lto = "thin"
 
 [patch.crates-io]
+wgpu = { git = "https://github.com/gfx-rs/wgpu.git", rev = "938c069608213b209e420b9087deb983ef732433" }
+wgpu-types = { git = "https://github.com/gfx-rs/wgpu.git", rev = "938c069608213b209e420b9087deb983ef732433" }
 # wgpu = { path = "../wgpu/wgpu" }
 # wgpu-types = { path = "../wgpu/wgpu-types" }
-# naga = { path = "../naga" }

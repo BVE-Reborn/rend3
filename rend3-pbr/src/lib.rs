@@ -39,18 +39,18 @@ pub struct PbrRenderRoutine {
 
 impl PbrRenderRoutine {
     pub fn new(renderer: &Renderer, render_texture_options: RenderTextureOptions) -> Self {
-        let device = renderer.device();
-        let mode = renderer.mode();
-        let interfaces = common::interfaces::ShaderInterfaces::new(device);
+        let interfaces = common::interfaces::ShaderInterfaces::new(&renderer.device);
 
-        let samplers = common::samplers::Samplers::new(device, mode, &interfaces.samplers_bgl);
+        let samplers = common::samplers::Samplers::new(&renderer.device, renderer.mode, &interfaces.samplers_bgl);
 
         let cpu_culler = culling::cpu::CpuCuller::new();
-        let gpu_culler = mode.into_data(|| (), || culling::gpu::GpuCuller::new(device));
+        let gpu_culler = renderer
+            .mode
+            .into_data(|| (), || culling::gpu::GpuCuller::new(&renderer.device));
 
         let primary_passes = PrimaryPasses::new(renderer, &interfaces, render_texture_options.samples);
         let tonemapping_pass = tonemapping::TonemappingPass::new(tonemapping::TonemappingPassNewArgs {
-            device,
+            device: &renderer.device,
             interfaces: &interfaces,
         });
 
@@ -85,9 +85,13 @@ impl PbrRenderRoutine {
 
 impl RenderRoutine for PbrRenderRoutine {
     fn render(&mut self, renderer: Arc<Renderer>, encoders: &mut Vec<CommandBuffer>, frame: &OutputFrame) {
+        profiling::scope!("PBR Render Routine");
+
         let mut encoder = renderer.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("primary encoder"),
         });
+
+        let mut profiler = renderer.profiler.lock();
 
         let mut mesh_manager = renderer.mesh_manager.write();
         let mut object_manager = renderer.object_manager.write();
@@ -123,6 +127,7 @@ impl RenderRoutine for PbrRenderRoutine {
                 .shadow_passes
                 .cull_shadows(directional::DirectionalShadowPassCullShadowsArgs {
                     device: &renderer.device,
+                    profiler: &mut profiler,
                     encoder: &mut encoder,
                     culler,
                     materials: &materials,
@@ -133,8 +138,11 @@ impl RenderRoutine for PbrRenderRoutine {
 
         let global_resources = renderer.global_resources.read();
 
+        profiler.begin_scope("forward culling", &mut encoder, &renderer.device);
+
         let transparent_culled_objects = self.primary_passes.transparent_pass.cull(forward::ForwardPassCullArgs {
             device: &renderer.device,
+            profiler: &mut profiler,
             encoder: &mut encoder,
             culler,
             materials: &materials,
@@ -145,6 +153,7 @@ impl RenderRoutine for PbrRenderRoutine {
 
         let cutout_culled_objects = self.primary_passes.cutout_pass.cull(forward::ForwardPassCullArgs {
             device: &renderer.device,
+            profiler: &mut profiler,
             encoder: &mut encoder,
             culler,
             materials: &materials,
@@ -155,6 +164,7 @@ impl RenderRoutine for PbrRenderRoutine {
 
         let opaque_culled_objects = self.primary_passes.opaque_pass.cull(forward::ForwardPassCullArgs {
             device: &renderer.device,
+            profiler: &mut profiler,
             encoder: &mut encoder,
             culler,
             materials: &materials,
@@ -163,10 +173,14 @@ impl RenderRoutine for PbrRenderRoutine {
             objects: &objects,
         });
 
+        profiler.end_scope(&mut encoder);
+
         let d2_texture_output_bg_ref = d2_texture_output.bg.as_ref().map(|_| (), |a| &**a);
 
         self.primary_passes.shadow_passes.draw_culled_shadows(
             directional::DirectionalShadowPassDrawCulledShadowsArgs {
+                device: &renderer.device,
+                profiler: &mut profiler,
                 encoder: &mut encoder,
                 materials: &materials,
                 meshes: mesh_manager.buffers(),
@@ -183,100 +197,117 @@ impl RenderRoutine for PbrRenderRoutine {
             ambient: Vec4::new(0.0, 0.0, 0.0, 1.0),
         });
 
-        let mut rpass = encoder.begin_render_pass(&RenderPassDescriptor {
-            label: Some("primary renderpass"),
-            color_attachments: &[RenderPassColorAttachment {
-                view: &self.render_textures.color,
-                resolve_target: self.render_textures.resolve.as_ref(),
-                ops: Operations {
-                    load: LoadOp::Clear(Color::BLACK),
-                    store: true,
-                },
-            }],
-            depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
-                view: &self.render_textures.depth,
-                depth_ops: Some(Operations {
-                    load: LoadOp::Clear(0.0),
-                    store: true,
-                }),
-                stencil_ops: None,
-            }),
-        });
+        {
+            profiling::scope!("primary renderpass");
+            profiler.begin_scope("primary renderpass", &mut encoder, &renderer.device);
 
-        rpass.push_debug_group("depth prepass");
-        self.primary_passes
-            .opaque_pass
-            .prepass(forward::ForwardPassPrepassArgs {
+            let mut rpass = encoder.begin_render_pass(&RenderPassDescriptor {
+                label: None,
+                color_attachments: &[RenderPassColorAttachment {
+                    view: &self.render_textures.color,
+                    resolve_target: self.render_textures.resolve.as_ref(),
+                    ops: Operations {
+                        load: LoadOp::Clear(Color::BLACK),
+                        store: true,
+                    },
+                }],
+                depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
+                    view: &self.render_textures.depth,
+                    depth_ops: Some(Operations {
+                        load: LoadOp::Clear(0.0),
+                        store: true,
+                    }),
+                    stencil_ops: None,
+                }),
+            });
+
+            profiler.begin_scope("depth prepass", &mut rpass, &renderer.device);
+            self.primary_passes
+                .opaque_pass
+                .prepass(forward::ForwardPassPrepassArgs {
+                    device: &renderer.device,
+                    profiler: &mut profiler,
+                    rpass: &mut rpass,
+                    materials: &materials,
+                    meshes: mesh_manager.buffers(),
+                    samplers: &self.samplers,
+                    texture_bg: d2_texture_output_bg_ref,
+                    culled_objects: &opaque_culled_objects,
+                });
+
+            self.primary_passes
+                .cutout_pass
+                .prepass(forward::ForwardPassPrepassArgs {
+                    device: &renderer.device,
+                    profiler: &mut profiler,
+                    rpass: &mut rpass,
+                    materials: &materials,
+                    meshes: mesh_manager.buffers(),
+                    samplers: &self.samplers,
+                    texture_bg: d2_texture_output_bg_ref,
+                    culled_objects: &cutout_culled_objects,
+                });
+
+            profiler.end_scope(&mut rpass);
+            profiler.begin_scope("skybox", &mut rpass, &renderer.device);
+
+            self.primary_passes.skybox_pass.draw_skybox(skybox::SkyboxPassDrawArgs {
+                rpass: &mut rpass,
+                samplers: &self.samplers,
+                shader_uniform_bg: &primary_camera_uniform_bg,
+            });
+
+            profiler.end_scope(&mut rpass);
+            profiler.begin_scope("forward", &mut rpass, &renderer.device);
+
+            self.primary_passes.opaque_pass.draw(forward::ForwardPassDrawArgs {
+                device: &renderer.device,
+                profiler: &mut profiler,
                 rpass: &mut rpass,
                 materials: &materials,
                 meshes: mesh_manager.buffers(),
                 samplers: &self.samplers,
+                directional_light_bg: directional_light.get_bg(),
                 texture_bg: d2_texture_output_bg_ref,
+                shader_uniform_bg: &primary_camera_uniform_bg,
                 culled_objects: &opaque_culled_objects,
             });
 
-        self.primary_passes
-            .cutout_pass
-            .prepass(forward::ForwardPassPrepassArgs {
+            self.primary_passes.cutout_pass.draw(forward::ForwardPassDrawArgs {
+                device: &renderer.device,
+                profiler: &mut profiler,
                 rpass: &mut rpass,
                 materials: &materials,
                 meshes: mesh_manager.buffers(),
                 samplers: &self.samplers,
+                directional_light_bg: directional_light.get_bg(),
                 texture_bg: d2_texture_output_bg_ref,
+                shader_uniform_bg: &primary_camera_uniform_bg,
                 culled_objects: &cutout_culled_objects,
             });
 
-        rpass.pop_debug_group();
-        rpass.push_debug_group("skybox");
+            self.primary_passes.transparent_pass.draw(forward::ForwardPassDrawArgs {
+                device: &renderer.device,
+                profiler: &mut profiler,
+                rpass: &mut rpass,
+                materials: &materials,
+                meshes: mesh_manager.buffers(),
+                samplers: &self.samplers,
+                directional_light_bg: directional_light.get_bg(),
+                texture_bg: d2_texture_output_bg_ref,
+                shader_uniform_bg: &primary_camera_uniform_bg,
+                culled_objects: &transparent_culled_objects,
+            });
 
-        self.primary_passes.skybox_pass.draw_skybox(skybox::SkyboxPassDrawArgs {
-            rpass: &mut rpass,
-            samplers: &self.samplers,
-            shader_uniform_bg: &primary_camera_uniform_bg,
-        });
+            profiler.end_scope(&mut rpass);
 
-        rpass.pop_debug_group();
-        rpass.push_debug_group("forward");
-
-        self.primary_passes.opaque_pass.draw(forward::ForwardPassDrawArgs {
-            rpass: &mut rpass,
-            materials: &materials,
-            meshes: mesh_manager.buffers(),
-            samplers: &self.samplers,
-            directional_light_bg: directional_light.get_bg(),
-            texture_bg: d2_texture_output_bg_ref,
-            shader_uniform_bg: &primary_camera_uniform_bg,
-            culled_objects: &opaque_culled_objects,
-        });
-
-        self.primary_passes.cutout_pass.draw(forward::ForwardPassDrawArgs {
-            rpass: &mut rpass,
-            materials: &materials,
-            meshes: mesh_manager.buffers(),
-            samplers: &self.samplers,
-            directional_light_bg: directional_light.get_bg(),
-            texture_bg: d2_texture_output_bg_ref,
-            shader_uniform_bg: &primary_camera_uniform_bg,
-            culled_objects: &cutout_culled_objects,
-        });
-
-        self.primary_passes.transparent_pass.draw(forward::ForwardPassDrawArgs {
-            rpass: &mut rpass,
-            materials: &materials,
-            meshes: mesh_manager.buffers(),
-            samplers: &self.samplers,
-            directional_light_bg: directional_light.get_bg(),
-            texture_bg: d2_texture_output_bg_ref,
-            shader_uniform_bg: &primary_camera_uniform_bg,
-            culled_objects: &transparent_culled_objects,
-        });
-
-        rpass.pop_debug_group();
-
-        drop(rpass);
+            drop(rpass);
+            profiler.end_scope(&mut encoder);
+        }
 
         self.tonemapping_pass.blit(tonemapping::TonemappingPassBlitArgs {
             device: &renderer.device,
+            profiler: &mut profiler,
             encoder: &mut encoder,
             interfaces: &self.interfaces,
             samplers: &self.samplers,
