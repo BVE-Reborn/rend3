@@ -6,7 +6,7 @@ use crate::{
         Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Material, MaterialChange,
         MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, Texture, TextureHandle,
     },
-    util::{output::RendererOutput, typedefs::RendererStatistics},
+    util::{mipmap::MipmapGenerator, output::RendererOutput, typedefs::RendererStatistics},
     InternalSurfaceOptions, RenderRoutine, RendererBuilder, RendererInitializationError, RendererMode,
 };
 use glam::Mat4;
@@ -50,6 +50,8 @@ pub struct Renderer {
     pub material_manager: RwLock<MaterialManager>,
     pub object_manager: RwLock<ObjectManager>,
     pub directional_light_manager: RwLock<DirectionalLightManager>,
+
+    pub mipmap_generator: Mutex<MipmapGenerator>,
 
     pub profiler: Mutex<GpuProfiler>,
 

@@ -3,10 +3,11 @@ use crate::{
     util::{output::RendererOutput, typedefs::RendererStatistics},
     RenderRoutine, Renderer,
 };
-use std::sync::Arc;
+use rend3_types::{MipmapCount, MipmapSource};
+use std::{num::NonZeroU32, sync::Arc};
 use wgpu::{
-    util::DeviceExt, CommandEncoderDescriptor, Extent3d, TextureDescriptor, TextureDimension, TextureUsages,
-    TextureViewDescriptor, TextureViewDimension,
+    util::DeviceExt, CommandEncoderDescriptor, Extent3d, ImageCopyTexture, ImageDataLayout, Origin3d, TextureAspect,
+    TextureDescriptor, TextureDimension, TextureUsages, TextureViewDescriptor, TextureViewDimension,
 };
 
 pub fn render_loop(
@@ -34,6 +35,7 @@ pub fn render_loop(
     let mut directional_light_manager = renderer.directional_light_manager.write();
     let mut global_resources = renderer.global_resources.write();
     let mut option_guard = renderer.options.write();
+    let mut mipmap_generator = renderer.mipmap_generator.lock();
     {
         profiling::scope!("Instruction Processing");
         for cmd in instructions.drain(..) {
@@ -55,21 +57,73 @@ pub fn render_loop(
                         depth_or_array_layers: 1,
                     };
 
-                    assert!(texture.mip_levels > 0, "Mipmap levels must be greater than 0");
+                    let mip_level_count = match texture.mip_count {
+                        MipmapCount::Specific(v) => v.get(),
+                        MipmapCount::Maximum => size.max_mips(),
+                    };
 
-                    let uploaded_tex = renderer.device.create_texture_with_data(
-                        &renderer.queue,
-                        &TextureDescriptor {
-                            label: None,
-                            size,
-                            mip_level_count: texture.mip_levels,
-                            sample_count: 1,
-                            dimension: TextureDimension::D2,
-                            format: texture.format,
-                            usage: TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST,
-                        },
-                        &texture.data,
-                    );
+                    let uploaded_tex = match texture.mip_source {
+                        MipmapSource::Uploaded => renderer.device.create_texture_with_data(
+                            &renderer.queue,
+                            &TextureDescriptor {
+                                label: None,
+                                size,
+                                mip_level_count,
+                                sample_count: 1,
+                                dimension: TextureDimension::D2,
+                                format: texture.format,
+                                usage: TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST,
+                            },
+                            &texture.data,
+                        ),
+                        MipmapSource::Generated => {
+                            let desc = TextureDescriptor {
+                                label: None,
+                                size,
+                                mip_level_count,
+                                sample_count: 1,
+                                dimension: TextureDimension::D2,
+                                format: texture.format,
+                                usage: TextureUsages::TEXTURE_BINDING
+                                    | TextureUsages::COPY_DST
+                                    | TextureUsages::RENDER_ATTACHMENT,
+                            };
+                            let tex = renderer.device.create_texture(&desc);
+
+                            let format_desc = texture.format.describe();
+
+                            // write first level
+                            renderer.queue.write_texture(
+                                ImageCopyTexture {
+                                    texture: &tex,
+                                    mip_level: 0,
+                                    origin: Origin3d::ZERO,
+                                    aspect: TextureAspect::All,
+                                },
+                                &texture.data,
+                                ImageDataLayout {
+                                    offset: 0,
+                                    bytes_per_row: NonZeroU32::new(
+                                        format_desc.block_size as u32
+                                            * (size.width / format_desc.block_dimensions.0 as u32),
+                                    ),
+                                    rows_per_image: None,
+                                },
+                                size,
+                            );
+
+                            // generate mipmaps
+                            mipmap_generator.generate_mipmaps(
+                                &renderer.device,
+                                &mut renderer.profiler.lock(),
+                                &mut encoder,
+                                &tex,
+                                &desc,
+                            );
+
+                            tex
+                        }
+                    };
 
                     texture_manager_2d.fill(
                         &handle,
@@ -85,14 +139,17 @@ pub fn render_loop(
                         depth_or_array_layers: 6,
                     };
 
-                    assert!(texture.mip_levels > 0, "Mipmap levels must be greater than 0");
+                    let mip_level_count = match texture.mip_count {
+                        MipmapCount::Specific(v) => v.get(),
+                        MipmapCount::Maximum => size.max_mips(),
+                    };
 
                     let uploaded_tex = renderer.device.create_texture_with_data(
                         &renderer.queue,
                         &TextureDescriptor {
                             label: None,
                             size,
-                            mip_level_count: texture.mip_levels,
+                            mip_level_count,
                             sample_count: 1,
                             dimension: TextureDimension::D2,
                             format: texture.format,

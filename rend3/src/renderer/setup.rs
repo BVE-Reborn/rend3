@@ -9,12 +9,14 @@ use crate::{
         DirectionalLightManager, MaterialManager, MeshManager, ObjectManager, TextureManager, STARTING_2D_TEXTURES,
         STARTING_CUBE_TEXTURES,
     },
+    util::mipmap::MipmapGenerator,
     Renderer, RendererBuilder, RendererInitializationError, RendererMode,
 };
 use arrayvec::ArrayVec;
 use fnv::FnvHashMap;
 use parking_lot::{Mutex, RwLock};
 use raw_window_handle::HasRawWindowHandle;
+use rend3_types::TextureFormat;
 use std::sync::Arc;
 use wgpu::{
     Adapter, AdapterInfo, Backend, Backends, DeviceDescriptor, DeviceType, Features, Instance, Limits,
@@ -226,6 +228,16 @@ pub async fn create_renderer<W: HasRawWindowHandle>(
     let object_manager = RwLock::new(ObjectManager::new());
     let directional_light_manager = RwLock::new(DirectionalLightManager::new(&device));
 
+    let mipmap_generator = MipmapGenerator::new(
+        &device,
+        &[
+            TextureFormat::Rgba8Unorm,
+            TextureFormat::Rgba8UnormSrgb,
+            TextureFormat::Bgra8Unorm,
+            TextureFormat::Bgra8UnormSrgb,
+            TextureFormat::Rgba16Float,
+        ],
+    );
     let mut profiler = wgpu_profiler::GpuProfiler::new(4, dbg!(queue.get_timestamp_period()));
     profiler.enable_timer = device
         .features()
@@ -249,6 +261,7 @@ pub async fn create_renderer<W: HasRawWindowHandle>(
         object_manager,
         directional_light_manager,
 
+        mipmap_generator: Mutex::new(mipmap_generator),
         profiler: Mutex::new(profiler),
 
         options: RwLock::new(builder.options),
