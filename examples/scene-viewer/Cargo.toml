@@ -28,4 +28,4 @@ rend3-pbr = { version = "^0.0.6", path = "../../rend3-pbr" }
 smallvec = "1"
 tracy-client = "0.12"
 winit = "0.25"
-
+wgpu-profiler = "0.6.1"

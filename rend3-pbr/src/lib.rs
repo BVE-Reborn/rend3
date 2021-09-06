@@ -301,6 +301,7 @@ impl RenderRoutine for PbrRenderRoutine {
 
         self.tonemapping_pass.blit(tonemapping::TonemappingPassBlitArgs {
             device: &renderer.device,
+            profiler: &mut profiler,
             encoder: &mut encoder,
             interfaces: &self.interfaces,
             samplers: &self.samplers,

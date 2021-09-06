@@ -226,7 +226,7 @@ pub async fn create_renderer<W: HasRawWindowHandle>(
     let object_manager = RwLock::new(ObjectManager::new());
     let directional_light_manager = RwLock::new(DirectionalLightManager::new(&device));
 
-    let mut profiler = wgpu_profiler::GpuProfiler::new(4, queue.get_timestamp_period());
+    let mut profiler = wgpu_profiler::GpuProfiler::new(4, dbg!(queue.get_timestamp_period()));
     profiler.enable_timer = device
         .features()
         .contains(wgpu_profiler::GpuProfiler::REQUIRED_WGPU_FEATURES);

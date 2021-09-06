@@ -161,13 +161,18 @@ pub fn render_loop(
     ));
 
     let frame = output.acquire(&renderer.surface);
-    renderer.profiler.lock().resolve_queries(&mut encoder);
 
     // 16 encoders is a reasonable default
     let mut encoders = Vec::with_capacity(16);
     encoders.push(encoder.finish());
 
     routine.render(Arc::clone(&renderer), &mut encoders, &frame);
+
+    let mut encoder = renderer.device.create_command_encoder(&CommandEncoderDescriptor {
+        label: Some("resolve encoder"),
+    });
+    renderer.profiler.lock().resolve_queries(&mut encoder);
+    encoders.push(encoder.finish());
 
     renderer.queue.submit(encoders);
 
