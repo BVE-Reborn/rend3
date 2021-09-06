@@ -7,3 +7,5 @@
 capstone.zip
 cargo-timing*
 Cargo.lock
+
+/profile.json

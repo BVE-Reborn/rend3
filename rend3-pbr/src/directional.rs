@@ -157,8 +157,10 @@ impl DirectionalShadowPass {
             let label = format_sso!("shadow pass {}", idx);
             profiling::scope!(&label);
 
+            args.profiler.begin_scope(&label, args.encoder, args.device);
+
             let mut rpass = args.encoder.begin_render_pass(&RenderPassDescriptor {
-                label: Some(&label),
+                label: None,
                 color_attachments: &[],
                 depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
                     view: &light.shadow_texture_arc,
@@ -203,6 +205,8 @@ impl DirectionalShadowPass {
             }
 
             args.profiler.end_scope(&mut rpass);
+            drop(rpass);
+            args.profiler.end_scope(args.encoder);
         }
     }
 }

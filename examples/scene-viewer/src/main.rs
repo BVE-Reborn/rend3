@@ -6,13 +6,13 @@ use rend3::{
     InternalSurfaceOptions, Renderer,
 };
 use rend3_pbr::PbrRenderRoutine;
-use wgpu_profiler::GpuTimerScopeResult;
 use std::{
     collections::HashMap,
     hash::BuildHasher,
     path::Path,
     time::{Duration, Instant},
 };
+use wgpu_profiler::GpuTimerScopeResult;
 use winit::{
     event::{DeviceEvent, ElementState, Event, KeyboardInput, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
@@ -244,6 +244,7 @@ fn main() {
             }
 
             if button_pressed(&scancode_status, platform::Scancodes::P) {
+                // write out gpu side performance info into a trace readable by chrome://tracing
                 if let Some(ref stats) = previous_profiling_stats {
                     println!("Outputing gpu timing chrome trace to profile.json");
                     wgpu_profiler::chrometrace::write_chrometrace(Path::new("profile.json"), stats).unwrap();
@@ -323,6 +324,7 @@ fn main() {
             // Dispatch a render!
             previous_profiling_stats = renderer.render(&mut routine, rend3::util::output::RendererOutput::InternalSurface);
 
+            // mark the end of the frame for tracy/other profilers
             profiling::finish_frame!();
         }
         _ => {}

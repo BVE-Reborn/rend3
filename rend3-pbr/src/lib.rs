@@ -138,6 +138,8 @@ impl RenderRoutine for PbrRenderRoutine {
 
         let global_resources = renderer.global_resources.read();
 
+        profiler.begin_scope("forward culling", &mut encoder, &renderer.device);
+
         let transparent_culled_objects = self.primary_passes.transparent_pass.cull(forward::ForwardPassCullArgs {
             device: &renderer.device,
             profiler: &mut profiler,
@@ -171,6 +173,8 @@ impl RenderRoutine for PbrRenderRoutine {
             objects: &objects,
         });
 
+        profiler.end_scope(&mut encoder);
+
         let d2_texture_output_bg_ref = d2_texture_output.bg.as_ref().map(|_| (), |a| &**a);
 
         self.primary_passes.shadow_passes.draw_culled_shadows(
@@ -195,9 +199,10 @@ impl RenderRoutine for PbrRenderRoutine {
 
         {
             profiling::scope!("primary renderpass");
+            profiler.begin_scope("primary renderpass", &mut encoder, &renderer.device);
 
             let mut rpass = encoder.begin_render_pass(&RenderPassDescriptor {
-                label: Some("primary renderpass"),
+                label: None,
                 color_attachments: &[RenderPassColorAttachment {
                     view: &self.render_textures.color,
                     resolve_target: self.render_textures.resolve.as_ref(),
@@ -297,6 +302,7 @@ impl RenderRoutine for PbrRenderRoutine {
             profiler.end_scope(&mut rpass);
 
             drop(rpass);
+            profiler.end_scope(&mut encoder);
         }
 
         self.tonemapping_pass.blit(tonemapping::TonemappingPassBlitArgs {
