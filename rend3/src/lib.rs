@@ -56,6 +56,7 @@ pub mod util {
     pub mod buffer;
     pub mod frustum;
     pub mod output;
+    pub mod mipmap;
     pub mod registry;
     pub mod typedefs;
 }

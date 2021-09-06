@@ -6,12 +6,7 @@ use rend3::{
     InternalSurfaceOptions, Renderer,
 };
 use rend3_pbr::PbrRenderRoutine;
-use std::{
-    collections::HashMap,
-    hash::BuildHasher,
-    path::Path,
-    time::{Duration, Instant},
-};
+use std::{collections::HashMap, hash::BuildHasher, num::NonZeroU32, path::Path, time::{Duration, Instant}};
 use wgpu_profiler::GpuTimerScopeResult;
 use winit::{
     event::{DeviceEvent, ElementState, Event, KeyboardInput, WindowEvent},
@@ -48,7 +43,8 @@ fn load_skybox(renderer: &Renderer, routine: &mut PbrRenderRoutine) -> Result<()
         size: UVec2::new(image_info.width, image_info.height),
         data: image,
         label: Some("background".into()),
-        mip_levels: mips,
+        mip_count: rend3::types::MipmapCount::Specific(NonZeroU32::new(mips).unwrap()),
+        mip_source: rend3::types::MipmapSource::Uploaded,
     });
     routine.set_background_texture(Some(handle));
     Ok(())

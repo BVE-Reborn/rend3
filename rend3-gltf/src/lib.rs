@@ -397,8 +397,8 @@ where
             },
             size: UVec2::new(rgba.width(), rgba.height()),
             data: rgba.into_raw(),
-            /// TODO: automatic mipmapping (#53)
-            mip_levels: 1,
+            mip_count: types::MipmapCount::Maximum,
+            mip_source: types::MipmapSource::Generated,
         });
 
         entry.insert(handle.clone());

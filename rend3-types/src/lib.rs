@@ -1,11 +1,5 @@
 use glam::{Mat3, Mat4, UVec2, Vec2, Vec3, Vec3A, Vec4};
-use std::{
-    fmt::Debug,
-    hash::Hash,
-    marker::PhantomData,
-    mem,
-    sync::{Arc, Weak},
-};
+use std::{fmt::Debug, hash::Hash, marker::PhantomData, mem, num::NonZeroU32, sync::{Arc, Weak}};
 
 /// Non-owning resource handle. Not part of rend3's external interface, but needed to interface with rend3's internal datastructures if writing your own structures or render routines.
 pub struct RawResourceHandle<T> {
@@ -517,13 +511,37 @@ impl Mesh {
     }
 }
 
+/// Describes the count of mipmap levels
+#[derive(Debug, Clone)]
+pub enum MipmapCount {
+    /// Specifies a texture with the tiven mipmap count. Must not be greater than the maximum.
+    Specific(NonZeroU32),
+    /// Specifies a texture with the maximum mipmap count.
+    Maximum,
+}
+
+impl MipmapCount {
+    pub const ONE: Self = Self::Specific(unsafe { NonZeroU32::new_unchecked(1) });
+}
+
+
+/// Describes how mipmaps get generated.
+#[derive(Debug, Clone)]
+pub enum MipmapSource {
+    /// The user will provide all of the mipmaps in the data texture. Upload all mip levels.
+    Uploaded,
+    /// rend3 will generate the mipmaps for you. Upload only mip level 0.
+    Generated
+}
+
 #[derive(Debug, Clone)]
 pub struct Texture {
     pub data: Vec<u8>,
     pub format: TextureFormat,
     pub size: UVec2,
     pub label: Option<String>,
-    pub mip_levels: u32,
+    pub mip_count: MipmapCount,
+    pub mip_source: MipmapSource,
 }
 
 bitflags::bitflags! {
