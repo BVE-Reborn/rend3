@@ -6,7 +6,13 @@ use rend3::{
     InternalSurfaceOptions, Renderer,
 };
 use rend3_pbr::PbrRenderRoutine;
-use std::{collections::HashMap, hash::BuildHasher, num::NonZeroU32, path::Path, time::{Duration, Instant}};
+use std::{
+    collections::HashMap,
+    hash::BuildHasher,
+    num::NonZeroU32,
+    path::Path,
+    time::{Duration, Instant},
+};
 use wgpu_profiler::GpuTimerScopeResult;
 use winit::{
     event::{DeviceEvent, ElementState, Event, KeyboardInput, WindowEvent},

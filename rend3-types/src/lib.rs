@@ -1,5 +1,12 @@
 use glam::{Mat3, Mat4, UVec2, Vec2, Vec3, Vec3A, Vec4};
-use std::{fmt::Debug, hash::Hash, marker::PhantomData, mem, num::NonZeroU32, sync::{Arc, Weak}};
+use std::{
+    fmt::Debug,
+    hash::Hash,
+    marker::PhantomData,
+    mem,
+    num::NonZeroU32,
+    sync::{Arc, Weak},
+};
 
 /// Non-owning resource handle. Not part of rend3's external interface, but needed to interface with rend3's internal datastructures if writing your own structures or render routines.
 pub struct RawResourceHandle<T> {
@@ -524,14 +531,13 @@ impl MipmapCount {
     pub const ONE: Self = Self::Specific(unsafe { NonZeroU32::new_unchecked(1) });
 }
 
-
 /// Describes how mipmaps get generated.
 #[derive(Debug, Clone)]
 pub enum MipmapSource {
     /// The user will provide all of the mipmaps in the data texture. Upload all mip levels.
     Uploaded,
     /// rend3 will generate the mipmaps for you. Upload only mip level 0.
-    Generated
+    Generated,
 }
 
 #[derive(Debug, Clone)]

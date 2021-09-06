@@ -1,7 +1,14 @@
-use crate::{InternalSurfaceOptions, RenderRoutine, RendererBuilder, RendererInitializationError, RendererMode, instruction::{Instruction, InstructionStreamPair}, renderer::{info::ExtendedAdapterInfo, resources::RendererGlobalResources}, resources::{DirectionalLightManager, MaterialManager, MeshManager, ObjectManager, TextureManager}, types::{
+use crate::{
+    instruction::{Instruction, InstructionStreamPair},
+    renderer::{info::ExtendedAdapterInfo, resources::RendererGlobalResources},
+    resources::{DirectionalLightManager, MaterialManager, MeshManager, ObjectManager, TextureManager},
+    types::{
         Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Material, MaterialChange,
         MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, Texture, TextureHandle,
-    }, util::{mipmap::MipmapGenerator, output::RendererOutput, typedefs::RendererStatistics}};
+    },
+    util::{mipmap::MipmapGenerator, output::RendererOutput, typedefs::RendererStatistics},
+    InternalSurfaceOptions, RenderRoutine, RendererBuilder, RendererInitializationError, RendererMode,
+};
 use glam::Mat4;
 use parking_lot::{Mutex, RwLock};
 use raw_window_handle::HasRawWindowHandle;

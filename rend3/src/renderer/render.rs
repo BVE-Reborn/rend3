@@ -104,7 +104,8 @@ pub fn render_loop(
                                 ImageDataLayout {
                                     offset: 0,
                                     bytes_per_row: NonZeroU32::new(
-                                        format_desc.block_size as u32 * (size.width / format_desc.block_dimensions.0 as u32),
+                                        format_desc.block_size as u32
+                                            * (size.width / format_desc.block_dimensions.0 as u32),
                                     ),
                                     rows_per_image: None,
                                 },
