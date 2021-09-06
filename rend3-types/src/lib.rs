@@ -542,12 +542,20 @@ pub enum MipmapSource {
 
 #[derive(Debug, Clone)]
 pub struct Texture {
+    pub label: Option<String>,
     pub data: Vec<u8>,
     pub format: TextureFormat,
     pub size: UVec2,
-    pub label: Option<String>,
     pub mip_count: MipmapCount,
     pub mip_source: MipmapSource,
+}
+
+#[derive(Debug, Clone)]
+pub struct TextureFromTexture {
+    pub label: Option<String>,
+    pub src: TextureHandle,
+    pub start_mip: u32,
+    pub mip_count: Option<NonZeroU32>,
 }
 
 bitflags::bitflags! {

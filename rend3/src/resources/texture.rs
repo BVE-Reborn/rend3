@@ -11,7 +11,8 @@ pub const STARTING_2D_TEXTURES: usize = 1 << 7;
 pub const STARTING_CUBE_TEXTURES: usize = 1 << 3;
 
 pub struct InternalTexture {
-    pub format: Option<TextureFormat>,
+    pub texture: Texture,
+    pub desc: TextureDescriptor<'static>,
 }
 
 pub struct TextureManager {
@@ -61,10 +62,16 @@ impl TextureManager {
         self.registry.allocate()
     }
 
-    pub fn fill(&mut self, handle: &TextureHandle, texture: TextureView, format: Option<TextureFormat>) {
+    pub fn fill(
+        &mut self,
+        handle: &TextureHandle,
+        desc: TextureDescriptor<'static>,
+        texture: Texture,
+        view: TextureView,
+    ) {
         self.group_dirty = self.group_dirty.map_gpu(|_| true);
 
-        let index = self.registry.insert(handle, InternalTexture { format });
+        let index = self.registry.insert(handle, InternalTexture { texture, desc });
 
         if index >= self.views.len() {
             self.layout_dirty = self.layout_dirty.map_gpu(|_| true);
@@ -73,7 +80,7 @@ impl TextureManager {
             fill_to_size(&mut self.null_tex_man, &mut self.views, self.dimension, new_size);
         }
 
-        let old_null = mem::replace(&mut self.views[index], texture);
+        let old_null = mem::replace(&mut self.views[index], view);
 
         self.null_tex_man.put(old_null);
     }
@@ -129,6 +136,10 @@ impl TextureManager {
                 dirty: ModeData::CPU(()),
             }
         }
+    }
+
+    pub fn get_internal(&self, handle: RawTextureHandle) -> &InternalTexture {
+        self.registry.get(handle)
     }
 
     pub fn get_view(&self, handle: RawTextureHandle) -> &TextureView {

@@ -400,6 +400,12 @@ where
             mip_count: types::MipmapCount::Maximum,
             mip_source: types::MipmapSource::Generated,
         });
+        let handle = renderer.add_texture_2d_from_texture(types::TextureFromTexture {
+            label: None,
+            src: handle,
+            start_mip: 3,
+            mip_count: None,
+        });
 
         entry.insert(handle.clone());
 
