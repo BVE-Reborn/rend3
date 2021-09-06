@@ -20,6 +20,7 @@ and this project adheres to cargo's version of [Semantic Versioning](https://sem
 - rend3: Materials now have a `Transparency` field that supports Opaque, Cutout, and Blend transparency modes.
 - rend3: `AlbedoComponent::TextureVertexValue` to represent `texture * vertex * constant`
 - rend3: Mipmaps can be generated automatically on the gpu without the user needing to upload them.
+- rend3: `Renderer::add_texture_2d_from_texture` which allows you to make a new texture from a set another texture's mipmaps.
 - rend3 & rend3-pbr: Use `wgpu-profiler` to generate GPU timings that show up as `RendererStatistics`.
 - rend3 & rend3-pbr: Annotate most code with `profiling` spans.
 - rend3-pbr: All major rendering spans are labeled and show up in renderdoc

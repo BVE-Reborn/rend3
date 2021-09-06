@@ -12,6 +12,7 @@ use crate::{
 use glam::Mat4;
 use parking_lot::{Mutex, RwLock};
 use raw_window_handle::HasRawWindowHandle;
+use rend3_types::TextureFromTexture;
 use std::{cmp::Ordering, future::Future, sync::Arc};
 use wgpu::{Device, Instance, Queue, Surface};
 use wgpu_profiler::GpuProfiler;
@@ -82,6 +83,18 @@ impl Renderer {
             handle: handle.clone(),
             texture,
         });
+        handle
+    }
+
+    pub fn add_texture_2d_from_texture(&self, texture: TextureFromTexture) -> TextureHandle {
+        let handle = self.d2_texture_manager.read().allocate();
+        self.instructions
+            .producer
+            .lock()
+            .push(Instruction::AddTexture2DFromTexture {
+                handle: handle.clone(),
+                texture,
+            });
         handle
     }
 

@@ -7,7 +7,9 @@ use crate::{
 };
 use glam::Mat4;
 use parking_lot::Mutex;
-use rend3_types::{MaterialHandle, MeshHandle, ObjectHandle, RawDirectionalLightHandle, TextureHandle};
+use rend3_types::{
+    MaterialHandle, MeshHandle, ObjectHandle, RawDirectionalLightHandle, TextureFromTexture, TextureHandle,
+};
 use std::mem;
 
 pub enum Instruction {
@@ -18,6 +20,10 @@ pub enum Instruction {
     AddTexture2D {
         handle: TextureHandle,
         texture: Texture,
+    },
+    AddTexture2DFromTexture {
+        handle: TextureHandle,
+        texture: TextureFromTexture,
     },
     AddTextureCube {
         handle: TextureHandle,
