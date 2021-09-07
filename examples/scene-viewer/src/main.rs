@@ -58,34 +58,24 @@ fn load_skybox(renderer: &Renderer, routine: &mut PbrRenderRoutine) -> Result<()
 
 fn load_gltf(renderer: &Renderer, location: String) -> rend3_gltf::LoadedGltfScene {
     let path = Path::new(&location);
-    let binary_path = path.with_extension("bin");
     let parent = path.parent().unwrap();
 
     println!("Reading gltf file: {}", path.display());
     let gltf_data =
         std::fs::read(&path).unwrap_or_else(|e| panic!("tried to load gltf file {}: {}", path.display(), e));
-    println!("Reading gltf sidecar file file: {}", binary_path.display());
-    let bin_data = std::fs::read(&binary_path).unwrap_or_else(|e| {
-        panic!(
-            "tried to load gltf binary sidecar file {}: {}",
-            binary_path.display(),
-            e
-        )
-    });
 
-    pollster::block_on(rend3_gltf::load_gltf(
-        renderer,
-        &gltf_data,
-        &bin_data,
-        move |tex_path| {
-            println!("Reading image file: {}", tex_path);
-            let tex_path = tex_path.to_owned();
-            async move {
-                let tex_resolved = parent.join(&tex_path);
-                std::fs::read(tex_resolved)
-            }
-        },
-    ))
+    pollster::block_on(rend3_gltf::load_gltf(renderer, &gltf_data, move |uri| {
+        let octet_stream_header = "data:application/octet-stream;base64,";
+        let data = if let Some(base64_data) = uri.strip_prefix(octet_stream_header) {
+            // TODO: errors
+            Ok(base64::decode(base64_data).unwrap())
+        } else {
+            let tex_path = uri.to_owned();
+            let tex_resolved = parent.join(&tex_path);
+            std::fs::read(tex_resolved)
+        };
+        async move { data }
+    }))
     .unwrap()
 }
 

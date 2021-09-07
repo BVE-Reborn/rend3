@@ -1,7 +1,8 @@
 use fnv::FnvHashMap;
 use glam::{Mat3, Mat4, UVec2, Vec2, Vec3, Vec4, Vec4Swizzles};
+use gltf::buffer::Source;
 use rend3::{types, Renderer};
-use std::{collections::hash_map::Entry, future::Future};
+use std::{borrow::Cow, collections::hash_map::Entry, future::Future};
 use thiserror::Error;
 
 #[derive(Debug)]
@@ -41,6 +42,8 @@ pub struct LoadedGltfScene {
 pub enum GltfLoadError<E: std::error::Error + 'static> {
     #[error("Gltf parsing or validation error")]
     Gltf(#[from] gltf::Error),
+    #[error("Buffer {0} failed to be loaded from the fs")]
+    BufferIo(String, #[source] E),
     #[error("Texture {0} failed to be loaded from the fs")]
     TextureIo(String, #[source] E),
     #[error("Texture {0} failed to be loaded as an image")]
@@ -60,20 +63,37 @@ pub enum GltfLoadError<E: std::error::Error + 'static> {
 pub async fn load_gltf<F, Fut, E>(
     renderer: &Renderer,
     data: &[u8],
-    binary: &[u8],
-    mut texture_func: F,
+    mut io_func: F,
 ) -> Result<LoadedGltfScene, GltfLoadError<E>>
 where
     F: FnMut(&str) -> Fut,
     Fut: Future<Output = Result<Vec<u8>, E>>,
     E: std::error::Error + 'static,
 {
-    let file = gltf::Gltf::from_slice_without_validation(data)?;
+    let mut file = gltf::Gltf::from_slice_without_validation(data)?;
+
+    let mut buffers = Vec::with_capacity(file.buffers().len());
+    let mut blob_index = None;
+    for b in file.buffers() {
+        let data = match b.source() {
+            Source::Bin => {
+                blob_index = Some(b.index());
+                Vec::new()
+            }
+            Source::Uri(uri) => io_func(uri)
+                .await
+                .map_err(|e| GltfLoadError::BufferIo(uri.to_string(), e))?,
+        };
+        buffers.push(data);
+    }
+    if let Some(blob_index) = blob_index {
+        buffers[blob_index] = file.blob.take().expect("glb blob not found, but gltf expected it");
+    }
 
     let mut loaded = LoadedGltfScene::default();
-    load_meshes(renderer, &mut loaded, file.meshes(), binary)?;
+    load_meshes(renderer, &mut loaded, file.meshes(), &buffers)?;
     load_default_material(renderer, &mut loaded);
-    load_materials_and_textures(renderer, &mut loaded, file.materials(), &mut texture_func).await?;
+    load_materials_and_textures(renderer, &mut loaded, file.materials(), &buffers, &mut io_func).await?;
 
     let scene = file
         .default_scene()
@@ -154,7 +174,7 @@ fn load_meshes<'a, E: std::error::Error + 'static>(
     renderer: &Renderer,
     loaded: &mut LoadedGltfScene,
     meshes: impl Iterator<Item = gltf::Mesh<'a>>,
-    binary: &[u8],
+    buffers: &[Vec<u8>],
 ) -> Result<(), GltfLoadError<E>> {
     for mesh in meshes {
         let mut res_prims = Vec::new();
@@ -167,12 +187,7 @@ fn load_meshes<'a, E: std::error::Error + 'static>(
                 ));
             }
 
-            let reader = prim.reader(|b| {
-                if b.index() != 0 {
-                    return None;
-                }
-                Some(&binary[..b.length()])
-            });
+            let reader = prim.reader(|b| Some(&buffers[b.index()][..b.length()]));
 
             let vertex_positions: Vec<_> = reader
                 .read_positions()
@@ -247,7 +262,8 @@ async fn load_materials_and_textures<'a, F, Fut, E>(
     renderer: &Renderer,
     loaded: &mut LoadedGltfScene,
     materials: impl Iterator<Item = gltf::Material<'a>>,
-    texture_func: &mut F,
+    buffers: &[Vec<u8>],
+    io_func: &mut F,
 ) -> Result<(), GltfLoadError<E>>
 where
     F: FnMut(&str) -> Fut,
@@ -288,23 +304,26 @@ where
             .unwrap_or(Mat3::IDENTITY);
 
         let albedo_tex =
-            option_resolve(albedo.map(|i| load_image(renderer, loaded, i.texture().source(), true, texture_func)))
+            option_resolve(albedo.map(|i| load_image(renderer, loaded, i.texture().source(), true, buffers, io_func)))
                 .await
                 .transpose()?;
-        let occlusion_tex =
-            option_resolve(occlusion.map(|i| load_image(renderer, loaded, i.texture().source(), false, texture_func)))
-                .await
-                .transpose()?;
-        let emissive_tex =
-            option_resolve(emissive.map(|i| load_image(renderer, loaded, i.texture().source(), true, texture_func)))
-                .await
-                .transpose()?;
-        let normals_tex =
-            option_resolve(normals.map(|i| load_image(renderer, loaded, i.texture().source(), false, texture_func)))
-                .await
-                .transpose()?;
+        let occlusion_tex = option_resolve(
+            occlusion.map(|i| load_image(renderer, loaded, i.texture().source(), false, buffers, io_func)),
+        )
+        .await
+        .transpose()?;
+        let emissive_tex = option_resolve(
+            emissive.map(|i| load_image(renderer, loaded, i.texture().source(), true, buffers, io_func)),
+        )
+        .await
+        .transpose()?;
+        let normals_tex = option_resolve(
+            normals.map(|i| load_image(renderer, loaded, i.texture().source(), false, buffers, io_func)),
+        )
+        .await
+        .transpose()?;
         let metallic_roughness_tex = option_resolve(
-            metallic_roughness.map(|i| load_image(renderer, loaded, i.texture().source(), false, texture_func)),
+            metallic_roughness.map(|i| load_image(renderer, loaded, i.texture().source(), false, buffers, io_func)),
         )
         .await
         .transpose()?;
@@ -364,7 +383,8 @@ async fn load_image<F, Fut, E>(
     loaded: &mut LoadedGltfScene,
     image: gltf::Image<'_>,
     srgb: bool,
-    texture_func: &mut F,
+    buffers: &[Vec<u8>],
+    io_func: &mut F,
 ) -> Result<types::TextureHandle, GltfLoadError<E>>
 where
     F: FnMut(&str) -> Fut,
@@ -383,30 +403,40 @@ where
 
     // TODO: Address format detection for compressed texs
     // TODO: Allow embedded images
-    if let gltf::image::Source::Uri { uri, .. } = image.source() {
-        let data = texture_func(uri)
-            .await
-            .map_err(|e| GltfLoadError::TextureIo(uri.to_string(), e))?;
-        let parsed = image::load_from_memory(&data).map_err(|e| GltfLoadError::TextureLoad(uri.to_string(), e))?;
-        let rgba = parsed.to_rgba8();
-        let handle = renderer.add_texture_2d(types::Texture {
-            label: image.name().map(str::to_owned),
-            format: match srgb {
-                true => types::TextureFormat::Rgba8UnormSrgb,
-                false => types::TextureFormat::Rgba8Unorm,
-            },
-            size: UVec2::new(rgba.width(), rgba.height()),
-            data: rgba.into_raw(),
-            mip_count: types::MipmapCount::Maximum,
-            mip_source: types::MipmapSource::Generated,
-        });
+    let (data, uri) = match image.source() {
+        gltf::image::Source::Uri { uri, .. } => {
+            let data = io_func(uri)
+                .await
+                .map_err(|e| GltfLoadError::TextureIo(uri.to_string(), e))?;
+            (Cow::Owned(data), uri.to_string())
+        }
+        gltf::image::Source::View { view, .. } => {
+            let start = view.offset();
+            let end = start + view.length();
+            (
+                Cow::Borrowed(&buffers[view.buffer().index()][start..end]),
+                String::from("<embedded>"),
+            )
+        }
+    };
 
-        entry.insert(handle.clone());
+    let parsed = image::load_from_memory(&data).map_err(|e| GltfLoadError::TextureLoad(uri, e))?;
+    let rgba = parsed.to_rgba8();
+    let handle = renderer.add_texture_2d(types::Texture {
+        label: image.name().map(str::to_owned),
+        format: match srgb {
+            true => types::TextureFormat::Rgba8UnormSrgb,
+            false => types::TextureFormat::Rgba8Unorm,
+        },
+        size: UVec2::new(rgba.width(), rgba.height()),
+        data: rgba.into_raw(),
+        mip_count: types::MipmapCount::Maximum,
+        mip_source: types::MipmapSource::Generated,
+    });
 
-        Ok(handle)
-    } else {
-        unimplemented!()
-    }
+    entry.insert(handle.clone());
+
+    Ok(handle)
 }
 
 pub async fn option_resolve<F: Future>(fut: Option<F>) -> Option<F::Output> {
