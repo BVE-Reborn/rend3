@@ -65,10 +65,13 @@ fn load_gltf(renderer: &Renderer, location: String) -> rend3_gltf::LoadedGltfSce
         std::fs::read(&path).unwrap_or_else(|e| panic!("tried to load gltf file {}: {}", path.display(), e));
 
     pollster::block_on(rend3_gltf::load_gltf(renderer, &gltf_data, move |uri| {
-        let octet_stream_header = "data:application/octet-stream;base64,";
+        let octet_stream_header = "data:";
         let data = if let Some(base64_data) = uri.strip_prefix(octet_stream_header) {
+            let (_mime, rest) = base64_data.split_once(";").unwrap();
+            let (encoding, data) = rest.split_once(",").unwrap();
+            assert_eq!(encoding, "base64");
             // TODO: errors
-            Ok(base64::decode(base64_data).unwrap())
+            Ok(base64::decode(data).unwrap())
         } else {
             let tex_path = uri.to_owned();
             let tex_resolved = parent.join(&tex_path);
