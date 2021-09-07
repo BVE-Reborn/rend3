@@ -21,7 +21,7 @@ impl OutputFrame {
 }
 
 pub enum RendererOutput {
-    /// Use an internally configured surface. Must setup window using [`RendererBuilder::window`] before
+    /// Use an internally configured surface. Must setup window using [`RendererBuilder::window`](crate::RendererBuilder::window) before
     /// this can be used.
     ///
     /// # Panics

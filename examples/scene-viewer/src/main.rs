@@ -58,34 +58,15 @@ fn load_skybox(renderer: &Renderer, routine: &mut PbrRenderRoutine) -> Result<()
 
 fn load_gltf(renderer: &Renderer, location: String) -> rend3_gltf::LoadedGltfScene {
     let path = Path::new(&location);
-    let binary_path = path.with_extension("bin");
     let parent = path.parent().unwrap();
 
     println!("Reading gltf file: {}", path.display());
     let gltf_data =
         std::fs::read(&path).unwrap_or_else(|e| panic!("tried to load gltf file {}: {}", path.display(), e));
-    println!("Reading gltf sidecar file file: {}", binary_path.display());
-    let bin_data = std::fs::read(&binary_path).unwrap_or_else(|e| {
-        panic!(
-            "tried to load gltf binary sidecar file {}: {}",
-            binary_path.display(),
-            e
-        )
-    });
 
-    pollster::block_on(rend3_gltf::load_gltf(
-        renderer,
-        &gltf_data,
-        &bin_data,
-        move |tex_path| {
-            println!("Reading image file: {}", tex_path);
-            let tex_path = tex_path.to_owned();
-            async move {
-                let tex_resolved = parent.join(&tex_path);
-                std::fs::read(tex_resolved)
-            }
-        },
-    ))
+    pollster::block_on(rend3_gltf::load_gltf(renderer, &gltf_data, |uri| {
+        rend3_gltf::filesystem_io_func(&parent, uri)
+    }))
     .unwrap()
 }
 
