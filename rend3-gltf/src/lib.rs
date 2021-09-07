@@ -1,8 +1,8 @@
 use fnv::FnvHashMap;
 use glam::{Mat3, Mat4, UVec2, Vec2, Vec3, Vec4, Vec4Swizzles};
 use gltf::buffer::Source;
-use rend3::{types, Renderer};
-use std::{borrow::Cow, collections::hash_map::Entry, future::Future};
+use rend3::{types, util::typedefs::SsoString, Renderer};
+use std::{borrow::Cow, collections::hash_map::Entry, future::Future, path::Path};
 use thiserror::Error;
 
 #[derive(Debug)]
@@ -60,13 +60,41 @@ pub enum GltfLoadError<E: std::error::Error + 'static> {
     UnsupportedPrimitiveMode(usize, usize, gltf::mesh::Mode),
 }
 
+/// Default implementation of [`load_gltf`]'s `io_func`.
+///
+/// The first argumnet is the directory all relative paths should be considered against. This is more than likely
+/// the directory the gltf/glb is in.
+pub async fn filesystem_io_func(parent_director: impl AsRef<Path>, uri: SsoString) -> Result<Vec<u8>, std::io::Error> {
+    let octet_stream_header = "data:";
+    if let Some(base64_data) = uri.strip_prefix(octet_stream_header) {
+        let (_mime, rest) = base64_data.split_once(";").unwrap();
+        let (encoding, data) = rest.split_once(",").unwrap();
+        assert_eq!(encoding, "base64");
+        // TODO: errors
+        Ok(base64::decode(data).unwrap())
+    } else {
+        let tex_resolved = parent_director.as_ref().join(&*uri);
+        std::fs::read(tex_resolved)
+    }
+}
+
+/// Load a given gltf's data into the renderer's world. Allows the user to specify how URIs are resolved into their underlying data. Supports most gltfs and glbs.
+///
+/// ```no_run
+/// # use std::path::Path;
+/// # let renderer = unimplemented!();
+/// let path = Path::new("some/path/scene.gltf"); // or glb
+/// let gltf_data = std::fs::read(&path).unwrap();
+/// let parent_directory = path.parent().unwrap();
+/// pollster::block_on(rend3_gltf::load_gltf(&renderer, &gltf_data, |p| rend3_gltf::filesystem_io_func(&parent_directory, p)));
+/// ```
 pub async fn load_gltf<F, Fut, E>(
     renderer: &Renderer,
     data: &[u8],
     mut io_func: F,
 ) -> Result<LoadedGltfScene, GltfLoadError<E>>
 where
-    F: FnMut(&str) -> Fut,
+    F: FnMut(SsoString) -> Fut,
     Fut: Future<Output = Result<Vec<u8>, E>>,
     E: std::error::Error + 'static,
 {
@@ -80,7 +108,7 @@ where
                 blob_index = Some(b.index());
                 Vec::new()
             }
-            Source::Uri(uri) => io_func(uri)
+            Source::Uri(uri) => io_func(SsoString::from(uri))
                 .await
                 .map_err(|e| GltfLoadError::BufferIo(uri.to_string(), e))?,
         };
@@ -266,7 +294,7 @@ async fn load_materials_and_textures<'a, F, Fut, E>(
     io_func: &mut F,
 ) -> Result<(), GltfLoadError<E>>
 where
-    F: FnMut(&str) -> Fut,
+    F: FnMut(SsoString) -> Fut,
     Fut: Future<Output = Result<Vec<u8>, E>>,
     E: std::error::Error + 'static,
 {
@@ -387,7 +415,7 @@ async fn load_image<F, Fut, E>(
     io_func: &mut F,
 ) -> Result<types::TextureHandle, GltfLoadError<E>>
 where
-    F: FnMut(&str) -> Fut,
+    F: FnMut(SsoString) -> Fut,
     Fut: Future<Output = Result<Vec<u8>, E>>,
     E: std::error::Error + 'static,
 {
@@ -405,7 +433,7 @@ where
     // TODO: Allow embedded images
     let (data, uri) = match image.source() {
         gltf::image::Source::Uri { uri, .. } => {
-            let data = io_func(uri)
+            let data = io_func(SsoString::from(uri))
                 .await
                 .map_err(|e| GltfLoadError::TextureIo(uri.to_string(), e))?;
             (Cow::Owned(data), uri.to_string())
