@@ -238,7 +238,7 @@ pub async fn create_renderer<W: HasRawWindowHandle>(
             TextureFormat::Rgba16Float,
         ],
     );
-    let mut profiler = wgpu_profiler::GpuProfiler::new(4, dbg!(queue.get_timestamp_period()));
+    let mut profiler = wgpu_profiler::GpuProfiler::new(4, queue.get_timestamp_period());
     profiler.enable_timer = device
         .features()
         .contains(wgpu_profiler::GpuProfiler::REQUIRED_WGPU_FEATURES);
