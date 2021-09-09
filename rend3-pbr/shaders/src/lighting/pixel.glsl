@@ -69,10 +69,12 @@ PixelData get_per_pixel_data_sampled(MATERIAL_TYPE material, sampler s) {
     }
     else {
         if (HAS_NORMAL_TEXTURE) {
-            vec3 normal = textureGrad(sampler2D(NORMAL_TEXTURE, s), coords, uvdx, uvdy).xyz * 2.0 - 1.0;
-            vec3 binorm = cross(i_normal, i_tangent);
+            vec3 normal = normalize(textureGrad(sampler2D(NORMAL_TEXTURE, s), coords, uvdx, uvdy).xyz * 2.0 - 1.0);
+            vec3 in_normal = normalize(i_normal);
+            vec3 in_tangent = normalize(i_tangent);
+            vec3 bitangent = cross(in_normal, in_tangent);
 
-            mat3 tbn = mat3(i_tangent, binorm, i_normal);
+            mat3 tbn = mat3(i_tangent, bitangent, i_normal);
 
             pixel.normal = tbn * normal;
         } else {
