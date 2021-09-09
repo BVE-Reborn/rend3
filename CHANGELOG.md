@@ -46,6 +46,7 @@ and this project adheres to cargo's version of [Semantic Versioning](https://sem
 ### Fixed
 - rend3-pbr: Shadow artifacting due to incorrect face culling when rendering shadow passes
 - rend3-pbr: CPU mode drawing failed to account for proper vertex offsets
+- rend3-pbr: Non-normalized normal maps now work correctly.
 - rend3-gltf: albedo-texture UV transform is now respected
 - rend3-gltf: image loading now properly caches images
 
