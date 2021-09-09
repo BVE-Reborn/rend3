@@ -167,7 +167,7 @@ fn main() {
 
     let mut frame_times = histogram::Histogram::new();
 
-    let mut  last_mouse_delta = None;
+    let mut last_mouse_delta = None;
 
     event_loop.run(move |event, _window_target, control| match event {
         Event::MainEventsCleared => {
