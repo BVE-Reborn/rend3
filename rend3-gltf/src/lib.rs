@@ -1,3 +1,4 @@
+use arrayvec::ArrayVec;
 use fnv::FnvHashMap;
 use glam::{Mat3, Mat4, UVec2, Vec2, Vec3, Vec4, Vec4Swizzles};
 use gltf::buffer::Source;
@@ -178,6 +179,12 @@ fn load_gltf_impl<'a, E: std::error::Error + 'static>(
                         color: Vec3::from(light.color()),
                         intensity: light.intensity(),
                         direction,
+                        distances: {
+                            let mut vec = ArrayVec::new();
+                            vec.push(0.0);
+                            vec.push(100.0);
+                            vec
+                        },
                     }))
                 }
                 _ => None,

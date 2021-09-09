@@ -141,6 +141,7 @@ fn main() {
         intensity: 10.0,
         // Direction will be normalized
         direction: glam::Vec3::new(-1.0, -4.0, 2.0),
+        distances: arrayvec::ArrayVec::from([0.0, 20.0, 50.0]),
     });
 
     event_loop.run(move |event, _, control| match event {

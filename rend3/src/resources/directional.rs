@@ -4,7 +4,8 @@ use crate::{
     util::{bind_merge::BindGroupBuilder, buffer::WrappedPotBuffer, registry::ResourceRegistry},
     INTERNAL_SHADOW_DEPTH_FORMAT, SHADOW_DIMENSIONS,
 };
-use glam::{Mat4, Vec3};
+use arrayvec::ArrayVec;
+use glam::{Mat4, Vec3, Vec3A};
 use rend3_types::{DirectionalLightChange, RawDirectionalLightHandle};
 use std::{
     mem::{self, size_of},
@@ -19,8 +20,6 @@ use wgpu::{
 
 pub struct InternalDirectionalLight {
     pub inner: DirectionalLight,
-    pub camera: CameraManager,
-    pub shadow_tex: u32,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -36,9 +35,8 @@ unsafe impl bytemuck::Pod for ShaderDirectionalLightBufferHeader {}
 #[repr(C, align(16))]
 struct ShaderDirectionalLight {
     pub view_proj: Mat4,
-    pub color: Vec3,
-    pub shadow_tex: u32,
-    pub direction: Vec3,
+    pub color: Vec3A,
+    pub direction: Vec3A,
 }
 
 unsafe impl bytemuck::Zeroable for ShaderDirectionalLight {}
@@ -89,20 +87,7 @@ impl DirectionalLightManager {
     }
 
     pub fn fill(&mut self, handle: &DirectionalLightHandle, light: DirectionalLight) {
-        self.registry.insert(
-            handle,
-            InternalDirectionalLight {
-                inner: light,
-                camera: CameraManager::new(
-                    Camera {
-                        projection: CameraProjection::from_orthographic_direction(light.direction.into()),
-                        ..Camera::default()
-                    },
-                    None,
-                ),
-                shadow_tex: self.registry.count() as u32,
-            },
-        );
+        self.registry.insert(handle, InternalDirectionalLight { inner: light });
     }
 
     pub fn get_mut(&mut self, handle: RawDirectionalLightHandle) -> &mut InternalDirectionalLight {
@@ -116,12 +101,6 @@ impl DirectionalLightManager {
     pub fn update_directional_light(&mut self, handle: RawDirectionalLightHandle, change: DirectionalLightChange) {
         let internal = self.registry.get_mut(handle);
         internal.inner.update_from_changes(change);
-        if let Some(direction) = change.direction {
-            internal.camera.set_data(Camera {
-                projection: CameraProjection::from_orthographic_direction(direction.into()),
-                ..Camera::default()
-            });
-        }
     }
 
     pub fn get_bgl(&self) -> &BindGroupLayout {
@@ -132,12 +111,12 @@ impl DirectionalLightManager {
         &self.bg
     }
 
-    pub fn ready(&mut self, device: &Device, queue: &Queue) {
+    pub fn ready(&mut self, device: &Device, queue: &Queue, user_camera: &CameraManager) -> Vec<CameraManager> {
         profiling::scope!("Directional Light Ready");
 
         self.registry.remove_all_dead(|_, _, _| ());
 
-        let registered_count = self.registry.count();
+        let registered_count: usize = self.registry.values().map(|l| l.inner.distances.len()).sum();
         let recreate_view = registered_count != self.layer_views.len() && registered_count != 0;
         if recreate_view {
             let (view, layer_views) = create_shadow_texture(device, registered_count as u32);
@@ -147,20 +126,25 @@ impl DirectionalLightManager {
 
         let registry = &self.registry;
 
-        let size = self.registry.count() * size_of::<ShaderDirectionalLight>()
-            + size_of::<ShaderDirectionalLightBufferHeader>();
+        let size =
+            registered_count * size_of::<ShaderDirectionalLight>() + size_of::<ShaderDirectionalLightBufferHeader>();
+
+        let mut cameras = Vec::with_capacity(registered_count);
 
         let mut buffer = Vec::with_capacity(size);
         buffer.extend_from_slice(bytemuck::bytes_of(&ShaderDirectionalLightBufferHeader {
             total_lights: registry.count() as u32,
         }));
         for light in registry.values() {
-            buffer.extend_from_slice(bytemuck::bytes_of(&ShaderDirectionalLight {
-                view_proj: light.camera.view_proj(),
-                color: light.inner.color * light.inner.intensity,
-                direction: light.inner.direction,
-                shadow_tex: light.shadow_tex as u32,
-            }));
+            let cs = shadow_cascades(light, user_camera);
+            for camera in &cs {
+                buffer.extend_from_slice(bytemuck::bytes_of(&ShaderDirectionalLight {
+                    view_proj: camera.view_proj(),
+                    color: (light.inner.color * light.inner.intensity).into(),
+                    direction: light.inner.direction.into(),
+                }));
+            }
+            cameras.extend_from_slice(&cs);
         }
 
         let reallocated_buffer = self.buffer.write_to_buffer(device, queue, &buffer);
@@ -168,11 +152,73 @@ impl DirectionalLightManager {
         if reallocated_buffer || recreate_view {
             self.bg = create_shadow_bg(device, &self.bgl, &self.buffer, &self.view);
         }
+
+        cameras
     }
 
     pub fn values(&self) -> impl Iterator<Item = &InternalDirectionalLight> {
         self.registry.values()
     }
+}
+
+fn shadow_cascades(l: &InternalDirectionalLight, user_camera: &CameraManager) -> ArrayVec<CameraManager, 4> {
+    let mut cascades = ArrayVec::new();
+
+    let view = Mat4::look_at_lh(Vec3::ZERO, l.inner.direction, Vec3::Y);
+    let user_camera_proj = user_camera.proj();
+    let user_camera_inv_view_proj = user_camera.view_proj().inverse();
+    for window in l.inner.distances.windows(2) {
+        let start = window[0];
+        let end = window[1];
+
+        let start_projected = user_camera_proj.project_point3(Vec3::new(0.0, 0.0, start.max(0.1))).z;
+        let end_projected = user_camera_proj.project_point3(Vec3::new(0.0, 0.0, end)).z;
+
+        let frustum_points = [
+            Vec3::new(-1.0, -1.0, start_projected),
+            Vec3::new(1.0, -1.0, start_projected),
+            Vec3::new(-1.0, 1.0, start_projected),
+            Vec3::new(1.0, 1.0, start_projected),
+            Vec3::new(-1.0, -1.0, end_projected),
+            Vec3::new(1.0, -1.0, end_projected),
+            Vec3::new(-1.0, 1.0, end_projected),
+            Vec3::new(1.0, 1.0, end_projected),
+        ];
+
+        let mat = view * user_camera_inv_view_proj;
+
+        let (sview_min, sview_max) =
+            vec_min_max(IntoIterator::into_iter(frustum_points).map(|p| Vec3A::from(mat.project_point3(p))));
+        let (world_min, world_max) = vec_min_max(
+            IntoIterator::into_iter(frustum_points).map(|p| Vec3A::from(user_camera_inv_view_proj.project_point3(p))),
+        );
+
+        // TODO: intermediate bounding sphere
+        cascades.push(CameraManager::new(
+            Camera {
+                projection: CameraProjection::Orthographic {
+                    size: sview_max - sview_min,
+                    direction: l.inner.direction.into(),
+                },
+                location: ((world_min + world_max) * 0.5).into(),
+            },
+            None,
+        ));
+    }
+
+    cascades
+}
+
+fn vec_min_max(iter: impl IntoIterator<Item = Vec3A>) -> (Vec3A, Vec3A) {
+    let mut iter = iter.into_iter();
+    let mut min = iter.next().unwrap();
+    let mut max = min;
+    for point in iter {
+        min = min.min(point);
+        max = max.max(point);
+    }
+
+    (min, max)
 }
 
 fn create_shadow_texture(device: &Device, count: u32) -> (TextureView, Vec<Arc<TextureView>>) {

@@ -129,6 +129,7 @@ impl RenderRoutine for PbrRenderRoutine {
         let mut materials = renderer.material_manager.write();
         let mut d2_textures = renderer.d2_texture_manager.write();
         let mut d2c_textures = renderer.d2c_texture_manager.write();
+        let camera_manager = renderer.camera_manager.read();
 
         // Do these in dependency order
         // Level 2
@@ -140,7 +141,8 @@ impl RenderRoutine for PbrRenderRoutine {
         // Level 0
         let d2_texture_output = d2_textures.ready(&renderer.device);
         let _d2c_texture_output = d2c_textures.ready(&renderer.device);
-        directional_light.ready(&renderer.device, &renderer.queue);
+        let directional_light_cameras =
+            directional_light.ready(&renderer.device, &renderer.queue, &global_resources.camera);
         mesh_manager.ready();
 
         if d2_texture_output.dirty.map(|_| false, |v| v).into_common() {
@@ -175,10 +177,9 @@ impl RenderRoutine for PbrRenderRoutine {
                     materials: &materials,
                     interfaces: &self.interfaces,
                     lights: &directional_light,
+                    directional_light_cameras: &directional_light_cameras,
                     objects: &objects,
                 });
-
-        let camera_manager = renderer.camera_manager.read();
 
         profiler.begin_scope("forward culling", &mut encoder, &renderer.device);
 

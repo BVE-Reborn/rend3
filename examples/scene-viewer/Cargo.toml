@@ -13,6 +13,7 @@ path = "src/main.rs"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+arrayvec = "0.7"
 basis = { version = "0.1.0", git = "https://github.com/BVE-Reborn/basis-rs.git", rev = "17480940261db81877ce4fec983a18a39d7db633" }
 env_logger = { version = "0.9", default-features = false, features = ["termcolor", "atty"] }
 fnv = "1"

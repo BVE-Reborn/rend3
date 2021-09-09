@@ -89,7 +89,7 @@ fn compute_view_matrix(data: Camera) -> Mat4 {
 fn compute_projection_matrix(data: Camera, aspect_ratio: f32) -> Mat4 {
     match data.projection {
         CameraProjection::Orthographic { size, .. } => {
-            let half = size / 2.0;
+            let half = size * 0.5;
             Mat4::orthographic_lh(-half.x, half.x, -half.y, half.y, -half.z, half.z)
         }
         CameraProjection::Projection { vfov, near, .. } => {

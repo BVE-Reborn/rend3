@@ -1,3 +1,4 @@
+use arrayvec::ArrayVec;
 use glam::{Mat3, Mat4, UVec2, Vec2, Vec3, Vec3A, Vec4};
 use std::{
     fmt::Debug,
@@ -1065,10 +1066,11 @@ impl Default for CameraProjection {
 }
 
 changeable_struct! {
-    #[derive(Debug, Copy, Clone)]
+    #[derive(Debug, Clone)]
     pub struct DirectionalLight <- DirectionalLightChange {
         pub color: Vec3,
         pub intensity: f32,
         pub direction: Vec3,
+        pub distances: ArrayVec<f32, 4>,
     }
 }

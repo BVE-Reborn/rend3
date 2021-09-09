@@ -1,3 +1,4 @@
+use arrayvec::ArrayVec;
 use fnv::FnvBuildHasher;
 use glam::{DVec2, UVec2, Vec3, Vec3A};
 use pico_args::Arguments;
@@ -151,11 +152,18 @@ fn main() {
     );
     load_skybox(&renderer, &mut routine).unwrap();
 
-    let _directional_light = renderer.add_directional_light(DirectionalLight {
-        color: Vec3::ONE,
-        intensity: 10.0,
-        direction: Vec3::new(-1.0, -1.0, 1.0),
-    });
+    // let _directional_light = renderer.add_directional_light(DirectionalLight {
+    //     color: Vec3::ONE,
+    //     intensity: 10.0,
+    //     direction: Vec3::new(-1.0, -1.0, 1.0),
+    //     distances: {
+    //         let mut vec = ArrayVec::new();
+    //         vec.push(0.0);
+    //         vec.push(20.0);
+    //         vec.push(50.0);
+    //         vec
+    //     }
+    // });
     let mut scancode_status = HashMap::with_hasher(FnvBuildHasher::default());
 
     let mut camera_location = Camera {

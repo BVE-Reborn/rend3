@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use rend3::{
     format_sso,
-    resources::{DirectionalLightManager, InternalObject, MaterialManager, MeshBuffers},
+    resources::{CameraManager, DirectionalLightManager, InternalObject, MaterialManager, MeshBuffers},
     types::TransparencyType,
     ModeData,
 };
@@ -33,6 +33,7 @@ pub struct DirectionalShadowPassCullShadowsArgs<'a> {
     pub interfaces: &'a ShaderInterfaces,
 
     pub lights: &'a DirectionalLightManager,
+    pub directional_light_cameras: &'a [CameraManager],
     pub objects: &'a [InternalObject],
 }
 
@@ -71,10 +72,10 @@ impl DirectionalShadowPass {
 
     pub fn cull_shadows(&self, args: DirectionalShadowPassCullShadowsArgs<'_>) -> Vec<CulledLightSet> {
         profiling::scope!("Cull Shadows");
-        args.lights
-            .values()
+        args.directional_light_cameras
+            .iter()
             .enumerate()
-            .map(|(idx, light)| -> CulledLightSet {
+            .map(|(idx, camera)| -> CulledLightSet {
                 let label = format_sso!("shadow cull {}", idx);
                 profiling::scope!(&label);
                 // TODO: This is hella duplicated
@@ -83,7 +84,7 @@ impl DirectionalShadowPass {
                     match args.culler {
                         ModeData::CPU(cpu_culler) => cpu_culler.cull(CpuCullerCullArgs {
                             device: args.device,
-                            camera: &light.camera,
+                            camera,
                             interfaces: args.interfaces,
                             materials: args.materials,
                             objects: args.objects,
@@ -98,7 +99,7 @@ impl DirectionalShadowPass {
                                 encoder: args.encoder,
                                 interfaces: args.interfaces,
                                 materials: args.materials,
-                                camera: &light.camera,
+                                camera,
                                 objects: args.objects,
                                 filter: |_, mat| mat.transparency == TransparencyType::Opaque,
                                 sort: None,
@@ -114,7 +115,7 @@ impl DirectionalShadowPass {
                     match args.culler {
                         ModeData::CPU(cpu_culler) => cpu_culler.cull(CpuCullerCullArgs {
                             device: args.device,
-                            camera: &light.camera,
+                            camera,
                             interfaces: args.interfaces,
                             materials: args.materials,
                             objects: args.objects,
@@ -128,7 +129,7 @@ impl DirectionalShadowPass {
                                 encoder: args.encoder,
                                 interfaces: args.interfaces,
                                 materials: args.materials,
-                                camera: &light.camera,
+                                camera,
                                 objects: args.objects,
                                 filter: |_, mat| mat.transparency == TransparencyType::Cutout,
                                 sort: None,
@@ -140,7 +141,7 @@ impl DirectionalShadowPass {
                     }
                 };
 
-                let shadow_texture_arc = args.lights.get_layer_view_arc(light.shadow_tex);
+                let shadow_texture_arc = args.lights.get_layer_view_arc(idx as _);
 
                 CulledLightSet {
                     opaque_culled_objects,
