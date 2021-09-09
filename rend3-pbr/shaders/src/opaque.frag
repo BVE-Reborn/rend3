@@ -73,7 +73,7 @@ void main() {
 
             float shadow_value;
             shadow_value = texture(sampler2DArrayShadow(shadow, shadow_sampler), shadow_shadow_coords);
-            if (shadow_shadow_coords.x < 0 || shadow_shadow_coords.x > 1 || shadow_shadow_coords.y < 0 || shadow_shadow_coords.y > 1) {
+            if (shadow_shadow_coords.x < 0 || shadow_shadow_coords.x > 1 || shadow_shadow_coords.y < 0 || shadow_shadow_coords.y > 1 || shadow_ndc.z < -1 || shadow_ndc.z > 1) {
                 shadow_value = 1.0;
             }
 

@@ -1,5 +1,5 @@
 use fnv::FnvBuildHasher;
-use glam::{UVec2, Vec3, Vec3A};
+use glam::{DVec2, UVec2, Vec3, Vec3A};
 use pico_args::Arguments;
 use rend3::{
     types::{Backend, Camera, CameraProjection, DirectionalLight, Texture, TextureFormat},
@@ -97,6 +97,7 @@ fn main() {
     env_logger::init();
 
     let mut args = Arguments::from_env();
+    let absolute_mouse: bool = args.contains("--absolute-mouse");
     let desired_backend = args.value_from_fn(["-b", "--backend"], extract_backend).ok();
     let desired_device_name: Option<String> = args
         .value_from_str(["-d", "--device"])
@@ -165,6 +166,8 @@ fn main() {
     let mut timestamp_last_frame = Instant::now();
 
     let mut frame_times = histogram::Histogram::new();
+
+    let mut last_mouse_delta = None;
 
     event_loop.run(move |event, _window_target, control| match event {
         Event::MainEventsCleared => {
@@ -264,9 +267,21 @@ fn main() {
         } => {
             const TAU: f32 = std::f32::consts::PI * 2.0;
 
+            let mouse_delta = if absolute_mouse {
+                let prev = last_mouse_delta.replace(DVec2::new(delta_x, delta_y));
+                if let Some(prev) = prev {
+                    (DVec2::new(delta_x, delta_y) - prev) / 4.0
+                } else {
+                    return;
+                }
+            } else {
+                DVec2::new(delta_x, delta_y)
+            };
+
+
             if let CameraProjection::Projection { ref mut yaw, ref mut pitch, .. } = camera_location.projection {
-                *yaw += (delta_x / 1000.0) as f32;
-                *pitch += (delta_y / 1000.0) as f32;
+                *yaw += (mouse_delta.x / 1000.0) as f32;
+                *pitch += (mouse_delta.y / 1000.0) as f32;
                 if *yaw < 0.0 {
                     *yaw += TAU;
                 } else if *yaw >= TAU {
