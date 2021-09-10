@@ -7,7 +7,8 @@ use wgpu::{
     TextureFormat, TextureSampleType, TextureUsages, TextureView, TextureViewDescriptor, TextureViewDimension,
 };
 
-pub const STARTING_2D_TEXTURES: usize = 1 << 7;
+// TODO: Intel's very low limit on windows will cause issues for users, so force them off gpu mode until we can solve this. See https://github.com/gfx-rs/wgpu/issues/1111
+pub const STARTING_2D_TEXTURES: usize = 1 << 8;
 pub const STARTING_CUBE_TEXTURES: usize = 1 << 3;
 
 pub struct InternalTexture {

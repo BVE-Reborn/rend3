@@ -15,13 +15,12 @@ use wgpu_profiler::GpuProfiler;
 use crate::{
     common::{interfaces::ShaderInterfaces, samplers::Samplers},
     culling::{
+        self,
         cpu::{CpuCuller, CpuCullerCullArgs},
         gpu::{GpuCuller, GpuCullerCullArgs},
         CulledObjectSet,
     },
 };
-
-use super::culling;
 
 pub struct DirectionalShadowPassCullShadowsArgs<'a> {
     pub device: &'a Device,

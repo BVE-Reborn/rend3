@@ -37,6 +37,7 @@ and this project adheres to cargo's version of [Semantic Versioning](https://sem
 - rend3: `Texture::width` and `Texture::height` replaced with `Texture::size`
 - rend3: `RendererStatistics` is now an alias for `Vec<wgpu_profiler::GpuTimerScopeResult>`
 - rend3: `Texture::mip_levels` was split into `mip_count` and `mip_source` allowing you to easily auto-generate mipmaps.
+- rend3: Changed limits such that intel gets CPU mode until [wgpu#1111](https://github.com/gfx-rs/wgpu/issues/1111) gets resolved.
 - rend3-pbr: creation and resizing's `resolution` argument replaced with options containing resolution and sample count.
   
 ### Updated
@@ -47,6 +48,7 @@ and this project adheres to cargo's version of [Semantic Versioning](https://sem
 - rend3-pbr: Shadow artifacting due to incorrect face culling when rendering shadow passes
 - rend3-pbr: CPU mode drawing failed to account for proper vertex offsets
 - rend3-pbr: Non-normalized normal maps now work correctly.
+- rend3-pbr: Growing the GPU mode texture descriptor list no longer causes panic
 - rend3-gltf: albedo-texture UV transform is now respected
 - rend3-gltf: image loading now properly caches images
 
