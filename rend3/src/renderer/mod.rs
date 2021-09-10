@@ -1,27 +1,25 @@
 use crate::{
     instruction::{Instruction, InstructionStreamPair},
-    renderer::{info::ExtendedAdapterInfo, resources::RendererGlobalResources},
-    resources::{DirectionalLightManager, MaterialManager, MeshManager, ObjectManager, TextureManager},
+    renderer::info::ExtendedAdapterInfo,
+    resources::{CameraManager, DirectionalLightManager, MaterialManager, MeshManager, ObjectManager, TextureManager},
     types::{
         Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Material, MaterialChange,
         MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, Texture, TextureHandle,
     },
-    util::{mipmap::MipmapGenerator, output::RendererOutput, typedefs::RendererStatistics},
-    InternalSurfaceOptions, RenderRoutine, RendererBuilder, RendererInitializationError, RendererMode,
+    util::{mipmap::MipmapGenerator, output::OutputFrame, typedefs::RendererStatistics},
+    InstanceAdapterDevice, RenderRoutine, RendererInitializationError, RendererMode,
 };
 use glam::Mat4;
 use parking_lot::{Mutex, RwLock};
-use raw_window_handle::HasRawWindowHandle;
 use rend3_types::TextureFromTexture;
-use std::{cmp::Ordering, future::Future, sync::Arc};
-use wgpu::{Device, Instance, Queue, Surface};
+use std::{cmp::Ordering, sync::Arc};
+use wgpu::{Device, Instance, Queue};
 use wgpu_profiler::GpuProfiler;
 
 pub mod error;
 pub mod info;
 pub mod limits;
 mod render;
-mod resources;
 mod setup;
 
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
@@ -42,9 +40,8 @@ pub struct Renderer {
     pub instance: Arc<Instance>,
     pub queue: Arc<Queue>,
     pub device: Arc<Device>,
-    pub surface: Option<Surface>,
 
-    pub global_resources: RwLock<RendererGlobalResources>,
+    pub camera_manager: RwLock<CameraManager>,
     pub mesh_manager: RwLock<MeshManager>,
     pub d2_texture_manager: RwLock<TextureManager>,
     pub d2c_texture_manager: RwLock<TextureManager>,
@@ -55,15 +52,11 @@ pub struct Renderer {
     pub mipmap_generator: Mutex<MipmapGenerator>,
 
     pub profiler: Mutex<GpuProfiler>,
-
-    options: RwLock<InternalSurfaceOptions>,
 }
 impl Renderer {
     /// Use [`RendererBuilder`](crate::RendererBuilder) to create a renderer.
-    pub(crate) fn new<W: HasRawWindowHandle>(
-        builder: RendererBuilder<'_, W>,
-    ) -> impl Future<Output = Result<Arc<Self>, RendererInitializationError>> + '_ {
-        setup::create_renderer(builder)
+    pub fn new(iad: InstanceAdapterDevice) -> Result<Arc<Self>, RendererInitializationError> {
+        setup::create_renderer(iad)
     }
 
     pub fn add_mesh(&self, mesh: Mesh) -> MeshHandle {
@@ -163,11 +156,11 @@ impl Renderer {
             })
     }
 
-    pub fn set_internal_surface_options(&self, options: InternalSurfaceOptions) {
+    pub fn set_aspect_ratio(&self, ratio: f32) {
         self.instructions
             .producer
             .lock()
-            .push(Instruction::SetInternalSurfaceOptions { options })
+            .push(Instruction::SetAspectRatio { ratio })
     }
 
     pub fn set_camera_data(&self, data: Camera) {
@@ -183,7 +176,7 @@ impl Renderer {
     pub fn render(
         self: &Arc<Self>,
         routine: &mut dyn RenderRoutine,
-        output: RendererOutput,
+        output: OutputFrame,
     ) -> Option<RendererStatistics> {
         render::render_loop(Arc::clone(self), routine, output)
     }

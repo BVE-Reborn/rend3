@@ -117,13 +117,10 @@ impl DirectionalLightManager {
         let internal = self.registry.get_mut(handle);
         internal.inner.update_from_changes(change);
         if let Some(direction) = change.direction {
-            internal.camera.set_data(
-                Camera {
-                    projection: CameraProjection::from_orthographic_direction(direction.into()),
-                    ..Camera::default()
-                },
-                None,
-            );
+            internal.camera.set_data(Camera {
+                projection: CameraProjection::from_orthographic_direction(direction.into()),
+                ..Camera::default()
+            });
         }
     }
 

@@ -167,9 +167,11 @@ macro_rules! changeable_struct {
 }
 
 // WGPU REXPORTS
-pub type TextureFormat = wgt::TextureFormat;
 pub type Backend = wgt::Backend;
 pub type Backends = wgt::Backends;
+pub type PresentMode = wgt::PresentMode;
+pub type TextureUsages = wgt::TextureUsages;
+pub type TextureFormat = wgt::TextureFormat;
 
 // Consider:
 //

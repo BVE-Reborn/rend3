@@ -51,6 +51,11 @@ pub mod resources {
     pub use object::*;
     pub use texture::*;
 }
+pub mod types {
+    pub type Surface = wgpu::Surface;
+    pub type SurfaceError = wgpu::SurfaceError;
+    pub use rend3_types::*;
+}
 pub mod util {
     pub mod bind_merge;
     pub mod buffer;
@@ -61,18 +66,17 @@ pub mod util {
     pub mod typedefs;
 }
 
-mod builder;
 mod instruction;
 mod mode;
-mod options;
 mod routine;
+mod setup;
+mod surface;
 
-pub use builder::*;
 pub use mode::*;
-pub use options::*;
-pub use rend3_types as types;
 pub use renderer::{error::*, Renderer};
 pub use routine::*;
+pub use setup::*;
+pub use surface::*;
 
 pub const INTERNAL_SHADOW_DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 // This needs to be dynamic

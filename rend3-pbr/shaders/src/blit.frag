@@ -13,5 +13,9 @@ layout(set = 1, binding = 0) uniform texture2D source;
 void main() {
     vec4 input_color = texture(sampler2D(source, primary_sampler), tex_coords);
     vec4 tonemapped = vec4(uncharted2_filmic(input_color.rgb), input_color.a);
+#ifdef SRGB_CONVERT
     color = linear_to_srgb(tonemapped);
+#else // SRGB_CONVERT
+    color = tonemapped;
+#endif
 }

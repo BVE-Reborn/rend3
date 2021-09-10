@@ -7,12 +7,14 @@ pub struct CameraManager {
     view: Mat4,
     proj: Mat4,
     data: Camera,
+    aspect_ratio: f32,
 }
 impl CameraManager {
     /// Builds a new camera, using the given aspect ratio. If no aspect ratio is given
     /// it is assumed that no aspect ratio scaling should be done.
     pub fn new(data: Camera, aspect_ratio: Option<f32>) -> Self {
-        let proj = compute_projection_matrix(data, aspect_ratio.unwrap_or(1.0));
+        let aspect_ratio = aspect_ratio.unwrap_or(1.0);
+        let proj = compute_projection_matrix(data, aspect_ratio);
         let view = compute_view_matrix(data);
         let orig_view = compute_origin_matrix(data);
 
@@ -21,24 +23,30 @@ impl CameraManager {
             view,
             proj,
             data,
+            aspect_ratio,
         }
     }
 
     /// Sets the camera data, rebuilding the using the given aspect ratio. If no aspect ratio is given
     /// it is assumed that no aspect ratio scaling should be done.
-    pub fn set_data(&mut self, data: Camera, aspect_ratio: Option<f32>) {
-        self.proj = compute_projection_matrix(data, aspect_ratio.unwrap_or(1.0));
+    pub fn set_data(&mut self, data: Camera) {
+        self.set_aspect_data(data, self.aspect_ratio)
+    }
+
+    pub fn set_aspect_ratio(&mut self, aspect_ratio: Option<f32>) {
+        self.set_aspect_data(self.data, aspect_ratio.unwrap_or(1.0));
+    }
+
+    pub fn set_aspect_data(&mut self, data: Camera, aspect_ratio: f32) {
+        self.proj = compute_projection_matrix(data, self.aspect_ratio);
         self.view = compute_view_matrix(data);
         self.orig_view = compute_origin_matrix(data);
         self.data = data;
+        self.aspect_ratio = aspect_ratio;
     }
 
     pub fn get_data(&self) -> Camera {
         self.data
-    }
-
-    pub fn set_aspect_ratio(&mut self, aspect_ratio: Option<f32>) {
-        self.set_data(self.data, aspect_ratio)
     }
 
     pub fn view(&self) -> Mat4 {

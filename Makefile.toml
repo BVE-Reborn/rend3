@@ -5,7 +5,8 @@ default_to_workspace = false
 script_runner = "@shell"
 script = '''
 glslc rend3-pbr/shaders/src/blit.vert                             -O -g -o rend3-pbr/shaders/spirv/blit.vert.spv
-glslc rend3-pbr/shaders/src/blit.frag                             -O -g -o rend3-pbr/shaders/spirv/blit.frag.spv
+glslc rend3-pbr/shaders/src/blit.frag                             -O -g -o rend3-pbr/shaders/spirv/blit-linear.frag.spv
+glslc rend3-pbr/shaders/src/blit.frag   -DSRGB_CONVERT            -O -g -o rend3-pbr/shaders/spirv/blit-srgb.frag.spv
 glslc rend3-pbr/shaders/src/cull.comp   -DATOMIC_CULL             -O -g -o rend3-pbr/shaders/spirv/cull-atomic-cull.comp.spv
 glslc rend3-pbr/shaders/src/cull.comp   -DPREFIX_CULL             -O -g -o rend3-pbr/shaders/spirv/cull-prefix-cull.comp.spv
 glslc rend3-pbr/shaders/src/cull.comp   -DPREFIX_SUM              -O -g -o rend3-pbr/shaders/spirv/cull-prefix-sum.comp.spv

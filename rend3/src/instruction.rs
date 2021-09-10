@@ -1,9 +1,6 @@
-use crate::{
-    types::{
-        Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Material, MaterialChange, Mesh,
-        Object, RawMaterialHandle, RawObjectHandle, Texture,
-    },
-    InternalSurfaceOptions,
+use crate::types::{
+    Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Material, MaterialChange, Mesh, Object,
+    RawMaterialHandle, RawObjectHandle, Texture,
 };
 use glam::Mat4;
 use parking_lot::Mutex;
@@ -53,8 +50,8 @@ pub enum Instruction {
         handle: RawDirectionalLightHandle,
         change: DirectionalLightChange,
     },
-    SetInternalSurfaceOptions {
-        options: InternalSurfaceOptions,
+    SetAspectRatio {
+        ratio: f32,
     },
     SetCameraData {
         data: Camera,

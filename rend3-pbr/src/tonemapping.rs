@@ -1,8 +1,9 @@
-use rend3::util::{bind_merge::BindGroupBuilder, output::SURFACE_FORMAT};
+use rend3::util::bind_merge::BindGroupBuilder;
 use wgpu::{
     Color, ColorTargetState, ColorWrites, CommandEncoder, Device, FragmentState, FrontFace, LoadOp, MultisampleState,
     Operations, PipelineLayoutDescriptor, PolygonMode, PrimitiveState, PrimitiveTopology, RenderPassColorAttachment,
-    RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptor, TextureView, VertexState,
+    RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptor, TextureFormat, TextureView,
+    VertexState,
 };
 use wgpu_profiler::GpuProfiler;
 
@@ -15,6 +16,8 @@ pub struct TonemappingPassNewArgs<'a> {
     pub device: &'a Device,
 
     pub interfaces: &'a ShaderInterfaces,
+
+    pub output_format: TextureFormat,
 }
 
 pub struct TonemappingPassBlitArgs<'a> {
@@ -42,7 +45,15 @@ impl TonemappingPass {
 
         let blit_frag = args.device.create_shader_module(&ShaderModuleDescriptor {
             label: Some("tonemapping frag"),
-            source: wgpu::util::make_spirv(SPIRV_SHADERS.get_file("blit.frag.spv").unwrap().contents()),
+            source: wgpu::util::make_spirv(
+                SPIRV_SHADERS
+                    .get_file(match args.output_format.describe().srgb {
+                        true => "blit-linear.frag.spv",
+                        false => "blit-srgb.frag.spv",
+                    })
+                    .unwrap()
+                    .contents(),
+            ),
         });
 
         let pll = args.device.create_pipeline_layout(&PipelineLayoutDescriptor {
@@ -74,7 +85,7 @@ impl TonemappingPass {
                 module: &blit_frag,
                 entry_point: "main",
                 targets: &[ColorTargetState {
-                    format: SURFACE_FORMAT,
+                    format: args.output_format,
                     blend: None,
                     write_mask: ColorWrites::all(),
                 }],
