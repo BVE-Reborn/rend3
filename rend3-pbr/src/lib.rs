@@ -2,12 +2,13 @@ use std::sync::Arc;
 
 use glam::Vec4;
 use rend3::{
+    resources::{DirectionalLightManager, MaterialManager, TextureManager},
     types::{TextureHandle, TransparencyType},
     util::output::OutputFrame,
-    ModeData, RenderRoutine, Renderer,
+    ModeData, RenderRoutine, Renderer, RendererMode,
 };
 use wgpu::{
-    Color, CommandBuffer, LoadOp, Operations, RenderPassColorAttachment, RenderPassDepthStencilAttachment,
+    Color, CommandBuffer, Device, LoadOp, Operations, RenderPassColorAttachment, RenderPassDepthStencilAttachment,
     RenderPassDescriptor,
 };
 
@@ -48,7 +49,20 @@ impl PbrRenderRoutine {
             .mode
             .into_data(|| (), || culling::gpu::GpuCuller::new(&renderer.device));
 
-        let primary_passes = PrimaryPasses::new(renderer, &interfaces, render_texture_options.samples);
+        let primary_passes = {
+            let d2_textures = renderer.d2_texture_manager.read();
+            let directional_light = renderer.directional_light_manager.read();
+            let materials = renderer.material_manager.read();
+            PrimaryPasses::new(PrimaryPassesNewArgs {
+                mode: renderer.mode,
+                device: &renderer.device,
+                d2_textures: &d2_textures,
+                directional_lights: &directional_light,
+                materials: &materials,
+                interfaces: &interfaces,
+                samples: render_texture_options.samples,
+            })
+        };
         let tonemapping_pass = tonemapping::TonemappingPass::new(tonemapping::TonemappingPassNewArgs {
             device: &renderer.device,
             interfaces: &interfaces,
@@ -78,7 +92,18 @@ impl PbrRenderRoutine {
         let different_sample_count = self.render_textures.samples != options.samples;
         self.render_textures = RenderTextures::new(&renderer.device, options);
         if different_sample_count {
-            self.primary_passes = PrimaryPasses::new(renderer, &self.interfaces, options.samples);
+            let d2_textures = renderer.d2_texture_manager.read();
+            let directional_light = renderer.directional_light_manager.read();
+            let materials = renderer.material_manager.read();
+            self.primary_passes = PrimaryPasses::new(PrimaryPassesNewArgs {
+                mode: renderer.mode,
+                device: &renderer.device,
+                d2_textures: &d2_textures,
+                directional_lights: &directional_light,
+                materials: &materials,
+                interfaces: &self.interfaces,
+                samples: self.render_textures.samples,
+            });
         }
     }
 }
@@ -112,6 +137,18 @@ impl RenderRoutine for PbrRenderRoutine {
         let _d2c_texture_output = d2c_textures.ready(&renderer.device);
         directional_light.ready(&renderer.device, &renderer.queue);
         mesh_manager.ready();
+
+        if d2_texture_output.dirty.map(|_| false, |v| v).into_common() {
+            self.primary_passes = PrimaryPasses::new(PrimaryPassesNewArgs {
+                mode: renderer.mode,
+                device: &renderer.device,
+                d2_textures: &d2_textures,
+                directional_lights: &directional_light,
+                materials: &materials,
+                interfaces: &self.interfaces,
+                samples: self.render_textures.samples,
+            });
+        }
 
         self.primary_passes.skybox_pass.update_skybox(skybox::UpdateSkyboxArgs {
             device: &renderer.device,
@@ -319,9 +356,17 @@ impl RenderRoutine for PbrRenderRoutine {
     }
 }
 
-pub struct SampleDependantPassesNewArgs<'a> {
-    pub renderer: &'a Renderer,
+pub struct PrimaryPassesNewArgs<'a> {
+    pub mode: RendererMode,
+    pub device: &'a Device,
+
+    pub d2_textures: &'a TextureManager,
+    pub directional_lights: &'a DirectionalLightManager,
+    pub materials: &'a MaterialManager,
+
     pub interfaces: &'a common::interfaces::ShaderInterfaces,
+
+    pub samples: SampleCount,
 }
 
 pub struct PrimaryPasses {
@@ -332,48 +377,43 @@ pub struct PrimaryPasses {
     pub transparent_pass: forward::ForwardPass,
 }
 impl PrimaryPasses {
-    pub fn new(renderer: &Renderer, interfaces: &common::interfaces::ShaderInterfaces, samples: SampleCount) -> Self {
-        let gpu_d2_texture_manager_guard = renderer.mode.into_data(|| (), || renderer.d2_texture_manager.read());
-        let gpu_d2_texture_bgl = gpu_d2_texture_manager_guard
-            .as_ref()
-            .map(|_| (), |guard| guard.gpu_bgl());
+    pub fn new(args: PrimaryPassesNewArgs<'_>) -> Self {
+        let gpu_d2_texture_bgl = args.mode.into_data(|| (), || args.d2_textures.gpu_bgl());
 
-        let material_manager = renderer.material_manager.read();
-        let directional_light_manager = renderer.directional_light_manager.read();
         let shadow_pipelines =
             common::depth_pass::build_depth_pass_shader(common::depth_pass::BuildDepthPassShaderArgs {
-                mode: renderer.mode,
-                device: &renderer.device,
-                interfaces,
+                mode: args.mode,
+                device: args.device,
+                interfaces: args.interfaces,
                 texture_bgl: gpu_d2_texture_bgl,
-                materials: &material_manager,
+                materials: args.materials,
                 samples: SampleCount::One,
                 ty: common::depth_pass::DepthPassType::Shadow,
             });
         let depth_pipelines =
             common::depth_pass::build_depth_pass_shader(common::depth_pass::BuildDepthPassShaderArgs {
-                mode: renderer.mode,
-                device: &renderer.device,
-                interfaces,
+                mode: args.mode,
+                device: args.device,
+                interfaces: args.interfaces,
                 texture_bgl: gpu_d2_texture_bgl,
-                materials: &material_manager,
-                samples,
+                materials: args.materials,
+                samples: args.samples,
                 ty: common::depth_pass::DepthPassType::Prepass,
             });
         let skybox_pipeline = common::skybox_pass::build_skybox_shader(common::skybox_pass::BuildSkyboxShaderArgs {
-            mode: renderer.mode,
-            device: &renderer.device,
-            interfaces,
-            samples,
+            mode: args.mode,
+            device: args.device,
+            interfaces: args.interfaces,
+            samples: args.samples,
         });
         let forward_pass_args = common::forward_pass::BuildForwardPassShaderArgs {
-            mode: renderer.mode,
-            device: &renderer.device,
-            interfaces,
-            directional_light_bgl: directional_light_manager.get_bgl(),
+            mode: args.mode,
+            device: args.device,
+            interfaces: args.interfaces,
+            directional_light_bgl: args.directional_lights.get_bgl(),
             texture_bgl: gpu_d2_texture_bgl,
-            materials: &material_manager,
-            samples,
+            materials: args.materials,
+            samples: args.samples,
             transparency: TransparencyType::Opaque,
         };
         let opaque_pipeline = Arc::new(common::forward_pass::build_forward_pass_shader(
