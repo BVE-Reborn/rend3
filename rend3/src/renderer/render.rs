@@ -2,7 +2,7 @@ use crate::{
     format_sso,
     instruction::Instruction,
     resources::InternalTexture,
-    util::{output::RendererOutput, typedefs::RendererStatistics},
+    util::{output::OutputFrame, typedefs::RendererStatistics},
     RenderRoutine, Renderer,
 };
 use rend3_types::{MipmapCount, MipmapSource};
@@ -15,7 +15,7 @@ use wgpu::{
 pub fn render_loop(
     renderer: Arc<Renderer>,
     routine: &mut dyn RenderRoutine,
-    output: RendererOutput,
+    frame: OutputFrame,
 ) -> Option<RendererStatistics> {
     profiling::scope!("render_loop");
 
@@ -27,16 +27,13 @@ pub fn render_loop(
         label: Some("primary encoder"),
     });
 
-    let mut new_surface_options = None;
-
     let mut mesh_manager = renderer.mesh_manager.write();
     let mut texture_manager_2d = renderer.d2_texture_manager.write();
     let mut texture_manager_cube = renderer.d2c_texture_manager.write();
     let mut material_manager = renderer.material_manager.write();
     let mut object_manager = renderer.object_manager.write();
     let mut directional_light_manager = renderer.directional_light_manager.write();
-    let mut global_resources = renderer.global_resources.write();
-    let mut option_guard = renderer.options.write();
+    let mut camera_resource = renderer.camera_manager.write();
     let mut profiler = renderer.profiler.lock();
     let mut mipmap_generator = renderer.mipmap_generator.lock();
     {
@@ -236,23 +233,16 @@ pub fn render_loop(
                 Instruction::ChangeDirectionalLight { handle, change } => {
                     directional_light_manager.update_directional_light(handle, change);
                 }
-                Instruction::SetInternalSurfaceOptions { options } => new_surface_options = Some(options),
+                Instruction::SetAspectRatio { ratio } => camera_resource.set_aspect_ratio(Some(ratio)),
                 Instruction::SetCameraData { data } => {
-                    global_resources
-                        .camera
-                        .set_data(data, Some(option_guard.aspect_ratio()));
+                    camera_resource.set_data(data);
                 }
             }
         }
     }
 
-    if let Some(new_opt) = new_surface_options {
-        global_resources.update(&renderer.device, renderer.surface.as_ref(), &mut *option_guard, new_opt);
-    };
-
     drop((
-        global_resources,
-        option_guard,
+        camera_resource,
         mesh_manager,
         texture_manager_2d,
         texture_manager_cube,
@@ -262,8 +252,6 @@ pub fn render_loop(
         mipmap_generator,
         profiler,
     ));
-
-    let frame = output.acquire(&renderer.surface);
 
     // 16 encoders is a reasonable default
     let mut encoders = Vec::with_capacity(16);

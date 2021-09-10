@@ -3,7 +3,7 @@ use glam::{DVec2, UVec2, Vec3, Vec3A};
 use pico_args::Arguments;
 use rend3::{
     types::{Backend, Camera, CameraProjection, DirectionalLight, Texture, TextureFormat},
-    InternalSurfaceOptions, Renderer,
+    Renderer,
 };
 use rend3_pbr::PbrRenderRoutine;
 use std::{
@@ -116,18 +116,25 @@ fn main() {
 
     let window_size = window.inner_size();
 
-    let options = rend3::InternalSurfaceOptions {
-        vsync: rend3::VSyncMode::Off,
-        size: UVec2::new(window_size.width, window_size.height),
-    };
+    // Create the Instance, Adapter, and Device needed
+    let iad = pollster::block_on(rend3::create_iad(desired_backend, desired_device_name, desired_mode)).unwrap();
 
-    let renderer = pollster::block_on(
-        rend3::RendererBuilder::new(options)
-            .window(&window)
-            .desired_device(desired_backend, desired_device_name, desired_mode)
-            .build(),
-    )
-    .unwrap();
+    // The one line of unsafe needed. We just need to guarentee that the window outlives the use of the surface.
+    let surface = unsafe { iad.instance.create_surface(&window) };
+    // Get the preferred format for the surface.
+    let format = surface.get_preferred_format(&iad.adapter).unwrap();
+    // Configure the surface to be ready for rendering.
+    rend3::configure_surface(
+        &surface,
+        &iad.device,
+        format,
+        UVec2::new(window_size.width, window_size.height),
+        rend3::types::PresentMode::Mailbox,
+    );
+
+    // Make us a renderer.
+    let renderer = rend3::Renderer::new(iad).unwrap();
+
     // Create the pbr pipeline with the same internal resolution and 4x multisampling
     let mut routine = rend3_pbr::PbrRenderRoutine::new(
         &renderer,
@@ -135,6 +142,7 @@ fn main() {
             resolution: UVec2::new(window_size.width, window_size.height),
             samples: rend3_pbr::SampleCount::One,
         },
+        format,
     );
 
     let _loaded_gltf = load_gltf(
@@ -295,14 +303,28 @@ fn main() {
             }
         }
         Event::WindowEvent {
-            event: WindowEvent::Resized(size),
+            event: WindowEvent::CloseRequested,
+            ..
+        } => {
+            *control = ControlFlow::Exit;
+        }
+        // Window was resized, need to resize renderer.
+        winit::event::Event::WindowEvent {
+            event: winit::event::WindowEvent::Resized(size),
             ..
         } => {
             let size = UVec2::new(size.width, size.height);
-            renderer.set_internal_surface_options(InternalSurfaceOptions {
-                vsync: rend3::VSyncMode::Off,
-                size,
-            });
+            // Reconfigure the surface for the new size.
+            rend3::configure_surface(
+                &surface,
+                &renderer.device,
+                format,
+                UVec2::new(size.x, size.y),
+                rend3::types::PresentMode::Mailbox,
+            );
+            // Tell the renderer about the new aspect ratio.
+            renderer.set_aspect_ratio(size.x as f32 / size.y as f32);
+            // Resize the internal buffers to the same size as the screen.
             routine.resize(
                 &renderer,
                 rend3_pbr::RenderTextureOptions {
@@ -311,17 +333,14 @@ fn main() {
                 },
             );
         }
-        Event::WindowEvent {
-            event: WindowEvent::CloseRequested,
-            ..
-        } => {
-            *control = ControlFlow::Exit;
-        }
-        Event::RedrawRequested(_) => {
+        // Render!
+        winit::event::Event::RedrawRequested(..) => {
+            // Update camera
             renderer.set_camera_data(camera_location);
+            // Get a frame
+            let frame = rend3::util::output::OutputFrame::from_surface(&surface).unwrap();
             // Dispatch a render!
-            previous_profiling_stats = renderer.render(&mut routine, rend3::util::output::RendererOutput::InternalSurface);
-
+            previous_profiling_stats = renderer.render(&mut routine, frame);
             // mark the end of the frame for tracy/other profilers
             profiling::finish_frame!();
         }

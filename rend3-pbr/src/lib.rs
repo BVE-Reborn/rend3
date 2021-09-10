@@ -3,7 +3,7 @@ use std::sync::Arc;
 use glam::Vec4;
 use rend3::{
     resources::{DirectionalLightManager, MaterialManager, TextureManager},
-    types::{TextureHandle, TransparencyType},
+    types::{TextureFormat, TextureHandle, TransparencyType},
     util::output::OutputFrame,
     ModeData, RenderRoutine, Renderer, RendererMode,
 };
@@ -39,7 +39,11 @@ pub struct PbrRenderRoutine {
 }
 
 impl PbrRenderRoutine {
-    pub fn new(renderer: &Renderer, render_texture_options: RenderTextureOptions) -> Self {
+    pub fn new(
+        renderer: &Renderer,
+        render_texture_options: RenderTextureOptions,
+        output_format: TextureFormat,
+    ) -> Self {
         let interfaces = common::interfaces::ShaderInterfaces::new(&renderer.device);
 
         let samplers = common::samplers::Samplers::new(&renderer.device, renderer.mode, &interfaces.samplers_bgl);
@@ -66,6 +70,7 @@ impl PbrRenderRoutine {
         let tonemapping_pass = tonemapping::TonemappingPass::new(tonemapping::TonemappingPassNewArgs {
             device: &renderer.device,
             interfaces: &interfaces,
+            output_format,
         });
 
         let render_textures = RenderTextures::new(&renderer.device, render_texture_options);
@@ -173,7 +178,7 @@ impl RenderRoutine for PbrRenderRoutine {
                     objects: &objects,
                 });
 
-        let global_resources = renderer.global_resources.read();
+        let camera_manager = renderer.camera_manager.read();
 
         profiler.begin_scope("forward culling", &mut encoder, &renderer.device);
 
@@ -184,7 +189,7 @@ impl RenderRoutine for PbrRenderRoutine {
             culler,
             materials: &materials,
             interfaces: &self.interfaces,
-            camera: &global_resources.camera,
+            camera: &camera_manager,
             objects: &objects,
         });
 
@@ -195,7 +200,7 @@ impl RenderRoutine for PbrRenderRoutine {
             culler,
             materials: &materials,
             interfaces: &self.interfaces,
-            camera: &global_resources.camera,
+            camera: &camera_manager,
             objects: &objects,
         });
 
@@ -206,7 +211,7 @@ impl RenderRoutine for PbrRenderRoutine {
             culler,
             materials: &materials,
             interfaces: &self.interfaces,
-            camera: &global_resources.camera,
+            camera: &camera_manager,
             objects: &objects,
         });
 
@@ -229,7 +234,7 @@ impl RenderRoutine for PbrRenderRoutine {
 
         let primary_camera_uniform_bg = uniforms::create_shader_uniform(uniforms::CreateShaderUniformArgs {
             device: &renderer.device,
-            camera: &global_resources.camera,
+            camera: &camera_manager,
             interfaces: &self.interfaces,
             ambient: Vec4::new(0.0, 0.0, 0.0, 1.0),
         });

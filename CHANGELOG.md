@@ -34,6 +34,9 @@ and this project adheres to cargo's version of [Semantic Versioning](https://sem
   - `Object`s will keep `Material`s/`Mesh`s alive.
   - `Material`s will keep `Texture`s alive.
   - All resources are removed the `render()` after they are deleted.
+- rend3: Externalize all surfaces, adapters, devices, etc.
+  - Instead of using a `RendererBuilder`, construct an Instance/Adapter/Device with `rend::create_iad` and pass that to `Renderer::new`.
+  - Surfaces are now controlled by the user. There is a convinence function `rend3::configure_surface` to make this smoother.
 - rend3: `Texture::width` and `Texture::height` replaced with `Texture::size`
 - rend3: `RendererStatistics` is now an alias for `Vec<wgpu_profiler::GpuTimerScopeResult>`
 - rend3: `Texture::mip_levels` was split into `mip_count` and `mip_source` allowing you to easily auto-generate mipmaps.
@@ -53,6 +56,7 @@ and this project adheres to cargo's version of [Semantic Versioning](https://sem
 - rend3-gltf: image loading now properly caches images
 
 ### Removed
+- rend3: `RendererBuilder` replaced with explicit calls to `Renderer::new`.
 - rend3: `Renderer::delete_*` functions were removed in favor of refcounting.
 
 ## v0.0.6
