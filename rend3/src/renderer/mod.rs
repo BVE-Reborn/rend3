@@ -55,7 +55,10 @@ pub struct Renderer {
 }
 impl Renderer {
     /// Use [`RendererBuilder`](crate::RendererBuilder) to create a renderer.
-    pub fn new(iad: InstanceAdapterDevice, aspect_ratio: Option<f32>) -> Result<Arc<Self>, RendererInitializationError> {
+    pub fn new(
+        iad: InstanceAdapterDevice,
+        aspect_ratio: Option<f32>,
+    ) -> Result<Arc<Self>, RendererInitializationError> {
         setup::create_renderer(iad, aspect_ratio)
     }
 
