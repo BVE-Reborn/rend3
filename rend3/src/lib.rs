@@ -1,7 +1,7 @@
 //! Easy to use, customizable, efficient 3D renderer library built on wgpu.
 //!
 //! Library is under active development. While internals will likely change quite a bit,
-// the external api will only experience minor changes as features are added.
+//! the external api will only experience minor changes as features are added.
 //!
 //! To use rend3 add the following to your Cargo.toml:
 //!
