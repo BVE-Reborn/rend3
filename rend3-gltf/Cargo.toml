@@ -14,7 +14,7 @@ arrayvec = "0.7"
 base64 = "0.13"
 gltf = { version = "0.16", default-features = false, features = ["KHR_lights_punctual", "KHR_texture_transform", "KHR_materials_unlit", "extras", "names", "utils"] }
 glam = "0.18"
-fnv = "1"
+rustc-hash = "1"
 image = "0.23"
 rend3 = { version = "^0.0.6", path = "../rend3" }
 thiserror = "1"

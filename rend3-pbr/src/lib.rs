@@ -25,6 +25,7 @@ pub mod uniforms;
 mod utils;
 pub mod vertex;
 
+/// Render routine that renders the using PBR materials and gpu based culling.
 pub struct PbrRenderRoutine {
     pub interfaces: common::interfaces::ShaderInterfaces,
     pub samplers: common::samplers::Samplers,

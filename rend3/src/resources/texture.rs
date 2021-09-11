@@ -7,15 +7,19 @@ use wgpu::{
     TextureFormat, TextureSampleType, TextureUsages, TextureView, TextureViewDescriptor, TextureViewDimension,
 };
 
-// TODO: Intel's very low limit on windows will cause issues for users, so force them off gpu mode until we can solve this. See https://github.com/gfx-rs/wgpu/issues/1111
+/// When using GPU mode, we start the 2D texture manager with a bind group with this many textures.
+// TODO: Intel's very low limit on windows will cause issues for users, so force them off gpu mode by forcing this number larger than their limits until we can solve this. See https://github.com/gfx-rs/wgpu/issues/1111
 pub const STARTING_2D_TEXTURES: usize = 1 << 8;
+/// When using GPU mode, we start the Cubemap texture manager with a bind group with this many textures.
 pub const STARTING_CUBE_TEXTURES: usize = 1 << 3;
 
+/// Internal representation of a Texture.
 pub struct InternalTexture {
     pub texture: Texture,
     pub desc: TextureDescriptor<'static>,
 }
 
+/// Manages textures and associated bindless bind groups
 pub struct TextureManager {
     layout: ModeData<(), Arc<BindGroupLayout>>,
     layout_dirty: ModeData<(), bool>,
@@ -126,13 +130,11 @@ impl TextureManager {
             }
 
             TextureManagerReadyOutput {
-                bgl: self.layout.as_ref().map(|_| (), Arc::clone),
                 bg: self.group.as_ref().map(|_| (), Arc::clone),
                 dirty: layout_dirty,
             }
         } else {
             TextureManagerReadyOutput {
-                bgl: ModeData::CPU(()),
                 bg: ModeData::CPU(()),
                 dirty: ModeData::CPU(()),
             }
@@ -164,10 +166,11 @@ impl TextureManager {
     }
 }
 
+/// Output of readying up a [`TextureManager`].
 pub struct TextureManagerReadyOutput {
-    pub bgl: ModeData<(), Arc<BindGroupLayout>>,
+    // TODO(0.10) https://github.com/gfx-rs/wgpu/issues/
     pub bg: ModeData<(), Arc<BindGroup>>,
-    // TODO(0.10) https://github.com/gfx-rs/wgpu/issues/1635 will make this unneccisary.
+    /// The BindGroupLayout has changed, and we need to recreate used pipelines.
     pub dirty: ModeData<(), bool>,
 }
 

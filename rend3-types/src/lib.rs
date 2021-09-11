@@ -88,6 +88,7 @@ impl<T> ResourceHandle<T> {
 #[doc(hidden)]
 macro_rules! declare_handle {
     ($($name:ident<$ty:ty>),*) => {$(
+        #[doc = concat!("Refcounted handle to a ", stringify!($ty) ,".")]
         pub type $name = ResourceHandle<$ty>;
     )*};
 }
@@ -104,6 +105,7 @@ declare_handle!(
 #[doc(hidden)]
 macro_rules! declare_raw_handle {
     ($($name:ident<$ty:ty>),*) => {$(
+        #[doc = concat!("Internal non-owning handle to a ", stringify!($ty) ,".")]
         pub type $name = RawResourceHandle<$ty>;
     )*};
 }
@@ -117,11 +119,12 @@ declare_raw_handle!(
 );
 
 macro_rules! changeable_struct {
-    ($(#[$outer:meta])* pub struct $name:ident <- nodefault $name_change:ident { $($field_vis:vis $field_name:ident : $field_type:ty),* $(,)? } ) => {
+    ($(#[$outer:meta])* pub struct $name:ident <- nodefault $name_change:ident { $($(#[$inner:meta])* $field_vis:vis $field_name:ident : $field_type:ty),* $(,)? } ) => {
         $(#[$outer])*
+        #[derive(Debug, Default, Clone)]
         pub struct $name {
             $(
-                $field_vis $field_name : $field_type
+                $(#[$inner])* $field_vis $field_name : $field_type
             ),*
         }
         impl $name {
@@ -133,18 +136,20 @@ macro_rules! changeable_struct {
                 );*
             }
         }
-        $(#[$outer])*
+        #[doc = concat!("Describes a modification to a ", stringify!($name), ".")]
+        #[derive(Debug, Default, Clone)]
         pub struct $name_change {
             $(
                 $field_vis $field_name : Option<$field_type>
             ),*
         }
     };
-    ($(#[$outer:meta])* pub struct $name:ident <- $name_change:ident { $($field_vis:vis $field_name:ident : $field_type:ty),* $(,)? } ) => {
+    ($(#[$outer:meta])* pub struct $name:ident <- $name_change:ident { $($(#[$inner:meta])* $field_vis:vis $field_name:ident : $field_type:ty),* $(,)? } ) => {
         $(#[$outer])*
+        #[derive(Debug, Clone)]
         pub struct $name {
             $(
-                $field_vis $field_name : $field_type
+                $(#[$inner])* $field_vis $field_name : $field_type
             ),*
         }
         impl $name {
@@ -156,8 +161,8 @@ macro_rules! changeable_struct {
                 );*
             }
         }
-        $(#[$outer])*
-        #[derive(Default)]
+        #[doc = concat!("Describes a modification to a ", stringify!($name), ".")]
+        #[derive(Debug, Default, Clone)]
         pub struct $name_change {
             $(
                 $field_vis $field_name : Option<$field_type>
@@ -166,32 +171,9 @@ macro_rules! changeable_struct {
     };
 }
 
-// WGPU REXPORTS
-pub type Backend = wgt::Backend;
-pub type Backends = wgt::Backends;
-pub type PresentMode = wgt::PresentMode;
-pub type TextureUsages = wgt::TextureUsages;
-pub type TextureFormat = wgt::TextureFormat;
-
-// Consider:
-//
-// Bone weights!!!
-// Lightmap UVs
-// Spherical harmonics
-// Baked light color
-// A lot of renderers put the tangent vector in the vertex data, but you can calculate it in the pixel shader ezpz
-// Maybe thiccness data for tree branches
-// I'd consider putting everything you can into the vertex data structure. Vertex data is just per-vertex data, and a lot of things can be per-vertex
-// Then you don't need a million 4K textures
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone)]
-pub struct InterleavedModelVertex {
-    pub position: Vec3,      // 00..12
-    pub normal: Vec3,        // 12..24
-    pub uv: Vec2,            // 24..32
-    pub color: [u8; 4],      // 32..36
-    pub material_index: u32, // 36..40
-}
+// WGPU REEXPORTS
+#[doc(inline)]
+pub use wgt::{Backend, Backends, DeviceType, PresentMode, TextureFormat, TextureUsages};
 
 /// Easy to use builder for a [`Mesh`] that deals with common operations for you.
 #[derive(Debug, Default)]
@@ -347,7 +329,7 @@ impl MeshBuilder {
     }
 }
 
-/// Represents a mesh that may be used by many objects.
+/// A mesh that may be used by many objects.
 ///
 /// Meshes are in Structure of Array format and must have all the vertex_* arrays be the same length.
 /// This condition can be checked with the [`Mesh::validate`] function.
@@ -520,7 +502,7 @@ impl Mesh {
     }
 }
 
-/// Describes the count of mipmap levels
+/// The count of mipmap levels a texture should have.
 #[derive(Debug, Clone)]
 pub enum MipmapCount {
     /// Specifies a texture with the tiven mipmap count. Must not be greater than the maximum.
@@ -533,7 +515,7 @@ impl MipmapCount {
     pub const ONE: Self = Self::Specific(unsafe { NonZeroU32::new_unchecked(1) });
 }
 
-/// Describes how mipmaps get generated.
+/// How texture mipmaps get generated.
 #[derive(Debug, Clone)]
 pub enum MipmapSource {
     /// The user will provide all of the mipmaps in the data texture. Upload all mip levels.
@@ -542,6 +524,7 @@ pub enum MipmapSource {
     Generated,
 }
 
+/// A bitmap image used as a data source for a texture.
 #[derive(Debug, Clone)]
 pub struct Texture {
     pub label: Option<String>,
@@ -552,6 +535,7 @@ pub struct Texture {
     pub mip_source: MipmapSource,
 }
 
+/// Describes a texture made from the mipmaps of another texture.
 #[derive(Debug, Clone)]
 pub struct TextureFromTexture {
     pub label: Option<String>,
@@ -561,6 +545,7 @@ pub struct TextureFromTexture {
 }
 
 bitflags::bitflags! {
+    /// Flags which shaders use to determine properties of a material
     pub struct MaterialFlags : u32 {
         const ALBEDO_ACTIVE =      0b0000_0000_0000_0001;
         const ALBEDO_BLEND =       0b0000_0000_0000_0010;
@@ -579,30 +564,31 @@ bitflags::bitflags! {
     }
 }
 
+/// How the albedo color should be determined.
 #[derive(Debug, Clone)]
 pub enum AlbedoComponent {
-    /// No albedo color
+    /// No albedo color.
     None,
-    /// Albedo color is the vertex value
+    /// Albedo color is the vertex value.
     Vertex {
-        /// Vertex should be converted from srgb -> linear before multiplication
+        /// Vertex should be converted from srgb -> linear before multiplication.
         srgb: bool,
     },
-    /// Albedo color is the given value
+    /// Albedo color is the given value.
     Value(Vec4),
-    /// Albedo color is the given value multiplied by the vertex color
+    /// Albedo color is the given value multiplied by the vertex color.
     ValueVertex {
         value: Vec4,
-        /// Vertex should be converted from srgb -> linear before multiplication
+        /// Vertex should be converted from srgb -> linear before multiplication.
         srgb: bool,
     },
-    /// Albedo color is loaded from the given texture
+    /// Albedo color is loaded from the given texture.
     Texture(TextureHandle),
     /// Albedo color is loaded from the given texture, then multiplied
-    /// by the vertex color;
+    /// by the vertex color.
     TextureVertex {
         texture: TextureHandle,
-        /// Vertex should be converted from srgb -> linear before multiplication
+        /// Vertex should be converted from srgb -> linear before multiplication.
         srgb: bool,
     },
     /// Albedo color is loaded from given texture, then multiplied
@@ -612,7 +598,7 @@ pub enum AlbedoComponent {
     /// by the vertex color and the given value.
     TextureVertexValue {
         texture: TextureHandle,
-        /// Vertex should be converted from srgb -> linear before multiplication
+        /// Vertex should be converted from srgb -> linear before multiplication.
         srgb: bool,
         value: Vec4,
     },
@@ -677,6 +663,7 @@ impl AlbedoComponent {
     }
 }
 
+/// Generic container for a component of a material that could either be from a texture or a fixed value.
 #[derive(Debug, Clone)]
 pub enum MaterialComponent<T> {
     None,
@@ -714,11 +701,12 @@ impl<T: Copy> MaterialComponent<T> {
     }
 }
 
+/// How normals should be derived
 #[derive(Debug, Clone)]
 pub enum NormalTexture {
-    /// No normal texture
+    /// No normal texture.
     None,
-    /// Normal stored in RGB values
+    /// Normal stored in RGB values.
     Tricomponent(TextureHandle),
     /// Normal stored in RG values, third value should be reconstructed.
     Bicomponent(TextureHandle),
@@ -755,6 +743,7 @@ impl NormalTexture {
     }
 }
 
+/// How the Ambient Occlusion, Metalic, and Roughness values should be determined.
 #[derive(Debug, Clone)]
 pub enum AoMRTextures {
     None,
@@ -848,6 +837,7 @@ impl Default for AoMRTextures {
     }
 }
 
+/// How clearcoat values should be derived.
 #[derive(Debug, Clone)]
 pub enum ClearcoatTextures {
     GltfCombined {
@@ -924,6 +914,7 @@ impl Default for ClearcoatTextures {
     }
 }
 
+/// How textures should be sampled.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum SampleType {
     Nearest,
@@ -935,10 +926,14 @@ impl Default for SampleType {
     }
 }
 
+/// The type of transparency in a material.
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum TransparencyType {
+    /// Alpha is completely ignored.
     Opaque,
+    /// Alpha less than a specified value is discorded.
     Cutout,
+    /// Alpha is blended.
     Blend,
 }
 impl From<Transparency> for TransparencyType {
@@ -974,10 +969,14 @@ impl PartialEq<TransparencyType> for Transparency {
     }
 }
 
+/// How transparency should be handled in a material.
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Transparency {
+    /// Alpha is completely ignored.
     Opaque,
+    /// Pixels with alpha less than `cutout` is discorded.
     Cutout { cutout: f32 },
+    /// Alpha is blended.
     Blend,
 }
 impl Default for Transparency {
@@ -990,7 +989,7 @@ impl Default for Transparency {
 //
 // - Green screen value
 changeable_struct! {
-    #[derive(Debug, Default, Clone)]
+    /// A set of textures and values that determine the how an object interacts with light.
     pub struct Material <- nodefault MaterialChange {
         pub albedo: AlbedoComponent,
         pub transparency: Transparency,
@@ -1012,6 +1011,7 @@ changeable_struct! {
     }
 }
 
+/// An object in the world that is composed of a [`Mesh`] and [`Material`].
 #[derive(Debug, Clone)]
 pub struct Object {
     pub mesh: MeshHandle,
@@ -1019,12 +1019,14 @@ pub struct Object {
     pub transform: Mat4,
 }
 
+/// Describes how the camera should look at the scene.
 #[derive(Debug, Default, Copy, Clone)]
 pub struct Camera {
     pub projection: CameraProjection,
     pub location: Vec3A,
 }
 
+/// Describes how the world should be projected into the camera.
 #[derive(Debug, Copy, Clone)]
 pub enum CameraProjection {
     Orthographic {
@@ -1065,11 +1067,15 @@ impl Default for CameraProjection {
 }
 
 changeable_struct! {
-    #[derive(Debug, Clone)]
+    /// Describes how directional lights (sun lights) and their shadows should be processed.
     pub struct DirectionalLight <- DirectionalLightChange {
+        /// Color of the light.
         pub color: Vec3,
+        /// Constant multiplier for the light.
         pub intensity: f32,
+        /// Direction of the sun.
         pub direction: Vec3,
+        /// Distance from the camera that shadows should be calculated.
         pub distance: f32,
     }
 }

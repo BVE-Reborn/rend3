@@ -18,6 +18,7 @@ use wgpu::{
     TextureDimension, TextureSampleType, TextureUsages, TextureView, TextureViewDescriptor, TextureViewDimension,
 };
 
+/// Internal representation of a directional light.
 pub struct InternalDirectionalLight {
     pub inner: DirectionalLight,
 }
@@ -42,6 +43,7 @@ struct ShaderDirectionalLight {
 unsafe impl bytemuck::Zeroable for ShaderDirectionalLight {}
 unsafe impl bytemuck::Pod for ShaderDirectionalLight {}
 
+/// Manages directional lights and their associated shadow maps.
 pub struct DirectionalLightManager {
     buffer: WrappedPotBuffer,
 

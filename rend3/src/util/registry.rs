@@ -1,4 +1,3 @@
-use fnv::FnvBuildHasher;
 use indexmap::map::IndexMap;
 use rend3_types::{RawResourceHandle, ResourceHandle};
 use std::{
@@ -9,6 +8,8 @@ use std::{
     },
 };
 
+use crate::util::typedefs::FastBuildHasher;
+
 #[derive(Debug)]
 struct ResourceStorage<T> {
     refcount: Weak<()>,
@@ -17,14 +18,14 @@ struct ResourceStorage<T> {
 
 #[derive(Debug)]
 pub struct ResourceRegistry<T, HandleType> {
-    mapping: IndexMap<usize, ResourceStorage<T>, FnvBuildHasher>,
+    mapping: IndexMap<usize, ResourceStorage<T>, FastBuildHasher>,
     current_idx: AtomicUsize,
     _phantom: PhantomData<HandleType>,
 }
 impl<T, HandleType> ResourceRegistry<T, HandleType> {
     pub fn new() -> Self {
         Self {
-            mapping: IndexMap::with_hasher(FnvBuildHasher::default()),
+            mapping: IndexMap::with_hasher(FastBuildHasher::default()),
             current_idx: AtomicUsize::new(0),
             _phantom: PhantomData,
         }

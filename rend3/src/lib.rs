@@ -1,8 +1,7 @@
 //! Easy to use, customizable, efficient 3D renderer library built on wgpu.
 //!
-//! Library is currently under heavy development. While the render routine api
-//! will likely have signifgant changes, the `Renderer` api has stayed
-//! very similar throughout development.
+//! Library is under active development. While internals will likely change quite a bit,
+// the external api will only experience minor changes as features are added.
 //!
 //! To use rend3 add the following to your Cargo.toml:
 //!
@@ -10,9 +9,14 @@
 //! rend3 = "0.0.6"
 //! ```
 //!
+//! # Screenshots
+//!
+//! ![scifi-base](https://raw.githubusercontent.com/BVE-Reborn/rend3/trunk/examples/scene-viewer/scifi-base.jpg)
+//! ![example](https://raw.githubusercontent.com/BVE-Reborn/rend3/trunk/examples/scene-viewer/screenshot.jpg)
+//!
 //! # Examples
 //!
-//! Take a look at the [examples] for examples on how to use the api.
+//! Take a look at the [examples] getting started with the api.
 //!
 //! [examples]: https://github.com/BVE-Reborn/rend3/tree/trunk/examples
 //!
@@ -24,9 +28,13 @@
 //!  3. A small cog in a big machine: a renderer doesn't interfere with the rest of the program.
 //!
 //! `rend3` is not:
-//!  1. A renderer for AAA games. AAA games have requirements far beyond any possible indie game and would be unreasonable to target.
+//!  1. A renderer for insane production value AAA games. AAA games have requirements far beyond any possible indie game and would be unreasonable to target.
 //!  2. A framework or engine. It does not include all the parts needed to make an advanced game or simulation nor care how you structure
 //!     your program. I do have plans for a `rend3-util` (or similar) crate that is a very basic framework for the second use case listed above.
+//!
+//! # GPU Mode
+//!
+//! On Vulkan and DX12, we can enable "gpu mode", which uses modern bindless resources and gpu-based culling. This reduces CPU load and allows sigifigantly more powerful culling.
 //!
 //! # Future Plans
 //!
@@ -34,8 +42,13 @@
 //! under the [enhancement] label.
 //!
 //! [enhancement]: https://github.com/BVE-Reborn/rend3/labels/enhancement
+//!
+//! ## Helping Out
+//!
+//! We welcome all contributions and ideas. If you want to participate or have ideas for this library, we'd love to hear them!
 
 mod renderer;
+/// Managers for various type of resources.
 pub mod resources {
     mod camera;
     mod directional;
@@ -51,11 +64,14 @@ pub mod resources {
     pub use object::*;
     pub use texture::*;
 }
+
+/// Reexport of [`rend3_types`] with some added wgpu re-exports.
 pub mod types {
-    pub type Surface = wgpu::Surface;
-    pub type SurfaceError = wgpu::SurfaceError;
     pub use rend3_types::*;
+    #[doc(inline)]
+    pub use wgpu::{Surface, SurfaceError};
 }
+/// Utilities and isolated bits of functionality that need a home.
 pub mod util {
     pub mod bind_merge;
     pub mod buffer;
@@ -78,6 +94,8 @@ pub use routine::*;
 pub use setup::*;
 pub use surface::*;
 
+/// Format of all shadow maps.
 pub const INTERNAL_SHADOW_DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
-// This needs to be dynamic
+// TODO: This needs to be dynamic
+/// Resolution of all shadow maps.
 pub const SHADOW_DIMENSIONS: u32 = 2048;
