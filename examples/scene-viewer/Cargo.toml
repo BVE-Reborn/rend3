@@ -15,7 +15,6 @@ path = "src/main.rs"
 [dependencies]
 basis = { version = "0.1.0", git = "https://github.com/BVE-Reborn/basis-rs.git", rev = "17480940261db81877ce4fec983a18a39d7db633" }
 env_logger = { version = "0.9", default-features = false, features = ["termcolor", "atty"] }
-fnv = "1"
 glam = "0.18"
 histogram = "0.6"
 image = { version = "0.23", default-features = false, features = ["png", "jpeg", "tiff"]}
@@ -25,7 +24,8 @@ profiling = { version = "1", default-features = false, features = ["profile-with
 rend3 = { version = "^0.0.6", path = "../../rend3" }
 rend3-gltf = { version = "^0.0.6", path = "../../rend3-gltf" }
 rend3-pbr = { version = "^0.0.6", path = "../../rend3-pbr" }
+rustc-hash = "1"
 smallvec = "1"
 tracy-client = "0.12"
-winit = "0.25"
 wgpu-profiler = "0.6.1"
+winit = "0.25"

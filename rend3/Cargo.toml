@@ -40,7 +40,6 @@ arrayvec = "0.7"
 bitflags = "1"
 bytemuck = "1"
 flume = "0.10"
-fnv = "1"
 glam = { version = "0.18", features = ["bytemuck"] }
 indexmap = "1"
 log = "0.4"
@@ -48,6 +47,7 @@ parking_lot = { version = "0.11" }
 profiling = {version = "1", default-features = false }
 range-alloc = "0.1"
 rend3-types = { version = "^0.0.6", path = "../rend3-types" }
+rustc-hash = "1"
 smallvec = "1"
 smartstring = "0.2"
 thiserror = "1"

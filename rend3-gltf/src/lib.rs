@@ -1,7 +1,6 @@
-use fnv::FnvHashMap;
 use glam::{Mat3, Mat4, UVec2, Vec2, Vec3, Vec4, Vec4Swizzles};
 use gltf::buffer::Source;
-use rend3::{types, util::typedefs::SsoString, Renderer};
+use rend3::{Renderer, types, util::typedefs::{FastHashMap, SsoString}};
 use std::{borrow::Cow, collections::hash_map::Entry, future::Future, path::Path};
 use thiserror::Error;
 
@@ -37,9 +36,9 @@ pub struct ImageKey {
 /// A fully loaded gltf.
 #[derive(Debug, Default)]
 pub struct LoadedGltfScene {
-    pub meshes: FnvHashMap<usize, Mesh>,
-    pub materials: FnvHashMap<Option<usize>, types::MaterialHandle>,
-    pub images: FnvHashMap<ImageKey, types::TextureHandle>,
+    pub meshes: FastHashMap<usize, Mesh>,
+    pub materials: FastHashMap<Option<usize>, types::MaterialHandle>,
+    pub images: FastHashMap<ImageKey, types::TextureHandle>,
     pub nodes: Vec<Node>,
 }
 

@@ -1,10 +1,6 @@
-use fnv::FnvBuildHasher;
 use glam::{DVec2, UVec2, Vec3, Vec3A};
 use pico_args::Arguments;
-use rend3::{
-    types::{Backend, Camera, CameraProjection, DirectionalLight, Texture, TextureFormat},
-    Renderer,
-};
+use rend3::{Renderer, types::{Backend, Camera, CameraProjection, DirectionalLight, Texture, TextureFormat}, util::typedefs::FastHashMap};
 use rend3_pbr::PbrRenderRoutine;
 use std::{
     collections::HashMap,
@@ -157,7 +153,7 @@ fn main() {
         direction: Vec3::new(-1.0, -1.0, 1.0),
         distance: 400.0,
     });
-    let mut scancode_status = HashMap::with_hasher(FnvBuildHasher::default());
+    let mut scancode_status = FastHashMap::default();
 
     let mut camera_location = Camera {
         projection: CameraProjection::Projection {

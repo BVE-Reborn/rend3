@@ -1,16 +1,12 @@
 use std::sync::Arc;
 
 use arrayvec::ArrayVec;
-use fnv::FnvHashMap;
 use wgpu::{
     Adapter, AdapterInfo, Backend, Backends, BufferAddress, Device, DeviceDescriptor, DeviceType, Features, Instance,
     Limits, Queue,
 };
 
-use crate::{
-    renderer::info::ExtendedAdapterInfo, resources::STARTING_2D_TEXTURES, LimitType, RendererInitializationError,
-    RendererMode,
-};
+use crate::{LimitType, RendererInitializationError, RendererMode, renderer::info::ExtendedAdapterInfo, resources::STARTING_2D_TEXTURES, util::typedefs::FastHashMap};
 
 /// Largest uniform buffer binding needed to run rend3.
 pub const MAX_UNIFORM_BUFFER_BINDING_SIZE: BufferAddress = 1024;
@@ -283,7 +279,7 @@ pub async fn create_iad(
 
     let instance = Instance::new(backend_bits);
 
-    let mut valid_adapters = FnvHashMap::default();
+    let mut valid_adapters = FastHashMap::default();
 
     for backend in &default_backend_order {
         let adapters = instance.enumerate_adapters(Backends::from(*backend));
