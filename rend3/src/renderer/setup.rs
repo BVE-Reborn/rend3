@@ -12,10 +12,10 @@ use rend3_types::{Camera, TextureFormat};
 use std::sync::Arc;
 use wgpu::TextureViewDimension;
 
-pub fn create_renderer(iad: InstanceAdapterDevice) -> Result<Arc<Renderer>, RendererInitializationError> {
+pub fn create_renderer(iad: InstanceAdapterDevice, aspect_ratio: Option<f32>) -> Result<Arc<Renderer>, RendererInitializationError> {
     let features = iad.device.features();
 
-    let camera_manager = RwLock::new(CameraManager::new(Camera::default(), None));
+    let camera_manager = RwLock::new(CameraManager::new(Camera::default(), aspect_ratio));
 
     let texture_manager_2d = RwLock::new(TextureManager::new(
         &iad.device,

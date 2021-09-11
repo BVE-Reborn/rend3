@@ -142,7 +142,7 @@ impl RenderRoutine for PbrRenderRoutine {
         let d2_texture_output = d2_textures.ready(&renderer.device);
         let _d2c_texture_output = d2c_textures.ready(&renderer.device);
         let directional_light_cameras =
-            directional_light.ready(&renderer.device, &renderer.queue, &global_resources.camera);
+            directional_light.ready(&renderer.device, &renderer.queue, &camera_manager);
         mesh_manager.ready();
 
         if d2_texture_output.dirty.map(|_| false, |v| v).into_common() {

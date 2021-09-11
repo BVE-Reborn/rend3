@@ -27,7 +27,7 @@ pub fn gpu_required_features() -> Features {
 }
 
 pub fn cpu_required_features() -> Features {
-    Features::empty()
+    wgpu::Features::DEPTH_CLAMPING
 }
 
 pub fn optional_features() -> Features {
