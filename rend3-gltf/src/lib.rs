@@ -1,6 +1,10 @@
 use glam::{Mat3, Mat4, UVec2, Vec2, Vec3, Vec4, Vec4Swizzles};
 use gltf::buffer::Source;
-use rend3::{Renderer, types, util::typedefs::{FastHashMap, SsoString}};
+use rend3::{
+    types,
+    util::typedefs::{FastHashMap, SsoString},
+    Renderer,
+};
 use std::{borrow::Cow, collections::hash_map::Entry, future::Future, path::Path};
 use thiserror::Error;
 

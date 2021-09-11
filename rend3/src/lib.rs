@@ -67,9 +67,9 @@ pub mod resources {
 
 /// Reexport of [`rend3_types`] with some added wgpu re-exports.
 pub mod types {
-#[doc(inline)]
-pub use wgpu::{Surface, SurfaceError};
     pub use rend3_types::*;
+    #[doc(inline)]
+    pub use wgpu::{Surface, SurfaceError};
 }
 /// Utilities and isolated bits of functionality that need a home.
 pub mod util {

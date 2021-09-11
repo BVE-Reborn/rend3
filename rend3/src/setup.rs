@@ -6,7 +6,10 @@ use wgpu::{
     Limits, Queue,
 };
 
-use crate::{LimitType, RendererInitializationError, RendererMode, renderer::info::ExtendedAdapterInfo, resources::STARTING_2D_TEXTURES, util::typedefs::FastHashMap};
+use crate::{
+    renderer::info::ExtendedAdapterInfo, resources::STARTING_2D_TEXTURES, util::typedefs::FastHashMap, LimitType,
+    RendererInitializationError, RendererMode,
+};
 
 /// Largest uniform buffer binding needed to run rend3.
 pub const MAX_UNIFORM_BUFFER_BINDING_SIZE: BufferAddress = 1024;

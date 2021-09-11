@@ -1,6 +1,10 @@
 use glam::{DVec2, UVec2, Vec3, Vec3A};
 use pico_args::Arguments;
-use rend3::{Renderer, types::{Backend, Camera, CameraProjection, DirectionalLight, Texture, TextureFormat}, util::typedefs::FastHashMap};
+use rend3::{
+    types::{Backend, Camera, CameraProjection, DirectionalLight, Texture, TextureFormat},
+    util::typedefs::FastHashMap,
+    Renderer,
+};
 use rend3_pbr::PbrRenderRoutine;
 use std::{
     collections::HashMap,
