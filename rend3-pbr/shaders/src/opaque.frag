@@ -69,7 +69,7 @@ void main() {
 
             vec3 shadow_ndc = (directional_lights[i].view_proj * uniforms.inv_view * i_view_position).xyz;
             vec2 shadow_flipped = (shadow_ndc.xy * 0.5) + 0.5;
-            vec4 shadow_shadow_coords = vec4(shadow_flipped.x, 1 - shadow_flipped.y, light.shadow_tex, shadow_ndc.z);
+            vec4 shadow_shadow_coords = vec4(shadow_flipped.x, 1 - shadow_flipped.y, float(i), shadow_ndc.z);
 
             float shadow_value;
             shadow_value = texture(sampler2DArrayShadow(shadow, shadow_sampler), shadow_shadow_coords);

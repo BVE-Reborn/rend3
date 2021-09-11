@@ -83,7 +83,7 @@ fn main() {
     );
 
     // Make us a renderer.
-    let renderer = rend3::Renderer::new(iad).unwrap();
+    let renderer = rend3::Renderer::new(iad, Some(window_size.width as f32 / window_size.height as f32)).unwrap();
 
     // Create the pbr pipeline with the same internal resolution and 4x multisampling
     let mut routine = rend3_pbr::PbrRenderRoutine::new(
@@ -141,6 +141,7 @@ fn main() {
         intensity: 10.0,
         // Direction will be normalized
         direction: glam::Vec3::new(-1.0, -4.0, 2.0),
+        distance: 400.0,
     });
 
     event_loop.run(move |event, _, control| match event {

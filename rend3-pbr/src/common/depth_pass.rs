@@ -138,7 +138,7 @@ fn create_depth_inner(
                 DepthPassType::Shadow => Face::Front,
                 DepthPassType::Prepass => Face::Back,
             }),
-            clamp_depth: false,
+            clamp_depth: matches!(args.ty, DepthPassType::Shadow),
             polygon_mode: PolygonMode::Fill,
             conservative: false,
         },

@@ -117,7 +117,6 @@ struct DirectionalLightBufferHeader {
 struct DirectionalLight {
     mat4 view_proj;
     vec3 color;
-    uint shadow_tex;
     vec3 direction;
 };
 

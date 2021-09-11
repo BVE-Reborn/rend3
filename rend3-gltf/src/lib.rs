@@ -178,6 +178,7 @@ fn load_gltf_impl<'a, E: std::error::Error + 'static>(
                         color: Vec3::from(light.color()),
                         intensity: light.intensity(),
                         direction,
+                        distance: 400.0,
                     }))
                 }
                 _ => None,

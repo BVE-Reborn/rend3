@@ -1065,10 +1065,11 @@ impl Default for CameraProjection {
 }
 
 changeable_struct! {
-    #[derive(Debug, Copy, Clone)]
+    #[derive(Debug, Clone)]
     pub struct DirectionalLight <- DirectionalLightChange {
         pub color: Vec3,
         pub intensity: f32,
         pub direction: Vec3,
+        pub distance: f32,
     }
 }
