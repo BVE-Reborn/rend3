@@ -23,6 +23,7 @@ and this project adheres to cargo's version of [Semantic Versioning](https://sem
 - rend3: `Renderer::add_texture_2d_from_texture` which allows you to make a new texture from a set another texture's mipmaps.
 - rend3 & rend3-pbr: Use `wgpu-profiler` to generate GPU timings that show up as `RendererStatistics`.
 - rend3 & rend3-pbr: Annotate most code with `profiling` spans.
+- rend3 & rend3-pbr: Add a `distance` field that signifies how much space shadows should take up.
 - rend3-pbr: All major rendering spans are labeled and show up in renderdoc
 - rend3-pbr: Multisampling support
 - rend3-pbr: Support for transparency as well as stable gpu-culling to preserve transparency sort order.
