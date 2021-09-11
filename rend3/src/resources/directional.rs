@@ -5,7 +5,7 @@ use crate::{
     INTERNAL_SHADOW_DEPTH_FORMAT, SHADOW_DIMENSIONS,
 };
 use arrayvec::ArrayVec;
-use glam::{Mat4, Vec3, Vec3A};
+use glam::{Mat4, Vec3A};
 use rend3_types::{DirectionalLightChange, RawDirectionalLightHandle};
 use std::{
     mem::{self, size_of},
@@ -116,7 +116,7 @@ impl DirectionalLightManager {
 
         self.registry.remove_all_dead(|_, _, _| ());
 
-        let registered_count: usize = self.registry.values().map(|l| l.inner.distances.len()).sum();
+        let registered_count: usize = self.registry.values().len();
         let recreate_view = registered_count != self.layer_views.len() && registered_count != 0;
         if recreate_view {
             let (view, layer_views) = create_shadow_texture(device, registered_count as u32);
@@ -136,7 +136,7 @@ impl DirectionalLightManager {
             total_lights: registry.count() as u32,
         }));
         for light in registry.values() {
-            let cs = shadow_cascades(light, user_camera);
+            let cs = shadow(light, user_camera);
             for camera in &cs {
                 buffer.extend_from_slice(bytemuck::bytes_of(&ShaderDirectionalLight {
                     view_proj: camera.view_proj(),
@@ -161,6 +161,25 @@ impl DirectionalLightManager {
     }
 }
 
+// TODO: re-enable cascades
+fn shadow(l: &InternalDirectionalLight, user_camera: &CameraManager) -> ArrayVec<CameraManager, 4> {
+    let mut cascades = ArrayVec::new();
+
+    cascades.push(CameraManager::new(
+        Camera {
+            projection: CameraProjection::Orthographic {
+                size: Vec3A::splat(l.inner.distance),
+                direction: l.inner.direction.into(),
+            },
+            location: user_camera.get_data().location,
+        },
+        None,
+    ));
+
+    cascades
+}
+
+/*
 fn shadow_cascades(l: &InternalDirectionalLight, user_camera: &CameraManager) -> ArrayVec<CameraManager, 4> {
     let mut cascades = ArrayVec::new();
 
@@ -208,7 +227,9 @@ fn shadow_cascades(l: &InternalDirectionalLight, user_camera: &CameraManager) ->
 
     cascades
 }
+*/
 
+#[allow(unused)]
 fn vec_min_max(iter: impl IntoIterator<Item = Vec3A>) -> (Vec3A, Vec3A) {
     let mut iter = iter.into_iter();
     let mut min = iter.next().unwrap();

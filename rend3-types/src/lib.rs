@@ -1,4 +1,3 @@
-use arrayvec::ArrayVec;
 use glam::{Mat3, Mat4, UVec2, Vec2, Vec3, Vec3A, Vec4};
 use std::{
     fmt::Debug,
@@ -1071,6 +1070,6 @@ changeable_struct! {
         pub color: Vec3,
         pub intensity: f32,
         pub direction: Vec3,
-        pub distances: ArrayVec<f32, 4>,
+        pub distance: f32,
     }
 }
