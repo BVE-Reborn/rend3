@@ -10,23 +10,34 @@ use wgpu::{
     Buffer, BufferAddress, BufferDescriptor, BufferUsages, CommandEncoder, Device, IndexFormat, Queue, RenderPass,
 };
 
+/// Size of a single vertex position.
 pub const VERTEX_POSITION_SIZE: usize = size_of::<Vec3>();
+/// Size of a single vertex normal.
 pub const VERTEX_NORMAL_SIZE: usize = size_of::<Vec3>();
+/// Size of a single vertex tangent.
 pub const VERTEX_TANGENT_SIZE: usize = size_of::<Vec3>();
+/// Size of a single vertex texture coordinate.
 pub const VERTEX_UV_SIZE: usize = size_of::<Vec2>();
+/// Size of a single vertex color.
 pub const VERTEX_COLOR_SIZE: usize = size_of::<[u8; 4]>();
+/// Size of a single vertex material index.
 pub const VERTEX_MATERIAL_INDEX_SIZE: usize = size_of::<u32>();
-const INDEX_SIZE: usize = size_of::<u32>();
+/// Size of a single index.
+pub const INDEX_SIZE: usize = size_of::<u32>();
 
-const STARTING_VERTICES: usize = 1 << 16;
-const STARTING_INDICES: usize = 1 << 16;
+/// Pre-allocated vertex count in the vertex megabuffers.
+pub const STARTING_VERTICES: usize = 1 << 16;
+/// Pre-allocated index count in the index megabuffer.
+pub const STARTING_INDICES: usize = 1 << 16;
 
+/// Internal representation of a mesh.
 pub struct InternalMesh {
     pub vertex_range: Range<usize>,
     pub index_range: Range<usize>,
     pub bounding_sphere: BoundingSphere,
 }
 
+/// Set of megabuffers used by the mesh manager.
 pub struct MeshBuffers {
     pub vertex_position: Buffer,
     pub vertex_normal: Buffer,
@@ -50,6 +61,7 @@ impl MeshBuffers {
     }
 }
 
+/// Manages vertex and instance buffers. All buffers are sub-allocated from megabuffers.
 pub struct MeshManager {
     buffers: MeshBuffers,
 

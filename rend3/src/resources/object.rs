@@ -6,6 +6,7 @@ use crate::{
 use glam::{Mat4, Vec3A};
 use rend3_types::RawObjectHandle;
 
+/// Internal representation of a Object.
 #[derive(Debug, Clone)]
 pub struct InternalObject {
     pub material: MaterialHandle,
@@ -17,6 +18,7 @@ pub struct InternalObject {
     pub vertex_offset: i32,
 }
 
+/// Manages objects. That's it. ¯\\\_(ツ)\_/¯
 pub struct ObjectManager {
     registry: ResourceRegistry<InternalObject, Object>,
 }

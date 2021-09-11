@@ -55,7 +55,6 @@ pub fn create_renderer(
 
         mode: iad.mode,
         adapter_info: iad.info,
-        instance: iad.instance,
         queue: iad.queue,
         device: iad.device,
 

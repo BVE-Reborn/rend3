@@ -5,17 +5,20 @@ use rend3::{types, util::typedefs::SsoString, Renderer};
 use std::{borrow::Cow, collections::hash_map::Entry, future::Future, path::Path};
 use thiserror::Error;
 
+/// A primative and its handles.
 #[derive(Debug)]
 pub struct MeshPrimitive {
     pub handle: types::MeshHandle,
     pub material: Option<usize>,
 }
 
+/// Set of primatives.
 #[derive(Debug)]
 pub struct Mesh {
     pub primitives: Vec<MeshPrimitive>,
 }
 
+/// Node in the gltf node tree.
 #[derive(Debug)]
 pub struct Node {
     pub children: Vec<Node>,
@@ -24,12 +27,14 @@ pub struct Node {
     pub light: Option<types::DirectionalLightHandle>,
 }
 
+/// Hashmap key for caching images.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct ImageKey {
     pub index: usize,
     pub srgb: bool,
 }
 
+/// A fully loaded gltf.
 #[derive(Debug, Default)]
 pub struct LoadedGltfScene {
     pub meshes: FnvHashMap<usize, Mesh>,
@@ -38,6 +43,7 @@ pub struct LoadedGltfScene {
     pub nodes: Vec<Node>,
 }
 
+/// Describes how loading gltf failed.
 #[derive(Debug, Error)]
 pub enum GltfLoadError<E: std::error::Error + 'static> {
     #[error("Gltf parsing or validation error")]
@@ -60,7 +66,7 @@ pub enum GltfLoadError<E: std::error::Error + 'static> {
     UnsupportedPrimitiveMode(usize, usize, gltf::mesh::Mode),
 }
 
-/// Default implementation of [`load_gltf`]'s `io_func`.
+/// Default implementation of [`load_gltf`]'s `io_func` that loads from the filesystem relative to the gltf.
 ///
 /// The first argumnet is the directory all relative paths should be considered against. This is more than likely
 /// the directory the gltf/glb is in.
@@ -468,7 +474,7 @@ where
     Ok(handle)
 }
 
-pub async fn option_resolve<F: Future>(fut: Option<F>) -> Option<F::Output> {
+async fn option_resolve<F: Future>(fut: Option<F>) -> Option<F::Output> {
     if let Some(f) = fut {
         Some(f.await)
     } else {

@@ -1,6 +1,7 @@
 use thiserror::Error;
 use wgpu::Features;
 
+/// Enum mapping to each of a device's limit.
 #[derive(Debug)]
 pub enum LimitType {
     BindGroups,
@@ -23,6 +24,7 @@ pub enum LimitType {
     MaxVertexBufferArrayStride,
 }
 
+/// Reason why the renderer failed to initialize.
 #[derive(Error, Debug)]
 pub enum RendererInitializationError {
     #[error("No supported adapter found")]

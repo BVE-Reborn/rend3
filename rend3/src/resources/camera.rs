@@ -1,6 +1,7 @@
 use crate::types::{Camera, CameraProjection};
 use glam::{Mat3A, Mat4, Vec3, Vec3A};
 
+/// Manages the camera's location and projection settings.
 #[derive(Clone)]
 pub struct CameraManager {
     orig_view: Mat4,

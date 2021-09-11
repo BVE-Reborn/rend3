@@ -19,7 +19,7 @@ use wgpu::{
 
 #[repr(C, align(16))]
 #[derive(Debug, Copy, Clone)]
-pub struct CPUShaderMaterial {
+struct CPUShaderMaterial {
     uv_transform_row0: Vec4,
     uv_transform_row1: Vec4,
     uv_transform_row2: Vec4,
@@ -42,7 +42,7 @@ unsafe impl bytemuck::Zeroable for CPUShaderMaterial {}
 unsafe impl bytemuck::Pod for CPUShaderMaterial {}
 
 impl CPUShaderMaterial {
-    pub fn from_material(material: &Material) -> Self {
+    fn from_material(material: &Material) -> Self {
         Self {
             uv_transform_row0: material.transform.x_axis.extend(0.0),
             uv_transform_row1: material.transform.y_axis.extend(0.0),
@@ -95,7 +95,7 @@ impl CPUShaderMaterial {
 
 #[repr(C, align(16))]
 #[derive(Debug, Copy, Clone)]
-pub struct GPUShaderMaterial {
+struct GPUShaderMaterial {
     albedo: Vec4,
     emissive: Vec3,
     roughness: f32,
@@ -185,6 +185,7 @@ struct InternalMaterial {
     material_buffer: ModeData<Buffer, ()>,
 }
 
+/// Manages materials and their associated BindGroups in CPU modes.
 pub struct MaterialManager {
     bgl: ModeData<BindGroupLayout, BindGroupLayout>,
     bg: ModeData<(), BindGroup>,

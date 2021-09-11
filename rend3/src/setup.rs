@@ -12,34 +12,43 @@ use crate::{
     RendererMode,
 };
 
+/// Largest uniform buffer binding needed to run rend3.
 pub const MAX_UNIFORM_BUFFER_BINDING_SIZE: BufferAddress = 1024;
 
-pub fn gpu_required_features() -> Features {
-    wgpu::Features::PUSH_CONSTANTS
-        | wgpu::Features::TEXTURE_COMPRESSION_BC
-        | wgpu::Features::DEPTH_CLAMPING
-        | wgpu::Features::TEXTURE_BINDING_ARRAY
-        | wgpu::Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING
-        | wgpu::Features::UNSIZED_BINDING_ARRAY
-        | wgpu::Features::MULTI_DRAW_INDIRECT
-        | wgpu::Features::MULTI_DRAW_INDIRECT_COUNT
-        | wgpu::Features::SPIRV_SHADER_PASSTHROUGH
-}
+/// Features required to run in gpu-mode.
+pub const GPU_REQUIRED_FEATURES: Features = {
+    // We need to do this whole bits thing to make this const as OpOr isn't const
+    Features::from_bits_truncate(
+        Features::PUSH_CONSTANTS.bits()
+            | Features::TEXTURE_COMPRESSION_BC.bits()
+            | Features::DEPTH_CLAMPING.bits()
+            | Features::TEXTURE_BINDING_ARRAY.bits()
+            | Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING.bits()
+            | Features::UNSIZED_BINDING_ARRAY.bits()
+            | Features::MULTI_DRAW_INDIRECT.bits()
+            | Features::MULTI_DRAW_INDIRECT_COUNT.bits()
+            | Features::SPIRV_SHADER_PASSTHROUGH.bits(),
+    )
+};
 
-pub fn cpu_required_features() -> Features {
-    wgpu::Features::DEPTH_CLAMPING
-}
+/// Features required to run in cpu-mode.
+pub const CPU_REQUIRED_FEATURES: Features = Features::from_bits_truncate(Features::DEPTH_CLAMPING.bits());
 
-pub fn optional_features() -> Features {
-    wgpu::Features::TEXTURE_COMPRESSION_BC | wgpu::Features::TIMESTAMP_QUERY
-}
+/// Features that rend3 can use if it they are available, but we don't requiire.
+pub const OPTIONAL_FEATURES: Features = Features::from_bits_truncate(
+    Features::TEXTURE_COMPRESSION_BC.bits()
+        | Features::TEXTURE_COMPRESSION_ETC2.bits()
+        | Features::TEXTURE_COMPRESSION_ASTC_LDR.bits()
+        | Features::TIMESTAMP_QUERY.bits(),
+);
 
+/// Check that all required features for a given mode are present in the feature set given.
 pub fn check_features(mode: RendererMode, device: Features) -> Result<Features, RendererInitializationError> {
     let required = match mode {
-        RendererMode::GPUPowered => gpu_required_features(),
-        RendererMode::CPUPowered => cpu_required_features(),
+        RendererMode::GPUPowered => GPU_REQUIRED_FEATURES,
+        RendererMode::CPUPowered => CPU_REQUIRED_FEATURES,
     };
-    let optional = optional_features() & device;
+    let optional = OPTIONAL_FEATURES & device;
     let missing = required - device;
     if !missing.is_empty() {
         Err(RendererInitializationError::MissingDeviceFeatures { features: missing })
@@ -48,6 +57,7 @@ pub fn check_features(mode: RendererMode, device: Features) -> Result<Features, 
     }
 }
 
+/// Limits required to run in gpu-mode.
 pub const GPU_REQUIRED_LIMITS: Limits = Limits {
     max_texture_dimension_1d: 2048,
     max_texture_dimension_2d: 2048,
@@ -69,6 +79,7 @@ pub const GPU_REQUIRED_LIMITS: Limits = Limits {
     max_push_constant_size: 128,
 };
 
+/// Limits required to run in cpu-mode.
 pub const CPU_REQUIRED_LIMITS: Limits = Limits {
     max_texture_dimension_1d: 2048,
     max_texture_dimension_2d: 2048,
@@ -102,6 +113,7 @@ fn check_limit_unlimited(d: u32, r: u32, ty: LimitType) -> Result<u32, RendererI
     }
 }
 
+/// Check that all required limits for a given mode are present in the given limit set.
 pub fn check_limits(mode: RendererMode, device_limits: &Limits) -> Result<Limits, RendererInitializationError> {
     let required_limits = match mode {
         RendererMode::GPUPowered => GPU_REQUIRED_LIMITS,
@@ -202,6 +214,7 @@ pub fn check_limits(mode: RendererMode, device_limits: &Limits) -> Result<Limits
     })
 }
 
+/// Validated set of features and limits for a given T.
 pub struct PotentialAdapter<T> {
     pub inner: T,
     pub info: ExtendedAdapterInfo,
@@ -241,6 +254,9 @@ impl<T> PotentialAdapter<T> {
     }
 }
 
+/// Container for Instance/Adapter/Device/Queue etc.
+///
+/// Create these yourself, or call [`create_iad`].
 pub struct InstanceAdapterDevice {
     pub instance: Arc<Instance>,
     pub adapter: Arc<Adapter>,
@@ -250,6 +266,7 @@ pub struct InstanceAdapterDevice {
     pub info: ExtendedAdapterInfo,
 }
 
+/// Creates an Instance/Adapter/Device/Queue using the given choices. Tries to get the best combination.
 pub async fn create_iad(
     desired_backend: Option<Backend>,
     desired_device: Option<String>,

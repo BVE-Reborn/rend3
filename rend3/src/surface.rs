@@ -3,6 +3,7 @@ use glam::UVec2;
 use rend3_types::{TextureFormat, TextureUsages};
 use wgpu::{Device, SurfaceConfiguration};
 
+/// Convinence function that re-configures the surface with the expected usages.
 pub fn configure_surface(
     surface: &Surface,
     device: &Device,
