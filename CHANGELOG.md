@@ -17,6 +17,9 @@ and this project adheres to cargo's version of [Semantic Versioning](https://sem
 
 ## Unreleased
 
+### Added
+- rend3-pbr: `set_ambient_lighting` sets the ambient light value, making sure no lighting result is less than `ambient * color`.
+
 ## v0.1.0
 
 Released 2021-09-11
