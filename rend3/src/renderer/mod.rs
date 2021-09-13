@@ -1,13 +1,12 @@
 use crate::{
     instruction::{Instruction, InstructionStreamPair},
-    renderer::info::ExtendedAdapterInfo,
     resources::{CameraManager, DirectionalLightManager, MaterialManager, MeshManager, ObjectManager, TextureManager},
     types::{
         Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Material, MaterialChange,
         MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, Texture, TextureHandle,
     },
     util::{mipmap::MipmapGenerator, output::OutputFrame, typedefs::RendererStatistics},
-    InstanceAdapterDevice, RenderRoutine, RendererInitializationError, RendererMode,
+    ExtendedAdapterInfo, InstanceAdapterDevice, RenderRoutine, RendererInitializationError, RendererMode,
 };
 use glam::Mat4;
 use parking_lot::{Mutex, RwLock};
@@ -17,7 +16,6 @@ use wgpu::{Device, Queue};
 use wgpu_profiler::GpuProfiler;
 
 pub mod error;
-pub mod info;
 mod render;
 mod setup;
 
