@@ -6,6 +6,7 @@ The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/
 and this project adheres to cargo's version of [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - [Unreleased](#unreleased)
+- [v0.1.1](#v011)
 - [v0.1.0](#v010)
 - [v0.0.6](#v006)
 - [v0.0.5](#v005)
@@ -16,6 +17,10 @@ and this project adheres to cargo's version of [Semantic Versioning](https://sem
 - [Diffs](#diffs)
 
 ## Unreleased
+
+## v0.1.1
+
+Released 2021-09-13
 
 ### Added
 - rend3-pbr: `set_ambient_lighting` sets the ambient light value, making sure no lighting result is less than `ambient * color`.
@@ -138,7 +143,8 @@ Released 2021-03-06
 
 ## Diffs
 
-- [Unreleased](https://github.com/BVE-Reborn/rend3/compare/v0.1.0...HEAD)
+- [Unreleased](https://github.com/BVE-Reborn/rend3/compare/v0.1.1...HEAD)
+- [v0.1.1](https://github.com/BVE-Reborn/rend3/compare/v0.1.0...v0.1.1)
 - [v0.1.0](https://github.com/BVE-Reborn/rend3/compare/v0.0.6...v0.1.0)
 - [v0.0.6](https://github.com/BVE-Reborn/rend3/compare/v0.0.5...v0.0.6)
 - [v0.0.5](https://github.com/BVE-Reborn/rend3/compare/v0.0.4...v0.0.5)
