@@ -35,6 +35,7 @@ pub struct PbrRenderRoutine {
     pub tonemapping_pass: tonemapping::TonemappingPass,
 
     pub skybox_texture: Option<TextureHandle>,
+    pub ambient: Vec4,
 
     pub render_textures: RenderTextures,
 }
@@ -85,9 +86,14 @@ impl PbrRenderRoutine {
             tonemapping_pass,
 
             skybox_texture: None,
+            ambient: Vec4::new(0.0, 0.0, 0.0, 1.0),
 
             render_textures,
         }
+    }
+
+    pub fn set_ambient_color(&mut self, color: Vec4) {
+        self.ambient = color;
     }
 
     pub fn set_background_texture(&mut self, handle: Option<TextureHandle>) {
@@ -237,7 +243,7 @@ impl RenderRoutine for PbrRenderRoutine {
             device: &renderer.device,
             camera: &camera_manager,
             interfaces: &self.interfaces,
-            ambient: Vec4::new(0.0, 0.0, 0.0, 1.0),
+            ambient: self.ambient,
         });
 
         {
