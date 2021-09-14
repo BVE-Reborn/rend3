@@ -2,14 +2,16 @@
 
 #include "structures.glsl"
 
+// TODO: we don't need most of these
 layout(location = 0) in vec3 i_position;
 layout(location = 1) in vec3 i_normal;
 layout(location = 2) in vec3 i_tangent;
-layout(location = 3) in vec2 i_coords;
-layout(location = 4) in vec4 i_color;
-layout(location = 5) in uint i_material;
+layout(location = 3) in vec2 i_coords0;
+layout(location = 4) in vec2 i_coords1;
+layout(location = 5) in vec4 i_color;
+layout(location = 6) in uint i_material;
 #ifdef GPU_MODE
-layout(location = 6) in uint i_object_idx;
+layout(location = 7) in uint i_object_idx;
 #endif
 
 layout(location = 0) out vec4 o_position;
@@ -20,8 +22,22 @@ layout(location = 3) flat out uint o_material;
 layout(set = 1, binding = 0, std430) readonly buffer ObjectOutputDataBuffer {
     ObjectOutputData object_output[];
 };
+#ifdef GPU_MODE
+layout(set = 2, binding = 0, std430) readonly buffer MaterialBuffer {
+    GPUMaterialData materials[];
+};
+#endif
+#ifdef CPU_MODE
+layout(set = 2, binding = 10) uniform TextureData {
+    CPUMaterialData material;
+};
+#endif
 
 void main() {
+    #ifdef GPU_MODE
+    GPUMaterialData material = materials[i_material];
+    #endif
+
     #ifdef CPU_MODE
     uint object_idx = gl_InstanceIndex;
     #else
@@ -38,5 +54,5 @@ void main() {
 
     o_color = i_color;
 
-    o_coords = i_coords;
+    o_coords = vec2(material.uv_transform0 * vec3(i_coords0, 1.0));
 }

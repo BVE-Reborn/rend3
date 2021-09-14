@@ -29,7 +29,7 @@ fn load_gltf(
     let mesh = rend3::types::MeshBuilder::new(vertex_positions.to_vec())
         .with_vertex_normals(vertex_normals)
         .with_vertex_tangents(vertex_tangents)
-        .with_vertex_uvs(vertex_uvs)
+        .with_vertex_uv0(vertex_uvs)
         .with_indices(indices)
         .with_right_handed()
         .build();

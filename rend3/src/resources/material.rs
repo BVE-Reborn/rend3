@@ -20,9 +20,12 @@ use wgpu::{
 #[repr(C, align(16))]
 #[derive(Debug, Copy, Clone)]
 struct CPUShaderMaterial {
-    uv_transform_row0: Vec4,
-    uv_transform_row1: Vec4,
-    uv_transform_row2: Vec4,
+    uv_transform0_row0: Vec4,
+    uv_transform0_row1: Vec4,
+    uv_transform0_row2: Vec4,
+    uv_transform1_row0: Vec4,
+    uv_transform1_row1: Vec4,
+    uv_transform1_row2: Vec4,
     albedo: Vec4,
     emissive: Vec3,
     roughness: f32,
@@ -44,9 +47,12 @@ unsafe impl bytemuck::Pod for CPUShaderMaterial {}
 impl CPUShaderMaterial {
     fn from_material(material: &Material) -> Self {
         Self {
-            uv_transform_row0: material.transform.x_axis.extend(0.0),
-            uv_transform_row1: material.transform.y_axis.extend(0.0),
-            uv_transform_row2: material.transform.z_axis.extend(0.0),
+            uv_transform0_row0: material.uv_transform0.x_axis.extend(0.0),
+            uv_transform0_row1: material.uv_transform0.y_axis.extend(0.0),
+            uv_transform0_row2: material.uv_transform0.z_axis.extend(0.0),
+            uv_transform1_row0: material.uv_transform1.x_axis.extend(0.0),
+            uv_transform1_row1: material.uv_transform1.y_axis.extend(0.0),
+            uv_transform1_row2: material.uv_transform1.z_axis.extend(0.0),
             albedo: material.albedo.to_value(),
             roughness: material.roughness_factor.unwrap_or(0.0),
             metallic: material.metallic_factor.unwrap_or(0.0),
@@ -107,9 +113,13 @@ struct GPUShaderMaterial {
     ambient_occlusion: f32,
     alpha_cutout: f32,
 
-    uv_transform_row0: Vec4,
-    uv_transform_row1: Vec4,
-    uv_transform_row2: Vec4,
+    uv_transform0_row0: Vec4,
+    uv_transform0_row1: Vec4,
+    uv_transform0_row2: Vec4,
+
+    uv_transform1_row0: Vec4,
+    uv_transform1_row1: Vec4,
+    uv_transform1_row2: Vec4,
 
     albedo_tex: Option<NonZeroU32>,
     normal_tex: Option<NonZeroU32>,
@@ -144,9 +154,13 @@ impl GPUShaderMaterial {
                 _ => 0.0,
             },
 
-            uv_transform_row0: material.transform.x_axis.extend(0.0),
-            uv_transform_row1: material.transform.y_axis.extend(0.0),
-            uv_transform_row2: material.transform.z_axis.extend(0.0),
+            uv_transform0_row0: material.uv_transform0.x_axis.extend(0.0),
+            uv_transform0_row1: material.uv_transform0.y_axis.extend(0.0),
+            uv_transform0_row2: material.uv_transform0.z_axis.extend(0.0),
+
+            uv_transform1_row0: material.uv_transform1.x_axis.extend(0.0),
+            uv_transform1_row1: material.uv_transform1.y_axis.extend(0.0),
+            uv_transform1_row2: material.uv_transform1.z_axis.extend(0.0),
 
             albedo_tex: material.albedo.to_texture(translate_texture),
             normal_tex: material.normal.to_texture(translate_texture),
@@ -224,7 +238,7 @@ impl MaterialManager {
                         texture_binding(9),
                         BindGroupLayoutEntry {
                             binding: 10,
-                            visibility: ShaderStages::FRAGMENT,
+                            visibility: ShaderStages::VERTEX_FRAGMENT,
                             ty: BindingType::Buffer {
                                 ty: BufferBindingType::Uniform,
                                 has_dynamic_offset: false,
@@ -240,7 +254,7 @@ impl MaterialManager {
                     label: Some("gpu material bgl"),
                     entries: &[BindGroupLayoutEntry {
                         binding: 0,
-                        visibility: ShaderStages::FRAGMENT,
+                        visibility: ShaderStages::VERTEX_FRAGMENT,
                         ty: BindingType::Buffer {
                             ty: BufferBindingType::Storage { read_only: true },
                             has_dynamic_offset: false,

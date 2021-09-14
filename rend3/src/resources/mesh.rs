@@ -42,7 +42,8 @@ pub struct MeshBuffers {
     pub vertex_position: Buffer,
     pub vertex_normal: Buffer,
     pub vertex_tangent: Buffer,
-    pub vertex_uv: Buffer,
+    pub vertex_uv0: Buffer,
+    pub vertex_uv1: Buffer,
     pub vertex_color: Buffer,
     pub vertex_mat_index: Buffer,
 
@@ -54,9 +55,10 @@ impl MeshBuffers {
         rpass.set_vertex_buffer(0, self.vertex_position.slice(..));
         rpass.set_vertex_buffer(1, self.vertex_normal.slice(..));
         rpass.set_vertex_buffer(2, self.vertex_tangent.slice(..));
-        rpass.set_vertex_buffer(3, self.vertex_uv.slice(..));
-        rpass.set_vertex_buffer(4, self.vertex_color.slice(..));
-        rpass.set_vertex_buffer(5, self.vertex_mat_index.slice(..));
+        rpass.set_vertex_buffer(3, self.vertex_uv0.slice(..));
+        rpass.set_vertex_buffer(4, self.vertex_uv1.slice(..));
+        rpass.set_vertex_buffer(5, self.vertex_color.slice(..));
+        rpass.set_vertex_buffer(6, self.vertex_mat_index.slice(..));
         rpass.set_index_buffer(self.index.slice(..), IndexFormat::Uint32);
     }
 }
@@ -148,9 +150,14 @@ impl MeshManager {
             bytemuck::cast_slice(&mesh.vertex_normals),
         );
         queue.write_buffer(
-            &self.buffers.vertex_uv,
+            &self.buffers.vertex_uv0,
             (vertex_range.start * VERTEX_UV_SIZE) as BufferAddress,
-            bytemuck::cast_slice(&mesh.vertex_uvs),
+            bytemuck::cast_slice(&mesh.vertex_uv0),
+        );
+        queue.write_buffer(
+            &self.buffers.vertex_uv1,
+            (vertex_range.start * VERTEX_UV_SIZE) as BufferAddress,
+            bytemuck::cast_slice(&mesh.vertex_uv1),
         );
         queue.write_buffer(
             &self.buffers.vertex_color,
@@ -254,8 +261,16 @@ impl MeshManager {
             );
             copy_vert(
                 encoder,
-                &self.buffers.vertex_uv,
-                &new_buffers.vertex_uv,
+                &self.buffers.vertex_uv0,
+                &new_buffers.vertex_uv0,
+                mesh,
+                &new_vert_range,
+                VERTEX_UV_SIZE,
+            );
+            copy_vert(
+                encoder,
+                &self.buffers.vertex_uv1,
+                &new_buffers.vertex_uv1,
                 mesh,
                 &new_vert_range,
                 VERTEX_UV_SIZE,
@@ -351,8 +366,15 @@ fn create_buffers(device: &Device, vertex_count: usize, index_count: usize) -> M
         mapped_at_creation: false,
     });
 
-    let vertex_uv = device.create_buffer(&BufferDescriptor {
-        label: Some("uv vertex buffer"),
+    let vertex_uv0 = device.create_buffer(&BufferDescriptor {
+        label: Some("uv0 vertex buffer"),
+        size: uv_bytes as BufferAddress,
+        usage: BufferUsages::COPY_SRC | BufferUsages::COPY_DST | BufferUsages::VERTEX | BufferUsages::STORAGE,
+        mapped_at_creation: false,
+    });
+
+    let vertex_uv1 = device.create_buffer(&BufferDescriptor {
+        label: Some("uv1 vertex buffer"),
         size: uv_bytes as BufferAddress,
         usage: BufferUsages::COPY_SRC | BufferUsages::COPY_DST | BufferUsages::VERTEX | BufferUsages::STORAGE,
         mapped_at_creation: false,
@@ -383,7 +405,8 @@ fn create_buffers(device: &Device, vertex_count: usize, index_count: usize) -> M
         vertex_position,
         vertex_normal,
         vertex_tangent,
-        vertex_uv,
+        vertex_uv0,
+        vertex_uv1,
         vertex_color,
         vertex_mat_index,
         index,

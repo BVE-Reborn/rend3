@@ -1,6 +1,6 @@
 use wgpu::{VertexAttribute, VertexBufferLayout, VertexFormat, VertexStepMode};
 
-pub const fn cpu_vertex_buffers() -> [VertexBufferLayout<'static>; 6] {
+pub const fn cpu_vertex_buffers() -> [VertexBufferLayout<'static>; 7] {
     [
         VertexBufferLayout {
             array_stride: rend3::resources::VERTEX_POSITION_SIZE as u64,
@@ -39,12 +39,21 @@ pub const fn cpu_vertex_buffers() -> [VertexBufferLayout<'static>; 6] {
             }],
         },
         VertexBufferLayout {
+            array_stride: rend3::resources::VERTEX_UV_SIZE as u64,
+            step_mode: VertexStepMode::Vertex,
+            attributes: &[VertexAttribute {
+                format: VertexFormat::Float32x2,
+                offset: 0,
+                shader_location: 4,
+            }],
+        },
+        VertexBufferLayout {
             array_stride: rend3::resources::VERTEX_COLOR_SIZE as u64,
             step_mode: VertexStepMode::Vertex,
             attributes: &[VertexAttribute {
                 format: VertexFormat::Unorm8x4,
                 offset: 0,
-                shader_location: 4,
+                shader_location: 5,
             }],
         },
         VertexBufferLayout {
@@ -53,13 +62,13 @@ pub const fn cpu_vertex_buffers() -> [VertexBufferLayout<'static>; 6] {
             attributes: &[VertexAttribute {
                 format: VertexFormat::Uint32,
                 offset: 0,
-                shader_location: 5,
+                shader_location: 6,
             }],
         },
     ]
 }
 
-pub const fn gpu_vertex_buffers() -> [VertexBufferLayout<'static>; 7] {
+pub const fn gpu_vertex_buffers() -> [VertexBufferLayout<'static>; 8] {
     [
         VertexBufferLayout {
             array_stride: rend3::resources::VERTEX_POSITION_SIZE as u64,
@@ -98,12 +107,21 @@ pub const fn gpu_vertex_buffers() -> [VertexBufferLayout<'static>; 7] {
             }],
         },
         VertexBufferLayout {
+            array_stride: rend3::resources::VERTEX_UV_SIZE as u64,
+            step_mode: VertexStepMode::Vertex,
+            attributes: &[VertexAttribute {
+                format: VertexFormat::Float32x2,
+                offset: 0,
+                shader_location: 4,
+            }],
+        },
+        VertexBufferLayout {
             array_stride: rend3::resources::VERTEX_COLOR_SIZE as u64,
             step_mode: VertexStepMode::Vertex,
             attributes: &[VertexAttribute {
                 format: VertexFormat::Unorm8x4,
                 offset: 0,
-                shader_location: 4,
+                shader_location: 5,
             }],
         },
         VertexBufferLayout {
@@ -112,7 +130,7 @@ pub const fn gpu_vertex_buffers() -> [VertexBufferLayout<'static>; 7] {
             attributes: &[VertexAttribute {
                 format: VertexFormat::Uint32,
                 offset: 0,
-                shader_location: 5,
+                shader_location: 6,
             }],
         },
         VertexBufferLayout {
@@ -121,7 +139,7 @@ pub const fn gpu_vertex_buffers() -> [VertexBufferLayout<'static>; 7] {
             attributes: &[VertexAttribute {
                 format: VertexFormat::Uint32,
                 offset: 16,
-                shader_location: 6,
+                shader_location: 7,
             }],
         },
     ]
