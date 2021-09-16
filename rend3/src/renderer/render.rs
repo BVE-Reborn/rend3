@@ -15,7 +15,7 @@ use wgpu::{
 pub fn render_loop(
     renderer: Arc<Renderer>,
     routine: &mut dyn RenderRoutine,
-    frame: OutputFrame,
+    frame: &OutputFrame,
 ) -> Option<RendererStatistics> {
     profiling::scope!("render_loop");
 
