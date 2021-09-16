@@ -257,7 +257,7 @@ pub fn render_loop(
     let mut encoders = Vec::with_capacity(16);
     encoders.push(encoder.finish());
 
-    routine.render(Arc::clone(&renderer), &mut encoders, &frame);
+    routine.render(Arc::clone(&renderer), &mut encoders, frame);
 
     let mut encoder = renderer.device.create_command_encoder(&CommandEncoderDescriptor {
         label: Some("resolve encoder"),

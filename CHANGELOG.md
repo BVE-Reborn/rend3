@@ -18,6 +18,8 @@ and this project adheres to cargo's version of [Semantic Versioning](https://sem
 
 ## Unreleased
 
+- rend3 borrow `OutputFrame` instead of taking ownership @MindSwipe
+
 ## v0.1.1
 
 Released 2021-09-13
