@@ -361,7 +361,7 @@ impl RenderRoutine for PbrRenderRoutine {
             interfaces: &self.interfaces,
             samplers: &self.samplers,
             source: self.render_textures.blit_source_view(),
-            target: frame.as_view(),
+            target: frame.as_view().expect("rend3-pbr doesn't support custom output"),
         });
 
         encoders.push(encoder.finish())
@@ -427,6 +427,7 @@ impl PrimaryPasses {
             materials: args.materials,
             samples: args.samples,
             transparency: TransparencyType::Opaque,
+            baking: common::forward_pass::Baking::Disabled,
         };
         let opaque_pipeline = Arc::new(common::forward_pass::build_forward_pass_shader(
             forward_pass_args.clone(),
@@ -450,17 +451,17 @@ impl PrimaryPasses {
             ),
             skybox_pass: skybox::SkyboxPass::new(skybox_pipeline),
             transparent_pass: forward::ForwardPass::new(
-                Arc::clone(&depth_pipelines.opaque),
+                Some(Arc::clone(&depth_pipelines.opaque)),
                 transparent_pipeline,
                 TransparencyType::Blend,
             ),
             cutout_pass: forward::ForwardPass::new(
-                Arc::clone(&depth_pipelines.cutout),
+                Some(Arc::clone(&depth_pipelines.cutout)),
                 cutout_pipeline,
                 TransparencyType::Cutout,
             ),
             opaque_pass: forward::ForwardPass::new(
-                Arc::clone(&depth_pipelines.opaque),
+                Some(Arc::clone(&depth_pipelines.opaque)),
                 opaque_pipeline,
                 TransparencyType::Opaque,
             ),

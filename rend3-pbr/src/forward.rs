@@ -65,14 +65,14 @@ pub struct ForwardPassDrawArgs<'rpass, 'b> {
 }
 
 pub struct ForwardPass {
-    depth_pipeline: Arc<RenderPipeline>,
+    depth_pipeline: Option<Arc<RenderPipeline>>,
     forward_pipeline: Arc<RenderPipeline>,
     transparency: TransparencyType,
 }
 
 impl ForwardPass {
     pub fn new(
-        depth_pipeline: Arc<RenderPipeline>,
+        depth_pipeline: Option<Arc<RenderPipeline>>,
         forward_pipeline: Arc<RenderPipeline>,
         transparency: TransparencyType,
     ) -> Self {
@@ -128,7 +128,11 @@ impl ForwardPass {
 
         args.meshes.bind(args.rpass);
 
-        args.rpass.set_pipeline(&self.depth_pipeline);
+        args.rpass.set_pipeline(
+            self.depth_pipeline
+                .as_ref()
+                .expect("prepass called on a forward pass with no depth pipeline"),
+        );
         args.rpass.set_bind_group(0, &args.samplers.linear_nearest_bg, &[]);
         args.rpass.set_bind_group(1, &args.culled_objects.output_bg, &[]);
 

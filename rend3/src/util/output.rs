@@ -3,15 +3,16 @@ use wgpu::{SurfaceError, SurfaceFrame, TextureView, TextureViewDescriptor};
 
 use crate::types::Surface;
 
-pub enum OutputFrame {
+pub enum OutputFrame<T = ()> {
     Surface {
         view: TextureView,
         surface: Arc<SurfaceFrame>,
     },
     View(Arc<TextureView>),
+    Custom(T),
 }
 
-impl OutputFrame {
+impl<T> OutputFrame<T> {
     pub fn from_surface(surface: &Surface) -> Result<Self, SurfaceError> {
         let mut retrieved_frame = None;
         for _ in 0..10 {
@@ -35,10 +36,18 @@ impl OutputFrame {
         })
     }
 
-    pub fn as_view(&self) -> &TextureView {
-        match self {
+    pub fn as_view(&self) -> Option<&TextureView> {
+        Some(match self {
             Self::Surface { view, .. } => view,
             Self::View(inner) => &**inner,
-        }
+            Self::Custom(..) => return None,
+        })
+    }
+
+    pub fn as_custom(&self) -> Option<&T> {
+        Some(match self {
+            Self::Custom(v) => v,
+            Self::View(..) | Self::Surface { .. } => return None,
+        })
     }
 }
