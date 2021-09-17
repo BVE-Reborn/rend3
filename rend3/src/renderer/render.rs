@@ -276,7 +276,7 @@ pub fn render_loop<Input, Output>(
     let (sender, reciever) = flume::unbounded();
     cmd_bufs.push(encoder.finish());
 
-    routine.render(Arc::clone(&renderer), sender.clone(), ready, input, output);
+    routine.render(Arc::clone(&renderer), sender, ready, input, output);
 
     let mut encoder = renderer.device.create_command_encoder(&CommandEncoderDescriptor {
         label: Some("resolve encoder"),

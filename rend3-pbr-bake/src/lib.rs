@@ -10,7 +10,6 @@ pub struct PbrBakerOutput<'a> {
 
 pub struct BakeData {
     pub object: rend3::types::ObjectHandle,
-    pub transform: glam::Mat3A,
 }
 
 pub struct PbrBakerRenderRoutine {
@@ -21,8 +20,6 @@ pub struct PbrBakerRenderRoutine {
     pub forward_opaque_pass: rend3_pbr::forward::ForwardPass,
     pub forward_cutout_pass: rend3_pbr::forward::ForwardPass,
     pub samplers: rend3_pbr::common::samplers::Samplers,
-
-    pub bake_data: Vec<BakeData>,
 }
 
 impl PbrBakerRenderRoutine {
@@ -92,24 +89,23 @@ impl PbrBakerRenderRoutine {
             gpu_culler,
             shadow_passes,
             samplers,
-            bake_data: Vec::new(),
         }
     }
 }
 
-impl rend3::RenderRoutine<BakeData, PbrBakerOutput<'_>> for PbrBakerRenderRoutine {
+impl rend3::RenderRoutine<Vec<BakeData>, PbrBakerOutput<'_>> for PbrBakerRenderRoutine {
     fn render(
         &mut self,
         renderer: Arc<Renderer>,
         encoders: flume::Sender<wgpu::CommandBuffer>,
         ready: ManagerReadyOutput,
-        input: BakeData,
+        input: Vec<BakeData>,
         output: PbrBakerOutput,
     ) {
         profiling::scope!("PBR Render Routine");
 
         let mut encoder = renderer.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("primary encoder"),
+            label: Some("cull encoder"),
         });
 
         let mut profiler = renderer.profiler.lock();
@@ -149,28 +145,6 @@ impl rend3::RenderRoutine<BakeData, PbrBakerOutput<'_>> for PbrBakerRenderRoutin
                 culled_lights: &culled_lights,
             });
 
-        let cutout_culled_objects = self.forward_opaque_pass.cull(rend3_pbr::forward::ForwardPassCullArgs {
-            device: &renderer.device,
-            profiler: &mut profiler,
-            encoder: &mut encoder,
-            culler,
-            materials: &materials,
-            interfaces: &self.interfaces,
-            camera: &camera_manager,
-            objects: &ready.objects,
-        });
-
-        let opaque_culled_objects = self.forward_cutout_pass.cull(rend3_pbr::forward::ForwardPassCullArgs {
-            device: &renderer.device,
-            profiler: &mut profiler,
-            encoder: &mut encoder,
-            culler,
-            materials: &materials,
-            interfaces: &self.interfaces,
-            camera: &camera_manager,
-            objects: &ready.objects,
-        });
-
         let primary_camera_uniform_bg =
             rend3_pbr::uniforms::create_shader_uniform(rend3_pbr::uniforms::CreateShaderUniformArgs {
                 device: &renderer.device,
@@ -178,23 +152,56 @@ impl rend3::RenderRoutine<BakeData, PbrBakerOutput<'_>> for PbrBakerRenderRoutin
                 interfaces: &self.interfaces,
                 ambient: Vec4::new(0.0, 0.0, 0.0, 1.0),
             });
+        let object_manager = renderer.object_manager.read();
 
-        {
+        let culled_objects: Vec<_> = input
+            .into_iter()
+            .map(|object| {
+                let the_object = object_manager.get_internal(object.object.get_raw());
+
+                let cutout_culled_objects = self.forward_opaque_pass.cull(rend3_pbr::forward::ForwardPassCullArgs {
+                    device: &renderer.device,
+                    profiler: &mut profiler,
+                    encoder: &mut encoder,
+                    culler,
+                    materials: &materials,
+                    interfaces: &self.interfaces,
+                    camera: &camera_manager,
+                    objects: std::slice::from_ref(the_object),
+                });
+
+                let opaque_culled_objects = self.forward_cutout_pass.cull(rend3_pbr::forward::ForwardPassCullArgs {
+                    device: &renderer.device,
+                    profiler: &mut profiler,
+                    encoder: &mut encoder,
+                    culler,
+                    materials: &materials,
+                    interfaces: &self.interfaces,
+                    camera: &camera_manager,
+                    objects: std::slice::from_ref(the_object),
+                });
+
+                (cutout_culled_objects, opaque_culled_objects)
+            })
+            .collect();
+
+        profiler.begin_scope("primary renderpass", &mut encoder, &renderer.device);
+
+        let mut rpass = encoder.begin_render_pass(&RenderPassDescriptor {
+            label: None,
+            color_attachments: &[RenderPassColorAttachment {
+                view: output.view,
+                resolve_target: None,
+                ops: Operations {
+                    load: LoadOp::Clear(Color::BLACK),
+                    store: true,
+                },
+            }],
+            depth_stencil_attachment: None,
+        });
+
+        for (cutout_culled_objects, opaque_culled_objects) in &culled_objects {
             profiling::scope!("primary renderpass");
-            profiler.begin_scope("primary renderpass", &mut encoder, &renderer.device);
-
-            let mut rpass = encoder.begin_render_pass(&RenderPassDescriptor {
-                label: None,
-                color_attachments: &[RenderPassColorAttachment {
-                    view: output.view,
-                    resolve_target: None,
-                    ops: Operations {
-                        load: LoadOp::Clear(Color::BLACK),
-                        store: true,
-                    },
-                }],
-                depth_stencil_attachment: None,
-            });
 
             profiler.begin_scope("forward", &mut rpass, &renderer.device);
 
@@ -208,7 +215,7 @@ impl rend3::RenderRoutine<BakeData, PbrBakerOutput<'_>> for PbrBakerRenderRoutin
                 directional_light_bg: directional_light.get_bg(),
                 texture_bg: d2_texture_output_bg_ref,
                 shader_uniform_bg: &primary_camera_uniform_bg,
-                culled_objects: &opaque_culled_objects,
+                culled_objects: opaque_culled_objects,
             });
 
             self.forward_cutout_pass.draw(rend3_pbr::forward::ForwardPassDrawArgs {
@@ -221,14 +228,14 @@ impl rend3::RenderRoutine<BakeData, PbrBakerOutput<'_>> for PbrBakerRenderRoutin
                 directional_light_bg: directional_light.get_bg(),
                 texture_bg: d2_texture_output_bg_ref,
                 shader_uniform_bg: &primary_camera_uniform_bg,
-                culled_objects: &cutout_culled_objects,
+                culled_objects: cutout_culled_objects,
             });
-
-            profiler.end_scope(&mut rpass);
-
-            drop(rpass);
-            profiler.end_scope(&mut encoder);
         }
+
+        profiler.end_scope(&mut rpass);
+
+        drop(rpass);
+        profiler.end_scope(&mut encoder);
 
         encoders.send(encoder.finish()).unwrap();
     }
