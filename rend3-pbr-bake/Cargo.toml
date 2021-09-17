@@ -6,8 +6,9 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+flume = "0.10"
 glam = "0.18"
+profiling = {version = "1", default-features = false }
 rend3 = { version = "^0.1.0", path = "../rend3" }
 rend3-pbr = { version = "^0.1.0", path = "../rend3-pbr" }
-profiling = {version = "1", default-features = false }
 wgpu = { version = "0.10", features = ["trace", "spirv"] }

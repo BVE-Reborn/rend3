@@ -1,9 +1,6 @@
 use crate::{
-    format_sso,
-    instruction::Instruction,
-    resources::InternalTexture,
-    util::{output::OutputFrame, typedefs::RendererStatistics},
-    RenderRoutine, Renderer,
+    format_sso, instruction::Instruction, resources::InternalTexture, util::typedefs::RendererStatistics,
+    ManagerReadyOutput, RenderRoutine, Renderer,
 };
 use rend3_types::{MipmapCount, MipmapSource};
 use std::{num::NonZeroU32, sync::Arc};
@@ -12,10 +9,11 @@ use wgpu::{
     TextureDescriptor, TextureDimension, TextureUsages, TextureViewDescriptor, TextureViewDimension,
 };
 
-pub fn render_loop(
+pub fn render_loop<Input, Output>(
     renderer: Arc<Renderer>,
-    routine: &mut dyn RenderRoutine,
-    frame: &OutputFrame,
+    routine: &mut dyn RenderRoutine<Input, Output>,
+    input: Input,
+    output: Output,
 ) -> Option<RendererStatistics> {
     profiling::scope!("render_loop");
 
@@ -33,7 +31,7 @@ pub fn render_loop(
     let mut material_manager = renderer.material_manager.write();
     let mut object_manager = renderer.object_manager.write();
     let mut directional_light_manager = renderer.directional_light_manager.write();
-    let mut camera_resource = renderer.camera_manager.write();
+    let mut camera_manager = renderer.camera_manager.write();
     let mut profiler = renderer.profiler.lock();
     let mut mipmap_generator = renderer.mipmap_generator.lock();
     {
@@ -233,16 +231,36 @@ pub fn render_loop(
                 Instruction::ChangeDirectionalLight { handle, change } => {
                     directional_light_manager.update_directional_light(handle, change);
                 }
-                Instruction::SetAspectRatio { ratio } => camera_resource.set_aspect_ratio(Some(ratio)),
+                Instruction::SetAspectRatio { ratio } => camera_manager.set_aspect_ratio(Some(ratio)),
                 Instruction::SetCameraData { data } => {
-                    camera_resource.set_data(data);
+                    camera_manager.set_data(data);
                 }
             }
         }
     }
 
+    // Do these in dependency order
+    // Level 2
+    let objects = object_manager.ready();
+
+    // Level 1
+    material_manager.ready(&renderer.device, &renderer.queue, &texture_manager_2d);
+
+    // Level 0
+    let d2_texture = texture_manager_2d.ready(&renderer.device);
+    let d2c_texture = texture_manager_cube.ready(&renderer.device);
+    let directional_light_cameras = directional_light_manager.ready(&renderer.device, &renderer.queue, &camera_manager);
+    mesh_manager.ready();
+
+    let ready = ManagerReadyOutput {
+        objects,
+        d2_texture,
+        d2c_texture,
+        directional_light_cameras,
+    };
+
     drop((
-        camera_resource,
+        camera_manager,
         mesh_manager,
         texture_manager_2d,
         texture_manager_cube,
@@ -254,18 +272,23 @@ pub fn render_loop(
     ));
 
     // 16 encoders is a reasonable default
-    let mut encoders = Vec::with_capacity(16);
-    encoders.push(encoder.finish());
+    let mut cmd_bufs = Vec::with_capacity(16);
+    let (sender, reciever) = flume::unbounded();
+    cmd_bufs.push(encoder.finish());
 
-    routine.render(Arc::clone(&renderer), &mut encoders, frame);
+    routine.render(Arc::clone(&renderer), sender.clone(), ready, input, output);
 
     let mut encoder = renderer.device.create_command_encoder(&CommandEncoderDescriptor {
         label: Some("resolve encoder"),
     });
     renderer.profiler.lock().resolve_queries(&mut encoder);
-    encoders.push(encoder.finish());
+    cmd_bufs.push(encoder.finish());
 
-    renderer.queue.submit(encoders);
+    // Recieve buffers from the renderlist
+    while let Ok(cmd_buf) = reciever.try_recv() {
+        cmd_bufs.push(cmd_buf)
+    }
+    renderer.queue.submit(cmd_bufs);
 
     let mut profiler = renderer.profiler.lock();
     profiler.end_frame().unwrap();

@@ -13,12 +13,13 @@ categories = ["game-development", "graphics", "rendering", "rendering::engine"]
 [dependencies]
 arrayvec = "0.7"
 bytemuck = "1"
+flume = "0.10"
 glam = { version = "0.18", features = ["bytemuck"] }
 include_dir = "0.6"
 log = "0.4"
+ordered-float = "2"
 parking_lot = { version = "0.11" }
 profiling = {version = "1", default-features = false }
-ordered-float = "2"
 rend3 = { version = "^0.1.0", path = "../rend3" }
 wgpu = { version = "0.10", features = ["trace", "spirv"] }
 wgpu-profiler = "0.6.1"

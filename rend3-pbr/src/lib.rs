@@ -4,12 +4,11 @@ use glam::Vec4;
 use rend3::{
     resources::{DirectionalLightManager, MaterialManager, TextureManager},
     types::{TextureFormat, TextureHandle, TransparencyType},
-    util::output::OutputFrame,
-    ModeData, RenderRoutine, Renderer, RendererMode,
+    ManagerReadyOutput, ModeData, RenderRoutine, Renderer, RendererMode,
 };
 use wgpu::{
     Color, CommandBuffer, Device, LoadOp, Operations, RenderPassColorAttachment, RenderPassDepthStencilAttachment,
-    RenderPassDescriptor,
+    RenderPassDescriptor, TextureView,
 };
 
 pub use utils::*;
@@ -120,8 +119,15 @@ impl PbrRenderRoutine {
     }
 }
 
-impl RenderRoutine for PbrRenderRoutine {
-    fn render(&mut self, renderer: Arc<Renderer>, encoders: &mut Vec<CommandBuffer>, frame: &OutputFrame) {
+impl RenderRoutine<(), &TextureView> for PbrRenderRoutine {
+    fn render(
+        &mut self,
+        renderer: Arc<Renderer>,
+        cmd_bufs: flume::Sender<CommandBuffer>,
+        ready: ManagerReadyOutput,
+        _input: (),
+        output: &TextureView,
+    ) {
         profiling::scope!("PBR Render Routine");
 
         let mut encoder = renderer.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -130,28 +136,14 @@ impl RenderRoutine for PbrRenderRoutine {
 
         let mut profiler = renderer.profiler.lock();
 
-        let mut mesh_manager = renderer.mesh_manager.write();
-        let mut object_manager = renderer.object_manager.write();
-        let mut directional_light = renderer.directional_light_manager.write();
-        let mut materials = renderer.material_manager.write();
-        let mut d2_textures = renderer.d2_texture_manager.write();
-        let mut d2c_textures = renderer.d2c_texture_manager.write();
+        let mesh_manager = renderer.mesh_manager.read();
+        let directional_light = renderer.directional_light_manager.read();
+        let materials = renderer.material_manager.read();
+        let d2_textures = renderer.d2_texture_manager.read();
+        let d2c_textures = renderer.d2c_texture_manager.read();
         let camera_manager = renderer.camera_manager.read();
 
-        // Do these in dependency order
-        // Level 2
-        let objects = object_manager.ready();
-
-        // Level 1
-        materials.ready(&renderer.device, &renderer.queue, &d2_textures);
-
-        // Level 0
-        let d2_texture_output = d2_textures.ready(&renderer.device);
-        let _d2c_texture_output = d2c_textures.ready(&renderer.device);
-        let directional_light_cameras = directional_light.ready(&renderer.device, &renderer.queue, &camera_manager);
-        mesh_manager.ready();
-
-        if d2_texture_output.dirty.map(|_| false, |v| v).into_common() {
+        if ready.d2_texture.dirty.map(|_| false, |v| v).into_common() {
             self.primary_passes = PrimaryPasses::new(PrimaryPassesNewArgs {
                 mode: renderer.mode,
                 device: &renderer.device,
@@ -183,8 +175,8 @@ impl RenderRoutine for PbrRenderRoutine {
                     materials: &materials,
                     interfaces: &self.interfaces,
                     lights: &directional_light,
-                    directional_light_cameras: &directional_light_cameras,
-                    objects: &objects,
+                    directional_light_cameras: &ready.directional_light_cameras,
+                    objects: &ready.objects,
                 });
 
         profiler.begin_scope("forward culling", &mut encoder, &renderer.device);
@@ -197,7 +189,7 @@ impl RenderRoutine for PbrRenderRoutine {
             materials: &materials,
             interfaces: &self.interfaces,
             camera: &camera_manager,
-            objects: &objects,
+            objects: &ready.objects,
         });
 
         let cutout_culled_objects = self.primary_passes.cutout_pass.cull(forward::ForwardPassCullArgs {
@@ -208,7 +200,7 @@ impl RenderRoutine for PbrRenderRoutine {
             materials: &materials,
             interfaces: &self.interfaces,
             camera: &camera_manager,
-            objects: &objects,
+            objects: &ready.objects,
         });
 
         let opaque_culled_objects = self.primary_passes.opaque_pass.cull(forward::ForwardPassCullArgs {
@@ -219,12 +211,12 @@ impl RenderRoutine for PbrRenderRoutine {
             materials: &materials,
             interfaces: &self.interfaces,
             camera: &camera_manager,
-            objects: &objects,
+            objects: &ready.objects,
         });
 
         profiler.end_scope(&mut encoder);
 
-        let d2_texture_output_bg_ref = d2_texture_output.bg.as_ref().map(|_| (), |a| &**a);
+        let d2_texture_output_bg_ref = ready.d2_texture.bg.as_ref().map(|_| (), |a| &**a);
 
         self.primary_passes.shadow_passes.draw_culled_shadows(
             directional::DirectionalShadowPassDrawCulledShadowsArgs {
@@ -361,10 +353,10 @@ impl RenderRoutine for PbrRenderRoutine {
             interfaces: &self.interfaces,
             samplers: &self.samplers,
             source: self.render_textures.blit_source_view(),
-            target: frame.as_view().expect("rend3-pbr doesn't support custom output"),
+            target: output,
         });
 
-        encoders.push(encoder.finish())
+        cmd_bufs.send(encoder.finish()).unwrap();
     }
 }
 

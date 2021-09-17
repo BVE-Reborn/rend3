@@ -1,10 +1,12 @@
 use std::sync::Arc;
 
 use glam::Vec4;
-use rend3::Renderer;
-use wgpu::{Color, LoadOp, Operations, RenderPassColorAttachment, RenderPassDescriptor};
+use rend3::{ManagerReadyOutput, Renderer};
+use wgpu::{Color, LoadOp, Operations, RenderPassColorAttachment, RenderPassDescriptor, TextureView};
 
-pub struct PbrBakerOutput {}
+pub struct PbrBakerOutput<'a> {
+    pub view: &'a TextureView,
+}
 
 pub struct BakeData {
     pub object: rend3::types::ObjectHandle,
@@ -90,16 +92,19 @@ impl PbrBakerRenderRoutine {
             gpu_culler,
             shadow_passes,
             samplers,
+            bake_data: Vec::new(),
         }
     }
 }
 
-impl rend3::RenderRoutine<PbrBakerOutput> for PbrBakerRenderRoutine {
+impl rend3::RenderRoutine<BakeData, PbrBakerOutput<'_>> for PbrBakerRenderRoutine {
     fn render(
         &mut self,
         renderer: Arc<Renderer>,
-        encoders: &mut Vec<wgpu::CommandBuffer>,
-        frame: &rend3::util::output::OutputFrame<PbrBakerOutput>,
+        encoders: flume::Sender<wgpu::CommandBuffer>,
+        ready: ManagerReadyOutput,
+        input: BakeData,
+        output: PbrBakerOutput,
     ) {
         profiling::scope!("PBR Render Routine");
 
@@ -109,26 +114,10 @@ impl rend3::RenderRoutine<PbrBakerOutput> for PbrBakerRenderRoutine {
 
         let mut profiler = renderer.profiler.lock();
 
-        let mut mesh_manager = renderer.mesh_manager.write();
-        let mut object_manager = renderer.object_manager.write();
-        let mut directional_light = renderer.directional_light_manager.write();
-        let mut materials = renderer.material_manager.write();
-        let mut d2_textures = renderer.d2_texture_manager.write();
-        let mut d2c_textures = renderer.d2c_texture_manager.write();
+        let mesh_manager = renderer.mesh_manager.read();
+        let directional_light = renderer.directional_light_manager.read();
+        let materials = renderer.material_manager.read();
         let camera_manager = renderer.camera_manager.read();
-
-        // Do these in dependency order
-        // Level 2
-        let objects = object_manager.ready();
-
-        // Level 1
-        materials.ready(&renderer.device, &renderer.queue, &d2_textures);
-
-        // Level 0
-        let d2_texture_output = d2_textures.ready(&renderer.device);
-        let _d2c_texture_output = d2c_textures.ready(&renderer.device);
-        let directional_light_cameras = directional_light.ready(&renderer.device, &renderer.queue, &camera_manager);
-        mesh_manager.ready();
 
         let culler = self.gpu_culler.as_ref().map_cpu(|_| &self.cpu_culler);
 
@@ -142,11 +131,11 @@ impl rend3::RenderRoutine<PbrBakerOutput> for PbrBakerRenderRoutine {
                     materials: &materials,
                     interfaces: &self.interfaces,
                     lights: &directional_light,
-                    directional_light_cameras: &directional_light_cameras,
-                    objects: &objects,
+                    directional_light_cameras: &ready.directional_light_cameras,
+                    objects: &ready.objects,
                 });
 
-        let d2_texture_output_bg_ref = d2_texture_output.bg.as_ref().map(|_| (), |a| &**a);
+        let d2_texture_output_bg_ref = ready.d2_texture.bg.as_ref().map(|_| (), |a| &**a);
 
         self.shadow_passes
             .draw_culled_shadows(rend3_pbr::directional::DirectionalShadowPassDrawCulledShadowsArgs {
@@ -168,7 +157,7 @@ impl rend3::RenderRoutine<PbrBakerOutput> for PbrBakerRenderRoutine {
             materials: &materials,
             interfaces: &self.interfaces,
             camera: &camera_manager,
-            objects: &objects,
+            objects: &ready.objects,
         });
 
         let opaque_culled_objects = self.forward_cutout_pass.cull(rend3_pbr::forward::ForwardPassCullArgs {
@@ -179,7 +168,7 @@ impl rend3::RenderRoutine<PbrBakerOutput> for PbrBakerRenderRoutine {
             materials: &materials,
             interfaces: &self.interfaces,
             camera: &camera_manager,
-            objects: &objects,
+            objects: &ready.objects,
         });
 
         let primary_camera_uniform_bg =
@@ -197,7 +186,7 @@ impl rend3::RenderRoutine<PbrBakerOutput> for PbrBakerRenderRoutine {
             let mut rpass = encoder.begin_render_pass(&RenderPassDescriptor {
                 label: None,
                 color_attachments: &[RenderPassColorAttachment {
-                    view: &frame.as_view().unwrap(),
+                    view: output.view,
                     resolve_target: None,
                     ops: Operations {
                         load: LoadOp::Clear(Color::BLACK),
@@ -241,6 +230,6 @@ impl rend3::RenderRoutine<PbrBakerOutput> for PbrBakerRenderRoutine {
             profiler.end_scope(&mut encoder);
         }
 
-        encoders.push(encoder.finish());
+        encoders.send(encoder.finish()).unwrap();
     }
 }
