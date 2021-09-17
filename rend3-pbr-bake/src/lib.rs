@@ -1,8 +1,15 @@
 use std::sync::Arc;
 
+use glam::Vec4;
 use rend3::Renderer;
+use wgpu::{Color, LoadOp, Operations, RenderPassColorAttachment, RenderPassDescriptor};
 
 pub struct PbrBakerOutput {}
+
+pub struct BakeData {
+    pub object: rend3::types::ObjectHandle,
+    pub transform: glam::Mat3A,
+}
 
 pub struct PbrBakerRenderRoutine {
     pub interfaces: rend3_pbr::common::interfaces::ShaderInterfaces,
@@ -11,6 +18,9 @@ pub struct PbrBakerRenderRoutine {
     pub shadow_passes: rend3_pbr::directional::DirectionalShadowPass,
     pub forward_opaque_pass: rend3_pbr::forward::ForwardPass,
     pub forward_cutout_pass: rend3_pbr::forward::ForwardPass,
+    pub samplers: rend3_pbr::common::samplers::Samplers,
+
+    pub bake_data: Vec<BakeData>,
 }
 
 impl PbrBakerRenderRoutine {
@@ -64,6 +74,9 @@ impl PbrBakerRenderRoutine {
         let forward_cutout_pass =
             rend3_pbr::forward::ForwardPass::new(None, cutout_pipeline, rend3::types::TransparencyType::Cutout);
 
+        let samplers =
+            rend3_pbr::common::samplers::Samplers::new(&renderer.device, renderer.mode, &interfaces.samplers_bgl);
+
         let cpu_culler = rend3_pbr::culling::cpu::CpuCuller::new();
         let gpu_culler = renderer
             .mode
@@ -76,6 +89,7 @@ impl PbrBakerRenderRoutine {
             cpu_culler,
             gpu_culler,
             shadow_passes,
+            samplers,
         }
     }
 }
@@ -131,5 +145,102 @@ impl rend3::RenderRoutine<PbrBakerOutput> for PbrBakerRenderRoutine {
                     directional_light_cameras: &directional_light_cameras,
                     objects: &objects,
                 });
+
+        let d2_texture_output_bg_ref = d2_texture_output.bg.as_ref().map(|_| (), |a| &**a);
+
+        self.shadow_passes
+            .draw_culled_shadows(rend3_pbr::directional::DirectionalShadowPassDrawCulledShadowsArgs {
+                device: &renderer.device,
+                profiler: &mut profiler,
+                encoder: &mut encoder,
+                materials: &materials,
+                meshes: mesh_manager.buffers(),
+                samplers: &self.samplers,
+                texture_bg: d2_texture_output_bg_ref,
+                culled_lights: &culled_lights,
+            });
+
+        let cutout_culled_objects = self.forward_opaque_pass.cull(rend3_pbr::forward::ForwardPassCullArgs {
+            device: &renderer.device,
+            profiler: &mut profiler,
+            encoder: &mut encoder,
+            culler,
+            materials: &materials,
+            interfaces: &self.interfaces,
+            camera: &camera_manager,
+            objects: &objects,
+        });
+
+        let opaque_culled_objects = self.forward_cutout_pass.cull(rend3_pbr::forward::ForwardPassCullArgs {
+            device: &renderer.device,
+            profiler: &mut profiler,
+            encoder: &mut encoder,
+            culler,
+            materials: &materials,
+            interfaces: &self.interfaces,
+            camera: &camera_manager,
+            objects: &objects,
+        });
+
+        let primary_camera_uniform_bg =
+            rend3_pbr::uniforms::create_shader_uniform(rend3_pbr::uniforms::CreateShaderUniformArgs {
+                device: &renderer.device,
+                camera: &camera_manager,
+                interfaces: &self.interfaces,
+                ambient: Vec4::new(0.0, 0.0, 0.0, 1.0),
+            });
+
+        {
+            profiling::scope!("primary renderpass");
+            profiler.begin_scope("primary renderpass", &mut encoder, &renderer.device);
+
+            let mut rpass = encoder.begin_render_pass(&RenderPassDescriptor {
+                label: None,
+                color_attachments: &[RenderPassColorAttachment {
+                    view: &frame.as_view().unwrap(),
+                    resolve_target: None,
+                    ops: Operations {
+                        load: LoadOp::Clear(Color::BLACK),
+                        store: true,
+                    },
+                }],
+                depth_stencil_attachment: None,
+            });
+
+            profiler.begin_scope("forward", &mut rpass, &renderer.device);
+
+            self.forward_opaque_pass.draw(rend3_pbr::forward::ForwardPassDrawArgs {
+                device: &renderer.device,
+                profiler: &mut profiler,
+                rpass: &mut rpass,
+                materials: &materials,
+                meshes: mesh_manager.buffers(),
+                samplers: &self.samplers,
+                directional_light_bg: directional_light.get_bg(),
+                texture_bg: d2_texture_output_bg_ref,
+                shader_uniform_bg: &primary_camera_uniform_bg,
+                culled_objects: &opaque_culled_objects,
+            });
+
+            self.forward_cutout_pass.draw(rend3_pbr::forward::ForwardPassDrawArgs {
+                device: &renderer.device,
+                profiler: &mut profiler,
+                rpass: &mut rpass,
+                materials: &materials,
+                meshes: mesh_manager.buffers(),
+                samplers: &self.samplers,
+                directional_light_bg: directional_light.get_bg(),
+                texture_bg: d2_texture_output_bg_ref,
+                shader_uniform_bg: &primary_camera_uniform_bg,
+                culled_objects: &cutout_culled_objects,
+            });
+
+            profiler.end_scope(&mut rpass);
+
+            drop(rpass);
+            profiler.end_scope(&mut encoder);
+        }
+
+        encoders.push(encoder.finish());
     }
 }

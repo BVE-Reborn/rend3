@@ -435,7 +435,7 @@ where
             continue;
         }
 
-        data.extend(bytemuck::bytes_of(&GPUCullingInput {
+        data.extend_from_slice(bytemuck::bytes_of(&GPUCullingInput {
             start_idx: object.start_idx,
             count: object.count,
             vertex_offset: object.vertex_offset,
