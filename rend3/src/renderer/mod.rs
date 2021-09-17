@@ -212,7 +212,7 @@ impl Renderer {
     pub fn render(
         self: &Arc<Self>,
         routine: &mut dyn RenderRoutine,
-        output: OutputFrame,
+        output: &OutputFrame,
     ) -> Option<RendererStatistics> {
         render::render_loop(Arc::clone(self), routine, output)
     }
