@@ -277,17 +277,16 @@ pub fn render_loop<Input, Output>(
     cmd_bufs.push(encoder.finish());
 
     routine.render(Arc::clone(&renderer), sender, ready, input, output);
+    // Recieve buffers from the render routine
+    while let Ok(cmd_buf) = reciever.try_recv() {
+        cmd_bufs.push(cmd_buf)
+    }
 
     let mut encoder = renderer.device.create_command_encoder(&CommandEncoderDescriptor {
         label: Some("resolve encoder"),
     });
     renderer.profiler.lock().resolve_queries(&mut encoder);
     cmd_bufs.push(encoder.finish());
-
-    // Recieve buffers from the renderlist
-    while let Ok(cmd_buf) = reciever.try_recv() {
-        cmd_bufs.push(cmd_buf)
-    }
     renderer.queue.submit(cmd_bufs);
 
     let mut profiler = renderer.profiler.lock();
