@@ -18,7 +18,15 @@ and this project adheres to cargo's version of [Semantic Versioning](https://sem
 
 ## Unreleased
 
-- rend3 borrow `OutputFrame` instead of taking ownership @MindSwipe
+# Added
+- rend3-pbr-bake: Added crate for automatic light baking to a texture.
+
+# Changed
+
+- rend3: renderlists refactored to have a generic Input and Output.
+  - `Renderer::renderer` passes through the Input and Output.
+  - OutputFrame is now a user-side only utility.
+- rend3-pbr: Input is of type `()` and Output is type `&TextureView`.
 
 ## v0.1.1
 
