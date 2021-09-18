@@ -246,7 +246,11 @@ fn load_meshes<'a, E: std::error::Error + 'static>(
             }
 
             if let Some(uvs) = reader.read_tex_coords(0) {
-                builder = builder.with_vertex_uvs(uvs.into_f32().map(Vec2::from).collect())
+                builder = builder.with_vertex_uv0(uvs.into_f32().map(Vec2::from).collect())
+            }
+
+            if let Some(uvs) = reader.read_tex_coords(1) {
+                builder = builder.with_vertex_uv1(uvs.into_f32().map(Vec2::from).collect())
             }
 
             if let Some(colors) = reader.read_colors(0) {
@@ -289,7 +293,8 @@ fn load_default_material(renderer: &Renderer, loaded: &mut LoadedGltfScene) {
             emissive: types::MaterialComponent::None,
             reflectance: types::MaterialComponent::None,
             anisotropy: types::MaterialComponent::None,
-            transform: Mat3::IDENTITY,
+            uv_transform0: Mat3::IDENTITY,
+            uv_transform1: Mat3::IDENTITY,
             unlit: false,
             sample_type: types::SampleType::Linear,
         }),
@@ -402,7 +407,8 @@ where
                 },
                 None => types::MaterialComponent::Value(Vec3::from(emissive_factor)),
             },
-            transform: uv_transform,
+            uv_transform0: uv_transform,
+            uv_transform1: uv_transform,
             unlit: material.unlit(),
             sample_type: nearest,
             ..types::Material::default()

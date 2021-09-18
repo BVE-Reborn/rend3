@@ -12,6 +12,15 @@ use crate::{
     SampleCount,
 };
 
+/// Determines if vertices will be projected, or outputted in uv2 space.
+#[derive(Clone)]
+pub enum Baking {
+    /// output position is uv2 space.
+    Enabled,
+    /// output position is normal clip space.
+    Disabled,
+}
+
 #[derive(Clone)]
 pub struct BuildForwardPassShaderArgs<'a> {
     pub mode: RendererMode,
@@ -26,6 +35,8 @@ pub struct BuildForwardPassShaderArgs<'a> {
 
     pub samples: SampleCount,
     pub transparency: TransparencyType,
+
+    pub baking: Baking,
 }
 
 pub fn build_forward_pass_shader(args: BuildForwardPassShaderArgs<'_>) -> RenderPipeline {
@@ -34,8 +45,14 @@ pub fn build_forward_pass_shader(args: BuildForwardPassShaderArgs<'_>) -> Render
             args.device,
             args.mode,
             "forward pass vert",
-            "opaque.vert.cpu.spv",
-            "opaque.vert.gpu.spv",
+            match args.baking {
+                Baking::Disabled => "opaque.vert.cpu.spv",
+                Baking::Enabled => "opaque-baking.vert.cpu.spv",
+            },
+            match args.baking {
+                Baking::Disabled => "opaque.vert.gpu.spv",
+                Baking::Enabled => "opaque-baking.vert.gpu.spv",
+            },
             false,
         )
     };

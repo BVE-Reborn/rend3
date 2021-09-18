@@ -1,4 +1,4 @@
-# Rend3 Examples
+# rend3 Examples
 
 The examples are separate crates, so to run an example run `cargo run --bin <name>`.
 

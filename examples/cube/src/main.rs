@@ -182,7 +182,7 @@ fn main() {
             // Get a frame
             let frame = rend3::util::output::OutputFrame::from_surface(&surface).unwrap();
             // Dispatch a render!
-            let _stats = renderer.render(&mut routine, &frame);
+            let _stats = renderer.render(&mut routine, (), frame.as_view());
         }
         // Other events we don't care about
         _ => {}

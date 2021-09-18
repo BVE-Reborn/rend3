@@ -44,7 +44,7 @@ void main() {
 
     bool has_albedo = HAS_ALBEDO_TEXTURE;
 
-    vec2 coords = vec2(material.uv_transform * vec3(i_coords, 1.0));
+    vec2 coords = i_coords;
     vec2 uvdx = dFdx(coords);
     vec2 uvdy = dFdy(coords);
 

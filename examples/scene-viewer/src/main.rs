@@ -341,7 +341,7 @@ fn main() {
             // Get a frame
             let frame = rend3::util::output::OutputFrame::from_surface(&surface).unwrap();
             // Dispatch a render!
-            previous_profiling_stats = renderer.render(&mut routine, &frame);
+            previous_profiling_stats = renderer.render(&mut routine, (), frame.as_view());
             // mark the end of the frame for tracy/other profilers
             profiling::finish_frame!();
         }

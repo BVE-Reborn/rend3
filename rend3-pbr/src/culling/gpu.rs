@@ -435,7 +435,7 @@ where
             continue;
         }
 
-        data.extend(bytemuck::bytes_of(&GPUCullingInput {
+        data.extend_from_slice(bytemuck::bytes_of(&GPUCullingInput {
             start_idx: object.start_idx,
             count: object.count,
             vertex_offset: object.vertex_offset,
@@ -450,7 +450,7 @@ where
 
 pub fn run<'rpass>(rpass: &mut RenderPass<'rpass>, indirect_data: &'rpass GPUIndirectData) {
     if indirect_data.count != 0 {
-        rpass.set_vertex_buffer(6, indirect_data.indirect_buffer.slice(16..));
+        rpass.set_vertex_buffer(7, indirect_data.indirect_buffer.slice(16..));
         rpass.multi_draw_indexed_indirect_count(
             &indirect_data.indirect_buffer,
             16,

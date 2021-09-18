@@ -5,7 +5,7 @@ use crate::{
         Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Material, MaterialChange,
         MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, Texture, TextureHandle,
     },
-    util::{mipmap::MipmapGenerator, output::OutputFrame, typedefs::RendererStatistics},
+    util::{mipmap::MipmapGenerator, typedefs::RendererStatistics},
     ExtendedAdapterInfo, InstanceAdapterDevice, RenderRoutine, RendererInitializationError, RendererMode,
 };
 use glam::Mat4;
@@ -209,11 +209,12 @@ impl Renderer {
     /// Render a frame of the scene onto the given output, using the given RenderRoutine.
     ///
     /// The RendererStatistics may not be the results from this frame, but might be the results from multiple frames ago.
-    pub fn render(
+    pub fn render<Input, Output>(
         self: &Arc<Self>,
-        routine: &mut dyn RenderRoutine,
-        output: &OutputFrame,
+        routine: &mut dyn RenderRoutine<Input, Output>,
+        input: Input,
+        output: Output,
     ) -> Option<RendererStatistics> {
-        render::render_loop(Arc::clone(self), routine, output)
+        render::render_loop(Arc::clone(self), routine, input, output)
     }
 }

@@ -1,25 +1,19 @@
 [package]
-name = "rend3-pbr"
-version = "0.1.1"
+name = "rend3-pbr-bake"
+version = "0.1.0"
 authors = ["Connor Fitzgerald <connorwadefitzgerald@gmail.com>"]
 edition = "2018"
-description = "PBR Render Routine for rend3"
+description = "PBR light baking RenderRoutine for rend3"
 readme = "../README.md"
 repository = "https://github.com/BVE-Reborn/rend3"
 license = "MIT OR Apache-2.0 OR Zlib"
 keywords = ["3d", "graphics", "gpu", "renderer", "wgpu"]
-categories = ["game-development", "graphics", "rendering", "rendering::engine"]
+categories = ["game-development", "graphics", "rendering", "rendering::engine"] 
 
 [dependencies]
-arrayvec = "0.7"
-bytemuck = "1"
 flume = "0.10"
-glam = { version = "0.18", features = ["bytemuck"] }
-include_dir = "0.6"
-log = "0.4"
-ordered-float = "2"
-parking_lot = { version = "0.11" }
+glam = "0.18"
 profiling = {version = "1", default-features = false }
 rend3 = { version = "^0.1.0", path = "../rend3" }
+rend3-pbr = { version = "^0.1.0", path = "../rend3-pbr" }
 wgpu = { version = "0.10", features = ["spirv"] }
-wgpu-profiler = "0.6.1"

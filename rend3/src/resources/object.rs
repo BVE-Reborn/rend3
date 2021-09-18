@@ -49,6 +49,10 @@ impl ObjectManager {
         self.registry.insert(handle, shader_object);
     }
 
+    pub fn get_internal(&self, handle: RawObjectHandle) -> &InternalObject {
+        self.registry.get(handle)
+    }
+
     pub fn ready(&mut self) -> Vec<InternalObject> {
         profiling::scope!("Object Manager Ready");
         self.registry.remove_all_dead(|_, _, _| ());
