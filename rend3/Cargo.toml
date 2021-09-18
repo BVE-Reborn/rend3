@@ -51,5 +51,5 @@ rustc-hash = "1"
 smallvec = "1"
 smartstring = "0.2"
 thiserror = "1"
-wgpu = { version = "0.10", features = ["trace", "spirv", "webgl"] }
+wgpu = "0.10"
 wgpu-profiler = "0.6.1"

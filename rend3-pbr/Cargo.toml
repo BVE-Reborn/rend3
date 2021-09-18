@@ -3,7 +3,7 @@ name = "rend3-pbr"
 version = "0.1.1"
 authors = ["Connor Fitzgerald <connorwadefitzgerald@gmail.com>"]
 edition = "2018"
-description = "PBR Render Routine for Rend3"
+description = "PBR Render Routine for rend3"
 readme = "../README.md"
 repository = "https://github.com/BVE-Reborn/rend3"
 license = "MIT OR Apache-2.0 OR Zlib"
@@ -21,5 +21,5 @@ ordered-float = "2"
 parking_lot = { version = "0.11" }
 profiling = {version = "1", default-features = false }
 rend3 = { version = "^0.1.0", path = "../rend3" }
-wgpu = { version = "0.10", features = ["trace", "spirv"] }
+wgpu = { version = "0.10", features = ["spirv"] }
 wgpu-profiler = "0.6.1"
