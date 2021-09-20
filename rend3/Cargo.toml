@@ -53,3 +53,7 @@ smartstring = "0.2"
 thiserror = "1"
 wgpu = { version = "0.10", features = ["trace", "spirv", "webgl"] }
 wgpu-profiler = "0.6.1"
+
+# not direct deps, but force new versions
+wgpu-core = "0.10.3"
+wgpu-hal = "0.10.7"

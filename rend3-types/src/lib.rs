@@ -32,6 +32,14 @@ impl<T> Clone for RawResourceHandle<T> {
     }
 }
 
+impl<T> PartialEq for RawResourceHandle<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.idx == other.idx
+    }
+}
+
+impl<T> Eq for RawResourceHandle<T> {}
+
 /// Owning resource handle. Used as part of rend3's interface.
 #[derive(Debug, Clone)]
 pub struct ResourceHandle<T> {

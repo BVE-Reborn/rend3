@@ -195,7 +195,8 @@ impl DirectionalShadowPass {
                 .begin_scope(TransparencyType::Cutout.to_debug_str(), &mut rpass, args.device);
 
             rpass.set_pipeline(&self.cutout_pipeline);
-            rpass.set_bind_group(1, &light.opaque_culled_objects.output_bg, &[]);
+            rpass.set_bind_group(0, &args.samplers.linear_nearest_bg, &[]);
+            rpass.set_bind_group(1, &light.cutout_culled_objects.output_bg, &[]);
 
             match light.cutout_culled_objects.calls {
                 ModeData::CPU(ref draws) => culling::cpu::run(&mut rpass, draws, args.samplers, 0, args.materials, 2),
