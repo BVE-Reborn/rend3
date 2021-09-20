@@ -13,7 +13,7 @@ the external api will only experience minor changes as features are added.
 To use rend3 add the following to your Cargo.toml:
 
 ```
-rend3 = "0.1.1"
+rend3 = "0.1.2"
 ```
 
 ## Screenshots

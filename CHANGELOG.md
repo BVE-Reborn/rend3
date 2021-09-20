@@ -15,6 +15,7 @@ Per Keep a Changelog there are 6 main categories of changes:
 - Security
 
 - [Unreleased](#unreleased)
+- [v0.1.2](#v012)
 - [v0.1.1](#v011)
 - [v0.1.0](#v010)
 - [v0.0.6](#v006)
@@ -26,6 +27,10 @@ Per Keep a Changelog there are 6 main categories of changes:
 - [Diffs](#diffs)
 
 ## Unreleased
+
+## v0.1.2
+
+Released 2021-09-20
 
 ### Added
 - rend3: Added an explicit dependency on wgpu-core and wgpu-hal to ensure bug-fixes are included.
@@ -159,7 +164,8 @@ Released 2021-03-06
 
 ## Diffs
 
-- [Unreleased](https://github.com/BVE-Reborn/rend3/compare/v0.1.1...HEAD)
+- [Unreleased](https://github.com/BVE-Reborn/rend3/compare/v0.1.2...HEAD)
+- [v0.1.2](https://github.com/BVE-Reborn/rend3/compare/v0.1.1...v0.1.2)
 - [v0.1.1](https://github.com/BVE-Reborn/rend3/compare/v0.1.0...v0.1.1)
 - [v0.1.0](https://github.com/BVE-Reborn/rend3/compare/v0.0.6...v0.1.0)
 - [v0.0.6](https://github.com/BVE-Reborn/rend3/compare/v0.0.5...v0.0.6)

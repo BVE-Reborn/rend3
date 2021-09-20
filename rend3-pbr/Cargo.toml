@@ -1,6 +1,6 @@
 [package]
 name = "rend3-pbr"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Connor Fitzgerald <connorwadefitzgerald@gmail.com>"]
 edition = "2018"
 description = "PBR Render Routine for Rend3"

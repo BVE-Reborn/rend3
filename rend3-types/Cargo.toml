@@ -1,6 +1,6 @@
 [package]
 name = "rend3-types"
-version = "0.1.0"
+version = "0.1.2"
 authors = ["Connor Fitzgerald <connorwadefitzgerald@gmail.com>"]
 edition = "2018"
 description = "Type definitions for rend3"
