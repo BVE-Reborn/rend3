@@ -1,12 +1,26 @@
 use glam::{Mat3, Mat4, UVec2, Vec2, Vec3, Vec4, Vec4Swizzles};
 use gltf::buffer::Source;
 use rend3::{
-    types,
+    types::{self, ObjectHandle},
     util::typedefs::{FastHashMap, SsoString},
     Renderer,
 };
 use std::{borrow::Cow, collections::hash_map::Entry, future::Future, path::Path};
 use thiserror::Error;
+
+#[derive(Debug)]
+pub struct Labeled<T> {
+    pub inner: T,
+    pub label: Option<SsoString>,
+}
+impl<T> Labeled<T> {
+    pub fn new(inner: T, label: Option<&str>) -> Self {
+        Self {
+            inner,
+            label: label.map(SsoString::from),
+        }
+    }
+}
 
 /// A primative and its handles.
 #[derive(Debug)]
@@ -21,12 +35,18 @@ pub struct Mesh {
     pub primitives: Vec<MeshPrimitive>,
 }
 
+/// A set of objects.
+#[derive(Debug)]
+pub struct Object {
+    pub primatives: Vec<ObjectHandle>,
+}
+
 /// Node in the gltf node tree.
 #[derive(Debug)]
 pub struct Node {
     pub children: Vec<Node>,
     pub local_transform: Mat4,
-    pub objects: Vec<types::ObjectHandle>,
+    pub objects: Vec<Labeled<Object>>,
     pub light: Option<types::DirectionalLightHandle>,
 }
 
@@ -38,12 +58,24 @@ pub struct ImageKey {
 }
 
 /// A fully loaded gltf.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct LoadedGltfScene {
-    pub meshes: FastHashMap<usize, Mesh>,
-    pub materials: FastHashMap<Option<usize>, types::MaterialHandle>,
-    pub images: FastHashMap<ImageKey, types::TextureHandle>,
+    pub meshes: Vec<Labeled<Mesh>>,
+    pub materials: Vec<Labeled<types::MaterialHandle>>,
+    pub dummy_material: types::MaterialHandle,
+    pub images: FastHashMap<ImageKey, Labeled<types::TextureHandle>>,
     pub nodes: Vec<Node>,
+}
+impl LoadedGltfScene {
+    pub fn new(renderer: &Renderer) -> Self {
+        Self {
+            meshes: Vec::default(),
+            materials: Vec::default(),
+            dummy_material: load_default_material(renderer),
+            images: FastHashMap::default(),
+            nodes: Vec::default(),
+        }
+    }
 }
 
 /// Describes how loading gltf failed.
@@ -127,9 +159,8 @@ where
         buffers[blob_index] = file.blob.take().expect("glb blob not found, but gltf expected it");
     }
 
-    let mut loaded = LoadedGltfScene::default();
+    let mut loaded = LoadedGltfScene::new(renderer);
     load_meshes(renderer, &mut loaded, file.meshes(), &buffers)?;
-    load_default_material(renderer, &mut loaded);
     load_materials_and_textures(renderer, &mut loaded, file.materials(), &buffers, &mut io_func).await?;
 
     let scene = file
@@ -162,21 +193,35 @@ fn load_gltf_impl<'a, E: std::error::Error + 'static>(
         if let Some(mesh) = node.mesh() {
             let mesh_handle = loaded
                 .meshes
-                .get(&mesh.index())
+                .get(mesh.index())
                 .ok_or_else(|| GltfLoadError::MissingMesh(mesh.index()))?;
-            for prim in &mesh_handle.primitives {
-                let mat_idx = prim.material;
-                let mat = loaded
-                    .materials
-                    .get(&mat_idx)
-                    .ok_or_else(|| GltfLoadError::MissingMaterial(mat_idx.expect("Could not find default material")))?;
-                let object_handle = renderer.add_object(types::Object {
-                    mesh: prim.handle.clone(),
-                    material: mat.clone(),
-                    transform,
-                });
-                objects.push(object_handle);
-            }
+            let primatives: Result<Vec<_>, GltfLoadError<_>> = mesh_handle
+                .inner
+                .primitives
+                .iter()
+                .map(|prim| {
+                    let mat_idx = prim.material;
+                    let mat = mat_idx
+                        .map_or_else(
+                            || Some(&loaded.dummy_material),
+                            |mat_idx| loaded.materials.get(mat_idx).map(|m| &m.inner),
+                        )
+                        .ok_or_else(|| {
+                            GltfLoadError::MissingMaterial(mat_idx.expect("Could not find default material"))
+                        })?;
+                    Ok(renderer.add_object(types::Object {
+                        mesh: prim.handle.clone(),
+                        material: mat.clone(),
+                        transform,
+                    }))
+                })
+                .collect();
+            objects.push(Labeled::new(
+                Object {
+                    primatives: primatives?,
+                },
+                mesh.name(),
+            ));
         }
 
         let light = if let Some(light) = node.light() {
@@ -270,35 +315,34 @@ fn load_meshes<'a, E: std::error::Error + 'static>(
                 material: prim.material().index(),
             })
         }
-        loaded.meshes.insert(mesh.index(), Mesh { primitives: res_prims });
+        loaded
+            .meshes
+            .push(Labeled::new(Mesh { primitives: res_prims }, mesh.name()));
     }
 
     Ok(())
 }
 
-fn load_default_material(renderer: &Renderer, loaded: &mut LoadedGltfScene) {
-    loaded.materials.insert(
-        None,
-        renderer.add_material(types::Material {
-            albedo: types::AlbedoComponent::Value(Vec4::splat(1.0)),
-            transparency: types::Transparency::Opaque,
-            normal: types::NormalTexture::None,
-            aomr_textures: types::AoMRTextures::None,
-            ao_factor: Some(1.0),
-            metallic_factor: Some(1.0),
-            roughness_factor: Some(1.0),
-            clearcoat_textures: types::ClearcoatTextures::None,
-            clearcoat_factor: Some(1.0),
-            clearcoat_roughness_factor: Some(1.0),
-            emissive: types::MaterialComponent::None,
-            reflectance: types::MaterialComponent::None,
-            anisotropy: types::MaterialComponent::None,
-            uv_transform0: Mat3::IDENTITY,
-            uv_transform1: Mat3::IDENTITY,
-            unlit: false,
-            sample_type: types::SampleType::Linear,
-        }),
-    );
+fn load_default_material(renderer: &Renderer) -> types::MaterialHandle {
+    renderer.add_material(types::Material {
+        albedo: types::AlbedoComponent::Value(Vec4::splat(1.0)),
+        transparency: types::Transparency::Opaque,
+        normal: types::NormalTexture::None,
+        aomr_textures: types::AoMRTextures::None,
+        ao_factor: Some(1.0),
+        metallic_factor: Some(1.0),
+        roughness_factor: Some(1.0),
+        clearcoat_textures: types::ClearcoatTextures::None,
+        clearcoat_factor: Some(1.0),
+        clearcoat_roughness_factor: Some(1.0),
+        emissive: types::MaterialComponent::None,
+        reflectance: types::MaterialComponent::None,
+        anisotropy: types::MaterialComponent::None,
+        uv_transform0: Mat3::IDENTITY,
+        uv_transform1: Mat3::IDENTITY,
+        unlit: false,
+        sample_type: types::SampleType::Linear,
+    })
 }
 
 async fn load_materials_and_textures<'a, F, Fut, E>(
@@ -414,9 +458,7 @@ where
             ..types::Material::default()
         });
 
-        loaded
-            .materials
-            .insert(Some(material.index().expect("unexpected default material")), handle);
+        loaded.materials.push(Labeled::new(handle, material.name()));
     }
 
     Ok(())
@@ -441,7 +483,7 @@ where
     };
 
     let entry = match loaded.images.entry(key) {
-        Entry::Occupied(handle) => return Ok(handle.get().clone()),
+        Entry::Occupied(handle) => return Ok(handle.get().inner.clone()),
         Entry::Vacant(v) => v,
     };
 
@@ -478,7 +520,7 @@ where
         mip_source: types::MipmapSource::Generated,
     });
 
-    entry.insert(handle.clone());
+    entry.insert(Labeled::new(handle.clone(), image.name()));
 
     Ok(handle)
 }
