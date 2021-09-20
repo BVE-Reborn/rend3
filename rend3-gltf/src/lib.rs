@@ -44,7 +44,7 @@ pub struct Object {
 /// Node in the gltf node tree.
 #[derive(Debug)]
 pub struct Node {
-    pub children: Vec<Node>,
+    pub children: Vec<Labeled<Node>>,
     pub local_transform: Mat4,
     pub objects: Vec<Labeled<Object>>,
     pub light: Option<types::DirectionalLightHandle>,
@@ -64,7 +64,7 @@ pub struct LoadedGltfScene {
     pub materials: Vec<Labeled<types::MaterialHandle>>,
     pub dummy_material: types::MaterialHandle,
     pub images: FastHashMap<ImageKey, Labeled<types::TextureHandle>>,
-    pub nodes: Vec<Node>,
+    pub nodes: Vec<Labeled<Node>>,
 }
 impl LoadedGltfScene {
     pub fn new(renderer: &Renderer) -> Self {
@@ -183,7 +183,7 @@ fn load_gltf_impl<'a, E: std::error::Error + 'static>(
     loaded: &mut LoadedGltfScene,
     nodes: impl Iterator<Item = gltf::Node<'a>>,
     parent_transform: Mat4,
-) -> Result<Vec<Node>, GltfLoadError<E>> {
+) -> Result<Vec<Labeled<Node>>, GltfLoadError<E>> {
     let mut final_nodes = Vec::new();
     for node in nodes {
         let local_transform = Mat4::from_cols_array_2d(&node.transform().matrix());
@@ -243,12 +243,15 @@ fn load_gltf_impl<'a, E: std::error::Error + 'static>(
 
         let children = load_gltf_impl(renderer, loaded, node.children(), transform)?;
 
-        final_nodes.push(Node {
-            children,
-            local_transform,
-            objects,
-            light,
-        })
+        final_nodes.push(Labeled::new(
+            Node {
+                children,
+                local_transform,
+                objects,
+                light,
+            },
+            node.name(),
+        ));
     }
     Ok(final_nodes)
 }
