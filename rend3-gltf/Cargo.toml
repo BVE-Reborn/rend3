@@ -9,13 +9,16 @@ license = "MIT OR Apache-2.0 OR Zlib"
 keywords = ["3d", "graphics", "gltf", "loading", "rend3"]
 categories = ["game-development", "graphics", "parser-implementations", "rendering", "rendering::engine"]
 
+[features]
+default = ["image/default"]
+
 [dependencies]
 arrayvec = "0.7"
 base64 = "0.13"
 gltf = { version = "0.16", default-features = false, features = ["KHR_lights_punctual", "KHR_texture_transform", "KHR_materials_unlit", "extras", "names", "utils"] }
 glam = "0.18"
 rustc-hash = "1"
-image = "0.23"
+image = { version = "0.23", default-features = false }
 rend3 = { version = "^0.1.0", path = "../rend3" }
 thiserror = "1"
 
