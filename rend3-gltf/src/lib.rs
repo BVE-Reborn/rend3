@@ -29,7 +29,7 @@ pub struct MeshPrimitive {
     pub material: Option<usize>,
 }
 
-/// Set of primatives.
+/// Set of primitives.
 #[derive(Debug)]
 pub struct Mesh {
     pub primitives: Vec<MeshPrimitive>,
@@ -38,7 +38,7 @@ pub struct Mesh {
 /// A set of objects.
 #[derive(Debug)]
 pub struct Object {
-    pub primatives: Vec<ObjectHandle>,
+    pub primitives: Vec<ObjectHandle>,
 }
 
 /// Node in the gltf node tree.
@@ -195,7 +195,7 @@ fn load_gltf_impl<'a, E: std::error::Error + 'static>(
                 .meshes
                 .get(mesh.index())
                 .ok_or_else(|| GltfLoadError::MissingMesh(mesh.index()))?;
-            let primatives: Result<Vec<_>, GltfLoadError<_>> = mesh_handle
+            let primitives: Result<Vec<_>, GltfLoadError<_>> = mesh_handle
                 .inner
                 .primitives
                 .iter()
@@ -218,7 +218,7 @@ fn load_gltf_impl<'a, E: std::error::Error + 'static>(
                 .collect();
             objects.push(Labeled::new(
                 Object {
-                    primatives: primatives?,
+                    primitives: primitives?,
                 },
                 mesh.name(),
             ));
