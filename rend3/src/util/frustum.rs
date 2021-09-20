@@ -1,3 +1,5 @@
+//! This entire module only exists because of <https://www.gamedevs.org/uploads/fast-extraction-viewing-frustum-planes-from-world-view-projection-matrix.pdf>.
+
 use glam::{Mat4, Vec3, Vec3A, Vec4Swizzles};
 
 #[derive(Debug, Clone, Copy)]
