@@ -1,3 +1,20 @@
+//! gltf scene and model loader for rend3.
+//!
+//! This crate attempts to map the concepts into gltf as best it can into rend3, but there is quite a variety of things that would be insane to properly represent.
+//!
+//! To "just load a gltf/glb", look at the documentation for [`load_gltf`] and use the default [`filesystem_io_func`].
+//!
+//! Individual components of a gltf can be loaded with the other functions in this crate.
+//!
+//! # Supported Extensions
+//! - `KHR_punctual_lights`
+//! - `KHR_texture_transform`
+//! - `KHR_material_unlit`
+//!
+//! # Known Limitations
+//! - Only the albedo texture's transform from `KHR_texture_transform` will be used.
+//! - Double sided materials are currently unsupported.
+
 use glam::{Mat3, Mat4, UVec2, Vec2, Vec3, Vec4, Vec4Swizzles};
 use gltf::buffer::Source;
 use rend3::{
@@ -8,12 +25,16 @@ use rend3::{
 use std::{borrow::Cow, collections::hash_map::Entry, future::Future, path::Path};
 use thiserror::Error;
 
+/// Wrapper around a T that stores an optional label.
 #[derive(Debug, Clone)]
 pub struct Labeled<T> {
+    /// Inner value
     pub inner: T,
+    /// Label associated with the T
     pub label: Option<SsoString>,
 }
 impl<T> Labeled<T> {
+    /// Create a new
     pub fn new(inner: T, label: Option<&str>) -> Self {
         Self {
             inner,
@@ -22,44 +43,53 @@ impl<T> Labeled<T> {
     }
 }
 
-/// A primative and its handles.
+/// A single sub-mesh of a gltf.
 #[derive(Debug)]
 pub struct MeshPrimitive {
     pub handle: types::MeshHandle,
+    /// Index into the material vector given by [`load_materials_and_textures`] or [`LoadedGltfScene::materials`].
     pub material: Option<usize>,
 }
 
-/// Set of primitives.
+/// Set of [`MeshPrimitive`]s that make up a logical mesh.
 #[derive(Debug)]
 pub struct Mesh {
     pub primitives: Vec<MeshPrimitive>,
 }
 
-/// A set of objects.
+/// Set of [`ObjectHandle`]s that correspond to a logical object in the node tree.
+///
+/// This is to a [`ObjectHandle`], as a [`Mesh`] is to a [`MeshPrimitive`].
 #[derive(Debug)]
 pub struct Object {
     pub primitives: Vec<ObjectHandle>,
 }
 
-/// Node in the gltf node tree.
+/// Node in the gltf scene tree
 #[derive(Debug)]
 pub struct Node {
     pub children: Vec<Labeled<Node>>,
+    /// Transform of this node relative to its parents.
     pub local_transform: Mat4,
-    pub objects: Vec<Labeled<Object>>,
-    pub light: Option<types::DirectionalLightHandle>,
+    /// Object for this node.
+    pub object: Option<Labeled<Object>>,
+    /// Directional light for this node.
+    pub directional_light: Option<types::DirectionalLightHandle>,
 }
 
 /// Hashmap key for caching images.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct ImageKey {
+    /// Index into the image array.
     pub index: usize,
+    /// If the image should be viewed as srgb or not.
     pub srgb: bool,
 }
 
+/// Hashmap which stores a mapping from [`ImageKey`] to a labeled handle.
 pub type ImageMap = FastHashMap<ImageKey, Labeled<types::TextureHandle>>;
 
-/// A fully loaded gltf.
+/// A fully loaded Gltf scene.
 #[derive(Debug)]
 pub struct LoadedGltfScene {
     pub meshes: Vec<Labeled<Mesh>>,
@@ -110,7 +140,11 @@ pub async fn filesystem_io_func(parent_director: impl AsRef<Path>, uri: SsoStrin
     }
 }
 
-/// Load a given gltf's data into the renderer's world. Allows the user to specify how URIs are resolved into their underlying data. Supports most gltfs and glbs.
+/// Load a given gltf into the renderer's world.
+///
+/// Allows the user to specify how URIs are resolved into their underlying data. Supports most gltfs and glbs.
+///
+/// **Must** keep the [`LoadedGltfScene`] alive for the scene to remain.
 ///
 /// ```no_run
 /// # use std::path::Path;
@@ -118,7 +152,7 @@ pub async fn filesystem_io_func(parent_director: impl AsRef<Path>, uri: SsoStrin
 /// let path = Path::new("some/path/scene.gltf"); // or glb
 /// let gltf_data = std::fs::read(&path).unwrap();
 /// let parent_directory = path.parent().unwrap();
-/// pollster::block_on(rend3_gltf::load_gltf(&renderer, &gltf_data, |p| rend3_gltf::filesystem_io_func(&parent_directory, p)));
+/// let _loaded = pollster::block_on(rend3_gltf::load_gltf(&renderer, &gltf_data, |p| rend3_gltf::filesystem_io_func(&parent_directory, p)));
 /// ```
 pub async fn load_gltf<F, Fut, E>(
     renderer: &Renderer,
@@ -173,8 +207,7 @@ fn load_gltf_nodes<'a, E: std::error::Error + 'static>(
         let local_transform = Mat4::from_cols_array_2d(&node.transform().matrix());
         let transform = parent_transform * local_transform;
 
-        let mut objects = Vec::new();
-        if let Some(mesh) = node.mesh() {
+        let object = if let Some(mesh) = node.mesh() {
             let mesh_handle = loaded
                 .meshes
                 .get(mesh.index())
@@ -200,13 +233,15 @@ fn load_gltf_nodes<'a, E: std::error::Error + 'static>(
                     }))
                 })
                 .collect();
-            objects.push(Labeled::new(
+            Some(Labeled::new(
                 Object {
                     primitives: primitives?,
                 },
                 mesh.name(),
-            ));
-        }
+            ))
+        } else {
+            None
+        };
 
         let light = if let Some(light) = node.light() {
             match light.kind() {
@@ -231,8 +266,8 @@ fn load_gltf_nodes<'a, E: std::error::Error + 'static>(
             Node {
                 children,
                 local_transform,
-                objects,
-                light,
+                object,
+                directional_light: light,
             },
             node.name(),
         ));
@@ -240,6 +275,13 @@ fn load_gltf_nodes<'a, E: std::error::Error + 'static>(
     Ok(final_nodes)
 }
 
+/// Loads buffers from a [`gltf::Buffer`] iterator, calling io_func to resolve them from URI.
+///
+/// If the gltf came from a .glb, the glb's blob should be provided.
+///
+/// # Panics
+///
+/// Panics if buffers requires a blob but no blob was given.
 pub async fn load_buffers<F, Fut, E>(
     file: impl ExactSizeIterator<Item = gltf::Buffer<'_>>,
     blob: Option<Vec<u8>>,
@@ -270,6 +312,9 @@ where
     Ok(buffers)
 }
 
+/// Loads meshes from a [`gltf::Mesh`] iterator.
+///
+/// All binary data buffers must be provided. Call this with [`gltf::Document::meshes`] as the mesh argument.
 pub fn load_meshes<'a, E: std::error::Error + 'static>(
     renderer: &Renderer,
     meshes: impl Iterator<Item = gltf::Mesh<'a>>,
@@ -338,6 +383,7 @@ pub fn load_meshes<'a, E: std::error::Error + 'static>(
         .collect()
 }
 
+/// Creates a gltf default material.
 pub fn load_default_material(renderer: &Renderer) -> types::MaterialHandle {
     renderer.add_material(types::Material {
         albedo: types::AlbedoComponent::Value(Vec4::splat(1.0)),
@@ -360,9 +406,14 @@ pub fn load_default_material(renderer: &Renderer) -> types::MaterialHandle {
     })
 }
 
-pub async fn load_materials_and_textures<'a, F, Fut, E>(
+/// Loads materials and textures from a [`gltf::Material`] iterator.
+///
+/// All binary data buffers must be provided. Call this with [`gltf::Document::materials`] as the materials argument.
+///
+/// io_func determines how URIs are resolved into their underlying data.
+pub async fn load_materials_and_textures<F, Fut, E>(
     renderer: &Renderer,
-    materials: impl ExactSizeIterator<Item = gltf::Material<'a>>,
+    materials: impl ExactSizeIterator<Item = gltf::Material<'_>>,
     buffers: &[Vec<u8>],
     io_func: &mut F,
 ) -> Result<(Vec<Labeled<types::MaterialHandle>>, ImageMap), GltfLoadError<E>>
@@ -406,23 +457,23 @@ where
             })
             .unwrap_or(Mat3::IDENTITY);
 
-        let albedo_tex = texture_option_resolve(
+        let albedo_tex = util::texture_option_resolve(
             albedo.map(|i| load_image_cached(renderer, &mut images, i.texture().source(), true, buffers, io_func)),
         )
         .await?;
-        let occlusion_tex = texture_option_resolve(
+        let occlusion_tex = util::texture_option_resolve(
             occlusion.map(|i| load_image_cached(renderer, &mut images, i.texture().source(), false, buffers, io_func)),
         )
         .await?;
-        let emissive_tex = texture_option_resolve(
+        let emissive_tex = util::texture_option_resolve(
             emissive.map(|i| load_image_cached(renderer, &mut images, i.texture().source(), true, buffers, io_func)),
         )
         .await?;
-        let normals_tex = texture_option_resolve(
+        let normals_tex = util::texture_option_resolve(
             normals.map(|i| load_image_cached(renderer, &mut images, i.texture().source(), false, buffers, io_func)),
         )
         .await?;
-        let metallic_roughness_tex = texture_option_resolve(
+        let metallic_roughness_tex = util::texture_option_resolve(
             metallic_roughness
                 .map(|i| load_image_cached(renderer, &mut images, i.texture().source(), false, buffers, io_func)),
         )
@@ -477,6 +528,13 @@ where
     Ok((result, images))
 }
 
+/// Loads a single image from a [`gltf::Image`], with caching.
+///
+/// Uses the given ImageMap as a cache.
+///
+/// All binary data buffers must be provided. You can get the image from a texture by calling [`gltf::Texture::source`].
+///
+/// io_func determines how URIs are resolved into their underlying data.
 pub async fn load_image_cached<F, Fut, E>(
     renderer: &Renderer,
     images: &mut ImageMap,
@@ -507,6 +565,11 @@ where
     Ok(handle)
 }
 
+/// Loads a single image from a [`gltf::Image`].
+///
+/// All binary data buffers must be provided. Call this with [`gltf::Document::materials`] as the materials argument.
+///
+/// io_func determines how URIs are resolved into their underlying data.
 pub async fn load_image<F, Fut, E>(
     renderer: &Renderer,
     image: gltf::Image<'_>,
@@ -554,16 +617,26 @@ where
     Ok(Labeled::new(handle, image.name()))
 }
 
-pub async fn texture_option_resolve<F: Future, T, E>(fut: Option<F>) -> Result<Option<T>, E>
-where
-    F: Future<Output = Result<Labeled<T>, E>>,
-{
-    if let Some(f) = fut {
-        match f.await {
-            Ok(l) => Ok(Some(l.inner)),
-            Err(e) => Err(e),
+/// Implementation utilities.
+pub mod util {
+    use std::future::Future;
+
+    use crate::Labeled;
+
+    /// Turns a `Option<Future<Output = Result<Labeled<T>, E>>>>` into a `Future<Output = Result<Option<T>, E>>`
+    ///
+    /// This is a very specific transformation that shows up a lot when using [`load_image_cached`].
+    pub async fn texture_option_resolve<F: Future, T, E>(fut: Option<F>) -> Result<Option<T>, E>
+    where
+        F: Future<Output = Result<Labeled<T>, E>>,
+    {
+        if let Some(f) = fut {
+            match f.await {
+                Ok(l) => Ok(Some(l.inner)),
+                Err(e) => Err(e),
+            }
+        } else {
+            Ok(None)
         }
-    } else {
-        Ok(None)
     }
 }
