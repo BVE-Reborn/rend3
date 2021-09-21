@@ -11,6 +11,7 @@ use std::{
     hash::BuildHasher,
     num::NonZeroU32,
     path::Path,
+    sync::Arc,
     time::{Duration, Instant},
 };
 use wgpu_profiler::GpuTimerScopeResult;
@@ -145,10 +146,13 @@ fn main() {
         format,
     );
 
-    let _loaded_gltf = load_gltf(
-        &renderer,
-        file_to_load.unwrap_or_else(|| concat!(env!("CARGO_MANIFEST_DIR"), "/data/scene.gltf").to_owned()),
-    );
+    let renderer_clone = Arc::clone(&renderer);
+    let _loaded_gltf = std::thread::spawn(move || {
+        load_gltf(
+            &renderer_clone,
+            file_to_load.unwrap_or_else(|| concat!(env!("CARGO_MANIFEST_DIR"), "/data/scene.gltf").to_owned()),
+        )
+    });
     load_skybox(&renderer, &mut routine).unwrap();
 
     let _directional_light = renderer.add_directional_light(DirectionalLight {

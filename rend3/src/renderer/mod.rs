@@ -1,6 +1,10 @@
 use crate::{
+    format_sso,
     instruction::{Instruction, InstructionStreamPair},
-    resources::{CameraManager, DirectionalLightManager, MaterialManager, MeshManager, ObjectManager, TextureManager},
+    resources::{
+        CameraManager, DirectionalLightManager, InternalTexture, MaterialManager, MeshManager, ObjectManager,
+        TextureManager,
+    },
     types::{
         Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Material, MaterialChange,
         MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, Texture, TextureHandle,
@@ -10,9 +14,12 @@ use crate::{
 };
 use glam::Mat4;
 use parking_lot::{Mutex, RwLock};
-use rend3_types::TextureFromTexture;
-use std::sync::Arc;
-use wgpu::{Device, Queue};
+use rend3_types::{MipmapCount, MipmapSource, TextureFromTexture, TextureUsages};
+use std::{num::NonZeroU32, sync::Arc};
+use wgpu::{
+    util::DeviceExt, CommandEncoderDescriptor, Device, Extent3d, ImageCopyTexture, ImageDataLayout, Origin3d, Queue,
+    TextureAspect, TextureDescriptor, TextureDimension, TextureViewDescriptor, TextureViewDimension,
+};
 use wgpu_profiler::GpuProfiler;
 
 pub mod error;
@@ -47,7 +54,7 @@ pub struct Renderer {
     /// Manages all directional lights, including their shadow maps.
     pub directional_light_manager: RwLock<DirectionalLightManager>,
 
-    pub mipmap_generator: Mutex<MipmapGenerator>,
+    pub mipmap_generator: MipmapGenerator,
 
     /// Stores gpu timing and debug scopes.
     pub profiler: Mutex<GpuProfiler>,
@@ -83,10 +90,80 @@ impl Renderer {
     ///
     /// The handle will keep the texture alive. All materials created with this texture will also keep the texture alive.
     pub fn add_texture_2d(&self, texture: Texture) -> TextureHandle {
+        profiling::scope!("Add Texture 2D");
         let handle = self.d2_texture_manager.read().allocate();
-        self.instructions.producer.lock().push(Instruction::AddTexture2D {
+        let size = Extent3d {
+            width: texture.size.x,
+            height: texture.size.y,
+            depth_or_array_layers: 1,
+        };
+
+        let mip_level_count = match texture.mip_count {
+            MipmapCount::Specific(v) => v.get(),
+            MipmapCount::Maximum => size.max_mips(),
+        };
+
+        let desc = TextureDescriptor {
+            label: None,
+            size,
+            mip_level_count,
+            sample_count: 1,
+            dimension: TextureDimension::D2,
+            format: texture.format,
+            usage: TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_SRC | TextureUsages::COPY_DST,
+        };
+
+        let (buffer, tex) = match texture.mip_source {
+            MipmapSource::Uploaded => (
+                None,
+                self.device.create_texture_with_data(&self.queue, &desc, &texture.data),
+            ),
+            MipmapSource::Generated => {
+                let desc = TextureDescriptor {
+                    usage: desc.usage | TextureUsages::RENDER_ATTACHMENT,
+                    ..desc
+                };
+                let tex = self.device.create_texture(&desc);
+
+                let format_desc = texture.format.describe();
+
+                // write first level
+                self.queue.write_texture(
+                    ImageCopyTexture {
+                        texture: &tex,
+                        mip_level: 0,
+                        origin: Origin3d::ZERO,
+                        aspect: TextureAspect::All,
+                    },
+                    &texture.data,
+                    ImageDataLayout {
+                        offset: 0,
+                        bytes_per_row: NonZeroU32::new(
+                            format_desc.block_size as u32 * (size.width / format_desc.block_dimensions.0 as u32),
+                        ),
+                        rows_per_image: None,
+                    },
+                    size,
+                );
+
+                let mut encoder = self.device.create_command_encoder(&CommandEncoderDescriptor::default());
+
+                // generate mipmaps
+                self.mipmap_generator
+                    .generate_mipmaps(&self.device, &self.profiler, &mut encoder, &tex, &desc);
+
+                (Some(encoder.finish()), tex)
+            }
+        };
+
+        let view = tex.create_view(&TextureViewDescriptor::default());
+        self.instructions.producer.lock().push(Instruction::AddTexture {
             handle: handle.clone(),
-            texture,
+            desc,
+            texture: tex,
+            view,
+            buffer,
+            cube: false,
         });
         handle
     }
@@ -95,14 +172,71 @@ impl Renderer {
     ///
     /// The handle will keep the texture alive. All materials created with this texture will also keep the texture alive.
     pub fn add_texture_2d_from_texture(&self, texture: TextureFromTexture) -> TextureHandle {
-        let handle = self.d2_texture_manager.read().allocate();
-        self.instructions
-            .producer
-            .lock()
-            .push(Instruction::AddTexture2DFromTexture {
-                handle: handle.clone(),
-                texture,
-            });
+        profiling::scope!("Add Texture 2D From Texture");
+
+        let mut encoder = self.device.create_command_encoder(&CommandEncoderDescriptor::default());
+
+        let d2_manager = self.d2_texture_manager.read();
+        let handle = d2_manager.allocate();
+        // self.profiler
+        //     .lock()
+        //     .begin_scope("Add Texture 2D From Texture", &mut encoder, &self.device);
+
+        let InternalTexture {
+            texture: old_texture,
+            desc: old_texture_desc,
+        } = d2_manager.get_internal(texture.src.get_raw());
+
+        let new_size = old_texture_desc.mip_level_size(texture.start_mip).unwrap();
+
+        let mip_level_count = texture
+            .mip_count
+            .map_or_else(|| old_texture_desc.mip_level_count - texture.start_mip, |c| c.get());
+
+        let desc = TextureDescriptor {
+            size: new_size,
+            mip_level_count,
+            ..old_texture_desc.clone()
+        };
+
+        let tex = self.device.create_texture(&desc);
+
+        let view = tex.create_view(&TextureViewDescriptor::default());
+
+        for new_mip in 0..mip_level_count {
+            let old_mip = new_mip + texture.start_mip;
+
+            let label = format_sso!("mip {} to {}", old_mip, new_mip);
+            profiling::scope!(&label);
+            // self.profiler.lock().begin_scope(&label, &mut encoder, &self.device);
+
+            encoder.copy_texture_to_texture(
+                ImageCopyTexture {
+                    texture: old_texture,
+                    mip_level: old_mip,
+                    origin: Origin3d::ZERO,
+                    aspect: TextureAspect::All,
+                },
+                ImageCopyTexture {
+                    texture: &tex,
+                    mip_level: new_mip,
+                    origin: Origin3d::ZERO,
+                    aspect: TextureAspect::All,
+                },
+                old_texture_desc.mip_level_size(old_mip).unwrap(),
+            );
+
+            // self.profiler.lock().end_scope(&mut encoder);
+        }
+        // self.profiler.lock().end_scope(&mut encoder);
+        self.instructions.producer.lock().push(Instruction::AddTexture {
+            handle: handle.clone(),
+            texture: tex,
+            desc,
+            view,
+            buffer: Some(encoder.finish()),
+            cube: false,
+        });
         handle
     }
 
@@ -110,10 +244,42 @@ impl Renderer {
     ///
     /// The handle will keep the texture alive.
     pub fn add_texture_cube(&self, texture: Texture) -> TextureHandle {
+        profiling::scope!("Add Texture Cube");
         let handle = self.d2c_texture_manager.read().allocate();
-        self.instructions.producer.lock().push(Instruction::AddTextureCube {
+        let size = Extent3d {
+            width: texture.size.x,
+            height: texture.size.y,
+            depth_or_array_layers: 6,
+        };
+
+        let mip_level_count = match texture.mip_count {
+            MipmapCount::Specific(v) => v.get(),
+            MipmapCount::Maximum => size.max_mips(),
+        };
+
+        let desc = TextureDescriptor {
+            label: None,
+            size,
+            mip_level_count,
+            sample_count: 1,
+            dimension: TextureDimension::D2,
+            format: texture.format,
+            usage: TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST,
+        };
+
+        let tex = self.device.create_texture_with_data(&self.queue, &desc, &texture.data);
+
+        let view = tex.create_view(&TextureViewDescriptor {
+            dimension: Some(TextureViewDimension::Cube),
+            ..TextureViewDescriptor::default()
+        });
+        self.instructions.producer.lock().push(Instruction::AddTexture {
             handle: handle.clone(),
-            texture,
+            texture: tex,
+            desc,
+            view,
+            buffer: None,
+            cube: true,
         });
         handle
     }

@@ -38,6 +38,7 @@ Per Keep a Changelog there are 6 main categories of changes:
 - rend3: renderlists refactored to have a generic Input and Output.
   - `Renderer::renderer` passes through the Input and Output.
   - OutputFrame is now a user-side only utility.
+- rend3: AddTexture* will now create/upload the texture before the call returns.
 - rend3: ResourceHandle<T> now prints the actual reference count while debug printing.
 - rend3-pbr: Input is of type `()` and Output is type `&TextureView`.
 - rend3-gltf: Added labels to all the different data types.

@@ -1,6 +1,7 @@
 use std::num::NonZeroU32;
 
 use arrayvec::ArrayVec;
+use parking_lot::{Mutex, RwLock};
 use rend3_types::TextureFormat;
 use wgpu::{
     AddressMode, BindGroup, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, Color,
@@ -22,7 +23,7 @@ pub struct MipmapGenerator {
     pub sampler_bg: BindGroup,
     pub sm: ShaderModule,
     pub pll: PipelineLayout,
-    pub piplines: FastHashMap<TextureFormat, RenderPipeline>,
+    pub pipelines: RwLock<FastHashMap<TextureFormat, RenderPipeline>>,
 }
 
 impl MipmapGenerator {
@@ -91,7 +92,7 @@ impl MipmapGenerator {
             sampler_bg,
             sm,
             pll,
-            piplines: pipelines,
+            pipelines: RwLock::new(pipelines),
         }
     }
 
@@ -135,9 +136,10 @@ impl MipmapGenerator {
     }
 
     pub fn generate_mipmaps(
-        &mut self,
+        &self,
         device: &Device,
-        profiler: &mut GpuProfiler,
+        // TODO: allow profiler to run asynchronously
+        _profiler: &Mutex<GpuProfiler>,
         encoder: &mut CommandEncoder,
         texture: &Texture,
         desc: &TextureDescriptor,
@@ -154,12 +156,22 @@ impl MipmapGenerator {
             })
             .collect();
 
-        let pll = &self.pll;
-        let sm = &self.sm;
-        let pipeline = self
-            .piplines
-            .entry(desc.format)
-            .or_insert_with(|| Self::build_blit_pipeline(device, desc.format, pll, sm));
+        let mut read_pipelines = self.pipelines.read();
+        let pipeline = match read_pipelines.get(&desc.format) {
+            Some(p) => p,
+            None => {
+                drop(read_pipelines);
+
+                self.pipelines.write().insert(
+                    desc.format,
+                    Self::build_blit_pipeline(device, desc.format, &self.pll, &self.sm),
+                );
+
+                read_pipelines = self.pipelines.read();
+
+                read_pipelines.get(&desc.format).unwrap()
+            }
+        };
 
         for (idx, view_window) in mips.windows(2).enumerate() {
             let src_view = &view_window[0];
@@ -169,7 +181,7 @@ impl MipmapGenerator {
             let dst_label = format_sso!("Mipmap level {}", idx + 1);
 
             profiling::scope!(&dst_label);
-            profiler.begin_scope(&dst_label, encoder, device);
+            // profiler.lock().begin_scope(&dst_label, encoder, device);
 
             let bg = BindGroupBuilder::new(Some(&src_label))
                 .with_texture_view(src_view)
@@ -195,7 +207,7 @@ impl MipmapGenerator {
 
             drop(rpass);
 
-            profiler.end_scope(encoder);
+            // profiler.lock().end_scope(encoder);
         }
     }
 }

@@ -1,30 +1,25 @@
 use crate::types::{
     Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Material, MaterialChange, Mesh, Object,
-    RawMaterialHandle, RawObjectHandle, Texture,
+    RawMaterialHandle, RawObjectHandle,
 };
 use glam::Mat4;
 use parking_lot::Mutex;
-use rend3_types::{
-    MaterialHandle, MeshHandle, ObjectHandle, RawDirectionalLightHandle, TextureFromTexture, TextureHandle,
-};
+use rend3_types::{MaterialHandle, MeshHandle, ObjectHandle, RawDirectionalLightHandle, TextureHandle};
 use std::mem;
+use wgpu::{CommandBuffer, Texture, TextureDescriptor, TextureView};
 
 pub enum Instruction {
     AddMesh {
         handle: MeshHandle,
         mesh: Mesh,
     },
-    AddTexture2D {
+    AddTexture {
         handle: TextureHandle,
+        desc: TextureDescriptor<'static>,
         texture: Texture,
-    },
-    AddTexture2DFromTexture {
-        handle: TextureHandle,
-        texture: TextureFromTexture,
-    },
-    AddTextureCube {
-        handle: TextureHandle,
-        texture: Texture,
+        view: TextureView,
+        buffer: Option<CommandBuffer>,
+        cube: bool,
     },
     AddMaterial {
         handle: MaterialHandle,
