@@ -120,16 +120,19 @@ fn build_forward_pass_inner(
             polygon_mode: PolygonMode::Fill,
             conservative: false,
         },
-        depth_stencil: Some(DepthStencilState {
-            format: TextureFormat::Depth32Float,
-            depth_write_enabled: true,
-            depth_compare: match args.transparency {
-                TransparencyType::Opaque | TransparencyType::Cutout => CompareFunction::Equal,
-                TransparencyType::Blend => CompareFunction::GreaterEqual,
-            },
-            stencil: StencilState::default(),
-            bias: DepthBiasState::default(),
-        }),
+        depth_stencil: match args.baking {
+            Baking::Enabled => None,
+            Baking::Disabled => Some(DepthStencilState {
+                format: TextureFormat::Depth32Float,
+                depth_write_enabled: true,
+                depth_compare: match args.transparency {
+                    TransparencyType::Opaque | TransparencyType::Cutout => CompareFunction::Equal,
+                    TransparencyType::Blend => CompareFunction::GreaterEqual,
+                },
+                stencil: StencilState::default(),
+                bias: DepthBiasState::default(),
+            }),
+        },
         multisample: MultisampleState {
             count: args.samples as u32,
             ..Default::default()
