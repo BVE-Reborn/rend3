@@ -15,11 +15,12 @@ default = ["image/default"]
 [dependencies]
 arrayvec = "0.7"
 base64 = "0.13"
-gltf = { version = "0.16", default-features = false, features = ["KHR_lights_punctual", "KHR_texture_transform", "KHR_materials_unlit", "extras", "names", "utils"] }
 glam = "0.18"
-rustc-hash = "1"
+gltf = { version = "0.16", default-features = false, features = ["KHR_lights_punctual", "KHR_texture_transform", "KHR_materials_unlit", "extras", "names", "utils"] }
 image = { version = "0.23", default-features = false }
+log = "0.4"
 rend3 = { version = "^0.1.0", path = "../rend3" }
+rustc-hash = "1"
 thiserror = "1"
 
 [dev-dependencies]

@@ -41,11 +41,20 @@ impl<T> PartialEq for RawResourceHandle<T> {
 impl<T> Eq for RawResourceHandle<T> {}
 
 /// Owning resource handle. Used as part of rend3's interface.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct ResourceHandle<T> {
     refcount: Arc<()>,
     idx: usize,
     _phantom: PhantomData<T>,
+}
+
+impl<T> Debug for ResourceHandle<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ResourceHandle")
+            .field("refcount", &Arc::strong_count(&self.refcount))
+            .field("idx", &self.idx)
+            .finish()
+    }
 }
 
 impl<T> PartialEq for ResourceHandle<T> {

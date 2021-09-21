@@ -60,7 +60,7 @@ fn load_gltf(renderer: &Renderer, location: String) -> rend3_gltf::LoadedGltfSce
     let path = Path::new(&location);
     let parent = path.parent().unwrap();
 
-    println!("Reading gltf file: {}", path.display());
+    log::info!("Reading gltf file: {}", path.display());
     let gltf_data =
         std::fs::read(&path).unwrap_or_else(|e| panic!("tried to load gltf file {}: {}", path.display(), e));
 
