@@ -8,7 +8,7 @@ use rend3::{
 use std::{borrow::Cow, collections::hash_map::Entry, future::Future, path::Path};
 use thiserror::Error;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Labeled<T> {
     pub inner: T,
     pub label: Option<SsoString>,
@@ -57,25 +57,16 @@ pub struct ImageKey {
     pub srgb: bool,
 }
 
+pub type ImageMap = FastHashMap<ImageKey, Labeled<types::TextureHandle>>;
+
 /// A fully loaded gltf.
 #[derive(Debug)]
 pub struct LoadedGltfScene {
     pub meshes: Vec<Labeled<Mesh>>,
     pub materials: Vec<Labeled<types::MaterialHandle>>,
-    pub dummy_material: types::MaterialHandle,
-    pub images: FastHashMap<ImageKey, Labeled<types::TextureHandle>>,
+    pub default_material: types::MaterialHandle,
+    pub images: ImageMap,
     pub nodes: Vec<Labeled<Node>>,
-}
-impl LoadedGltfScene {
-    pub fn new(renderer: &Renderer) -> Self {
-        Self {
-            meshes: Vec::default(),
-            materials: Vec::default(),
-            dummy_material: load_default_material(renderer),
-            images: FastHashMap::default(),
-            nodes: Vec::default(),
-        }
-    }
 }
 
 /// Describes how loading gltf failed.
@@ -84,11 +75,11 @@ pub enum GltfLoadError<E: std::error::Error + 'static> {
     #[error("Gltf parsing or validation error")]
     Gltf(#[from] gltf::Error),
     #[error("Buffer {0} failed to be loaded from the fs")]
-    BufferIo(String, #[source] E),
+    BufferIo(SsoString, #[source] E),
     #[error("Texture {0} failed to be loaded from the fs")]
-    TextureIo(String, #[source] E),
+    TextureIo(SsoString, #[source] E),
     #[error("Texture {0} failed to be loaded as an image")]
-    TextureLoad(String, #[source] image::ImageError),
+    TextureLoad(SsoString, #[source] image::ImageError),
     #[error("Gltf file must have at least one scene")]
     MissingScene,
     #[error("Mesh {0} does not have positions")]
@@ -140,35 +131,28 @@ where
     E: std::error::Error + 'static,
 {
     let mut file = gltf::Gltf::from_slice_without_validation(data)?;
+    let blob = file.blob.take();
 
-    let mut buffers = Vec::with_capacity(file.buffers().len());
-    let mut blob_index = None;
-    for b in file.buffers() {
-        let data = match b.source() {
-            Source::Bin => {
-                blob_index = Some(b.index());
-                Vec::new()
-            }
-            Source::Uri(uri) => io_func(SsoString::from(uri))
-                .await
-                .map_err(|e| GltfLoadError::BufferIo(uri.to_string(), e))?,
-        };
-        buffers.push(data);
-    }
-    if let Some(blob_index) = blob_index {
-        buffers[blob_index] = file.blob.take().expect("glb blob not found, but gltf expected it");
-    }
+    let buffers = load_buffers(file.buffers(), blob, &mut io_func).await?;
 
-    let mut loaded = LoadedGltfScene::new(renderer);
-    load_meshes(renderer, &mut loaded, file.meshes(), &buffers)?;
-    load_materials_and_textures(renderer, &mut loaded, file.materials(), &buffers, &mut io_func).await?;
+    let default_material = load_default_material(renderer);
+    let meshes = load_meshes(renderer, file.meshes(), &buffers)?;
+    let (materials, images) = load_materials_and_textures(renderer, file.materials(), &buffers, &mut io_func).await?;
 
     let scene = file
         .default_scene()
         .or_else(|| file.scenes().next())
         .ok_or(GltfLoadError::MissingScene)?;
 
-    loaded.nodes = load_gltf_impl(
+    let mut loaded = LoadedGltfScene {
+        meshes,
+        materials,
+        default_material,
+        images,
+        nodes: Vec::with_capacity(scene.nodes().len()),
+    };
+
+    loaded.nodes = load_gltf_nodes(
         renderer,
         &mut loaded,
         scene.nodes(),
@@ -178,7 +162,7 @@ where
     Ok(loaded)
 }
 
-fn load_gltf_impl<'a, E: std::error::Error + 'static>(
+fn load_gltf_nodes<'a, E: std::error::Error + 'static>(
     renderer: &Renderer,
     loaded: &mut LoadedGltfScene,
     nodes: impl Iterator<Item = gltf::Node<'a>>,
@@ -203,7 +187,7 @@ fn load_gltf_impl<'a, E: std::error::Error + 'static>(
                     let mat_idx = prim.material;
                     let mat = mat_idx
                         .map_or_else(
-                            || Some(&loaded.dummy_material),
+                            || Some(&loaded.default_material),
                             |mat_idx| loaded.materials.get(mat_idx).map(|m| &m.inner),
                         )
                         .ok_or_else(|| {
@@ -241,7 +225,7 @@ fn load_gltf_impl<'a, E: std::error::Error + 'static>(
             None
         };
 
-        let children = load_gltf_impl(renderer, loaded, node.children(), transform)?;
+        let children = load_gltf_nodes(renderer, loaded, node.children(), transform)?;
 
         final_nodes.push(Labeled::new(
             Node {
@@ -256,77 +240,105 @@ fn load_gltf_impl<'a, E: std::error::Error + 'static>(
     Ok(final_nodes)
 }
 
-fn load_meshes<'a, E: std::error::Error + 'static>(
-    renderer: &Renderer,
-    loaded: &mut LoadedGltfScene,
-    meshes: impl Iterator<Item = gltf::Mesh<'a>>,
-    buffers: &[Vec<u8>],
-) -> Result<(), GltfLoadError<E>> {
-    for mesh in meshes {
-        let mut res_prims = Vec::new();
-        for prim in mesh.primitives() {
-            if prim.mode() != gltf::mesh::Mode::Triangles {
-                return Err(GltfLoadError::UnsupportedPrimitiveMode(
-                    mesh.index(),
-                    prim.index(),
-                    prim.mode(),
-                ));
+pub async fn load_buffers<F, Fut, E>(
+    file: impl ExactSizeIterator<Item = gltf::Buffer<'_>>,
+    blob: Option<Vec<u8>>,
+    mut io_func: F,
+) -> Result<Vec<Vec<u8>>, GltfLoadError<E>>
+where
+    F: FnMut(SsoString) -> Fut,
+    Fut: Future<Output = Result<Vec<u8>, E>>,
+    E: std::error::Error + 'static,
+{
+    let mut buffers = Vec::with_capacity(file.len());
+    let mut blob_index = None;
+    for b in file {
+        let data = match b.source() {
+            Source::Bin => {
+                blob_index = Some(b.index());
+                Vec::new()
             }
-
-            let reader = prim.reader(|b| Some(&buffers[b.index()][..b.length()]));
-
-            let vertex_positions: Vec<_> = reader
-                .read_positions()
-                .ok_or_else(|| GltfLoadError::MissingPositions(mesh.index()))?
-                .map(Vec3::from)
-                .collect();
-
-            // glTF models are right handed, so we must flip their winding order
-            let mut builder = types::MeshBuilder::new(vertex_positions).with_right_handed();
-
-            if let Some(normals) = reader.read_normals() {
-                builder = builder.with_vertex_normals(normals.map(Vec3::from).collect())
-            }
-
-            if let Some(tangents) = reader.read_tangents() {
-                // todo: handedness
-                builder = builder.with_vertex_tangents(tangents.map(|[x, y, z, _]| Vec3::new(x, y, z)).collect())
-            }
-
-            if let Some(uvs) = reader.read_tex_coords(0) {
-                builder = builder.with_vertex_uv0(uvs.into_f32().map(Vec2::from).collect())
-            }
-
-            if let Some(uvs) = reader.read_tex_coords(1) {
-                builder = builder.with_vertex_uv1(uvs.into_f32().map(Vec2::from).collect())
-            }
-
-            if let Some(colors) = reader.read_colors(0) {
-                builder = builder.with_vertex_colors(colors.into_rgba_u8().collect())
-            }
-
-            if let Some(indices) = reader.read_indices() {
-                builder = builder.with_indices(indices.into_u32().collect())
-            }
-
-            let mesh = builder.build();
-
-            let handle = renderer.add_mesh(mesh);
-
-            res_prims.push(MeshPrimitive {
-                handle,
-                material: prim.material().index(),
-            })
-        }
-        loaded
-            .meshes
-            .push(Labeled::new(Mesh { primitives: res_prims }, mesh.name()));
+            Source::Uri(uri) => io_func(SsoString::from(uri))
+                .await
+                .map_err(|e| GltfLoadError::BufferIo(SsoString::from(uri), e))?,
+        };
+        buffers.push(data);
     }
-
-    Ok(())
+    if let Some(blob_index) = blob_index {
+        buffers[blob_index] = blob.expect("glb blob not found, but gltf expected it");
+    }
+    Ok(buffers)
 }
 
-fn load_default_material(renderer: &Renderer) -> types::MaterialHandle {
+pub fn load_meshes<'a, E: std::error::Error + 'static>(
+    renderer: &Renderer,
+    meshes: impl Iterator<Item = gltf::Mesh<'a>>,
+    buffers: &[Vec<u8>],
+) -> Result<Vec<Labeled<Mesh>>, GltfLoadError<E>> {
+    meshes
+        .into_iter()
+        .map(|mesh| {
+            let mut res_prims = Vec::new();
+            for prim in mesh.primitives() {
+                if prim.mode() != gltf::mesh::Mode::Triangles {
+                    return Err(GltfLoadError::UnsupportedPrimitiveMode(
+                        mesh.index(),
+                        prim.index(),
+                        prim.mode(),
+                    ));
+                }
+
+                let reader = prim.reader(|b| Some(&buffers[b.index()][..b.length()]));
+
+                let vertex_positions: Vec<_> = reader
+                    .read_positions()
+                    .ok_or_else(|| GltfLoadError::MissingPositions(mesh.index()))?
+                    .map(Vec3::from)
+                    .collect();
+
+                // glTF models are right handed, so we must flip their winding order
+                let mut builder = types::MeshBuilder::new(vertex_positions).with_right_handed();
+
+                if let Some(normals) = reader.read_normals() {
+                    builder = builder.with_vertex_normals(normals.map(Vec3::from).collect())
+                }
+
+                if let Some(tangents) = reader.read_tangents() {
+                    // todo: handedness
+                    builder = builder.with_vertex_tangents(tangents.map(|[x, y, z, _]| Vec3::new(x, y, z)).collect())
+                }
+
+                if let Some(uvs) = reader.read_tex_coords(0) {
+                    builder = builder.with_vertex_uv0(uvs.into_f32().map(Vec2::from).collect())
+                }
+
+                if let Some(uvs) = reader.read_tex_coords(1) {
+                    builder = builder.with_vertex_uv1(uvs.into_f32().map(Vec2::from).collect())
+                }
+
+                if let Some(colors) = reader.read_colors(0) {
+                    builder = builder.with_vertex_colors(colors.into_rgba_u8().collect())
+                }
+
+                if let Some(indices) = reader.read_indices() {
+                    builder = builder.with_indices(indices.into_u32().collect())
+                }
+
+                let mesh = builder.build();
+
+                let handle = renderer.add_mesh(mesh);
+
+                res_prims.push(MeshPrimitive {
+                    handle,
+                    material: prim.material().index(),
+                })
+            }
+            Ok(Labeled::new(Mesh { primitives: res_prims }, mesh.name()))
+        })
+        .collect()
+}
+
+pub fn load_default_material(renderer: &Renderer) -> types::MaterialHandle {
     renderer.add_material(types::Material {
         albedo: types::AlbedoComponent::Value(Vec4::splat(1.0)),
         transparency: types::Transparency::Opaque,
@@ -348,18 +360,19 @@ fn load_default_material(renderer: &Renderer) -> types::MaterialHandle {
     })
 }
 
-async fn load_materials_and_textures<'a, F, Fut, E>(
+pub async fn load_materials_and_textures<'a, F, Fut, E>(
     renderer: &Renderer,
-    loaded: &mut LoadedGltfScene,
-    materials: impl Iterator<Item = gltf::Material<'a>>,
+    materials: impl ExactSizeIterator<Item = gltf::Material<'a>>,
     buffers: &[Vec<u8>],
     io_func: &mut F,
-) -> Result<(), GltfLoadError<E>>
+) -> Result<(Vec<Labeled<types::MaterialHandle>>, ImageMap), GltfLoadError<E>>
 where
     F: FnMut(SsoString) -> Fut,
     Fut: Future<Output = Result<Vec<u8>, E>>,
     E: std::error::Error + 'static,
 {
+    let mut images = ImageMap::default();
+    let mut result = Vec::with_capacity(materials.len());
     for material in materials {
         let pbr = material.pbr_metallic_roughness();
         let albedo = pbr.base_color_texture();
@@ -393,30 +406,27 @@ where
             })
             .unwrap_or(Mat3::IDENTITY);
 
-        let albedo_tex =
-            option_resolve(albedo.map(|i| load_image(renderer, loaded, i.texture().source(), true, buffers, io_func)))
-                .await
-                .transpose()?;
-        let occlusion_tex = option_resolve(
-            occlusion.map(|i| load_image(renderer, loaded, i.texture().source(), false, buffers, io_func)),
+        let albedo_tex = texture_option_resolve(
+            albedo.map(|i| load_image_cached(renderer, &mut images, i.texture().source(), true, buffers, io_func)),
         )
-        .await
-        .transpose()?;
-        let emissive_tex = option_resolve(
-            emissive.map(|i| load_image(renderer, loaded, i.texture().source(), true, buffers, io_func)),
+        .await?;
+        let occlusion_tex = texture_option_resolve(
+            occlusion.map(|i| load_image_cached(renderer, &mut images, i.texture().source(), false, buffers, io_func)),
         )
-        .await
-        .transpose()?;
-        let normals_tex = option_resolve(
-            normals.map(|i| load_image(renderer, loaded, i.texture().source(), false, buffers, io_func)),
+        .await?;
+        let emissive_tex = texture_option_resolve(
+            emissive.map(|i| load_image_cached(renderer, &mut images, i.texture().source(), true, buffers, io_func)),
         )
-        .await
-        .transpose()?;
-        let metallic_roughness_tex = option_resolve(
-            metallic_roughness.map(|i| load_image(renderer, loaded, i.texture().source(), false, buffers, io_func)),
+        .await?;
+        let normals_tex = texture_option_resolve(
+            normals.map(|i| load_image_cached(renderer, &mut images, i.texture().source(), false, buffers, io_func)),
         )
-        .await
-        .transpose()?;
+        .await?;
+        let metallic_roughness_tex = texture_option_resolve(
+            metallic_roughness
+                .map(|i| load_image_cached(renderer, &mut images, i.texture().source(), false, buffers, io_func)),
+        )
+        .await?;
 
         let handle = renderer.add_material(types::Material {
             albedo: match albedo_tex {
@@ -461,20 +471,20 @@ where
             ..types::Material::default()
         });
 
-        loaded.materials.push(Labeled::new(handle, material.name()));
+        result.push(Labeled::new(handle, material.name()));
     }
 
-    Ok(())
+    Ok((result, images))
 }
 
-async fn load_image<F, Fut, E>(
+pub async fn load_image_cached<F, Fut, E>(
     renderer: &Renderer,
-    loaded: &mut LoadedGltfScene,
+    images: &mut ImageMap,
     image: gltf::Image<'_>,
     srgb: bool,
     buffers: &[Vec<u8>],
     io_func: &mut F,
-) -> Result<types::TextureHandle, GltfLoadError<E>>
+) -> Result<Labeled<types::TextureHandle>, GltfLoadError<E>>
 where
     F: FnMut(SsoString) -> Fut,
     Fut: Future<Output = Result<Vec<u8>, E>>,
@@ -485,26 +495,44 @@ where
         srgb,
     };
 
-    let entry = match loaded.images.entry(key) {
-        Entry::Occupied(handle) => return Ok(handle.get().inner.clone()),
+    let entry = match images.entry(key) {
+        Entry::Occupied(handle) => return Ok(handle.get().clone()),
         Entry::Vacant(v) => v,
     };
 
+    let handle = load_image(renderer, image, srgb, buffers, io_func).await?;
+
+    entry.insert(handle.clone());
+
+    Ok(handle)
+}
+
+pub async fn load_image<F, Fut, E>(
+    renderer: &Renderer,
+    image: gltf::Image<'_>,
+    srgb: bool,
+    buffers: &[Vec<u8>],
+    io_func: &mut F,
+) -> Result<Labeled<types::TextureHandle>, GltfLoadError<E>>
+where
+    F: FnMut(SsoString) -> Fut,
+    Fut: Future<Output = Result<Vec<u8>, E>>,
+    E: std::error::Error + 'static,
+{
     // TODO: Address format detection for compressed texs
-    // TODO: Allow embedded images
     let (data, uri) = match image.source() {
         gltf::image::Source::Uri { uri, .. } => {
             let data = io_func(SsoString::from(uri))
                 .await
-                .map_err(|e| GltfLoadError::TextureIo(uri.to_string(), e))?;
-            (Cow::Owned(data), uri.to_string())
+                .map_err(|e| GltfLoadError::TextureIo(SsoString::from(uri), e))?;
+            (Cow::Owned(data), SsoString::from(uri))
         }
         gltf::image::Source::View { view, .. } => {
             let start = view.offset();
             let end = start + view.length();
             (
                 Cow::Borrowed(&buffers[view.buffer().index()][start..end]),
-                String::from("<embedded>"),
+                SsoString::from("<embedded>"),
             )
         }
     };
@@ -523,15 +551,19 @@ where
         mip_source: types::MipmapSource::Generated,
     });
 
-    entry.insert(Labeled::new(handle.clone(), image.name()));
-
-    Ok(handle)
+    Ok(Labeled::new(handle, image.name()))
 }
 
-async fn option_resolve<F: Future>(fut: Option<F>) -> Option<F::Output> {
+pub async fn texture_option_resolve<F: Future, T, E>(fut: Option<F>) -> Result<Option<T>, E>
+where
+    F: Future<Output = Result<Labeled<T>, E>>,
+{
     if let Some(f) = fut {
-        Some(f.await)
+        match f.await {
+            Ok(l) => Ok(Some(l.inner)),
+            Err(e) => Err(e),
+        }
     } else {
-        None
+        Ok(None)
     }
 }
