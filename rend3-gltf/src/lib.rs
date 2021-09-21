@@ -132,11 +132,13 @@ pub async fn filesystem_io_func(parent_director: impl AsRef<Path>, uri: SsoStrin
         let (_mime, rest) = base64_data.split_once(";").unwrap();
         let (encoding, data) = rest.split_once(",").unwrap();
         assert_eq!(encoding, "base64");
+        log::info!("loading {} bytes of base64 data", data.len());
         // TODO: errors
         Ok(base64::decode(data).unwrap())
     } else {
-        let tex_resolved = parent_director.as_ref().join(&*uri);
-        std::fs::read(tex_resolved)
+        let path_resolved = parent_director.as_ref().join(&*uri);
+        log::info!("loading file '{}' from disk", path_resolved.display());
+        std::fs::read(path_resolved)
     }
 }
 

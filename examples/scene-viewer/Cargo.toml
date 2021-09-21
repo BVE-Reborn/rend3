@@ -18,6 +18,7 @@ env_logger = { version = "0.9", default-features = false, features = ["termcolor
 glam = "0.18"
 histogram = "0.6"
 image = { version = "0.23", default-features = false, features = ["png", "jpeg", "tiff"]}
+log = "0.4"
 pico-args = "0.4"
 pollster = "0.2"
 profiling = { version = "1", default-features = false, features = ["profile-with-tracy"] }
