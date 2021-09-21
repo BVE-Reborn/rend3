@@ -29,6 +29,8 @@ Per Keep a Changelog there are 6 main categories of changes:
 
 ### Added
 - rend3: Added an explicit dependency on wgpu-core and wgpu-hal to ensure bug-fixes are included.
+- rend3-gltf: Add the ability to turn off image's default features.
+- rend3-gltf: Expose implementation functions
 - rend3-pbr-bake: Added crate for automatic light baking to a texture.
 
 ### Changed
@@ -36,7 +38,11 @@ Per Keep a Changelog there are 6 main categories of changes:
 - rend3: renderlists refactored to have a generic Input and Output.
   - `Renderer::renderer` passes through the Input and Output.
   - OutputFrame is now a user-side only utility.
+- rend3: ResourceHandle<T> now prints the actual reference count while debug printing.
 - rend3-pbr: Input is of type `()` and Output is type `&TextureView`.
+- rend3-gltf: Added labels to all the different data types.
+- rend3-gltf: Errors now use a `SsoString` instead of a `String` for the URI.
+- rend3-gltf: All implementation functions no longer write into a single `&mut LoadedGltfScene`, but return their results directly.
 
 ### Fixed
 - rend3-pbr: fix rendering of cutout objects in shadow passes.
