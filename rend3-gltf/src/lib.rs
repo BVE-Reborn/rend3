@@ -627,7 +627,7 @@ pub mod util {
 
     /// Turns a `Option<Future<Output = Result<Labeled<T>, E>>>>` into a `Future<Output = Result<Option<T>, E>>`
     ///
-    /// This is a very specific transformation that shows up a lot when using [`load_image_cached`].
+    /// This is a very specific transformation that shows up a lot when using [`load_image_cached`](super::load_image_cached).
     pub async fn texture_option_resolve<F: Future, T, E>(fut: Option<F>) -> Result<Option<T>, E>
     where
         F: Future<Output = Result<Labeled<T>, E>>,
