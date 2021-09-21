@@ -66,7 +66,7 @@ pub fn create_renderer(
         object_manager,
         directional_light_manager,
 
-        mipmap_generator: Mutex::new(mipmap_generator),
+        mipmap_generator,
         profiler: Mutex::new(profiler),
     }))
 }
