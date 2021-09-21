@@ -39,7 +39,7 @@ impl PbrBakerRenderRoutine {
             directional_light_bgl,
             texture_bgl,
             materials: &material_manager,
-            samples: rend3_pbr::SampleCount::Four,
+            samples: rend3_pbr::SampleCount::One,
             transparency: rend3::types::TransparencyType::Opaque,
             baking: rend3_pbr::common::forward_pass::Baking::Enabled,
         };
