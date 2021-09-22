@@ -67,7 +67,7 @@ void main() {
     o_coords1 = vec2(material.uv_transform1 * vec3(i_coords1, 1.0));
 
     #ifdef BAKING
-    gl_Position = vec4(o_coords1, 0.0, 1.0);
+    gl_Position = vec4(o_coords1 * 2.0 - 1.0, 0.0, 1.0);
     #else
     gl_Position = data.model_view_proj * vec4(i_position, 1.0);
     #endif
