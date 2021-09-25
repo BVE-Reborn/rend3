@@ -75,6 +75,8 @@ pub const GPU_REQUIRED_LIMITS: Limits = Limits {
     max_vertex_buffers: 7,
     max_vertex_attributes: 7,
     max_push_constant_size: 128,
+    min_uniform_buffer_offset_alignment: 256,
+    min_storage_buffer_offset_alignment: 256,
 };
 
 /// Limits required to run in cpu-mode.
@@ -93,14 +95,28 @@ pub const CPU_REQUIRED_LIMITS: Limits = Limits {
     max_uniform_buffers_per_shader_stage: 2,
     max_uniform_buffer_binding_size: MAX_UNIFORM_BUFFER_BINDING_SIZE as u32,
     max_storage_buffer_binding_size: 128 << 20,
-    max_vertex_buffer_array_stride: 128,
     max_vertex_buffers: 6,
     max_vertex_attributes: 6,
+    max_vertex_buffer_array_stride: 128,
     max_push_constant_size: 0,
+    min_uniform_buffer_offset_alignment: 256,
+    min_storage_buffer_offset_alignment: 256,
 };
 
 fn check_limit_unlimited(d: u32, r: u32, ty: LimitType) -> Result<u32, RendererInitializationError> {
     if d < r {
+        Err(RendererInitializationError::LowDeviceLimit {
+            ty,
+            device_limit: d,
+            required_limit: r,
+        })
+    } else {
+        Ok(d)
+    }
+}
+
+fn check_limit_low(d: u32, r: u32, ty: LimitType) -> Result<u32, RendererInitializationError> {
+    if r < d {
         Err(RendererInitializationError::LowDeviceLimit {
             ty,
             device_limit: d,
@@ -208,6 +224,16 @@ pub fn check_limits(mode: RendererMode, device_limits: &Limits) -> Result<Limits
             device_limits.max_push_constant_size,
             required_limits.max_push_constant_size,
             LimitType::PushConstantSize,
+        )?,
+        min_storage_buffer_offset_alignment: check_limit_low(
+            device_limits.min_storage_buffer_offset_alignment,
+            required_limits.min_storage_buffer_offset_alignment,
+            LimitType::StorageBufferBindingAlignment,
+        )?,
+        min_uniform_buffer_offset_alignment: check_limit_low(
+            device_limits.min_uniform_buffer_offset_alignment,
+            required_limits.min_uniform_buffer_offset_alignment,
+            LimitType::UniformBufferBindingAlignment,
         )?,
     })
 }

@@ -13,6 +13,8 @@ pub enum LimitType {
     StorageTexturesPerShaderStages,
     UniformBuffersPerShaderStages,
     UniformBufferBindingSize,
+    UniformBufferBindingAlignment,
+    StorageBufferBindingAlignment,
     PushConstantSize,
     MaxTextureDimension1d,
     MaxTextureDimension2d,

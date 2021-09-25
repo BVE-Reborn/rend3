@@ -73,9 +73,10 @@ void main() {
             vec4 shadow_shadow_coords = vec4(shadow_flipped.x, 1 - shadow_flipped.y, float(i), shadow_ndc.z);
 
             float shadow_value;
-            shadow_value = texture(sampler2DArrayShadow(shadow, shadow_sampler), shadow_shadow_coords);
             if (shadow_shadow_coords.x < 0 || shadow_shadow_coords.x > 1 || shadow_shadow_coords.y < 0 || shadow_shadow_coords.y > 1 || shadow_ndc.z < -1 || shadow_ndc.z > 1) {
                 shadow_value = 1.0;
+            } else {
+                shadow_value = textureGrad(sampler2DArrayShadow(shadow, shadow_sampler), shadow_shadow_coords, vec2(0), vec2(0));
             }
 
             color += surface_shading(directional_lights[i], pixel, v, shadow_value * pixel.ambient_occlusion);

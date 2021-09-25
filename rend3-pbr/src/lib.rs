@@ -139,21 +139,8 @@ impl RenderRoutine<(), &TextureView> for PbrRenderRoutine {
         let mesh_manager = renderer.mesh_manager.read();
         let directional_light = renderer.directional_light_manager.read();
         let materials = renderer.material_manager.read();
-        let d2_textures = renderer.d2_texture_manager.read();
         let d2c_textures = renderer.d2c_texture_manager.read();
         let camera_manager = renderer.camera_manager.read();
-
-        if ready.d2_texture.dirty.map(|_| false, |v| v).into_common() {
-            self.primary_passes = PrimaryPasses::new(PrimaryPassesNewArgs {
-                mode: renderer.mode,
-                device: &renderer.device,
-                d2_textures: &d2_textures,
-                directional_lights: &directional_light,
-                materials: &materials,
-                interfaces: &self.interfaces,
-                samples: self.render_textures.samples,
-            });
-        }
 
         self.primary_passes.skybox_pass.update_skybox(skybox::UpdateSkyboxArgs {
             device: &renderer.device,

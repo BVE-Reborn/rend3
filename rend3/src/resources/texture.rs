@@ -1,10 +1,10 @@
 use crate::{mode::ModeData, types::TextureHandle, util::registry::ResourceRegistry, RendererMode};
-use rend3_types::RawTextureHandle;
-use std::{mem, num::NonZeroU32, sync::Arc};
+use rend3_types::{RawTextureHandle, TextureFormat, TextureUsages};
+use std::{num::NonZeroU32, sync::Arc};
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
     BindingResource, BindingType, Device, Extent3d, ShaderStages, Texture, TextureDescriptor, TextureDimension,
-    TextureFormat, TextureSampleType, TextureUsages, TextureView, TextureViewDescriptor, TextureViewDimension,
+    TextureSampleType, TextureView, TextureViewDescriptor, TextureViewDimension,
 };
 
 /// When using GPU mode, we start the 2D texture manager with a bind group with this many textures.
@@ -19,15 +19,18 @@ pub struct InternalTexture {
     pub desc: TextureDescriptor<'static>,
 }
 
+/// Preallocation count of texture view array
+const TEXTURE_PREALLOCATION: usize = 1024;
+/// What we divide the texture limit by to get the count supplied in the BGL.
+const BGL_DIVISOR: u32 = 4;
+
 /// Manages textures and associated bindless bind groups
 pub struct TextureManager {
     layout: ModeData<(), Arc<BindGroupLayout>>,
-    layout_dirty: ModeData<(), bool>,
-
     group: ModeData<(), Arc<BindGroup>>,
     group_dirty: ModeData<(), bool>,
 
-    null_tex_man: NullTextureManager,
+    null_view: TextureView,
 
     views: Vec<TextureView>,
     registry: ResourceRegistry<InternalTexture, rend3_types::Texture>,
@@ -35,28 +38,27 @@ pub struct TextureManager {
     dimension: TextureViewDimension,
 }
 impl TextureManager {
-    pub fn new(device: &Device, mode: RendererMode, starting_textures: usize, dimension: TextureViewDimension) -> Self {
-        let mut null_tex_man = NullTextureManager::new(device, dimension);
+    pub fn new(device: &Device, mode: RendererMode, texture_limit: u32, dimension: TextureViewDimension) -> Self {
+        let views = Vec::with_capacity(TEXTURE_PREALLOCATION);
 
-        let view_count = starting_textures;
+        let null_view = create_null_tex_view(device, dimension);
 
-        let mut views = Vec::with_capacity(view_count);
-        fill_to_size(&mut null_tex_man, &mut views, dimension, view_count);
-
-        let layout = mode.into_data(|| (), || create_bind_group_layout(device, view_count as u32, dimension));
+        let layout = mode.into_data(
+            || (),
+            || create_bind_group_layout(device, texture_limit / BGL_DIVISOR, dimension),
+        );
         let group = mode.into_data(
             || (),
-            || create_bind_group(device, layout.as_gpu(), &views.iter().collect::<Vec<_>>(), dimension),
+            || create_bind_group(device, layout.as_gpu(), &null_view, views.iter(), dimension),
         );
 
         let registry = ResourceRegistry::new();
 
         Self {
             layout,
-            layout_dirty: mode.into_data(|| (), || false),
             group,
             group_dirty: mode.into_data(|| (), || false),
-            null_tex_man,
+            null_view,
             views,
             registry,
             dimension,
@@ -76,18 +78,9 @@ impl TextureManager {
     ) {
         self.group_dirty = self.group_dirty.map_gpu(|_| true);
 
-        let index = self.registry.insert(handle, InternalTexture { texture, desc });
+        self.registry.insert(handle, InternalTexture { texture, desc });
 
-        if index >= self.views.len() {
-            self.layout_dirty = self.layout_dirty.map_gpu(|_| true);
-
-            let new_size = self.views.len() * 2;
-            fill_to_size(&mut self.null_tex_man, &mut self.views, self.dimension, new_size);
-        }
-
-        let old_null = mem::replace(&mut self.views[index], view);
-
-        self.null_tex_man.put(old_null);
+        self.views.push(view);
     }
 
     pub fn internal_index(&self, handle: RawTextureHandle) -> usize {
@@ -96,34 +89,21 @@ impl TextureManager {
 
     pub fn ready(&mut self, device: &Device) -> TextureManagerReadyOutput {
         profiling::scope!("D2 Texture Manager Ready");
-        let dimension = self.dimension;
-        let null_tex_man = &mut self.null_tex_man;
         let views = &mut self.views;
-        self.registry.remove_all_dead(|registry, index, _| {
-            let active_count = registry.count();
-
+        self.registry.remove_all_dead(|_, index, _| {
             // Do the same swap remove move as the registry did
-            if active_count > 1 {
-                views.swap(index, active_count);
-            }
-            // Overwrite the last item with the null tex
-            views[active_count] = null_tex_man.get(dimension);
+            views.swap_remove(index);
         });
 
-        if let ModeData::GPU(_) = self.layout_dirty {
+        if let ModeData::GPU(group_dirty) = self.group_dirty {
             profiling::scope!("Update GPU Texture Arrays");
-            let layout_dirty = self.layout_dirty;
 
-            if self.layout_dirty.into_gpu() {
-                *self.layout.as_gpu_mut() = create_bind_group_layout(device, self.views.len() as u32, self.dimension);
-                *self.layout_dirty.as_gpu_mut() = false;
-            }
-
-            if self.group_dirty.into_gpu() {
+            if group_dirty {
                 *self.group.as_gpu_mut() = create_bind_group(
                     device,
                     self.layout.as_gpu(),
-                    &self.views.iter().collect::<Vec<_>>(),
+                    &self.null_view,
+                    self.views.iter(),
                     self.dimension,
                 );
                 *self.group_dirty.as_gpu_mut() = false;
@@ -131,13 +111,9 @@ impl TextureManager {
 
             TextureManagerReadyOutput {
                 bg: self.group.as_ref().map(|_| (), Arc::clone),
-                dirty: layout_dirty,
             }
         } else {
-            TextureManagerReadyOutput {
-                bg: ModeData::CPU(()),
-                dirty: ModeData::CPU(()),
-            }
+            TextureManagerReadyOutput { bg: ModeData::CPU(()) }
         }
     }
 
@@ -149,12 +125,8 @@ impl TextureManager {
         &self.views[self.registry.get_index_of(handle)]
     }
 
-    pub fn ensure_null_view(&mut self) {
-        self.null_tex_man.ensure_at_least_one(self.dimension)
-    }
-
     pub fn get_null_view(&self) -> &TextureView {
-        self.null_tex_man.get_ref()
+        &self.null_view
     }
 
     pub fn gpu_bgl(&self) -> &BindGroupLayout {
@@ -168,23 +140,7 @@ impl TextureManager {
 
 /// Output of readying up a [`TextureManager`].
 pub struct TextureManagerReadyOutput {
-    // TODO(0.10) https://github.com/gfx-rs/wgpu/issues/
     pub bg: ModeData<(), Arc<BindGroup>>,
-    /// The BindGroupLayout has changed, and we need to recreate used pipelines.
-    pub dirty: ModeData<(), bool>,
-}
-
-fn fill_to_size(
-    null_tex_man: &mut NullTextureManager,
-    views: &mut Vec<TextureView>,
-    dimension: TextureViewDimension,
-    size: usize,
-) {
-    let to_add = size.saturating_sub(views.len());
-
-    for _ in 0..to_add {
-        views.push(null_tex_man.get(dimension))
-    }
 }
 
 fn create_bind_group_layout(device: &Device, count: u32, view_dimension: TextureViewDimension) -> Arc<BindGroupLayout> {
@@ -203,29 +159,33 @@ fn create_bind_group_layout(device: &Device, count: u32, view_dimension: Texture
     }))
 }
 
-fn create_bind_group(
+fn create_bind_group<'a>(
     device: &Device,
     layout: &BindGroupLayout,
-    views: &[&TextureView],
+    null_view: &'a TextureView,
+    views: impl ExactSizeIterator<Item = &'a TextureView>,
     dimension: TextureViewDimension,
 ) -> Arc<BindGroup> {
+    let mut view_array = Vec::with_capacity(views.len().max(1));
+    let count = views.len();
+    if count == 0 {
+        view_array.push(null_view);
+    } else {
+        view_array.extend(views);
+    }
     Arc::new(device.create_bind_group(&BindGroupDescriptor {
-        label: Some(&*format!("{:?} texture bg", dimension)),
+        label: Some(&*format!("{:?} texture bg count {}", dimension, count)),
         layout,
         entries: &[BindGroupEntry {
             binding: 0,
-            resource: BindingResource::TextureViewArray(views),
+            resource: BindingResource::TextureViewArray(&view_array),
         }],
     }))
 }
 
-struct NullTextureManager {
-    null_tex: Texture,
-    inner: Vec<TextureView>,
-}
-impl NullTextureManager {
-    pub fn new(device: &Device, dimension: TextureViewDimension) -> Self {
-        let null_tex = device.create_texture(&TextureDescriptor {
+fn create_null_tex_view(device: &Device, dimension: TextureViewDimension) -> TextureView {
+    device
+        .create_texture(&TextureDescriptor {
             label: Some(&*format!("null {:?} texture", dimension)),
             size: Extent3d {
                 width: 1,
@@ -247,34 +207,9 @@ impl NullTextureManager {
             },
             format: TextureFormat::R8Unorm,
             usage: TextureUsages::TEXTURE_BINDING,
-        });
-
-        Self {
-            null_tex,
-            inner: Vec::new(),
-        }
-    }
-
-    fn ensure_at_least_one(&mut self, dimension: TextureViewDimension) {
-        if self.inner.is_empty() {
-            self.inner.push(self.null_tex.create_view(&TextureViewDescriptor {
-                dimension: Some(dimension),
-                ..TextureViewDescriptor::default()
-            }));
-        }
-    }
-
-    pub fn get(&mut self, dimension: TextureViewDimension) -> TextureView {
-        self.ensure_at_least_one(dimension);
-
-        self.inner.pop().unwrap()
-    }
-
-    pub fn get_ref(&self) -> &TextureView {
-        self.inner.first().unwrap()
-    }
-
-    pub fn put(&mut self, view: TextureView) {
-        self.inner.push(view);
-    }
+        })
+        .create_view(&TextureViewDescriptor {
+            dimension: Some(dimension),
+            ..TextureViewDescriptor::default()
+        })
 }
