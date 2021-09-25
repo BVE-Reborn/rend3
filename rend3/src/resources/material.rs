@@ -25,12 +25,15 @@ use wgpu::{
     TextureViewDimension,
 };
 
+const TEXTURE_MASK_SIZE: u32 = 4;
+
 pub struct InternalMaterial<M: MaterialTrait> {
     pub mat: M,
     pub bind_group: ModeData<BindGroup, ()>,
     pub material_buffer: ModeData<Buffer, ()>,
 }
 
+#[allow(clippy::type_complexity)]
 struct PerTypeInfo {
     bgl: ModeData<BindGroupLayout, BindGroupLayout>,
     data_size: u32,
@@ -61,7 +64,7 @@ impl MaterialManager {
     pub fn new(device: &Device, mode: RendererMode) -> Self {
         let buffer = mode.into_data(
             || (),
-            || WrappedPotBuffer::new(device, 0, 16 as _, BufferUsages::STORAGE, Some("material buffer")),
+            || WrappedPotBuffer::new(device, 0, 16, BufferUsages::STORAGE, Some("material buffer")),
         );
 
         let registry = ArchitypicalErasedRegistry::new();
@@ -170,7 +173,7 @@ impl MaterialManager {
         let bind_group = mode.into_data(
             || {
                 let mut textures = vec![NonZeroU32::new(u32::MAX); M::TEXTURE_COUNT as usize];
-                material.to_texture(&mut textures, &mut translation_fn);
+                material.to_textures(&mut textures, &mut translation_fn);
 
                 let mut builder = BindGroupBuilder::new(None);
                 for texture in textures {
@@ -235,7 +238,10 @@ impl MaterialManager {
     }
 
     pub fn get_bind_group_layout<M: MaterialTrait>(&self) -> &BindGroupLayout {
-        self.type_info[&TypeId::of::<InternalMaterial<M>>()].bgl.as_ref().into_common()
+        self.type_info[&TypeId::of::<InternalMaterial<M>>()]
+            .bgl
+            .as_ref()
+            .into_common()
     }
 
     pub fn get_internal_material<M: MaterialTrait>(&self, handle: RawMaterialHandle) -> &InternalMaterial<M> {
@@ -265,8 +271,7 @@ impl MaterialManager {
 
     pub fn ready(&mut self, device: &Device, queue: &Queue, texture_manager: &TextureManager) {
         profiling::scope!("Material Ready");
-        self.registry
-            .remove_all_dead();
+        self.registry.remove_all_dead();
 
         if let ModeData::GPU(ref mut buffer) = self.buffer {
             profiling::scope!("Update GPU Material Buffer");
@@ -280,7 +285,9 @@ impl MaterialManager {
                 .map(|(ty, len)| {
                     let type_info = &self_type_info[&ty];
 
-                    len * (round_up_pot(type_info.texture_count, 16) + round_up_pot(type_info.data_size, 16)) as usize
+                    len * (round_up_pot(type_info.texture_count, 16)
+                        + round_up_pot(type_info.data_size, 16)
+                        + round_up_pot(TEXTURE_MASK_SIZE, 16)) as usize
                 })
                 .sum();
 
@@ -331,7 +338,7 @@ fn create_gpu_buffer_bg(
         .build(device, bgl)
 }
 
-fn write_gpu_materials<'a, M: MaterialTrait>(
+fn write_gpu_materials<M: MaterialTrait>(
     dest: &mut [u8],
     vec_any: &VecAny,
     translation_fn: &mut (dyn FnMut(&TextureHandle) -> NonZeroU32 + '_),
@@ -341,18 +348,28 @@ fn write_gpu_materials<'a, M: MaterialTrait>(
     let mut offset = 0_usize;
 
     for mat in materials {
-        let mat_size = round_up_pot(M::TEXTURE_COUNT * 4, 16) as usize;
-        mat.data.to_texture(
-            bytemuck::cast_slice_mut(&mut dest[offset..offset + mat_size]),
-            translation_fn,
-        );
+        let texture_bytes = (M::TEXTURE_COUNT * 4) as usize;
+        let mat_size = round_up_pot(texture_bytes, 16);
+        let texture_slice = bytemuck::cast_slice_mut(&mut dest[offset..offset + texture_bytes]);
+        mat.data.to_textures(texture_slice, translation_fn);
+
+        let mut texture_enable_mask = 0_u32;
+        for (idx, texture) in texture_slice.iter().enumerate() {
+            let enabled = texture.is_some();
+            texture_enable_mask |= (enabled as u32) << (idx as u32)
+        }
 
         offset += mat_size;
 
         let data_size = round_up_pot(M::DATA_SIZE, 16) as usize;
-        mat.data.to_data(&mut dest[offset..offset + data_size]);
+        mat.data.to_data(&mut dest[offset..offset + M::DATA_SIZE as usize]);
 
-        offset += mat_size;
+        offset += data_size;
+
+        let mask_size = round_up_pot(TEXTURE_MASK_SIZE, 16) as usize;
+        *bytemuck::from_bytes_mut(&mut dest[offset..offset + TEXTURE_MASK_SIZE as usize]) = texture_enable_mask;
+
+        offset += mask_size;
     }
 
     offset

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use glam::Vec4;
 use rend3::{
     resources::{DirectionalLightManager, MaterialManager, TextureManager},
-    types::{TextureFormat, TextureHandle, TransparencyType},
+    types::{TextureFormat, TextureHandle},
     ManagerReadyOutput, ModeData, RenderRoutine, Renderer, RendererMode,
 };
 use wgpu::{

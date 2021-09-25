@@ -84,3 +84,12 @@ where
         &mut self.archetype_map.get_mut(&handle_info.key).unwrap()[handle_info.index].data
     }
 }
+
+impl<K, V, HandleType> Default for ArchetypicalRegistry<K, V, HandleType>
+where
+    K: Copy + Eq + Hash,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}

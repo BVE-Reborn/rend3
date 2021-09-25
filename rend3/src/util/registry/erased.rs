@@ -20,8 +20,7 @@ pub struct ArchitypeResourceStorage<T> {
 struct Architype {
     vec: VecAny,
     remove_single: fn(&mut VecAny, usize, &mut FastHashMap<usize, usize>),
-    remove_all_dead:
-        fn(&mut VecAny, &mut FastHashMap<usize, usize>, &mut FastHashMap<usize, TypeId>),
+    remove_all_dead: fn(&mut VecAny, &mut FastHashMap<usize, usize>, &mut FastHashMap<usize, TypeId>),
 }
 
 pub struct ArchitypicalErasedRegistry<HandleType> {
@@ -74,7 +73,7 @@ impl<HandleType> ArchitypicalErasedRegistry<HandleType> {
         let current_type_id = self.handle_architype_map.get_mut(&handle.get_raw().idx).unwrap();
         let new_type_id = TypeId::of::<T>();
 
-        let architype = self.architype_map.get_mut(&current_type_id).unwrap();
+        let architype = self.architype_map.get_mut(current_type_id).unwrap();
         if *current_type_id == new_type_id {
             // We're just updating the data
             architype
@@ -131,6 +130,12 @@ impl<HandleType> ArchitypicalErasedRegistry<HandleType> {
 
     pub fn architype_lengths(&self) -> impl ExactSizeIterator<Item = (TypeId, usize)> + '_ {
         self.architype_map.iter().map(|(key, value)| (*key, value.vec.len()))
+    }
+}
+
+impl<HandleType> Default for ArchitypicalErasedRegistry<HandleType> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

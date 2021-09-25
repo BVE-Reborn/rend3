@@ -1,3 +1,8 @@
+use std::mem;
+
+use glam::{Mat3, Mat3A, Vec3, Vec3A, Vec4};
+use rend3::types::{MaterialTrait, TextureHandle};
+
 bitflags::bitflags! {
     /// Flags which shaders use to determine properties of a material
     pub struct MaterialFlags : u32 {
@@ -381,6 +386,7 @@ impl Default for SampleType {
 }
 
 /// The type of transparency in a material.
+#[repr(u8)]
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum TransparencyType {
     /// Alpha is completely ignored.
@@ -442,26 +448,114 @@ impl Default for Transparency {
 // Consider:
 //
 // - Green screen value
-changeable_struct! {
-    /// A set of textures and values that determine the how an object interacts with light.
-    pub struct Material <- nodefault MaterialChange {
-        pub albedo: AlbedoComponent,
-        pub transparency: Transparency,
-        pub normal: NormalTexture,
-        pub aomr_textures: AoMRTextures,
-        pub ao_factor: Option<f32>,
-        pub metallic_factor: Option<f32>,
-        pub roughness_factor: Option<f32>,
-        pub clearcoat_textures: ClearcoatTextures,
-        pub clearcoat_factor: Option<f32>,
-        pub clearcoat_roughness_factor: Option<f32>,
-        pub emissive: MaterialComponent<Vec3>,
-        pub reflectance: MaterialComponent<f32>,
-        pub anisotropy: MaterialComponent<f32>,
-        pub uv_transform0: Mat3,
-        pub uv_transform1: Mat3,
-        // TODO: Determine how to make this a clearer part of the type system, esp. with the changable_struct macro.
-        pub unlit: bool,
-        pub sample_type: SampleType,
+/// A set of textures and values that determine the how an object interacts with light.
+pub struct PbrMaterial {
+    pub albedo: AlbedoComponent,
+    pub transparency: Transparency,
+    pub normal: NormalTexture,
+    pub aomr_textures: AoMRTextures,
+    pub ao_factor: Option<f32>,
+    pub metallic_factor: Option<f32>,
+    pub roughness_factor: Option<f32>,
+    pub clearcoat_textures: ClearcoatTextures,
+    pub clearcoat_factor: Option<f32>,
+    pub clearcoat_roughness_factor: Option<f32>,
+    pub emissive: MaterialComponent<Vec3>,
+    pub reflectance: MaterialComponent<f32>,
+    pub anisotropy: MaterialComponent<f32>,
+    pub uv_transform0: Mat3,
+    pub uv_transform1: Mat3,
+    // TODO: Determine how to make this a clearer part of the type system, esp. with the changable_struct macro.
+    pub unlit: bool,
+    pub sample_type: SampleType,
+}
+
+impl MaterialTrait for PbrMaterial {
+    const TEXTURE_COUNT: u32 = 10;
+    const DATA_SIZE: u32 = mem::size_of::<ShaderMaterial>() as _;
+
+    fn object_key(&self) -> u64 {
+        TransparencyType::from(self.transparency) as u64
+    }
+
+    fn to_textures(
+        &self,
+        slice: &mut [Option<std::num::NonZeroU32>],
+        translation_fn: &mut (dyn FnMut(&TextureHandle) -> std::num::NonZeroU32 + '_),
+    ) {
+        slice[0] = self.albedo.to_texture(translation_fn);
+        slice[1] = self.normal.to_texture(translation_fn);
+        slice[2] = self.aomr_textures.to_roughness_texture(translation_fn);
+        slice[3] = self.aomr_textures.to_metallic_texture(translation_fn);
+        slice[4] = self.reflectance.to_texture(translation_fn);
+        slice[5] = self.clearcoat_textures.to_clearcoat_texture(translation_fn);
+        slice[6] = self.clearcoat_textures.to_clearcoat_roughness_texture(translation_fn);
+        slice[7] = self.emissive.to_texture(translation_fn);
+        slice[8] = self.anisotropy.to_texture(translation_fn);
+        slice[9] = self.aomr_textures.to_ao_texture(translation_fn);
+    }
+
+    fn to_data(&self, slice: &mut [u8]) {
+        slice.copy_from_slice(bytemuck::bytes_of(&ShaderMaterial::from_material(self)));
+    }
+}
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+struct ShaderMaterial {
+    uv_transform0: Mat3A,
+    uv_transform1: Mat3A,
+
+    albedo: Vec4,
+    emissive: Vec3,
+    roughness: f32,
+    metallic: f32,
+    reflectance: f32,
+    clear_coat: f32,
+    clear_coat_roughness: f32,
+    anisotropy: f32,
+    ambient_occlusion: f32,
+    alpha_cutout: f32,
+
+    material_flags: MaterialFlags,
+}
+
+unsafe impl bytemuck::Zeroable for ShaderMaterial {}
+unsafe impl bytemuck::Pod for ShaderMaterial {}
+
+impl ShaderMaterial {
+    fn from_material(material: &PbrMaterial) -> Self {
+        Self {
+            uv_transform0: material.uv_transform0.into(),
+            uv_transform1: material.uv_transform1.into(),
+            albedo: material.albedo.to_value(),
+            roughness: material.roughness_factor.unwrap_or(0.0),
+            metallic: material.metallic_factor.unwrap_or(0.0),
+            reflectance: material.reflectance.to_value(0.5),
+            clear_coat: material.clearcoat_factor.unwrap_or(0.0),
+            clear_coat_roughness: material.clearcoat_roughness_factor.unwrap_or(0.0),
+            emissive: material.emissive.to_value(Vec3::ZERO),
+            anisotropy: material.anisotropy.to_value(0.0),
+            ambient_occlusion: material.ao_factor.unwrap_or(1.0),
+            alpha_cutout: match material.transparency {
+                Transparency::Cutout { cutout } => cutout,
+                _ => 0.0,
+            },
+            material_flags: {
+                let mut flags = material.albedo.to_flags();
+                flags |= material.normal.to_flags();
+                flags |= material.aomr_textures.to_flags();
+                flags |= material.clearcoat_textures.to_flags();
+                flags.set(MaterialFlags::UNLIT, material.unlit);
+                flags.set(
+                    MaterialFlags::NEAREST,
+                    match material.sample_type {
+                        SampleType::Nearest => true,
+                        SampleType::Linear => false,
+                    },
+                );
+                flags
+            },
+        }
     }
 }

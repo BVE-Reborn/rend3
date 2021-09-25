@@ -60,8 +60,8 @@ impl<T> Clone for ResourceHandle<T> {
     fn clone(&self) -> Self {
         Self {
             refcount: self.refcount.clone(),
-            idx: self.idx.clone(),
-            _phantom: self._phantom.clone(),
+            idx: self.idx,
+            _phantom: self._phantom,
         }
     }
 }
@@ -593,7 +593,7 @@ pub trait MaterialTrait: Send + Sync + 'static {
 
     fn object_key(&self) -> u64;
 
-    fn to_texture(
+    fn to_textures(
         &self,
         slice: &mut [Option<NonZeroU32>],
         translation_fn: &mut (dyn FnMut(&TextureHandle) -> NonZeroU32 + '_),
