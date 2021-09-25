@@ -1,4 +1,4 @@
-use glam::{Mat3, Mat4, UVec2, Vec2, Vec3, Vec3A, Vec4};
+use glam::{Mat4, UVec2, Vec2, Vec3, Vec3A};
 use std::{
     fmt::Debug,
     hash::Hash,
@@ -591,7 +591,11 @@ pub trait MaterialTrait: Send + Sync + 'static {
     fn texture_count(&self) -> u32;
     fn data_count(&self) -> u32;
 
-    fn to_texture(&self, slice: &mut [Option<NonZeroU32>], translation_fn: &mut (dyn FnMut(&TextureHandle) -> NonZeroU32 + '_));
+    fn to_texture(
+        &self,
+        slice: &mut [Option<NonZeroU32>],
+        translation_fn: &mut (dyn FnMut(&TextureHandle) -> NonZeroU32 + '_),
+    );
     fn to_data(&self, slice: &mut [u8]);
 }
 

@@ -6,8 +6,8 @@ use crate::{
         TextureManager,
     },
     types::{
-        Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Material,
-        MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, Texture, TextureHandle,
+        Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, MaterialHandle, Mesh,
+        MeshHandle, Object, ObjectHandle, Texture, TextureHandle,
     },
     util::{mipmap::MipmapGenerator, typedefs::RendererStatistics},
     ExtendedAdapterInfo, InstanceAdapterDevice, RenderRoutine, RendererInitializationError, RendererMode,
@@ -293,7 +293,9 @@ impl Renderer {
         let handle = self.material_manager.read().allocate();
         self.instructions.producer.lock().push(Instruction::AddMaterial {
             handle: handle.clone(),
-            material: Box::new(material),
+            fill_invoke: Box::new(|material_manager, device, mode, d2_manager, mat_handle| {
+                material_manager.fill(device, mode, d2_manager, mat_handle, material)
+            }),
         });
         handle
     }

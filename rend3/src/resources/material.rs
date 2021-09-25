@@ -1,33 +1,48 @@
-use crate::{RendererMode, mode::ModeData, resources::TextureManager, types::{Material, MaterialChange, MaterialFlags, MaterialHandle, SampleType, TextureHandle}, util::{bind_merge::BindGroupBuilder, buffer::WrappedPotBuffer, math::round_up_pot, registry::{ArchitypeResourceStorage, ArchitypicalRegistry, ResourceRegistry}, typedefs::FastHashMap}};
-use glam::{Vec3, Vec4};
+use crate::{
+    mode::ModeData,
+    resources::TextureManager,
+    types::{Material, MaterialHandle, TextureHandle},
+    util::{
+        bind_merge::BindGroupBuilder,
+        buffer::WrappedPotBuffer,
+        math::round_up_pot,
+        registry::{ArchitypeResourceStorage, ArchitypicalRegistry},
+        typedefs::FastHashMap,
+    },
+    RendererMode,
+};
 use list_any::VecAny;
 use rend3_types::{MaterialTrait, RawMaterialHandle};
 use std::{
     any::TypeId,
-    mem,
     num::{NonZeroU32, NonZeroU64},
 };
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
     BindGroup, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType, Buffer,
-    BufferBindingType, BufferUsages, Device, Queue, ShaderStages, TextureSampleType, TextureViewDimension,
+    BufferBinding, BufferBindingType, BufferUsages, Device, Queue, ShaderStages, TextureSampleType,
+    TextureViewDimension,
 };
 
-struct InternalMaterial<M: MaterialTrait> {
-    mat: M,
-    bind_group: ModeData<BindGroup, ()>,
-    material_buffer: ModeData<Buffer, ()>,
+pub struct InternalMaterial<M: MaterialTrait> {
+    pub mat: M,
+    pub bind_group: ModeData<BindGroup, ()>,
+    pub material_buffer: ModeData<Buffer, ()>,
 }
 
-#[derive(Copy, Clone)]
 struct PerTypeInfo {
+    bgl: ModeData<BindGroupLayout, BindGroupLayout>,
     data_count: u32,
     texture_count: u32,
+    write_gpu_materials_fn: fn(
+        dest: &mut [u8],
+        vec_any: &VecAny,
+        translation_fn: &mut (dyn FnMut(&TextureHandle) -> NonZeroU32 + '_),
+    ) -> usize,
 }
 
 /// Manages materials and their associated BindGroups in CPU modes.
 pub struct MaterialManager {
-    bgl: FastHashMap<TypeId, ModeData<BindGroupLayout, BindGroupLayout>>,
     bg: FastHashMap<TypeId, ModeData<(), BindGroup>>,
 
     type_info: FastHashMap<TypeId, PerTypeInfo>,
@@ -47,7 +62,6 @@ impl MaterialManager {
         let registry = ArchitypicalRegistry::new();
 
         Self {
-            bgl: FastHashMap::default(),
             bg: FastHashMap::default(),
             type_info: FastHashMap::default(),
             buffer,
@@ -87,9 +101,7 @@ impl MaterialManager {
             || (),
         );
 
-        let ty = TypeId::of::<M>();
-
-        let bgl = self.bgl.entry(ty).or_insert_with(|| {
+        let create_bgl = || {
             mode.into_data(
                 || {
                     let texture_binding = |idx: u32| BindGroupLayoutEntry {
@@ -137,40 +149,43 @@ impl MaterialManager {
                     })
                 },
             )
+        };
+
+        let ty = TypeId::of::<M>();
+
+        let type_info = self.type_info.entry(ty).or_insert_with(|| PerTypeInfo {
+            bgl: create_bgl(),
+            data_count,
+            texture_count,
+            write_gpu_materials_fn: write_gpu_materials::<M>,
         });
 
-        self.type_info.insert(
-            ty,
-            PerTypeInfo {
-                data_count,
-                texture_count,
-            },
-        );
+        let mut translation_fn = texture_manager_2d.translation_fn();
 
-        let translation_fn = texture_manager_2d.translation_fn();
+        let bind_group = mode.into_data(
+            || {
+                let mut textures = vec![NonZeroU32::new(u32::MAX); texture_count as usize];
+                material.to_texture(&mut textures, &mut translation_fn);
+
+                let mut builder = BindGroupBuilder::new(None);
+                for texture in textures {
+                    builder.append(BindingResource::TextureView(
+                        texture
+                            .map(|tex| texture_manager_2d.get_view_from_index(tex))
+                            .unwrap_or(null_tex),
+                    ));
+                }
+                builder
+                    .with_buffer(material_buffer.as_cpu())
+                    .build(device, type_info.bgl.as_ref().as_cpu())
+            },
+            || (),
+        );
 
         self.registry.insert(
             handle,
             InternalMaterial {
-                bind_group: mode.into_data(
-                    || {
-                        let mut textures = vec![NonZeroU32::new(u32::MAX); texture_count as usize];
-                        material.to_texture(&mut textures, &mut translation_fn);
-
-                        let mut builder = BindGroupBuilder::new(None);
-                        for texture in textures {
-                            builder.append(BindingResource::TextureView(
-                                texture
-                                    .map(|tex| texture_manager_2d.get_view_from_index(tex))
-                                    .unwrap_or(null_tex),
-                            ));
-                        }
-                        builder
-                            .with_buffer(material_buffer.as_cpu())
-                            .build(device, bgl.as_ref().as_cpu())
-                    },
-                    || (),
-                ),
+                bind_group,
                 mat: material,
                 material_buffer,
             },
@@ -187,26 +202,25 @@ impl MaterialManager {
     //     }
     // }
 
-    // pub fn get_material(&self, handle: RawMaterialHandle) -> &Material {
-    //     &self.registry.get(handle).mat
-    // }
+    pub fn get_material<M: MaterialTrait>(&self, handle: RawMaterialHandle) -> &M {
+        &self.registry.get_ref::<InternalMaterial<M>>(handle).mat
+    }
 
-    // pub fn get_bind_group_layout(&self) -> &BindGroupLayout {
-    //     self.bgl.as_ref().into_common()
-    // }
+    pub fn get_bind_group_layout<M: MaterialTrait>(&self) -> &BindGroupLayout {
+        self.type_info[&TypeId::of::<M>()].bgl.as_ref().into_common()
+    }
 
-    // pub fn cpu_get_bind_group(&self, handle: RawMaterialHandle) -> (&BindGroup, SampleType) {
-    //     let material = self.registry.get(handle);
-    //     (material.bind_group.as_cpu(), material.mat.sample_type)
-    // }
+    pub fn get_internal_material<M: MaterialTrait>(&self, handle: RawMaterialHandle) -> &InternalMaterial<M> {
+        self.registry.get_ref::<InternalMaterial<M>>(handle)
+    }
 
-    // pub fn gpu_get_bind_group(&self) -> &BindGroup {
-    //     self.bg.as_gpu()
-    // }
+    pub fn get_bind_group_gpu<M: MaterialTrait>(&self) -> &BindGroup {
+        self.bg[&TypeId::of::<M>()].as_gpu()
+    }
 
-    // pub fn internal_index(&self, handle: RawMaterialHandle) -> usize {
-    //     self.registry.get_index_of(handle)
-    // }
+    pub fn get_internal_index(&self, handle: RawMaterialHandle) -> usize {
+        self.registry.get_index(handle)
+    }
 
     pub fn ready(&mut self, device: &Device, queue: &Queue, texture_manager: &TextureManager) {
         profiling::scope!("Material Ready");
@@ -214,56 +228,90 @@ impl MaterialManager {
 
         if let ModeData::GPU(ref mut buffer) = self.buffer {
             profiling::scope!("Update GPU Material Buffer");
-            let translate_texture = texture_manager.translation_fn();
+            let mut translate_texture = texture_manager.translation_fn();
+
+            let self_type_info = &self.type_info;
 
             let count: usize = self
                 .registry
                 .architype_lengths()
                 .map(|(ty, len)| {
-                    let type_info = self.type_info[&ty];
+                    let type_info = &self_type_info[&ty];
 
-                    len * (round_up_pot(type_info.texture_count, 16) + round_up_pot(type_info.data_count, 16))
+                    len * (round_up_pot(type_info.texture_count, 16) + round_up_pot(type_info.data_count, 16)) as usize
                 })
                 .sum();
-            
+
+            buffer.ensure_size(device, count as u64);
+
             let mut data = vec![0u8; count];
-            
 
-            
+            let mut offset = 0_usize;
+            for (ty, architype) in self.registry.architypes_mut() {
+                let type_info = &self.type_info[&ty];
 
-            let data: Vec<_> = self
-                .registry
-                .values()
-                .map(|internal| GPUShaderMaterial::from_material(&internal.mat, &translate_texture))
-                .collect();
+                let size = (type_info.write_gpu_materials_fn)(&mut data[offset..], architype, &mut translate_texture);
+                let size = size.max(16);
 
-            let resized = buffer.write_to_buffer(device, queue, bytemuck::cast_slice(&data));
+                self.bg.insert(
+                    ty,
+                    ModeData::GPU(create_gpu_buffer_bg(
+                        device,
+                        type_info.bgl.as_gpu(),
+                        buffer,
+                        offset,
+                        size,
+                    )),
+                );
 
-            if resized {
-                *self.bg.as_gpu_mut() = create_gpu_buffer_bg(device, self.bgl.as_gpu_mut(), self.buffer.as_gpu_mut());
+                offset += size;
             }
+
+            // TODO: I know the size before hand, we could elide this cpu side copy
+            buffer.write_to_buffer(device, queue, bytemuck::cast_slice(&data));
         }
     }
 }
 
-fn create_gpu_buffer_bg(device: &Device, bgl: &BindGroupLayout, buffer: &Buffer) -> BindGroup {
+fn create_gpu_buffer_bg(
+    device: &Device,
+    bgl: &BindGroupLayout,
+    buffer: &Buffer,
+    offset: usize,
+    size: usize,
+) -> BindGroup {
     BindGroupBuilder::new(Some("gpu material bg"))
-        .with_buffer(buffer)
+        .with(BindingResource::Buffer(BufferBinding {
+            buffer,
+            offset: offset as u64,
+            size: Some(NonZeroU64::new(size as u64).unwrap()),
+        }))
         .build(device, bgl)
 }
 
-fn write_gpu_materials<M: MaterialTrait>(mut dest: &mut [u8], vec_any: &VecAny, translation_fn: &mut (dyn FnMut(&TextureHandle) -> NonZeroU32 + '_)) {
+fn write_gpu_materials<'a, M: MaterialTrait>(
+    dest: &mut [u8],
+    vec_any: &VecAny,
+    translation_fn: &mut (dyn FnMut(&TextureHandle) -> NonZeroU32 + '_),
+) -> usize {
     let materials = vec_any.downcast_slice::<ArchitypeResourceStorage<M>>().unwrap();
 
+    let mut offset = 0_usize;
+
     for mat in materials {
-        let mat_size = round_up_pot((mat.data.texture_count() * 4) as usize, 16);
-        mat.data.to_texture(bytemuck::cast_slice_mut(&mut dest[0..mat_size]), translation_fn);
+        let mat_size = round_up_pot(mat.data.texture_count() * 4, 16) as usize;
+        mat.data.to_texture(
+            bytemuck::cast_slice_mut(&mut dest[offset..offset + mat_size]),
+            translation_fn,
+        );
 
-        dest = &mut dest[mat_size..];
+        offset += mat_size;
 
-        let data_size = round_up_pot(mat.data.data_count() as usize, 16);
-        mat.data.to_data(&mut dest[0..data_size]);
+        let data_size = round_up_pot(mat.data.data_count(), 16) as usize;
+        mat.data.to_data(&mut dest[offset..offset + data_size]);
 
-        dest = &mut dest[data_size..];
+        offset += mat_size;
     }
+
+    offset
 }

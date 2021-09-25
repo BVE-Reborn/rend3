@@ -57,18 +57,19 @@ pub fn render_loop<Input, Output>(
                         texture_manager_2d.fill(&handle, desc, texture, view);
                     }
                 }
-                Instruction::AddMaterial { handle, material } => {
+                Instruction::AddMaterial { handle, fill_invoke } => {
                     profiling::scope!("Add Texture Material");
-                    material_manager.fill(
+                    fill_invoke(
+                        &mut material_manager,
                         &renderer.device,
                         renderer.mode,
                         &mut texture_manager_2d,
                         &handle,
-                        material,
                     );
                 }
-                Instruction::ChangeMaterial { handle, material } => {
-                    material_manager.update_from_changes(&renderer.queue, handle, change);
+                Instruction::ChangeMaterial { .. } => {
+                    todo!()
+                    // material_manager.update_from_changes(&renderer.queue, handle, change);
                 }
                 Instruction::AddObject { handle, object } => {
                     object_manager.fill(&handle, object, &mesh_manager);

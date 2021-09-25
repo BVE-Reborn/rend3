@@ -439,7 +439,7 @@ where
             start_idx: object.start_idx,
             count: object.count,
             vertex_offset: object.vertex_offset,
-            material_idx: materials.internal_index(object.material.get_raw()) as u32,
+            material_idx: materials.get_internal_index(object.material.get_raw()) as u32,
             transform: object.transform,
             bounding_sphere: object.sphere,
         }));

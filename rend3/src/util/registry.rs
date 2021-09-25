@@ -1,10 +1,14 @@
 use indexmap::map::IndexMap;
 use list_any::VecAny;
 use rend3_types::{RawResourceHandle, ResourceHandle};
-use std::{any::TypeId, marker::PhantomData, mem::size_of, sync::{
+use std::{
+    any::TypeId,
+    marker::PhantomData,
+    sync::{
         atomic::{AtomicUsize, Ordering},
         Weak,
-    }};
+    },
+};
 
 use crate::util::typedefs::{FastBuildHasher, FastHashMap};
 
@@ -154,8 +158,20 @@ impl<HandleType> ArchitypicalRegistry<HandleType> {
         }
     }
 
-    pub fn architypes(&self) -> impl ExactSizeIterator<Item = (TypeId, &VecAny)> {
-        self.architype_map.iter().map(|(key, value)| (*key, &value.vec))
+    pub fn get_ref<T: Send + Sync + 'static>(&self, handle: RawResourceHandle<HandleType>) -> &T {
+        &self.architype_map[&TypeId::of::<T>()]
+            .vec
+            .downcast_slice::<ArchitypeResourceStorage<T>>()
+            .unwrap()[self.index_map[&handle.idx]]
+            .data
+    }
+
+    pub fn get_index(&self, handle: RawResourceHandle<HandleType>) -> usize {
+        self.index_map[&handle.idx]
+    }
+
+    pub fn architypes_mut(&mut self) -> impl ExactSizeIterator<Item = (TypeId, &mut VecAny)> {
+        self.architype_map.iter_mut().map(|(key, value)| (*key, &mut value.vec))
     }
 
     pub fn architype_lengths(&self) -> impl ExactSizeIterator<Item = (TypeId, usize)> + '_ {
@@ -166,12 +182,16 @@ impl<HandleType> ArchitypicalRegistry<HandleType> {
 fn remove_all_dead<T: Send + Sync + 'static>(vec_any: &mut VecAny, index_map: &mut FastHashMap<usize, usize>) {
     let mut vec = vec_any.downcast_mut::<ArchitypeResourceStorage<T>>().unwrap();
 
-    profiling::scope!(&format!("ArchitypicalRegistry::<{}>::remove_all_dead", std::any::type_name::<T>()));
+    profiling::scope!(&format!(
+        "ArchitypicalRegistry::<{}>::remove_all_dead",
+        std::any::type_name::<T>()
+    ));
     for idx in (0..vec.len()).rev() {
         // SAFETY: We're iterating back to front, removing no more than once per time, so this is always valid.
         let element = unsafe { vec.get_unchecked(idx) };
         if element.refcount.strong_count() == 0 {
             vec.swap_remove(idx);
+            // If we swapped an element, update its value in the index map
             if let Some(resource) = vec.get(idx) {
                 *index_map.get_mut(&resource.handle).unwrap() = idx;
             }
