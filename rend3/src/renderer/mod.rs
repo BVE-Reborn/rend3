@@ -206,8 +206,8 @@ impl Renderer {
         for new_mip in 0..mip_level_count {
             let old_mip = new_mip + texture.start_mip;
 
-            let label = format_sso!("mip {} to {}", old_mip, new_mip);
-            profiling::scope!(&label);
+            let _label = format_sso!("mip {} to {}", old_mip, new_mip);
+            profiling::scope!(&_label);
             // self.profiler.lock().begin_scope(&label, &mut encoder, &self.device);
 
             encoder.copy_texture_to_texture(
@@ -304,7 +304,9 @@ impl Renderer {
     pub fn update_material<M: MaterialTrait>(&self, handle: &MaterialHandle, material: M) {
         self.instructions.producer.lock().push(Instruction::ChangeMaterial {
             handle: handle.get_raw(),
-            material: Box::new(material),
+            change_invoke: Box::new(|material_manager, device, mode, d2_manager, mat_handle| {
+                material_manager.update(device, mode, d2_manager, mat_handle, material)
+            }),
         })
     }
 

@@ -122,7 +122,7 @@ macro_rules! declare_handle {
 declare_handle!(
     MeshHandle<Mesh>,
     TextureHandle<Texture>,
-    MaterialHandle<Material>,
+    MaterialHandle<MaterialTag>,
     ObjectHandle<Object>,
     DirectionalLightHandle<DirectionalLight>
 );
@@ -139,7 +139,7 @@ macro_rules! declare_raw_handle {
 declare_raw_handle!(
     RawMeshHandle<Mesh>,
     RawTextureHandle<Texture>,
-    RawMaterialHandle<Material>,
+    RawMaterialHandle<MaterialTag>,
     RawObjectHandle<Object>,
     RawDirectionalLightHandle<DirectionalLight>
 );
@@ -585,11 +585,13 @@ pub struct TextureFromTexture {
     pub mip_count: Option<NonZeroU32>,
 }
 
-pub type Material = Box<dyn MaterialTrait>;
+pub struct MaterialTag;
 
 pub trait MaterialTrait: Send + Sync + 'static {
-    fn texture_count(&self) -> u32;
-    fn data_count(&self) -> u32;
+    const TEXTURE_COUNT: u32;
+    const DATA_SIZE: u32;
+
+    fn object_key(&self) -> u64;
 
     fn to_texture(
         &self,

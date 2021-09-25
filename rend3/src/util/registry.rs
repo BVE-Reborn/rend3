@@ -105,12 +105,14 @@ pub struct ArchitypeResourceStorage<T> {
 
 struct Architype {
     vec: VecAny,
-    remove_all_dead: fn(&mut VecAny, &mut FastHashMap<usize, usize>),
+    remove_single: fn(&mut VecAny, usize, &mut FastHashMap<usize, usize>),
+    remove_all_dead: fn(&mut VecAny, &mut FastHashMap<usize, usize>, &mut FastHashMap<usize, TypeId>),
 }
 
 pub struct ArchitypicalRegistry<HandleType> {
     architype_map: FastHashMap<TypeId, Architype>,
     index_map: FastHashMap<usize, usize>,
+    handle_architype_map: FastHashMap<usize, TypeId>,
     current_idx: AtomicUsize,
     _phantom: PhantomData<HandleType>,
 }
@@ -120,6 +122,7 @@ impl<HandleType> ArchitypicalRegistry<HandleType> {
         Self {
             architype_map: FastHashMap::default(),
             index_map: FastHashMap::default(),
+            handle_architype_map: FastHashMap::default(),
             current_idx: AtomicUsize::new(0),
             _phantom: PhantomData,
         }
@@ -132,13 +135,12 @@ impl<HandleType> ArchitypicalRegistry<HandleType> {
     }
 
     pub fn insert<T: Send + Sync + 'static>(&mut self, handle: &ResourceHandle<HandleType>, data: T) {
-        let architype = self
-            .architype_map
-            .entry(TypeId::of::<T>())
-            .or_insert_with(|| Architype {
-                vec: VecAny::new::<ArchitypeResourceStorage<T>>(),
-                remove_all_dead: remove_all_dead::<T>,
-            });
+        let type_id = TypeId::of::<T>();
+        let architype = self.architype_map.entry(type_id).or_insert_with(|| Architype {
+            vec: VecAny::new::<ArchitypeResourceStorage<T>>(),
+            remove_all_dead: remove_all_dead::<T>,
+            remove_single: remove_single::<T>,
+        });
         let mut vec = architype.vec.downcast_mut::<ArchitypeResourceStorage<T>>().unwrap();
 
         let vec_index = vec.len();
@@ -148,13 +150,39 @@ impl<HandleType> ArchitypicalRegistry<HandleType> {
             data,
         });
 
-        self.index_map.insert(handle.get_raw().idx, vec_index);
+        let handle_value = handle.get_raw().idx;
+        self.index_map.insert(handle_value, vec_index);
+        self.handle_architype_map.insert(handle_value, type_id);
+    }
+
+    pub fn update<T: Send + Sync + 'static>(&mut self, handle: &ResourceHandle<HandleType>, data: T) {
+        let current_type_id = self.handle_architype_map.get_mut(&handle.get_raw().idx).unwrap();
+        let new_type_id = TypeId::of::<T>();
+
+        let architype = self.architype_map.get_mut(&current_type_id).unwrap();
+        if *current_type_id == new_type_id {
+            // We're just updating the data
+            architype
+                .vec
+                .downcast_slice_mut::<ArchitypeResourceStorage<T>>()
+                .unwrap()[self.index_map[&handle.get_raw().idx]]
+                .data = data;
+        } else {
+            // We need to change architype, so we clean up, then insert with the old handle. We must clean up first, so the value in the index map is still accurate.
+            (architype.remove_single)(
+                &mut architype.vec,
+                self.index_map[&handle.get_raw().idx],
+                &mut self.index_map,
+            );
+
+            self.insert(handle, data);
+        }
     }
 
     pub fn remove_all_dead(&mut self) {
         profiling::scope!("ResourceRegistry::remove_all_dead");
         for architype in self.architype_map.values_mut() {
-            (architype.remove_all_dead)(&mut architype.vec, &mut self.index_map)
+            (architype.remove_all_dead)(&mut architype.vec, &mut self.index_map, &mut self.handle_architype_map);
         }
     }
 
@@ -179,7 +207,28 @@ impl<HandleType> ArchitypicalRegistry<HandleType> {
     }
 }
 
-fn remove_all_dead<T: Send + Sync + 'static>(vec_any: &mut VecAny, index_map: &mut FastHashMap<usize, usize>) {
+fn remove_single<T: Send + Sync + 'static>(
+    vec_any: &mut VecAny,
+    idx: usize,
+    index_map: &mut FastHashMap<usize, usize>,
+) {
+    let mut vec = vec_any.downcast_mut::<ArchitypeResourceStorage<T>>().unwrap();
+
+    vec.swap_remove(idx);
+    // We don't need to remove our value from the index map or the archetype map because
+    // this is only called in the context of an update, where going to update these values anyway.
+
+    // If we swapped an element, update its value in the index map
+    if let Some(resource) = vec.get(idx) {
+        *index_map.get_mut(&resource.handle).unwrap() = idx;
+    }
+}
+
+fn remove_all_dead<T: Send + Sync + 'static>(
+    vec_any: &mut VecAny,
+    index_map: &mut FastHashMap<usize, usize>,
+    handle_architype_map: &mut FastHashMap<usize, TypeId>,
+) {
     let mut vec = vec_any.downcast_mut::<ArchitypeResourceStorage<T>>().unwrap();
 
     profiling::scope!(&format!(
@@ -190,7 +239,10 @@ fn remove_all_dead<T: Send + Sync + 'static>(vec_any: &mut VecAny, index_map: &m
         // SAFETY: We're iterating back to front, removing no more than once per time, so this is always valid.
         let element = unsafe { vec.get_unchecked(idx) };
         if element.refcount.strong_count() == 0 {
-            vec.swap_remove(idx);
+            let old = vec.swap_remove(idx);
+            index_map.remove(&old.handle);
+            handle_architype_map.remove(&old.handle);
+
             // If we swapped an element, update its value in the index map
             if let Some(resource) = vec.get(idx) {
                 *index_map.get_mut(&resource.handle).unwrap() = idx;

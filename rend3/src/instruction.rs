@@ -1,7 +1,7 @@
 use crate::{
     resources::{MaterialManager, TextureManager},
     types::{
-        Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Material, Mesh,
+        Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Mesh,
         Object, RawMaterialHandle, RawObjectHandle,
     },
     RendererMode,
@@ -26,12 +26,12 @@ pub enum Instruction {
         cube: bool,
     },
     AddMaterial {
-        fill_invoke: Box<dyn FnOnce(&mut MaterialManager, &Device, RendererMode, &mut TextureManager, &MaterialHandle)>,
         handle: MaterialHandle,
+        fill_invoke: Box<dyn FnOnce(&mut MaterialManager, &Device, RendererMode, &mut TextureManager, &MaterialHandle)>,
     },
     ChangeMaterial {
         handle: RawMaterialHandle,
-        material: Material,
+        change_invoke: Box<dyn FnOnce(&mut MaterialManager, &Device, RendererMode, &mut TextureManager, &MaterialHandle)>,
     },
     AddObject {
         handle: ObjectHandle,
