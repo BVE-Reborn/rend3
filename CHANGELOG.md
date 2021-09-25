@@ -34,18 +34,19 @@ Per Keep a Changelog there are 6 main categories of changes:
 - rend3-pbr-bake: Added crate for automatic light baking to a texture.
 
 ### Changed
-
 - rend3: renderlists refactored to have a generic Input and Output.
   - `Renderer::renderer` passes through the Input and Output.
   - OutputFrame is now a user-side only utility.
 - rend3: AddTexture* will now create/upload the texture before the call returns.
 - rend3: ResourceHandle<T> now prints the actual reference count while debug printing.
+- rend3 & rend3-gltf: update to wgpu 0.11
 - rend3-pbr: Input is of type `()` and Output is type `&TextureView`.
 - rend3-gltf: Added labels to all the different data types.
 - rend3-gltf: Errors now use a `SsoString` instead of a `String` for the URI.
 - rend3-gltf: All implementation functions no longer write into a single `&mut LoadedGltfScene`, but return their results directly.
 
 ### Fixed
+- rend3: No longer require pipeline rebuilds when bind group length updates.
 - rend3-pbr: fix rendering of cutout objects in shadow passes.
 - rend3-pbr: remove redundant material changes in cpu mode.
 

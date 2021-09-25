@@ -1,8 +1,6 @@
 use crate::{
     instruction::InstructionStreamPair,
-    resources::{
-        CameraManager, DirectionalLightManager, MaterialManager, MeshManager, ObjectManager, TextureManager,
-    },
+    resources::{CameraManager, DirectionalLightManager, MaterialManager, MeshManager, ObjectManager, TextureManager},
     util::mipmap::MipmapGenerator,
     InstanceAdapterDevice, Renderer, RendererInitializationError,
 };
