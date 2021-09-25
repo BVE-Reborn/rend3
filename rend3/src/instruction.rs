@@ -5,7 +5,7 @@ use crate::types::{
 use glam::Mat4;
 use parking_lot::Mutex;
 use rend3_types::{MaterialHandle, MeshHandle, ObjectHandle, RawDirectionalLightHandle, TextureHandle};
-use std::mem;
+use std::{any::Any, mem};
 use wgpu::{CommandBuffer, Texture, TextureDescriptor, TextureView};
 
 pub enum Instruction {
@@ -27,7 +27,7 @@ pub enum Instruction {
     },
     ChangeMaterial {
         handle: RawMaterialHandle,
-        change: MaterialChange,
+        material: Material
     },
     AddObject {
         handle: ObjectHandle,

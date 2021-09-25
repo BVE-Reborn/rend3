@@ -6,7 +6,7 @@ use crate::{
         TextureManager,
     },
     types::{
-        Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Material, MaterialChange,
+        Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Material,
         MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, Texture, TextureHandle,
     },
     util::{mipmap::MipmapGenerator, typedefs::RendererStatistics},
@@ -14,7 +14,7 @@ use crate::{
 };
 use glam::Mat4;
 use parking_lot::{Mutex, RwLock};
-use rend3_types::{MipmapCount, MipmapSource, TextureFromTexture, TextureUsages};
+use rend3_types::{MaterialTrait, MipmapCount, MipmapSource, TextureFromTexture, TextureUsages};
 use std::{num::NonZeroU32, sync::Arc};
 use wgpu::{
     util::DeviceExt, CommandEncoderDescriptor, Device, Extent3d, ImageCopyTexture, ImageDataLayout, Origin3d, Queue,
@@ -289,20 +289,20 @@ impl Renderer {
     /// The handle will keep the material alive. All objects created with this material will also keep this material alive.
     ///
     /// The material will keep the inside textures alive.
-    pub fn add_material(&self, material: Material) -> MaterialHandle {
+    pub fn add_material<M: MaterialTrait>(&self, material: M) -> MaterialHandle {
         let handle = self.material_manager.read().allocate();
         self.instructions.producer.lock().push(Instruction::AddMaterial {
             handle: handle.clone(),
-            material,
+            material: Box::new(material),
         });
         handle
     }
 
     /// Updates a given material. Old references will be dropped.
-    pub fn update_material(&self, handle: &MaterialHandle, change: MaterialChange) {
+    pub fn update_material<M: MaterialTrait>(&self, handle: &MaterialHandle, material: M) {
         self.instructions.producer.lock().push(Instruction::ChangeMaterial {
             handle: handle.get_raw(),
-            change,
+            material: Box::new(material),
         })
     }
 

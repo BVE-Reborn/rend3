@@ -42,6 +42,7 @@ bytemuck = "1"
 flume = "0.10"
 glam = { version = "0.18", features = ["bytemuck"] }
 indexmap = "1"
+list-any = "0.1"
 log = "0.4"
 parking_lot = { version = "0.11" }
 profiling = {version = "1", default-features = false }

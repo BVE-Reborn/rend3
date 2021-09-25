@@ -17,6 +17,7 @@ pub mod common;
 pub mod culling;
 pub mod directional;
 pub mod forward;
+pub mod material;
 pub mod shaders;
 pub mod skybox;
 pub mod tonemapping;

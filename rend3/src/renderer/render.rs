@@ -67,7 +67,7 @@ pub fn render_loop<Input, Output>(
                         material,
                     );
                 }
-                Instruction::ChangeMaterial { handle, change } => {
+                Instruction::ChangeMaterial { handle, material } => {
                     material_manager.update_from_changes(&renderer.queue, handle, change);
                 }
                 Instruction::AddObject { handle, object } => {
