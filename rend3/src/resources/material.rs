@@ -304,7 +304,6 @@ impl MaterialManager {
         handle: &MaterialHandle,
         material: Material,
     ) {
-        texture_manager_2d.ensure_null_view();
         let null_tex = texture_manager_2d.get_null_view();
 
         let material_buffer = mode.into_data(

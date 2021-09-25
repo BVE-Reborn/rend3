@@ -2,7 +2,6 @@ use crate::{
     instruction::InstructionStreamPair,
     resources::{
         CameraManager, DirectionalLightManager, MaterialManager, MeshManager, ObjectManager, TextureManager,
-        STARTING_2D_TEXTURES, STARTING_CUBE_TEXTURES,
     },
     util::mipmap::MipmapGenerator,
     InstanceAdapterDevice, Renderer, RendererInitializationError,
@@ -17,19 +16,20 @@ pub fn create_renderer(
     aspect_ratio: Option<f32>,
 ) -> Result<Arc<Renderer>, RendererInitializationError> {
     let features = iad.device.features();
+    let limits = iad.device.limits();
 
     let camera_manager = RwLock::new(CameraManager::new(Camera::default(), aspect_ratio));
 
     let texture_manager_2d = RwLock::new(TextureManager::new(
         &iad.device,
         iad.mode,
-        STARTING_2D_TEXTURES,
+        limits.max_sampled_textures_per_shader_stage,
         TextureViewDimension::D2,
     ));
     let texture_manager_cube = RwLock::new(TextureManager::new(
         &iad.device,
         iad.mode,
-        STARTING_CUBE_TEXTURES,
+        limits.max_sampled_textures_per_shader_stage,
         TextureViewDimension::Cube,
     ));
     let mesh_manager = RwLock::new(MeshManager::new(&iad.device));
