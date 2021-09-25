@@ -303,7 +303,7 @@ impl Renderer {
     /// Updates a given material. Old references will be dropped.
     pub fn update_material<M: MaterialTrait>(&self, handle: &MaterialHandle, material: M) {
         self.instructions.producer.lock().push(Instruction::ChangeMaterial {
-            handle: handle.get_raw(),
+            handle: handle.clone(),
             change_invoke: Box::new(|material_manager, device, mode, d2_manager, mat_handle| {
                 material_manager.update(device, mode, d2_manager, mat_handle, material)
             }),

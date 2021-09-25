@@ -58,7 +58,7 @@ pub fn render_loop<Input, Output>(
                     }
                 }
                 Instruction::AddMaterial { handle, fill_invoke } => {
-                    profiling::scope!("Add Texture Material");
+                    profiling::scope!("Add Material");
                     fill_invoke(
                         &mut material_manager,
                         &renderer.device,
@@ -67,12 +67,18 @@ pub fn render_loop<Input, Output>(
                         &handle,
                     );
                 }
-                Instruction::ChangeMaterial { .. } => {
-                    todo!()
-                    // material_manager.update_from_changes(&renderer.queue, handle, change);
+                Instruction::ChangeMaterial { handle, change_invoke } => {
+                    profiling::scope!("Change Material");
+
+                    change_invoke(
+                        &mut material_manager,
+                        &renderer.device,
+                        renderer.mode,
+                        &mut texture_manager_2d,
+                        &handle)
                 }
                 Instruction::AddObject { handle, object } => {
-                    object_manager.fill(&handle, object, &mesh_manager);
+                    object_manager.fill(&handle, object, &mesh_manager, &material_manager);
                 }
                 Instruction::SetObjectTransform { handle, transform } => {
                     object_manager.set_object_transform(handle, transform);
@@ -93,7 +99,7 @@ pub fn render_loop<Input, Output>(
 
     // Do these in dependency order
     // Level 2
-    let objects = object_manager.ready();
+    object_manager.ready();
 
     // Level 1
     material_manager.ready(&renderer.device, &renderer.queue, &texture_manager_2d);
@@ -105,7 +111,6 @@ pub fn render_loop<Input, Output>(
     mesh_manager.ready();
 
     let ready = ManagerReadyOutput {
-        objects,
         d2_texture,
         d2c_texture,
         directional_light_cameras,

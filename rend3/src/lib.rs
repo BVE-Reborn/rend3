@@ -79,7 +79,15 @@ pub mod util {
     pub mod math;
     pub mod mipmap;
     pub mod output;
-    pub mod registry;
+    pub mod registry {
+        mod archetypical;
+        mod basic;
+        mod erased;
+
+        pub use archetypical::*;
+        pub use basic::*;
+        pub use erased::*;
+    }
     pub mod typedefs;
 }
 

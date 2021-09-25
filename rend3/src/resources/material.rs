@@ -6,7 +6,7 @@ use crate::{
         bind_merge::BindGroupBuilder,
         buffer::WrappedPotBuffer,
         math::round_up_pot,
-        registry::{ArchitypeResourceStorage, ArchitypicalRegistry},
+        registry::{ArchitypeResourceStorage, ArchitypicalErasedRegistry},
         typedefs::FastHashMap,
     },
     RendererMode,
@@ -15,6 +15,7 @@ use list_any::VecAny;
 use rend3_types::{MaterialTag, MaterialTrait, RawMaterialHandle};
 use std::{
     any::TypeId,
+    mem,
     num::{NonZeroU32, NonZeroU64},
 };
 use wgpu::{
@@ -34,22 +35,26 @@ struct PerTypeInfo {
     bgl: ModeData<BindGroupLayout, BindGroupLayout>,
     data_size: u32,
     texture_count: u32,
-    write_gpu_materials_fn: fn(
-        dest: &mut [u8],
-        vec_any: &VecAny,
-        translation_fn: &mut (dyn FnMut(&TextureHandle) -> NonZeroU32 + '_),
-    ) -> usize,
+    write_gpu_materials_fn: fn(&mut [u8], &VecAny, &mut (dyn FnMut(&TextureHandle) -> NonZeroU32 + '_)) -> usize,
+    get_material_key: fn(vec_any: &VecAny, usize) -> MaterialKeyPair,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, Hash)]
+pub struct MaterialKeyPair {
+    pub ty: TypeId,
+    pub key: u64,
 }
 
 /// Manages materials and their associated BindGroups in CPU modes.
 pub struct MaterialManager {
     bg: FastHashMap<TypeId, ModeData<(), BindGroup>>,
-
     type_info: FastHashMap<TypeId, PerTypeInfo>,
+
+    updates: FastHashMap<usize, MaterialKeyPair>,
 
     buffer: ModeData<(), WrappedPotBuffer>,
 
-    registry: ArchitypicalRegistry<MaterialTag>,
+    registry: ArchitypicalErasedRegistry<MaterialTag>,
 }
 
 impl MaterialManager {
@@ -59,11 +64,12 @@ impl MaterialManager {
             || WrappedPotBuffer::new(device, 0, 16 as _, BufferUsages::STORAGE, Some("material buffer")),
         );
 
-        let registry = ArchitypicalRegistry::new();
+        let registry = ArchitypicalErasedRegistry::new();
 
         Self {
             bg: FastHashMap::default(),
             type_info: FastHashMap::default(),
+            updates: FastHashMap::default(),
             buffer,
             registry,
         }
@@ -122,13 +128,14 @@ impl MaterialManager {
             )
         };
 
-        let ty = TypeId::of::<M>();
+        let ty = TypeId::of::<InternalMaterial<M>>();
 
         self.type_info.entry(ty).or_insert_with(|| PerTypeInfo {
             bgl: create_bgl(),
             data_size: M::DATA_SIZE,
             texture_count: M::TEXTURE_COUNT,
             write_gpu_materials_fn: write_gpu_materials::<M>,
+            get_material_key: get_material_key::<M>,
         })
     }
 
@@ -208,9 +215,19 @@ impl MaterialManager {
         handle: &MaterialHandle,
         material: M,
     ) {
+        let key = material.object_key();
         let internal = self.fill_inner(device, mode, texture_manager_2d, material);
 
-        self.registry.update(handle, internal);
+        // TODO: only mark this as updated if archetype + key has changed
+        let _changed_archetype = self.registry.update(handle, internal);
+
+        self.updates.insert(
+            handle.get_raw().idx,
+            MaterialKeyPair {
+                ty: TypeId::of::<M>(),
+                key,
+            },
+        );
     }
 
     pub fn get_material<M: MaterialTrait>(&self, handle: RawMaterialHandle) -> &M {
@@ -218,7 +235,7 @@ impl MaterialManager {
     }
 
     pub fn get_bind_group_layout<M: MaterialTrait>(&self) -> &BindGroupLayout {
-        self.type_info[&TypeId::of::<M>()].bgl.as_ref().into_common()
+        self.type_info[&TypeId::of::<InternalMaterial<M>>()].bgl.as_ref().into_common()
     }
 
     pub fn get_internal_material<M: MaterialTrait>(&self, handle: RawMaterialHandle) -> &InternalMaterial<M> {
@@ -226,16 +243,30 @@ impl MaterialManager {
     }
 
     pub fn get_bind_group_gpu<M: MaterialTrait>(&self) -> &BindGroup {
-        self.bg[&TypeId::of::<M>()].as_gpu()
+        self.bg[&TypeId::of::<InternalMaterial<M>>()].as_gpu()
+    }
+
+    pub fn get_material_key(&self, handle: RawMaterialHandle) -> MaterialKeyPair {
+        let index = self.registry.get_index(handle);
+        let ty = self.registry.get_type_id(handle);
+        let type_info = &self.type_info[&ty];
+        let arch_vec = self.registry.get_archetype_vector(ty);
+
+        (type_info.get_material_key)(arch_vec, index)
     }
 
     pub fn get_internal_index(&self, handle: RawMaterialHandle) -> usize {
         self.registry.get_index(handle)
     }
 
+    pub fn get_updates(&mut self) -> FastHashMap<usize, MaterialKeyPair> {
+        mem::take(&mut self.updates)
+    }
+
     pub fn ready(&mut self, device: &Device, queue: &Queue, texture_manager: &TextureManager) {
         profiling::scope!("Material Ready");
-        self.registry.remove_all_dead();
+        self.registry
+            .remove_all_dead();
 
         if let ModeData::GPU(ref mut buffer) = self.buffer {
             profiling::scope!("Update GPU Material Buffer");
@@ -325,4 +356,15 @@ fn write_gpu_materials<'a, M: MaterialTrait>(
     }
 
     offset
+}
+
+fn get_material_key<M: MaterialTrait>(vec_any: &VecAny, index: usize) -> MaterialKeyPair {
+    let materials = vec_any.downcast_slice::<ArchitypeResourceStorage<M>>().unwrap();
+
+    let key = materials[index].data.object_key();
+
+    MaterialKeyPair {
+        ty: TypeId::of::<InternalMaterial<M>>(),
+        key,
+    }
 }

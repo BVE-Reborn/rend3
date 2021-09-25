@@ -1,4 +1,3 @@
-use indexmap::map::IndexMap;
 use list_any::VecAny;
 use rend3_types::{RawResourceHandle, ResourceHandle};
 use std::{
@@ -10,92 +9,7 @@ use std::{
     },
 };
 
-use crate::util::typedefs::{FastBuildHasher, FastHashMap};
-
-#[derive(Debug)]
-struct ResourceStorage<T> {
-    refcount: Weak<()>,
-    data: T,
-}
-
-#[derive(Debug)]
-pub struct ResourceRegistry<T, HandleType> {
-    mapping: IndexMap<usize, ResourceStorage<T>, FastBuildHasher>,
-    current_idx: AtomicUsize,
-    _phantom: PhantomData<HandleType>,
-}
-impl<T, HandleType> ResourceRegistry<T, HandleType> {
-    pub fn new() -> Self {
-        Self {
-            mapping: IndexMap::with_hasher(FastBuildHasher::default()),
-            current_idx: AtomicUsize::new(0),
-            _phantom: PhantomData,
-        }
-    }
-
-    pub fn allocate(&self) -> ResourceHandle<HandleType> {
-        let idx = self.current_idx.fetch_add(1, Ordering::Relaxed);
-
-        ResourceHandle::new(idx)
-    }
-
-    pub fn insert(&mut self, handle: &ResourceHandle<HandleType>, data: T) {
-        self.mapping.insert(
-            handle.get_raw().idx,
-            ResourceStorage {
-                refcount: handle.get_weak_refcount(),
-                data,
-            },
-        );
-    }
-
-    pub fn remove_all_dead(&mut self, mut func: impl FnMut(&mut Self, usize, T)) {
-        profiling::scope!("ResourceRegistry::remove_all_dead");
-        for idx in (0..self.mapping.len()).rev() {
-            let element = self.mapping.get_index(idx).unwrap().1;
-            if element.refcount.strong_count() == 0 {
-                let (_, value) = self.mapping.swap_remove_index(idx).unwrap();
-                func(self, idx, value.data)
-            }
-        }
-    }
-
-    pub fn iter(&self) -> impl ExactSizeIterator<Item = (&usize, &T)> + Clone {
-        self.mapping
-            .iter()
-            .map(|(idx, ResourceStorage { data, .. })| (idx, data))
-    }
-
-    pub fn values(&self) -> impl ExactSizeIterator<Item = &T> + Clone {
-        self.mapping.values().map(|ResourceStorage { data, .. }| data)
-    }
-
-    pub fn values_mut(&mut self) -> impl ExactSizeIterator<Item = &mut T> {
-        self.mapping.values_mut().map(|ResourceStorage { data, .. }| data)
-    }
-
-    pub fn get(&self, handle: RawResourceHandle<HandleType>) -> &T {
-        &self.mapping.get(&handle.idx).unwrap().data
-    }
-
-    pub fn get_mut(&mut self, handle: RawResourceHandle<HandleType>) -> &mut T {
-        &mut self.mapping.get_mut(&handle.idx).unwrap().data
-    }
-
-    pub fn get_index_of(&self, handle: RawResourceHandle<HandleType>) -> usize {
-        self.mapping.get_index_of(&handle.idx).unwrap()
-    }
-
-    pub fn count(&self) -> usize {
-        self.mapping.len()
-    }
-}
-
-impl<T, HandleType> Default for ResourceRegistry<T, HandleType> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+use crate::util::typedefs::FastHashMap;
 
 pub struct ArchitypeResourceStorage<T> {
     pub handle: usize,
@@ -106,10 +20,11 @@ pub struct ArchitypeResourceStorage<T> {
 struct Architype {
     vec: VecAny,
     remove_single: fn(&mut VecAny, usize, &mut FastHashMap<usize, usize>),
-    remove_all_dead: fn(&mut VecAny, &mut FastHashMap<usize, usize>, &mut FastHashMap<usize, TypeId>),
+    remove_all_dead:
+        fn(&mut VecAny, &mut FastHashMap<usize, usize>, &mut FastHashMap<usize, TypeId>),
 }
 
-pub struct ArchitypicalRegistry<HandleType> {
+pub struct ArchitypicalErasedRegistry<HandleType> {
     architype_map: FastHashMap<TypeId, Architype>,
     index_map: FastHashMap<usize, usize>,
     handle_architype_map: FastHashMap<usize, TypeId>,
@@ -117,7 +32,7 @@ pub struct ArchitypicalRegistry<HandleType> {
     _phantom: PhantomData<HandleType>,
 }
 
-impl<HandleType> ArchitypicalRegistry<HandleType> {
+impl<HandleType> ArchitypicalErasedRegistry<HandleType> {
     pub fn new() -> Self {
         Self {
             architype_map: FastHashMap::default(),
@@ -155,7 +70,7 @@ impl<HandleType> ArchitypicalRegistry<HandleType> {
         self.handle_architype_map.insert(handle_value, type_id);
     }
 
-    pub fn update<T: Send + Sync + 'static>(&mut self, handle: &ResourceHandle<HandleType>, data: T) {
+    pub fn update<T: Send + Sync + 'static>(&mut self, handle: &ResourceHandle<HandleType>, data: T) -> bool {
         let current_type_id = self.handle_architype_map.get_mut(&handle.get_raw().idx).unwrap();
         let new_type_id = TypeId::of::<T>();
 
@@ -167,6 +82,8 @@ impl<HandleType> ArchitypicalRegistry<HandleType> {
                 .downcast_slice_mut::<ArchitypeResourceStorage<T>>()
                 .unwrap()[self.index_map[&handle.get_raw().idx]]
                 .data = data;
+
+            false
         } else {
             // We need to change architype, so we clean up, then insert with the old handle. We must clean up first, so the value in the index map is still accurate.
             (architype.remove_single)(
@@ -176,6 +93,8 @@ impl<HandleType> ArchitypicalRegistry<HandleType> {
             );
 
             self.insert(handle, data);
+
+            true
         }
     }
 
@@ -196,6 +115,14 @@ impl<HandleType> ArchitypicalRegistry<HandleType> {
 
     pub fn get_index(&self, handle: RawResourceHandle<HandleType>) -> usize {
         self.index_map[&handle.idx]
+    }
+
+    pub fn get_type_id(&self, handle: RawResourceHandle<HandleType>) -> TypeId {
+        self.handle_architype_map[&handle.idx]
+    }
+
+    pub fn get_archetype_vector(&self, ty: TypeId) -> &VecAny {
+        &self.architype_map[&ty].vec
     }
 
     pub fn architypes_mut(&mut self) -> impl ExactSizeIterator<Item = (TypeId, &mut VecAny)> {

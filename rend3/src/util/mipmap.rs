@@ -178,9 +178,9 @@ impl MipmapGenerator {
             let dst_view = &view_window[1];
 
             let src_label = format_sso!("Mipmap level {}", idx);
-            let dst_label = format_sso!("Mipmap level {}", idx + 1);
+            let _dst_label = format_sso!("Mipmap level {}", idx + 1);
 
-            profiling::scope!(&dst_label);
+            profiling::scope!(&_dst_label);
             // profiler.lock().begin_scope(&dst_label, encoder, device);
 
             let bg = BindGroupBuilder::new(Some(&src_label))
