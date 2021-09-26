@@ -253,14 +253,8 @@ impl GpuCuller {
     pub fn cull(&self, args: GpuCullerCullArgs<'_>) -> CulledObjectSet {
         profiling::scope!("Record GPU Culling");
 
-        let uniform_size = mem::size_of::<GPUCullingUniforms>();
-
         let objects = args.objects.get_objects_mut::<PbrMaterial>(args.transparency as u64);
-
-        let mut data = Vec::<u8>::with_capacity(objects.len() * mem::size_of::<GPUCullingInput>() + uniform_size);
-
-        // Allocate space for uniforms to be filled in later
-        data.resize(uniform_size, 0);
+        let count = objects.len();
 
         if let Some(sorting) = args.sort {
             profiling::scope!("Sorting");
@@ -277,15 +271,14 @@ impl GpuCuller {
             }
         }
 
-        let count = build_cull_data(&mut data, args.materials, objects);
-
-        // Fill in the uniforms once we know the size
-        data[0..uniform_size].copy_from_slice(bytemuck::bytes_of(&GPUCullingUniforms {
+        let uniforms = GPUCullingUniforms {
             view: args.camera.view(),
             view_proj: args.camera.view_proj(),
             frustum: ShaderFrustum::from_matrix(args.camera.proj()),
             object_count: count as u32,
-        }));
+        };
+
+        let data = build_cull_data(uniforms, args.materials, objects);
 
         let output_buffer = args.device.create_buffer(&BufferDescriptor {
             label: Some("culling output"),
@@ -402,22 +395,49 @@ impl GpuCuller {
     }
 }
 
-pub fn build_cull_data(data: &mut Vec<u8>, materials: &MaterialManager, objects: &[InternalObject]) -> usize {
+fn build_cull_data(uniforms: GPUCullingUniforms, materials: &MaterialManager, objects: &[InternalObject]) -> Vec<u8> {
     profiling::scope!("Building Input Data");
 
-    let mut count = 0;
-    for object in objects {
-        data.extend_from_slice(bytemuck::bytes_of(&GPUCullingInput {
-            start_idx: object.start_idx,
-            count: object.count,
-            vertex_offset: object.vertex_offset,
-            material_idx: materials.get_internal_index(object.material.get_raw()) as u32,
-            transform: object.transform,
-            bounding_sphere: object.sphere,
-        }));
-        count += 1;
+    let uniform_size = mem::size_of::<GPUCullingUniforms>();
+    let total_length = objects.len() * mem::size_of::<GPUCullingInput>() + uniform_size;
+    let mut data = Vec::<u8>::with_capacity(objects.len() * mem::size_of::<GPUCullingInput>() + uniform_size);
+
+    // This unsafe block measured a bit faster in my tests, and as this is basically _the_ hot path, so this is worthwhile.
+    unsafe {
+        let ptr = data.as_mut_ptr();
+
+        // Assert everything is aligned
+        assert!((ptr as usize).trailing_zeros() >= mem::align_of::<GPUCullingUniforms>().trailing_zeros());
+        assert!((ptr as usize).trailing_zeros() >= mem::align_of::<GPUCullingInput>().trailing_zeros());
+
+        // Things are aligned, so this conversion is safe
+        let uniform_ptr = data.as_mut_ptr() as *mut GPUCullingUniforms;
+        uniform_ptr.write(uniforms);
+
+        // Skip over the uniform data
+        let data_ptr = data.as_mut_ptr().offset(uniform_size as isize) as *mut GPUCullingInput;
+
+        // Iterate over the objects
+        for idx in 0..objects.len() {
+            // We're iterating over 0..len so this is never going to be out of bounds
+            let object = objects.get_unchecked(idx);
+
+            // This is aligned, and we know the vector has enough bytes to hold this, so this is safe
+            data_ptr.offset(idx as isize).write(GPUCullingInput {
+                start_idx: object.start_idx,
+                count: object.count,
+                vertex_offset: object.vertex_offset,
+                material_idx: materials.get_internal_index(object.material.get_raw()) as u32,
+                transform: object.transform,
+                bounding_sphere: object.sphere,
+            });
+        }
+
+        // Everything is initialized now, so set the length
+        data.set_len(total_length);
     }
-    count
+
+    data
 }
 
 pub fn run<'rpass>(rpass: &mut RenderPass<'rpass>, indirect_data: &'rpass GPUIndirectData) {
