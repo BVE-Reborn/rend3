@@ -257,7 +257,7 @@ impl GpuCuller {
 
         let objects = args.objects.get_objects_mut::<PbrMaterial>(args.transparency as u64);
 
-        let mut data = vec![0_u8; objects.len() * mem::size_of::<GPUCullingInput>()];
+        let mut data = Vec::<u8>::with_capacity(objects.len() * mem::size_of::<GPUCullingInput>() + uniform_size);
 
         // Allocate space for uniforms to be filled in later
         data.resize(uniform_size, 0);
