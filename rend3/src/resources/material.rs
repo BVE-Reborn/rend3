@@ -6,7 +6,7 @@ use crate::{
         bind_merge::BindGroupBuilder,
         buffer::WrappedPotBuffer,
         math::round_up_pot,
-        registry::{ArchitypeResourceStorage, ArchitypicalErasedRegistry},
+        registry::{ArchetypeResourceStorage, ArchitypicalErasedRegistry},
         typedefs::FastHashMap,
     },
     RendererMode,
@@ -82,11 +82,11 @@ impl MaterialManager {
         self.registry.allocate()
     }
 
-    pub fn ensure_architype<M: MaterialTrait>(&mut self, device: &Device, mode: RendererMode) {
-        self.ensure_architype_inner::<M>(device, mode);
+    pub fn ensure_archetype<M: MaterialTrait>(&mut self, device: &Device, mode: RendererMode) {
+        self.ensure_archetype_inner::<M>(device, mode);
     }
 
-    fn ensure_architype_inner<M: MaterialTrait>(&mut self, device: &Device, mode: RendererMode) -> &mut PerTypeInfo {
+    fn ensure_archetype_inner<M: MaterialTrait>(&mut self, device: &Device, mode: RendererMode) -> &mut PerTypeInfo {
         let create_bgl = || {
             mode.into_data(
                 || {
@@ -159,7 +159,7 @@ impl MaterialManager {
 
         let mut translation_fn = texture_manager_2d.translation_fn();
 
-        let type_info = self.ensure_architype_inner::<M>(device, mode);
+        let type_info = self.ensure_archetype_inner::<M>(device, mode);
 
         let (bind_group, material_buffer) = if mode == RendererMode::CPUPowered {
             let mut textures = vec![NonZeroU32::new(u32::MAX); M::TEXTURE_COUNT as usize];
@@ -292,7 +292,7 @@ impl MaterialManager {
 
             let bytes: usize = self
                 .registry
-                .architype_lengths()
+                .archetype_lengths()
                 .map(|(ty, len)| {
                     let type_info = &self_type_info[&ty];
 
@@ -306,10 +306,10 @@ impl MaterialManager {
             let mut data = vec![0u8; bytes];
 
             let mut offset = 0_usize;
-            for (ty, architype) in self.registry.architypes_mut() {
+            for (ty, archetype) in self.registry.archetypes_mut() {
                 let type_info = &self.type_info[&ty];
 
-                let size = (type_info.write_gpu_materials_fn)(&mut data[offset..], architype, &mut translate_texture);
+                let size = (type_info.write_gpu_materials_fn)(&mut data[offset..], archetype, &mut translate_texture);
                 let size = size.max(16);
 
                 self.bg.insert(
@@ -354,7 +354,7 @@ fn write_gpu_materials<M: MaterialTrait>(
     translation_fn: &mut (dyn FnMut(&TextureHandle) -> NonZeroU32 + '_),
 ) -> usize {
     let materials = vec_any
-        .downcast_slice::<ArchitypeResourceStorage<InternalMaterial<M>>>()
+        .downcast_slice::<ArchetypeResourceStorage<InternalMaterial<M>>>()
         .unwrap();
 
     let mut offset = 0_usize;
@@ -380,7 +380,7 @@ fn write_gpu_materials<M: MaterialTrait>(
 
 fn get_material_key<M: MaterialTrait>(vec_any: &VecAny, index: usize) -> MaterialKeyPair {
     let materials = vec_any
-        .downcast_slice::<ArchitypeResourceStorage<InternalMaterial<M>>>()
+        .downcast_slice::<ArchetypeResourceStorage<InternalMaterial<M>>>()
         .unwrap();
 
     let key = materials[index].data.mat.object_key();

@@ -62,7 +62,7 @@ impl PbrRenderRoutine {
             let directional_light = renderer.directional_light_manager.read();
             let mut materials = renderer.material_manager.write();
             // TODO(material): figure out a better way for zero materials to work
-            materials.ensure_architype::<PbrMaterial>(&renderer.device, renderer.mode);
+            materials.ensure_archetype::<PbrMaterial>(&renderer.device, renderer.mode);
             PrimaryPasses::new(PrimaryPassesNewArgs {
                 mode: renderer.mode,
                 device: &renderer.device,
