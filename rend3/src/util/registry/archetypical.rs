@@ -23,7 +23,10 @@ struct ArchetypeStorage<T> {
 }
 impl<T> Default for ArchetypeStorage<T> {
     fn default() -> Self {
-        Self { data: Default::default(), metadata: Default::default() }
+        Self {
+            data: Default::default(),
+            metadata: Default::default(),
+        }
     }
 }
 
@@ -31,7 +34,6 @@ struct HandleData<K> {
     key: K,
     index: usize,
 }
-
 
 pub struct ArchetypicalRegistry<K, V, HandleType> {
     archetype_map: FastHashMap<K, ArchetypeStorage<V>>,

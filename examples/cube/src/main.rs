@@ -103,10 +103,10 @@ fn main() {
     // All handles are refcounted, so we only need to hang onto the handle until we make an object.
     let mesh_handle = renderer.add_mesh(mesh);
 
-    // Add basic material with all defaults except a single color.
-    let material = rend3::types::Material {
-        albedo: rend3::types::AlbedoComponent::Value(glam::Vec4::new(0.0, 0.5, 0.5, 1.0)),
-        ..rend3::types::Material::default()
+    // Add PBR material with all defaults except a single color.
+    let material = rend3_pbr::material::PbrMaterial {
+        albedo: rend3_pbr::material::AlbedoComponent::Value(glam::Vec4::new(0.0, 0.5, 0.5, 1.0)),
+        ..rend3_pbr::material::PbrMaterial::default()
     };
     let material_handle = renderer.add_material(material);
 

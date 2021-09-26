@@ -40,8 +40,8 @@ fn load_gltf(
     // Add basic material with all defaults except a single color.
     let material = primitive.material();
     let metallic_roughness = material.pbr_metallic_roughness();
-    let material_handle = renderer.add_material(rend3::types::Material {
-        albedo: rend3::types::AlbedoComponent::Value(metallic_roughness.base_color_factor().into()),
+    let material_handle = renderer.add_material(rend3_pbr::material::PbrMaterial {
+        albedo: rend3_pbr::material::AlbedoComponent::Value(metallic_roughness.base_color_factor().into()),
         ..Default::default()
     });
 

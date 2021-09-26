@@ -6,8 +6,8 @@ use crate::{
         TextureManager,
     },
     types::{
-        Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, MaterialHandle, Mesh,
-        MeshHandle, Object, ObjectHandle, Texture, TextureHandle,
+        Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, MaterialHandle, Mesh, MeshHandle,
+        Object, ObjectHandle, Texture, TextureHandle,
     },
     util::{mipmap::MipmapGenerator, typedefs::RendererStatistics},
     ExtendedAdapterInfo, InstanceAdapterDevice, RenderRoutine, RendererInitializationError, RendererMode,

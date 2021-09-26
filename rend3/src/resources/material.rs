@@ -296,7 +296,8 @@ impl MaterialManager {
                 .map(|(ty, len)| {
                     let type_info = &self_type_info[&ty];
 
-                    len * ((round_up_pot(type_info.texture_count * 4, 16) + round_up_pot(type_info.data_size, 16))) as usize
+                    len * (round_up_pot(type_info.texture_count * 4, 16) + round_up_pot(type_info.data_size, 16))
+                        as usize
                 })
                 .sum();
 

@@ -75,7 +75,8 @@ pub fn render_loop<Input, Output>(
                         &renderer.device,
                         renderer.mode,
                         &mut texture_manager_2d,
-                        &handle)
+                        &handle,
+                    )
                 }
                 Instruction::AddObject { handle, object } => {
                     object_manager.fill(&handle, object, &mesh_manager, &material_manager);

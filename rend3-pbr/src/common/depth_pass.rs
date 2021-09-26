@@ -8,7 +8,12 @@ use wgpu::{
     PrimitiveTopology, RenderPipeline, RenderPipelineDescriptor, StencilState, TextureFormat, VertexState,
 };
 
-use crate::{SampleCount, common::{interfaces::ShaderInterfaces, shaders::mode_safe_shader}, material::PbrMaterial, vertex::{cpu_vertex_buffers, gpu_vertex_buffers}};
+use crate::{
+    common::{interfaces::ShaderInterfaces, shaders::mode_safe_shader},
+    material::PbrMaterial,
+    vertex::{cpu_vertex_buffers, gpu_vertex_buffers},
+    SampleCount,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DepthPassType {

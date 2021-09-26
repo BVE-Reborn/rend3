@@ -8,7 +8,7 @@ use std::{
     },
 };
 
-use crate::util::typedefs::{FastBuildHasher};
+use crate::util::typedefs::FastBuildHasher;
 
 #[derive(Debug)]
 struct ResourceStorage<T> {

@@ -6,7 +6,12 @@ use wgpu::{
     PrimitiveTopology, RenderPipeline, RenderPipelineDescriptor, StencilState, TextureFormat, VertexState,
 };
 
-use crate::{SampleCount, common::{interfaces::ShaderInterfaces, shaders::mode_safe_shader}, material::{PbrMaterial, TransparencyType}, vertex::{cpu_vertex_buffers, gpu_vertex_buffers}};
+use crate::{
+    common::{interfaces::ShaderInterfaces, shaders::mode_safe_shader},
+    material::{PbrMaterial, TransparencyType},
+    vertex::{cpu_vertex_buffers, gpu_vertex_buffers},
+    SampleCount,
+};
 
 /// Determines if vertices will be projected, or outputted in uv2 space.
 #[derive(Clone)]
