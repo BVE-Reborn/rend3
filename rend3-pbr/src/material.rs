@@ -1,6 +1,6 @@
 use std::mem;
 
-use glam::{Mat3, Mat3A, Vec3, Vec3A, Vec4};
+use glam::{Mat3, Mat3A, Vec3, Vec4};
 use rend3::types::{MaterialTrait, TextureHandle};
 
 bitflags::bitflags! {
@@ -483,16 +483,16 @@ impl MaterialTrait for PbrMaterial {
         slice: &mut [Option<std::num::NonZeroU32>],
         translation_fn: &mut (dyn FnMut(&TextureHandle) -> std::num::NonZeroU32 + '_),
     ) {
-        slice[0] = self.albedo.to_texture(translation_fn);
-        slice[1] = self.normal.to_texture(translation_fn);
-        slice[2] = self.aomr_textures.to_roughness_texture(translation_fn);
-        slice[3] = self.aomr_textures.to_metallic_texture(translation_fn);
-        slice[4] = self.reflectance.to_texture(translation_fn);
-        slice[5] = self.clearcoat_textures.to_clearcoat_texture(translation_fn);
-        slice[6] = self.clearcoat_textures.to_clearcoat_roughness_texture(translation_fn);
-        slice[7] = self.emissive.to_texture(translation_fn);
-        slice[8] = self.anisotropy.to_texture(translation_fn);
-        slice[9] = self.aomr_textures.to_ao_texture(translation_fn);
+        slice[0] = self.albedo.to_texture(&mut *translation_fn);
+        slice[1] = self.normal.to_texture(&mut *translation_fn);
+        slice[2] = self.aomr_textures.to_roughness_texture(&mut *translation_fn);
+        slice[3] = self.aomr_textures.to_metallic_texture(&mut *translation_fn);
+        slice[4] = self.reflectance.to_texture(&mut *translation_fn);
+        slice[5] = self.clearcoat_textures.to_clearcoat_texture(&mut *translation_fn);
+        slice[6] = self.clearcoat_textures.to_clearcoat_roughness_texture(&mut *translation_fn);
+        slice[7] = self.emissive.to_texture(&mut *translation_fn);
+        slice[8] = self.anisotropy.to_texture(&mut *translation_fn);
+        slice[9] = self.aomr_textures.to_ao_texture(&mut *translation_fn);
     }
 
     fn to_data(&self, slice: &mut [u8]) {

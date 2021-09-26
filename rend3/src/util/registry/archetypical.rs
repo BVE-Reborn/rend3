@@ -12,10 +12,19 @@ use rend3_types::{RawResourceHandle, ResourceHandle};
 use crate::util::typedefs::FastHashMap;
 
 #[derive(Debug)]
-struct ResourceStorage<T> {
+struct ResourceMetadata {
     handle: usize,
     refcount: Weak<()>,
-    data: T,
+}
+
+struct ArchetypeStorage<T> {
+    data: Vec<T>,
+    metadata: Vec<ResourceMetadata>,
+}
+impl<T> Default for ArchetypeStorage<T> {
+    fn default() -> Self {
+        Self { data: Default::default(), metadata: Default::default() }
+    }
 }
 
 struct HandleData<K> {
@@ -23,8 +32,9 @@ struct HandleData<K> {
     index: usize,
 }
 
+
 pub struct ArchetypicalRegistry<K, V, HandleType> {
-    archetype_map: FastHashMap<K, Vec<ResourceStorage<V>>>,
+    archetype_map: FastHashMap<K, ArchetypeStorage<V>>,
     handle_info: FastHashMap<usize, HandleData<K>>,
     current_idx: AtomicUsize,
     _phantom: PhantomData<HandleType>,
@@ -49,13 +59,13 @@ where
     }
 
     pub fn insert(&mut self, handle: &ResourceHandle<HandleType>, data: V, key: K) {
-        let vec = self.archetype_map.entry(key).or_default();
+        let storage = self.archetype_map.entry(key).or_default();
 
-        let index = vec.len();
-        vec.push(ResourceStorage {
+        let index = storage.data.len();
+        storage.data.push(data);
+        storage.metadata.push(ResourceMetadata {
             handle: handle.get_raw().idx,
             refcount: handle.get_weak_refcount(),
-            data,
         });
 
         self.handle_info.insert(handle.get_raw().idx, HandleData { key, index });
@@ -63,15 +73,18 @@ where
 
     pub fn remove_all_dead(&mut self) {
         for archetype in self.archetype_map.values_mut() {
-            for idx in (0..archetype.len()).rev() {
+            let length = archetype.data.len();
+            debug_assert_eq!(length, archetype.metadata.len());
+            for idx in (0..length).rev() {
                 // SAFETY: We're iterating back to front, removing no more than once per time, so this is always valid.
-                let element = unsafe { archetype.get_unchecked(idx) };
-                if element.refcount.strong_count() == 0 {
-                    let value = archetype.swap_remove(idx);
-                    self.handle_info.remove(&value.handle);
+                let metadata = unsafe { archetype.metadata.get_unchecked(idx) };
+                if metadata.refcount.strong_count() == 0 {
+                    let _ = archetype.data.swap_remove(idx);
+                    let metadata = archetype.metadata.swap_remove(idx);
+                    self.handle_info.remove(&metadata.handle);
 
                     // If we swapped an element, update its value in the index map
-                    if let Some(resource) = archetype.get_mut(idx) {
+                    if let Some(resource) = archetype.metadata.get_mut(idx) {
                         self.handle_info.get_mut(&resource.handle).unwrap().index = idx;
                     }
                 }
@@ -81,7 +94,16 @@ where
 
     pub fn get_value_mut(&mut self, handle: RawResourceHandle<HandleType>) -> &mut V {
         let handle_info = &self.handle_info[&handle.idx];
-        &mut self.archetype_map.get_mut(&handle_info.key).unwrap()[handle_info.index].data
+        &mut self.archetype_map.get_mut(&handle_info.key).unwrap().data[handle_info.index]
+    }
+
+    pub fn get_archetype_vector(&self, key: &K) -> &[V] {
+        &self.archetype_map[key].data
+    }
+
+    // TODO(material): runtime borrow checking
+    pub fn get_archetype_vector_mut(&mut self, key: &K) -> &mut [V] {
+        &mut self.archetype_map.get_mut(key).unwrap().data
     }
 }
 

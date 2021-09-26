@@ -1,16 +1,12 @@
 use arrayvec::ArrayVec;
-use rend3::{resources::MaterialManager, types::TransparencyType, ModeData, RendererMode};
+use rend3::{resources::MaterialManager, ModeData, RendererMode};
 use wgpu::{
     BindGroupLayout, BlendState, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState, DepthStencilState,
     Device, Face, FragmentState, FrontFace, MultisampleState, PipelineLayoutDescriptor, PolygonMode, PrimitiveState,
     PrimitiveTopology, RenderPipeline, RenderPipelineDescriptor, StencilState, TextureFormat, VertexState,
 };
 
-use crate::{
-    common::{interfaces::ShaderInterfaces, shaders::mode_safe_shader},
-    vertex::{cpu_vertex_buffers, gpu_vertex_buffers},
-    SampleCount,
-};
+use crate::{SampleCount, common::{interfaces::ShaderInterfaces, shaders::mode_safe_shader}, material::{PbrMaterial, TransparencyType}, vertex::{cpu_vertex_buffers, gpu_vertex_buffers}};
 
 /// Determines if vertices will be projected, or outputted in uv2 space.
 #[derive(Clone)]
@@ -73,7 +69,7 @@ pub fn build_forward_pass_shader(args: BuildForwardPassShaderArgs<'_>) -> Render
     bgls.push(&args.interfaces.culled_object_bgl);
     bgls.push(args.directional_light_bgl);
     bgls.push(&args.interfaces.uniform_bgl);
-    bgls.push(args.materials.get_bind_group_layout());
+    bgls.push(args.materials.get_bind_group_layout::<PbrMaterial>());
     if args.mode == RendererMode::GPUPowered {
         bgls.push(args.texture_bgl.as_gpu())
     }

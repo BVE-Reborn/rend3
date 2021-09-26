@@ -3,8 +3,7 @@ use std::{mem, num::NonZeroU64};
 use glam::Mat4;
 use ordered_float::OrderedFloat;
 use rend3::{
-    resources::{CameraManager, InternalObject, MaterialManager},
-    types::Material,
+    resources::{CameraManager, InternalObject, MaterialManager, ObjectManager},
     util::{bind_merge::BindGroupBuilder, frustum::ShaderFrustum},
     ModeData,
 };
@@ -19,6 +18,7 @@ use wgpu::{
 use crate::{
     common::interfaces::{PerObjectData, ShaderInterfaces},
     culling::{CulledObjectSet, GPUCullingInput, GPUIndirectData, Sorting},
+    material::{PbrMaterial, TransparencyType},
     shaders::SPIRV_SHADERS,
 };
 
@@ -34,10 +34,7 @@ struct GPUCullingUniforms {
 unsafe impl bytemuck::Pod for GPUCullingUniforms {}
 unsafe impl bytemuck::Zeroable for GPUCullingUniforms {}
 
-pub struct GpuCullerCullArgs<'a, FilterFn>
-where
-    FilterFn: FnMut(&InternalObject, &Material) -> bool,
-{
+pub struct GpuCullerCullArgs<'a> {
     pub device: &'a Device,
     pub encoder: &'a mut CommandEncoder,
 
@@ -46,8 +43,9 @@ where
     pub materials: &'a MaterialManager,
     pub camera: &'a CameraManager,
 
-    pub objects: &'a [InternalObject],
-    pub filter: FilterFn,
+    pub objects: &'a mut ObjectManager,
+
+    pub transparency: TransparencyType,
     pub sort: Option<Sorting>,
 }
 
@@ -252,48 +250,34 @@ impl GpuCuller {
         }
     }
 
-    pub fn cull<FilterFn>(&self, mut args: GpuCullerCullArgs<'_, FilterFn>) -> CulledObjectSet
-    where
-        FilterFn: FnMut(&InternalObject, &Material) -> bool,
-    {
+    pub fn cull(&self, args: GpuCullerCullArgs<'_>) -> CulledObjectSet {
         profiling::scope!("Record GPU Culling");
 
         let uniform_size = mem::size_of::<GPUCullingUniforms>();
 
-        let mut data = Vec::<u8>::with_capacity(args.objects.len() * mem::size_of::<GPUCullingInput>());
+        let objects = args.objects.get_objects_mut::<PbrMaterial>(args.transparency as u64);
+
+        let mut data = Vec::<u8>::with_capacity(objects.len() * mem::size_of::<GPUCullingInput>());
 
         // Allocate space for uniforms to be filled in later
         data.resize(uniform_size, 0);
 
-        let count = if let Some(sorting) = args.sort {
+        if let Some(sorting) = args.sort {
             profiling::scope!("Sorting");
-            let mut objects: Vec<_> = args
-                .objects
-                .iter()
-                .map(|o| {
-                    let distance = args.camera.get_data().location.distance_squared(o.location);
-                    (o, OrderedFloat(distance))
-                })
-                .collect();
+
+            let camera_location = args.camera.get_data().location;
 
             match sorting {
                 Sorting::FrontToBack => {
-                    objects.sort_unstable_by(|(_, lh_distance), (_, rh_distance)| lh_distance.cmp(rh_distance))
+                    objects.sort_unstable_by_key(|o| OrderedFloat(o.location.distance_squared(camera_location)));
                 }
                 Sorting::BackToFront => {
-                    objects.sort_unstable_by(|(_, lh_distance), (_, rh_distance)| rh_distance.cmp(lh_distance))
+                    objects.sort_unstable_by_key(|o| OrderedFloat(-o.location.distance_squared(camera_location)));
                 }
             }
+        }
 
-            build_cull_data(
-                &mut data,
-                args.materials,
-                &mut args.filter,
-                objects.into_iter().map(|(o, _)| o),
-            )
-        } else {
-            build_cull_data(&mut data, args.materials, &mut args.filter, args.objects.iter())
-        };
+        let count = build_cull_data(&mut data, args.materials, objects);
 
         // Fill in the uniforms once we know the size
         data[0..uniform_size].copy_from_slice(bytemuck::bytes_of(&GPUCullingUniforms {
@@ -418,23 +402,11 @@ impl GpuCuller {
     }
 }
 
-pub fn build_cull_data<'a, FilterFn>(
-    data: &mut Vec<u8>,
-    materials: &MaterialManager,
-    filter: &mut FilterFn,
-    objects: impl ExactSizeIterator<Item = &'a InternalObject>,
-) -> usize
-where
-    FilterFn: FnMut(&InternalObject, &Material) -> bool,
-{
-    profiling::scope!("Filtering Building Input Data");
+pub fn build_cull_data(data: &mut Vec<u8>, materials: &MaterialManager, objects: &[InternalObject]) -> usize {
+    profiling::scope!("Building Input Data");
 
     let mut count = 0;
     for object in objects {
-        if !filter(object, materials.get_material(object.material.get_raw())) {
-            continue;
-        }
-
         data.extend_from_slice(bytemuck::bytes_of(&GPUCullingInput {
             start_idx: object.start_idx,
             count: object.count,

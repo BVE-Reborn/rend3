@@ -151,44 +151,48 @@ impl MaterialManager {
     ) -> InternalMaterial<M> {
         let null_tex = texture_manager_2d.get_null_view();
 
-        let material_buffer = mode.into_data(
-            || {
-                // TODO: stack allocation
-                let mut data = vec![0u8; M::DATA_SIZE as usize];
-                material.to_data(&mut data);
-
-                device.create_buffer_init(&BufferInitDescriptor {
-                    label: None,
-                    contents: &data,
-                    usage: BufferUsages::COPY_DST | BufferUsages::UNIFORM,
-                })
-            },
-            || (),
-        );
-
         let mut translation_fn = texture_manager_2d.translation_fn();
 
         let type_info = self.ensure_architype::<M>(device, mode);
 
-        let bind_group = mode.into_data(
-            || {
-                let mut textures = vec![NonZeroU32::new(u32::MAX); M::TEXTURE_COUNT as usize];
-                material.to_textures(&mut textures, &mut translation_fn);
+        let (bind_group, material_buffer) = if mode == RendererMode::CPUPowered {
+            let mut textures = vec![NonZeroU32::new(u32::MAX); M::TEXTURE_COUNT as usize];
+            material.to_textures(&mut textures, &mut translation_fn);
 
-                let mut builder = BindGroupBuilder::new(None);
-                for texture in textures {
-                    builder.append(BindingResource::TextureView(
-                        texture
-                            .map(|tex| texture_manager_2d.get_view_from_index(tex))
-                            .unwrap_or(null_tex),
-                    ));
-                }
-                builder
-                    .with_buffer(material_buffer.as_cpu())
-                    .build(device, type_info.bgl.as_ref().as_cpu())
-            },
-            || (),
-        );
+            // TODO(material): stack allocation
+            let material_uprounded = round_up_pot(M::DATA_SIZE, 16) as usize;
+            let actual_size = material_uprounded + round_up_pot(TEXTURE_MASK_SIZE, 16) as usize;
+            let mut data = vec![0u8; actual_size as usize];
+            material.to_data(&mut data);
+
+            let mut builder = BindGroupBuilder::new(None);
+            let mut texture_mask = 0_u32;
+            for (idx, texture) in textures.into_iter().enumerate() {
+                builder.append(BindingResource::TextureView(
+                    texture
+                        .map(|tex| texture_manager_2d.get_view_from_index(tex))
+                        .unwrap_or(null_tex),
+                ));
+                let enabled = texture.is_some();
+                texture_mask |= (enabled as u32) << (1 << idx as u32);
+            }
+
+            *bytemuck::from_bytes_mut(&mut data[material_uprounded..material_uprounded + 4]) = texture_mask;
+
+            let material_buffer = device.create_buffer_init(&BufferInitDescriptor {
+                label: None,
+                contents: &data,
+                usage: BufferUsages::COPY_DST | BufferUsages::UNIFORM,
+            });
+
+            let bind_group = builder
+                .with_buffer(&material_buffer)
+                .build(device, type_info.bgl.as_ref().as_cpu());
+
+            (ModeData::CPU(bind_group), ModeData::CPU(material_buffer))
+        } else {
+            (ModeData::GPU(()), ModeData::GPU(()))
+        };
 
         InternalMaterial {
             bind_group,
@@ -218,10 +222,11 @@ impl MaterialManager {
         handle: &MaterialHandle,
         material: M,
     ) {
+        // TODO(material): if this doesn't change archetype, this should do a buffer write cpu side.
         let key = material.object_key();
         let internal = self.fill_inner(device, mode, texture_manager_2d, material);
 
-        // TODO: only mark this as updated if archetype + key has changed
+        // TODO(material): only mark this as updated if archetype + key has changed
         let _changed_archetype = self.registry.update(handle, internal);
 
         self.updates.insert(
@@ -285,9 +290,7 @@ impl MaterialManager {
                 .map(|(ty, len)| {
                     let type_info = &self_type_info[&ty];
 
-                    len * (round_up_pot(type_info.texture_count, 16)
-                        + round_up_pot(type_info.data_size, 16)
-                        + round_up_pot(TEXTURE_MASK_SIZE, 16)) as usize
+                    len * (round_up_pot(type_info.texture_count, 16) + round_up_pot(type_info.data_size, 16)) as usize
                 })
                 .sum();
 
@@ -316,7 +319,7 @@ impl MaterialManager {
                 offset += size;
             }
 
-            // TODO: I know the size before hand, we could elide this cpu side copy
+            // TODO(material): I know the size before hand, we could elide this cpu side copy
             buffer.write_to_buffer(device, queue, bytemuck::cast_slice(&data));
         }
     }
@@ -353,23 +356,12 @@ fn write_gpu_materials<M: MaterialTrait>(
         let texture_slice = bytemuck::cast_slice_mut(&mut dest[offset..offset + texture_bytes]);
         mat.data.to_textures(texture_slice, translation_fn);
 
-        let mut texture_enable_mask = 0_u32;
-        for (idx, texture) in texture_slice.iter().enumerate() {
-            let enabled = texture.is_some();
-            texture_enable_mask |= (enabled as u32) << (idx as u32)
-        }
-
         offset += mat_size;
 
         let data_size = round_up_pot(M::DATA_SIZE, 16) as usize;
         mat.data.to_data(&mut dest[offset..offset + M::DATA_SIZE as usize]);
 
         offset += data_size;
-
-        let mask_size = round_up_pot(TEXTURE_MASK_SIZE, 16) as usize;
-        *bytemuck::from_bytes_mut(&mut dest[offset..offset + TEXTURE_MASK_SIZE as usize]) = texture_enable_mask;
-
-        offset += mask_size;
     }
 
     offset

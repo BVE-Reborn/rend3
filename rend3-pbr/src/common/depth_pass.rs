@@ -8,11 +8,7 @@ use wgpu::{
     PrimitiveTopology, RenderPipeline, RenderPipelineDescriptor, StencilState, TextureFormat, VertexState,
 };
 
-use crate::{
-    common::{interfaces::ShaderInterfaces, shaders::mode_safe_shader},
-    vertex::{cpu_vertex_buffers, gpu_vertex_buffers},
-    SampleCount,
-};
+use crate::{SampleCount, common::{interfaces::ShaderInterfaces, shaders::mode_safe_shader}, material::PbrMaterial, vertex::{cpu_vertex_buffers, gpu_vertex_buffers}};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DepthPassType {
@@ -76,7 +72,7 @@ pub fn build_depth_pass_shader(args: BuildDepthPassShaderArgs) -> DepthPassPipel
     let mut bgls: ArrayVec<&BindGroupLayout, 4> = ArrayVec::new();
     bgls.push(&args.interfaces.samplers_bgl);
     bgls.push(&args.interfaces.culled_object_bgl);
-    bgls.push(args.materials.get_bind_group_layout());
+    bgls.push(args.materials.get_bind_group_layout::<PbrMaterial>());
     if args.mode == RendererMode::GPUPowered {
         bgls.push(args.texture_bgl.as_gpu())
     }

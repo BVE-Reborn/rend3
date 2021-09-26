@@ -1,8 +1,7 @@
 use glam::{Mat3, Mat3A, Mat4};
 use ordered_float::OrderedFloat;
 use rend3::{
-    resources::{CameraManager, InternalObject, MaterialManager},
-    types::{Material, SampleType},
+    resources::{CameraManager, InternalObject, MaterialManager, ObjectManager},
     util::frustum::ShaderFrustum,
     ModeData,
 };
@@ -17,21 +16,18 @@ use crate::{
         samplers::Samplers,
     },
     culling::{CPUDrawCall, CulledObjectSet, Sorting},
+    material::{PbrMaterial, SampleType, TransparencyType},
 };
 
-pub struct CpuCullerCullArgs<'a, FilterFn>
-where
-    FilterFn: FnMut(&InternalObject, &Material) -> bool,
-{
+pub struct CpuCullerCullArgs<'a> {
     pub device: &'a Device,
     pub camera: &'a CameraManager,
 
     pub interfaces: &'a ShaderInterfaces,
 
-    pub materials: &'a MaterialManager,
+    pub objects: &'a mut ObjectManager,
 
-    pub objects: &'a [InternalObject],
-    pub filter: FilterFn,
+    pub transparency: TransparencyType,
 
     pub sort: Option<Sorting>,
 }
@@ -43,53 +39,30 @@ impl CpuCuller {
         Self {}
     }
 
-    pub fn cull<FilterFn>(&self, mut args: CpuCullerCullArgs<'_, FilterFn>) -> CulledObjectSet
-    where
-        FilterFn: FnMut(&InternalObject, &Material) -> bool,
-    {
+    pub fn cull(&self, args: CpuCullerCullArgs<'_>) -> CulledObjectSet {
         profiling::scope!("CPU Culling");
         let frustum = ShaderFrustum::from_matrix(args.camera.proj());
         let view = args.camera.view();
         let view_proj = args.camera.view_proj();
 
-        let (mut outputs, calls) = if let Some(sorting) = args.sort {
+        let objects = args.objects.get_objects_mut::<PbrMaterial>(args.transparency as u64);
+
+        if let Some(sorting) = args.sort {
             profiling::scope!("Sorting");
-            let mut objects: Vec<_> = args
-                .objects
-                .iter()
-                .map(|o| {
-                    let distance = args.camera.get_data().location.distance_squared(o.location);
-                    (o, OrderedFloat(distance))
-                })
-                .collect();
+
+            let camera_location = args.camera.get_data().location;
 
             match sorting {
                 Sorting::FrontToBack => {
-                    objects.sort_unstable_by(|(_, lh_distance), (_, rh_distance)| lh_distance.cmp(rh_distance))
+                    objects.sort_unstable_by_key(|o| OrderedFloat(o.location.distance_squared(camera_location)));
                 }
                 Sorting::BackToFront => {
-                    objects.sort_unstable_by(|(_, lh_distance), (_, rh_distance)| rh_distance.cmp(lh_distance))
+                    objects.sort_unstable_by_key(|o| OrderedFloat(-o.location.distance_squared(camera_location)));
                 }
             }
+        }
 
-            cull_internal(
-                args.materials,
-                &mut args.filter,
-                objects.into_iter().map(|(o, _)| o),
-                frustum,
-                view,
-                view_proj,
-            )
-        } else {
-            cull_internal(
-                args.materials,
-                &mut args.filter,
-                args.objects.iter(),
-                frustum,
-                view,
-                view_proj,
-            )
-        };
+        let (mut outputs, calls) = cull_internal(objects, frustum, view, view_proj);
 
         assert_eq!(calls.len(), outputs.len());
 
@@ -131,25 +104,16 @@ impl Default for CpuCuller {
     }
 }
 
-pub fn cull_internal<'a, FilterFn>(
-    materials: &MaterialManager,
-    filter: &mut FilterFn,
-    objects: impl ExactSizeIterator<Item = &'a InternalObject>,
+pub fn cull_internal(
+    objects: &[InternalObject],
     frustum: ShaderFrustum,
     view: Mat4,
     view_proj: Mat4,
-) -> (Vec<PerObjectData>, Vec<CPUDrawCall>)
-where
-    FilterFn: FnMut(&InternalObject, &Material) -> bool,
-{
+) -> (Vec<PerObjectData>, Vec<CPUDrawCall>) {
     let mut outputs = Vec::with_capacity(objects.len());
     let mut calls = Vec::with_capacity(objects.len());
 
-    for object in objects.into_iter() {
-        if !filter(object, materials.get_material(object.material.get_raw())) {
-            continue;
-        }
-
+    for object in objects {
         let model = object.transform;
         let model_view = view * model;
 
@@ -194,7 +158,9 @@ pub fn run<'rpass>(
     for (idx, draw) in draws.iter().enumerate() {
         if previous_mat_handle != Some(draw.material_handle) {
             previous_mat_handle = Some(draw.material_handle);
-            let (material_bind_group, sample_type) = materials.cpu_get_bind_group(draw.material_handle);
+            // TODO(material): only resolve the archetype lookup once
+            let material = materials.get_internal_material::<PbrMaterial>(draw.material_handle);
+            let sample_type = material.mat.sample_type;
 
             // As a workaround for OpenGL's combined samplers, we need to manually swap the linear and nearest samplers so that shader code can think it's always using linear.
             if state_sample_type != sample_type {
@@ -206,7 +172,7 @@ pub fn run<'rpass>(
                 rpass.set_bind_group(samplers_binding_index, bg, &[]);
             }
 
-            rpass.set_bind_group(material_binding_index, material_bind_group, &[]);
+            rpass.set_bind_group(material_binding_index, material.bind_group.as_ref().as_cpu(), &[]);
         }
         let idx = idx as u32;
         rpass.draw_indexed(draw.start_idx..draw.end_idx, draw.vertex_offset, idx..idx + 1);

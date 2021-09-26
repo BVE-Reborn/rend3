@@ -13,6 +13,8 @@ use wgpu::{
 
 pub use utils::*;
 
+use crate::material::TransparencyType;
+
 pub mod common;
 pub mod culling;
 pub mod directional;
@@ -142,6 +144,8 @@ impl RenderRoutine<(), &TextureView> for PbrRenderRoutine {
         let materials = renderer.material_manager.read();
         let d2c_textures = renderer.d2c_texture_manager.read();
         let camera_manager = renderer.camera_manager.read();
+        // TODO(material): let this be read
+        let mut object_manager = renderer.object_manager.write();
 
         self.primary_passes.skybox_pass.update_skybox(skybox::UpdateSkyboxArgs {
             device: &renderer.device,
@@ -164,7 +168,7 @@ impl RenderRoutine<(), &TextureView> for PbrRenderRoutine {
                     interfaces: &self.interfaces,
                     lights: &directional_light,
                     directional_light_cameras: &ready.directional_light_cameras,
-                    objects: &ready.objects,
+                    objects: &mut object_manager,
                 });
 
         profiler.begin_scope("forward culling", &mut encoder, &renderer.device);
@@ -177,7 +181,7 @@ impl RenderRoutine<(), &TextureView> for PbrRenderRoutine {
             materials: &materials,
             interfaces: &self.interfaces,
             camera: &camera_manager,
-            objects: &ready.objects,
+            objects: &mut object_manager,
         });
 
         let cutout_culled_objects = self.primary_passes.cutout_pass.cull(forward::ForwardPassCullArgs {
@@ -188,7 +192,7 @@ impl RenderRoutine<(), &TextureView> for PbrRenderRoutine {
             materials: &materials,
             interfaces: &self.interfaces,
             camera: &camera_manager,
-            objects: &ready.objects,
+            objects: &mut object_manager,
         });
 
         let opaque_culled_objects = self.primary_passes.opaque_pass.cull(forward::ForwardPassCullArgs {
@@ -199,7 +203,7 @@ impl RenderRoutine<(), &TextureView> for PbrRenderRoutine {
             materials: &materials,
             interfaces: &self.interfaces,
             camera: &camera_manager,
-            objects: &ready.objects,
+            objects: &mut object_manager,
         });
 
         profiler.end_scope(&mut encoder);

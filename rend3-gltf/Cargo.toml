@@ -20,6 +20,7 @@ gltf = { version = "0.16", default-features = false, features = ["KHR_lights_pun
 image = { version = "0.23", default-features = false }
 log = "0.4"
 rend3 = { version = "^0.1.0", path = "../rend3" }
+rend3-pbr = { version = "^0.1.0", path = "../rend3-pbr" }
 rustc-hash = "1"
 thiserror = "1"
 

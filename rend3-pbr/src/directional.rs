@@ -2,8 +2,7 @@ use std::sync::Arc;
 
 use rend3::{
     format_sso,
-    resources::{CameraManager, DirectionalLightManager, InternalObject, MaterialManager, MeshBuffers},
-    types::TransparencyType,
+    resources::{CameraManager, DirectionalLightManager, MaterialManager, MeshBuffers, ObjectManager},
     ModeData,
 };
 use wgpu::{
@@ -20,6 +19,7 @@ use crate::{
         gpu::{GpuCuller, GpuCullerCullArgs},
         CulledObjectSet,
     },
+    material::{PbrMaterial, TransparencyType},
 };
 
 pub struct DirectionalShadowPassCullShadowsArgs<'a> {
@@ -29,12 +29,12 @@ pub struct DirectionalShadowPassCullShadowsArgs<'a> {
 
     pub culler: ModeData<&'a CpuCuller, &'a GpuCuller>,
     pub materials: &'a MaterialManager,
+    pub objects: &'a mut ObjectManager,
 
     pub interfaces: &'a ShaderInterfaces,
 
     pub lights: &'a DirectionalLightManager,
     pub directional_light_cameras: &'a [CameraManager],
-    pub objects: &'a [InternalObject],
 }
 
 pub struct CulledLightSet {
@@ -86,9 +86,8 @@ impl DirectionalShadowPass {
                             device: args.device,
                             camera,
                             interfaces: args.interfaces,
-                            materials: args.materials,
                             objects: args.objects,
-                            filter: |_, mat| mat.transparency == TransparencyType::Opaque,
+                            transparency: TransparencyType::Opaque,
                             sort: None,
                         }),
                         ModeData::GPU(gpu_culler) => {
@@ -101,7 +100,7 @@ impl DirectionalShadowPass {
                                 materials: args.materials,
                                 camera,
                                 objects: args.objects,
-                                filter: |_, mat| mat.transparency == TransparencyType::Opaque,
+                                transparency: TransparencyType::Opaque,
                                 sort: None,
                             });
                             args.profiler.end_scope(args.encoder);
@@ -117,9 +116,8 @@ impl DirectionalShadowPass {
                             device: args.device,
                             camera,
                             interfaces: args.interfaces,
-                            materials: args.materials,
                             objects: args.objects,
-                            filter: |_, mat| mat.transparency == TransparencyType::Cutout,
+                            transparency: TransparencyType::Cutout,
                             sort: None,
                         }),
                         ModeData::GPU(gpu_culler) => {
@@ -130,8 +128,8 @@ impl DirectionalShadowPass {
                                 interfaces: args.interfaces,
                                 materials: args.materials,
                                 camera,
+                                transparency: TransparencyType::Cutout,
                                 objects: args.objects,
-                                filter: |_, mat| mat.transparency == TransparencyType::Cutout,
                                 sort: None,
                             });
                             args.profiler.end_scope(args.encoder);
@@ -184,7 +182,7 @@ impl DirectionalShadowPass {
             match light.opaque_culled_objects.calls {
                 ModeData::CPU(ref draws) => culling::cpu::run(&mut rpass, draws, args.samplers, 0, args.materials, 2),
                 ModeData::GPU(ref data) => {
-                    rpass.set_bind_group(2, args.materials.gpu_get_bind_group(), &[]);
+                    rpass.set_bind_group(2, args.materials.get_bind_group_gpu::<PbrMaterial>(), &[]);
                     rpass.set_bind_group(3, args.texture_bg.as_gpu(), &[]);
                     culling::gpu::run(&mut rpass, data);
                 }
