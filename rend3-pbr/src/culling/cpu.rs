@@ -130,7 +130,7 @@ pub fn cull_internal(
             start_idx: object.start_idx,
             end_idx: object.start_idx + object.count,
             vertex_offset: object.vertex_offset,
-            material_handle: object.material.get_raw(),
+            material_index: object.material_index,
         });
 
         outputs.push(PerObjectData {
@@ -156,11 +156,11 @@ pub fn run<'rpass>(
 
     let mut previous_mat_handle = None;
     for (idx, draw) in draws.iter().enumerate() {
-        if previous_mat_handle != Some(draw.material_handle) {
-            previous_mat_handle = Some(draw.material_handle);
+        if previous_mat_handle != Some(draw.material_index) {
+            previous_mat_handle = Some(draw.material_index);
             // TODO(material): only resolve the archetype lookup once
-            let material = materials.get_internal_material::<PbrMaterial>(draw.material_handle);
-            let sample_type = material.mat.sample_type;
+            let (material, internal) = materials.get_internal_material_full_by_index::<PbrMaterial>(draw.material_index as usize);
+            let sample_type = material.sample_type;
 
             // As a workaround for OpenGL's combined samplers, we need to manually swap the linear and nearest samplers so that shader code can think it's always using linear.
             if state_sample_type != sample_type {
@@ -172,7 +172,7 @@ pub fn run<'rpass>(
                 rpass.set_bind_group(samplers_binding_index, bg, &[]);
             }
 
-            rpass.set_bind_group(material_binding_index, material.bind_group.as_ref().as_cpu(), &[]);
+            rpass.set_bind_group(material_binding_index, internal.bind_group.as_ref().as_cpu(), &[]);
         }
         let idx = idx as u32;
         rpass.draw_indexed(draw.start_idx..draw.end_idx, draw.vertex_offset, idx..idx + 1);

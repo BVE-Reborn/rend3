@@ -1,14 +1,11 @@
-use crate::{
-    resources::{MaterialManager, TextureManager},
-    types::{Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Mesh, Object, RawObjectHandle},
-    RendererMode,
-};
+use crate::{RendererMode, resources::{MaterialManager, ObjectManager, TextureManager}, types::{Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Mesh, Object, RawObjectHandle}};
 use glam::Mat4;
 use parking_lot::Mutex;
 use rend3_types::{MaterialHandle, MeshHandle, ObjectHandle, RawDirectionalLightHandle, TextureHandle};
 use std::mem;
 use wgpu::{CommandBuffer, Device, Texture, TextureDescriptor, TextureView};
 
+#[allow(clippy::type_complexity)]
 pub enum Instruction {
     AddMesh {
         handle: MeshHandle,
@@ -31,7 +28,7 @@ pub enum Instruction {
     ChangeMaterial {
         handle: MaterialHandle,
         change_invoke: Box<
-            dyn FnOnce(&mut MaterialManager, &Device, RendererMode, &mut TextureManager, &MaterialHandle) + Send + Sync,
+            dyn FnOnce(&mut MaterialManager, &Device, RendererMode, &mut TextureManager, &mut ObjectManager, &MaterialHandle) + Send + Sync,
         >,
     },
     AddObject {

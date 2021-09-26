@@ -73,7 +73,7 @@ where
         self.handle_info.insert(handle.get_raw().idx, HandleData { key, index });
     }
 
-    pub fn remove_all_dead(&mut self) {
+    pub fn remove_all_dead(&mut self, mut remove_fn: impl FnMut(usize, V)) {
         for archetype in self.archetype_map.values_mut() {
             let length = archetype.data.len();
             debug_assert_eq!(length, archetype.metadata.len());
@@ -81,9 +81,10 @@ where
                 // SAFETY: We're iterating back to front, removing no more than once per time, so this is always valid.
                 let metadata = unsafe { archetype.metadata.get_unchecked(idx) };
                 if metadata.refcount.strong_count() == 0 {
-                    let _ = archetype.data.swap_remove(idx);
+                    let data = archetype.data.swap_remove(idx);
                     let metadata = archetype.metadata.swap_remove(idx);
                     self.handle_info.remove(&metadata.handle);
+                    remove_fn(metadata.handle, data);
 
                     // If we swapped an element, update its value in the index map
                     if let Some(resource) = archetype.metadata.get_mut(idx) {

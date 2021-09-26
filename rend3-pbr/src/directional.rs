@@ -28,7 +28,6 @@ pub struct DirectionalShadowPassCullShadowsArgs<'a> {
     pub encoder: &'a mut CommandEncoder,
 
     pub culler: ModeData<&'a CpuCuller, &'a GpuCuller>,
-    pub materials: &'a MaterialManager,
     pub objects: &'a mut ObjectManager,
 
     pub interfaces: &'a ShaderInterfaces,
@@ -97,7 +96,6 @@ impl DirectionalShadowPass {
                                 device: args.device,
                                 encoder: args.encoder,
                                 interfaces: args.interfaces,
-                                materials: args.materials,
                                 camera,
                                 objects: args.objects,
                                 transparency: TransparencyType::Opaque,
@@ -126,7 +124,6 @@ impl DirectionalShadowPass {
                                 device: args.device,
                                 encoder: args.encoder,
                                 interfaces: args.interfaces,
-                                materials: args.materials,
                                 camera,
                                 transparency: TransparencyType::Cutout,
                                 objects: args.objects,

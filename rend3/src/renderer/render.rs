@@ -75,11 +75,12 @@ pub fn render_loop<Input, Output>(
                         &renderer.device,
                         renderer.mode,
                         &mut texture_manager_2d,
+                        &mut object_manager,
                         &handle,
                     )
                 }
                 Instruction::AddObject { handle, object } => {
-                    object_manager.fill(&handle, object, &mesh_manager, &material_manager);
+                    object_manager.fill(&handle, object, &mesh_manager, &mut material_manager);
                 }
                 Instruction::SetObjectTransform { handle, transform } => {
                     object_manager.set_object_transform(handle, transform);
@@ -100,7 +101,7 @@ pub fn render_loop<Input, Output>(
 
     // Do these in dependency order
     // Level 2
-    object_manager.ready();
+    object_manager.ready(&mut material_manager);
 
     // Level 1
     material_manager.ready(&renderer.device, &renderer.queue, &texture_manager_2d);

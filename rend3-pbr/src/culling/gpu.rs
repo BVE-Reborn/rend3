@@ -3,7 +3,7 @@ use std::{mem, num::NonZeroU64};
 use glam::Mat4;
 use ordered_float::OrderedFloat;
 use rend3::{
-    resources::{CameraManager, InternalObject, MaterialManager, ObjectManager},
+    resources::{CameraManager, InternalObject, ObjectManager},
     util::{bind_merge::BindGroupBuilder, frustum::ShaderFrustum},
     ModeData,
 };
@@ -40,7 +40,6 @@ pub struct GpuCullerCullArgs<'a> {
 
     pub interfaces: &'a ShaderInterfaces,
 
-    pub materials: &'a MaterialManager,
     pub camera: &'a CameraManager,
 
     pub objects: &'a mut ObjectManager,
@@ -278,7 +277,7 @@ impl GpuCuller {
             object_count: count as u32,
         };
 
-        let data = build_cull_data(uniforms, args.materials, objects);
+        let data = build_cull_data(uniforms, objects);
 
         let output_buffer = args.device.create_buffer(&BufferDescriptor {
             label: Some("culling output"),
@@ -304,7 +303,7 @@ impl GpuCuller {
 
             let dispatch_count = ((count + 255) / 256) as u32;
 
-            if args.sort.is_some() || true {
+            if args.sort.is_some() {
                 let buffer_a = args.device.create_buffer(&BufferDescriptor {
                     label: Some("cull result index buffer A"),
                     size: (count * 4) as _,
@@ -395,7 +394,7 @@ impl GpuCuller {
     }
 }
 
-fn build_cull_data(uniforms: GPUCullingUniforms, materials: &MaterialManager, objects: &[InternalObject]) -> Vec<u8> {
+fn build_cull_data(uniforms: GPUCullingUniforms, objects: &[InternalObject]) -> Vec<u8> {
     profiling::scope!("Building Input Data");
 
     let uniform_size = mem::size_of::<GPUCullingUniforms>();
@@ -415,7 +414,7 @@ fn build_cull_data(uniforms: GPUCullingUniforms, materials: &MaterialManager, ob
         uniform_ptr.write(uniforms);
 
         // Skip over the uniform data
-        let data_ptr = data.as_mut_ptr().offset(uniform_size as isize) as *mut GPUCullingInput;
+        let data_ptr = data.as_mut_ptr().add(uniform_size) as *mut GPUCullingInput;
 
         // Iterate over the objects
         for idx in 0..objects.len() {
@@ -423,11 +422,11 @@ fn build_cull_data(uniforms: GPUCullingUniforms, materials: &MaterialManager, ob
             let object = objects.get_unchecked(idx);
 
             // This is aligned, and we know the vector has enough bytes to hold this, so this is safe
-            data_ptr.offset(idx as isize).write(GPUCullingInput {
+            data_ptr.add(idx).write(GPUCullingInput {
                 start_idx: object.start_idx,
                 count: object.count,
                 vertex_offset: object.vertex_offset,
-                material_idx: materials.get_internal_index(object.material.get_raw()) as u32,
+                material_idx: object.material_index as u32,
                 transform: object.transform,
                 bounding_sphere: object.sphere,
             });

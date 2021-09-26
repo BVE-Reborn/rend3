@@ -26,7 +26,6 @@ pub struct ForwardPassCullArgs<'a> {
     pub encoder: &'a mut CommandEncoder,
 
     pub culler: ModeData<&'a CpuCuller, &'a GpuCuller>,
-    pub materials: &'a MaterialManager,
 
     pub interfaces: &'a ShaderInterfaces,
 
@@ -108,7 +107,6 @@ impl ForwardPass {
                     device: args.device,
                     encoder: args.encoder,
                     interfaces: args.interfaces,
-                    materials: args.materials,
                     camera: args.camera,
                     objects: args.objects,
                     transparency: self.transparency,

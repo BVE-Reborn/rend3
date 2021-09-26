@@ -1,17 +1,19 @@
 use std::any::TypeId;
 
 use crate::{
-    resources::{InternalMaterial, MaterialKeyPair, MaterialManager, MeshManager},
-    types::{MaterialHandle, Object, ObjectHandle},
+    resources::{MaterialKeyPair, MaterialManager, MeshManager},
+    types::{Object, ObjectHandle},
     util::{frustum::BoundingSphere, registry::ArchetypicalRegistry},
 };
 use glam::{Mat4, Vec3A};
-use rend3_types::{MaterialTrait, RawObjectHandle};
+use rend3_types::{MaterialHandle, MaterialTrait, RawObjectHandle};
 
 /// Internal representation of a Object.
 #[derive(Debug, Clone)]
 pub struct InternalObject {
-    pub material: MaterialHandle,
+    pub material_handle: MaterialHandle,
+    // Index into the material archetype array
+    pub material_index: u32,
     pub transform: Mat4,
     pub sphere: BoundingSphere,
     pub location: Vec3A,
@@ -40,13 +42,15 @@ impl ObjectManager {
         handle: &ObjectHandle,
         object: Object,
         mesh_manager: &MeshManager,
-        material_manager: &MaterialManager,
+        material_manager: &mut MaterialManager,
     ) {
         let mesh = mesh_manager.internal_data(object.mesh.get_raw());
-        let material_key = material_manager.get_material_key(object.material.get_raw());
+        let (material_key, object_list) = material_manager.get_material_key_and_objects(object.material.get_raw());
+        object_list.push(handle.get_raw());
 
         let shader_object = InternalObject {
-            material: object.material,
+            material_index: material_manager.get_internal_index(object.material.get_raw()) as u32,
+            material_handle: object.material,
             transform: object.transform,
             sphere: mesh.bounding_sphere,
             location: object.transform.transform_point3a(Vec3A::ZERO),
@@ -58,9 +62,18 @@ impl ObjectManager {
         self.registry.insert(handle, shader_object, material_key);
     }
 
-    pub fn ready(&mut self) {
+    pub fn ready(&mut self, material_manager: &mut MaterialManager) {
         profiling::scope!("Object Manager Ready");
-        self.registry.remove_all_dead();
+        self.registry.remove_all_dead(|handle, object| {
+            let objects = material_manager.get_objects(object.material_handle.get_raw());
+            let index = objects.iter().position(|v| v.idx == handle).unwrap();
+            objects.swap_remove(index);
+        });
+    }
+
+    pub fn set_material_index(&mut self, handle: RawObjectHandle, index: usize) {
+        let object = self.registry.get_value_mut(handle);
+        object.material_index = index as u32;
     }
 
     pub fn set_object_transform(&mut self, handle: RawObjectHandle, transform: Mat4) {
@@ -73,17 +86,17 @@ impl ObjectManager {
         self.registry
             .get_archetype_vector(&MaterialKeyPair {
                 // TODO(material): unify a M -> TypeId method
-                ty: TypeId::of::<InternalMaterial<M>>(),
+                ty: TypeId::of::<M>(),
                 key,
             })
-            .unwrap_or(&mut [])
+            .unwrap_or(&[])
     }
 
     pub fn get_objects_mut<M: MaterialTrait>(&mut self, key: u64) -> &mut [InternalObject] {
         self.registry
             .get_archetype_vector_mut(&MaterialKeyPair {
                 // TODO(material): unify a M -> TypeId method
-                ty: TypeId::of::<InternalMaterial<M>>(),
+                ty: TypeId::of::<M>(),
                 key,
             })
             .unwrap_or(&mut [])
