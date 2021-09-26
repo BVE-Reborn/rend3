@@ -114,6 +114,7 @@ impl rend3::RenderRoutine<Vec<BakeData>, PbrBakerOutput<'_>> for PbrBakerRenderR
         let directional_light = renderer.directional_light_manager.read();
         let materials = renderer.material_manager.read();
         let camera_manager = renderer.camera_manager.read();
+        let mut object_manager = renderer.object_manager.write();
 
         let culler = self.gpu_culler.as_ref().map_cpu(|_| &self.cpu_culler);
 
@@ -128,7 +129,7 @@ impl rend3::RenderRoutine<Vec<BakeData>, PbrBakerOutput<'_>> for PbrBakerRenderR
                     interfaces: &self.interfaces,
                     lights: &directional_light,
                     directional_light_cameras: &ready.directional_light_cameras,
-                    objects: &ready.objects,
+                    objects: &mut object_manager,
                 });
 
         let d2_texture_output_bg_ref = ready.d2_texture.bg.as_ref().map(|_| (), |a| &**a);

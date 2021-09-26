@@ -57,20 +57,20 @@ struct IndirectCall {
 #define MATERIAL_FLAG(name) bool(material.material_flags & name)
 
 struct GPUMaterialData {
-    uint material_flags;
     uint albedo_tex;
     uint normal_tex;
     uint roughness_tex;
-    // -- 16 --
     uint metallic_tex;
+    // -- 16 --
     uint reflectance_tex;
     uint clear_coat_tex;
     uint clear_coat_roughness_tex;
-    // -- 16 --
     uint emissive_tex;
+    // -- 16 --
     uint anisotropy_tex;
     uint ambient_occlusion_tex;
-    uint material_flags;
+    uint _padding0;
+    uint _padding1;
     
     // -- 16 --
 
@@ -91,6 +91,7 @@ struct GPUMaterialData {
     float anisotropy;
     float ambient_occlusion;
     float alpha_cutout;
+    uint material_flags;
 };
 
 struct CPUMaterialData {

@@ -13,7 +13,7 @@ use wgpu::{
 
 pub use utils::*;
 
-use crate::material::TransparencyType;
+use crate::material::{PbrMaterial, TransparencyType};
 
 pub mod common;
 pub mod culling;
@@ -60,7 +60,9 @@ impl PbrRenderRoutine {
         let primary_passes = {
             let d2_textures = renderer.d2_texture_manager.read();
             let directional_light = renderer.directional_light_manager.read();
-            let materials = renderer.material_manager.read();
+            let mut materials = renderer.material_manager.write();
+            // TODO(material): figure out a better way for zero materials to work
+            materials.ensure_architype::<PbrMaterial>(&renderer.device, renderer.mode);
             PrimaryPasses::new(PrimaryPassesNewArgs {
                 mode: renderer.mode,
                 device: &renderer.device,

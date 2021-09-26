@@ -449,6 +449,7 @@ impl Default for Transparency {
 //
 // - Green screen value
 /// A set of textures and values that determine the how an object interacts with light.
+#[derive(Default)]
 pub struct PbrMaterial {
     pub albedo: AlbedoComponent,
     pub transparency: Transparency,
@@ -489,7 +490,9 @@ impl MaterialTrait for PbrMaterial {
         slice[3] = self.aomr_textures.to_metallic_texture(&mut *translation_fn);
         slice[4] = self.reflectance.to_texture(&mut *translation_fn);
         slice[5] = self.clearcoat_textures.to_clearcoat_texture(&mut *translation_fn);
-        slice[6] = self.clearcoat_textures.to_clearcoat_roughness_texture(&mut *translation_fn);
+        slice[6] = self
+            .clearcoat_textures
+            .to_clearcoat_roughness_texture(&mut *translation_fn);
         slice[7] = self.emissive.to_texture(&mut *translation_fn);
         slice[8] = self.anisotropy.to_texture(&mut *translation_fn);
         slice[9] = self.aomr_textures.to_ao_texture(&mut *translation_fn);

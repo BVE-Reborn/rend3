@@ -1,6 +1,10 @@
 use std::any::TypeId;
 
-use crate::{resources::{MaterialKeyPair, MaterialManager, MeshManager}, types::{MaterialHandle, Object, ObjectHandle}, util::{frustum::BoundingSphere, registry::{ArchetypicalRegistry, ArchitypeResourceStorage}}};
+use crate::{
+    resources::{InternalMaterial, MaterialKeyPair, MaterialManager, MeshManager},
+    types::{MaterialHandle, Object, ObjectHandle},
+    util::{frustum::BoundingSphere, registry::ArchetypicalRegistry},
+};
 use glam::{Mat4, Vec3A};
 use rend3_types::{MaterialTrait, RawObjectHandle};
 
@@ -66,19 +70,23 @@ impl ObjectManager {
     }
 
     pub fn get_objects<M: MaterialTrait>(&self, key: u64) -> &[InternalObject] {
-        self.registry.get_archetype_vector(&MaterialKeyPair {
-            // TODO(material): unify a M -> TypeId method
-            ty: TypeId::of::<ArchitypeResourceStorage<M>>(),
-            key,
-        })
+        self.registry
+            .get_archetype_vector(&MaterialKeyPair {
+                // TODO(material): unify a M -> TypeId method
+                ty: TypeId::of::<InternalMaterial<M>>(),
+                key,
+            })
+            .unwrap_or(&mut [])
     }
 
     pub fn get_objects_mut<M: MaterialTrait>(&mut self, key: u64) -> &mut [InternalObject] {
-        self.registry.get_archetype_vector_mut(&MaterialKeyPair {
-            // TODO(material): unify a M -> TypeId method
-            ty: TypeId::of::<ArchitypeResourceStorage<M>>(),
-            key,
-        })
+        self.registry
+            .get_archetype_vector_mut(&MaterialKeyPair {
+                // TODO(material): unify a M -> TypeId method
+                ty: TypeId::of::<InternalMaterial<M>>(),
+                key,
+            })
+            .unwrap_or(&mut [])
     }
 }
 

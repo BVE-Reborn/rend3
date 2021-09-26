@@ -22,6 +22,7 @@ use rend3::{
     util::typedefs::{FastHashMap, SsoString},
     Renderer,
 };
+use rend3_pbr::material;
 use std::{borrow::Cow, collections::hash_map::Entry, future::Future, path::Path};
 use thiserror::Error;
 
@@ -387,24 +388,24 @@ pub fn load_meshes<'a, E: std::error::Error + 'static>(
 
 /// Creates a gltf default material.
 pub fn load_default_material(renderer: &Renderer) -> types::MaterialHandle {
-    renderer.add_material(types::Material {
-        albedo: types::AlbedoComponent::Value(Vec4::splat(1.0)),
-        transparency: types::Transparency::Opaque,
-        normal: types::NormalTexture::None,
-        aomr_textures: types::AoMRTextures::None,
+    renderer.add_material(material::PbrMaterial {
+        albedo: material::AlbedoComponent::Value(Vec4::splat(1.0)),
+        transparency: material::Transparency::Opaque,
+        normal: material::NormalTexture::None,
+        aomr_textures: material::AoMRTextures::None,
         ao_factor: Some(1.0),
         metallic_factor: Some(1.0),
         roughness_factor: Some(1.0),
-        clearcoat_textures: types::ClearcoatTextures::None,
+        clearcoat_textures: material::ClearcoatTextures::None,
         clearcoat_factor: Some(1.0),
         clearcoat_roughness_factor: Some(1.0),
-        emissive: types::MaterialComponent::None,
-        reflectance: types::MaterialComponent::None,
-        anisotropy: types::MaterialComponent::None,
+        emissive: material::MaterialComponent::None,
+        reflectance: material::MaterialComponent::None,
+        anisotropy: material::MaterialComponent::None,
         uv_transform0: Mat3::IDENTITY,
         uv_transform1: Mat3::IDENTITY,
         unlit: false,
-        sample_type: types::SampleType::Linear,
+        sample_type: material::SampleType::Linear,
     })
 }
 
@@ -481,7 +482,7 @@ where
         )
         .await?;
 
-        let handle = renderer.add_material(material::Material {
+        let handle = renderer.add_material(material::PbrMaterial {
             albedo: match albedo_tex {
                 Some(tex) => material::AlbedoComponent::TextureVertexValue {
                     texture: tex,
@@ -521,7 +522,7 @@ where
             uv_transform1: uv_transform,
             unlit: material.unlit(),
             sample_type: nearest,
-            ..material::Material::default()
+            ..material::PbrMaterial::default()
         });
 
         result.push(Labeled::new(handle, material.name()));

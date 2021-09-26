@@ -82,7 +82,11 @@ impl MaterialManager {
         self.registry.allocate()
     }
 
-    fn ensure_architype<M: MaterialTrait>(&mut self, device: &Device, mode: RendererMode) -> &mut PerTypeInfo {
+    pub fn ensure_architype<M: MaterialTrait>(&mut self, device: &Device, mode: RendererMode) {
+        self.ensure_architype_inner::<M>(device, mode);
+    }
+
+    fn ensure_architype_inner<M: MaterialTrait>(&mut self, device: &Device, mode: RendererMode) -> &mut PerTypeInfo {
         let create_bgl = || {
             mode.into_data(
                 || {
@@ -99,12 +103,14 @@ impl MaterialManager {
 
                     let mut entries: Vec<_> = (0..M::TEXTURE_COUNT).map(texture_binding).collect();
                     entries.push(BindGroupLayoutEntry {
-                        binding: M::TEXTURE_COUNT + 1,
+                        binding: M::TEXTURE_COUNT,
                         visibility: ShaderStages::VERTEX_FRAGMENT,
                         ty: BindingType::Buffer {
                             ty: BufferBindingType::Uniform,
                             has_dynamic_offset: false,
-                            min_binding_size: NonZeroU64::new(M::DATA_SIZE as _),
+                            min_binding_size: NonZeroU64::new(
+                                (round_up_pot(M::DATA_SIZE, 16) + round_up_pot(TEXTURE_MASK_SIZE, 16)) as _,
+                            ),
                         },
                         count: None,
                     });
@@ -153,7 +159,7 @@ impl MaterialManager {
 
         let mut translation_fn = texture_manager_2d.translation_fn();
 
-        let type_info = self.ensure_architype::<M>(device, mode);
+        let type_info = self.ensure_architype_inner::<M>(device, mode);
 
         let (bind_group, material_buffer) = if mode == RendererMode::CPUPowered {
             let mut textures = vec![NonZeroU32::new(u32::MAX); M::TEXTURE_COUNT as usize];
@@ -163,7 +169,7 @@ impl MaterialManager {
             let material_uprounded = round_up_pot(M::DATA_SIZE, 16) as usize;
             let actual_size = material_uprounded + round_up_pot(TEXTURE_MASK_SIZE, 16) as usize;
             let mut data = vec![0u8; actual_size as usize];
-            material.to_data(&mut data);
+            material.to_data(&mut data[..M::DATA_SIZE as usize]);
 
             let mut builder = BindGroupBuilder::new(None);
             let mut texture_mask = 0_u32;
@@ -174,7 +180,7 @@ impl MaterialManager {
                         .unwrap_or(null_tex),
                 ));
                 let enabled = texture.is_some();
-                texture_mask |= (enabled as u32) << (1 << idx as u32);
+                texture_mask |= (enabled as u32) << idx as u32;
             }
 
             *bytemuck::from_bytes_mut(&mut data[material_uprounded..material_uprounded + 4]) = texture_mask;
@@ -232,7 +238,7 @@ impl MaterialManager {
         self.updates.insert(
             handle.get_raw().idx,
             MaterialKeyPair {
-                ty: TypeId::of::<M>(),
+                ty: TypeId::of::<InternalMaterial<M>>(),
                 key,
             },
         );
@@ -284,19 +290,19 @@ impl MaterialManager {
 
             let self_type_info = &self.type_info;
 
-            let count: usize = self
+            let bytes: usize = self
                 .registry
                 .architype_lengths()
                 .map(|(ty, len)| {
                     let type_info = &self_type_info[&ty];
 
-                    len * (round_up_pot(type_info.texture_count, 16) + round_up_pot(type_info.data_size, 16)) as usize
+                    len * ((round_up_pot(type_info.texture_count * 4, 16) + round_up_pot(type_info.data_size, 16))) as usize
                 })
                 .sum();
 
-            buffer.ensure_size(device, count as u64);
+            buffer.ensure_size(device, bytes as u64);
 
-            let mut data = vec![0u8; count];
+            let mut data = vec![0u8; bytes];
 
             let mut offset = 0_usize;
             for (ty, architype) in self.registry.architypes_mut() {
@@ -346,20 +352,24 @@ fn write_gpu_materials<M: MaterialTrait>(
     vec_any: &VecAny,
     translation_fn: &mut (dyn FnMut(&TextureHandle) -> NonZeroU32 + '_),
 ) -> usize {
-    let materials = vec_any.downcast_slice::<ArchitypeResourceStorage<M>>().unwrap();
+    let materials = vec_any
+        .downcast_slice::<ArchitypeResourceStorage<InternalMaterial<M>>>()
+        .unwrap();
 
     let mut offset = 0_usize;
 
-    for mat in materials {
+    for storage in materials {
+        let mat = &storage.data.mat;
+
         let texture_bytes = (M::TEXTURE_COUNT * 4) as usize;
         let mat_size = round_up_pot(texture_bytes, 16);
         let texture_slice = bytemuck::cast_slice_mut(&mut dest[offset..offset + texture_bytes]);
-        mat.data.to_textures(texture_slice, translation_fn);
+        mat.to_textures(texture_slice, translation_fn);
 
         offset += mat_size;
 
         let data_size = round_up_pot(M::DATA_SIZE, 16) as usize;
-        mat.data.to_data(&mut dest[offset..offset + M::DATA_SIZE as usize]);
+        mat.to_data(&mut dest[offset..offset + M::DATA_SIZE as usize]);
 
         offset += data_size;
     }
@@ -368,9 +378,11 @@ fn write_gpu_materials<M: MaterialTrait>(
 }
 
 fn get_material_key<M: MaterialTrait>(vec_any: &VecAny, index: usize) -> MaterialKeyPair {
-    let materials = vec_any.downcast_slice::<ArchitypeResourceStorage<M>>().unwrap();
+    let materials = vec_any
+        .downcast_slice::<ArchitypeResourceStorage<InternalMaterial<M>>>()
+        .unwrap();
 
-    let key = materials[index].data.object_key();
+    let key = materials[index].data.mat.object_key();
 
     MaterialKeyPair {
         ty: TypeId::of::<InternalMaterial<M>>(),

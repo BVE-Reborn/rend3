@@ -257,7 +257,7 @@ impl GpuCuller {
 
         let objects = args.objects.get_objects_mut::<PbrMaterial>(args.transparency as u64);
 
-        let mut data = Vec::<u8>::with_capacity(objects.len() * mem::size_of::<GPUCullingInput>());
+        let mut data = vec![0_u8; objects.len() * mem::size_of::<GPUCullingInput>()];
 
         // Allocate space for uniforms to be filled in later
         data.resize(uniform_size, 0);
@@ -311,7 +311,7 @@ impl GpuCuller {
 
             let dispatch_count = ((count + 255) / 256) as u32;
 
-            if args.sort.is_some() {
+            if args.sort.is_some() || true {
                 let buffer_a = args.device.create_buffer(&BufferDescriptor {
                     label: Some("cull result index buffer A"),
                     size: (count * 4) as _,

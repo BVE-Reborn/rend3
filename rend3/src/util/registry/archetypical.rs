@@ -97,13 +97,13 @@ where
         &mut self.archetype_map.get_mut(&handle_info.key).unwrap().data[handle_info.index]
     }
 
-    pub fn get_archetype_vector(&self, key: &K) -> &[V] {
-        &self.archetype_map[key].data
+    pub fn get_archetype_vector(&self, key: &K) -> Option<&[V]> {
+        Some(&self.archetype_map.get(key)?.data)
     }
 
     // TODO(material): runtime borrow checking
-    pub fn get_archetype_vector_mut(&mut self, key: &K) -> &mut [V] {
-        &mut self.archetype_map.get_mut(key).unwrap().data
+    pub fn get_archetype_vector_mut(&mut self, key: &K) -> Option<&mut [V]> {
+        Some(&mut self.archetype_map.get_mut(key)?.data)
     }
 }
 

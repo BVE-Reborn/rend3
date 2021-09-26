@@ -1,9 +1,6 @@
 use crate::{
     resources::{MaterialManager, TextureManager},
-    types::{
-        Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Mesh, Object,
-        RawObjectHandle,
-    },
+    types::{Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Mesh, Object, RawObjectHandle},
     RendererMode,
 };
 use glam::Mat4;
@@ -27,12 +24,15 @@ pub enum Instruction {
     },
     AddMaterial {
         handle: MaterialHandle,
-        fill_invoke: Box<dyn FnOnce(&mut MaterialManager, &Device, RendererMode, &mut TextureManager, &MaterialHandle)>,
+        fill_invoke: Box<
+            dyn FnOnce(&mut MaterialManager, &Device, RendererMode, &mut TextureManager, &MaterialHandle) + Send + Sync,
+        >,
     },
     ChangeMaterial {
         handle: MaterialHandle,
-        change_invoke:
-            Box<dyn FnOnce(&mut MaterialManager, &Device, RendererMode, &mut TextureManager, &MaterialHandle)>,
+        change_invoke: Box<
+            dyn FnOnce(&mut MaterialManager, &Device, RendererMode, &mut TextureManager, &MaterialHandle) + Send + Sync,
+        >,
     },
     AddObject {
         handle: ObjectHandle,
