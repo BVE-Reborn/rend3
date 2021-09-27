@@ -54,6 +54,7 @@ pub struct Renderer {
     /// Manages all directional lights, including their shadow maps.
     pub directional_light_manager: RwLock<DirectionalLightManager>,
 
+    /// Tool which generates mipmaps from a texture.
     pub mipmap_generator: MipmapGenerator,
 
     /// Stores gpu timing and debug scopes.

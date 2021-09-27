@@ -39,9 +39,12 @@ struct PerTypeInfo {
     get_material_key: fn(vec_any: &VecAny, usize) -> MaterialKeyPair,
 }
 
+/// Key which determine's an object's archetype.
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub struct MaterialKeyPair {
+    /// TypeId of the material the object uses.
     pub ty: TypeId,
+    /// Per-material data.
     pub key: u64,
 }
 
@@ -232,6 +235,7 @@ impl MaterialManager {
             let new_index = self.registry.get_index(handle.get_raw());
             for object in &objects {
                 object_manager.set_material_index(*object, new_index);
+                // TODO(material): this also needs to change object archetype due to key/material archetype changes
             }
             self.registry.get_metadata_mut::<M>(handle.get_raw()).objects = objects;
         }

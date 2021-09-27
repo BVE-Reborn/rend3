@@ -27,6 +27,9 @@ Per Keep a Changelog there are 6 main categories of changes:
 
 ## Unreleased
 
+This release saw a signifigant amount of cpu side optimization.
+In a 50k object scene, the render loop went from taking 16ms to taking 1.75ms, a 9x speedup
+
 ### Added
 - rend3: Added an explicit dependency on wgpu-core and wgpu-hal to ensure bug-fixes are included.
 - rend3-gltf: Add the ability to turn off image's default features.
@@ -34,6 +37,9 @@ Per Keep a Changelog there are 6 main categories of changes:
 - rend3-pbr-bake: Added crate for automatic light baking to a texture.
 
 ### Changed
+- rend3: `Material` is now a trait and render routines can specify their own material.
+  - `rend3::types::Material` is now `rend3_pbr::material::PbrMaterial`
+  - `Renderer::update_material` no longer takes a `MaterialChange`, it takes a completely new material.
 - rend3: renderlists refactored to have a generic Input and Output.
   - `Renderer::renderer` passes through the Input and Output.
   - OutputFrame is now a user-side only utility.
