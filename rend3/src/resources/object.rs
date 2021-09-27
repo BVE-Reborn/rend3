@@ -6,7 +6,7 @@ use crate::{
     util::{frustum::BoundingSphere, registry::ArchetypicalRegistry},
 };
 use glam::{Mat4, Vec3A};
-use rend3_types::{MaterialHandle, MaterialTrait, RawObjectHandle};
+use rend3_types::{MaterialHandle, Material, RawObjectHandle};
 
 #[repr(C, align(16))]
 #[derive(Debug, Copy, Clone)]
@@ -95,7 +95,7 @@ impl ObjectManager {
         object.location = transform.transform_point3a(Vec3A::ZERO)
     }
 
-    pub fn get_objects<M: MaterialTrait>(&self, key: u64) -> &[InternalObject] {
+    pub fn get_objects<M: Material>(&self, key: u64) -> &[InternalObject] {
         self.registry
             .get_archetype_vector(&MaterialKeyPair {
                 // TODO(material): unify a M -> TypeId method
@@ -105,7 +105,7 @@ impl ObjectManager {
             .unwrap_or(&[])
     }
 
-    pub fn get_objects_mut<M: MaterialTrait>(&mut self, key: u64) -> &mut [InternalObject] {
+    pub fn get_objects_mut<M: Material>(&mut self, key: u64) -> &mut [InternalObject] {
         self.registry
             .get_archetype_vector_mut(&MaterialKeyPair {
                 // TODO(material): unify a M -> TypeId method

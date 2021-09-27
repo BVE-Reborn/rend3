@@ -585,19 +585,43 @@ pub struct TextureFromTexture {
     pub mip_count: Option<NonZeroU32>,
 }
 
+#[doc(hidden)]
 pub struct MaterialTag;
 
-pub trait MaterialTrait: Send + Sync + 'static {
+/// Interface that all materials must use.
+///
+/// The material will provide a set of textures, and a pile of bytes. It will then, as part of the material bind group, present the following abi:
+///
+/// ### CPU Mode
+///
+/// - One Texture2D binding per texture, provided in the order given. If given a `None`, will bind a null texture (1x1 texture with a (0, 0, 0, 255) pixel).
+/// - A uniform binding with:
+///   - The data provided, with padding up to 16 byte alignment.
+///   - A u32 bitflag telling which textures are null. To check if texture N is enabled, do `(texture_bitflag >> N) & 0x1 == 1`.
+///
+/// ### GPU Mode
+/// - A material array indexed by the material index. Each material has:
+///   - One u32 per texture. If this value is 0, the texture doesn't exist. If this value is non-zero, subtract one and index into the texture array to ge thte texture.
+///   - Padding to 16 byte alignemnet.
+///   - The data provided by the material.
+pub trait Material: Send + Sync + 'static {
+    /// The texture count that will be provided to `to_textures`
     const TEXTURE_COUNT: u32;
+    /// The amount of data that will be provided to `to_data`.
     const DATA_SIZE: u32;
 
+    /// u64 key that determine's an object's archetype. When you query for objects from the object manager, you must provide this key to get all objects with this key.
     fn object_key(&self) -> u64;
 
+    /// Write out the given materials textures
+    ///
+    /// To determine what to fill in, call `translation_fn` on the wanted texture handle, then write Some(result) to the given slot in the slice.
     fn to_textures(
         &self,
         slice: &mut [Option<NonZeroU32>],
         translation_fn: &mut (dyn FnMut(&TextureHandle) -> NonZeroU32 + '_),
     );
+    /// Fill up the given slice with binary material data. This can be whatever data a shader expects.
     fn to_data(&self, slice: &mut [u8]);
 }
 

@@ -9,7 +9,7 @@ use crate::{
     RendererMode,
 };
 use list_any::VecAny;
-use rend3_types::{MaterialTag, MaterialTrait, RawMaterialHandle, RawObjectHandle};
+use rend3_types::{MaterialTag, Material, RawMaterialHandle, RawObjectHandle};
 use std::{
     any::TypeId,
     num::{NonZeroU32, NonZeroU64},
@@ -76,11 +76,11 @@ impl MaterialManager {
         self.registry.allocate()
     }
 
-    pub fn ensure_archetype<M: MaterialTrait>(&mut self, device: &Device, mode: RendererMode) {
+    pub fn ensure_archetype<M: Material>(&mut self, device: &Device, mode: RendererMode) {
         self.ensure_archetype_inner::<M>(device, mode);
     }
 
-    fn ensure_archetype_inner<M: MaterialTrait>(&mut self, device: &Device, mode: RendererMode) -> &mut PerTypeInfo {
+    fn ensure_archetype_inner<M: Material>(&mut self, device: &Device, mode: RendererMode) -> &mut PerTypeInfo {
         let create_bgl = || {
             mode.into_data(
                 || {
@@ -142,7 +142,7 @@ impl MaterialManager {
         })
     }
 
-    fn fill_inner<M: MaterialTrait>(
+    fn fill_inner<M: Material>(
         &mut self,
         device: &Device,
         mode: RendererMode,
@@ -201,7 +201,7 @@ impl MaterialManager {
         }
     }
 
-    pub fn fill<M: MaterialTrait>(
+    pub fn fill<M: Material>(
         &mut self,
         device: &Device,
         mode: RendererMode,
@@ -214,7 +214,7 @@ impl MaterialManager {
         self.registry.insert(handle, material, internal);
     }
 
-    pub fn update<M: MaterialTrait>(
+    pub fn update<M: Material>(
         &mut self,
         device: &Device,
         mode: RendererMode,
@@ -237,23 +237,23 @@ impl MaterialManager {
         }
     }
 
-    pub fn get_material<M: MaterialTrait>(&self, handle: RawMaterialHandle) -> &M {
+    pub fn get_material<M: Material>(&self, handle: RawMaterialHandle) -> &M {
         self.registry.get_ref::<M>(handle)
     }
 
-    pub fn get_bind_group_layout<M: MaterialTrait>(&self) -> &BindGroupLayout {
+    pub fn get_bind_group_layout<M: Material>(&self) -> &BindGroupLayout {
         self.type_info[&TypeId::of::<M>()].bgl.as_ref().into_common()
     }
 
-    pub fn get_internal_material_full<M: MaterialTrait>(&self, handle: RawMaterialHandle) -> (&M, &InternalMaterial) {
+    pub fn get_internal_material_full<M: Material>(&self, handle: RawMaterialHandle) -> (&M, &InternalMaterial) {
         self.registry.get_ref_full::<M>(handle)
     }
 
-    pub fn get_internal_material_full_by_index<M: MaterialTrait>(&self, index: usize) -> (&M, &InternalMaterial) {
+    pub fn get_internal_material_full_by_index<M: Material>(&self, index: usize) -> (&M, &InternalMaterial) {
         self.registry.get_ref_full_by_index::<M>(index)
     }
 
-    pub fn get_bind_group_gpu<M: MaterialTrait>(&self) -> &BindGroup {
+    pub fn get_bind_group_gpu<M: Material>(&self) -> &BindGroup {
         self.bg[&TypeId::of::<M>()].as_gpu()
     }
 
@@ -351,7 +351,7 @@ fn create_gpu_buffer_bg(
         .build(device, bgl)
 }
 
-fn write_gpu_materials<M: MaterialTrait>(
+fn write_gpu_materials<M: Material>(
     dest: &mut [u8],
     vec_any: &VecAny,
     translation_fn: &mut (dyn FnMut(&TextureHandle) -> NonZeroU32 + '_),
@@ -377,7 +377,7 @@ fn write_gpu_materials<M: MaterialTrait>(
     offset
 }
 
-fn get_material_key<M: MaterialTrait>(vec_any: &VecAny, index: usize) -> MaterialKeyPair {
+fn get_material_key<M: Material>(vec_any: &VecAny, index: usize) -> MaterialKeyPair {
     let materials = vec_any.downcast_slice::<M>().unwrap();
 
     let key = materials[index].object_key();

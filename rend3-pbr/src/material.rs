@@ -1,7 +1,7 @@
 use std::mem;
 
 use glam::{Mat3, Mat3A, Vec3, Vec4};
-use rend3::types::{MaterialTrait, TextureHandle};
+use rend3::types::{Material, TextureHandle};
 
 bitflags::bitflags! {
     /// Flags which shaders use to determine properties of a material
@@ -471,7 +471,7 @@ pub struct PbrMaterial {
     pub sample_type: SampleType,
 }
 
-impl MaterialTrait for PbrMaterial {
+impl Material for PbrMaterial {
     const TEXTURE_COUNT: u32 = 10;
     const DATA_SIZE: u32 = mem::size_of::<ShaderMaterial>() as _;
 
