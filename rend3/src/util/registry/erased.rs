@@ -26,7 +26,7 @@ struct PerHandleData {
 #[allow(clippy::type_complexity)]
 pub struct Archetype<Metadata> {
     pub vec: VecAny,
-    pub metadata: Vec<NonErasedData<Metadata>>,
+    pub non_erased: Vec<NonErasedData<Metadata>>,
     remove_single: fn(
         &mut VecAny,
         &mut Vec<NonErasedData<Metadata>>,
@@ -63,22 +63,22 @@ impl<HandleType, Metadata> ArchitypicalErasedRegistry<HandleType, Metadata> {
         &mut self,
         handle: &ResourceHandle<HandleType>,
         data: T,
-        non_erased: Metadata,
+        metadata: Metadata,
     ) -> &mut Metadata {
         let type_id = TypeId::of::<T>();
         let archetype = self.archetype_map.entry(type_id).or_insert_with(|| Archetype {
             vec: VecAny::new::<T>(),
-            metadata: Vec::new(),
+            non_erased: Vec::new(),
             remove_all_dead: remove_all_dead::<T, Metadata>,
             remove_single: remove_single::<T, Metadata>,
         });
         let mut vec = archetype.vec.downcast_mut::<T>().unwrap();
 
         let vec_index = vec.len();
-        archetype.metadata.push(NonErasedData {
+        archetype.non_erased.push(NonErasedData {
             handle: handle.get_raw().idx,
             refcount: handle.get_weak_refcount(),
-            inner: non_erased,
+            inner: metadata,
         });
         vec.push(data);
 
@@ -91,7 +91,7 @@ impl<HandleType, Metadata> ArchitypicalErasedRegistry<HandleType, Metadata> {
             },
         );
 
-        &mut archetype.metadata[vec_index].inner
+        &mut archetype.non_erased[vec_index].inner
     }
 
     pub fn update<T: Send + Sync + 'static>(
@@ -112,8 +112,12 @@ impl<HandleType, Metadata> ArchitypicalErasedRegistry<HandleType, Metadata> {
             None
         } else {
             // We need to change archetype, so we clean up, then insert with the old handle. We must clean up first, so the value in the index map is still accurate.
-            let old_metadata =
-                (archetype.remove_single)(&mut archetype.vec, &mut archetype.metadata, &mut self.handle_map, index);
+            let old_metadata = (archetype.remove_single)(
+                &mut archetype.vec,
+                &mut archetype.non_erased,
+                &mut self.handle_map,
+                index,
+            );
 
             Some(self.insert(handle, data, old_metadata.inner))
         }
@@ -122,7 +126,7 @@ impl<HandleType, Metadata> ArchitypicalErasedRegistry<HandleType, Metadata> {
     pub fn remove_all_dead(&mut self) {
         profiling::scope!("ResourceRegistry::remove_all_dead");
         for archetype in self.archetype_map.values_mut() {
-            (archetype.remove_all_dead)(&mut archetype.vec, &mut archetype.metadata, &mut self.handle_map);
+            (archetype.remove_all_dead)(&mut archetype.vec, &mut archetype.non_erased, &mut self.handle_map);
         }
     }
 
@@ -137,7 +141,7 @@ impl<HandleType, Metadata> ArchitypicalErasedRegistry<HandleType, Metadata> {
         let archetype = &self.archetype_map[&TypeId::of::<T>()];
         let index = self.handle_map[&handle.idx].index;
         let t_ref = &archetype.vec.downcast_slice::<T>().unwrap()[index];
-        let meta_ref = &archetype.metadata[index].inner;
+        let meta_ref = &archetype.non_erased[index].inner;
 
         (t_ref, meta_ref)
     }
@@ -145,7 +149,7 @@ impl<HandleType, Metadata> ArchitypicalErasedRegistry<HandleType, Metadata> {
     pub fn get_ref_full_by_index<T: Send + Sync + 'static>(&self, index: usize) -> (&T, &Metadata) {
         let archetype = &self.archetype_map[&TypeId::of::<T>()];
         let t_ref = &archetype.vec.downcast_slice::<T>().unwrap()[index];
-        let meta_ref = &archetype.metadata[index].inner;
+        let meta_ref = &archetype.non_erased[index].inner;
 
         (t_ref, meta_ref)
     }
@@ -156,7 +160,7 @@ impl<HandleType, Metadata> ArchitypicalErasedRegistry<HandleType, Metadata> {
     ) -> &mut Metadata {
         let archetype = self.archetype_map.get_mut(&TypeId::of::<T>()).unwrap();
         let index = self.handle_map[&handle.idx].index;
-        &mut archetype.metadata[index].inner
+        &mut archetype.non_erased[index].inner
     }
 
     pub fn get_index(&self, handle: RawResourceHandle<HandleType>) -> usize {

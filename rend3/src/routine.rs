@@ -7,6 +7,7 @@ use crate::{
     Renderer,
 };
 
+/// Output of calling ready on various managers.
 pub struct ManagerReadyOutput {
     pub d2_texture: TextureManagerReadyOutput,
     pub d2c_texture: TextureManagerReadyOutput,

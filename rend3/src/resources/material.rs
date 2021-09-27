@@ -9,7 +9,7 @@ use crate::{
     RendererMode,
 };
 use list_any::VecAny;
-use rend3_types::{MaterialTag, Material, RawMaterialHandle, RawObjectHandle};
+use rend3_types::{Material, MaterialTag, RawMaterialHandle, RawObjectHandle};
 use std::{
     any::TypeId,
     num::{NonZeroU32, NonZeroU64},
@@ -268,7 +268,7 @@ impl MaterialManager {
 
         let key_pair = (type_info.get_material_key)(&arch.vec, index);
 
-        (key_pair, &mut arch.metadata[index].inner.objects)
+        (key_pair, &mut arch.non_erased[index].inner.objects)
     }
 
     pub fn get_objects(&mut self, handle: RawMaterialHandle) -> &mut Vec<RawObjectHandle> {
@@ -276,7 +276,7 @@ impl MaterialManager {
         let ty = self.registry.get_type_id(handle);
         let arch = self.registry.get_archetype_mut(ty);
 
-        &mut arch.metadata[index].inner.objects
+        &mut arch.non_erased[index].inner.objects
     }
 
     pub fn get_internal_index(&self, handle: RawMaterialHandle) -> usize {

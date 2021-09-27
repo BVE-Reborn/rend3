@@ -605,7 +605,7 @@ pub struct MaterialTag;
 ///   - Padding to 16 byte alignemnet.
 ///   - The data provided by the material.
 pub trait Material: Send + Sync + 'static {
-    /// The texture count that will be provided to `to_textures`
+    /// The texture count that will be provided to `to_textures`.
     const TEXTURE_COUNT: u32;
     /// The amount of data that will be provided to `to_data`.
     const DATA_SIZE: u32;
@@ -613,7 +613,7 @@ pub trait Material: Send + Sync + 'static {
     /// u64 key that determine's an object's archetype. When you query for objects from the object manager, you must provide this key to get all objects with this key.
     fn object_key(&self) -> u64;
 
-    /// Write out the given materials textures
+    /// Fill up the given slice with textures.
     ///
     /// To determine what to fill in, call `translation_fn` on the wanted texture handle, then write Some(result) to the given slot in the slice.
     fn to_textures(

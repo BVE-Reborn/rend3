@@ -1,3 +1,5 @@
+//! Types which make up `rend3-pbr`'s material [`PbrMaterial`]
+
 use std::mem;
 
 use glam::{Mat3, Mat3A, Vec3, Vec4};
