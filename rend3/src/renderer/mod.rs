@@ -6,15 +6,15 @@ use crate::{
         TextureManager,
     },
     types::{
-        Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Material, MaterialChange,
-        MaterialHandle, Mesh, MeshHandle, Object, ObjectHandle, Texture, TextureHandle,
+        Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, MaterialHandle, Mesh, MeshHandle,
+        Object, ObjectHandle, Texture, TextureHandle,
     },
     util::{mipmap::MipmapGenerator, typedefs::RendererStatistics},
     ExtendedAdapterInfo, InstanceAdapterDevice, RenderRoutine, RendererInitializationError, RendererMode,
 };
 use glam::Mat4;
 use parking_lot::{Mutex, RwLock};
-use rend3_types::{MipmapCount, MipmapSource, TextureFromTexture, TextureUsages};
+use rend3_types::{Material, MipmapCount, MipmapSource, TextureFromTexture, TextureUsages};
 use std::{num::NonZeroU32, sync::Arc};
 use wgpu::{
     util::DeviceExt, CommandEncoderDescriptor, Device, Extent3d, ImageCopyTexture, ImageDataLayout, Origin3d, Queue,
@@ -54,6 +54,7 @@ pub struct Renderer {
     /// Manages all directional lights, including their shadow maps.
     pub directional_light_manager: RwLock<DirectionalLightManager>,
 
+    /// Tool which generates mipmaps from a texture.
     pub mipmap_generator: MipmapGenerator,
 
     /// Stores gpu timing and debug scopes.
@@ -206,8 +207,8 @@ impl Renderer {
         for new_mip in 0..mip_level_count {
             let old_mip = new_mip + texture.start_mip;
 
-            let label = format_sso!("mip {} to {}", old_mip, new_mip);
-            profiling::scope!(&label);
+            let _label = format_sso!("mip {} to {}", old_mip, new_mip);
+            profiling::scope!(&_label);
             // self.profiler.lock().begin_scope(&label, &mut encoder, &self.device);
 
             encoder.copy_texture_to_texture(
@@ -289,20 +290,26 @@ impl Renderer {
     /// The handle will keep the material alive. All objects created with this material will also keep this material alive.
     ///
     /// The material will keep the inside textures alive.
-    pub fn add_material(&self, material: Material) -> MaterialHandle {
+    pub fn add_material<M: Material>(&self, material: M) -> MaterialHandle {
         let handle = self.material_manager.read().allocate();
         self.instructions.producer.lock().push(Instruction::AddMaterial {
             handle: handle.clone(),
-            material,
+            fill_invoke: Box::new(|material_manager, device, mode, d2_manager, mat_handle| {
+                material_manager.fill(device, mode, d2_manager, mat_handle, material)
+            }),
         });
         handle
     }
 
     /// Updates a given material. Old references will be dropped.
-    pub fn update_material(&self, handle: &MaterialHandle, change: MaterialChange) {
+    pub fn update_material<M: Material>(&self, handle: &MaterialHandle, material: M) {
         self.instructions.producer.lock().push(Instruction::ChangeMaterial {
-            handle: handle.get_raw(),
-            change,
+            handle: handle.clone(),
+            change_invoke: Box::new(
+                |material_manager, device, mode, d2_manager, object_manager, mat_handle| {
+                    material_manager.update(device, mode, d2_manager, object_manager, mat_handle, material)
+                },
+            ),
         })
     }
 

@@ -1,292 +1,75 @@
 use crate::{
     mode::ModeData,
-    resources::TextureManager,
-    types::{Material, MaterialChange, MaterialFlags, MaterialHandle, SampleType, TextureHandle},
-    util::{bind_merge::BindGroupBuilder, buffer::WrappedPotBuffer, registry::ResourceRegistry},
+    resources::{ObjectManager, TextureManager},
+    types::{MaterialHandle, TextureHandle},
+    util::{
+        bind_merge::BindGroupBuilder, buffer::WrappedPotBuffer, math::round_up_pot,
+        registry::ArchitypicalErasedRegistry, typedefs::FastHashMap,
+    },
     RendererMode,
 };
-use glam::{Vec3, Vec4};
-use rend3_types::RawMaterialHandle;
+use list_any::VecAny;
+use rend3_types::{Material, MaterialTag, RawMaterialHandle, RawObjectHandle};
 use std::{
-    mem,
+    any::TypeId,
     num::{NonZeroU32, NonZeroU64},
 };
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
-    BindGroup, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, Buffer,
-    BufferBindingType, BufferUsages, Device, Queue, ShaderStages, TextureSampleType, TextureViewDimension,
+    BindGroup, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType, Buffer,
+    BufferBinding, BufferBindingType, BufferUsages, Device, Queue, ShaderStages, TextureSampleType,
+    TextureViewDimension,
 };
 
-#[repr(C, align(16))]
-#[derive(Debug, Copy, Clone)]
-struct CPUShaderMaterial {
-    uv_transform0_row0: Vec4,
-    uv_transform0_row1: Vec4,
-    uv_transform0_row2: Vec4,
-    uv_transform1_row0: Vec4,
-    uv_transform1_row1: Vec4,
-    uv_transform1_row2: Vec4,
-    albedo: Vec4,
-    emissive: Vec3,
-    roughness: f32,
-    metallic: f32,
-    reflectance: f32,
-    clear_coat: f32,
-    clear_coat_roughness: f32,
-    anisotropy: f32,
-    ambient_occlusion: f32,
-    alpha_cutout: f32,
+const TEXTURE_MASK_SIZE: u32 = 4;
 
-    texture_enable: u32,
-    material_flags: MaterialFlags,
+pub struct InternalMaterial {
+    pub bind_group: ModeData<BindGroup, ()>,
+    pub material_buffer: ModeData<Buffer, ()>,
+    /// Handles of all objects
+    pub objects: Vec<RawObjectHandle>,
 }
 
-unsafe impl bytemuck::Zeroable for CPUShaderMaterial {}
-unsafe impl bytemuck::Pod for CPUShaderMaterial {}
-
-impl CPUShaderMaterial {
-    fn from_material(material: &Material) -> Self {
-        Self {
-            uv_transform0_row0: material.uv_transform0.x_axis.extend(0.0),
-            uv_transform0_row1: material.uv_transform0.y_axis.extend(0.0),
-            uv_transform0_row2: material.uv_transform0.z_axis.extend(0.0),
-            uv_transform1_row0: material.uv_transform1.x_axis.extend(0.0),
-            uv_transform1_row1: material.uv_transform1.y_axis.extend(0.0),
-            uv_transform1_row2: material.uv_transform1.z_axis.extend(0.0),
-            albedo: material.albedo.to_value(),
-            roughness: material.roughness_factor.unwrap_or(0.0),
-            metallic: material.metallic_factor.unwrap_or(0.0),
-            reflectance: material.reflectance.to_value(0.5),
-            clear_coat: material.clearcoat_factor.unwrap_or(0.0),
-            clear_coat_roughness: material.clearcoat_roughness_factor.unwrap_or(0.0),
-            emissive: material.emissive.to_value(Vec3::ZERO),
-            anisotropy: material.anisotropy.to_value(0.0),
-            ambient_occlusion: material.ao_factor.unwrap_or(1.0),
-            alpha_cutout: match material.transparency {
-                rend3_types::Transparency::Cutout { cutout } => cutout,
-                _ => 0.0,
-            },
-            texture_enable: material.albedo.is_texture() as u32
-                | (material.normal.to_texture(|_| ()).is_some() as u32) << 1
-                | (material.aomr_textures.to_roughness_texture(|_| ()).is_some() as u32) << 2
-                | (material.aomr_textures.to_metallic_texture(|_| ()).is_some() as u32) << 3
-                | (material.reflectance.is_texture() as u32) << 4
-                | (material.clearcoat_textures.to_clearcoat_texture(|_| ()).is_some() as u32) << 5
-                | (material
-                    .clearcoat_textures
-                    .to_clearcoat_roughness_texture(|_| ())
-                    .is_some() as u32)
-                    << 6
-                | (material.emissive.is_texture() as u32) << 7
-                | (material.anisotropy.is_texture() as u32) << 8
-                | (material.aomr_textures.to_ao_texture(|_| ()).is_some() as u32) << 9,
-            material_flags: {
-                let mut flags = material.albedo.to_flags();
-                flags |= material.normal.to_flags();
-                flags |= material.aomr_textures.to_flags();
-                flags |= material.clearcoat_textures.to_flags();
-                flags.set(MaterialFlags::UNLIT, material.unlit);
-                flags.set(
-                    MaterialFlags::NEAREST,
-                    match material.sample_type {
-                        SampleType::Nearest => true,
-                        SampleType::Linear => false,
-                    },
-                );
-                flags
-            },
-        }
-    }
+#[allow(clippy::type_complexity)]
+struct PerTypeInfo {
+    bgl: ModeData<BindGroupLayout, BindGroupLayout>,
+    data_size: u32,
+    texture_count: u32,
+    write_gpu_materials_fn: fn(&mut [u8], &VecAny, &mut (dyn FnMut(&TextureHandle) -> NonZeroU32 + '_)) -> usize,
+    get_material_key: fn(vec_any: &VecAny, usize) -> MaterialKeyPair,
 }
 
-#[repr(C, align(16))]
-#[derive(Debug, Copy, Clone)]
-struct GPUShaderMaterial {
-    albedo: Vec4,
-    emissive: Vec3,
-    roughness: f32,
-    metallic: f32,
-    reflectance: f32,
-    clear_coat: f32,
-    clear_coat_roughness: f32,
-    anisotropy: f32,
-    ambient_occlusion: f32,
-    alpha_cutout: f32,
-
-    uv_transform0_row0: Vec4,
-    uv_transform0_row1: Vec4,
-    uv_transform0_row2: Vec4,
-
-    uv_transform1_row0: Vec4,
-    uv_transform1_row1: Vec4,
-    uv_transform1_row2: Vec4,
-
-    albedo_tex: Option<NonZeroU32>,
-    normal_tex: Option<NonZeroU32>,
-    roughness_tex: Option<NonZeroU32>,
-    metallic_tex: Option<NonZeroU32>,
-    reflectance_tex: Option<NonZeroU32>,
-    clear_coat_tex: Option<NonZeroU32>,
-    clear_coat_roughness_tex: Option<NonZeroU32>,
-    emissive_tex: Option<NonZeroU32>,
-    anisotropy_tex: Option<NonZeroU32>,
-    ambient_occlusion_tex: Option<NonZeroU32>,
-    material_flags: MaterialFlags,
-}
-
-unsafe impl bytemuck::Zeroable for GPUShaderMaterial {}
-unsafe impl bytemuck::Pod for GPUShaderMaterial {}
-
-impl GPUShaderMaterial {
-    pub fn from_material(material: &Material, translate_texture: &impl Fn(&TextureHandle) -> NonZeroU32) -> Self {
-        Self {
-            albedo: material.albedo.to_value(),
-            emissive: material.emissive.to_value(Vec3::ZERO),
-            roughness: material.roughness_factor.unwrap_or(0.0),
-            metallic: material.metallic_factor.unwrap_or(0.0),
-            reflectance: material.reflectance.to_value(0.5),
-            clear_coat: material.clearcoat_factor.unwrap_or(0.0),
-            clear_coat_roughness: material.clearcoat_roughness_factor.unwrap_or(0.0),
-            anisotropy: material.anisotropy.to_value(0.0),
-            ambient_occlusion: material.ao_factor.unwrap_or(1.0),
-            alpha_cutout: match material.transparency {
-                rend3_types::Transparency::Cutout { cutout } => cutout,
-                _ => 0.0,
-            },
-
-            uv_transform0_row0: material.uv_transform0.x_axis.extend(0.0),
-            uv_transform0_row1: material.uv_transform0.y_axis.extend(0.0),
-            uv_transform0_row2: material.uv_transform0.z_axis.extend(0.0),
-
-            uv_transform1_row0: material.uv_transform1.x_axis.extend(0.0),
-            uv_transform1_row1: material.uv_transform1.y_axis.extend(0.0),
-            uv_transform1_row2: material.uv_transform1.z_axis.extend(0.0),
-
-            albedo_tex: material.albedo.to_texture(translate_texture),
-            normal_tex: material.normal.to_texture(translate_texture),
-            roughness_tex: material.aomr_textures.to_roughness_texture(translate_texture),
-            metallic_tex: material.aomr_textures.to_metallic_texture(translate_texture),
-            reflectance_tex: material.reflectance.to_texture(translate_texture),
-            clear_coat_tex: material.clearcoat_textures.to_clearcoat_texture(translate_texture),
-            clear_coat_roughness_tex: material
-                .clearcoat_textures
-                .to_clearcoat_roughness_texture(translate_texture),
-            emissive_tex: material.emissive.to_texture(translate_texture),
-            anisotropy_tex: material.anisotropy.to_texture(translate_texture),
-            ambient_occlusion_tex: material.aomr_textures.to_ao_texture(translate_texture),
-            material_flags: {
-                let mut flags = material.albedo.to_flags();
-                flags |= material.normal.to_flags();
-                flags |= material.aomr_textures.to_flags();
-                flags |= material.clearcoat_textures.to_flags();
-                flags.set(MaterialFlags::UNLIT, material.unlit);
-                flags.set(
-                    MaterialFlags::NEAREST,
-                    match material.sample_type {
-                        SampleType::Nearest => true,
-                        SampleType::Linear => false,
-                    },
-                );
-                flags
-            },
-        }
-    }
-}
-
-struct InternalMaterial {
-    mat: Material,
-    bind_group: ModeData<BindGroup, ()>,
-    material_buffer: ModeData<Buffer, ()>,
+/// Key which determine's an object's archetype.
+#[derive(Copy, Clone, PartialEq, Eq, Hash)]
+pub struct MaterialKeyPair {
+    /// TypeId of the material the object uses.
+    pub ty: TypeId,
+    /// Per-material data.
+    pub key: u64,
 }
 
 /// Manages materials and their associated BindGroups in CPU modes.
 pub struct MaterialManager {
-    bgl: ModeData<BindGroupLayout, BindGroupLayout>,
-    bg: ModeData<(), BindGroup>,
+    bg: FastHashMap<TypeId, ModeData<(), BindGroup>>,
+    type_info: FastHashMap<TypeId, PerTypeInfo>,
+
     buffer: ModeData<(), WrappedPotBuffer>,
 
-    registry: ResourceRegistry<InternalMaterial, Material>,
+    registry: ArchitypicalErasedRegistry<MaterialTag, InternalMaterial>,
 }
 
 impl MaterialManager {
     pub fn new(device: &Device, mode: RendererMode) -> Self {
-        let bgl = mode.into_data(
-            || {
-                let texture_binding = |idx| BindGroupLayoutEntry {
-                    binding: idx,
-                    visibility: ShaderStages::FRAGMENT,
-                    ty: BindingType::Texture {
-                        sample_type: TextureSampleType::Float { filterable: true },
-                        view_dimension: TextureViewDimension::D2,
-                        multisampled: false,
-                    },
-                    count: None,
-                };
-
-                device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-                    label: Some("cpu material bgl"),
-                    entries: &[
-                        texture_binding(0),
-                        texture_binding(1),
-                        texture_binding(2),
-                        texture_binding(3),
-                        texture_binding(4),
-                        texture_binding(5),
-                        texture_binding(6),
-                        texture_binding(7),
-                        texture_binding(8),
-                        texture_binding(9),
-                        BindGroupLayoutEntry {
-                            binding: 10,
-                            visibility: ShaderStages::VERTEX_FRAGMENT,
-                            ty: BindingType::Buffer {
-                                ty: BufferBindingType::Uniform,
-                                has_dynamic_offset: false,
-                                min_binding_size: NonZeroU64::new(mem::size_of::<CPUShaderMaterial>() as _),
-                            },
-                            count: None,
-                        },
-                    ],
-                })
-            },
-            || {
-                device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-                    label: Some("gpu material bgl"),
-                    entries: &[BindGroupLayoutEntry {
-                        binding: 0,
-                        visibility: ShaderStages::VERTEX_FRAGMENT,
-                        ty: BindingType::Buffer {
-                            ty: BufferBindingType::Storage { read_only: true },
-                            has_dynamic_offset: false,
-                            min_binding_size: NonZeroU64::new(mem::size_of::<GPUShaderMaterial>() as _),
-                        },
-                        count: None,
-                    }],
-                })
-            },
-        );
-
         let buffer = mode.into_data(
             || (),
-            || {
-                WrappedPotBuffer::new(
-                    device,
-                    0,
-                    mem::size_of::<GPUShaderMaterial>() as _,
-                    BufferUsages::STORAGE,
-                    Some("material buffer"),
-                )
-            },
+            || WrappedPotBuffer::new(device, 0, 16, BufferUsages::STORAGE, Some("material buffer")),
         );
 
-        let bg = mode.into_data(|| (), || create_gpu_buffer_bg(device, bgl.as_gpu(), buffer.as_gpu()));
-
-        let registry = ResourceRegistry::new();
+        let registry = ArchitypicalErasedRegistry::new();
 
         Self {
-            bgl,
-            bg,
-
+            bg: FastHashMap::default(),
+            type_info: FastHashMap::default(),
             buffer,
             registry,
         }
@@ -296,133 +79,315 @@ impl MaterialManager {
         self.registry.allocate()
     }
 
-    pub fn fill(
+    pub fn ensure_archetype<M: Material>(&mut self, device: &Device, mode: RendererMode) {
+        self.ensure_archetype_inner::<M>(device, mode);
+    }
+
+    fn ensure_archetype_inner<M: Material>(&mut self, device: &Device, mode: RendererMode) -> &mut PerTypeInfo {
+        let create_bgl = || {
+            mode.into_data(
+                || {
+                    let texture_binding = |idx: u32| BindGroupLayoutEntry {
+                        binding: idx as u32,
+                        visibility: ShaderStages::FRAGMENT,
+                        ty: BindingType::Texture {
+                            sample_type: TextureSampleType::Float { filterable: true },
+                            view_dimension: TextureViewDimension::D2,
+                            multisampled: false,
+                        },
+                        count: None,
+                    };
+
+                    let mut entries: Vec<_> = (0..M::TEXTURE_COUNT).map(texture_binding).collect();
+                    entries.push(BindGroupLayoutEntry {
+                        binding: M::TEXTURE_COUNT,
+                        visibility: ShaderStages::VERTEX_FRAGMENT,
+                        ty: BindingType::Buffer {
+                            ty: BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: NonZeroU64::new(
+                                (round_up_pot(M::DATA_SIZE, 16) + round_up_pot(TEXTURE_MASK_SIZE, 16)) as _,
+                            ),
+                        },
+                        count: None,
+                    });
+                    device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+                        label: Some("cpu material bgl"),
+                        entries: &entries,
+                    })
+                },
+                || {
+                    device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+                        label: Some("gpu material bgl"),
+                        entries: &[BindGroupLayoutEntry {
+                            binding: 0,
+                            visibility: ShaderStages::VERTEX_FRAGMENT,
+                            ty: BindingType::Buffer {
+                                ty: BufferBindingType::Storage { read_only: true },
+                                has_dynamic_offset: false,
+                                min_binding_size: NonZeroU64::new((M::TEXTURE_COUNT * 4 + M::DATA_SIZE) as _),
+                            },
+                            count: None,
+                        }],
+                    })
+                },
+            )
+        };
+
+        let ty = TypeId::of::<M>();
+
+        self.type_info.entry(ty).or_insert_with(|| PerTypeInfo {
+            bgl: create_bgl(),
+            data_size: M::DATA_SIZE,
+            texture_count: M::TEXTURE_COUNT,
+            write_gpu_materials_fn: write_gpu_materials::<M>,
+            get_material_key: get_material_key::<M>,
+        })
+    }
+
+    fn fill_inner<M: Material>(
+        &mut self,
+        device: &Device,
+        mode: RendererMode,
+        texture_manager_2d: &mut TextureManager,
+        material: &M,
+    ) -> InternalMaterial {
+        let null_tex = texture_manager_2d.get_null_view();
+
+        let mut translation_fn = texture_manager_2d.translation_fn();
+
+        let type_info = self.ensure_archetype_inner::<M>(device, mode);
+
+        let (bind_group, material_buffer) = if mode == RendererMode::CPUPowered {
+            let mut textures = vec![NonZeroU32::new(u32::MAX); M::TEXTURE_COUNT as usize];
+            material.to_textures(&mut textures, &mut translation_fn);
+
+            // TODO(material): stack allocation
+            let material_uprounded = round_up_pot(M::DATA_SIZE, 16) as usize;
+            let actual_size = material_uprounded + round_up_pot(TEXTURE_MASK_SIZE, 16) as usize;
+            let mut data = vec![0u8; actual_size as usize];
+            material.to_data(&mut data[..M::DATA_SIZE as usize]);
+
+            let mut builder = BindGroupBuilder::new(None);
+            let mut texture_mask = 0_u32;
+            for (idx, texture) in textures.into_iter().enumerate() {
+                builder.append(BindingResource::TextureView(
+                    texture
+                        .map(|tex| texture_manager_2d.get_view_from_index(tex))
+                        .unwrap_or(null_tex),
+                ));
+                let enabled = texture.is_some();
+                texture_mask |= (enabled as u32) << idx as u32;
+            }
+
+            *bytemuck::from_bytes_mut(&mut data[material_uprounded..material_uprounded + 4]) = texture_mask;
+
+            let material_buffer = device.create_buffer_init(&BufferInitDescriptor {
+                label: None,
+                contents: &data,
+                usage: BufferUsages::COPY_DST | BufferUsages::UNIFORM,
+            });
+
+            let bind_group = builder
+                .with_buffer(&material_buffer)
+                .build(device, type_info.bgl.as_ref().as_cpu());
+
+            (ModeData::CPU(bind_group), ModeData::CPU(material_buffer))
+        } else {
+            (ModeData::GPU(()), ModeData::GPU(()))
+        };
+
+        InternalMaterial {
+            bind_group,
+            material_buffer,
+            objects: Vec::new(),
+        }
+    }
+
+    pub fn fill<M: Material>(
         &mut self,
         device: &Device,
         mode: RendererMode,
         texture_manager_2d: &mut TextureManager,
         handle: &MaterialHandle,
-        material: Material,
+        material: M,
     ) {
-        let null_tex = texture_manager_2d.get_null_view();
+        let internal = self.fill_inner(device, mode, texture_manager_2d, &material);
 
-        let material_buffer = mode.into_data(
-            || {
-                let data = CPUShaderMaterial::from_material(&material);
-
-                device.create_buffer_init(&BufferInitDescriptor {
-                    label: None,
-                    contents: bytemuck::bytes_of(&data),
-                    usage: BufferUsages::COPY_DST | BufferUsages::UNIFORM,
-                })
-            },
-            || (),
-        );
-
-        let lookup_fn = |handle: &TextureHandle| texture_manager_2d.get_view(handle.get_raw());
-
-        self.registry.insert(
-            handle,
-            InternalMaterial {
-                bind_group: mode.into_data(
-                    || {
-                        BindGroupBuilder::new(None)
-                            .with_texture_view(material.albedo.to_texture(lookup_fn).unwrap_or(null_tex))
-                            .with_texture_view(material.normal.to_texture(lookup_fn).unwrap_or(null_tex))
-                            .with_texture_view(
-                                material
-                                    .aomr_textures
-                                    .to_roughness_texture(lookup_fn)
-                                    .unwrap_or(null_tex),
-                            )
-                            .with_texture_view(
-                                material
-                                    .aomr_textures
-                                    .to_metallic_texture(lookup_fn)
-                                    .unwrap_or(null_tex),
-                            )
-                            .with_texture_view(material.reflectance.to_texture(lookup_fn).unwrap_or(null_tex))
-                            .with_texture_view(
-                                material
-                                    .clearcoat_textures
-                                    .to_clearcoat_texture(lookup_fn)
-                                    .unwrap_or(null_tex),
-                            )
-                            .with_texture_view(
-                                material
-                                    .clearcoat_textures
-                                    .to_clearcoat_roughness_texture(lookup_fn)
-                                    .unwrap_or(null_tex),
-                            )
-                            .with_texture_view(material.emissive.to_texture(lookup_fn).unwrap_or(null_tex))
-                            .with_texture_view(material.anisotropy.to_texture(lookup_fn).unwrap_or(null_tex))
-                            .with_texture_view(material.aomr_textures.to_ao_texture(lookup_fn).unwrap_or(null_tex))
-                            .with_buffer(material_buffer.as_cpu())
-                            .build(device, self.bgl.as_cpu())
-                    },
-                    || (),
-                ),
-                mat: material,
-                material_buffer,
-            },
-        );
+        self.registry.insert(handle, material, internal);
     }
 
-    pub fn update_from_changes(&mut self, queue: &Queue, handle: RawMaterialHandle, change: MaterialChange) {
-        let material = self.registry.get_mut(handle);
-        material.mat.update_from_changes(change);
+    pub fn update<M: Material>(
+        &mut self,
+        device: &Device,
+        mode: RendererMode,
+        texture_manager_2d: &mut TextureManager,
+        object_manager: &mut ObjectManager,
+        handle: &MaterialHandle,
+        material: M,
+    ) {
+        // TODO(material): if this doesn't change archetype, this should do a buffer write cpu side.
+        let internal = self.fill_inner(device, mode, texture_manager_2d, &material);
 
-        if let ModeData::CPU(ref mut mat_buffer) = material.material_buffer {
-            let cpu = CPUShaderMaterial::from_material(&material.mat);
-            queue.write_buffer(mat_buffer, 0, bytemuck::bytes_of(&cpu));
+        let used_objects = self.registry.update(handle, internal).map(|im| im.objects.clone());
+
+        if let Some(objects) = used_objects {
+            let new_index = self.registry.get_index(handle.get_raw());
+            for object in &objects {
+                object_manager.set_material_index(*object, new_index);
+                // TODO(material): this also needs to change object archetype due to key/material archetype changes
+            }
+            self.registry.get_metadata_mut::<M>(handle.get_raw()).objects = objects;
         }
     }
 
-    pub fn get_material(&self, handle: RawMaterialHandle) -> &Material {
-        &self.registry.get(handle).mat
+    pub fn get_material<M: Material>(&self, handle: RawMaterialHandle) -> &M {
+        self.registry.get_ref::<M>(handle)
     }
 
-    pub fn get_bind_group_layout(&self) -> &BindGroupLayout {
-        self.bgl.as_ref().into_common()
+    pub fn get_bind_group_layout<M: Material>(&self) -> &BindGroupLayout {
+        self.type_info[&TypeId::of::<M>()].bgl.as_ref().into_common()
     }
 
-    pub fn cpu_get_bind_group(&self, handle: RawMaterialHandle) -> (&BindGroup, SampleType) {
-        let material = self.registry.get(handle);
-        (material.bind_group.as_cpu(), material.mat.sample_type)
+    pub fn get_internal_material_full<M: Material>(&self, handle: RawMaterialHandle) -> (&M, &InternalMaterial) {
+        self.registry.get_ref_full::<M>(handle)
     }
 
-    pub fn gpu_get_bind_group(&self) -> &BindGroup {
-        self.bg.as_gpu()
+    pub fn get_internal_material_full_by_index<M: Material>(&self, index: usize) -> (&M, &InternalMaterial) {
+        self.registry.get_ref_full_by_index::<M>(index)
     }
 
-    pub fn internal_index(&self, handle: RawMaterialHandle) -> usize {
-        self.registry.get_index_of(handle)
+    pub fn get_bind_group_gpu<M: Material>(&self) -> &BindGroup {
+        self.bg[&TypeId::of::<M>()].as_gpu()
+    }
+
+    pub fn get_material_key_and_objects(
+        &mut self,
+        handle: RawMaterialHandle,
+    ) -> (MaterialKeyPair, &mut Vec<RawObjectHandle>) {
+        let index = self.registry.get_index(handle);
+        let ty = self.registry.get_type_id(handle);
+        let type_info = &self.type_info[&ty];
+        let arch = self.registry.get_archetype_mut(ty);
+
+        let key_pair = (type_info.get_material_key)(&arch.vec, index);
+
+        (key_pair, &mut arch.non_erased[index].inner.objects)
+    }
+
+    pub fn get_objects(&mut self, handle: RawMaterialHandle) -> &mut Vec<RawObjectHandle> {
+        let index = self.registry.get_index(handle);
+        let ty = self.registry.get_type_id(handle);
+        let arch = self.registry.get_archetype_mut(ty);
+
+        &mut arch.non_erased[index].inner.objects
+    }
+
+    pub fn get_internal_index(&self, handle: RawMaterialHandle) -> usize {
+        self.registry.get_index(handle)
     }
 
     pub fn ready(&mut self, device: &Device, queue: &Queue, texture_manager: &TextureManager) {
         profiling::scope!("Material Ready");
-        self.registry.remove_all_dead(|_, _, _| ());
+        self.registry.remove_all_dead();
 
         if let ModeData::GPU(ref mut buffer) = self.buffer {
             profiling::scope!("Update GPU Material Buffer");
-            let translate_texture = texture_manager.translation_fn();
-            let data: Vec<_> = self
+            let mut translate_texture = texture_manager.translation_fn();
+
+            let self_type_info = &self.type_info;
+
+            let bytes: usize = self
                 .registry
-                .values()
-                .map(|internal| GPUShaderMaterial::from_material(&internal.mat, &translate_texture))
-                .collect();
+                .archetype_lengths()
+                .map(|(ty, len)| {
+                    let type_info = &self_type_info[&ty];
 
-            let resized = buffer.write_to_buffer(device, queue, bytemuck::cast_slice(&data));
+                    len * (round_up_pot(type_info.texture_count * 4, 16) + round_up_pot(type_info.data_size, 16))
+                        as usize
+                })
+                .sum();
 
-            if resized {
-                *self.bg.as_gpu_mut() = create_gpu_buffer_bg(device, self.bgl.as_gpu_mut(), self.buffer.as_gpu_mut());
+            buffer.ensure_size(device, bytes as u64);
+
+            let mut data = vec![0u8; bytes];
+
+            let mut offset = 0_usize;
+            for (ty, archetype) in self.registry.archetypes_mut() {
+                let type_info = &self.type_info[&ty];
+
+                let size = (type_info.write_gpu_materials_fn)(&mut data[offset..], archetype, &mut translate_texture);
+                let size = size.max(16);
+
+                self.bg.insert(
+                    ty,
+                    ModeData::GPU(create_gpu_buffer_bg(
+                        device,
+                        type_info.bgl.as_gpu(),
+                        buffer,
+                        offset,
+                        size,
+                    )),
+                );
+
+                offset += size;
             }
+
+            // TODO(material): I know the size before hand, we could elide this cpu side copy
+            buffer.write_to_buffer(device, queue, bytemuck::cast_slice(&data));
         }
     }
 }
 
-fn create_gpu_buffer_bg(device: &Device, bgl: &BindGroupLayout, buffer: &Buffer) -> BindGroup {
+fn create_gpu_buffer_bg(
+    device: &Device,
+    bgl: &BindGroupLayout,
+    buffer: &Buffer,
+    offset: usize,
+    size: usize,
+) -> BindGroup {
     BindGroupBuilder::new(Some("gpu material bg"))
-        .with_buffer(buffer)
+        .with(BindingResource::Buffer(BufferBinding {
+            buffer,
+            offset: offset as u64,
+            size: Some(NonZeroU64::new(size as u64).unwrap()),
+        }))
         .build(device, bgl)
+}
+
+fn write_gpu_materials<M: Material>(
+    dest: &mut [u8],
+    vec_any: &VecAny,
+    translation_fn: &mut (dyn FnMut(&TextureHandle) -> NonZeroU32 + '_),
+) -> usize {
+    let materials = vec_any.downcast_slice::<M>().unwrap();
+
+    let mut offset = 0_usize;
+
+    for mat in materials {
+        let texture_bytes = (M::TEXTURE_COUNT * 4) as usize;
+        let mat_size = round_up_pot(texture_bytes, 16);
+        let texture_slice = bytemuck::cast_slice_mut(&mut dest[offset..offset + texture_bytes]);
+        mat.to_textures(texture_slice, translation_fn);
+
+        offset += mat_size;
+
+        let data_size = round_up_pot(M::DATA_SIZE, 16) as usize;
+        mat.to_data(&mut dest[offset..offset + M::DATA_SIZE as usize]);
+
+        offset += data_size;
+    }
+
+    offset
+}
+
+fn get_material_key<M: Material>(vec_any: &VecAny, index: usize) -> MaterialKeyPair {
+    let materials = vec_any.downcast_slice::<M>().unwrap();
+
+    let key = materials[index].object_key();
+
+    MaterialKeyPair {
+        ty: TypeId::of::<M>(),
+        key,
+    }
 }

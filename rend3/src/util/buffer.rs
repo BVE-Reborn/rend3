@@ -51,8 +51,8 @@ impl WrappedPotBuffer {
         will_resize_inner(self.size, desired, self.minimum)
     }
 
-    pub fn write_to_buffer(&mut self, device: &Device, queue: &Queue, data: &[u8]) -> bool {
-        let resize = self.will_resize(data.len() as BufferAddress);
+    pub fn ensure_size(&mut self, device: &Device, desired: BufferAddress) -> Option<BufferAddress> {
+        let resize = self.will_resize(desired);
         if let Some(size) = resize {
             self.size = size;
             self.inner = Arc::new(device.create_buffer(&BufferDescriptor {
@@ -62,6 +62,11 @@ impl WrappedPotBuffer {
                 mapped_at_creation: false,
             }));
         }
+        resize
+    }
+
+    pub fn write_to_buffer(&mut self, device: &Device, queue: &Queue, data: &[u8]) -> bool {
+        let resize = self.ensure_size(device, data.len() as u64);
 
         queue.write_buffer(&self.inner, 0, data);
 

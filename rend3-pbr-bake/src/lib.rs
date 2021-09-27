@@ -40,7 +40,7 @@ impl PbrBakerRenderRoutine {
             texture_bgl,
             materials: &material_manager,
             samples: rend3_pbr::SampleCount::One,
-            transparency: rend3::types::TransparencyType::Opaque,
+            transparency: rend3_pbr::material::TransparencyType::Opaque,
             baking: rend3_pbr::common::forward_pass::Baking::Enabled,
         };
         let opaque_pipeline = Arc::new(rend3_pbr::common::forward_pass::build_forward_pass_shader(
@@ -48,7 +48,7 @@ impl PbrBakerRenderRoutine {
         ));
         let cutout_pipeline = Arc::new(rend3_pbr::common::forward_pass::build_forward_pass_shader(
             rend3_pbr::common::forward_pass::BuildForwardPassShaderArgs {
-                transparency: rend3::types::TransparencyType::Opaque,
+                transparency: rend3_pbr::material::TransparencyType::Opaque,
                 ..pipeline_desc
             },
         ));
@@ -68,10 +68,10 @@ impl PbrBakerRenderRoutine {
             rend3_pbr::directional::DirectionalShadowPass::new(shadow_pipelines.cutout, shadow_pipelines.opaque);
 
         let forward_opaque_pass =
-            rend3_pbr::forward::ForwardPass::new(None, opaque_pipeline, rend3::types::TransparencyType::Opaque);
+            rend3_pbr::forward::ForwardPass::new(None, opaque_pipeline, rend3_pbr::material::TransparencyType::Opaque);
 
         let forward_cutout_pass =
-            rend3_pbr::forward::ForwardPass::new(None, cutout_pipeline, rend3::types::TransparencyType::Cutout);
+            rend3_pbr::forward::ForwardPass::new(None, cutout_pipeline, rend3_pbr::material::TransparencyType::Cutout);
 
         let samplers =
             rend3_pbr::common::samplers::Samplers::new(&renderer.device, renderer.mode, &interfaces.samplers_bgl);
@@ -114,8 +114,34 @@ impl rend3::RenderRoutine<Vec<BakeData>, PbrBakerOutput<'_>> for PbrBakerRenderR
         let directional_light = renderer.directional_light_manager.read();
         let materials = renderer.material_manager.read();
         let camera_manager = renderer.camera_manager.read();
+        let mut object_manager = renderer.object_manager.write();
 
         let culler = self.gpu_culler.as_ref().map_cpu(|_| &self.cpu_culler);
+
+        let mut culling_input_opaque = culler.map(
+            |_| (),
+            |culler| {
+                culler.pre_cull(rend3_pbr::culling::gpu::GpuCullerPreCullArgs {
+                    device: &renderer.device,
+                    camera: &camera_manager,
+                    objects: &mut object_manager,
+                    transparency: rend3_pbr::material::TransparencyType::Opaque,
+                    sort: None,
+                })
+            },
+        );
+        let mut culling_input_cutout = culler.map(
+            |_| (),
+            |culler| {
+                culler.pre_cull(rend3_pbr::culling::gpu::GpuCullerPreCullArgs {
+                    device: &renderer.device,
+                    camera: &camera_manager,
+                    objects: &mut object_manager,
+                    transparency: rend3_pbr::material::TransparencyType::Cutout,
+                    sort: None,
+                })
+            },
+        );
 
         let culled_lights =
             self.shadow_passes
@@ -124,11 +150,12 @@ impl rend3::RenderRoutine<Vec<BakeData>, PbrBakerOutput<'_>> for PbrBakerRenderR
                     profiler: &mut profiler,
                     encoder: &mut encoder,
                     culler,
-                    materials: &materials,
                     interfaces: &self.interfaces,
                     lights: &directional_light,
                     directional_light_cameras: &ready.directional_light_cameras,
-                    objects: &ready.objects,
+                    objects: &mut object_manager,
+                    culling_input_opaque: culling_input_opaque.as_gpu_only_mut(),
+                    culling_input_cutout: culling_input_cutout.as_gpu_only_mut(),
                 });
 
         let d2_texture_output_bg_ref = ready.d2_texture.bg.as_ref().map(|_| (), |a| &**a);
@@ -152,36 +179,39 @@ impl rend3::RenderRoutine<Vec<BakeData>, PbrBakerOutput<'_>> for PbrBakerRenderR
                 interfaces: &self.interfaces,
                 ambient: Vec4::new(0.0, 0.0, 0.0, 1.0),
             });
-        let object_manager = renderer.object_manager.read();
+        let _object_manager = renderer.object_manager.read();
 
         let culled_objects: Vec<_> = input
             .into_iter()
-            .map(|object| {
-                let the_object = object_manager.get_internal(object.object.get_raw());
+            .map(|_object| {
+                // let the_object = object_manager.get(object.object.get_raw());
 
-                let cutout_culled_objects = self.forward_opaque_pass.cull(rend3_pbr::forward::ForwardPassCullArgs {
-                    device: &renderer.device,
-                    profiler: &mut profiler,
-                    encoder: &mut encoder,
-                    culler,
-                    materials: &materials,
-                    interfaces: &self.interfaces,
-                    camera: &camera_manager,
-                    objects: std::slice::from_ref(the_object),
-                });
+                // let cutout_culled_objects = self.forward_opaque_pass.cull(rend3_pbr::forward::ForwardPassCullArgs {
+                //     device: &renderer.device,
+                //     profiler: &mut profiler,
+                //     encoder: &mut encoder,
+                //     culler,
+                //     materials: &materials,
+                //     interfaces: &self.interfaces,
+                //     camera: &camera_manager,
+                //     objects: std::slice::from_ref(the_object),
+                // });
 
-                let opaque_culled_objects = self.forward_cutout_pass.cull(rend3_pbr::forward::ForwardPassCullArgs {
-                    device: &renderer.device,
-                    profiler: &mut profiler,
-                    encoder: &mut encoder,
-                    culler,
-                    materials: &materials,
-                    interfaces: &self.interfaces,
-                    camera: &camera_manager,
-                    objects: std::slice::from_ref(the_object),
-                });
+                // let opaque_culled_objects = self.forward_cutout_pass.cull(rend3_pbr::forward::ForwardPassCullArgs {
+                //     device: &renderer.device,
+                //     profiler: &mut profiler,
+                //     encoder: &mut encoder,
+                //     culler,
+                //     materials: &materials,
+                //     interfaces: &self.interfaces,
+                //     camera: &camera_manager,
+                //     objects: std::slice::from_ref(the_object),
+                // });
 
-                (cutout_culled_objects, opaque_culled_objects)
+                // (cutout_culled_objects, opaque_culled_objects)
+
+                // TODO(material): figure out how to query a sinlg ething
+                todo!()
             })
             .collect();
 

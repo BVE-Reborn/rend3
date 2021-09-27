@@ -2,8 +2,7 @@ use std::sync::Arc;
 
 use rend3::{
     format_sso,
-    resources::{CameraManager, InternalObject, MaterialManager, MeshBuffers},
-    types::TransparencyType,
+    resources::{CameraManager, MaterialManager, MeshBuffers, ObjectManager},
     ModeData,
 };
 use wgpu::{BindGroup, CommandEncoder, Device, RenderPass, RenderPipeline};
@@ -13,9 +12,10 @@ use crate::{
     common::{interfaces::ShaderInterfaces, samplers::Samplers},
     culling::{
         cpu::{CpuCuller, CpuCullerCullArgs},
-        gpu::{GpuCuller, GpuCullerCullArgs},
+        gpu::{GpuCuller, GpuCullerCullArgs, PreCulledBuffer},
         CulledObjectSet, Sorting,
     },
+    material::{PbrMaterial, TransparencyType},
 };
 
 use super::culling;
@@ -26,12 +26,13 @@ pub struct ForwardPassCullArgs<'a> {
     pub encoder: &'a mut CommandEncoder,
 
     pub culler: ModeData<&'a CpuCuller, &'a GpuCuller>,
-    pub materials: &'a MaterialManager,
 
     pub interfaces: &'a ShaderInterfaces,
 
     pub camera: &'a CameraManager,
-    pub objects: &'a [InternalObject],
+    pub objects: &'a mut ObjectManager,
+
+    pub culling_input: ModeData<(), &'a mut PreCulledBuffer>,
 }
 
 pub struct ForwardPassPrepassArgs<'rpass, 'b> {
@@ -98,9 +99,8 @@ impl ForwardPass {
                 device: args.device,
                 camera: args.camera,
                 interfaces: args.interfaces,
-                materials: args.materials,
                 objects: args.objects,
-                filter: |_, m| m.transparency == self.transparency,
+                transparency: self.transparency,
                 sort,
             }),
             ModeData::GPU(gpu_culler) => {
@@ -109,10 +109,8 @@ impl ForwardPass {
                     device: args.device,
                     encoder: args.encoder,
                     interfaces: args.interfaces,
-                    materials: args.materials,
                     camera: args.camera,
-                    objects: args.objects,
-                    filter: |_, m| m.transparency == self.transparency,
+                    input_buffer: args.culling_input.as_gpu(),
                     sort,
                 });
                 args.profiler.end_scope(args.encoder);
@@ -139,7 +137,8 @@ impl ForwardPass {
         match args.culled_objects.calls {
             ModeData::CPU(ref draws) => culling::cpu::run(args.rpass, draws, args.samplers, 0, args.materials, 2),
             ModeData::GPU(ref data) => {
-                args.rpass.set_bind_group(2, args.materials.gpu_get_bind_group(), &[]);
+                args.rpass
+                    .set_bind_group(2, args.materials.get_bind_group_gpu::<PbrMaterial>(), &[]);
                 args.rpass.set_bind_group(3, args.texture_bg.as_gpu(), &[]);
                 culling::gpu::run(args.rpass, data);
             }
@@ -163,7 +162,8 @@ impl ForwardPass {
         match args.culled_objects.calls {
             ModeData::CPU(ref draws) => culling::cpu::run(args.rpass, draws, args.samplers, 0, args.materials, 4),
             ModeData::GPU(ref data) => {
-                args.rpass.set_bind_group(4, args.materials.gpu_get_bind_group(), &[]);
+                args.rpass
+                    .set_bind_group(4, args.materials.get_bind_group_gpu::<PbrMaterial>(), &[]);
                 args.rpass.set_bind_group(5, args.texture_bg.as_gpu(), &[]);
                 culling::gpu::run(args.rpass, data);
             }

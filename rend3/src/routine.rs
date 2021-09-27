@@ -3,12 +3,12 @@ use std::sync::Arc;
 use wgpu::CommandBuffer;
 
 use crate::{
-    resources::{CameraManager, InternalObject, TextureManagerReadyOutput},
+    resources::{CameraManager, TextureManagerReadyOutput},
     Renderer,
 };
 
+/// Output of calling ready on various managers.
 pub struct ManagerReadyOutput {
-    pub objects: Vec<InternalObject>,
     pub d2_texture: TextureManagerReadyOutput,
     pub d2c_texture: TextureManagerReadyOutput,
     pub directional_light_cameras: Vec<CameraManager>,

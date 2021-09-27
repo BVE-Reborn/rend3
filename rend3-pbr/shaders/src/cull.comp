@@ -12,22 +12,24 @@ struct CullingUniforms {
 };
 
 #ifdef ATOMIC_CULL
-#define OBJECT_OUTPUT_DATA_BUFFER_BINDING 1
-#define INDIRECT_BUFFER_BINDING 2
+#define OBJECT_OUTPUT_DATA_BUFFER_BINDING 2
+#define INDIRECT_BUFFER_BINDING 3
 #else // ATOMIC_CULL
-#define OBJECT_OUTPUT_DATA_BUFFER_BINDING 3
-#define INDIRECT_BUFFER_BINDING 4
+#define OBJECT_OUTPUT_DATA_BUFFER_BINDING 4
+#define INDIRECT_BUFFER_BINDING 5
 #endif // ATOMIC_CULL
 
 layout(set = 0, binding = 0, std430) restrict readonly buffer ObjectInputDataBuffer {
-    CullingUniforms uniforms;
     ObjectInputData object_input[];
 };
+layout(set = 0, binding = 1) uniform ObjectInputUniforms {
+    CullingUniforms uniforms;
+};
 #ifndef ATOMIC_CULL
-layout(set = 0, binding = 1, std430) restrict buffer IntermediateBufferA {
+layout(set = 0, binding = 2, std430) restrict buffer IntermediateBufferA {
     uint result_index_a[];
 };
-layout(set = 0, binding = 2, std430) restrict buffer IntermediateBufferB {
+layout(set = 0, binding = 3, std430) restrict buffer IntermediateBufferB {
     uint result_index_b[];
 };
 #endif

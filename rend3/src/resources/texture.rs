@@ -121,6 +121,10 @@ impl TextureManager {
         self.registry.get(handle)
     }
 
+    pub fn get_view_from_index(&self, idx: NonZeroU32) -> &TextureView {
+        &self.views[(idx.get() - 1) as usize]
+    }
+
     pub fn get_view(&self, handle: RawTextureHandle) -> &TextureView {
         &self.views[self.registry.get_index_of(handle)]
     }

@@ -22,6 +22,7 @@ use rend3::{
     util::typedefs::{FastHashMap, SsoString},
     Renderer,
 };
+use rend3_pbr::material;
 use std::{borrow::Cow, collections::hash_map::Entry, future::Future, path::Path};
 use thiserror::Error;
 
@@ -387,24 +388,24 @@ pub fn load_meshes<'a, E: std::error::Error + 'static>(
 
 /// Creates a gltf default material.
 pub fn load_default_material(renderer: &Renderer) -> types::MaterialHandle {
-    renderer.add_material(types::Material {
-        albedo: types::AlbedoComponent::Value(Vec4::splat(1.0)),
-        transparency: types::Transparency::Opaque,
-        normal: types::NormalTexture::None,
-        aomr_textures: types::AoMRTextures::None,
+    renderer.add_material(material::PbrMaterial {
+        albedo: material::AlbedoComponent::Value(Vec4::splat(1.0)),
+        transparency: material::Transparency::Opaque,
+        normal: material::NormalTexture::None,
+        aomr_textures: material::AoMRTextures::None,
         ao_factor: Some(1.0),
         metallic_factor: Some(1.0),
         roughness_factor: Some(1.0),
-        clearcoat_textures: types::ClearcoatTextures::None,
+        clearcoat_textures: material::ClearcoatTextures::None,
         clearcoat_factor: Some(1.0),
         clearcoat_roughness_factor: Some(1.0),
-        emissive: types::MaterialComponent::None,
-        reflectance: types::MaterialComponent::None,
-        anisotropy: types::MaterialComponent::None,
+        emissive: material::MaterialComponent::None,
+        reflectance: material::MaterialComponent::None,
+        anisotropy: material::MaterialComponent::None,
         uv_transform0: Mat3::IDENTITY,
         uv_transform1: Mat3::IDENTITY,
         unlit: false,
-        sample_type: types::SampleType::Linear,
+        sample_type: material::SampleType::Linear,
     })
 }
 
@@ -441,9 +442,9 @@ where
         let nearest = albedo
             .as_ref()
             .map(|i| match i.texture().sampler().mag_filter() {
-                Some(gltf::texture::MagFilter::Nearest) => types::SampleType::Nearest,
-                Some(gltf::texture::MagFilter::Linear) => types::SampleType::Linear,
-                None => types::SampleType::Linear,
+                Some(gltf::texture::MagFilter::Nearest) => material::SampleType::Nearest,
+                Some(gltf::texture::MagFilter::Linear) => material::SampleType::Linear,
+                None => material::SampleType::Linear,
             })
             .unwrap_or_default();
 
@@ -481,29 +482,29 @@ where
         )
         .await?;
 
-        let handle = renderer.add_material(types::Material {
+        let handle = renderer.add_material(material::PbrMaterial {
             albedo: match albedo_tex {
-                Some(tex) => types::AlbedoComponent::TextureVertexValue {
+                Some(tex) => material::AlbedoComponent::TextureVertexValue {
                     texture: tex,
                     value: Vec4::from(albedo_factor),
                     srgb: false,
                 },
-                None => types::AlbedoComponent::Value(Vec4::from(albedo_factor)),
+                None => material::AlbedoComponent::Value(Vec4::from(albedo_factor)),
             },
             transparency: match material.alpha_mode() {
-                gltf::material::AlphaMode::Opaque => types::Transparency::Opaque,
-                gltf::material::AlphaMode::Mask => types::Transparency::Cutout {
+                gltf::material::AlphaMode::Opaque => material::Transparency::Opaque,
+                gltf::material::AlphaMode::Mask => material::Transparency::Cutout {
                     cutout: material.alpha_cutoff().unwrap_or(0.5),
                 },
-                gltf::material::AlphaMode::Blend => types::Transparency::Blend,
+                gltf::material::AlphaMode::Blend => material::Transparency::Blend,
             },
             normal: match normals_tex {
-                Some(tex) => types::NormalTexture::Tricomponent(tex),
-                None => types::NormalTexture::None,
+                Some(tex) => material::NormalTexture::Tricomponent(tex),
+                None => material::NormalTexture::None,
             },
             aomr_textures: match (metallic_roughness_tex, occlusion_tex) {
-                (Some(mr), Some(ao)) if mr == ao => types::AoMRTextures::GltfCombined { texture: Some(mr) },
-                (mr, ao) => types::AoMRTextures::GltfSplit {
+                (Some(mr), Some(ao)) if mr == ao => material::AoMRTextures::GltfCombined { texture: Some(mr) },
+                (mr, ao) => material::AoMRTextures::GltfSplit {
                     mr_texture: mr,
                     ao_texture: ao,
                 },
@@ -511,17 +512,17 @@ where
             metallic_factor: Some(metallic_factor),
             roughness_factor: Some(roughness_factor),
             emissive: match emissive_tex {
-                Some(tex) => types::MaterialComponent::TextureValue {
+                Some(tex) => material::MaterialComponent::TextureValue {
                     texture: tex,
                     value: Vec3::from(emissive_factor),
                 },
-                None => types::MaterialComponent::Value(Vec3::from(emissive_factor)),
+                None => material::MaterialComponent::Value(Vec3::from(emissive_factor)),
             },
             uv_transform0: uv_transform,
             uv_transform1: uv_transform,
             unlit: material.unlit(),
             sample_type: nearest,
-            ..types::Material::default()
+            ..material::PbrMaterial::default()
         });
 
         result.push(Labeled::new(handle, material.name()));

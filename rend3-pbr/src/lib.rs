@@ -3,7 +3,7 @@ use std::sync::Arc;
 use glam::Vec4;
 use rend3::{
     resources::{DirectionalLightManager, MaterialManager, TextureManager},
-    types::{TextureFormat, TextureHandle, TransparencyType},
+    types::{TextureFormat, TextureHandle},
     ManagerReadyOutput, ModeData, RenderRoutine, Renderer, RendererMode,
 };
 use wgpu::{
@@ -13,10 +13,13 @@ use wgpu::{
 
 pub use utils::*;
 
+use crate::material::{PbrMaterial, TransparencyType};
+
 pub mod common;
 pub mod culling;
 pub mod directional;
 pub mod forward;
+pub mod material;
 pub mod shaders;
 pub mod skybox;
 pub mod tonemapping;
@@ -57,7 +60,9 @@ impl PbrRenderRoutine {
         let primary_passes = {
             let d2_textures = renderer.d2_texture_manager.read();
             let directional_light = renderer.directional_light_manager.read();
-            let materials = renderer.material_manager.read();
+            let mut materials = renderer.material_manager.write();
+            // TODO(material): figure out a better way for zero materials to work
+            materials.ensure_archetype::<PbrMaterial>(&renderer.device, renderer.mode);
             PrimaryPasses::new(PrimaryPassesNewArgs {
                 mode: renderer.mode,
                 device: &renderer.device,
@@ -141,6 +146,8 @@ impl RenderRoutine<(), &TextureView> for PbrRenderRoutine {
         let materials = renderer.material_manager.read();
         let d2c_textures = renderer.d2c_texture_manager.read();
         let camera_manager = renderer.camera_manager.read();
+        // TODO(material): let this be read
+        let mut object_manager = renderer.object_manager.write();
 
         self.primary_passes.skybox_pass.update_skybox(skybox::UpdateSkyboxArgs {
             device: &renderer.device,
@@ -151,6 +158,43 @@ impl RenderRoutine<(), &TextureView> for PbrRenderRoutine {
 
         let culler = self.gpu_culler.as_ref().map_cpu(|_| &self.cpu_culler);
 
+        let mut culling_input_opaque = culler.map(
+            |_| (),
+            |culler| {
+                culler.pre_cull(culling::gpu::GpuCullerPreCullArgs {
+                    device: &renderer.device,
+                    camera: &camera_manager,
+                    objects: &mut object_manager,
+                    transparency: TransparencyType::Opaque,
+                    sort: None,
+                })
+            },
+        );
+        let mut culling_input_cutout = culler.map(
+            |_| (),
+            |culler| {
+                culler.pre_cull(culling::gpu::GpuCullerPreCullArgs {
+                    device: &renderer.device,
+                    camera: &camera_manager,
+                    objects: &mut object_manager,
+                    transparency: TransparencyType::Cutout,
+                    sort: None,
+                })
+            },
+        );
+        let mut culling_input_blend = culler.map(
+            |_| (),
+            |culler| {
+                culler.pre_cull(culling::gpu::GpuCullerPreCullArgs {
+                    device: &renderer.device,
+                    camera: &camera_manager,
+                    objects: &mut object_manager,
+                    transparency: TransparencyType::Blend,
+                    sort: Some(culling::Sorting::FrontToBack),
+                })
+            },
+        );
+
         let culled_lights =
             self.primary_passes
                 .shadow_passes
@@ -159,11 +203,12 @@ impl RenderRoutine<(), &TextureView> for PbrRenderRoutine {
                     profiler: &mut profiler,
                     encoder: &mut encoder,
                     culler,
-                    materials: &materials,
                     interfaces: &self.interfaces,
                     lights: &directional_light,
                     directional_light_cameras: &ready.directional_light_cameras,
-                    objects: &ready.objects,
+                    objects: &mut object_manager,
+                    culling_input_opaque: culling_input_opaque.as_gpu_only_mut(),
+                    culling_input_cutout: culling_input_cutout.as_gpu_only_mut(),
                 });
 
         profiler.begin_scope("forward culling", &mut encoder, &renderer.device);
@@ -173,10 +218,10 @@ impl RenderRoutine<(), &TextureView> for PbrRenderRoutine {
             profiler: &mut profiler,
             encoder: &mut encoder,
             culler,
-            materials: &materials,
             interfaces: &self.interfaces,
             camera: &camera_manager,
-            objects: &ready.objects,
+            objects: &mut object_manager,
+            culling_input: culling_input_blend.as_gpu_only_mut(),
         });
 
         let cutout_culled_objects = self.primary_passes.cutout_pass.cull(forward::ForwardPassCullArgs {
@@ -184,10 +229,10 @@ impl RenderRoutine<(), &TextureView> for PbrRenderRoutine {
             profiler: &mut profiler,
             encoder: &mut encoder,
             culler,
-            materials: &materials,
             interfaces: &self.interfaces,
             camera: &camera_manager,
-            objects: &ready.objects,
+            objects: &mut object_manager,
+            culling_input: culling_input_cutout.as_gpu_only_mut(),
         });
 
         let opaque_culled_objects = self.primary_passes.opaque_pass.cull(forward::ForwardPassCullArgs {
@@ -195,10 +240,10 @@ impl RenderRoutine<(), &TextureView> for PbrRenderRoutine {
             profiler: &mut profiler,
             encoder: &mut encoder,
             culler,
-            materials: &materials,
             interfaces: &self.interfaces,
             camera: &camera_manager,
-            objects: &ready.objects,
+            objects: &mut object_manager,
+            culling_input: culling_input_opaque.as_gpu_only_mut(),
         });
 
         profiler.end_scope(&mut encoder);

@@ -57,49 +57,65 @@ struct IndirectCall {
 #define MATERIAL_FLAG(name) bool(material.material_flags & name)
 
 struct GPUMaterialData {
-    vec4 albedo;
-    vec3 emissive;
-    float roughness;
-    float metallic;
-    float reflectance;
-    float clear_coat;
-    float clear_coat_roughness;
-    float anisotropy;
-    float ambient_occlusion;
-    float alpha_cutout;
-
-    mat3 uv_transform0;
-    mat3 uv_transform1;
-
     uint albedo_tex;
     uint normal_tex;
     uint roughness_tex;
     uint metallic_tex;
+    // -- 16 --
     uint reflectance_tex;
     uint clear_coat_tex;
     uint clear_coat_roughness_tex;
     uint emissive_tex;
+    // -- 16 --
     uint anisotropy_tex;
     uint ambient_occlusion_tex;
+    uint _padding0;
+    uint _padding1;
+    
+    // -- 16 --
+
+    mat3 uv_transform0;
+    // -- 16 --
+    mat3 uv_transform1;
+    // -- 16 --
+    vec4 albedo;
+    // -- 16 --
+    vec3 emissive;
+    float roughness;
+    // -- 16 --
+    float metallic;
+    float reflectance;
+    float clear_coat;
+    float clear_coat_roughness;
+    // -- 16 --
+    float anisotropy;
+    float ambient_occlusion;
+    float alpha_cutout;
     uint material_flags;
 };
 
 struct CPUMaterialData {
     mat3 uv_transform0;
+    // -- 16 --
     mat3 uv_transform1;
+    // -- 16 --
     vec4 albedo;
+    // -- 16 --
     vec3 emissive;
     float roughness;
+    // -- 16 --
     float metallic;
     float reflectance;
     float clear_coat;
     float clear_coat_roughness;
+    // -- 16 --
     float anisotropy;
     float ambient_occlusion;
     float alpha_cutout;
-
-    uint texture_enable;
     uint material_flags;
+    
+    // -- 16 --
+    uint texture_enable;
 };
 
 struct UniformData {

@@ -12,6 +12,7 @@ categories = ["game-development", "graphics", "rendering", "rendering::engine"]
 
 [dependencies]
 arrayvec = "0.7"
+bitflags = "1"
 bytemuck = "1"
 flume = "0.10"
 glam = { version = "0.18", features = ["bytemuck"] }
