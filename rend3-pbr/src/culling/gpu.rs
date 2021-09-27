@@ -7,12 +7,7 @@ use rend3::{
     util::{bind_merge::BindGroupBuilder, frustum::ShaderFrustum},
     ModeData,
 };
-use wgpu::{
-    BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType,
-    Buffer, BufferBindingType, BufferDescriptor, BufferUsages, CommandEncoder, ComputePassDescriptor, ComputePipeline,
-    ComputePipelineDescriptor, Device, PipelineLayoutDescriptor, PushConstantRange, RenderPass,
-    ShaderModuleDescriptorSpirV, ShaderStages,
-};
+use wgpu::{BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, Buffer, BufferBindingType, BufferDescriptor, BufferUsages, CommandEncoder, ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor, Device, PipelineLayoutDescriptor, PushConstantRange, RenderPass, ShaderModuleDescriptorSpirV, ShaderStages, util::{BufferInitDescriptor, DeviceExt}};
 
 use crate::{
     common::interfaces::{PerObjectData, ShaderInterfaces},
@@ -20,6 +15,11 @@ use crate::{
     material::{PbrMaterial, TransparencyType},
     shaders::SPIRV_SHADERS,
 };
+
+pub struct PreCulledBuffer {
+    inner: Buffer,
+    count: usize,
+}
 
 #[repr(C, align(16))]
 #[derive(Debug, Copy, Clone)]
@@ -33,6 +33,17 @@ struct GPUCullingUniforms {
 unsafe impl bytemuck::Pod for GPUCullingUniforms {}
 unsafe impl bytemuck::Zeroable for GPUCullingUniforms {}
 
+pub struct GpuCullerPreCullArgs<'a> {
+    pub device: &'a Device,
+
+    pub camera: &'a CameraManager,
+
+    pub objects: &'a mut ObjectManager,
+
+    pub transparency: TransparencyType,
+    pub sort: Option<Sorting>,
+}
+
 pub struct GpuCullerCullArgs<'a> {
     pub device: &'a Device,
     pub encoder: &'a mut CommandEncoder,
@@ -41,9 +52,8 @@ pub struct GpuCullerCullArgs<'a> {
 
     pub camera: &'a CameraManager,
 
-    pub objects: &'a mut ObjectManager,
+    pub input_buffer: &'a PreCulledBuffer, 
 
-    pub transparency: TransparencyType,
     pub sort: Option<Sorting>,
 }
 
@@ -75,6 +85,16 @@ impl GpuCuller {
                     binding: 1,
                     visibility: ShaderStages::COMPUTE,
                     ty: BindingType::Buffer {
+                        ty: BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: NonZeroU64::new(mem::size_of::<GPUCullingUniforms>() as _),
+                    },
+                    count: None,
+                },
+                BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: ShaderStages::COMPUTE,
+                    ty: BindingType::Buffer {
                         ty: BufferBindingType::Storage { read_only: false },
                         has_dynamic_offset: false,
                         min_binding_size: NonZeroU64::new(mem::size_of::<PerObjectData>() as _),
@@ -82,7 +102,7 @@ impl GpuCuller {
                     count: None,
                 },
                 BindGroupLayoutEntry {
-                    binding: 2,
+                    binding: 3,
                     visibility: ShaderStages::COMPUTE,
                     ty: BindingType::Buffer {
                         ty: BufferBindingType::Storage { read_only: false },
@@ -103,7 +123,7 @@ impl GpuCuller {
                     ty: BindingType::Buffer {
                         ty: BufferBindingType::Storage { read_only: true },
                         has_dynamic_offset: false,
-                        min_binding_size: NonZeroU64::new(mem::size_of::<GPUCullingUniforms>() as _),
+                        min_binding_size: NonZeroU64::new(mem::size_of::<GPUCullingInput>() as _),
                     },
                     count: None,
                 },
@@ -111,9 +131,9 @@ impl GpuCuller {
                     binding: 1,
                     visibility: ShaderStages::COMPUTE,
                     ty: BindingType::Buffer {
-                        ty: BufferBindingType::Storage { read_only: false },
+                        ty: BufferBindingType::Uniform,
                         has_dynamic_offset: false,
-                        min_binding_size: NonZeroU64::new(mem::size_of::<u32>() as _),
+                        min_binding_size: NonZeroU64::new(mem::size_of::<GPUCullingUniforms>() as _),
                     },
                     count: None,
                 },
@@ -133,12 +153,22 @@ impl GpuCuller {
                     ty: BindingType::Buffer {
                         ty: BufferBindingType::Storage { read_only: false },
                         has_dynamic_offset: false,
-                        min_binding_size: NonZeroU64::new(mem::size_of::<PerObjectData>() as _),
+                        min_binding_size: NonZeroU64::new(mem::size_of::<u32>() as _),
                     },
                     count: None,
                 },
                 BindGroupLayoutEntry {
                     binding: 4,
+                    visibility: ShaderStages::COMPUTE,
+                    ty: BindingType::Buffer {
+                        ty: BufferBindingType::Storage { read_only: false },
+                        has_dynamic_offset: false,
+                        min_binding_size: NonZeroU64::new(mem::size_of::<PerObjectData>() as _),
+                    },
+                    count: None,
+                },
+                BindGroupLayoutEntry {
+                    binding: 5,
                     visibility: ShaderStages::COMPUTE,
                     ty: BindingType::Buffer {
                         ty: BufferBindingType::Storage { read_only: false },
@@ -248,9 +278,7 @@ impl GpuCuller {
         }
     }
 
-    pub fn cull(&self, args: GpuCullerCullArgs<'_>) -> CulledObjectSet {
-        profiling::scope!("Record GPU Culling");
-
+    pub fn pre_cull(&self, args: GpuCullerPreCullArgs<'_>) -> PreCulledBuffer {
         let objects = args.objects.get_objects_mut::<PbrMaterial>(args.transparency as u64);
         let count = objects.len();
 
@@ -268,13 +296,31 @@ impl GpuCuller {
                 }
             }
         }
+        let buffer = build_cull_data(args.device, objects);
 
-        let uniforms = GPUCullingUniforms {
+        PreCulledBuffer {
+            inner: buffer,
+            count,
+        }
+    }
+
+    pub fn cull(&self, args: GpuCullerCullArgs<'_>) -> CulledObjectSet {
+        profiling::scope!("Record GPU Culling");
+
+        let count = args.input_buffer.count;
+
+        let uniform = GPUCullingUniforms {
             view: args.camera.view(),
             view_proj: args.camera.view_proj(),
             frustum: ShaderFrustum::from_matrix(args.camera.proj()),
             object_count: count as u32,
         };
+
+        let uniform_buffer = args.device.create_buffer_init(&BufferInitDescriptor {
+            label: Some("gpu culling uniform buffer"),
+            contents: bytemuck::bytes_of(&uniform),
+            usage: BufferUsages::UNIFORM,
+        });
 
         let output_buffer = args.device.create_buffer(&BufferDescriptor {
             label: Some("culling output"),
@@ -292,8 +338,6 @@ impl GpuCuller {
         });
 
         if count != 0 {
-            let input_buffer = build_cull_data(args.device, uniforms, objects);
-
             let dispatch_count = ((count + 255) / 256) as u32;
 
             if args.sort.is_some() {
@@ -312,7 +356,8 @@ impl GpuCuller {
                 });
 
                 let bg_a = BindGroupBuilder::new(Some("prefix cull A bg"))
-                    .with_buffer(&input_buffer)
+                    .with_buffer(&args.input_buffer.inner)
+                    .with_buffer(&uniform_buffer)
                     .with_buffer(&buffer_a)
                     .with_buffer(&buffer_b)
                     .with_buffer(&output_buffer)
@@ -320,7 +365,8 @@ impl GpuCuller {
                     .build(args.device, &self.prefix_bgl);
 
                 let bg_b = BindGroupBuilder::new(Some("prefix cull B bg"))
-                    .with_buffer(&input_buffer)
+                    .with_buffer(&args.input_buffer.inner)
+                    .with_buffer(&uniform_buffer)
                     .with_buffer(&buffer_b)
                     .with_buffer(&buffer_a)
                     .with_buffer(&output_buffer)
@@ -354,7 +400,8 @@ impl GpuCuller {
                 cpass.dispatch(dispatch_count, 1, 1);
             } else {
                 let bg = BindGroupBuilder::new(Some("atomic culling bg"))
-                    .with_buffer(&input_buffer)
+                    .with_buffer(&args.input_buffer.inner)
+                    .with_buffer(&uniform_buffer)
                     .with_buffer(&output_buffer)
                     .with_buffer(&indirect_buffer)
                     .build(args.device, &self.atomic_bgl);
@@ -387,11 +434,10 @@ impl GpuCuller {
     }
 }
 
-fn build_cull_data(device: &Device, uniforms: GPUCullingUniforms, objects: &[InternalObject]) -> Buffer {
+fn build_cull_data(device: &Device, objects: &[InternalObject]) -> Buffer {
     profiling::scope!("Building Input Data");
 
-    let uniform_size = mem::size_of::<GPUCullingUniforms>();
-    let total_length = objects.len() * mem::size_of::<GPUCullingInput>() + uniform_size;
+    let total_length = objects.len() * mem::size_of::<GPUCullingInput>();
 
     let buffer = device.create_buffer(&BufferDescriptor {
         label: Some("culling inputs"),
@@ -407,15 +453,10 @@ fn build_cull_data(device: &Device, uniforms: GPUCullingUniforms, objects: &[Int
         let ptr = data.as_mut_ptr();
 
         // Assert everything is aligned
-        assert!((ptr as usize).trailing_zeros() >= mem::align_of::<GPUCullingUniforms>().trailing_zeros());
         assert!((ptr as usize).trailing_zeros() >= mem::align_of::<GPUCullingInput>().trailing_zeros());
 
-        // Things are aligned, so this conversion is safe
-        let uniform_ptr = data.as_mut_ptr() as *mut GPUCullingUniforms;
-        uniform_ptr.write(uniforms);
-
         // Skip over the uniform data
-        let data_ptr = data.as_mut_ptr().add(uniform_size) as *mut GPUCullingInput;
+        let data_ptr = data.as_mut_ptr() as *mut GPUCullingInput;
 
         // Iterate over the objects
         for idx in 0..objects.len() {

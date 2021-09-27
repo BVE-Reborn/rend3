@@ -11,16 +11,7 @@ use wgpu::{
 };
 use wgpu_profiler::GpuProfiler;
 
-use crate::{
-    common::{interfaces::ShaderInterfaces, samplers::Samplers},
-    culling::{
-        self,
-        cpu::{CpuCuller, CpuCullerCullArgs},
-        gpu::{GpuCuller, GpuCullerCullArgs},
-        CulledObjectSet,
-    },
-    material::{PbrMaterial, TransparencyType},
-};
+use crate::{common::{interfaces::ShaderInterfaces, samplers::Samplers}, culling::{self, CulledObjectSet, cpu::{CpuCuller, CpuCullerCullArgs}, gpu::{GpuCuller, GpuCullerCullArgs, PreCulledBuffer}}, material::{PbrMaterial, TransparencyType}};
 
 pub struct DirectionalShadowPassCullShadowsArgs<'a> {
     pub device: &'a Device,
@@ -33,6 +24,9 @@ pub struct DirectionalShadowPassCullShadowsArgs<'a> {
     pub interfaces: &'a ShaderInterfaces,
 
     pub lights: &'a DirectionalLightManager,
+    
+    pub culling_input_opaque: ModeData<(), &'a mut PreCulledBuffer>,
+    pub culling_input_cutout: ModeData<(), &'a mut PreCulledBuffer>,
     pub directional_light_cameras: &'a [CameraManager],
 }
 
@@ -97,8 +91,7 @@ impl DirectionalShadowPass {
                                 encoder: args.encoder,
                                 interfaces: args.interfaces,
                                 camera,
-                                objects: args.objects,
-                                transparency: TransparencyType::Opaque,
+                                input_buffer: args.culling_input_opaque.as_gpu(),
                                 sort: None,
                             });
                             args.profiler.end_scope(args.encoder);
@@ -125,8 +118,7 @@ impl DirectionalShadowPass {
                                 encoder: args.encoder,
                                 interfaces: args.interfaces,
                                 camera,
-                                transparency: TransparencyType::Cutout,
-                                objects: args.objects,
+                                input_buffer: args.culling_input_cutout.as_gpu(),
                                 sort: None,
                             });
                             args.profiler.end_scope(args.encoder);

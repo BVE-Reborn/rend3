@@ -51,6 +51,20 @@ impl<C, G> ModeData<C, G> {
         }
     }
 
+    pub fn as_cpu_only_ref(&self) -> ModeData<&C, ()> {
+        match self {
+            Self::CPU(c) => ModeData::CPU(c),
+            Self::GPU(_) => ModeData::GPU(()),
+        }
+    }
+
+    pub fn as_cpu_only_mut(&mut self) -> ModeData<&mut C, ()> {
+        match self {
+            Self::CPU(c) => ModeData::CPU(c),
+            Self::GPU(_) => ModeData::GPU(()),
+        }
+    }
+
     pub fn into_gpu(self) -> G {
         match self {
             Self::GPU(g) => g,
@@ -69,6 +83,20 @@ impl<C, G> ModeData<C, G> {
         match self {
             Self::GPU(g) => g,
             Self::CPU(_) => panic!("tried to extract gpu data in cpu mode"),
+        }
+    }
+
+    pub fn as_gpu_only_ref(&self) -> ModeData<(), &G> {
+        match self {
+            Self::GPU(g) => ModeData::GPU(g),
+            Self::CPU(_) => ModeData::CPU(()),
+        }
+    }
+
+    pub fn as_gpu_only_mut(&mut self) -> ModeData<(), &mut G> {
+        match self {
+            Self::GPU(g) => ModeData::GPU(g),
+            Self::CPU(_) => ModeData::CPU(()),
         }
     }
 

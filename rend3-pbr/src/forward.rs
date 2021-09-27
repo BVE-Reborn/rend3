@@ -12,7 +12,7 @@ use crate::{
     common::{interfaces::ShaderInterfaces, samplers::Samplers},
     culling::{
         cpu::{CpuCuller, CpuCullerCullArgs},
-        gpu::{GpuCuller, GpuCullerCullArgs},
+        gpu::{GpuCuller, GpuCullerCullArgs, PreCulledBuffer},
         CulledObjectSet, Sorting,
     },
     material::{PbrMaterial, TransparencyType},
@@ -31,6 +31,8 @@ pub struct ForwardPassCullArgs<'a> {
 
     pub camera: &'a CameraManager,
     pub objects: &'a mut ObjectManager,
+
+    pub culling_input: ModeData<(), &'a mut PreCulledBuffer>,
 }
 
 pub struct ForwardPassPrepassArgs<'rpass, 'b> {
@@ -108,8 +110,7 @@ impl ForwardPass {
                     encoder: args.encoder,
                     interfaces: args.interfaces,
                     camera: args.camera,
-                    objects: args.objects,
-                    transparency: self.transparency,
+                    input_buffer: args.culling_input.as_gpu(),
                     sort,
                 });
                 args.profiler.end_scope(args.encoder);
