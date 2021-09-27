@@ -114,10 +114,10 @@ pub fn cull_internal(
     let mut calls = Vec::with_capacity(objects.len());
 
     for object in objects {
-        let model = object.transform;
+        let model = object.input.transform;
         let model_view = view * model;
 
-        let transformed = object.sphere.apply_transform(model_view);
+        let transformed = object.input.bounding_sphere.apply_transform(model_view);
         if !frustum.contains_sphere(transformed) {
             continue;
         }
@@ -127,10 +127,10 @@ pub fn cull_internal(
         let inv_trans_model_view = Mat3::from_mat4(model_view.inverse().transpose());
 
         calls.push(CPUDrawCall {
-            start_idx: object.start_idx,
-            end_idx: object.start_idx + object.count,
-            vertex_offset: object.vertex_offset,
-            material_index: object.material_index,
+            start_idx: object.input.start_idx,
+            end_idx: object.input.start_idx + object.input.count,
+            vertex_offset: object.input.vertex_offset,
+            material_index: object.input.material_index,
         });
 
         outputs.push(PerObjectData {
@@ -159,7 +159,8 @@ pub fn run<'rpass>(
         if previous_mat_handle != Some(draw.material_index) {
             previous_mat_handle = Some(draw.material_index);
             // TODO(material): only resolve the archetype lookup once
-            let (material, internal) = materials.get_internal_material_full_by_index::<PbrMaterial>(draw.material_index as usize);
+            let (material, internal) =
+                materials.get_internal_material_full_by_index::<PbrMaterial>(draw.material_index as usize);
             let sample_type = material.sample_type;
 
             // As a workaround for OpenGL's combined samplers, we need to manually swap the linear and nearest samplers so that shader code can think it's always using linear.

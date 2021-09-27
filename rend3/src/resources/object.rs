@@ -8,18 +8,29 @@ use crate::{
 use glam::{Mat4, Vec3A};
 use rend3_types::{MaterialHandle, MaterialTrait, RawObjectHandle};
 
+#[repr(C, align(16))]
+#[derive(Debug, Copy, Clone)]
+pub struct GPUCullingInput {
+    pub start_idx: u32,
+    pub count: u32,
+    pub vertex_offset: i32,
+    pub material_index: u32,
+    pub transform: Mat4,
+    // xyz position; w radius
+    pub bounding_sphere: BoundingSphere,
+}
+
+unsafe impl bytemuck::Pod for GPUCullingInput {}
+unsafe impl bytemuck::Zeroable for GPUCullingInput {}
+
 /// Internal representation of a Object.
+#[repr(C, align(16))]
 #[derive(Debug, Clone)]
 pub struct InternalObject {
     pub material_handle: MaterialHandle,
     // Index into the material archetype array
-    pub material_index: u32,
-    pub transform: Mat4,
-    pub sphere: BoundingSphere,
     pub location: Vec3A,
-    pub start_idx: u32,
-    pub count: u32,
-    pub vertex_offset: i32,
+    pub input: GPUCullingInput,
 }
 
 /// Manages objects. That's it. ¯\\\_(ツ)\_/¯
@@ -49,14 +60,16 @@ impl ObjectManager {
         object_list.push(handle.get_raw());
 
         let shader_object = InternalObject {
-            material_index: material_manager.get_internal_index(object.material.get_raw()) as u32,
-            material_handle: object.material,
-            transform: object.transform,
-            sphere: mesh.bounding_sphere,
             location: object.transform.transform_point3a(Vec3A::ZERO),
-            start_idx: mesh.index_range.start as u32,
-            count: (mesh.index_range.end - mesh.index_range.start) as u32,
-            vertex_offset: mesh.vertex_range.start as i32,
+            input: GPUCullingInput {
+                material_index: material_manager.get_internal_index(object.material.get_raw()) as u32,
+                transform: object.transform,
+                bounding_sphere: mesh.bounding_sphere,
+                start_idx: mesh.index_range.start as u32,
+                count: (mesh.index_range.end - mesh.index_range.start) as u32,
+                vertex_offset: mesh.vertex_range.start as i32,
+            },
+            material_handle: object.material,
         };
 
         self.registry.insert(handle, shader_object, material_key);
@@ -73,12 +86,12 @@ impl ObjectManager {
 
     pub fn set_material_index(&mut self, handle: RawObjectHandle, index: usize) {
         let object = self.registry.get_value_mut(handle);
-        object.material_index = index as u32;
+        object.input.material_index = index as u32;
     }
 
     pub fn set_object_transform(&mut self, handle: RawObjectHandle, transform: Mat4) {
         let object = self.registry.get_value_mut(handle);
-        object.transform = transform;
+        object.input.transform = transform;
         object.location = transform.transform_point3a(Vec3A::ZERO)
     }
 

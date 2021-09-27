@@ -3,21 +3,20 @@ use std::{mem, num::NonZeroU64};
 use glam::Mat4;
 use ordered_float::OrderedFloat;
 use rend3::{
-    resources::{CameraManager, InternalObject, ObjectManager},
+    resources::{CameraManager, GPUCullingInput, InternalObject, ObjectManager},
     util::{bind_merge::BindGroupBuilder, frustum::ShaderFrustum},
     ModeData,
 };
 use wgpu::{
-    util::{BufferInitDescriptor, DeviceExt},
     BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType,
-    BufferBindingType, BufferDescriptor, BufferUsages, CommandEncoder, ComputePassDescriptor, ComputePipeline,
+    Buffer, BufferBindingType, BufferDescriptor, BufferUsages, CommandEncoder, ComputePassDescriptor, ComputePipeline,
     ComputePipelineDescriptor, Device, PipelineLayoutDescriptor, PushConstantRange, RenderPass,
     ShaderModuleDescriptorSpirV, ShaderStages,
 };
 
 use crate::{
     common::interfaces::{PerObjectData, ShaderInterfaces},
-    culling::{CulledObjectSet, GPUCullingInput, GPUIndirectData, Sorting},
+    culling::{CulledObjectSet, GPUIndirectData, Sorting},
     material::{PbrMaterial, TransparencyType},
     shaders::SPIRV_SHADERS,
 };
@@ -277,8 +276,6 @@ impl GpuCuller {
             object_count: count as u32,
         };
 
-        let data = build_cull_data(uniforms, objects);
-
         let output_buffer = args.device.create_buffer(&BufferDescriptor {
             label: Some("culling output"),
             size: (count.max(1) * mem::size_of::<PerObjectData>()) as _,
@@ -295,11 +292,7 @@ impl GpuCuller {
         });
 
         if count != 0 {
-            let input_buffer = args.device.create_buffer_init(&BufferInitDescriptor {
-                label: Some("culling inputs"),
-                contents: &data,
-                usage: BufferUsages::STORAGE,
-            });
+            let input_buffer = build_cull_data(args.device, uniforms, objects);
 
             let dispatch_count = ((count + 255) / 256) as u32;
 
@@ -394,12 +387,20 @@ impl GpuCuller {
     }
 }
 
-fn build_cull_data(uniforms: GPUCullingUniforms, objects: &[InternalObject]) -> Vec<u8> {
+fn build_cull_data(device: &Device, uniforms: GPUCullingUniforms, objects: &[InternalObject]) -> Buffer {
     profiling::scope!("Building Input Data");
 
     let uniform_size = mem::size_of::<GPUCullingUniforms>();
     let total_length = objects.len() * mem::size_of::<GPUCullingInput>() + uniform_size;
-    let mut data = Vec::<u8>::with_capacity(objects.len() * mem::size_of::<GPUCullingInput>() + uniform_size);
+
+    let buffer = device.create_buffer(&BufferDescriptor {
+        label: Some("culling inputs"),
+        size: total_length as u64,
+        usage: BufferUsages::STORAGE,
+        mapped_at_creation: true,
+    });
+
+    let mut data = buffer.slice(..).get_mapped_range_mut();
 
     // This unsafe block measured a bit faster in my tests, and as this is basically _the_ hot path, so this is worthwhile.
     unsafe {
@@ -422,21 +423,14 @@ fn build_cull_data(uniforms: GPUCullingUniforms, objects: &[InternalObject]) -> 
             let object = objects.get_unchecked(idx);
 
             // This is aligned, and we know the vector has enough bytes to hold this, so this is safe
-            data_ptr.add(idx).write(GPUCullingInput {
-                start_idx: object.start_idx,
-                count: object.count,
-                vertex_offset: object.vertex_offset,
-                material_idx: object.material_index as u32,
-                transform: object.transform,
-                bounding_sphere: object.sphere,
-            });
+            data_ptr.add(idx).write(object.input);
         }
-
-        // Everything is initialized now, so set the length
-        data.set_len(total_length);
     }
 
-    data
+    drop(data);
+    buffer.unmap();
+
+    buffer
 }
 
 pub fn run<'rpass>(rpass: &mut RenderPass<'rpass>, indirect_data: &'rpass GPUIndirectData) {
