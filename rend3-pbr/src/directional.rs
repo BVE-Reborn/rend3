@@ -11,7 +11,16 @@ use wgpu::{
 };
 use wgpu_profiler::GpuProfiler;
 
-use crate::{common::{interfaces::ShaderInterfaces, samplers::Samplers}, culling::{self, CulledObjectSet, cpu::{CpuCuller, CpuCullerCullArgs}, gpu::{GpuCuller, GpuCullerCullArgs, PreCulledBuffer}}, material::{PbrMaterial, TransparencyType}};
+use crate::{
+    common::{interfaces::ShaderInterfaces, samplers::Samplers},
+    culling::{
+        self,
+        cpu::{CpuCuller, CpuCullerCullArgs},
+        gpu::{GpuCuller, GpuCullerCullArgs, PreCulledBuffer},
+        CulledObjectSet,
+    },
+    material::{PbrMaterial, TransparencyType},
+};
 
 pub struct DirectionalShadowPassCullShadowsArgs<'a> {
     pub device: &'a Device,
@@ -24,7 +33,7 @@ pub struct DirectionalShadowPassCullShadowsArgs<'a> {
     pub interfaces: &'a ShaderInterfaces,
 
     pub lights: &'a DirectionalLightManager,
-    
+
     pub culling_input_opaque: ModeData<(), &'a mut PreCulledBuffer>,
     pub culling_input_cutout: ModeData<(), &'a mut PreCulledBuffer>,
     pub directional_light_cameras: &'a [CameraManager],

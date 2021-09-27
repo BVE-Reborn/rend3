@@ -7,7 +7,13 @@ use rend3::{
     util::{bind_merge::BindGroupBuilder, frustum::ShaderFrustum},
     ModeData,
 };
-use wgpu::{BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, Buffer, BufferBindingType, BufferDescriptor, BufferUsages, CommandEncoder, ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor, Device, PipelineLayoutDescriptor, PushConstantRange, RenderPass, ShaderModuleDescriptorSpirV, ShaderStages, util::{BufferInitDescriptor, DeviceExt}};
+use wgpu::{
+    util::{BufferInitDescriptor, DeviceExt},
+    BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType,
+    Buffer, BufferBindingType, BufferDescriptor, BufferUsages, CommandEncoder, ComputePassDescriptor, ComputePipeline,
+    ComputePipelineDescriptor, Device, PipelineLayoutDescriptor, PushConstantRange, RenderPass,
+    ShaderModuleDescriptorSpirV, ShaderStages,
+};
 
 use crate::{
     common::interfaces::{PerObjectData, ShaderInterfaces},
@@ -52,7 +58,7 @@ pub struct GpuCullerCullArgs<'a> {
 
     pub camera: &'a CameraManager,
 
-    pub input_buffer: &'a PreCulledBuffer, 
+    pub input_buffer: &'a PreCulledBuffer,
 
     pub sort: Option<Sorting>,
 }
@@ -298,10 +304,7 @@ impl GpuCuller {
         }
         let buffer = build_cull_data(args.device, objects);
 
-        PreCulledBuffer {
-            inner: buffer,
-            count,
-        }
+        PreCulledBuffer { inner: buffer, count }
     }
 
     pub fn cull(&self, args: GpuCullerCullArgs<'_>) -> CulledObjectSet {
