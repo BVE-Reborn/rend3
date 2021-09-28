@@ -83,7 +83,7 @@ impl GpuCuller {
                     ty: BindingType::Buffer {
                         ty: BufferBindingType::Storage { read_only: true },
                         has_dynamic_offset: false,
-                        min_binding_size: NonZeroU64::new(mem::size_of::<GPUCullingUniforms>() as _),
+                        min_binding_size: NonZeroU64::new(mem::size_of::<GPUCullingInput>() as _),
                     },
                     count: None,
                 },
