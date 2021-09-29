@@ -453,12 +453,6 @@ fn build_cull_data(device: &Device, objects: &[InternalObject]) -> Buffer {
 
     // This unsafe block measured a bit faster in my tests, and as this is basically _the_ hot path, so this is worthwhile.
     unsafe {
-        let ptr = data.as_mut_ptr();
-
-        // Assert everything is aligned
-        assert!((ptr as usize).trailing_zeros() >= mem::align_of::<GPUCullingInput>().trailing_zeros());
-
-        // Skip over the uniform data
         let data_ptr = data.as_mut_ptr() as *mut GPUCullingInput;
 
         // Iterate over the objects
@@ -467,7 +461,7 @@ fn build_cull_data(device: &Device, objects: &[InternalObject]) -> Buffer {
             let object = objects.get_unchecked(idx);
 
             // This is aligned, and we know the vector has enough bytes to hold this, so this is safe
-            data_ptr.add(idx).write(object.input);
+            data_ptr.add(idx).write_unaligned(object.input);
         }
     }
 
