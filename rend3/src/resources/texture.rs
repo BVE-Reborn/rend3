@@ -8,11 +8,12 @@ use wgpu::{
 };
 
 /// When using GPU mode, we start the 2D texture manager with a bind group with this many textures.
-// TODO: Intel's very low limit on windows will cause issues for users, so force them off gpu mode by forcing this number larger than their limits until we can solve this. See https://github.com/gfx-rs/wgpu/issues/1111
 pub const STARTING_2D_TEXTURES: usize = 1 << 8;
 /// When using GPU mode, we start the Cubemap texture manager with a bind group with this many textures.
 pub const STARTING_CUBE_TEXTURES: usize = 1 << 3;
-
+/// Largest amount of supported textures per type
+// TODO: Add a higher limit for !intel
+pub const MAX_TEXTURE_COUNT: u32 = 1 << 13;
 /// Internal representation of a Texture.
 pub struct InternalTexture {
     pub texture: Texture,
@@ -43,10 +44,9 @@ impl TextureManager {
 
         let null_view = create_null_tex_view(device, dimension);
 
-        let layout = mode.into_data(
-            || (),
-            || create_bind_group_layout(device, texture_limit / BGL_DIVISOR, dimension),
-        );
+        let max_textures = (texture_limit / BGL_DIVISOR).min(MAX_TEXTURE_COUNT);
+
+        let layout = mode.into_data(|| (), || create_bind_group_layout(device, max_textures, dimension));
         let group = mode.into_data(
             || (),
             || create_bind_group(device, layout.as_gpu(), &null_view, views.iter(), dimension),
