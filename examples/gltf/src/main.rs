@@ -1,4 +1,4 @@
-use glam::UVec2;
+use glam::{Mat3A, Mat4, UVec2, Vec3, Vec3A};
 
 fn load_gltf(
     renderer: &rend3::Renderer,
@@ -10,8 +10,8 @@ fn load_gltf(
     let primitive = mesh_data.primitives().next().expect("no primitives in data.glb");
     let reader = primitive.reader(|b| Some(&datas.get(b.index())?.0[..b.length()]));
 
-    let vertex_positions: Vec<_> = reader.read_positions().unwrap().map(glam::Vec3::from).collect();
-    let vertex_normals: Vec<_> = reader.read_normals().unwrap().map(glam::Vec3::from).collect();
+    let vertex_positions: Vec<_> = reader.read_positions().unwrap().map(Vec3::from).collect();
+    let vertex_normals: Vec<_> = reader.read_normals().unwrap().map(Vec3::from).collect();
     let vertex_tangents: Vec<_> = reader
         .read_tangents()
         .unwrap()
@@ -100,30 +100,32 @@ fn main() {
     let object = rend3::types::Object {
         mesh,
         material,
-        transform: glam::Mat4::from_scale(glam::Vec3::new(1.0, 1.0, -1.0)),
+        transform: Mat4::from_scale(Vec3::new(1.0, 1.0, -1.0)),
     };
     // We need to keep the object alive.
     let _object_handle = renderer.add_object(object);
+
+    let view_location = Vec3::new(3.0, 3.0, -5.0);
+    let view_direction: Vec3 = (Mat3A::from_euler(glam::EulerRot::YXZ, -0.49, 0.43, 0.0) * Vec3A::Z).into();
+    let view = Mat4::look_at_lh(view_location, view_location + view_direction, Vec3::Y);
 
     // Set camera's location
     renderer.set_camera_data(rend3::types::Camera {
         projection: rend3::types::CameraProjection::Projection {
             vfov: 60.0,
             near: 0.1,
-            pitch: 0.43,
-            yaw: -0.49,
+            view,
         },
-        location: glam::Vec3A::new(3.0, 3.0, -5.0),
     });
 
     // Create a single directional light
     //
     // We need to keep the handle alive.
     let _directional_handle = renderer.add_directional_light(rend3::types::DirectionalLight {
-        color: glam::Vec3::ONE,
+        color: Vec3::ONE,
         intensity: 10.0,
         // Direction will be normalized
-        direction: glam::Vec3::new(-1.0, -4.0, 2.0),
+        direction: Vec3::new(-1.0, -4.0, 2.0),
         distance: 400.0,
     });
 

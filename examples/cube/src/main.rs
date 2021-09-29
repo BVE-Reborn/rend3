@@ -1,7 +1,7 @@
-use glam::UVec2;
+use glam::{Mat3A, Mat4, UVec2, Vec3, Vec3A};
 
-fn vertex(pos: [f32; 3]) -> glam::Vec3 {
-    glam::Vec3::from(pos)
+fn vertex(pos: [f32; 3]) -> Vec3 {
+    Vec3::from(pos)
 }
 
 fn create_mesh() -> rend3::types::Mesh {
@@ -113,7 +113,7 @@ fn main() {
     // Combine the mesh and the material with a location to give an object.
     let object = rend3::types::Object {
         mesh: mesh_handle,
-        material: material_handle.clone(),
+        material: material_handle,
         transform: glam::Mat4::IDENTITY,
     };
     // Creating an object will hold onto both the mesh and the material
@@ -122,25 +122,27 @@ fn main() {
     // We need to keep the object handle alive.
     let _object_handle = renderer.add_object(object);
 
+    let view_location = Vec3::new(3.0, 3.0, -5.0);
+    let view_direction: Vec3 = (Mat3A::from_euler(glam::EulerRot::YXZ, -0.55, 0.5, 0.0) * Vec3A::Z).into();
+    let view = Mat4::look_at_lh(view_location, view_location + view_direction, Vec3::Y);
+
     // Set camera's location
     renderer.set_camera_data(rend3::types::Camera {
         projection: rend3::types::CameraProjection::Projection {
             vfov: 60.0,
             near: 0.1,
-            pitch: 0.5,
-            yaw: -0.55,
+            view,
         },
-        location: glam::Vec3A::new(3.0, 3.0, -5.0),
     });
 
     // Create a single directional light
     //
     // We need to keep the directional light handle alive.
     let _directional_handle = renderer.add_directional_light(rend3::types::DirectionalLight {
-        color: glam::Vec3::ONE,
+        color: Vec3::ONE,
         intensity: 10.0,
         // Direction will be normalized
-        direction: glam::Vec3::new(-1.0, -4.0, 2.0),
+        direction: Vec3::new(-1.0, -4.0, 2.0),
         distance: 400.0,
     });
 
