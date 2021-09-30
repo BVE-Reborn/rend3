@@ -23,7 +23,7 @@ use rend3::{
     Renderer,
 };
 use rend3_pbr::material;
-use std::{borrow::Cow, collections::hash_map::Entry, future::Future, path::Path};
+use std::{borrow::Cow, collections::hash_map::Entry, future::Future, num::NonZeroU32, path::Path};
 use thiserror::Error;
 
 /// Wrapper around a T that stores an optional label.
@@ -499,7 +499,7 @@ where
                 gltf::material::AlphaMode::Blend => material::Transparency::Blend,
             },
             normal: match normals_tex {
-                Some(tex) => material::NormalTexture::Tricomponent(tex),
+                Some(tex) => material::NormalTexture::Bicomponent(tex),
                 None => material::NormalTexture::None,
             },
             aomr_textures: match (metallic_roughness_tex, occlusion_tex) {
@@ -603,19 +603,48 @@ where
         }
     };
 
-    let parsed = image::load_from_memory(&data).map_err(|e| GltfLoadError::TextureLoad(uri, e))?;
-    let rgba = parsed.to_rgba8();
-    let handle = renderer.add_texture_2d(types::Texture {
-        label: image.name().map(str::to_owned),
-        format: match srgb {
-            true => types::TextureFormat::Rgba8UnormSrgb,
-            false => types::TextureFormat::Rgba8Unorm,
-        },
-        size: UVec2::new(rgba.width(), rgba.height()),
-        data: rgba.into_raw(),
-        mip_count: types::MipmapCount::Maximum,
-        mip_source: types::MipmapSource::Generated,
-    });
+    let texture = if let Ok(reader) = ktx2_reader::Reader::new(&data) {
+        use ktx2_reader::format::Format as ktxf;
+
+        let header = reader.header();
+
+        let format = match header.format {
+            ktxf::VK_FORMAT_BC1_RGB_UNORM_BLOCK | ktxf::VK_FORMAT_BC1_RGBA_UNORM_BLOCK | ktxf::VK_FORMAT_BC1_RGB_SRGB_BLOCK | ktxf::VK_FORMAT_BC1_RGBA_SRGB_BLOCK => {
+                if srgb {
+                    types::TextureFormat::Bc1RgbaUnormSrgb
+                } else {
+                    types::TextureFormat::Bc1RgbaUnorm
+                }
+            }
+            ktxf::VK_FORMAT_BC5_UNORM_BLOCK => types::TextureFormat::Bc5RgUnorm,
+            _ => unimplemented!(),
+        };
+
+        types::Texture {
+            label: image.name().map(str::to_owned),
+            format,
+            size: UVec2::new(header.base_width, header.base_height),
+            data: reader.read_data().unwrap().to_vec(),
+            mip_count: types::MipmapCount::Specific(NonZeroU32::new(header.level_count).unwrap()),
+            mip_source: types::MipmapSource::Uploaded,
+        }
+    } else {
+        let parsed = image::load_from_memory(&data).map_err(|e| GltfLoadError::TextureLoad(uri, e))?;
+        let rgba = parsed.to_rgba8();
+
+        types::Texture {
+            label: image.name().map(str::to_owned),
+            format: match srgb {
+                true => types::TextureFormat::Rgba8UnormSrgb,
+                false => types::TextureFormat::Rgba8Unorm,
+            },
+            size: UVec2::new(rgba.width(), rgba.height()),
+            data: rgba.into_raw(),
+            mip_count: types::MipmapCount::Maximum,
+            mip_source: types::MipmapSource::Generated,
+        }
+    };
+    let handle = renderer.add_texture_2d(texture);
 
     Ok(Labeled::new(handle, image.name()))
 }
