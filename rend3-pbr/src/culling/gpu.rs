@@ -74,6 +74,8 @@ pub struct GpuCuller {
 }
 impl GpuCuller {
     pub fn new(device: &Device) -> Self {
+        profiling::scope!("GpuCuller::new");
+
         let atomic_bgl = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
             label: Some("atomic culling pll"),
             entries: &[

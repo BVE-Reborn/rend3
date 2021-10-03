@@ -125,6 +125,10 @@ where
             self.handle_info.get_mut(&handle).unwrap().index = old_index;
         }
     }
+    
+    pub fn count(&self) -> usize {
+        self.handle_info.len()
+    }
 
     pub fn get_value_mut(&mut self, handle: RawResourceHandle<HandleType>) -> &mut V {
         let handle_info = &self.handle_info[&handle.idx];

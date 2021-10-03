@@ -133,12 +133,15 @@ pub async fn filesystem_io_func(parent_director: impl AsRef<Path>, uri: SsoStrin
         let (_mime, rest) = base64_data.split_once(";").unwrap();
         let (encoding, data) = rest.split_once(",").unwrap();
         assert_eq!(encoding, "base64");
+        profiling::scope!("decoding base64 uri");
         log::info!("loading {} bytes of base64 data", data.len());
         // TODO: errors
         Ok(base64::decode(data).unwrap())
     } else {
         let path_resolved = parent_director.as_ref().join(&*uri);
-        log::info!("loading file '{}' from disk", path_resolved.display());
+        let display = path_resolved.as_os_str().to_string_lossy();
+        profiling::scope!("loading file", &display);
+        log::info!("loading file '{}' from disk", &display);
         std::fs::read(path_resolved)
     }
 }
@@ -167,7 +170,11 @@ where
     Fut: Future<Output = Result<Vec<u8>, E>>,
     E: std::error::Error + 'static,
 {
-    let mut file = gltf::Gltf::from_slice_without_validation(data)?;
+    profiling::scope!("loading gltf");
+    let mut file = {
+        profiling::scope!("parsing gltf");
+        gltf::Gltf::from_slice_without_validation(data)?
+    };
     let blob = file.blob.take();
 
     let buffers = load_buffers(file.buffers(), blob, &mut io_func).await?;
@@ -295,6 +302,7 @@ where
     Fut: Future<Output = Result<Vec<u8>, E>>,
     E: std::error::Error + 'static,
 {
+    profiling::scope!("loading buffers");
     let mut buffers = Vec::with_capacity(file.len());
     let mut blob_index = None;
     for b in file {
@@ -388,6 +396,7 @@ pub fn load_meshes<'a, E: std::error::Error + 'static>(
 
 /// Creates a gltf default material.
 pub fn load_default_material(renderer: &Renderer) -> types::MaterialHandle {
+    profiling::scope!("creating default material");
     renderer.add_material(material::PbrMaterial {
         albedo: material::AlbedoComponent::Value(Vec4::splat(1.0)),
         transparency: material::Transparency::Opaque,
@@ -425,9 +434,13 @@ where
     Fut: Future<Output = Result<Vec<u8>, E>>,
     E: std::error::Error + 'static,
 {
+    profiling::scope!("loading materials and textures");
+
     let mut images = ImageMap::default();
     let mut result = Vec::with_capacity(materials.len());
     for material in materials {
+        profiling::scope!("load material", material.name().unwrap_or_default());
+
         let pbr = material.pbr_metallic_roughness();
         let albedo = pbr.base_color_texture();
         let albedo_factor = pbr.base_color_factor();
@@ -585,6 +598,7 @@ where
     Fut: Future<Output = Result<Vec<u8>, E>>,
     E: std::error::Error + 'static,
 {
+    profiling::scope!("load image", image.name().unwrap_or_default());
     // TODO: Address format detection for compressed texs
     let (data, uri) = match image.source() {
         gltf::image::Source::Uri { uri, .. } => {
@@ -604,12 +618,16 @@ where
     };
 
     let texture = if let Ok(reader) = ktx2_reader::Reader::new(&data) {
+        profiling::scope!("parsing ktx2");
         use ktx2_reader::format::Format as ktxf;
 
         let header = reader.header();
 
         let format = match header.format {
-            ktxf::VK_FORMAT_BC1_RGB_UNORM_BLOCK | ktxf::VK_FORMAT_BC1_RGBA_UNORM_BLOCK | ktxf::VK_FORMAT_BC1_RGB_SRGB_BLOCK | ktxf::VK_FORMAT_BC1_RGBA_SRGB_BLOCK => {
+            ktxf::VK_FORMAT_BC1_RGB_UNORM_BLOCK
+            | ktxf::VK_FORMAT_BC1_RGBA_UNORM_BLOCK
+            | ktxf::VK_FORMAT_BC1_RGB_SRGB_BLOCK
+            | ktxf::VK_FORMAT_BC1_RGBA_SRGB_BLOCK => {
                 if srgb {
                     types::TextureFormat::Bc1RgbaUnormSrgb
                 } else {
@@ -629,6 +647,7 @@ where
             mip_source: types::MipmapSource::Uploaded,
         }
     } else {
+        profiling::scope!("decoding image");
         let parsed = image::load_from_memory(&data).map_err(|e| GltfLoadError::TextureLoad(uri, e))?;
         let rgba = parsed.to_rgba8();
 

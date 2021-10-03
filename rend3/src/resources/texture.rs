@@ -40,6 +40,8 @@ pub struct TextureManager {
 }
 impl TextureManager {
     pub fn new(device: &Device, mode: RendererMode, texture_limit: u32, dimension: TextureViewDimension) -> Self {
+        profiling::scope!("TextureManager::new");
+
         let views = Vec::with_capacity(TEXTURE_PREALLOCATION);
 
         let null_view = create_null_tex_view(device, dimension);
@@ -88,7 +90,8 @@ impl TextureManager {
     }
 
     pub fn ready(&mut self, device: &Device) -> TextureManagerReadyOutput {
-        profiling::scope!("D2 Texture Manager Ready");
+        profiling::scope!("TextureManager::ready");
+
         let views = &mut self.views;
         self.registry.remove_all_dead(|_, index, _| {
             // Do the same swap remove move as the registry did

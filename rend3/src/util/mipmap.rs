@@ -28,6 +28,8 @@ pub struct MipmapGenerator {
 
 impl MipmapGenerator {
     pub fn new(device: &Device, default_formats: &[TextureFormat]) -> Self {
+        profiling::scope!("MipmapGenerator::new");
+
         let texture_bgl = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
             label: Some("Mipmap generator texture bgl"),
             entries: &[BindGroupLayoutEntry {

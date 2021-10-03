@@ -48,6 +48,8 @@ impl PbrRenderRoutine {
         render_texture_options: RenderTextureOptions,
         output_format: TextureFormat,
     ) -> Self {
+        profiling::scope!("PbrRenderRoutine::new");
+
         let interfaces = common::interfaces::ShaderInterfaces::new(&renderer.device);
 
         let samplers = common::samplers::Samplers::new(&renderer.device, renderer.mode, &interfaces.samplers_bgl);
@@ -105,6 +107,7 @@ impl PbrRenderRoutine {
     }
 
     pub fn resize(&mut self, renderer: &Renderer, options: RenderTextureOptions) {
+        profiling::scope!("PbrRenderRoutine::resize");
         let different_sample_count = self.render_textures.samples != options.samples;
         self.render_textures = RenderTextures::new(&renderer.device, options);
         if different_sample_count {
@@ -414,10 +417,12 @@ pub struct PrimaryPasses {
 }
 impl PrimaryPasses {
     pub fn new(args: PrimaryPassesNewArgs<'_>) -> Self {
+        profiling::scope!("PrimaryPasses::new");
+
         let gpu_d2_texture_bgl = args.mode.into_data(|| (), || args.d2_textures.gpu_bgl());
 
         let shadow_pipelines =
-            common::depth_pass::build_depth_pass_shader(common::depth_pass::BuildDepthPassShaderArgs {
+            common::depth_pass::build_depth_pass_pipeline(common::depth_pass::BuildDepthPassShaderArgs {
                 mode: args.mode,
                 device: args.device,
                 interfaces: args.interfaces,
@@ -427,7 +432,7 @@ impl PrimaryPasses {
                 ty: common::depth_pass::DepthPassType::Shadow,
             });
         let depth_pipelines =
-            common::depth_pass::build_depth_pass_shader(common::depth_pass::BuildDepthPassShaderArgs {
+            common::depth_pass::build_depth_pass_pipeline(common::depth_pass::BuildDepthPassShaderArgs {
                 mode: args.mode,
                 device: args.device,
                 interfaces: args.interfaces,
@@ -436,7 +441,7 @@ impl PrimaryPasses {
                 samples: args.samples,
                 ty: common::depth_pass::DepthPassType::Prepass,
             });
-        let skybox_pipeline = common::skybox_pass::build_skybox_shader(common::skybox_pass::BuildSkyboxShaderArgs {
+        let skybox_pipeline = common::skybox_pass::build_skybox_pipeline(common::skybox_pass::BuildSkyboxShaderArgs {
             mode: args.mode,
             device: args.device,
             interfaces: args.interfaces,
@@ -453,16 +458,16 @@ impl PrimaryPasses {
             transparency: TransparencyType::Opaque,
             baking: common::forward_pass::Baking::Disabled,
         };
-        let opaque_pipeline = Arc::new(common::forward_pass::build_forward_pass_shader(
+        let opaque_pipeline = Arc::new(common::forward_pass::build_forward_pass_pipeline(
             forward_pass_args.clone(),
         ));
-        let cutout_pipeline = Arc::new(common::forward_pass::build_forward_pass_shader(
+        let cutout_pipeline = Arc::new(common::forward_pass::build_forward_pass_pipeline(
             common::forward_pass::BuildForwardPassShaderArgs {
                 transparency: TransparencyType::Cutout,
                 ..forward_pass_args.clone()
             },
         ));
-        let transparent_pipeline = Arc::new(common::forward_pass::build_forward_pass_shader(
+        let transparent_pipeline = Arc::new(common::forward_pass::build_forward_pass_pipeline(
             common::forward_pass::BuildForwardPassShaderArgs {
                 transparency: TransparencyType::Blend,
                 ..forward_pass_args.clone()

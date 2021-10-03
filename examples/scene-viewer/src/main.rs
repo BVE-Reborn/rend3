@@ -1,6 +1,8 @@
 use glam::{DVec2, Mat3A, Mat4, UVec2, Vec3, Vec3A};
+use parking_lot::Mutex;
 use pico_args::Arguments;
 use rend3::{
+    format_sso,
     types::{Backend, Camera, CameraProjection, DirectionalLight, Texture, TextureFormat},
     util::typedefs::FastHashMap,
     Renderer,
@@ -23,7 +25,9 @@ use winit::{
 
 mod platform;
 
-fn load_skybox(renderer: &Renderer, routine: &mut PbrRenderRoutine) -> Result<(), Box<dyn std::error::Error>> {
+fn load_skybox(renderer: &Renderer, routine: &Mutex<PbrRenderRoutine>) -> Result<(), Box<dyn std::error::Error>> {
+    profiling::scope!("load skybox");
+
     let name = concat!(env!("CARGO_MANIFEST_DIR"), "/data/skybox.basis");
     let file = std::fs::read(name).unwrap_or_else(|_| panic!("Could not read skybox {}", name));
 
@@ -32,12 +36,16 @@ fn load_skybox(renderer: &Renderer, routine: &mut PbrRenderRoutine) -> Result<()
 
     let mips = transcoder.get_total_image_levels(&file, 0);
 
-    let mut prepared = transcoder
-        .prepare_transcoding(&file)
-        .ok_or("could not prepare skybox transcoding")?;
+    let mut prepared = {
+        profiling::scope!("prepare basis transcoding");
+        transcoder
+            .prepare_transcoding(&file)
+            .ok_or("could not prepare skybox transcoding")?
+    };
     let mut image = Vec::with_capacity(image_info.total_blocks as usize * 16 * 6);
     for i in 0..6 {
         for mip in 0..mips {
+            profiling::scope!("basis transcoding", &format_sso!("layer {} mip {}", i, mip));
             let mip_info = transcoder.get_image_level_info(&file, 0, mip).unwrap();
             let data = prepared.transcode_image_level(i, mip, basis::TargetTextureFormat::Rgba32)?;
             image.extend_from_slice(&data[0..(mip_info.orig_width * mip_info.orig_height * 4) as usize]);
@@ -53,17 +61,21 @@ fn load_skybox(renderer: &Renderer, routine: &mut PbrRenderRoutine) -> Result<()
         mip_count: rend3::types::MipmapCount::Specific(NonZeroU32::new(mips).unwrap()),
         mip_source: rend3::types::MipmapSource::Uploaded,
     });
-    routine.set_background_texture(Some(handle));
+    routine.lock().set_background_texture(Some(handle));
     Ok(())
 }
 
 fn load_gltf(renderer: &Renderer, location: String) -> rend3_gltf::LoadedGltfScene {
+    profiling::scope!("loading gltf");
     let path = Path::new(&location);
     let parent = path.parent().unwrap();
 
-    log::info!("Reading gltf file: {}", path.display());
-    let gltf_data =
-        std::fs::read(&path).unwrap_or_else(|e| panic!("tried to load gltf file {}: {}", path.display(), e));
+    let path_str = path.as_os_str().to_string_lossy();
+    log::info!("Reading gltf file: {}", path_str);
+    let gltf_data = {
+        profiling::scope!("reading gltf file", &path_str);
+        std::fs::read(&path).unwrap_or_else(|e| panic!("tried to load gltf file {}: {}", path_str, e))
+    };
 
     pollster::block_on(rend3_gltf::load_gltf(renderer, &gltf_data, |uri| {
         rend3_gltf::filesystem_io_func(&parent, uri)
@@ -107,12 +119,14 @@ fn main() {
     let desired_mode = args.value_from_fn(["-m", "--mode"], extract_mode).ok();
     let file_to_load: Option<String> = args.free_from_str().ok();
 
-    let event_loop = EventLoop::new();
-
-    let window = {
+    let (event_loop, window) = {
+        profiling::scope!("creating window");
+        let event_loop = EventLoop::new();
         let mut builder = WindowBuilder::new();
         builder = builder.with_title("scene-viewer");
-        builder.build(&event_loop).expect("Could not build window")
+        let window = builder.build(&event_loop).expect("Could not build window");
+
+        (event_loop, window)
     };
 
     let window_size = window.inner_size();
@@ -121,9 +135,15 @@ fn main() {
     let iad = pollster::block_on(rend3::create_iad(desired_backend, desired_device_name, desired_mode)).unwrap();
 
     // The one line of unsafe needed. We just need to guarentee that the window outlives the use of the surface.
-    let surface = unsafe { iad.instance.create_surface(&window) };
+    let surface = unsafe {
+        profiling::scope!("creating surface");
+        iad.instance.create_surface(&window)
+    };
     // Get the preferred format for the surface.
-    let format = surface.get_preferred_format(&iad.adapter).unwrap();
+    let format = {
+        profiling::scope!("getting preferred format");
+        surface.get_preferred_format(&iad.adapter).unwrap()
+    };
     // Configure the surface to be ready for rendering.
     rend3::configure_surface(
         &surface,
@@ -137,23 +157,25 @@ fn main() {
     let renderer = rend3::Renderer::new(iad, Some(window_size.width as f32 / window_size.height as f32)).unwrap();
 
     // Create the pbr pipeline with the same internal resolution and 4x multisampling
-    let mut routine = rend3_pbr::PbrRenderRoutine::new(
+    let routine = Arc::new(Mutex::new(rend3_pbr::PbrRenderRoutine::new(
         &renderer,
         rend3_pbr::RenderTextureOptions {
             resolution: UVec2::new(window_size.width, window_size.height),
-            samples: rend3_pbr::SampleCount::One,
+            samples: rend3_pbr::SampleCount::Four,
         },
         format,
-    );
+    )));
 
+    let routine_clone = Arc::clone(&routine);
     let renderer_clone = Arc::clone(&renderer);
     let _loaded_gltf = std::thread::spawn(move || {
+        profiling::register_thread!("asset loading");
+        load_skybox(&renderer_clone, &routine_clone).unwrap();
         load_gltf(
             &renderer_clone,
             file_to_load.unwrap_or_else(|| concat!(env!("CARGO_MANIFEST_DIR"), "/data/scene.gltf").to_owned()),
         )
     });
-    load_skybox(&renderer, &mut routine).unwrap();
 
     let _directional_light = renderer.add_directional_light(DirectionalLight {
         color: Vec3::ONE,
@@ -178,6 +200,7 @@ fn main() {
 
     event_loop.run(move |event, _window_target, control| match event {
         Event::MainEventsCleared => {
+            profiling::scope!("MainEventsCleared");
             let now = Instant::now();
 
             let delta_time = now - timestamp_last_frame;
@@ -303,6 +326,7 @@ fn main() {
             event: winit::event::WindowEvent::Resized(size),
             ..
         } => {
+            profiling::scope!("Resized", &format_sso!("{}x{}", size.width, size.height));
             let size = UVec2::new(size.width, size.height);
             // Reconfigure the surface for the new size.
             rend3::configure_surface(
@@ -315,16 +339,17 @@ fn main() {
             // Tell the renderer about the new aspect ratio.
             renderer.set_aspect_ratio(size.x as f32 / size.y as f32);
             // Resize the internal buffers to the same size as the screen.
-            routine.resize(
+            routine.lock().resize(
                 &renderer,
                 rend3_pbr::RenderTextureOptions {
                     resolution: size,
-                    samples: rend3_pbr::SampleCount::One,
+                    samples: rend3_pbr::SampleCount::Four,
                 },
             );
         }
         // Render!
         winit::event::Event::RedrawRequested(..) => {
+        profiling::scope!("RedrawRequested");
             // Update camera
 
             let view  = Mat4::from_euler(glam::EulerRot::XYZ, -camera_pitch, -camera_yaw, 0.0);
@@ -341,7 +366,7 @@ fn main() {
             // Get a frame
             let frame = rend3::util::output::OutputFrame::from_surface(&surface).unwrap();
             // Dispatch a render!
-            previous_profiling_stats = renderer.render(&mut routine, (), frame.as_view());
+            previous_profiling_stats = renderer.render(&mut *routine.lock(), (), frame.as_view());
             // mark the end of the frame for tracy/other profilers
             profiling::finish_frame!();
         }

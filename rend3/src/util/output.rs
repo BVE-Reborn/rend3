@@ -13,6 +13,7 @@ pub enum OutputFrame {
 
 impl OutputFrame {
     pub fn from_surface(surface: &Surface) -> Result<Self, SurfaceError> {
+        profiling::scope!("OutputFrame::from_surface");
         let mut retrieved_frame = None;
         for _ in 0..10 {
             profiling::scope!("Inner Acquire Loop");

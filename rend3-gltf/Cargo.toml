@@ -20,6 +20,7 @@ gltf = { version = "0.16", default-features = false, features = ["KHR_lights_pun
 image = { version = "0.23", default-features = false }
 ktx2-reader = { git = "https://github.com/BVE-Reborn/ktx2-reader.git", rev = "3db1c60351367f56316e5811574626bb8045a6e5" }
 log = "0.4"
+profiling = {version = "1", default-features = false }
 rend3 = { version = "^0.1.0", path = "../rend3" }
 rend3-pbr = { version = "^0.1.0", path = "../rend3-pbr" }
 rustc-hash = "1"

@@ -23,6 +23,8 @@ impl WrappedPotBuffer {
         SsoString: From<T>,
         T: Deref<Target = str>,
     {
+        profiling::scope!("WrappedPotBuffer::new");
+
         let minimum_pot = (minimum - 1).next_power_of_two().max(16);
         let starting_size = if size <= minimum_pot {
             minimum_pot

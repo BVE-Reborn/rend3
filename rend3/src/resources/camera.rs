@@ -14,6 +14,8 @@ impl CameraManager {
     /// Builds a new camera, using the given aspect ratio. If no aspect ratio is given
     /// it is assumed that no aspect ratio scaling should be done.
     pub fn new(data: Camera, aspect_ratio: Option<f32>) -> Self {
+        profiling::scope!("CameraManager::new");
+
         let aspect_ratio = aspect_ratio.unwrap_or(1.0);
         let proj = compute_projection_matrix(data, aspect_ratio);
         let view = data.view;

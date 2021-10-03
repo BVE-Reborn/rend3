@@ -15,6 +15,8 @@ pub struct Samplers {
 
 impl Samplers {
     pub fn new(device: &Device, mode: RendererMode, samplers_bgl: &BindGroupLayout) -> Self {
+        profiling::scope!("Samplers::new");
+
         let linear = create_sampler(device, FilterMode::Linear, None);
         let nearest = create_sampler(device, FilterMode::Nearest, None);
         let shadow = create_sampler(device, FilterMode::Linear, Some(CompareFunction::LessEqual));

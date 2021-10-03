@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: ["trunk"]
+    branches: ["trunk", "CI/**"]
   pull_request:
 
 jobs:
