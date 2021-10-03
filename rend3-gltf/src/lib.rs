@@ -623,8 +623,8 @@ where
 
         let header = reader.header();
 
-        let format = match header.format {
-            F::BC1_RGB_SRGB_BLOCK | F::BC1_RGB_SRGB_BLOCK | F::BC1_RGBA_SRGB_BLOCK | F::BC1_RGBA_SRGB_BLOCK => {
+        let format = match header.format.unwrap() {
+            F::BC1_RGB_SRGB_BLOCK | F::BC1_RGB_UNORM_BLOCK | F::BC1_RGBA_SRGB_BLOCK | F::BC1_RGBA_UNORM_BLOCK => {
                 if srgb {
                     types::TextureFormat::Bc1RgbaUnormSrgb
                 } else {
@@ -639,7 +639,7 @@ where
             label: image.name().map(str::to_owned),
             format,
             size: UVec2::new(header.pixel_width, header.pixel_height),
-            data: reader.data(),
+            data: reader.data().to_vec(),
             mip_count: types::MipmapCount::Specific(NonZeroU32::new(header.level_count).unwrap()),
             mip_source: types::MipmapSource::Uploaded,
         }

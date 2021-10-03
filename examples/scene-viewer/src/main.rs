@@ -31,31 +31,42 @@ fn load_skybox(renderer: &Renderer, routine: &Mutex<PbrRenderRoutine>) -> Result
     let name = concat!(env!("CARGO_MANIFEST_DIR"), "/data/skybox.basis");
     let file = std::fs::read(name).unwrap_or_else(|_| panic!("Could not read skybox {}", name));
 
-    let transcoder = basis::Transcoder::new();
-    let image_info = transcoder.get_image_info(&file, 0).ok_or("skybox image missing")?;
+    let mut transcoder = basis_universal::Transcoder::new();
+    let image_info = transcoder.image_info(&file, 0).ok_or("skybox image missing")?;
 
-    let mips = transcoder.get_total_image_levels(&file, 0);
+    let mips = transcoder.image_level_count(&file, 0);
 
-    let mut prepared = {
+    {
         profiling::scope!("prepare basis transcoding");
         transcoder
             .prepare_transcoding(&file)
-            .ok_or("could not prepare skybox transcoding")?
-    };
-    let mut image = Vec::with_capacity(image_info.total_blocks as usize * 16 * 6);
+            .map_err(|_| "could not prepare skybox transcoding")?
+    }
+    let mut image = Vec::with_capacity(image_info.m_total_blocks as usize * 16 * 6);
     for i in 0..6 {
         for mip in 0..mips {
             profiling::scope!("basis transcoding", &format_sso!("layer {} mip {}", i, mip));
-            let mip_info = transcoder.get_image_level_info(&file, 0, mip).unwrap();
-            let data = prepared.transcode_image_level(i, mip, basis::TargetTextureFormat::Rgba32)?;
-            image.extend_from_slice(&data[0..(mip_info.orig_width * mip_info.orig_height * 4) as usize]);
+            let mip_info = transcoder.image_level_info(&file, 0, mip).unwrap();
+            let data = transcoder
+                .transcode_image_level(
+                    &file,
+                    basis_universal::TranscoderTextureFormat::RGBA32,
+                    basis_universal::TranscodeParameters {
+                        image_index: i,
+                        level_index: mip,
+                        decode_flags: None,
+                        output_row_pitch_in_blocks_or_pixels: None,
+                        output_rows_in_pixels: None,
+                    },
+                )
+                .map_err(|_| "failed to transcode")?;
+            image.extend_from_slice(&data[0..(mip_info.m_orig_width * mip_info.m_orig_height * 4) as usize]);
         }
     }
-    drop(prepared);
 
     let handle = renderer.add_texture_cube(Texture {
         format: TextureFormat::Rgba8UnormSrgb,
-        size: UVec2::new(image_info.width, image_info.height),
+        size: UVec2::new(image_info.m_width, image_info.m_height),
         data: image,
         label: Some("background".into()),
         mip_count: rend3::types::MipmapCount::Specific(NonZeroU32::new(mips).unwrap()),
