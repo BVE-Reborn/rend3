@@ -617,32 +617,29 @@ where
         }
     };
 
-    let texture = if let Ok(reader) = ktx2_reader::Reader::new(&data) {
+    let texture = if let Ok(reader) = ktx2::Reader::new(&data) {
         profiling::scope!("parsing ktx2");
-        use ktx2_reader::format::Format as ktxf;
+        use ktx2::Format as F;
 
         let header = reader.header();
 
         let format = match header.format {
-            ktxf::VK_FORMAT_BC1_RGB_UNORM_BLOCK
-            | ktxf::VK_FORMAT_BC1_RGBA_UNORM_BLOCK
-            | ktxf::VK_FORMAT_BC1_RGB_SRGB_BLOCK
-            | ktxf::VK_FORMAT_BC1_RGBA_SRGB_BLOCK => {
+            F::BC1_RGB_SRGB_BLOCK | F::BC1_RGB_SRGB_BLOCK | F::BC1_RGBA_SRGB_BLOCK | F::BC1_RGBA_SRGB_BLOCK => {
                 if srgb {
                     types::TextureFormat::Bc1RgbaUnormSrgb
                 } else {
                     types::TextureFormat::Bc1RgbaUnorm
                 }
             }
-            ktxf::VK_FORMAT_BC5_UNORM_BLOCK => types::TextureFormat::Bc5RgUnorm,
+            F::BC5_UNORM_BLOCK => types::TextureFormat::Bc5RgUnorm,
             _ => unimplemented!(),
         };
 
         types::Texture {
             label: image.name().map(str::to_owned),
             format,
-            size: UVec2::new(header.base_width, header.base_height),
-            data: reader.read_data().unwrap().to_vec(),
+            size: UVec2::new(header.pixel_width, header.pixel_height),
+            data: reader.data(),
             mip_count: types::MipmapCount::Specific(NonZeroU32::new(header.level_count).unwrap()),
             mip_source: types::MipmapSource::Uploaded,
         }
