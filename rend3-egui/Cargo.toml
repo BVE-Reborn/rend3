@@ -15,7 +15,7 @@ categories = ["game-development", "graphics", "rendering", "rendering::engine"]
 [dependencies]
 egui = "0.14.2"
 epi = "0.14.0"
-egui_wgpu_backend = { version = "0.12.0", path = "C:/Source/egui_wgpu_backend" }
+egui_wgpu_backend = { version = "0.12.0", git = "https://github.com/hasenbanck/egui_wgpu_backend" }
 rend3 = { version = "^0.1.0", path = "../rend3" }
 wgpu = "0.10"
 flume = "0.10"
