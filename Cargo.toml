@@ -2,10 +2,12 @@
 resolver = "2"
 members = [
     "examples/cube",
+    "examples/egui",
     "examples/gltf",
     "examples/scene-viewer",
     "rend3",
     "rend3-gltf",
+    "rend3-egui",
     "rend3-pbr",
     "rend3-pbr-bake",
     "rend3-types"

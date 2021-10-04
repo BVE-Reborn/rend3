@@ -1,0 +1,33 @@
+[package]
+name = "rend3-egui-example"
+license = "MIT OR Apache-2.0 OR Zlib"
+version = "0.1.0"
+authors = ["Juri Furer <juri.furer@protonmail.com>"]
+edition = "2018"
+publish = false
+
+[[bin]]
+name = "egui"
+path = "src/main.rs"
+
+[dependencies]
+# The egui immediate mode gui library
+egui = "0.14.2"
+# Backend-agnostic interface for writing apps using egui
+epi = "0.14.0"
+# Winit integration with egui
+egui_winit_platform = "0.10.0"
+# logging
+env_logger = { version = "0.9", default-features = false, features = ["termcolor", "atty"] }
+# Linear algebra library
+glam = "0.18"
+# Provides `block_on` to wait for futures from sync code
+pollster = "0.2"
+# Renderer core
+rend3 = { version = "^0.1.0", path = "../../rend3" }
+# Egui renderer integration
+rend3-egui = { version = "^0.1.0", path = "../../rend3-egui" }
+# Programmable render list that dictates how the scene renders
+rend3-pbr = { version = "^0.1.0", path = "../../rend3-pbr" }
+# Windowing
+winit = "0.25.0"

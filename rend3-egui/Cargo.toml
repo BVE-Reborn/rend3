@@ -1,0 +1,21 @@
+[package]
+name = "rend3-egui"
+version = "0.1.0"
+authors = ["Juri Furer <juri.furer@protonmail.com>"]
+edition = "2018"
+description = "Egui Render Routine for rend3"
+readme = "../README.md"
+repository = "https://github.com/BVE-Reborn/rend3"
+license = "MIT OR Apache-2.0 OR Zlib"
+keywords = ["3d", "graphics", "gpu", "renderer", "wgpu"]
+categories = ["game-development", "graphics", "rendering", "rendering::engine"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+egui = "0.14.2"
+epi = "0.14.0"
+egui_wgpu_backend = { version = "0.12.0", path = "C:/Source/egui_wgpu_backend" }
+rend3 = { version = "^0.1.0", path = "../rend3" }
+wgpu = "0.10"
+flume = "0.10"
