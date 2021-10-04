@@ -95,6 +95,37 @@ where
         }
     }
 
+    pub fn set_key(&mut self, handle: RawResourceHandle<HandleType>, key: K) {
+        let handle_info_ref = self.handle_info.get_mut(&handle.idx).unwrap();
+        let old_index = handle_info_ref.index;
+
+        // remove it from the old archetype
+        let old_archetype = self.archetype_map.get_mut(&handle_info_ref.key).unwrap();
+        let data = old_archetype.data.swap_remove(old_index);
+        let metadata = old_archetype.metadata.swap_remove(old_index);
+
+        // If we swapped an element get its handle to update later. We can't update now as handle_info_ref is holding a &mut on self.handle_info
+        let update_handle = old_archetype
+            .metadata
+            .get_mut(old_index)
+            .map(|resource| resource.handle);
+
+        // Add it to the new archetype
+        let new_archetype = self.archetype_map.entry(key).or_default();
+        let new_index = new_archetype.data.len();
+        new_archetype.data.push(data);
+        new_archetype.metadata.push(metadata);
+
+        // Update our metadata
+        handle_info_ref.key = key;
+        handle_info_ref.index = new_index;
+
+        // Update the index if swap_remove moved an object.
+        if let Some(handle) = update_handle {
+            self.handle_info.get_mut(&handle).unwrap().index = old_index;
+        }
+    }
+
     pub fn get_value_mut(&mut self, handle: RawResourceHandle<HandleType>) -> &mut V {
         let handle_info = &self.handle_info[&handle.idx];
         &mut self.archetype_map.get_mut(&handle_info.key).unwrap().data[handle_info.index]
