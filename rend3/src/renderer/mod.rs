@@ -294,7 +294,7 @@ impl Renderer {
         let handle = self.material_manager.read().allocate();
         self.instructions.producer.lock().push(Instruction::AddMaterial {
             handle: handle.clone(),
-            fill_invoke: Box::new(|material_manager, device, mode, d2_manager, mat_handle| {
+            fill_invoke: Box::new(move |material_manager, device, mode, d2_manager, mat_handle| {
                 material_manager.fill(device, mode, d2_manager, mat_handle, material)
             }),
         });
@@ -306,7 +306,7 @@ impl Renderer {
         self.instructions.producer.lock().push(Instruction::ChangeMaterial {
             handle: handle.clone(),
             change_invoke: Box::new(
-                |material_manager, device, mode, d2_manager, object_manager, mat_handle| {
+                move |material_manager, device, mode, d2_manager, object_manager, mat_handle| {
                     material_manager.update(device, mode, d2_manager, object_manager, mat_handle, material)
                 },
             ),

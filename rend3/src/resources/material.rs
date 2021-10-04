@@ -229,7 +229,7 @@ impl MaterialManager {
         // TODO(material): if this doesn't change archetype, this should do a buffer write cpu side.
         let internal = self.fill_inner(device, mode, texture_manager_2d, &material);
 
-        let used_objects = self.registry.update(handle, internal).map(|im| im.objects.clone());
+        let used_objects = self.registry.update(handle, material).map(|im| im.objects.clone());
 
         if let Some(objects) = used_objects {
             let new_index = self.registry.get_index(handle.get_raw());
@@ -237,7 +237,11 @@ impl MaterialManager {
                 object_manager.set_material_index(*object, new_index);
                 // TODO(material): this also needs to change object archetype due to key/material archetype changes
             }
-            self.registry.get_metadata_mut::<M>(handle.get_raw()).objects = objects;
+            *self.registry.get_metadata_mut::<M>(handle.get_raw()) = InternalMaterial { objects, ..internal };
+        } else {
+            let new_internal = self.registry.get_metadata_mut::<M>(handle.get_raw());
+            new_internal.bind_group = internal.bind_group;
+            new_internal.material_buffer = internal.material_buffer;
         }
     }
 
