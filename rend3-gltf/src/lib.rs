@@ -17,6 +17,7 @@
 
 use glam::{Mat3, Mat4, UVec2, Vec2, Vec3, Vec4, Vec4Swizzles};
 use gltf::buffer::Source;
+use image::GenericImageView;
 use rend3::{
     types::{self, ObjectHandle},
     util::typedefs::{FastHashMap, SsoString},
@@ -87,8 +88,15 @@ pub struct ImageKey {
     pub srgb: bool,
 }
 
+/// Format
+#[derive(Debug, Clone)]
+pub struct Texture {
+    pub handle: types::TextureHandle,
+    pub format: types::TextureFormat,
+}
+
 /// Hashmap which stores a mapping from [`ImageKey`] to a labeled handle.
-pub type ImageMap = FastHashMap<ImageKey, Labeled<types::TextureHandle>>;
+pub type ImageMap = FastHashMap<ImageKey, Labeled<Texture>>;
 
 /// A fully loaded Gltf scene.
 #[derive(Debug)]
@@ -500,7 +508,7 @@ where
         let handle = renderer.add_material(material::PbrMaterial {
             albedo: match albedo_tex {
                 Some(tex) => material::AlbedoComponent::TextureVertexValue {
-                    texture: tex,
+                    texture: util::extract_handle(tex),
                     value: Vec4::from(albedo_factor),
                     srgb: false,
                 },
@@ -514,21 +522,29 @@ where
                 gltf::material::AlphaMode::Blend => material::Transparency::Blend,
             },
             normal: match normals_tex {
-                Some(tex) => material::NormalTexture::Bicomponent(tex),
+                Some(tex) => material::NormalTexture::Bicomponent(util::extract_handle(tex)),
                 None => material::NormalTexture::None,
             },
             aomr_textures: match (metallic_roughness_tex, occlusion_tex) {
-                (Some(mr), Some(ao)) if mr == ao => material::AoMRTextures::GltfCombined { texture: Some(mr) },
-                (mr, ao) => material::AoMRTextures::GltfSplit {
-                    mr_texture: mr,
-                    ao_texture: ao,
+                (Some(mr), Some(ao)) if mr == ao => material::AoMRTextures::Combined {
+                    texture: Some(util::extract_handle(mr)),
+                },
+                (mr, ao) if ao.map(|ao| ao.format.describe().components < 3).unwrap_or(false) => {
+                    material::AoMRTextures::Split {
+                        mr_texture: util::extract_handle(mr),
+                        ao_texture: util::extract_handle(ao),
+                    }
+                }
+                (mr, ao) => material::AoMRTextures::SwizzledSplit {
+                    mr_texture: util::extract_handle(mr),
+                    ao_texture: util::extract_handle(ao),
                 },
             },
             metallic_factor: Some(metallic_factor),
             roughness_factor: Some(roughness_factor),
             emissive: match emissive_tex {
                 Some(tex) => material::MaterialComponent::TextureValue {
-                    texture: tex,
+                    texture: util::extract_handle(tex),
                     value: Vec3::from(emissive_factor),
                 },
                 None => material::MaterialComponent::Value(Vec3::from(emissive_factor)),
@@ -560,7 +576,7 @@ pub async fn load_image_cached<F, Fut, E>(
     srgb: bool,
     buffers: &[Vec<u8>],
     io_func: &mut F,
-) -> Result<Labeled<types::TextureHandle>, GltfLoadError<E>>
+) -> Result<Labeled<Texture>, GltfLoadError<E>>
 where
     F: FnMut(SsoString) -> Fut,
     Fut: Future<Output = Result<Vec<u8>, E>>,
@@ -594,7 +610,7 @@ pub async fn load_image<F, Fut, E>(
     srgb: bool,
     buffers: &[Vec<u8>],
     io_func: &mut F,
-) -> Result<Labeled<types::TextureHandle>, GltfLoadError<E>>
+) -> Result<Labeled<Texture>, GltfLoadError<E>>
 where
     F: FnMut(SsoString) -> Fut,
     Fut: Future<Output = Result<Vec<u8>, E>>,
@@ -628,41 +644,63 @@ where
             GltfLoadError::TextureBadKxt2Format(image.name().map(SsoString::from).unwrap_or_default(), src_format)
         })?;
 
+        let guaranteed_format = format.describe().guaranteed_format_features;
+        let generate = header.level_count == 1
+            && guaranteed_format.filterable
+            && guaranteed_format.allowed_usages.contains(
+                rend3::types::TextureUsages::TEXTURE_BINDING | rend3::types::TextureUsages::RENDER_ATTACHMENT,
+            );
+
         types::Texture {
             label: image.name().map(str::to_owned),
             format,
             size: UVec2::new(header.pixel_width, header.pixel_height),
             data: reader.data().to_vec(),
-            mip_count: types::MipmapCount::Specific(NonZeroU32::new(header.level_count).unwrap()),
-            mip_source: types::MipmapSource::Uploaded,
+            mip_count: if generate {
+                types::MipmapCount::Maximum
+            } else {
+                types::MipmapCount::Specific(NonZeroU32::new(header.level_count).unwrap())
+            },
+            mip_source: if generate {
+                types::MipmapSource::Generated
+            } else {
+                types::MipmapSource::Uploaded
+            },
         }
     } else {
         profiling::scope!("decoding image");
         let parsed = image::load_from_memory(&data).map_err(|e| GltfLoadError::TextureDecode(uri, e))?;
-        let rgba = parsed.to_rgba8();
+        let size = UVec2::new(parsed.width(), parsed.height());
+        let (data, format) = util::convert_dynamic_image(parsed, srgb);
 
         types::Texture {
             label: image.name().map(str::to_owned),
-            format: match srgb {
-                true => types::TextureFormat::Rgba8UnormSrgb,
-                false => types::TextureFormat::Rgba8Unorm,
-            },
-            size: UVec2::new(rgba.width(), rgba.height()),
-            data: rgba.into_raw(),
+            format,
+            size,
+            data,
             mip_count: types::MipmapCount::Maximum,
             mip_source: types::MipmapSource::Generated,
         }
     };
+    let format = texture.format;
     let handle = renderer.add_texture_2d(texture);
 
-    Ok(Labeled::new(handle, image.name()))
+    Ok(Labeled::new(Texture { handle, format }, image.name()))
 }
 
 /// Implementation utilities.
 pub mod util {
     use std::future::Future;
 
-    use crate::Labeled;
+    use image::{buffer::ConvertBuffer, Bgra, ImageBuffer, Luma, Rgba};
+    use rend3::types;
+
+    use crate::{Labeled, Texture};
+
+    /// Turns an `Option<Texture>` into `Option<types::TextureHandle>`
+    pub fn extract_handle(texture: Option<Texture>) -> Option<types::TextureHandle> {
+        textures.map(|t| t.handle)
+    }
 
     /// Turns a `Option<Future<Output = Result<Labeled<T>, E>>>>` into a `Future<Output = Result<Option<T>, E>>`
     ///
@@ -678,6 +716,35 @@ pub mod util {
             }
         } else {
             Ok(None)
+        }
+    }
+
+    pub fn convert_dynamic_image(image: image::DynamicImage, srgb: bool) -> (Vec<u8>, rend3::types::TextureFormat) {
+        use rend3::types::TextureFormat as r3F;
+
+        profiling::scope!("convert dynamic image");
+        match image {
+            image::DynamicImage::ImageLuma8(i) => (i.into_raw(), r3F::R8Unorm),
+            image::DynamicImage::ImageLumaA8(i) => (
+                ConvertBuffer::<ImageBuffer<Luma<u8>, Vec<u8>>>::convert(&i).into_raw(),
+                r3F::R8Unorm,
+            ),
+            image::DynamicImage::ImageRgb8(i) => (
+                ConvertBuffer::<ImageBuffer<Rgba<u8>, Vec<u8>>>::convert(&i).into_raw(),
+                if srgb { r3F::Rgba8UnormSrgb } else { r3F::Rgba8Unorm },
+            ),
+            image::DynamicImage::ImageRgba8(i) => (i.into_raw(), r3F::Rgba8Unorm),
+            image::DynamicImage::ImageBgr8(i) => (
+                ConvertBuffer::<ImageBuffer<Bgra<u8>, Vec<u8>>>::convert(&i).into_raw(),
+                if srgb { r3F::Bgra8UnormSrgb } else { r3F::Bgra8Unorm },
+            ),
+            image::DynamicImage::ImageBgra8(i) => {
+                (i.into_raw(), if srgb { r3F::Bgra8UnormSrgb } else { r3F::Bgra8Unorm })
+            }
+            i => (
+                i.into_rgba8().into_raw(),
+                if srgb { r3F::Rgba8UnormSrgb } else { r3F::Rgba8Unorm },
+            ),
         }
     }
 

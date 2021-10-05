@@ -40,19 +40,20 @@ struct IndirectCall {
     uint base_instance;
 };
 
-#define FLAGS_ALBEDO_ACTIVE      0x0001
-#define FLAGS_ALBEDO_BLEND       0x0002
-#define FLAGS_ALBEDO_VERTEX_SRGB 0x0004
-#define FLAGS_BICOMPONENT_NORMAL 0x0010
-#define FLAGS_SWIZZLED_NORMAL    0x0020
-#define FLAGS_AOMR_GLTF_COMBINED 0x0040
-#define FLAGS_AOMR_GLTF_SPLIT    0x0080
-#define FLAGS_AOMR_BW_SPLIT      0x0100
-#define FLAGS_CC_GLTF_COMBINED   0x0200
-#define FLAGS_CC_GLTF_SPLIT      0x0400
-#define FLAGS_CC_BW_SPLIT        0x0800
-#define FLAGS_UNLIT              0x1000
-#define FLAGS_NEAREST            0x2000
+#define FLAGS_ALBEDO_ACTIVE       0x0001
+#define FLAGS_ALBEDO_BLEND        0x0002
+#define FLAGS_ALBEDO_VERTEX_SRGB  0x0004
+#define FLAGS_BICOMPONENT_NORMAL  0x0008
+#define FLAGS_SWIZZLED_NORMAL     0x0010
+#define FLAGS_AOMR_COMBINED       0x0020
+#define FLAGS_AOMR_SWIZZLED_SPLIT 0x0040
+#define FLAGS_AOMR_SPLIT          0x0080
+#define FLAGS_AOMR_BW_SPLIT       0x0100
+#define FLAGS_CC_GLTF_COMBINED    0x0200
+#define FLAGS_CC_GLTF_SPLIT       0x0400
+#define FLAGS_CC_BW_SPLIT         0x0800
+#define FLAGS_UNLIT               0x1000
+#define FLAGS_NEAREST             0x2000
 
 #define MATERIAL_FLAG(name) bool(material.material_flags & name)
 

@@ -15,7 +15,8 @@ default = ["image/default"]
 [dependencies]
 arrayvec = "0.7"
 base64 = "0.13"
-glam = "0.19.0"
+bytemuck = "1"
+glam = "0.19"
 gltf = { version = "0.16", default-features = false, features = ["KHR_lights_punctual", "KHR_texture_transform", "KHR_materials_unlit", "extras", "names", "utils"] }
 image = { version = "0.23", default-features = false }
 ktx2 = "0.2"
