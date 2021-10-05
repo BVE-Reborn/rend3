@@ -4,58 +4,6 @@ use egui_winit_platform::{Platform, PlatformDescriptor};
 use glam::UVec2;
 use winit::{event::Event::*, event_loop::ControlFlow};
 
-fn create_mesh() -> rend3::types::Mesh {
-    let vertex_positions = [
-        // far side (0.0, 0.0, 1.0)
-        vertex([-1.0, -1.0, 1.0]),
-        vertex([1.0, -1.0, 1.0]),
-        vertex([1.0, 1.0, 1.0]),
-        vertex([-1.0, 1.0, 1.0]),
-        // near side (0.0, 0.0, -1.0)
-        vertex([-1.0, 1.0, -1.0]),
-        vertex([1.0, 1.0, -1.0]),
-        vertex([1.0, -1.0, -1.0]),
-        vertex([-1.0, -1.0, -1.0]),
-        // right side (1.0, 0.0, 0.0)
-        vertex([1.0, -1.0, -1.0]),
-        vertex([1.0, 1.0, -1.0]),
-        vertex([1.0, 1.0, 1.0]),
-        vertex([1.0, -1.0, 1.0]),
-        // left side (-1.0, 0.0, 0.0)
-        vertex([-1.0, -1.0, 1.0]),
-        vertex([-1.0, 1.0, 1.0]),
-        vertex([-1.0, 1.0, -1.0]),
-        vertex([-1.0, -1.0, -1.0]),
-        // top (0.0, 1.0, 0.0)
-        vertex([1.0, 1.0, -1.0]),
-        vertex([-1.0, 1.0, -1.0]),
-        vertex([-1.0, 1.0, 1.0]),
-        vertex([1.0, 1.0, 1.0]),
-        // bottom (0.0, -1.0, 0.0)
-        vertex([1.0, -1.0, 1.0]),
-        vertex([-1.0, -1.0, 1.0]),
-        vertex([-1.0, -1.0, -1.0]),
-        vertex([1.0, -1.0, -1.0]),
-    ];
-
-    let index_data: &[u32] = &[
-        0, 1, 2, 2, 3, 0, // far
-        4, 5, 6, 6, 7, 4, // near
-        8, 9, 10, 10, 11, 8, // right
-        12, 13, 14, 14, 15, 12, // left
-        16, 17, 18, 18, 19, 16, // top
-        20, 21, 22, 22, 23, 20, // bottom
-    ];
-
-    rend3::types::MeshBuilder::new(vertex_positions.to_vec())
-        .with_indices(index_data.to_vec())
-        .build()
-}
-
-fn vertex(pos: [f32; 3]) -> glam::Vec3 {
-    glam::Vec3::from(pos)
-}
-
 fn main() {
     // Setup logging
     env_logger::init();
@@ -172,6 +120,7 @@ fn main() {
 
     let start_time = Instant::now();
     let mut previous_frame_time = None;
+    let mut color: [f32; 4] = [0.0, 0.0, 0.0, 1.0];
 
     event_loop.run(move |event, _, control_flow| {
         // Pass the winit events to the platform integration.
@@ -200,7 +149,12 @@ fn main() {
 
                 // Insert egui commands here
                 let ctx = &platform.context();
-                egui::Window::new("Hello World!").resizable(true).show(ctx, |ui| {
+                egui::Window::new("Change color").resizable(true).show(ctx, |ui| {
+                    
+                    if ui.color_edit_button_rgba_unmultiplied(&mut color).changed() {
+                        println!("[{}, {}, {}, {}]", color[0], color[1], color[2], color[3]);
+                    }
+
                     ui.label("This is awesome!");
                     if ui.button("Click me!").clicked() {
                         // This currently crashes the application
@@ -230,6 +184,7 @@ fn main() {
 
                 // Render our frame
                 let frame = rend3::util::output::OutputFrame::from_surface(&surface).unwrap();
+
                 let _stats = renderer.render(&mut pbr_routine, (), frame.as_view());
                 let _stats = renderer.render(&mut routine, &input, frame.as_view());
 
@@ -250,7 +205,12 @@ fn main() {
                         rend3::types::PresentMode::Mailbox,
                     );
 
-                    routine.resize(size.x, size.y, window.scale_factor() as f32);
+                    routine.resize(rend3_egui::ScreenDescriptor {
+                        physical_width: size.x,
+                        physical_height: size.y,
+                        scale_factor: window.scale_factor() as f32,
+                    });
+
                     pbr_routine.resize(
                         &renderer,
                         rend3_pbr::RenderTextureOptions {
@@ -282,4 +242,56 @@ impl epi::RepaintSignal for ExampleRepaintSignal {
     fn request_repaint(&self) {
         self.0.lock().unwrap().send_event(Event::RequestRedraw).ok();
     }
+}
+
+fn create_mesh() -> rend3::types::Mesh {
+    let vertex_positions = [
+        // far side (0.0, 0.0, 1.0)
+        vertex([-1.0, -1.0, 1.0]),
+        vertex([1.0, -1.0, 1.0]),
+        vertex([1.0, 1.0, 1.0]),
+        vertex([-1.0, 1.0, 1.0]),
+        // near side (0.0, 0.0, -1.0)
+        vertex([-1.0, 1.0, -1.0]),
+        vertex([1.0, 1.0, -1.0]),
+        vertex([1.0, -1.0, -1.0]),
+        vertex([-1.0, -1.0, -1.0]),
+        // right side (1.0, 0.0, 0.0)
+        vertex([1.0, -1.0, -1.0]),
+        vertex([1.0, 1.0, -1.0]),
+        vertex([1.0, 1.0, 1.0]),
+        vertex([1.0, -1.0, 1.0]),
+        // left side (-1.0, 0.0, 0.0)
+        vertex([-1.0, -1.0, 1.0]),
+        vertex([-1.0, 1.0, 1.0]),
+        vertex([-1.0, 1.0, -1.0]),
+        vertex([-1.0, -1.0, -1.0]),
+        // top (0.0, 1.0, 0.0)
+        vertex([1.0, 1.0, -1.0]),
+        vertex([-1.0, 1.0, -1.0]),
+        vertex([-1.0, 1.0, 1.0]),
+        vertex([1.0, 1.0, 1.0]),
+        // bottom (0.0, -1.0, 0.0)
+        vertex([1.0, -1.0, 1.0]),
+        vertex([-1.0, -1.0, 1.0]),
+        vertex([-1.0, -1.0, -1.0]),
+        vertex([1.0, -1.0, -1.0]),
+    ];
+
+    let index_data: &[u32] = &[
+        0, 1, 2, 2, 3, 0, // far
+        4, 5, 6, 6, 7, 4, // near
+        8, 9, 10, 10, 11, 8, // right
+        12, 13, 14, 14, 15, 12, // left
+        16, 17, 18, 18, 19, 16, // top
+        20, 21, 22, 22, 23, 20, // bottom
+    ];
+
+    rend3::types::MeshBuilder::new(vertex_positions.to_vec())
+        .with_indices(index_data.to_vec())
+        .build()
+}
+
+fn vertex(pos: [f32; 3]) -> glam::Vec3 {
+    glam::Vec3::from(pos)
 }

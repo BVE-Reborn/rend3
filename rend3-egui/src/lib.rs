@@ -1,4 +1,4 @@
-use egui_wgpu_backend::ScreenDescriptor;
+pub use egui_wgpu_backend::ScreenDescriptor;
 use rend3::{RenderRoutine, Renderer};
 use wgpu::{TextureFormat, TextureView};
 
@@ -35,12 +35,8 @@ pub struct Input<'a> {
 }
 
 impl EguiRenderRoutine {
-    pub fn resize(&mut self, new_width: u32, new_height: u32, new_scale_factor: f32) {
-        self.screen_descriptor = ScreenDescriptor {
-            physical_width: new_width,
-            physical_height: new_height,
-            scale_factor: new_scale_factor,
-        };
+    pub fn resize(&mut self, new_screen_descriptor: ScreenDescriptor) {
+        self.screen_descriptor = new_screen_descriptor;
     }
 }
 
