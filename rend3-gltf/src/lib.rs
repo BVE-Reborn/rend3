@@ -110,7 +110,9 @@ pub enum GltfLoadError<E: std::error::Error + 'static> {
     #[error("Texture {0} failed to be loaded from the fs")]
     TextureIo(SsoString, #[source] E),
     #[error("Texture {0} failed to be loaded as an image")]
-    TextureLoad(SsoString, #[source] image::ImageError),
+    TextureDecode(SsoString, #[source] image::ImageError),
+    #[error("Texture {0} failed to be loaded as a ktx2 format due to incompatible format {1:?}")]
+    TextureBadKxt2Format(SsoString, ktx2::Format),
     #[error("Gltf file must have at least one scene")]
     MissingScene,
     #[error("Mesh {0} does not have positions")]
@@ -599,7 +601,6 @@ where
     E: std::error::Error + 'static,
 {
     profiling::scope!("load image", image.name().unwrap_or_default());
-    // TODO: Address format detection for compressed texs
     let (data, uri) = match image.source() {
         gltf::image::Source::Uri { uri, .. } => {
             let data = io_func(SsoString::from(uri))
@@ -619,21 +620,13 @@ where
 
     let texture = if let Ok(reader) = ktx2::Reader::new(&data) {
         profiling::scope!("parsing ktx2");
-        use ktx2::Format as F;
 
         let header = reader.header();
 
-        let format = match header.format.unwrap() {
-            F::BC1_RGB_SRGB_BLOCK | F::BC1_RGB_UNORM_BLOCK | F::BC1_RGBA_SRGB_BLOCK | F::BC1_RGBA_UNORM_BLOCK => {
-                if srgb {
-                    types::TextureFormat::Bc1RgbaUnormSrgb
-                } else {
-                    types::TextureFormat::Bc1RgbaUnorm
-                }
-            }
-            F::BC5_UNORM_BLOCK => types::TextureFormat::Bc5RgUnorm,
-            _ => unimplemented!(),
-        };
+        let src_format = header.format.unwrap();
+        let format = util::map_ktx2_format(src_format, srgb).ok_or_else(|| {
+            GltfLoadError::TextureBadKxt2Format(image.name().map(SsoString::from).unwrap_or_default(), src_format)
+        })?;
 
         types::Texture {
             label: image.name().map(str::to_owned),
@@ -645,7 +638,7 @@ where
         }
     } else {
         profiling::scope!("decoding image");
-        let parsed = image::load_from_memory(&data).map_err(|e| GltfLoadError::TextureLoad(uri, e))?;
+        let parsed = image::load_from_memory(&data).map_err(|e| GltfLoadError::TextureDecode(uri, e))?;
         let rgba = parsed.to_rgba8();
 
         types::Texture {
@@ -686,5 +679,279 @@ pub mod util {
         } else {
             Ok(None)
         }
+    }
+
+    /// Maps a ktx2 format into the rend3's TextureFormat
+    pub fn map_ktx2_format(format: ktx2::Format, srgb: bool) -> Option<rend3::types::TextureFormat> {
+        use ktx2::Format as k2F;
+        use rend3::types::TextureFormat as r3F;
+        Some(match format {
+            k2F::R4G4_UNORM_PACK8
+            | k2F::R4G4B4A4_UNORM_PACK16
+            | k2F::B4G4R4A4_UNORM_PACK16
+            | k2F::R5G6B5_UNORM_PACK16
+            | k2F::B5G6R5_UNORM_PACK16
+            | k2F::R5G5B5A1_UNORM_PACK16
+            | k2F::B5G5R5A1_UNORM_PACK16
+            | k2F::A1R5G5B5_UNORM_PACK16 => return None,
+            k2F::R8_UNORM | k2F::R8_SRGB => {
+                if srgb {
+                    return None;
+                } else {
+                    r3F::R8Unorm
+                }
+            }
+            k2F::R8_SNORM => r3F::R8Snorm,
+            k2F::R8_UINT => r3F::R8Uint,
+            k2F::R8_SINT => r3F::R8Sint,
+            k2F::R8G8_UNORM | k2F::R8G8_SRGB => {
+                if srgb {
+                    return None;
+                } else {
+                    r3F::Rg8Unorm
+                }
+            }
+            k2F::R8G8_SNORM => r3F::Rg8Snorm,
+            k2F::R8G8_UINT => r3F::Rg8Uint,
+            k2F::R8G8_SINT => r3F::Rg8Sint,
+            k2F::R8G8B8_UNORM
+            | k2F::R8G8B8_SNORM
+            | k2F::R8G8B8_UINT
+            | k2F::R8G8B8_SINT
+            | k2F::R8G8B8_SRGB
+            | k2F::B8G8R8_UNORM
+            | k2F::B8G8R8_SNORM
+            | k2F::B8G8R8_UINT
+            | k2F::B8G8R8_SINT
+            | k2F::B8G8R8_SRGB => return None,
+            k2F::R8G8B8A8_UNORM | k2F::R8G8B8A8_SRGB => {
+                if srgb {
+                    r3F::Rgba8UnormSrgb
+                } else {
+                    r3F::Rgba8Unorm
+                }
+            }
+            k2F::R8G8B8A8_SNORM => r3F::Rgba8Snorm,
+            k2F::R8G8B8A8_UINT => r3F::Rgba8Uint,
+            k2F::R8G8B8A8_SINT => r3F::Rgba8Sint,
+            k2F::B8G8R8A8_UNORM | k2F::B8G8R8A8_SRGB => {
+                if srgb {
+                    r3F::Bgra8UnormSrgb
+                } else {
+                    r3F::Bgra8Unorm
+                }
+            }
+            k2F::B8G8R8A8_SNORM | k2F::B8G8R8A8_UINT | k2F::B8G8R8A8_SINT => return None,
+            k2F::A2R10G10B10_UNORM_PACK32
+            | k2F::A2R10G10B10_SNORM_PACK32
+            | k2F::A2R10G10B10_UINT_PACK32
+            | k2F::A2R10G10B10_SINT_PACK32
+            | k2F::A2B10G10R10_UNORM_PACK32
+            | k2F::A2B10G10R10_SNORM_PACK32
+            | k2F::A2B10G10R10_UINT_PACK32
+            | k2F::A2B10G10R10_SINT_PACK32 => return None,
+            k2F::R16_UNORM | k2F::R16_SNORM => return None,
+            k2F::R16_UINT => r3F::R16Uint,
+            k2F::R16_SINT => r3F::R16Sint,
+            k2F::R16_SFLOAT => r3F::R16Float,
+            k2F::R16G16_UNORM | k2F::R16G16_SNORM => return None,
+            k2F::R16G16_UINT => r3F::Rg16Uint,
+            k2F::R16G16_SINT => r3F::Rg16Sint,
+            k2F::R16G16_SFLOAT => r3F::Rg16Float,
+            k2F::R16G16B16_UNORM
+            | k2F::R16G16B16_SNORM
+            | k2F::R16G16B16_UINT
+            | k2F::R16G16B16_SINT
+            | k2F::R16G16B16_SFLOAT => return None,
+            k2F::R16G16B16A16_UNORM | k2F::R16G16B16A16_SNORM => return None,
+            k2F::R16G16B16A16_UINT => r3F::Rgba16Uint,
+            k2F::R16G16B16A16_SINT => r3F::Rgba16Sint,
+            k2F::R16G16B16A16_SFLOAT => r3F::Rgba16Float,
+            k2F::R32_UINT => r3F::R32Uint,
+            k2F::R32_SINT => r3F::R32Sint,
+            k2F::R32_SFLOAT => r3F::R32Float,
+            k2F::R32G32_UINT => r3F::Rg32Uint,
+            k2F::R32G32_SINT => r3F::Rg32Sint,
+            k2F::R32G32_SFLOAT => r3F::Rg32Float,
+            k2F::R32G32B32_UINT | k2F::R32G32B32_SINT | k2F::R32G32B32_SFLOAT => return None,
+            k2F::R32G32B32A32_UINT => r3F::Rgba32Uint,
+            k2F::R32G32B32A32_SINT => r3F::Rgba32Sint,
+            k2F::R32G32B32A32_SFLOAT => r3F::Rgba32Float,
+            k2F::R64_UINT
+            | k2F::R64_SINT
+            | k2F::R64_SFLOAT
+            | k2F::R64G64_UINT
+            | k2F::R64G64_SINT
+            | k2F::R64G64_SFLOAT
+            | k2F::R64G64B64_UINT
+            | k2F::R64G64B64_SINT
+            | k2F::R64G64B64_SFLOAT
+            | k2F::R64G64B64A64_UINT
+            | k2F::R64G64B64A64_SINT
+            | k2F::R64G64B64A64_SFLOAT => return None,
+            k2F::B10G11R11_UFLOAT_PACK32 => r3F::Rg11b10Float,
+            k2F::E5B9G9R9_UFLOAT_PACK32 => r3F::Rgb9e5Ufloat,
+            k2F::D16_UNORM => return None,
+            k2F::X8_D24_UNORM_PACK32 => r3F::Depth24Plus,
+            k2F::D32_SFLOAT => r3F::Depth32Float,
+            k2F::S8_UINT | k2F::D16_UNORM_S8_UINT => return None,
+            k2F::D24_UNORM_S8_UINT => r3F::Depth24PlusStencil8,
+            k2F::D32_SFLOAT_S8_UINT => return None,
+            k2F::BC1_RGB_UNORM_BLOCK
+            | k2F::BC1_RGB_SRGB_BLOCK
+            | k2F::BC1_RGBA_UNORM_BLOCK
+            | k2F::BC1_RGBA_SRGB_BLOCK => {
+                if srgb {
+                    r3F::Bc1RgbaUnormSrgb
+                } else {
+                    r3F::Bc1RgbaUnorm
+                }
+            }
+            k2F::BC2_UNORM_BLOCK | k2F::BC2_SRGB_BLOCK => {
+                if srgb {
+                    r3F::Bc2RgbaUnormSrgb
+                } else {
+                    r3F::Bc2RgbaUnorm
+                }
+            }
+            k2F::BC3_UNORM_BLOCK | k2F::BC3_SRGB_BLOCK => {
+                if srgb {
+                    r3F::Bc3RgbaUnormSrgb
+                } else {
+                    r3F::Bc3RgbaUnorm
+                }
+            }
+            k2F::BC4_UNORM_BLOCK => r3F::Bc4RUnorm,
+            k2F::BC4_SNORM_BLOCK => r3F::Bc4RSnorm,
+            k2F::BC5_UNORM_BLOCK => r3F::Bc5RgUnorm,
+            k2F::BC5_SNORM_BLOCK => r3F::Bc5RgSnorm,
+            k2F::BC6H_UFLOAT_BLOCK => r3F::Bc6hRgbUfloat,
+            k2F::BC6H_SFLOAT_BLOCK => r3F::Bc6hRgbSfloat,
+            k2F::BC7_UNORM_BLOCK | k2F::BC7_SRGB_BLOCK => {
+                if srgb {
+                    r3F::Bc7RgbaUnormSrgb
+                } else {
+                    r3F::Bc7RgbaUnorm
+                }
+            }
+            k2F::ETC2_R8G8B8_UNORM_BLOCK | k2F::ETC2_R8G8B8_SRGB_BLOCK => {
+                if srgb {
+                    r3F::Etc2RgbUnormSrgb
+                } else {
+                    r3F::Etc2RgbUnorm
+                }
+            }
+            k2F::ETC2_R8G8B8A1_UNORM_BLOCK | k2F::ETC2_R8G8B8A1_SRGB_BLOCK => {
+                if srgb {
+                    r3F::Etc2RgbA1UnormSrgb
+                } else {
+                    r3F::Etc2RgbA1Unorm
+                }
+            }
+            k2F::ETC2_R8G8B8A8_UNORM_BLOCK | k2F::ETC2_R8G8B8A8_SRGB_BLOCK => return None,
+            k2F::EAC_R11_UNORM_BLOCK => r3F::EacRUnorm,
+            k2F::EAC_R11_SNORM_BLOCK => r3F::EacRSnorm,
+            k2F::EAC_R11G11_UNORM_BLOCK => r3F::EacRgUnorm,
+            k2F::EAC_R11G11_SNORM_BLOCK => r3F::EacRgSnorm,
+            k2F::ASTC_4x4_UNORM_BLOCK | k2F::ASTC_4x4_SRGB_BLOCK => {
+                if srgb {
+                    r3F::Astc4x4RgbaUnormSrgb
+                } else {
+                    r3F::Astc4x4RgbaUnorm
+                }
+            }
+            k2F::ASTC_5x4_UNORM_BLOCK | k2F::ASTC_5x4_SRGB_BLOCK => {
+                if srgb {
+                    r3F::Astc5x4RgbaUnormSrgb
+                } else {
+                    r3F::Astc5x4RgbaUnorm
+                }
+            }
+            k2F::ASTC_5x5_UNORM_BLOCK | k2F::ASTC_5x5_SRGB_BLOCK => {
+                if srgb {
+                    r3F::Astc5x5RgbaUnormSrgb
+                } else {
+                    r3F::Astc5x5RgbaUnorm
+                }
+            }
+            k2F::ASTC_6x5_UNORM_BLOCK | k2F::ASTC_6x5_SRGB_BLOCK => {
+                if srgb {
+                    r3F::Astc6x5RgbaUnormSrgb
+                } else {
+                    r3F::Astc6x5RgbaUnorm
+                }
+            }
+            k2F::ASTC_6x6_UNORM_BLOCK | k2F::ASTC_6x6_SRGB_BLOCK => {
+                if srgb {
+                    r3F::Astc6x6RgbaUnormSrgb
+                } else {
+                    r3F::Astc6x6RgbaUnorm
+                }
+            }
+            k2F::ASTC_8x5_UNORM_BLOCK | k2F::ASTC_8x5_SRGB_BLOCK => {
+                if srgb {
+                    r3F::Astc8x5RgbaUnormSrgb
+                } else {
+                    r3F::Astc8x5RgbaUnorm
+                }
+            }
+            k2F::ASTC_8x6_UNORM_BLOCK | k2F::ASTC_8x6_SRGB_BLOCK => {
+                if srgb {
+                    r3F::Astc8x6RgbaUnormSrgb
+                } else {
+                    r3F::Astc8x6RgbaUnorm
+                }
+            }
+            k2F::ASTC_8x8_UNORM_BLOCK | k2F::ASTC_8x8_SRGB_BLOCK => {
+                if srgb {
+                    r3F::Astc8x8RgbaUnormSrgb
+                } else {
+                    r3F::Astc8x8RgbaUnorm
+                }
+            }
+            k2F::ASTC_10x5_UNORM_BLOCK | k2F::ASTC_10x5_SRGB_BLOCK => {
+                if srgb {
+                    r3F::Astc10x5RgbaUnormSrgb
+                } else {
+                    r3F::Astc10x5RgbaUnorm
+                }
+            }
+            k2F::ASTC_10x6_UNORM_BLOCK | k2F::ASTC_10x6_SRGB_BLOCK => {
+                if srgb {
+                    r3F::Astc10x6RgbaUnormSrgb
+                } else {
+                    r3F::Astc10x6RgbaUnorm
+                }
+            }
+            k2F::ASTC_10x8_UNORM_BLOCK | k2F::ASTC_10x8_SRGB_BLOCK => {
+                if srgb {
+                    r3F::Astc10x8RgbaUnormSrgb
+                } else {
+                    r3F::Astc10x8RgbaUnorm
+                }
+            }
+            k2F::ASTC_10x10_UNORM_BLOCK | k2F::ASTC_10x10_SRGB_BLOCK => {
+                if srgb {
+                    r3F::Astc10x10RgbaUnormSrgb
+                } else {
+                    r3F::Astc10x10RgbaUnorm
+                }
+            }
+            k2F::ASTC_12x10_UNORM_BLOCK | k2F::ASTC_12x10_SRGB_BLOCK => {
+                if srgb {
+                    r3F::Astc12x10RgbaUnormSrgb
+                } else {
+                    r3F::Astc12x10RgbaUnorm
+                }
+            }
+            k2F::ASTC_12x12_UNORM_BLOCK | k2F::ASTC_12x12_SRGB_BLOCK => {
+                if srgb {
+                    r3F::Astc12x12RgbaUnormSrgb
+                } else {
+                    r3F::Astc12x12RgbaUnorm
+                }
+            }
+            _ => return None,
+        })
     }
 }
