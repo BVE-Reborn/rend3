@@ -89,7 +89,7 @@ pub struct ImageKey {
 }
 
 /// Format
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Texture {
     pub handle: types::TextureHandle,
     pub format: types::TextureFormat,
@@ -508,11 +508,14 @@ where
         let handle = renderer.add_material(material::PbrMaterial {
             albedo: match albedo_tex {
                 Some(tex) => material::AlbedoComponent::TextureVertexValue {
-                    texture: util::extract_handle(tex),
+                    texture: tex.handle,
                     value: Vec4::from(albedo_factor),
                     srgb: false,
                 },
-                None => material::AlbedoComponent::Value(Vec4::from(albedo_factor)),
+                None => material::AlbedoComponent::ValueVertex {
+                    value: Vec4::from(albedo_factor),
+                    srgb: false,
+                },
             },
             transparency: match material.alpha_mode() {
                 gltf::material::AlphaMode::Opaque => material::Transparency::Opaque,
@@ -522,14 +525,20 @@ where
                 gltf::material::AlphaMode::Blend => material::Transparency::Blend,
             },
             normal: match normals_tex {
-                Some(tex) => material::NormalTexture::Bicomponent(util::extract_handle(tex)),
-                None => material::NormalTexture::None,
+                Some(tex) if tex.format.describe().components == 2 => material::NormalTexture::Bicomponent(tex.handle),
+                Some(tex) if tex.format.describe().components >= 3 => material::NormalTexture::Tricomponent(tex.handle),
+                _ => material::NormalTexture::None,
             },
             aomr_textures: match (metallic_roughness_tex, occlusion_tex) {
                 (Some(mr), Some(ao)) if mr == ao => material::AoMRTextures::Combined {
-                    texture: Some(util::extract_handle(mr)),
+                    texture: Some(mr.handle),
                 },
-                (mr, ao) if ao.map(|ao| ao.format.describe().components < 3).unwrap_or(false) => {
+                (mr, ao)
+                    if ao
+                        .as_ref()
+                        .map(|ao| ao.format.describe().components < 3)
+                        .unwrap_or(false) =>
+                {
                     material::AoMRTextures::Split {
                         mr_texture: util::extract_handle(mr),
                         ao_texture: util::extract_handle(ao),
@@ -544,7 +553,7 @@ where
             roughness_factor: Some(roughness_factor),
             emissive: match emissive_tex {
                 Some(tex) => material::MaterialComponent::TextureValue {
-                    texture: util::extract_handle(tex),
+                    texture: tex.handle,
                     value: Vec3::from(emissive_factor),
                 },
                 None => material::MaterialComponent::Value(Vec3::from(emissive_factor)),
@@ -699,7 +708,7 @@ pub mod util {
 
     /// Turns an `Option<Texture>` into `Option<types::TextureHandle>`
     pub fn extract_handle(texture: Option<Texture>) -> Option<types::TextureHandle> {
-        textures.map(|t| t.handle)
+        texture.map(|t| t.handle)
     }
 
     /// Turns a `Option<Future<Output = Result<Labeled<T>, E>>>>` into a `Future<Output = Result<Option<T>, E>>`
@@ -733,7 +742,9 @@ pub mod util {
                 ConvertBuffer::<ImageBuffer<Rgba<u8>, Vec<u8>>>::convert(&i).into_raw(),
                 if srgb { r3F::Rgba8UnormSrgb } else { r3F::Rgba8Unorm },
             ),
-            image::DynamicImage::ImageRgba8(i) => (i.into_raw(), r3F::Rgba8Unorm),
+            image::DynamicImage::ImageRgba8(i) => {
+                (i.into_raw(), if srgb { r3F::Rgba8UnormSrgb } else { r3F::Rgba8Unorm })
+            }
             image::DynamicImage::ImageBgr8(i) => (
                 ConvertBuffer::<ImageBuffer<Bgra<u8>, Vec<u8>>>::convert(&i).into_raw(),
                 if srgb { r3F::Bgra8UnormSrgb } else { r3F::Bgra8Unorm },

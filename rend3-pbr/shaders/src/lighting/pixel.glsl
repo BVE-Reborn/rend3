@@ -70,7 +70,7 @@ PixelData get_per_pixel_data_sampled(MATERIAL_TYPE material, sampler s) {
     else {
         if (HAS_NORMAL_TEXTURE) {
             vec4 texture_read = textureGrad(sampler2D(NORMAL_TEXTURE, s), coords, uvdx, uvdy);
-            vec3 normal_raw;
+            vec3 normal;
             if (MATERIAL_FLAG(FLAGS_BICOMPONENT_NORMAL)) {
                 vec2 bicomp;
                 if (MATERIAL_FLAG(FLAGS_SWIZZLED_NORMAL)) {
@@ -80,11 +80,10 @@ PixelData get_per_pixel_data_sampled(MATERIAL_TYPE material, sampler s) {
                 }
                 bicomp = bicomp * 2.0 - 1.0;
 
-                normal_raw = vec3(bicomp, sqrt(1 - (bicomp.r * bicomp.r) - (bicomp.g * bicomp.g)));
+                normal = vec3(bicomp, sqrt(1 - (bicomp.r * bicomp.r) - (bicomp.g * bicomp.g)));
             } else {
-                normal_raw = texture_read.rgb;
+                normal = normalize(texture_read.rgb);
             }
-            vec3 normal = normalize(normal_raw);
             vec3 in_normal = normalize(i_normal);
             vec3 in_tangent = normalize(i_tangent);
             vec3 bitangent = cross(in_normal, in_tangent);
@@ -103,7 +102,7 @@ PixelData get_per_pixel_data_sampled(MATERIAL_TYPE material, sampler s) {
         // Red: AO
         // Green: Metallic
         // Blue: Roughness
-        if (MATERIAL_FLAG(FLAGS_AOMR_GLTF_COMBINED)) {
+        if (MATERIAL_FLAG(FLAGS_AOMR_COMBINED)) {
             if (HAS_ROUGHNESS_TEXTURE) {
                 vec3 aomr = textureGrad(sampler2D(ROUGHNESS_TEXTURE, s), coords, uvdx, uvdy).rgb;
                 pixel.ambient_occlusion = material.ambient_occlusion * aomr.r;
@@ -120,10 +119,10 @@ PixelData get_per_pixel_data_sampled(MATERIAL_TYPE material, sampler s) {
         // In roughness texture:
         // Green: Metallic
         // Blue: Roughness
-        else if (MATERIAL_FLAG(FLAGS_AOMR_GLTF_SPLIT)) {
+        else if (MATERIAL_FLAG(FLAGS_AOMR_SWIZZLED_SPLIT) || MATERIAL_FLAG(FLAGS_AOMR_SPLIT)) {
             if (HAS_ROUGHNESS_TEXTURE) {
-                // TODO: flag this
-                vec2 mr = textureGrad(sampler2D(ROUGHNESS_TEXTURE, s), coords, uvdx, uvdy).rg;
+                vec4 texture_read = textureGrad(sampler2D(ROUGHNESS_TEXTURE, s), coords, uvdx, uvdy);
+                vec2 mr = MATERIAL_FLAG(FLAGS_AOMR_SWIZZLED_SPLIT) ? texture_read.gb : texture_read.rg;
                 pixel.metallic = material.metallic * mr[0];
                 pixel.perceptual_roughness = material.roughness * mr[1];
             } else {
