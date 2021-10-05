@@ -15,7 +15,7 @@ arrayvec = "0.7"
 bitflags = "1"
 bytemuck = "1"
 flume = "0.10"
-glam = { version = "0.18", features = ["bytemuck"] }
+glam = { version = "0.19", features = ["bytemuck"] }
 include_dir = "0.6"
 log = "0.4"
 ordered-float = "2"
