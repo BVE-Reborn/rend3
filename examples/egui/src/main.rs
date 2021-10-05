@@ -199,11 +199,7 @@ fn main() {
                         rend3::types::PresentMode::Mailbox,
                     );
 
-                    routine.resize(rend3_egui::ScreenDescriptor {
-                        physical_width: size.x,
-                        physical_height: size.y,
-                        scale_factor: window.scale_factor() as f32,
-                    });
+                    routine.resize(size.x, size.y, window.scale_factor() as f32);
 
                     pbr_routine.resize(
                         &renderer,
