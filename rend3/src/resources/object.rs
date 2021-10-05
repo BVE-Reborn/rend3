@@ -89,6 +89,10 @@ impl ObjectManager {
         object.input.material_index = index as u32;
     }
 
+    pub fn set_key(&mut self, handle: RawObjectHandle, key: MaterialKeyPair) {
+        self.registry.set_key(handle, key);
+    }
+
     pub fn set_object_transform(&mut self, handle: RawObjectHandle, transform: Mat4) {
         let object = self.registry.get_value_mut(handle);
         object.input.transform = transform;

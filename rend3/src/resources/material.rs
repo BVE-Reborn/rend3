@@ -26,6 +26,7 @@ const TEXTURE_MASK_SIZE: u32 = 4;
 pub struct InternalMaterial {
     pub bind_group: ModeData<BindGroup, ()>,
     pub material_buffer: ModeData<Buffer, ()>,
+    pub key: u64,
     /// Handles of all objects
     pub objects: Vec<RawObjectHandle>,
 }
@@ -200,6 +201,7 @@ impl MaterialManager {
         InternalMaterial {
             bind_group,
             material_buffer,
+            key: material.object_key(),
             objects: Vec::new(),
         }
     }
@@ -229,15 +231,41 @@ impl MaterialManager {
         // TODO(material): if this doesn't change archetype, this should do a buffer write cpu side.
         let internal = self.fill_inner(device, mode, texture_manager_2d, &material);
 
-        let used_objects = self.registry.update(handle, internal).map(|im| im.objects.clone());
+        let archetype_changed = self.registry.update(handle, material);
 
-        if let Some(objects) = used_objects {
+        if archetype_changed {
             let new_index = self.registry.get_index(handle.get_raw());
-            for object in &objects {
+            let new_internal = self.registry.get_metadata_mut::<M>(handle.get_raw());
+
+            for object in &new_internal.objects {
                 object_manager.set_material_index(*object, new_index);
-                // TODO(material): this also needs to change object archetype due to key/material archetype changes
+                object_manager.set_key(
+                    *object,
+                    MaterialKeyPair {
+                        ty: TypeId::of::<M>(),
+                        key: internal.key,
+                    },
+                )
             }
-            self.registry.get_metadata_mut::<M>(handle.get_raw()).objects = objects;
+            new_internal.bind_group = internal.bind_group;
+            new_internal.material_buffer = internal.material_buffer;
+            new_internal.key = internal.key;
+        } else {
+            let new_internal = self.registry.get_metadata_mut::<M>(handle.get_raw());
+            if internal.key != new_internal.key {
+                for object in &new_internal.objects {
+                    object_manager.set_key(
+                        *object,
+                        MaterialKeyPair {
+                            ty: TypeId::of::<M>(),
+                            key: internal.key,
+                        },
+                    )
+                }
+                new_internal.key = internal.key;
+            }
+            new_internal.bind_group = internal.bind_group;
+            new_internal.material_buffer = internal.material_buffer;
         }
     }
 
