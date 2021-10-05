@@ -129,7 +129,7 @@ fn build_forward_pass_inner(
             Baking::Enabled => None,
             Baking::Disabled => Some(DepthStencilState {
                 format: TextureFormat::Depth32Float,
-                depth_write_enabled: true,
+                depth_write_enabled: matches!(args.transparency, TransparencyType::Opaque | TransparencyType::Cutout),
                 depth_compare: match args.transparency {
                     TransparencyType::Opaque | TransparencyType::Cutout => CompareFunction::Equal,
                     TransparencyType::Blend => CompareFunction::GreaterEqual,
