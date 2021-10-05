@@ -16,7 +16,7 @@ path = "src/main.rs"
 # logging
 env_logger = { version = "0.9", default-features = false, features = ["termcolor", "atty"] }
 # Linear algebra library
-glam = "0.19.0"
+glam = "0.19"
 # parsing model files
 gltf = { version = "0.16", default-features = false, features = [ "import", "utils" ] }
 # Renderer core

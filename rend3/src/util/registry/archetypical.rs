@@ -125,7 +125,7 @@ where
             self.handle_info.get_mut(&handle).unwrap().index = old_index;
         }
     }
-    
+
     pub fn count(&self) -> usize {
         self.handle_info.len()
     }
