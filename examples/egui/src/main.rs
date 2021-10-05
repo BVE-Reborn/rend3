@@ -120,7 +120,7 @@ fn main() {
 
     let start_time = Instant::now();
     let mut previous_frame_time = None;
-    let mut color: [f32; 4] = [0.0, 0.0, 0.0, 1.0];
+    let mut color: [f32; 4] = [0.0, 0.5, 0.5, 1.0];
 
     event_loop.run(move |event, _, control_flow| {
         // Pass the winit events to the platform integration.
@@ -150,19 +150,13 @@ fn main() {
                 // Insert egui commands here
                 let ctx = &platform.context();
                 egui::Window::new("Change color").resizable(true).show(ctx, |ui| {
-                    
+                    ui.label("Change the color of the cube");
                     if ui.color_edit_button_rgba_unmultiplied(&mut color).changed() {
-                        println!("[{}, {}, {}, {}]", color[0], color[1], color[2], color[3]);
-                    }
-
-                    ui.label("This is awesome!");
-                    if ui.button("Click me!").clicked() {
-                        // This currently crashes the application
                         renderer.update_material(
                             &material_handle.clone(),
                             rend3_pbr::material::PbrMaterial {
                                 albedo: rend3_pbr::material::AlbedoComponent::Value(glam::Vec4::new(
-                                    1.0, 0.5, 0.5, 1.0,
+                                    color[0], color[1], color[2], color[3],
                                 )),
                                 ..rend3_pbr::material::PbrMaterial::default()
                             },
@@ -244,6 +238,10 @@ impl epi::RepaintSignal for ExampleRepaintSignal {
     }
 }
 
+fn vertex(pos: [f32; 3]) -> glam::Vec3 {
+    glam::Vec3::from(pos)
+}
+
 fn create_mesh() -> rend3::types::Mesh {
     let vertex_positions = [
         // far side (0.0, 0.0, 1.0)
@@ -290,8 +288,4 @@ fn create_mesh() -> rend3::types::Mesh {
     rend3::types::MeshBuilder::new(vertex_positions.to_vec())
         .with_indices(index_data.to_vec())
         .build()
-}
-
-fn vertex(pos: [f32; 3]) -> glam::Vec3 {
-    glam::Vec3::from(pos)
 }
