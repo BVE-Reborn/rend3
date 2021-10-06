@@ -637,11 +637,21 @@ pub struct Object {
 #[derive(Debug, Default, Copy, Clone)]
 pub struct Camera {
     pub projection: CameraProjection,
+    /// View matrix
+    pub view: Mat4,
 }
 
 impl Camera {
     pub fn location(&self) -> Vec3A {
-        self.projection.view().w_axis.xyz().into()
+        self.view.w_axis.xyz().into()
+    }
+    pub fn from_orthographic_direction(direction: Vec3A) -> Self {
+        Self {
+            projection: CameraProjection::Orthographic {
+                size: Vec3A::new(100.0, 100.0, 200.0),
+            },
+            view: glam::Mat4::look_at_lh(Vec3::new(0.0, 0.0, 0.0), direction.into(), Vec3::Y),
+        }
     }
 }
 
@@ -651,41 +661,18 @@ pub enum CameraProjection {
     Orthographic {
         /// Size assumes the location is at the center of the camera area.
         size: Vec3A,
-        /// View matrix
-        view: Mat4,
     },
     Projection {
         /// Vertical field of view in degrees.
         vfov: f32,
         /// Near plane distance. All projection uses a infinite far plane.
         near: f32,
-        /// View matrix
-        view: Mat4,
     },
-}
-
-impl CameraProjection {
-    pub fn from_orthographic_direction(direction: Vec3A) -> Self {
-        Self::Orthographic {
-            size: Vec3A::new(100.0, 100.0, 200.0),
-            view: glam::Mat4::look_at_lh(Vec3::new(0.0, 0.0, 0.0), direction.into(), Vec3::Y),
-        }
-    }
-    pub fn view(&self) -> Mat4 {
-        match *self {
-            CameraProjection::Orthographic { view, .. } => view,
-            CameraProjection::Projection { view, .. } => view,
-        }
-    }
 }
 
 impl Default for CameraProjection {
     fn default() -> Self {
-        Self::Projection {
-            vfov: 60.0,
-            near: 0.1,
-            view: Mat4::IDENTITY,
-        }
+        Self::Projection { vfov: 60.0, near: 0.1 }
     }
 }
 

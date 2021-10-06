@@ -16,7 +16,7 @@ impl CameraManager {
     pub fn new(data: Camera, aspect_ratio: Option<f32>) -> Self {
         let aspect_ratio = aspect_ratio.unwrap_or(1.0);
         let proj = compute_projection_matrix(data, aspect_ratio);
-        let view = compute_view_matrix(data);
+        let view = data.view;
         let orig_view = compute_origin_matrix(data);
 
         Self {
@@ -40,7 +40,7 @@ impl CameraManager {
 
     pub fn set_aspect_data(&mut self, data: Camera, aspect_ratio: f32) {
         self.proj = compute_projection_matrix(data, self.aspect_ratio);
-        self.view = compute_view_matrix(data);
+        self.view = data.view;
         self.orig_view = compute_origin_matrix(data);
         self.data = data;
         self.aspect_ratio = aspect_ratio;
@@ -71,10 +71,6 @@ impl CameraManager {
     }
 }
 
-fn compute_view_matrix(data: Camera) -> Mat4 {
-    data.projection.view()
-}
-
 fn compute_projection_matrix(data: Camera, aspect_ratio: f32) -> Mat4 {
     match data.projection {
         CameraProjection::Orthographic { size, .. } => {
@@ -88,7 +84,7 @@ fn compute_projection_matrix(data: Camera, aspect_ratio: f32) -> Mat4 {
 }
 
 fn compute_origin_matrix(data: Camera) -> Mat4 {
-    let mut view = compute_view_matrix(data);
+    let mut view = data.view;
 
     view.w_axis = glam::Vec4::W;
     view

@@ -109,11 +109,8 @@ fn main() {
 
     // Set camera's location
     renderer.set_camera_data(rend3::types::Camera {
-        projection: rend3::types::CameraProjection::Projection {
-            vfov: 60.0,
-            near: 0.1,
-            view,
-        },
+        projection: rend3::types::CameraProjection::Projection { vfov: 60.0, near: 0.1 },
+        view,
     });
 
     // Create a single directional light

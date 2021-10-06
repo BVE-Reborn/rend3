@@ -172,8 +172,8 @@ fn shadow(l: &InternalDirectionalLight, user_camera: &CameraManager) -> ArrayVec
         Camera {
             projection: CameraProjection::Orthographic {
                 size: Vec3A::splat(l.inner.distance),
-                view: Mat4::look_at_lh(camera_location, camera_location + l.inner.direction, glam::Vec3::Y),
             },
+            view: Mat4::look_at_lh(camera_location, camera_location + l.inner.direction, glam::Vec3::Y),
         },
         None,
     ));

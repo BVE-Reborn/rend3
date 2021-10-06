@@ -334,8 +334,8 @@ fn main() {
                 projection: CameraProjection::Projection {
                     vfov: 60.0,
                     near: 0.1,
-                    view
                 },
+                view
             });
 
             // Get a frame
