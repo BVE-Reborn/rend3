@@ -121,9 +121,8 @@ fn main() {
     let _object_handle = renderer.add_object(object);
 
     let view_location = glam::Vec3::new(3.0, 3.0, -5.0);
-    let view_direction: glam::Vec3 =
-        (glam::Mat3A::from_euler(glam::EulerRot::YXZ, -0.55, 0.5, 0.0) * glam::Vec3A::Z).into();
-    let view = glam::Mat4::look_at_lh(view_location, view_location + view_direction, glam::Vec3::Y);
+    let view = glam::Mat4::from_euler(glam::EulerRot::XYZ, -0.55, 0.5, 0.0);
+    let view = view * glam::Mat4::from_translation(-view_location);
 
     // Set camera's location
     renderer.set_camera_data(rend3::types::Camera {

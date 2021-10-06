@@ -203,9 +203,10 @@ fn main() {
 
             timestamp_last_frame = now;
 
-            let forward = Vec3A::new(camera_yaw.sin() * camera_pitch.cos(), -camera_pitch.sin(), camera_yaw.cos() * camera_pitch.cos());
-            let up = Vec3A::Y;
-            let side: Vec3A = forward.cross(up).normalize();
+            let rotation = Mat3A::from_euler(glam::EulerRot::XYZ, -camera_pitch, -camera_yaw, 0.0).transpose();
+            let forward = rotation.z_axis;
+            let up = rotation.y_axis;
+            let side = rotation.x_axis;
             let velocity = if button_pressed(&scancode_status, platform::Scancodes::SHIFT) {
                 100.0
             } else {
@@ -326,9 +327,8 @@ fn main() {
         winit::event::Event::RedrawRequested(..) => {
             // Update camera
 
-            let loc = camera_location.into();
-            let view_direction : Vec3 = (Mat3A::from_euler(glam::EulerRot::YXZ, camera_yaw, camera_pitch, 0.0) * Vec3A::Z).into();
-            let view = Mat4::look_at_lh(loc, loc + view_direction, Vec3::Y);
+            let view  = Mat4::from_euler(glam::EulerRot::XYZ, -camera_pitch, -camera_yaw, 0.0);
+            let view = view * Mat4::from_translation((-camera_location).into());
 
             renderer.set_camera_data(Camera {
                 projection: CameraProjection::Projection {
