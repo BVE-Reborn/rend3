@@ -50,7 +50,7 @@ impl CpuCuller {
         if let Some(sorting) = args.sort {
             profiling::scope!("Sorting");
 
-            let camera_location = args.camera.get_data().location();
+            let camera_location = args.camera.location().into();
 
             match sorting {
                 Sorting::FrontToBack => {

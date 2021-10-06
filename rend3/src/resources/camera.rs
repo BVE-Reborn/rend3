@@ -1,5 +1,5 @@
 use crate::types::{Camera, CameraProjection};
-use glam::{Mat4, Vec3};
+use glam::{Mat4, Vec3, Vec4Swizzles};
 
 /// Manages the camera's location and projection settings.
 #[derive(Debug, Clone)]
@@ -67,7 +67,7 @@ impl CameraManager {
     }
 
     pub fn location(&self) -> Vec3 {
-        self.data.location().into()
+        self.data.view.w_axis.xyz().into()
     }
 }
 

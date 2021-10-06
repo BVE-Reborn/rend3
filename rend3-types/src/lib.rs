@@ -1,4 +1,4 @@
-use glam::{Mat4, UVec2, Vec2, Vec3, Vec3A, Vec4Swizzles};
+use glam::{Mat4, UVec2, Vec2, Vec3, Vec3A};
 use std::{
     fmt::Debug,
     hash::Hash,
@@ -642,9 +642,6 @@ pub struct Camera {
 }
 
 impl Camera {
-    pub fn location(&self) -> Vec3A {
-        self.view.w_axis.xyz().into()
-    }
     pub fn from_orthographic_direction(direction: Vec3A) -> Self {
         Self {
             projection: CameraProjection::Orthographic {
