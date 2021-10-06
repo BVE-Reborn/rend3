@@ -1,7 +1,5 @@
-use glam::{Mat3A, Mat4, UVec2, Vec3, Vec3A};
-
-fn vertex(pos: [f32; 3]) -> Vec3 {
-    Vec3::from(pos)
+fn vertex(pos: [f32; 3]) -> glam::Vec3 {
+    glam::Vec3::from(pos)
 }
 
 fn create_mesh() -> rend3::types::Mesh {
@@ -78,7 +76,7 @@ fn main() {
         &surface,
         &iad.device,
         format,
-        UVec2::new(window_size.width, window_size.height),
+        glam::UVec2::new(window_size.width, window_size.height),
         rend3::types::PresentMode::Mailbox,
     );
 
@@ -89,7 +87,7 @@ fn main() {
     let mut routine = rend3_pbr::PbrRenderRoutine::new(
         &renderer,
         rend3_pbr::RenderTextureOptions {
-            resolution: UVec2::new(window_size.width, window_size.height),
+            resolution: glam::UVec2::new(window_size.width, window_size.height),
             samples: rend3_pbr::SampleCount::Four,
         },
         format,
@@ -122,9 +120,10 @@ fn main() {
     // We need to keep the object handle alive.
     let _object_handle = renderer.add_object(object);
 
-    let view_location = Vec3::new(3.0, 3.0, -5.0);
-    let view_direction: Vec3 = (Mat3A::from_euler(glam::EulerRot::YXZ, -0.55, 0.5, 0.0) * Vec3A::Z).into();
-    let view = Mat4::look_at_lh(view_location, view_location + view_direction, Vec3::Y);
+    let view_location = glam::Vec3::new(3.0, 3.0, -5.0);
+    let view_direction: glam::Vec3 =
+        (glam::Mat3A::from_euler(glam::EulerRot::YXZ, -0.55, 0.5, 0.0) * glam::Vec3A::Z).into();
+    let view = glam::Mat4::look_at_lh(view_location, view_location + view_direction, glam::Vec3::Y);
 
     // Set camera's location
     renderer.set_camera_data(rend3::types::Camera {
@@ -139,10 +138,10 @@ fn main() {
     //
     // We need to keep the directional light handle alive.
     let _directional_handle = renderer.add_directional_light(rend3::types::DirectionalLight {
-        color: Vec3::ONE,
+        color: glam::Vec3::ONE,
         intensity: 10.0,
         // Direction will be normalized
-        direction: Vec3::new(-1.0, -4.0, 2.0),
+        direction: glam::Vec3::new(-1.0, -4.0, 2.0),
         distance: 400.0,
     });
 
@@ -159,13 +158,13 @@ fn main() {
             event: winit::event::WindowEvent::Resized(size),
             ..
         } => {
-            let size = UVec2::new(size.width, size.height);
+            let size = glam::UVec2::new(size.width, size.height);
             // Reconfigure the surface for the new size.
             rend3::configure_surface(
                 &surface,
                 &renderer.device,
                 format,
-                UVec2::new(size.x, size.y),
+                glam::UVec2::new(size.x, size.y),
                 rend3::types::PresentMode::Mailbox,
             );
             // Tell the renderer about the new aspect ratio.
