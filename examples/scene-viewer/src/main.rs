@@ -1,4 +1,4 @@
-use glam::{DVec2, UVec2, Vec3, Vec3A};
+use glam::{DVec2, Mat3A, Mat4, UVec2, Vec3, Vec3A};
 use pico_args::Arguments;
 use rend3::{
     types::{Backend, Camera, CameraProjection, DirectionalLight, Texture, TextureFormat},
@@ -163,15 +163,9 @@ fn main() {
     });
     let mut scancode_status = FastHashMap::default();
 
-    let mut camera_location = Camera {
-        projection: CameraProjection::Projection {
-            vfov: 60.0,
-            near: 0.1,
-            pitch: std::f32::consts::FRAC_PI_4,
-            yaw: -std::f32::consts::FRAC_PI_4,
-        },
-        location: Vec3A::new(20.0, 20.0, -20.0),
-    };
+    let mut camera_pitch = std::f32::consts::FRAC_PI_4;
+    let mut camera_yaw = -std::f32::consts::FRAC_PI_4;
+    let mut camera_location = Vec3A::new(20.0, 20.0, -20.0);
 
     let mut previous_profiling_stats: Option<Vec<GpuTimerScopeResult>> = None;
 
@@ -209,37 +203,32 @@ fn main() {
 
             timestamp_last_frame = now;
 
-            let forward = {
-                if let CameraProjection::Projection { yaw, pitch, .. } = camera_location.projection {
-                    Vec3A::new(yaw.sin() * pitch.cos(), -pitch.sin(), yaw.cos() * pitch.cos())
-                } else {
-                    unreachable!()
-                }
-            };
-            let up = Vec3A::Y;
-            let side: Vec3A = forward.cross(up).normalize();
+            let rotation = Mat3A::from_euler(glam::EulerRot::XYZ, -camera_pitch, -camera_yaw, 0.0).transpose();
+            let forward = rotation.z_axis;
+            let up = rotation.y_axis;
+            let side = rotation.x_axis;
             let velocity = if button_pressed(&scancode_status, platform::Scancodes::SHIFT) {
                 100.0
             } else {
                 1.0
             };
             if button_pressed(&scancode_status, platform::Scancodes::W) {
-                camera_location.location += forward * velocity * delta_time.as_secs_f32();
+                camera_location += forward * velocity * delta_time.as_secs_f32();
             }
             if button_pressed(&scancode_status, platform::Scancodes::S) {
-                camera_location.location -= forward * velocity * delta_time.as_secs_f32();
+                camera_location -= forward * velocity * delta_time.as_secs_f32();
             }
             if button_pressed(&scancode_status, platform::Scancodes::A) {
-                camera_location.location += side * velocity * delta_time.as_secs_f32();
+                camera_location += side * velocity * delta_time.as_secs_f32();
             }
             if button_pressed(&scancode_status, platform::Scancodes::D) {
-                camera_location.location -= side * velocity * delta_time.as_secs_f32();
+                camera_location -= side * velocity * delta_time.as_secs_f32();
             }
             if button_pressed(&scancode_status, platform::Scancodes::Q) {
-                camera_location.location += up * velocity * delta_time.as_secs_f32();
+                camera_location += up * velocity * delta_time.as_secs_f32();
             }
             if button_pressed(&scancode_status, platform::Scancodes::Z) {
-                camera_location.location -= up * velocity * delta_time.as_secs_f32();
+                camera_location -= up * velocity * delta_time.as_secs_f32();
             }
 
             if button_pressed(&scancode_status, platform::Scancodes::P) {
@@ -292,20 +281,16 @@ fn main() {
             };
 
 
-            if let CameraProjection::Projection { ref mut yaw, ref mut pitch, .. } = camera_location.projection {
-                *yaw += (mouse_delta.x / 1000.0) as f32;
-                *pitch += (mouse_delta.y / 1000.0) as f32;
-                if *yaw < 0.0 {
-                    *yaw += TAU;
-                } else if *yaw >= TAU {
-                    *yaw -= TAU;
-                }
-                *pitch = pitch
-                    .max(-std::f32::consts::FRAC_PI_2 + 0.0001)
-                    .min(std::f32::consts::FRAC_PI_2 - 0.0001);
-            } else {
-                unreachable!()
+            camera_yaw += (mouse_delta.x / 1000.0) as f32;
+            camera_pitch += (mouse_delta.y / 1000.0) as f32;
+            if camera_yaw < 0.0 {
+                camera_yaw += TAU;
+            } else if camera_yaw >= TAU {
+                camera_yaw -= TAU;
             }
+            camera_pitch = camera_pitch
+                .max(-std::f32::consts::FRAC_PI_2 + 0.0001)
+                .min(std::f32::consts::FRAC_PI_2 - 0.0001);
         }
         Event::WindowEvent {
             event: WindowEvent::CloseRequested,
@@ -341,7 +326,18 @@ fn main() {
         // Render!
         winit::event::Event::RedrawRequested(..) => {
             // Update camera
-            renderer.set_camera_data(camera_location);
+
+            let view  = Mat4::from_euler(glam::EulerRot::XYZ, -camera_pitch, -camera_yaw, 0.0);
+            let view = view * Mat4::from_translation((-camera_location).into());
+
+            renderer.set_camera_data(Camera {
+                projection: CameraProjection::Projection {
+                    vfov: 60.0,
+                    near: 0.1,
+                },
+                view
+            });
+
             // Get a frame
             let frame = rend3::util::output::OutputFrame::from_surface(&surface).unwrap();
             // Dispatch a render!

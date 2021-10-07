@@ -1,5 +1,5 @@
 use crate::types::{Camera, CameraProjection};
-use glam::{Mat3A, Mat4, Vec3, Vec3A};
+use glam::{Mat4, Vec3, Vec4Swizzles};
 
 /// Manages the camera's location and projection settings.
 #[derive(Debug, Clone)]
@@ -16,7 +16,7 @@ impl CameraManager {
     pub fn new(data: Camera, aspect_ratio: Option<f32>) -> Self {
         let aspect_ratio = aspect_ratio.unwrap_or(1.0);
         let proj = compute_projection_matrix(data, aspect_ratio);
-        let view = compute_view_matrix(data);
+        let view = data.view;
         let orig_view = compute_origin_matrix(data);
 
         Self {
@@ -40,7 +40,7 @@ impl CameraManager {
 
     pub fn set_aspect_data(&mut self, data: Camera, aspect_ratio: f32) {
         self.proj = compute_projection_matrix(data, self.aspect_ratio);
-        self.view = compute_view_matrix(data);
+        self.view = data.view;
         self.orig_view = compute_origin_matrix(data);
         self.data = data;
         self.aspect_ratio = aspect_ratio;
@@ -65,26 +65,10 @@ impl CameraManager {
     pub fn proj(&self) -> Mat4 {
         self.proj
     }
-}
 
-fn compute_look_offset(data: Camera) -> Vec3A {
-    match data.projection {
-        CameraProjection::Projection { pitch, yaw, .. } => {
-            let starting = Vec3A::Z;
-            Mat3A::from_euler(glam::EulerRot::YXZ, yaw, pitch, 0.0) * starting
-        }
-        CameraProjection::Orthographic { direction, .. } => direction,
+    pub fn location(&self) -> Vec3 {
+        self.data.view.w_axis.xyz().into()
     }
-}
-
-fn compute_view_matrix(data: Camera) -> Mat4 {
-    let look_offset = compute_look_offset(data);
-
-    Mat4::look_at_lh(
-        Vec3::from(data.location),
-        Vec3::from(data.location + look_offset),
-        Vec3::Y,
-    )
 }
 
 fn compute_projection_matrix(data: Camera, aspect_ratio: f32) -> Mat4 {
@@ -99,9 +83,9 @@ fn compute_projection_matrix(data: Camera, aspect_ratio: f32) -> Mat4 {
     }
 }
 
-// This is horribly inefficient but is called like once a frame.
 fn compute_origin_matrix(data: Camera) -> Mat4 {
-    let look_offset = compute_look_offset(data);
+    let mut view = data.view;
 
-    Mat4::look_at_lh(Vec3::ZERO, Vec3::from(look_offset), Vec3::Y)
+    view.w_axis = glam::Vec4::W;
+    view
 }

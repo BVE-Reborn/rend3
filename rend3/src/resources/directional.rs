@@ -167,13 +167,13 @@ impl DirectionalLightManager {
 fn shadow(l: &InternalDirectionalLight, user_camera: &CameraManager) -> ArrayVec<CameraManager, 4> {
     let mut cascades = ArrayVec::new();
 
+    let camera_location = user_camera.location();
     cascades.push(CameraManager::new(
         Camera {
             projection: CameraProjection::Orthographic {
                 size: Vec3A::splat(l.inner.distance),
-                direction: l.inner.direction.into(),
             },
-            location: user_camera.get_data().location,
+            view: Mat4::look_at_lh(camera_location, camera_location + l.inner.direction, glam::Vec3::Y),
         },
         None,
     ));
