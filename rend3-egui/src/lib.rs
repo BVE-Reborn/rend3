@@ -1,5 +1,4 @@
-use egui_wgpu_backend::ScreenDescriptor;
-use rend3::{RenderRoutine, Renderer};
+use rend3::{RenderRoutine, Renderer, ManagerReadyOutput};
 use wgpu::{TextureFormat, TextureView};
 
 pub struct EguiRenderRoutine {
@@ -36,7 +35,7 @@ pub struct Input<'a> {
 
 impl EguiRenderRoutine {
     pub fn resize(&mut self, new_width: u32, new_height: u32, new_scale_factor: f32) {
-        self.screen_descriptor = ScreenDescriptor {
+        self.screen_descriptor = egui_wgpu_backend::ScreenDescriptor {
             physical_height: new_height,
             physical_width: new_width,
             scale_factor: new_scale_factor,
@@ -47,9 +46,9 @@ impl EguiRenderRoutine {
 impl RenderRoutine<&Input<'_>, &TextureView> for EguiRenderRoutine {
     fn render(
         &mut self,
-        renderer: std::sync::Arc<rend3::Renderer>,
+        renderer: std::sync::Arc<Renderer>,
         cmd_bufs: flume::Sender<wgpu::CommandBuffer>,
-        _ready: rend3::ManagerReadyOutput,
+        _ready: ManagerReadyOutput,
         input: &Input<'_>,
         output: &TextureView,
     ) {
