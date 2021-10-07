@@ -35,7 +35,7 @@ impl BoundingSphere {
         let center = model_view * self.center.extend(1.0);
 
         Self {
-            center: Vec3::from(center),
+            center: center.truncate(),
             radius: max_scale * self.radius,
         }
     }

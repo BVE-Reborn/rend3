@@ -78,6 +78,8 @@ pub struct MeshManager {
 
 impl MeshManager {
     pub fn new(device: &Device) -> Self {
+        profiling::scope!("MeshManager::new");
+
         let buffers = create_buffers(device, STARTING_VERTICES, STARTING_INDICES);
 
         let vertex_count = STARTING_VERTICES;
@@ -110,6 +112,8 @@ impl MeshManager {
         handle: &MeshHandle,
         mesh: Mesh,
     ) {
+        profiling::scope!("MeshManager::fill");
+
         assert!(mesh.validate());
 
         let vertex_count = mesh.vertex_positions.len();
@@ -195,7 +199,7 @@ impl MeshManager {
     }
 
     pub fn ready(&mut self) {
-        profiling::scope!("Mesh Manager Ready");
+        profiling::scope!("MeshManager::ready");
 
         let vertex_alloc = &mut self.vertex_alloc;
         let index_alloc = &mut self.index_alloc;
@@ -212,6 +216,8 @@ impl MeshManager {
         needed_verts: u32,
         needed_indices: u32,
     ) {
+        profiling::scope!("reallocate mesh buffers");
+
         let new_vert_count = (self.vertex_count + needed_verts as usize).next_power_of_two();
         let new_index_count = (self.index_count + needed_indices as usize).next_power_of_two();
 
@@ -337,6 +343,8 @@ fn copy_vert(
 }
 
 fn create_buffers(device: &Device, vertex_count: usize, index_count: usize) -> MeshBuffers {
+    profiling::scope!("mesh buffers creation");
+
     let position_bytes = vertex_count * VERTEX_POSITION_SIZE;
     let normal_bytes = vertex_count * VERTEX_NORMAL_SIZE;
     let tangent_bytes = vertex_count * VERTEX_TANGENT_SIZE;

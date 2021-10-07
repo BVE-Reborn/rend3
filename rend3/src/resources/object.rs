@@ -39,6 +39,8 @@ pub struct ObjectManager {
 }
 impl ObjectManager {
     pub fn new() -> Self {
+        profiling::scope!("ObjectManager::new");
+
         let registry = ArchetypicalRegistry::new();
 
         Self { registry }

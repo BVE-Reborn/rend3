@@ -16,7 +16,7 @@ path = "src/main.rs"
 # logging
 env_logger = { version = "0.9", default-features = false, features = ["termcolor", "atty"] }
 # Linear algebra library
-glam = "0.18"
+glam = "0.19"
 # Renderer core
 rend3 = { version = "^0.1.0", path = "../../rend3" }
 # Programmable render list that dictates how the scene renders

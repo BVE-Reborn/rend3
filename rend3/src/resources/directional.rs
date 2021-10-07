@@ -57,6 +57,8 @@ pub struct DirectionalLightManager {
 }
 impl DirectionalLightManager {
     pub fn new(device: &Device) -> Self {
+        profiling::scope!("DirectionalLightManager::new");
+
         let registry = ResourceRegistry::new();
 
         let buffer = WrappedPotBuffer::new(
@@ -167,13 +169,13 @@ impl DirectionalLightManager {
 fn shadow(l: &InternalDirectionalLight, user_camera: &CameraManager) -> ArrayVec<CameraManager, 4> {
     let mut cascades = ArrayVec::new();
 
+    let camera_location = user_camera.location();
     cascades.push(CameraManager::new(
         Camera {
             projection: CameraProjection::Orthographic {
                 size: Vec3A::splat(l.inner.distance),
-                direction: l.inner.direction.into(),
             },
-            location: user_camera.get_data().location,
+            view: Mat4::look_at_lh(camera_location, camera_location + l.inner.direction, glam::Vec3::Y),
         },
         None,
     ));
@@ -245,6 +247,8 @@ fn vec_min_max(iter: impl IntoIterator<Item = Vec3A>) -> (Vec3A, Vec3A) {
 }
 
 fn create_shadow_texture(device: &Device, count: u32) -> (TextureView, Vec<Arc<TextureView>>) {
+    profiling::scope!("shadow texture creation");
+
     let texture = device.create_texture(&TextureDescriptor {
         label: Some("shadow texture"),
         size: Extent3d {
@@ -289,6 +293,7 @@ fn create_shadow_texture(device: &Device, count: u32) -> (TextureView, Vec<Arc<T
 }
 
 fn create_shadow_bgl(device: &Device) -> BindGroupLayout {
+    profiling::scope!("shadow bgl creation");
     device.create_bind_group_layout(&BindGroupLayoutDescriptor {
         label: Some("shadow bgl"),
         entries: &[
@@ -320,6 +325,7 @@ fn create_shadow_bgl(device: &Device) -> BindGroupLayout {
 }
 
 fn create_shadow_bg(device: &Device, bgl: &BindGroupLayout, buffer: &Buffer, view: &TextureView) -> BindGroup {
+    profiling::scope!("shadow bg creation");
     BindGroupBuilder::new(Some("shadow bg"))
         .with_buffer(buffer)
         .with_texture_view(view)

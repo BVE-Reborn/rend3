@@ -40,12 +40,12 @@ arrayvec = "0.7"
 bitflags = "1"
 bytemuck = "1"
 flume = "0.10"
-glam = { version = "0.18", features = ["bytemuck"] }
+glam = { version = "0.19", features = ["bytemuck"] }
 indexmap = "1"
 list-any = "0.2"
 log = "0.4"
 num-traits = "0.2"
-parking_lot = { version = "0.11" }
+parking_lot = "0.11.2"
 profiling = {version = "1", default-features = false }
 range-alloc = "0.1"
 rend3-types = { version = "^0.1.0", path = "../rend3-types" }

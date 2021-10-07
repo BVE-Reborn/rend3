@@ -43,17 +43,17 @@ impl PbrBakerRenderRoutine {
             transparency: rend3_pbr::material::TransparencyType::Opaque,
             baking: rend3_pbr::common::forward_pass::Baking::Enabled,
         };
-        let opaque_pipeline = Arc::new(rend3_pbr::common::forward_pass::build_forward_pass_shader(
+        let opaque_pipeline = Arc::new(rend3_pbr::common::forward_pass::build_forward_pass_pipeline(
             pipeline_desc.clone(),
         ));
-        let cutout_pipeline = Arc::new(rend3_pbr::common::forward_pass::build_forward_pass_shader(
+        let cutout_pipeline = Arc::new(rend3_pbr::common::forward_pass::build_forward_pass_pipeline(
             rend3_pbr::common::forward_pass::BuildForwardPassShaderArgs {
                 transparency: rend3_pbr::material::TransparencyType::Opaque,
                 ..pipeline_desc
             },
         ));
 
-        let shadow_pipelines = rend3_pbr::common::depth_pass::build_depth_pass_shader(
+        let shadow_pipelines = rend3_pbr::common::depth_pass::build_depth_pass_pipeline(
             rend3_pbr::common::depth_pass::BuildDepthPassShaderArgs {
                 mode: renderer.mode,
                 device: &renderer.device,

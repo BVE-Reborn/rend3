@@ -1,5 +1,5 @@
 use arrayvec::ArrayVec;
-use rend3::{resources::MaterialManager, ModeData, RendererMode};
+use rend3::{format_sso, resources::MaterialManager, ModeData, RendererMode};
 use wgpu::{
     BindGroupLayout, BlendState, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState, DepthStencilState,
     Device, Face, FragmentState, FrontFace, MultisampleState, PipelineLayoutDescriptor, PolygonMode, PrimitiveState,
@@ -14,7 +14,7 @@ use crate::{
 };
 
 /// Determines if vertices will be projected, or outputted in uv2 space.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum Baking {
     /// output position is uv2 space.
     Enabled,
@@ -40,7 +40,11 @@ pub struct BuildForwardPassShaderArgs<'a> {
     pub baking: Baking,
 }
 
-pub fn build_forward_pass_shader(args: BuildForwardPassShaderArgs<'_>) -> RenderPipeline {
+pub fn build_forward_pass_pipeline(args: BuildForwardPassShaderArgs<'_>) -> RenderPipeline {
+    profiling::scope!(
+        "build forward pass pipeline",
+        &format_sso!("{:?}:samp {:?}:bake {:?}", args.transparency, args.samples, args.baking)
+    );
     let forward_pass_vert = unsafe {
         mode_safe_shader(
             args.device,
@@ -125,7 +129,7 @@ fn build_forward_pass_inner(
             Baking::Enabled => None,
             Baking::Disabled => Some(DepthStencilState {
                 format: TextureFormat::Depth32Float,
-                depth_write_enabled: true,
+                depth_write_enabled: matches!(args.transparency, TransparencyType::Opaque | TransparencyType::Cutout),
                 depth_compare: match args.transparency {
                     TransparencyType::Opaque | TransparencyType::Cutout => CompareFunction::Equal,
                     TransparencyType::Blend => CompareFunction::GreaterEqual,
