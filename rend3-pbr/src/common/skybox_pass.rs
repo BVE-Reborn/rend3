@@ -16,7 +16,8 @@ pub struct BuildSkyboxShaderArgs<'a> {
     pub samples: SampleCount,
 }
 
-pub fn build_skybox_shader(args: BuildSkyboxShaderArgs<'_>) -> RenderPipeline {
+pub fn build_skybox_pipeline(args: BuildSkyboxShaderArgs<'_>) -> RenderPipeline {
+    profiling::scope!("build skybox pipeline");
     let skybox_pass_vert = args.device.create_shader_module(&ShaderModuleDescriptor {
         label: Some("skybox vert"),
         source: wgpu::util::make_spirv(SPIRV_SHADERS.get_file("skybox.vert.spv").unwrap().contents()),

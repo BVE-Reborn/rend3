@@ -8,20 +8,20 @@ use rend3::types::{Material, TextureHandle};
 bitflags::bitflags! {
     /// Flags which shaders use to determine properties of a material
     pub struct MaterialFlags : u32 {
-        const ALBEDO_ACTIVE =      0b0000_0000_0000_0001;
-        const ALBEDO_BLEND =       0b0000_0000_0000_0010;
-        const ALBEDO_VERTEX_SRGB = 0b0000_0000_0000_0100;
-        /// TODO hole
-        const BICOMPONENT_NORMAL = 0b0000_0000_0001_0000;
-        const SWIZZLED_NORMAL =    0b0000_0000_0010_0000;
-        const AOMR_GLTF_COMBINED = 0b0000_0000_0100_0000;
-        const AOMR_GLTF_SPLIT =    0b0000_0000_1000_0000;
-        const AOMR_BW_SPLIT =      0b0000_0001_0000_0000;
-        const CC_GLTF_COMBINED =   0b0000_0010_0000_0000;
-        const CC_GLTF_SPLIT =      0b0000_0100_0000_0000;
-        const CC_BW_SPLIT =        0b0000_1000_0000_0000;
-        const UNLIT =              0b0001_0000_0000_0000;
-        const NEAREST =            0b0010_0000_0000_0000;
+        const ALBEDO_ACTIVE =       0b0000_0000_0000_0001;
+        const ALBEDO_BLEND =        0b0000_0000_0000_0010;
+        const ALBEDO_VERTEX_SRGB =  0b0000_0000_0000_0100;
+        const BICOMPONENT_NORMAL =  0b0000_0000_0000_1000;
+        const SWIZZLED_NORMAL =     0b0000_0000_0001_0000;
+        const AOMR_COMBINED =       0b0000_0000_0010_0000;
+        const AOMR_SWIZZLED_SPLIT = 0b0000_0000_0100_0000;
+        const AOMR_SPLIT =          0b0000_0000_1000_0000;
+        const AOMR_BW_SPLIT =       0b0000_0001_0000_0000;
+        const CC_GLTF_COMBINED =    0b0000_0010_0000_0000;
+        const CC_GLTF_SPLIT =       0b0000_0100_0000_0000;
+        const CC_BW_SPLIT =         0b0000_1000_0000_0000;
+        const UNLIT =               0b0001_0000_0000_0000;
+        const NEAREST =             0b0010_0000_0000_0000;
     }
 }
 
@@ -208,14 +208,20 @@ impl NormalTexture {
 #[derive(Debug, Clone)]
 pub enum AoMRTextures {
     None,
-    GltfCombined {
+    Combined {
         /// Texture with Ambient Occlusion in R, Metallic in G, and Roughness in B
         texture: Option<TextureHandle>,
     },
-    GltfSplit {
+    SwizzledSplit {
         /// Texture with Ambient Occlusion in R
         ao_texture: Option<TextureHandle>,
         /// Texture with Metallic in G, and Roughness in B
+        mr_texture: Option<TextureHandle>,
+    },
+    Split {
+        /// Texture with Ambient Occlusion in R
+        ao_texture: Option<TextureHandle>,
+        /// Texture with Metallic in R, and Roughness in G
         mr_texture: Option<TextureHandle>,
     },
     BWSplit {
@@ -234,10 +240,14 @@ impl AoMRTextures {
         Func: FnOnce(&TextureHandle) -> Out,
     {
         match *self {
-            Self::GltfCombined {
+            Self::Combined {
                 texture: Some(ref texture),
             } => Some(func(texture)),
-            Self::GltfSplit {
+            Self::SwizzledSplit {
+                mr_texture: Some(ref texture),
+                ..
+            } => Some(func(texture)),
+            Self::Split {
                 mr_texture: Some(ref texture),
                 ..
             } => Some(func(texture)),
@@ -254,8 +264,9 @@ impl AoMRTextures {
         Func: FnOnce(&TextureHandle) -> Out,
     {
         match *self {
-            Self::GltfCombined { .. } => None,
-            Self::GltfSplit { .. } => None,
+            Self::Combined { .. } => None,
+            Self::SwizzledSplit { .. } => None,
+            Self::Split { .. } => None,
             Self::BWSplit {
                 m_texture: Some(ref texture),
                 ..
@@ -269,8 +280,12 @@ impl AoMRTextures {
         Func: FnOnce(&TextureHandle) -> Out,
     {
         match *self {
-            Self::GltfCombined { .. } => None,
-            Self::GltfSplit {
+            Self::Combined { .. } => None,
+            Self::SwizzledSplit {
+                ao_texture: Some(ref texture),
+                ..
+            } => Some(func(texture)),
+            Self::Split {
                 ao_texture: Some(ref texture),
                 ..
             } => Some(func(texture)),
@@ -284,11 +299,12 @@ impl AoMRTextures {
 
     pub fn to_flags(&self) -> MaterialFlags {
         match self {
-            Self::GltfCombined { .. } => MaterialFlags::AOMR_GLTF_COMBINED,
-            Self::GltfSplit { .. } => MaterialFlags::AOMR_GLTF_SPLIT,
+            Self::Combined { .. } => MaterialFlags::AOMR_COMBINED,
+            Self::SwizzledSplit { .. } => MaterialFlags::AOMR_SWIZZLED_SPLIT,
+            Self::Split { .. } => MaterialFlags::AOMR_SPLIT,
             Self::BWSplit { .. } => MaterialFlags::AOMR_BW_SPLIT,
-            // Use AOMR_GLTF_COMBINED so shader only checks roughness texture, then bails
-            Self::None => MaterialFlags::AOMR_GLTF_COMBINED,
+            // Use AOMR_COMBINED so shader only checks roughness texture, then bails
+            Self::None => MaterialFlags::AOMR_COMBINED,
         }
     }
 }

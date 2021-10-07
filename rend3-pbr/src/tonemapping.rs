@@ -38,6 +38,7 @@ pub struct TonemappingPass {
 }
 impl TonemappingPass {
     pub fn new(args: TonemappingPassNewArgs<'_>) -> Self {
+        profiling::scope!("TonemappingPass::new");
         let blit_vert = args.device.create_shader_module(&ShaderModuleDescriptor {
             label: Some("tonemapping vert"),
             source: wgpu::util::make_spirv(SPIRV_SHADERS.get_file("blit.vert.spv").unwrap().contents()),

@@ -32,6 +32,8 @@ pub struct ShaderInterfaces {
 
 impl ShaderInterfaces {
     pub fn new(device: &Device) -> Self {
+        profiling::scope!("ShaderInterfaces::new");
+
         let samplers_bgl = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
             label: Some("samplers bgl"),
             entries: &[

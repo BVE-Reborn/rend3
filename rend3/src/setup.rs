@@ -7,7 +7,8 @@ use wgpu::{
 };
 
 use crate::{
-    resources::STARTING_2D_TEXTURES, util::typedefs::FastHashMap, LimitType, RendererInitializationError, RendererMode,
+    format_sso, resources::STARTING_2D_TEXTURES, util::typedefs::FastHashMap, LimitType, RendererInitializationError,
+    RendererMode,
 };
 
 /// Largest uniform buffer binding needed to run rend3.
@@ -347,6 +348,7 @@ pub async fn create_iad(
     desired_device: Option<String>,
     desired_mode: Option<RendererMode>,
 ) -> Result<InstanceAdapterDevice, RendererInitializationError> {
+    profiling::scope!("create_iad");
     let backend_bits = Backends::VULKAN | Backends::DX12 | Backends::DX11 | Backends::METAL | Backends::GL;
     let default_backend_order = [
         Backend::Vulkan,
@@ -361,6 +363,7 @@ pub async fn create_iad(
     let mut valid_adapters = FastHashMap::default();
 
     for backend in &default_backend_order {
+        profiling::scope!("enumerating backend", &format_sso!("{:?}", backend));
         let adapters = instance.enumerate_adapters(Backends::from(*backend));
 
         let mut potential_adapters = ArrayVec::<PotentialAdapter<Adapter>, 4>::new();

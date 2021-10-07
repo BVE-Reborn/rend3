@@ -54,6 +54,16 @@ impl<HandleType, Metadata> ArchitypicalErasedRegistry<HandleType, Metadata> {
         ResourceHandle::new(idx)
     }
 
+    pub fn ensure_archetype<T: Send + Sync + 'static>(&mut self) {
+        let type_id = TypeId::of::<T>();
+        self.archetype_map.entry(type_id).or_insert_with(|| Archetype {
+            vec: VecAny::new::<T>(),
+            non_erased: Vec::new(),
+            remove_all_dead: remove_all_dead::<T, Metadata>,
+            remove_single: remove_single::<T, Metadata>,
+        });
+    }
+
     pub fn insert<T: Send + Sync + 'static>(
         &mut self,
         handle: &ResourceHandle<HandleType>,
@@ -119,6 +129,10 @@ impl<HandleType, Metadata> ArchitypicalErasedRegistry<HandleType, Metadata> {
         for archetype in self.archetype_map.values_mut() {
             (archetype.remove_all_dead)(&mut archetype.vec, &mut archetype.non_erased, &mut self.handle_map);
         }
+    }
+
+    pub fn count(&self) -> usize {
+        self.handle_map.len()
     }
 
     pub fn get_ref<T: Send + Sync + 'static>(&self, handle: RawResourceHandle<HandleType>) -> &T {

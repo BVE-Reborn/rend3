@@ -163,6 +163,8 @@ fn main() {
             let frame = rend3::util::output::OutputFrame::from_surface(&surface).unwrap();
             // Dispatch a render!
             let _stats = renderer.render(&mut routine, (), frame.as_view());
+            // Present the frame on screen
+            frame.present();
         }
         // Other events we don't care about
         _ => {}

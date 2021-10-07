@@ -15,11 +15,11 @@ arrayvec = "0.7"
 bitflags = "1"
 bytemuck = "1"
 flume = "0.10"
-glam = { version = "0.19.0", features = ["bytemuck"] }
+glam = { version = "0.19", features = ["bytemuck"] }
 include_dir = "0.6"
 log = "0.4"
 ordered-float = "2"
-parking_lot = { version = "0.11" }
+parking_lot = "0.11.2"
 profiling = {version = "1", default-features = false }
 rend3 = { version = "^0.1.0", path = "../rend3" }
 wgpu = { version = "0.10", features = ["spirv"] }

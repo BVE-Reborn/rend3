@@ -40,7 +40,8 @@ pub struct DepthPassPipelines {
     pub opaque: Arc<RenderPipeline>,
 }
 
-pub fn build_depth_pass_shader(args: BuildDepthPassShaderArgs) -> DepthPassPipelines {
+pub fn build_depth_pass_pipeline(args: BuildDepthPassShaderArgs) -> DepthPassPipelines {
+    profiling::scope!("build depth pass pipelines");
     let depth_vert = unsafe {
         mode_safe_shader(
             args.device,
@@ -94,14 +95,20 @@ pub fn build_depth_pass_shader(args: BuildDepthPassShaderArgs) -> DepthPassPipel
             &pll,
             &depth_vert,
             &depth_opaque_frag,
-            "depth opaque prepass",
+            match args.ty {
+                DepthPassType::Prepass => "depth opaque prepass",
+                DepthPassType::Shadow => "depth opaque prepass",
+            },
         )),
         cutout: Arc::new(create_depth_inner(
             &args,
             &pll,
             &depth_vert,
             &depth_cutout_frag,
-            "depth cutout prepass",
+            match args.ty {
+                DepthPassType::Prepass => "depth cutout prepass",
+                DepthPassType::Shadow => "depth cutout prepass",
+            },
         )),
     }
 }
@@ -113,6 +120,7 @@ fn create_depth_inner(
     frag: &wgpu::ShaderModule,
     name: &str,
 ) -> RenderPipeline {
+    profiling::scope!("build depth pipeline", name);
     let color_state = [ColorTargetState {
         format: TextureFormat::Rgba16Float,
         blend: None,

@@ -13,6 +13,8 @@ pub fn create_renderer(
     iad: InstanceAdapterDevice,
     aspect_ratio: Option<f32>,
 ) -> Result<Arc<Renderer>, RendererInitializationError> {
+    profiling::scope!("Renderer::new");
+
     let features = iad.device.features();
     let limits = iad.device.limits();
 

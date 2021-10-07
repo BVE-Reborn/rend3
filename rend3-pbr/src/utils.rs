@@ -45,6 +45,7 @@ pub struct RenderTextures {
 }
 impl RenderTextures {
     pub fn new(device: &Device, options: RenderTextureOptions) -> Self {
+        profiling::scope!("RenderTextures::new");
         Self {
             color: create_internal_color_buffer(
                 device,
