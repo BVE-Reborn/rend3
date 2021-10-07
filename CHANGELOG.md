@@ -46,6 +46,7 @@ In a 50k object scene, the render loop went from taking 16ms to taking 1.75ms, a
 - rend3: AddTexture* will now create/upload the texture before the call returns.
 - rend3: ResourceHandle<T> now prints the actual reference count while debug printing.
 - rend3: `CameraProjection` now deals with view matrix, instead of location/yaw/pitch @scoopr
+- rend3: Update to glam 0.19 @scoopr
 - rend3 & rend3-gltf: update to wgpu 0.11
 - rend3-pbr: Input is of type `()` and Output is type `&TextureView`.
 - rend3-gltf: Added labels to all the different data types.
