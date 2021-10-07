@@ -1,12 +1,12 @@
 use crate::types::{Camera, CameraProjection};
-use glam::{Mat4, Vec3, Vec4Swizzles};
+use glam::{Mat4, Vec3};
 
 /// Manages the camera's location and projection settings.
 #[derive(Debug, Clone)]
 pub struct CameraManager {
     orig_view: Mat4,
-    view: Mat4,
     proj: Mat4,
+    inv_view: Mat4,
     data: Camera,
     aspect_ratio: f32,
 }
@@ -18,13 +18,12 @@ impl CameraManager {
 
         let aspect_ratio = aspect_ratio.unwrap_or(1.0);
         let proj = compute_projection_matrix(data, aspect_ratio);
-        let view = data.view;
         let orig_view = compute_origin_matrix(data);
 
         Self {
             orig_view,
-            view,
             proj,
+            inv_view: data.view.inverse(),
             data,
             aspect_ratio,
         }
@@ -42,8 +41,8 @@ impl CameraManager {
 
     pub fn set_aspect_data(&mut self, data: Camera, aspect_ratio: f32) {
         self.proj = compute_projection_matrix(data, self.aspect_ratio);
-        self.view = data.view;
         self.orig_view = compute_origin_matrix(data);
+        self.inv_view = data.view.inverse();
         self.data = data;
         self.aspect_ratio = aspect_ratio;
     }
@@ -53,11 +52,11 @@ impl CameraManager {
     }
 
     pub fn view(&self) -> Mat4 {
-        self.view
+        self.data.view
     }
 
     pub fn view_proj(&self) -> Mat4 {
-        self.proj * self.view
+        self.proj * self.data.view
     }
 
     pub fn origin_view_proj(&self) -> Mat4 {
@@ -69,7 +68,7 @@ impl CameraManager {
     }
 
     pub fn location(&self) -> Vec3 {
-        self.data.view.w_axis.xyz()
+        self.inv_view.w_axis.truncate()
     }
 }
 

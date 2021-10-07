@@ -247,6 +247,10 @@ impl AoMRTextures {
                 mr_texture: Some(ref texture),
                 ..
             } => Some(func(texture)),
+            Self::Split {
+                mr_texture: Some(ref texture),
+                ..
+            } => Some(func(texture)),
             Self::BWSplit {
                 r_texture: Some(ref texture),
                 ..
@@ -262,6 +266,7 @@ impl AoMRTextures {
         match *self {
             Self::Combined { .. } => None,
             Self::SwizzledSplit { .. } => None,
+            Self::Split { .. } => None,
             Self::BWSplit {
                 m_texture: Some(ref texture),
                 ..
@@ -277,6 +282,10 @@ impl AoMRTextures {
         match *self {
             Self::Combined { .. } => None,
             Self::SwizzledSplit {
+                ao_texture: Some(ref texture),
+                ..
+            } => Some(func(texture)),
+            Self::Split {
                 ao_texture: Some(ref texture),
                 ..
             } => Some(func(texture)),
