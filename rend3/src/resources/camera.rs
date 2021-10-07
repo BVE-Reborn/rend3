@@ -67,7 +67,7 @@ impl CameraManager {
     }
 
     pub fn location(&self) -> Vec3 {
-        self.data.view.w_axis.xyz().into()
+        self.data.view.w_axis.xyz()
     }
 }
 
