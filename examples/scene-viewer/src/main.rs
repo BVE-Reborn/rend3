@@ -206,7 +206,7 @@ fn main() {
             let rotation = Mat3A::from_euler(glam::EulerRot::XYZ, -camera_pitch, -camera_yaw, 0.0).transpose();
             let forward = rotation.z_axis;
             let up = rotation.y_axis;
-            let side = rotation.x_axis;
+            let side = -rotation.x_axis;
             let velocity = if button_pressed(&scancode_status, platform::Scancodes::SHIFT) {
                 100.0
             } else {
