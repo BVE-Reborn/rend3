@@ -1,5 +1,7 @@
 use arrayvec::ArrayVec;
-use rend3::{format_sso, resources::MaterialManager, ModeData, RendererMode};
+#[allow(unused_imports)]
+use rend3::format_sso;
+use rend3::{resources::MaterialManager, ModeData, RendererMode};
 use wgpu::{
     BindGroupLayout, BlendState, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState, DepthStencilState,
     Device, Face, FragmentState, FrontFace, MultisampleState, PipelineLayoutDescriptor, PolygonMode, PrimitiveState,
