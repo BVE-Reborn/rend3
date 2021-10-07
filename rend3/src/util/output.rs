@@ -38,11 +38,8 @@ impl OutputFrame {
     }
 
     pub fn present(self) {
-        match self {
-            Self::Surface { surface, .. } => {
-                surface.present();
-            }
-            _ => {}
+        if let Self::Surface { surface, .. } = self {
+            surface.present();
         }
     }
 }
