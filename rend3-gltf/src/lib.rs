@@ -173,7 +173,7 @@ pub async fn filesystem_io_func(parent_director: impl AsRef<Path>, uri: SsoStrin
 pub async fn load_gltf<F, Fut, E>(
     renderer: &Renderer,
     data: &[u8],
-    mut io_func: F,
+    io_func: F,
 ) -> Result<LoadedGltfScene, GltfLoadError<E>>
 where
     F: FnMut(SsoString) -> Fut,
@@ -181,30 +181,18 @@ where
     E: std::error::Error + 'static,
 {
     profiling::scope!("loading gltf");
+
     let mut file = {
         profiling::scope!("parsing gltf");
         gltf::Gltf::from_slice_without_validation(data)?
     };
-    let blob = file.blob.take();
 
-    let buffers = load_buffers(file.buffers(), blob, &mut io_func).await?;
-
-    let default_material = load_default_material(renderer);
-    let meshes = load_meshes(renderer, file.meshes(), &buffers)?;
-    let (materials, images) = load_materials_and_textures(renderer, file.materials(), &buffers, &mut io_func).await?;
+    let mut loaded = load_gltf_data(renderer, &mut file, io_func).await?;
 
     let scene = file
         .default_scene()
         .or_else(|| file.scenes().next())
         .ok_or(GltfLoadError::MissingScene)?;
-
-    let mut loaded = LoadedGltfScene {
-        meshes,
-        materials,
-        default_material,
-        images,
-        nodes: Vec::with_capacity(scene.nodes().len()),
-    };
 
     loaded.nodes = load_gltf_nodes(
         renderer,
@@ -216,49 +204,101 @@ where
     Ok(loaded)
 }
 
-fn load_gltf_nodes<'a, E: std::error::Error + 'static>(
+/// Load a given gltf's data, like meshes and materials, without yet adding
+/// any of the nodes to the scene.
+///
+/// Allows the user to specify how URIs are resolved into their underlying data. Supports most gltfs and glbs.
+///
+/// **Must** keep the [`LoadedGltfScene`] alive for the meshes and materials
+pub async fn load_gltf_data<F, Fut, E>(
+    renderer: &Renderer,
+    file: &mut gltf::Gltf,
+    mut io_func: F,
+) -> Result<LoadedGltfScene, GltfLoadError<E>>
+where
+    F: FnMut(SsoString) -> Fut,
+    Fut: Future<Output = Result<Vec<u8>, E>>,
+    E: std::error::Error + 'static,
+{
+    profiling::scope!("loading gltf data");
+    let blob = file.blob.take();
+
+    let buffers = load_buffers(file.buffers(), blob, &mut io_func).await?;
+
+    let default_material = load_default_material(renderer);
+    let meshes = load_meshes(renderer, file.meshes(), &buffers)?;
+    let (materials, images) = load_materials_and_textures(renderer, file.materials(), &buffers, &mut io_func).await?;
+
+    let loaded = LoadedGltfScene {
+        meshes,
+        materials,
+        default_material,
+        images,
+        nodes: Vec::new(),
+    };
+
+    Ok(loaded)
+}
+
+/// Adds a single mesh from the [`LoadedGltfScene`] found by its index,
+/// as an object to the scene.
+pub fn add_mesh_by_index<E: std::error::Error + 'static>(
+    renderer: &Renderer,
+    loaded: &mut LoadedGltfScene,
+    mesh_index: usize,
+    name: Option<&str>,
+    transform: Mat4,
+) -> Result<Labeled<Object>, GltfLoadError<E>> {
+    let mesh_handle = loaded
+        .meshes
+        .get(mesh_index)
+        .ok_or(GltfLoadError::MissingMesh(mesh_index))?;
+    let primitives: Result<Vec<_>, GltfLoadError<_>> = mesh_handle
+        .inner
+        .primitives
+        .iter()
+        .map(|prim| {
+            let mat_idx = prim.material;
+            let mat = mat_idx
+                .map_or_else(
+                    || Some(&loaded.default_material),
+                    |mat_idx| loaded.materials.get(mat_idx).map(|m| &m.inner),
+                )
+                .ok_or_else(|| GltfLoadError::MissingMaterial(mat_idx.expect("Could not find default material")))?;
+            Ok(renderer.add_object(types::Object {
+                mesh: prim.handle.clone(),
+                material: mat.clone(),
+                transform,
+            }))
+        })
+        .collect();
+    Ok(Labeled::new(
+        Object {
+            primitives: primitives?,
+        },
+        name,
+    ))
+}
+
+pub fn load_gltf_nodes<'a, E: std::error::Error + 'static>(
     renderer: &Renderer,
     loaded: &mut LoadedGltfScene,
     nodes: impl Iterator<Item = gltf::Node<'a>>,
     parent_transform: Mat4,
 ) -> Result<Vec<Labeled<Node>>, GltfLoadError<E>> {
-    let mut final_nodes = Vec::new();
+    let mut final_nodes = Vec::with_capacity(nodes.size_hint().0);
     for node in nodes {
         let local_transform = Mat4::from_cols_array_2d(&node.transform().matrix());
         let transform = parent_transform * local_transform;
 
         let object = if let Some(mesh) = node.mesh() {
-            let mesh_handle = loaded
-                .meshes
-                .get(mesh.index())
-                .ok_or_else(|| GltfLoadError::MissingMesh(mesh.index()))?;
-            let primitives: Result<Vec<_>, GltfLoadError<_>> = mesh_handle
-                .inner
-                .primitives
-                .iter()
-                .map(|prim| {
-                    let mat_idx = prim.material;
-                    let mat = mat_idx
-                        .map_or_else(
-                            || Some(&loaded.default_material),
-                            |mat_idx| loaded.materials.get(mat_idx).map(|m| &m.inner),
-                        )
-                        .ok_or_else(|| {
-                            GltfLoadError::MissingMaterial(mat_idx.expect("Could not find default material"))
-                        })?;
-                    Ok(renderer.add_object(types::Object {
-                        mesh: prim.handle.clone(),
-                        material: mat.clone(),
-                        transform,
-                    }))
-                })
-                .collect();
-            Some(Labeled::new(
-                Object {
-                    primitives: primitives?,
-                },
+            Some(add_mesh_by_index(
+                renderer,
+                loaded,
+                mesh.index(),
                 mesh.name(),
-            ))
+                transform,
+            )?)
         } else {
             None
         };
