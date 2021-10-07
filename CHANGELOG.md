@@ -37,6 +37,7 @@ In a 50k object scene, the render loop went from taking 16ms to taking 1.75ms, a
 - rend3-pbr-bake: Added crate for automatic light baking to a texture.
 
 ### Changed
+- rend3: IMPORTANT: You now must call output.present() in order for things to show up on screen.
 - rend3: `Material` is now a trait and render routines can specify their own material.
   - `rend3::types::Material` is now `rend3_pbr::material::PbrMaterial`
   - `Renderer::update_material` no longer takes a `MaterialChange`, it takes a completely new material.

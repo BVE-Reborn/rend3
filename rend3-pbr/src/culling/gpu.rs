@@ -11,7 +11,7 @@ use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
     BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType,
     Buffer, BufferBindingType, BufferDescriptor, BufferUsages, CommandEncoder, ComputePassDescriptor, ComputePipeline,
-    ComputePipelineDescriptor, Device, PipelineLayoutDescriptor, PushConstantRange, RenderPass,
+    ComputePipelineDescriptor, Device, PipelineLayoutDescriptor, PushConstantRange, RenderPass, ShaderModuleDescriptor,
     ShaderModuleDescriptorSpirV, ShaderStages,
 };
 
@@ -218,35 +218,25 @@ impl GpuCuller {
             })
         };
 
-        let prefix_cull_sm = unsafe {
-            device.create_shader_module_spirv(&ShaderModuleDescriptorSpirV {
-                label: Some("cull-prefix-cull"),
-                source: wgpu::util::make_spirv_raw(
-                    SPIRV_SHADERS.get_file("cull-prefix-cull.comp.spv").unwrap().contents(),
-                ),
-            })
-        };
+        let prefix_cull_sm = device.create_shader_module(&ShaderModuleDescriptor {
+            label: Some("cull-prefix-cull"),
+            source: wgpu::util::make_spirv(SPIRV_SHADERS.get_file("cull-prefix-cull.comp.spv").unwrap().contents()),
+        });
 
-        let prefix_sum_sm = unsafe {
-            device.create_shader_module_spirv(&ShaderModuleDescriptorSpirV {
-                label: Some("cull-prefix-sum"),
-                source: wgpu::util::make_spirv_raw(
-                    SPIRV_SHADERS.get_file("cull-prefix-sum.comp.spv").unwrap().contents(),
-                ),
-            })
-        };
+        let prefix_sum_sm = device.create_shader_module(&ShaderModuleDescriptor {
+            label: Some("cull-prefix-sum"),
+            source: wgpu::util::make_spirv(SPIRV_SHADERS.get_file("cull-prefix-sum.comp.spv").unwrap().contents()),
+        });
 
-        let prefix_output_sm = unsafe {
-            device.create_shader_module_spirv(&ShaderModuleDescriptorSpirV {
-                label: Some("cull-prefix-output"),
-                source: wgpu::util::make_spirv_raw(
-                    SPIRV_SHADERS
-                        .get_file("cull-prefix-output.comp.spv")
-                        .unwrap()
-                        .contents(),
-                ),
-            })
-        };
+        let prefix_output_sm = device.create_shader_module(&ShaderModuleDescriptor {
+            label: Some("cull-prefix-output"),
+            source: wgpu::util::make_spirv(
+                SPIRV_SHADERS
+                    .get_file("cull-prefix-output.comp.spv")
+                    .unwrap()
+                    .contents(),
+            ),
+        });
 
         let atomic_pipeline = device.create_compute_pipeline(&ComputePipelineDescriptor {
             label: Some("atomic culling pl"),
