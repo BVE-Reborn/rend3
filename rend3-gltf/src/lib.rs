@@ -244,7 +244,7 @@ where
 /// as an object to the scene.
 pub fn add_mesh_by_index<E: std::error::Error + 'static>(
     renderer: &Renderer,
-    loaded: &mut LoadedGltfScene,
+    loaded: &LoadedGltfScene,
     mesh_index: usize,
     name: Option<&str>,
     transform: Mat4,
