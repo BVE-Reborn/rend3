@@ -30,15 +30,10 @@ jobs:
           default: true
           override: true
 
-      - uses: actions/cache@v2
+      - name: caching
+        uses: Swatinem/rust-cache@v1
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ matrix.os }}-${{ steps.setup-rust.outputs.rustc_hash }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ matrix.os }}-${{ steps.setup-rust.outputs.rustc_hash }}
+          key: ${{ matrix.target }}-a # suffix for cache busting
 
       - uses: actions-rs/cargo@v1
         with:
