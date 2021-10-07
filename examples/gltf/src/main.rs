@@ -14,7 +14,7 @@ fn load_gltf(
         .read_tangents()
         .unwrap()
         .map(glam::Vec4::from)
-        .map(From::from)
+        .map(glam::Vec4::truncate)
         .collect();
     let vertex_uvs: Vec<_> = reader
         .read_tex_coords(0)
