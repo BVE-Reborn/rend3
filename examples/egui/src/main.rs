@@ -87,15 +87,20 @@ fn main() {
     // We need to keep the object handle alive.
     let _object_handle = renderer.add_object(object);
 
-    // Set camera's location
+    let camera_pitch = std::f32::consts::FRAC_PI_4;
+    let camera_yaw = -std::f32::consts::FRAC_PI_4;
+    // These values may seem arbitrary, but they center the camera on the cube in the scene
+    let camera_location = glam::Vec3A::new(10.0, 15.0, -10.0);
+    let view  = glam::Mat4::from_euler(glam::EulerRot::XYZ, -camera_pitch, -camera_yaw, 0.0);
+    let view = view * glam::Mat4::from_translation((-camera_location).into());
+
+    // Set camera location data
     renderer.set_camera_data(rend3::types::Camera {
         projection: rend3::types::CameraProjection::Projection {
             vfov: 60.0,
             near: 0.1,
-            pitch: 0.5,
-            yaw: -0.55,
         },
-        location: glam::Vec3A::new(3.0, 3.0, -5.0),
+        view
     });
 
     // Create a single directional light
@@ -181,6 +186,8 @@ fn main() {
 
                 let _stats = renderer.render(&mut pbr_routine, (), frame.as_view());
                 let _stats = renderer.render(&mut routine, &input, frame.as_view());
+
+                frame.present();
 
                 *control_flow = ControlFlow::Poll;
             }
