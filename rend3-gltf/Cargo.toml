@@ -10,16 +10,17 @@ keywords = ["3d", "graphics", "gltf", "loading", "rend3"]
 categories = ["game-development", "graphics", "parser-implementations", "rendering", "rendering::engine"]
 
 [features]
-default = ["image/default"]
+default = ["image/default", "ddsfile", "ktx2"]
 
 [dependencies]
 arrayvec = "0.7"
 base64 = "0.13"
 bytemuck = "1"
+ddsfile = { version = "0.4", optional = true }
 glam = "0.19"
 gltf = { version = "0.16", default-features = false, features = ["KHR_lights_punctual", "KHR_texture_transform", "KHR_materials_unlit", "extras", "names", "utils"] }
 image = { version = "0.23", default-features = false }
-ktx2 = "0.2"
+ktx2 = { version = "0.2", optional = true }
 log = "0.4"
 profiling = {version = "1", default-features = false }
 rend3 = { version = "^0.1.0", path = "../rend3" }

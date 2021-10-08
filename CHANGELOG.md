@@ -33,6 +33,7 @@ In a 50k object scene, the render loop went from taking 16ms to taking 1.75ms, a
 ### Added
 - rend3: Added an explicit dependency on wgpu-core and wgpu-hal to ensure bug-fixes are included.
 - rend3-gltf: Add the ability to turn off image's default features.
+- rend3-gltf: Add support for ktx2 and dds images.
 - rend3-gltf: Expose implementation functions
 - rend3-pbr-bake: Added crate for automatic light baking to a texture.
 
