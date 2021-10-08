@@ -24,7 +24,7 @@ use rend3::{
     Renderer,
 };
 use rend3_pbr::material;
-use std::{borrow::Cow, collections::hash_map::Entry, future::Future, num::NonZeroU32, path::Path};
+use std::{borrow::Cow, collections::hash_map::Entry, future::Future, path::Path};
 use thiserror::Error;
 
 /// Wrapper around a T that stores an optional label.
@@ -119,8 +119,19 @@ pub enum GltfLoadError<E: std::error::Error + 'static> {
     TextureIo(SsoString, #[source] E),
     #[error("Texture {0} failed to be loaded as an image")]
     TextureDecode(SsoString, #[source] image::ImageError),
-    #[error("Texture {0} failed to be loaded as a ktx2 format due to incompatible format {1:?}")]
+    #[cfg(feature = "ddsfile")]
+    #[error("Texture {0} failed to be loaded as a ddsfile due to incompatible dxgi format {1:?}")]
+    TextureBadDxgiFormat(SsoString, ddsfile::DxgiFormat),
+    #[cfg(feature = "ddsfile")]
+    #[error("Texture {0} failed to be loaded as a ddsfile due to incompatible d3d format {1:?}")]
+    TextureBadD3DFormat(SsoString, ddsfile::D3DFormat),
+    #[cfg(feature = "ktx2")]
+    #[error("Texture {0} failed to be loaded as a ktx2 file due to incompatible format {1:?}")]
     TextureBadKxt2Format(SsoString, ktx2::Format),
+    #[error("Texture {0} failed to be loaded as it has 0 levels")]
+    TextureZeroLevels(SsoString),
+    #[error("Texture {0} failed to be loaded as it has 0 layers")]
+    TextureZeroLayers(SsoString),
     #[error("Gltf file must have at least one scene")]
     MissingScene,
     #[error("Mesh {0} does not have positions")]
@@ -683,15 +694,25 @@ where
         }
     };
 
-    let texture = if let Ok(reader) = ktx2::Reader::new(&data) {
+    let mut uri = Some(uri);
+    let mut texture = None;
+
+    #[cfg(feature = "ktx2")]
+    if let Ok(reader) = ktx2::Reader::new(&data) {
         profiling::scope!("parsing ktx2");
 
         let header = reader.header();
 
         let src_format = header.format.unwrap();
-        let format = util::map_ktx2_format(src_format, srgb).ok_or_else(|| {
-            GltfLoadError::TextureBadKxt2Format(image.name().map(SsoString::from).unwrap_or_default(), src_format)
-        })?;
+        let format = util::map_ktx2_format(src_format, srgb)
+            .ok_or_else(|| GltfLoadError::TextureBadKxt2Format(uri.take().unwrap(), src_format))?;
+
+        if header.level_count == 0 {
+            return Err(GltfLoadError::TextureZeroLevels(uri.take().unwrap()));
+        }
+        if header.layer_count == 0 {
+            return Err(GltfLoadError::TextureZeroLayers(uri.take().unwrap()));
+        }
 
         let guaranteed_format = format.describe().guaranteed_format_features;
         let generate = header.level_count == 1
@@ -700,7 +721,7 @@ where
                 rend3::types::TextureUsages::TEXTURE_BINDING | rend3::types::TextureUsages::RENDER_ATTACHMENT,
             );
 
-        types::Texture {
+        texture = Some(types::Texture {
             label: image.name().map(str::to_owned),
             format,
             size: UVec2::new(header.pixel_width, header.pixel_height),
@@ -708,29 +729,87 @@ where
             mip_count: if generate {
                 types::MipmapCount::Maximum
             } else {
-                types::MipmapCount::Specific(NonZeroU32::new(header.level_count).unwrap())
+                types::MipmapCount::Specific(std::num::NonZeroU32::new(header.level_count).unwrap())
             },
             mip_source: if generate {
                 types::MipmapSource::Generated
             } else {
                 types::MipmapSource::Uploaded
             },
+        })
+    }
+
+    #[cfg(feature = "ddsfile")]
+    if texture.is_none() {
+        if let Ok(dds) = ddsfile::Dds::read(&mut std::io::Cursor::new(&data)) {
+            let format = dds
+                .get_dxgi_format()
+                .map(|f| {
+                    util::map_dxgi_format(f, srgb)
+                        .ok_or_else(|| GltfLoadError::TextureBadDxgiFormat(uri.take().unwrap(), f))
+                })
+                .or_else(|| {
+                    dds.get_d3d_format().map(|f| {
+                        util::map_d3d_format(f, srgb)
+                            .ok_or_else(|| GltfLoadError::TextureBadD3DFormat(uri.take().unwrap(), f))
+                    })
+                })
+                .unwrap()?;
+
+            let levels = dds.get_num_mipmap_levels();
+
+            if levels == 0 {
+                return Err(GltfLoadError::TextureZeroLevels(uri.take().unwrap()));
+            }
+
+            let guaranteed_format = format.describe().guaranteed_format_features;
+            let generate = dds.get_num_mipmap_levels() == 1
+                && guaranteed_format.filterable
+                && guaranteed_format.allowed_usages.contains(
+                    rend3::types::TextureUsages::TEXTURE_BINDING | rend3::types::TextureUsages::RENDER_ATTACHMENT,
+                );
+
+            let data = dds
+                .get_data(0)
+                .map_err(|_| GltfLoadError::TextureZeroLayers(uri.take().unwrap()))?;
+
+            texture = Some(types::Texture {
+                label: image.name().map(str::to_owned),
+                format,
+                size: UVec2::new(dds.get_width(), dds.get_height()),
+                data: data.to_vec(),
+                mip_count: if generate {
+                    types::MipmapCount::Maximum
+                } else {
+                    types::MipmapCount::Specific(std::num::NonZeroU32::new(dds.get_num_mipmap_levels()).unwrap())
+                },
+                mip_source: if generate {
+                    types::MipmapSource::Generated
+                } else {
+                    types::MipmapSource::Uploaded
+                },
+            })
         }
-    } else {
+    }
+
+    if texture.is_none() {
         profiling::scope!("decoding image");
-        let parsed = image::load_from_memory(&data).map_err(|e| GltfLoadError::TextureDecode(uri, e))?;
+        let parsed =
+            image::load_from_memory(&data).map_err(|e| GltfLoadError::TextureDecode(uri.take().unwrap(), e))?;
         let size = UVec2::new(parsed.width(), parsed.height());
         let (data, format) = util::convert_dynamic_image(parsed, srgb);
 
-        types::Texture {
+        texture = Some(types::Texture {
             label: image.name().map(str::to_owned),
             format,
             size,
             data,
             mip_count: types::MipmapCount::Maximum,
             mip_source: types::MipmapSource::Generated,
-        }
+        })
     };
+
+    let texture = texture.unwrap();
     let format = texture.format;
     let handle = renderer.add_texture_2d(texture);
 
@@ -800,6 +879,7 @@ pub mod util {
     }
 
     /// Maps a ktx2 format into the rend3's TextureFormat
+    #[cfg(feature = "ktx2")]
     pub fn map_ktx2_format(format: ktx2::Format, srgb: bool) -> Option<rend3::types::TextureFormat> {
         use ktx2::Format as k2F;
         use rend3::types::TextureFormat as r3F;
@@ -1070,6 +1150,217 @@ pub mod util {
                 }
             }
             _ => return None,
+        })
+    }
+
+    /// Maps a dds file d3dformat into the rend3's TextureFormat
+    #[cfg(feature = "ddsfile")]
+    pub fn map_d3d_format(format: ddsfile::D3DFormat, srgb: bool) -> Option<rend3::types::TextureFormat> {
+        use ddsfile::D3DFormat as d3F;
+        use rend3::types::TextureFormat as r3F;
+
+        Some(match format {
+            d3F::A8B8G8R8 => {
+                if srgb {
+                    r3F::Rgba8UnormSrgb
+                } else {
+                    r3F::Rgba8Unorm
+                }
+            }
+            d3F::G16R16 => r3F::Rg16Uint,
+            d3F::A2B10G10R10 => return None,
+            d3F::A1R5G5B5 => return None,
+            d3F::R5G6B5 => return None,
+            d3F::A8 => r3F::R8Unorm,
+            d3F::A8R8G8B8 => {
+                if srgb {
+                    r3F::Bgra8UnormSrgb
+                } else {
+                    r3F::Bgra8Unorm
+                }
+            }
+            d3F::X8R8G8B8
+            | d3F::X8B8G8R8
+            | d3F::A2R10G10B10
+            | d3F::R8G8B8
+            | d3F::X1R5G5B5
+            | d3F::A4R4G4B4
+            | d3F::X4R4G4B4
+            | d3F::A8R3G3B2 => return None,
+            d3F::A8L8 => r3F::Rg8Uint,
+            d3F::L16 => r3F::R16Uint,
+            d3F::L8 => r3F::R8Uint,
+            d3F::A4L4 => return None,
+            d3F::DXT1 | d3F::DXT2 => {
+                if srgb {
+                    r3F::Bc1RgbaUnormSrgb
+                } else {
+                    r3F::Bc1RgbaUnorm
+                }
+            }
+            d3F::DXT3 | d3F::DXT4 => {
+                if srgb {
+                    r3F::Bc2RgbaUnormSrgb
+                } else {
+                    r3F::Bc2RgbaUnorm
+                }
+            }
+            d3F::DXT5 => {
+                if srgb {
+                    r3F::Bc3RgbaUnormSrgb
+                } else {
+                    r3F::Bc3RgbaUnorm
+                }
+            }
+            d3F::R8G8_B8G8 => return None,
+            d3F::G8R8_G8B8 => return None,
+            d3F::A16B16G16R16 => r3F::Rgba16Uint,
+            d3F::Q16W16V16U16 => r3F::Rgba16Sint,
+            d3F::R16F => r3F::R16Float,
+            d3F::G16R16F => r3F::Rg16Float,
+            d3F::A16B16G16R16F => r3F::Rgba16Float,
+            d3F::R32F => r3F::R32Float,
+            d3F::G32R32F => r3F::Rg32Float,
+            d3F::A32B32G32R32F => r3F::Rgba32Float,
+            d3F::UYVY => return None,
+            d3F::YUY2 => return None,
+            d3F::CXV8U8 => return None,
+        })
+    }
+
+    #[cfg(feature = "ddsfile")]
+    pub fn map_dxgi_format(format: ddsfile::DxgiFormat, srgb: bool) -> Option<rend3::types::TextureFormat> {
+        use ddsfile::DxgiFormat as d3F;
+        use rend3::types::TextureFormat as r3F;
+
+        Some(match format {
+            d3F::Unknown => return None,
+            d3F::R32G32B32A32_Typeless | d3F::R32G32B32A32_Float => r3F::Rgba32Float,
+            d3F::R32G32B32A32_UInt => r3F::Rgba32Uint,
+            d3F::R32G32B32A32_SInt => r3F::Rgba32Sint,
+            d3F::R32G32B32_Typeless | d3F::R32G32B32_Float | d3F::R32G32B32_UInt | d3F::R32G32B32_SInt => return None,
+            d3F::R16G16B16A16_Typeless | d3F::R16G16B16A16_Float => r3F::Rgba16Float,
+            d3F::R16G16B16A16_UInt => r3F::Rgba16Uint,
+            d3F::R16G16B16A16_UNorm | d3F::R16G16B16A16_SNorm => return None,
+            d3F::R16G16B16A16_SInt => r3F::Rgba16Sint,
+            d3F::R32G32_Typeless | d3F::R32G32_Float => r3F::Rg32Float,
+            d3F::R32G32_UInt => r3F::Rg32Uint,
+            d3F::R32G32_SInt => r3F::Rg32Sint,
+            d3F::R32G8X24_Typeless
+            | d3F::D32_Float_S8X24_UInt
+            | d3F::R32_Float_X8X24_Typeless
+            | d3F::X32_Typeless_G8X24_UInt
+            | d3F::R10G10B10A2_Typeless
+            | d3F::R10G10B10A2_UNorm
+            | d3F::R10G10B10A2_UInt => return None,
+            d3F::R11G11B10_Float => r3F::Rg11b10Float,
+            d3F::R8G8B8A8_Typeless | d3F::R8G8B8A8_UNorm | d3F::R8G8B8A8_UNorm_sRGB => {
+                if srgb {
+                    r3F::Rgba8UnormSrgb
+                } else {
+                    r3F::Rgba8Unorm
+                }
+            }
+            d3F::R8G8B8A8_UInt => r3F::Rgba8Uint,
+            d3F::R8G8B8A8_SNorm => r3F::Rgba8Snorm,
+            d3F::R8G8B8A8_SInt => r3F::Rgba8Sint,
+            d3F::R16G16_Typeless | d3F::R16G16_Float => r3F::Rg16Float,
+            d3F::R16G16_UInt => r3F::Rg16Uint,
+            d3F::R16G16_SInt => r3F::Rg16Sint,
+            d3F::R16G16_UNorm | d3F::R16G16_SNorm => return None,
+            d3F::R32_Typeless | d3F::R32_Float => r3F::R32Float,
+            d3F::D32_Float => r3F::Depth32Float,
+            d3F::R32_UInt => r3F::R32Uint,
+            d3F::R32_SInt => r3F::R32Sint,
+            d3F::R24G8_Typeless | d3F::D24_UNorm_S8_UInt => r3F::Depth24PlusStencil8,
+            d3F::R24_UNorm_X8_Typeless => r3F::Depth24Plus,
+            d3F::X24_Typeless_G8_UInt => return None,
+            d3F::R8G8_Typeless | d3F::R8G8_UNorm => r3F::Rg8Unorm,
+            d3F::R8G8_UInt => r3F::Rg8Uint,
+            d3F::R8G8_SNorm => r3F::Rg8Snorm,
+            d3F::R8G8_SInt => r3F::Rg8Sint,
+            d3F::R16_Typeless | d3F::R16_Float => r3F::R16Float,
+            d3F::D16_UNorm | d3F::R16_SNorm | d3F::R16_UNorm => return None,
+            d3F::R16_UInt => r3F::R16Uint,
+            d3F::R16_SInt => r3F::R16Sint,
+            d3F::R8_Typeless | d3F::R8_UNorm => r3F::R8Unorm,
+            d3F::R8_UInt => r3F::R8Uint,
+            d3F::R8_SNorm => r3F::R8Snorm,
+            d3F::R8_SInt => r3F::R8Sint,
+            d3F::A8_UNorm => return None,
+            d3F::R1_UNorm => return None,
+            d3F::R9G9B9E5_SharedExp => r3F::Rgb9e5Ufloat,
+            d3F::R8G8_B8G8_UNorm => return None,
+            d3F::G8R8_G8B8_UNorm => return None,
+            d3F::BC1_Typeless | d3F::BC1_UNorm | d3F::BC1_UNorm_sRGB => {
+                if srgb {
+                    r3F::Bc1RgbaUnormSrgb
+                } else {
+                    r3F::Bc1RgbaUnorm
+                }
+            }
+
+            d3F::BC2_Typeless | d3F::BC2_UNorm | d3F::BC2_UNorm_sRGB => {
+                if srgb {
+                    r3F::Bc2RgbaUnormSrgb
+                } else {
+                    r3F::Bc2RgbaUnorm
+                }
+            }
+
+            d3F::BC3_Typeless | d3F::BC3_UNorm | d3F::BC3_UNorm_sRGB => {
+                if srgb {
+                    r3F::Bc3RgbaUnormSrgb
+                } else {
+                    r3F::Bc3RgbaUnorm
+                }
+            }
+
+            d3F::BC4_Typeless | d3F::BC4_UNorm => r3F::Bc4RUnorm,
+            d3F::BC4_SNorm => r3F::Bc4RSnorm,
+            d3F::BC5_Typeless | d3F::BC5_UNorm => r3F::Bc5RgUnorm,
+            d3F::BC5_SNorm => r3F::Bc5RgSnorm,
+            d3F::B5G6R5_UNorm | d3F::B5G5R5A1_UNorm => return None,
+            d3F::B8G8R8A8_UNorm | d3F::B8G8R8A8_Typeless | d3F::B8G8R8A8_UNorm_sRGB => {
+                if srgb {
+                    r3F::Bgra8UnormSrgb
+                } else {
+                    r3F::Bgra8Unorm
+                }
+            }
+            d3F::B8G8R8X8_UNorm
+            | d3F::R10G10B10_XR_Bias_A2_UNorm
+            | d3F::B8G8R8X8_Typeless
+            | d3F::B8G8R8X8_UNorm_sRGB => return None,
+            d3F::BC6H_Typeless | d3F::BC6H_UF16 => r3F::Bc6hRgbUfloat,
+            d3F::BC6H_SF16 => r3F::Bc6hRgbSfloat,
+            d3F::BC7_Typeless | d3F::BC7_UNorm | d3F::BC7_UNorm_sRGB => {
+                if srgb {
+                    r3F::Bc7RgbaUnormSrgb
+                } else {
+                    r3F::Bc7RgbaUnorm
+                }
+            }
+            d3F::AYUV
+            | d3F::Y410
+            | d3F::Y416
+            | d3F::NV12
+            | d3F::P010
+            | d3F::P016
+            | d3F::Format_420_Opaque
+            | d3F::YUY2
+            | d3F::Y210
+            | d3F::Y216
+            | d3F::NV11
+            | d3F::AI44
+            | d3F::IA44
+            | d3F::P8
+            | d3F::A8P8
+            | d3F::B4G4R4A4_UNorm
+            | d3F::P208
+            | d3F::V208
+            | d3F::V408
+            | d3F::Force_UInt => return None,
         })
     }
 }

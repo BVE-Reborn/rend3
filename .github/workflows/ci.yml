@@ -35,17 +35,27 @@ jobs:
         with:
           key: ${{ matrix.target }}-a # suffix for cache busting
 
-      - uses: actions-rs/cargo@v1
+      - name: build
+        uses: actions-rs/cargo@v1
         with:
           command: build
 
-      - uses: actions-rs/cargo@v1
+      - name: test
+        uses: actions-rs/cargo@v1
         with:
           command: test
 
-      - uses: actions-rs/cargo@v1
+      - name: clippy (rend3-gltf featureless)
+        uses: actions-rs/cargo@v1
         with:
           command: clippy
+          args: -p rend3-gltf --no-default-features -- -D warnings
+
+      - name: clippy
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: -- -D warnings
         if: matrix.rust_version == 'stable'
 
   cargo-fmt:
