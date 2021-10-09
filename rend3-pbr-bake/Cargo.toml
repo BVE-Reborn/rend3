@@ -1,6 +1,6 @@
 [package]
 name = "rend3-pbr-bake"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Connor Fitzgerald <connorwadefitzgerald@gmail.com>"]
 edition = "2018"
 description = "PBR light baking RenderRoutine for rend3"
@@ -15,6 +15,6 @@ publish = false
 flume = "0.10"
 glam = "0.19"
 profiling = {version = "1", default-features = false }
-rend3 = { version = "^0.1.0", path = "../rend3" }
-rend3-pbr = { version = "^0.1.0", path = "../rend3-pbr" }
+rend3 = { version = "^0.2.0", path = "../rend3" }
+rend3-pbr = { version = "^0.2.0", path = "../rend3-pbr" }
 wgpu = { version = "0.11", features = ["spirv"] }

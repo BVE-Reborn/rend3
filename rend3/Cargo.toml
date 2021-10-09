@@ -1,6 +1,6 @@
 [package]
 name = "rend3"
-version = "0.1.1"
+version = "0.2.0"
 authors = ["Connor Fitzgerald <connorwadefitzgerald@gmail.com>"]
 edition = "2018"
 description = "Easy to use, customizable, efficient 3D renderer library built on wgpu."
@@ -48,7 +48,7 @@ num-traits = "0.2"
 parking_lot = "0.11.2"
 profiling = { version = "1", default-features = false }
 range-alloc = "0.1"
-rend3-types = { version = "^0.1.0", path = "../rend3-types" }
+rend3-types = { version = "^0.2.0", path = "../rend3-types" }
 rustc-hash = "1"
 smallvec = "1"
 smartstring = "0.2"

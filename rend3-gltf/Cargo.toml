@@ -1,6 +1,6 @@
 [package]
 name = "rend3-gltf"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Connor Fitzgerald <connorwadefitzgerald@gmail.com>"]
 edition = "2018"
 description = "gltf scene and model loader for rend3"
@@ -23,8 +23,8 @@ image = { version = "0.23", default-features = false }
 ktx2 = { version = "0.2", optional = true }
 log = "0.4"
 profiling = {version = "1", default-features = false }
-rend3 = { version = "^0.1.0", path = "../rend3" }
-rend3-pbr = { version = "^0.1.0", path = "../rend3-pbr" }
+rend3 = { version = "^0.2.0", path = "../rend3" }
+rend3-pbr = { version = "^0.2.0", path = "../rend3-pbr" }
 rustc-hash = "1"
 thiserror = "1"
 
