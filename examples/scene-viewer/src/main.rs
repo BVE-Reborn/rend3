@@ -29,7 +29,7 @@ fn load_skybox(renderer: &Renderer, routine: &Mutex<PbrRenderRoutine>) -> Result
     profiling::scope!("load skybox");
 
     let name = concat!(env!("CARGO_MANIFEST_DIR"), "/data/skybox.basis");
-    let file = std::fs::read(name).unwrap_or_else(|_| panic!("Could not read skybox {}", name));
+    let file = std::fs::read(name)?;
 
     let mut transcoder = basis_universal::Transcoder::new();
     let image_info = transcoder.image_info(&file, 0).ok_or("skybox image missing")?;
@@ -183,7 +183,10 @@ fn main() {
     let renderer_clone = Arc::clone(&renderer);
     let _loaded_gltf = std::thread::spawn(move || {
         profiling::register_thread!("asset loading");
-        load_skybox(&renderer_clone, &routine_clone).unwrap();
+        match load_skybox(&renderer_clone, &routine_clone) {
+            Err(e) => println!("Failed to load skybox {}", e),
+            _ => {}
+        };
         load_gltf(
             &renderer_clone,
             file_to_load.unwrap_or_else(|| concat!(env!("CARGO_MANIFEST_DIR"), "/data/scene.gltf").to_owned()),
