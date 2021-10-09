@@ -287,10 +287,11 @@ impl GpuCuller {
 
             match sorting {
                 Sorting::FrontToBack => {
-                    objects.sort_unstable_by_key(|o| OrderedFloat(o.location.distance_squared(camera_location)));
+                    objects.sort_unstable_by_key(|o| OrderedFloat(o.mesh_location().distance_squared(camera_location)));
                 }
                 Sorting::BackToFront => {
-                    objects.sort_unstable_by_key(|o| OrderedFloat(-o.location.distance_squared(camera_location)));
+                    objects
+                        .sort_unstable_by_key(|o| OrderedFloat(-o.mesh_location().distance_squared(camera_location)));
                 }
             }
         }
