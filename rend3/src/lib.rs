@@ -12,6 +12,7 @@
 //! # Screenshots
 //!
 //! ![scifi-base](https://raw.githubusercontent.com/BVE-Reborn/rend3/trunk/examples/scene-viewer/scifi-base.jpg)
+//! ![emerald-square](https://raw.githubusercontent.com/BVE-Reborn/rend3/trunk/examples/scene-viewer/emerald-square.jpg)
 //! ![example](https://raw.githubusercontent.com/BVE-Reborn/rend3/trunk/examples/scene-viewer/screenshot.jpg)
 //!
 //! # Examples
@@ -23,18 +24,17 @@
 //! # Purpose
 //!
 //! `rend3` tries to fulfill the following usecases:
-//!  1. Games and visualizations that need a customizable and efficient renderer.
+//!  1. Games and visualizations that need a customizable, and efficient renderer.
 //!  2. Small projects that just want to put objects on screen, but want lighting and effects.
 //!  3. A small cog in a big machine: a renderer doesn't interfere with the rest of the program.
 //!
 //! `rend3` is not:
-//!  1. A renderer for insane production value AAA games. AAA games have requirements far beyond any possible indie game and would be unreasonable to target.
-//!  2. A framework or engine. It does not include all the parts needed to make an advanced game or simulation nor care how you structure
+//!  1. A framework or engine. It does not include all the parts needed to make an advanced game or simulation nor care how you structure
 //!     your program. I do have plans for a `rend3-util` (or similar) crate that is a very basic framework for the second use case listed above.
 //!
-//! # GPU Mode
+//! # GPU Culling
 //!
-//! On Vulkan and DX12, we can enable "gpu mode", which uses modern bindless resources and gpu-based culling. This reduces CPU load and allows sigifigantly more powerful culling.
+//! On Vulkan and DX12 "gpu mode" is enabled by default, which uses modern bindless resources and gpu-based culling. This reduces CPU load and allows sigifigantly more powerful culling.
 //!
 //! # Future Plans
 //!

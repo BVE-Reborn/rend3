@@ -177,6 +177,8 @@ fn main() {
         format,
     )));
 
+    routine.lock().set_ambient_color(glam::Vec4::new(0.15, 0.15, 0.15, 1.0));
+
     let routine_clone = Arc::clone(&routine);
     let renderer_clone = Arc::clone(&renderer);
     let _loaded_gltf = std::thread::spawn(move || {
@@ -191,7 +193,7 @@ fn main() {
     let _directional_light = renderer.add_directional_light(DirectionalLight {
         color: Vec3::ONE,
         intensity: 10.0,
-        direction: Vec3::new(-1.0, -1.0, 1.0),
+        direction: Vec3::new(-1.0, -1.0, 0.0),
         distance: 400.0,
     });
     let mut scancode_status = FastHashMap::default();
@@ -242,9 +244,9 @@ fn main() {
             let up = rotation.y_axis;
             let side = -rotation.x_axis;
             let velocity = if button_pressed(&scancode_status, platform::Scancodes::SHIFT) {
-                100.0
+                50.0
             } else {
-                1.0
+                10.0
             };
             if button_pressed(&scancode_status, platform::Scancodes::W) {
                 camera_location += forward * velocity * delta_time.as_secs_f32();
