@@ -29,5 +29,5 @@ rend3-pbr = { version = "^0.1.0", path = "../../rend3-pbr" }
 rustc-hash = "1"
 smallvec = "1"
 tracy-client = "0.12"
-wgpu-profiler = "0.6.1"
+wgpu-profiler = "0.7.0"
 winit = "0.25"

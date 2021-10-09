@@ -46,16 +46,12 @@ list-any = "0.2"
 log = "0.4"
 num-traits = "0.2"
 parking_lot = "0.11.2"
-profiling = {version = "1", default-features = false }
+profiling = { version = "1", default-features = false }
 range-alloc = "0.1"
 rend3-types = { version = "^0.1.0", path = "../rend3-types" }
 rustc-hash = "1"
 smallvec = "1"
 smartstring = "0.2"
 thiserror = "1"
-wgpu = "0.10"
-wgpu-profiler = "0.6.1"
-
-# not direct deps, but force new versions
-# wgpu-core = "0.10.3"
-# wgpu-hal = "0.10.7"
+wgpu = "0.11"
+wgpu-profiler = "0.7.0"
