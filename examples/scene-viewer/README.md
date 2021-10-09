@@ -1,6 +1,6 @@
 # scene-viewer
 
-gltf (and glb) loader and 
+gltf (and glb) loader and viewer using the [rend3](https://crates.io/crates/rend3) rendering engine.
 
 Exported Unity Scene through glTF:
 
