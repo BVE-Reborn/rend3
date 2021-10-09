@@ -183,9 +183,8 @@ fn main() {
     let renderer_clone = Arc::clone(&renderer);
     let _loaded_gltf = std::thread::spawn(move || {
         profiling::register_thread!("asset loading");
-        match load_skybox(&renderer_clone, &routine_clone) {
-            Err(e) => println!("Failed to load skybox {}", e),
-            _ => {}
+        if let Err(e) = load_skybox(&renderer_clone, &routine_clone) {
+            println!("Failed to load skybox {}", e)
         };
         load_gltf(
             &renderer_clone,
