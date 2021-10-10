@@ -184,6 +184,8 @@ fn main() {
                 // Render our frame
                 let frame = rend3::util::output::OutputFrame::from_surface(&surface).unwrap();
 
+                // For now we'll have to render our routines separately
+                // Check out https://github.com/BVE-Reborn/rend3/issues/229 for progress
                 let _stats = renderer.render(&mut pbr_routine, (), frame.as_view());
                 let _stats = renderer.render(&mut routine, &input, frame.as_view());
 
