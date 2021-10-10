@@ -28,6 +28,8 @@ Per Keep a Changelog there are 6 main categories of changes:
 
 ## Unreleased
 
+- rend3: Rename `CameraProjection::Projection` to `CameraProjection::Perspective`.
+
 ## v0.2.0
 
 Released 2021-10-09
