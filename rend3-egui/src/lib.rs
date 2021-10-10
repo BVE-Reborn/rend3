@@ -62,15 +62,15 @@ impl RenderRoutine<&Input<'_>, &TextureView> for EguiRenderRoutine {
         self.internal.update_buffers(
             &renderer.device,
             &renderer.queue,
-            &input.clipped_meshes,
+            input.clipped_meshes,
             &self.screen_descriptor,
         );
 
         self.internal
             .execute(
                 &mut encoder,
-                &output,
-                &input.clipped_meshes,
+                output,
+                input.clipped_meshes,
                 &self.screen_descriptor,
                 None,
             )
