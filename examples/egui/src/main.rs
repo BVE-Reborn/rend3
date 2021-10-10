@@ -89,16 +89,13 @@ fn main() {
     let camera_yaw = -std::f32::consts::FRAC_PI_4;
     // These values may seem arbitrary, but they center the camera on the cube in the scene
     let camera_location = glam::Vec3A::new(10.0, 15.0, -10.0);
-    let view  = glam::Mat4::from_euler(glam::EulerRot::XYZ, -camera_pitch, -camera_yaw, 0.0);
+    let view = glam::Mat4::from_euler(glam::EulerRot::XYZ, -camera_pitch, -camera_yaw, 0.0);
     let view = view * glam::Mat4::from_translation((-camera_location).into());
 
     // Set camera location data
     renderer.set_camera_data(rend3::types::Camera {
-        projection: rend3::types::CameraProjection::Projection {
-            vfov: 60.0,
-            near: 0.1,
-        },
-        view
+        projection: rend3::types::CameraProjection::Projection { vfov: 60.0, near: 0.1 },
+        view,
     });
 
     // Create a single directional light

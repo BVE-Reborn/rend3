@@ -27,6 +27,7 @@ Per Keep a Changelog there are 6 main categories of changes:
 - [Diffs](#diffs)
 
 ## Unreleased
+- rend3-egui: Created an initial [egui](https://github.com/emilk/egui) immediate mode GUI integration @MindSwipe
 
 - rend3: Instead of passing a render routine to the render function, you now add them to a rendergraph, then pass that rendergraph into the renderer.
   - rend3-pbr: split the PbrRoutine into two parts `add_prepass_to_graph` and `add_forward_to_graph`. 

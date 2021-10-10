@@ -1,4 +1,4 @@
-use rend3::{RenderRoutine, Renderer, ManagerReadyOutput};
+use rend3::{ManagerReadyOutput, RenderRoutine, Renderer};
 use wgpu::{TextureFormat, TextureView};
 
 pub struct EguiRenderRoutine {
