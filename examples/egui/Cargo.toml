@@ -24,10 +24,10 @@ glam = "0.19"
 # Provides `block_on` to wait for futures from sync code
 pollster = "0.2"
 # Renderer core
-rend3 = { version = "^0.1.0", path = "../../rend3" }
+rend3 = { version = "^0.2.0",path = "../../rend3" }
 # Egui renderer integration
-rend3-egui = { version = "^0.1.0", path = "../../rend3-egui" }
+rend3-egui = { version = "^0.1.0",path = "../../rend3-egui" }
 # Programmable render list that dictates how the scene renders
-rend3-pbr = { version = "^0.1.0", path = "../../rend3-pbr" }
+rend3-pbr = { version = "^0.2.0",path = "../../rend3-pbr" }
 # Windowing
 winit = "0.25.0"
