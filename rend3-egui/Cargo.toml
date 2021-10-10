@@ -10,13 +10,10 @@ license = "MIT OR Apache-2.0 OR Zlib"
 keywords = ["3d", "graphics", "gpu", "renderer", "wgpu"]
 categories = ["game-development", "graphics", "rendering", "rendering::engine"]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 egui = "0.14.2"
 epi = "0.14.0"
-# egui_wgpu_backend = { version = "0.12.0", git = "https://github.com/hasenbanck/egui_wgpu_backend" }
-egui_wgpu_backend = { path = "C:/Source/egui_wgpu_backend" }
-rend3 = { path = "../rend3" }
-wgpu = "0.10"
+egui_wgpu_backend = { git = "https://github.com/hasenbanck/egui_wgpu_backend.git", rev = "6f1f59be1054a523cd28e3ba020b3c7490793e9a" }
+rend3 = { version = "^0.2.0", path = "../rend3" }
+wgpu = "0.11"
 flume = "0.10"

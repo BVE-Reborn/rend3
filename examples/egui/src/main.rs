@@ -9,14 +9,12 @@ fn main() {
     env_logger::init();
 
     // Create event loop and window
-    let event_loop = winit::event_loop::EventLoop::with_user_event();
+    let event_loop = winit::event_loop::EventLoop::new();
     let window = {
         let mut builder = winit::window::WindowBuilder::new();
-        builder = builder.with_title("rend3 cube");
+        builder = builder.with_title("rend3 egui demo");
         builder.build(&event_loop).expect("Could not build window")
     };
-
-    let repaint_signal = std::sync::Arc::new(ExampleRepaintSignal(std::sync::Mutex::new(event_loop.create_proxy())));
 
     let window_size = window.inner_size();
 
@@ -124,7 +122,6 @@ fn main() {
     });
 
     let start_time = Instant::now();
-    let mut previous_frame_time = None;
     let mut color: [f32; 4] = [0.0, 0.5, 0.5, 1.0];
 
     event_loop.run(move |event, _, control_flow| {
@@ -134,27 +131,11 @@ fn main() {
         match event {
             RedrawRequested(..) => {
                 platform.update_time(start_time.elapsed().as_secs_f64());
-
-                let egui_start = Instant::now();
                 platform.begin_frame();
-                let mut app_output = epi::backend::AppOutput::default();
-                let mut _frame = epi::backend::FrameBuilder {
-                    info: epi::IntegrationInfo {
-                        web_info: None,
-                        cpu_usage: previous_frame_time,
-                        seconds_since_midnight: None,
-                        native_pixels_per_point: Some(window.scale_factor() as _),
-                        prefer_dark_mode: None,
-                    },
-                    tex_allocator: &mut routine,
-                    output: &mut app_output,
-                    repaint_signal: repaint_signal.clone(),
-                }
-                .build();
 
                 // Insert egui commands here
-                let ctx = &platform.context();
-                egui::Window::new("Change color").resizable(true).show(ctx, |ui| {
+                let ctx = platform.context();
+                egui::Window::new("Change color").resizable(true).show(&ctx, |ui| {
                     ui.label("Change the color of the cube");
                     if ui.color_edit_button_rgba_unmultiplied(&mut color).changed() {
                         renderer.update_material(
@@ -169,12 +150,9 @@ fn main() {
                     }
                 });
 
-                // End the UI frame. We could now handle the output and draw the UI with the backend.
+                // End the UI frame. Now let's draw the UI with our Backend, we could also handle the output here
                 let (_output, paint_commands) = platform.end_frame(Some(&window));
                 let paint_jobs = platform.context().tessellate(paint_commands);
-
-                let frame_time = (Instant::now() - egui_start).as_secs_f64() as f32;
-                previous_frame_time = Some(frame_time);
 
                 let input = rend3_egui::Input {
                     clipped_meshes: &paint_jobs,
@@ -226,21 +204,6 @@ fn main() {
             _ => {}
         }
     });
-}
-
-/// A custom event type for the winit app.
-enum Event {
-    RequestRedraw,
-}
-
-/// This is the repaint signal type that egui needs for requesting a repaint from another thread.
-/// It sends the custom RequestRedraw event to the winit event loop.
-struct ExampleRepaintSignal(std::sync::Mutex<winit::event_loop::EventLoopProxy<Event>>);
-
-impl epi::RepaintSignal for ExampleRepaintSignal {
-    fn request_repaint(&self) {
-        self.0.lock().unwrap().send_event(Event::RequestRedraw).ok();
-    }
 }
 
 fn vertex(pos: [f32; 3]) -> glam::Vec3 {
