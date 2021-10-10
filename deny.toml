@@ -35,6 +35,10 @@ skip = [
     { name = "getrandom", version = "0.1.16" },
     { name = "redox_syscall", version = "0.1.57" },
     { name = "wasi", version = "0.10.2" },
+    # egui
+    { name = "ahash", version = "0.4.7" },
+    { name = "owned_ttf_parser", version = "0.6.0" },
+    { name = "ttf-parser", version = "0.12.3" }
 ]
 
 [advisories]
