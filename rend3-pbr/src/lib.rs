@@ -1,3 +1,8 @@
+/// PBR Render Routine for rend3.
+///
+/// Contains [`PbrMaterial`] and the [`PbrRenderRoutine`] which serve as the default render routines.
+///
+/// Tries to strike a balance between photorealism and performance.
 use std::sync::Arc;
 
 use glam::Vec4;

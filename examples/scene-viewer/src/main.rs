@@ -29,7 +29,7 @@ fn load_skybox(renderer: &Renderer, routine: &Mutex<PbrRenderRoutine>) -> Result
     profiling::scope!("load skybox");
 
     let name = concat!(env!("CARGO_MANIFEST_DIR"), "/data/skybox.basis");
-    let file = std::fs::read(name).unwrap_or_else(|_| panic!("Could not read skybox {}", name));
+    let file = std::fs::read(name)?;
 
     let mut transcoder = basis_universal::Transcoder::new();
     let image_info = transcoder.image_info(&file, 0).ok_or("skybox image missing")?;
@@ -177,11 +177,15 @@ fn main() {
         format,
     )));
 
+    routine.lock().set_ambient_color(glam::Vec4::new(0.15, 0.15, 0.15, 1.0));
+
     let routine_clone = Arc::clone(&routine);
     let renderer_clone = Arc::clone(&renderer);
     let _loaded_gltf = std::thread::spawn(move || {
         profiling::register_thread!("asset loading");
-        load_skybox(&renderer_clone, &routine_clone).unwrap();
+        if let Err(e) = load_skybox(&renderer_clone, &routine_clone) {
+            println!("Failed to load skybox {}", e)
+        };
         load_gltf(
             &renderer_clone,
             file_to_load.unwrap_or_else(|| concat!(env!("CARGO_MANIFEST_DIR"), "/data/scene.gltf").to_owned()),
@@ -191,7 +195,7 @@ fn main() {
     let _directional_light = renderer.add_directional_light(DirectionalLight {
         color: Vec3::ONE,
         intensity: 10.0,
-        direction: Vec3::new(-1.0, -1.0, 1.0),
+        direction: Vec3::new(-1.0, -1.0, 0.0),
         distance: 400.0,
     });
     let mut scancode_status = FastHashMap::default();
@@ -242,9 +246,9 @@ fn main() {
             let up = rotation.y_axis;
             let side = -rotation.x_axis;
             let velocity = if button_pressed(&scancode_status, platform::Scancodes::SHIFT) {
-                100.0
+                50.0
             } else {
-                1.0
+                10.0
             };
             if button_pressed(&scancode_status, platform::Scancodes::W) {
                 camera_location += forward * velocity * delta_time.as_secs_f32();

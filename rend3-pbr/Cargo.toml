@@ -1,6 +1,6 @@
 [package]
 name = "rend3-pbr"
-version = "0.1.1"
+version = "0.2.0"
 authors = ["Connor Fitzgerald <connorwadefitzgerald@gmail.com>"]
 edition = "2018"
 description = "PBR Render Routine for rend3"
@@ -21,6 +21,6 @@ log = "0.4"
 ordered-float = "2"
 parking_lot = "0.11.2"
 profiling = {version = "1", default-features = false }
-rend3 = { version = "^0.1.0", path = "../rend3" }
-wgpu = { version = "0.10", features = ["spirv"] }
-wgpu-profiler = "0.6.1"
+rend3 = { version = "^0.2.0", path = "../rend3" }
+wgpu = { version = "0.11", features = ["spirv"] }
+wgpu-profiler = "0.7.0"

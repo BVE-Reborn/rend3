@@ -1,6 +1,6 @@
 [package]
 name = "rend3-types"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Connor Fitzgerald <connorwadefitzgerald@gmail.com>"]
 edition = "2018"
 description = "Type definitions for rend3"
@@ -14,4 +14,4 @@ categories = ["game-development", "graphics", "rendering", "rendering::engine"]
 [dependencies]
 bitflags = "1"
 glam = "0.19"
-wgt = { package = "wgpu-types", version = "0.10" }
+wgt = { package = "wgpu-types", version = "0.11" }

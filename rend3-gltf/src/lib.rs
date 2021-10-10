@@ -88,7 +88,7 @@ pub struct ImageKey {
     pub srgb: bool,
 }
 
-/// Format
+/// A uploaded texture and its format.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Texture {
     pub handle: types::TextureHandle,

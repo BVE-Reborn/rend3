@@ -33,6 +33,12 @@ pub struct InternalObject {
     pub input: GPUCullingInput,
 }
 
+impl InternalObject {
+    pub fn mesh_location(&self) -> Vec3A {
+        self.location + Vec3A::from(self.input.bounding_sphere.center)
+    }
+}
+
 /// Manages objects. That's it. ¯\\\_(ツ)\_/¯
 pub struct ObjectManager {
     registry: ArchetypicalRegistry<MaterialKeyPair, InternalObject, Object>,

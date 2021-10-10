@@ -15,6 +15,7 @@ Per Keep a Changelog there are 6 main categories of changes:
 - Security
 
 - [Unreleased](#unreleased)
+- [v0.2.0](#v020)
 - [v0.1.1](#v011)
 - [v0.1.0](#v010)
 - [v0.0.6](#v006)
@@ -26,6 +27,10 @@ Per Keep a Changelog there are 6 main categories of changes:
 - [Diffs](#diffs)
 
 ## Unreleased
+
+## v0.2.0
+
+Released 2021-10-09
 
 This release saw a signifigant amount of cpu side optimization.
 In a 50k object scene, the render loop went from taking 16ms to taking 1.75ms, a 9x speedup
@@ -185,7 +190,8 @@ Released 2021-03-06
 
 ## Diffs
 
-- [Unreleased](https://github.com/BVE-Reborn/rend3/compare/v0.1.1...HEAD)
+- [Unreleased](https://github.com/BVE-Reborn/rend3/compare/v0.2.0...HEAD)
+- [v0.2.0](https://github.com/BVE-Reborn/rend3/compare/v0.1.1...v0.2.0)
 - [v0.1.1](https://github.com/BVE-Reborn/rend3/compare/v0.1.0...v0.1.1)
 - [v0.1.0](https://github.com/BVE-Reborn/rend3/compare/v0.0.6...v0.1.0)
 - [v0.0.6](https://github.com/BVE-Reborn/rend3/compare/v0.0.5...v0.0.6)
