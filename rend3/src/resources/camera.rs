@@ -78,7 +78,7 @@ fn compute_projection_matrix(data: Camera, aspect_ratio: f32) -> Mat4 {
             let half = size * 0.5;
             Mat4::orthographic_lh(-half.x, half.x, -half.y, half.y, -half.z, half.z)
         }
-        CameraProjection::Projection { vfov, near, .. } => {
+        CameraProjection::Perspective { vfov, near, .. } => {
             Mat4::perspective_infinite_reverse_lh(vfov.to_radians(), aspect_ratio, near)
         }
     }

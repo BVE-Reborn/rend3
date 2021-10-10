@@ -371,7 +371,7 @@ fn main() {
             let view = view * Mat4::from_translation((-camera_location).into());
 
             renderer.set_camera_data(Camera {
-                projection: CameraProjection::Projection {
+                projection: CameraProjection::Perspective {
                     vfov: 60.0,
                     near: 0.1,
                 },
