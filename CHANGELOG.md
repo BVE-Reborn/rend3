@@ -27,6 +27,7 @@ Per Keep a Changelog there are 6 main categories of changes:
 - [Diffs](#diffs)
 
 ## Unreleased
+- rend3-egui: Created an initial [egui](https://github.com/emilk/egui) immediate mode GUI integration @MindSwipe
 
 ## v0.2.0
 
