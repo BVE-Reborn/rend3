@@ -62,7 +62,7 @@ fn main() {
         &renderer,
         rend3_pbr::RenderTextureOptions {
             resolution: glam::UVec2::new(window_size.width, window_size.height),
-            samples: rend3_pbr::SampleCount::Four,
+            samples: rend3_pbr::SampleCount::One,
         },
         format,
     );
