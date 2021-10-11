@@ -108,15 +108,15 @@ pub mod util {
     pub mod typedefs;
 }
 
+mod graph;
 mod instruction;
 mod mode;
-mod graph;
 mod setup;
 mod surface;
 
+pub use graph::*;
 pub use mode::*;
 pub use renderer::{error::*, Renderer};
-pub use graph::*;
 pub use setup::*;
 pub use surface::*;
 

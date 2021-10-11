@@ -6,11 +6,7 @@ use crate::{
 use std::sync::Arc;
 use wgpu::CommandEncoderDescriptor;
 
-pub fn render_loop(
-    renderer: Arc<Renderer>,
-    graph: RenderGraph<'_>,
-    output: OutputFrame,
-) -> Option<RendererStatistics> {
+pub fn render_loop(renderer: Arc<Renderer>, graph: RenderGraph<'_>, output: OutputFrame) -> Option<RendererStatistics> {
     profiling::scope!("render_loop");
 
     renderer.instructions.swap();
