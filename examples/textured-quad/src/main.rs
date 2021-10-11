@@ -33,7 +33,6 @@ fn main() {
     let window = {
         let mut builder = winit::window::WindowBuilder::new();
         builder = builder.with_title("rend3 textured quad");
-        builder = builder.with_inner_size(winit::dpi::Size::new(winit::dpi::LogicalSize::new(800, 500)));
         builder.build(&event_loop).expect("Could not build window")
     };
 
