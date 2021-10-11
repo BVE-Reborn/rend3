@@ -15,12 +15,7 @@ fn create_quad(size: f32) -> rend3::types::Mesh {
         vertex([size * 0.5, -size * 0.5, 0.0]),
         vertex([-size * 0.5, -size * 0.5, 0.0]),
     ];
-    let uv_positions = [
-        uv([0.0, 0.0]),
-        uv([1.0, 0.0]),
-        uv([1.0, 1.0]),
-        uv([0.0, 1.0]),
-    ];
+    let uv_positions = [uv([0.0, 0.0]), uv([1.0, 0.0]), uv([1.0, 1.0]), uv([0.0, 1.0])];
     let index_data: &[u32] = &[0, 1, 2, 2, 3, 0];
 
     rend3::types::MeshBuilder::new(vertex_positions.to_vec())
@@ -82,7 +77,8 @@ fn main() {
     let mesh_handle = renderer.add_mesh(mesh);
 
     // Add texture to renderer's world.
-    let image_checker = image::load_from_memory(include_bytes!("checker.png")).expect("Failed to load image from memory");
+    let image_checker =
+        image::load_from_memory(include_bytes!("checker.png")).expect("Failed to load image from memory");
     let image_checker_rgba8 = image_checker.to_rgba8();
     let texture_checker = rend3::types::Texture {
         label: Option::None,
@@ -96,8 +92,9 @@ fn main() {
 
     // Add PBR material with all defaults except a single color.
     let material = rend3_pbr::material::PbrMaterial {
-        albedo: rend3_pbr::material::AlbedoComponent::TextureValue{
-            texture: texture_handle, value: glam::Vec4::new(1.0, 1.0, 1.0, 1.0)
+        albedo: rend3_pbr::material::AlbedoComponent::TextureValue {
+            texture: texture_handle,
+            value: glam::Vec4::new(1.0, 1.0, 1.0, 1.0),
         },
         unlit: true,
         ..rend3_pbr::material::PbrMaterial::default()
