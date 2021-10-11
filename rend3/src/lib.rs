@@ -40,7 +40,7 @@
 //!
 //! # GPU Culling
 //!
-//! On Vulkan and DX12 "gpu mode" is enabled by default, which uses modern bindless resources and gpu-based culling. This reduces CPU load and allows sigifigantly more powerful culling.
+//! On Vulkan and DX12 "gpu mode" is enabled by default, which uses modern bindless resources and gpu-based culling. This reduces CPU load and allows significantly more powerful culling.
 //!
 //! # Future Plans
 //!
