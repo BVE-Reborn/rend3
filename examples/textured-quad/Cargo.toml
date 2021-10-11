@@ -1,5 +1,5 @@
 [package]
-name = "rend3-gltf-example"
+name = "rend3-textured-quad-example"
 license = "MIT OR Apache-2.0 OR Zlib"
 version = "0.2.0"
 authors = ["The rend3 Developers"]
@@ -7,7 +7,7 @@ edition = "2018"
 publish = false
 
 [[bin]]
-name = "gltf"
+name = "textured-quad"
 path = "src/main.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -17,13 +17,13 @@ path = "src/main.rs"
 env_logger = { version = "0.9", default-features = false, features = ["termcolor", "atty"] }
 # Linear algebra library
 glam = "0.19"
-# parsing model files
-gltf = { version = "0.16", default-features = false, features = [ "import", "utils" ] }
 # Renderer core
-rend3 = { version = "^0.2.0", path = "../../rend3"}
+rend3 = { version = "^0.2.0", path = "../../rend3" }
 # Programmable render list that dictates how the scene renders
 rend3-pbr = { version = "^0.2.0", path = "../../rend3-pbr" }
 # Provides `block_on` to wait for futures from sync code
 pollster = "0.2"
 # windowing
 winit = "0.25"
+# Load image
+image = { version = "0.23", default-features = false, features = ["png"]}

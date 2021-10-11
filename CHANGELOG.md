@@ -29,6 +29,13 @@ Per Keep a Changelog there are 6 main categories of changes:
 ## Unreleased
 - rend3-egui: Created an initial [egui](https://github.com/emilk/egui) immediate mode GUI integration @MindSwipe
 
+- rend3: Instead of passing a render routine to the render function, you now add them to a rendergraph, then pass that rendergraph into the renderer.
+  - rend3-pbr: split the PbrRoutine into two parts `add_prepass_to_graph` and `add_forward_to_graph`. 
+  - rend3-pbr: Split out the skybox renderer into `SkyboxRoutine`.
+  - rend3-pp: Split out tonemapping into the postprocessing crate and the `TonemappingRoutine`.
+- rend3: Add example `textured-quad`.
+- rend3: Rename `CameraProjection::Projection` to `CameraProjection::Perspective`.
+
 ## v0.2.0
 
 Released 2021-10-09

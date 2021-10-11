@@ -659,7 +659,7 @@ pub enum CameraProjection {
         /// Size assumes the location is at the center of the camera area.
         size: Vec3A,
     },
-    Projection {
+    Perspective {
         /// Vertical field of view in degrees.
         vfov: f32,
         /// Near plane distance. All projection uses a infinite far plane.
@@ -669,7 +669,7 @@ pub enum CameraProjection {
 
 impl Default for CameraProjection {
     fn default() -> Self {
-        Self::Projection { vfov: 60.0, near: 0.1 }
+        Self::Perspective { vfov: 60.0, near: 0.1 }
     }
 }
 

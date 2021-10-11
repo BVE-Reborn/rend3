@@ -2,7 +2,7 @@
 name = "rend3-cube-example"
 license = "MIT OR Apache-2.0 OR Zlib"
 version = "0.2.0"
-authors = ["Connor Fitzgerald <connorwadefitzgerald@gmail.com>"]
+authors = ["The rend3 Developers"]
 edition = "2018"
 publish = false
 

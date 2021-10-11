@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 fn vertex(pos: [f32; 3]) -> glam::Vec3 {
     glam::Vec3::from(pos)
 }
@@ -68,7 +70,7 @@ fn main() {
     let iad = pollster::block_on(rend3::create_iad(None, None, None)).unwrap();
 
     // The one line of unsafe needed. We just need to guarentee that the window outlives the use of the surface.
-    let surface = unsafe { iad.instance.create_surface(&window) };
+    let surface = Arc::new(unsafe { iad.instance.create_surface(&window) });
     // Get the preferred format for the surface.
     let format = surface.get_preferred_format(&iad.adapter).unwrap();
     // Configure the surface to be ready for rendering.
@@ -84,14 +86,13 @@ fn main() {
     let renderer = rend3::Renderer::new(iad, Some(window_size.width as f32 / window_size.height as f32)).unwrap();
 
     // Create the pbr pipeline with the same internal resolution and 4x multisampling
-    let mut routine = rend3_pbr::PbrRenderRoutine::new(
-        &renderer,
-        rend3_pbr::RenderTextureOptions {
-            resolution: glam::UVec2::new(window_size.width, window_size.height),
-            samples: rend3_pbr::SampleCount::Four,
-        },
-        format,
-    );
+    let render_texture_options = rend3_pbr::RenderTextureOptions {
+        resolution: glam::UVec2::new(window_size.width, window_size.height),
+        samples: rend3_pbr::SampleCount::One,
+    };
+    let mut pbr_routine = rend3_pbr::PbrRenderRoutine::new(&renderer, render_texture_options);
+    let mut tonemapping_routine =
+        rend3_pbr::TonemappingRoutine::new(&renderer, render_texture_options.resolution, format);
 
     // Create mesh and calculate smooth normals based on vertices
     let mesh = create_mesh();
@@ -126,7 +127,7 @@ fn main() {
 
     // Set camera's location
     renderer.set_camera_data(rend3::types::Camera {
-        projection: rend3::types::CameraProjection::Projection { vfov: 60.0, near: 0.1 },
+        projection: rend3::types::CameraProjection::Perspective { vfov: 60.0, near: 0.1 },
         view,
     });
 
@@ -166,22 +167,28 @@ fn main() {
             // Tell the renderer about the new aspect ratio.
             renderer.set_aspect_ratio(size.x as f32 / size.y as f32);
             // Resize the internal buffers to the same size as the screen.
-            routine.resize(
+            pbr_routine.resize(
                 &renderer,
                 rend3_pbr::RenderTextureOptions {
                     resolution: size,
                     samples: rend3_pbr::SampleCount::One,
                 },
             );
+            tonemapping_routine.resize(size);
         }
         // Render!
         winit::event::Event::MainEventsCleared => {
             // Get a frame
-            let frame = rend3::util::output::OutputFrame::from_surface(&surface).unwrap();
+            let frame = rend3::util::output::OutputFrame::Surface {
+                surface: Arc::clone(&surface),
+            };
+            // Build a rendergraph
+            let mut graph = rend3::RenderGraph::new();
+            pbr_routine.add_prepass_to_graph(graph.add_node());
+            pbr_routine.add_forward_to_graph(graph.add_node());
+            tonemapping_routine.add_to_graph(graph.add_node());
             // Dispatch a render!
-            let _stats = renderer.render(&mut routine, (), frame.as_view());
-            // Present the frame on screen
-            frame.present();
+            renderer.render(graph, frame);
         }
         // Other events we don't care about
         _ => {}

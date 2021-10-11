@@ -7,7 +7,7 @@ use rend3::{
     util::typedefs::FastHashMap,
     Renderer,
 };
-use rend3_pbr::PbrRenderRoutine;
+use rend3_pbr::SkyboxRoutine;
 use std::{
     collections::HashMap,
     hash::BuildHasher,
@@ -25,7 +25,7 @@ use winit::{
 
 mod platform;
 
-fn load_skybox(renderer: &Renderer, routine: &Mutex<PbrRenderRoutine>) -> Result<(), Box<dyn std::error::Error>> {
+fn load_skybox(renderer: &Renderer, skybox_routine: &Mutex<SkyboxRoutine>) -> Result<(), Box<dyn std::error::Error>> {
     profiling::scope!("load skybox");
 
     let name = concat!(env!("CARGO_MANIFEST_DIR"), "/data/skybox.basis");
@@ -72,7 +72,7 @@ fn load_skybox(renderer: &Renderer, routine: &Mutex<PbrRenderRoutine>) -> Result
         mip_count: rend3::types::MipmapCount::Specific(NonZeroU32::new(mips).unwrap()),
         mip_source: rend3::types::MipmapSource::Uploaded,
     });
-    routine.lock().set_background_texture(Some(handle));
+    skybox_routine.lock().set_background_texture(Some(handle));
     Ok(())
 }
 
@@ -148,7 +148,7 @@ fn main() {
     // The one line of unsafe needed. We just need to guarentee that the window outlives the use of the surface.
     let surface = unsafe {
         profiling::scope!("creating surface");
-        iad.instance.create_surface(&window)
+        Arc::new(iad.instance.create_surface(&window))
     };
     // Get the preferred format for the surface.
     let format = {
@@ -168,22 +168,33 @@ fn main() {
     let renderer = rend3::Renderer::new(iad, Some(window_size.width as f32 / window_size.height as f32)).unwrap();
 
     // Create the pbr pipeline with the same internal resolution and 4x multisampling
-    let routine = Arc::new(Mutex::new(rend3_pbr::PbrRenderRoutine::new(
+    let render_texture_options = rend3_pbr::RenderTextureOptions {
+        resolution: UVec2::new(window_size.width, window_size.height),
+        samples: rend3_pbr::SampleCount::One,
+    };
+    let pbr_routine = Arc::new(Mutex::new(rend3_pbr::PbrRenderRoutine::new(
         &renderer,
-        rend3_pbr::RenderTextureOptions {
-            resolution: UVec2::new(window_size.width, window_size.height),
-            samples: rend3_pbr::SampleCount::Four,
-        },
+        render_texture_options,
+    )));
+    let skybox_routine = Arc::new(Mutex::new(rend3_pbr::SkyboxRoutine::new(
+        &renderer,
+        render_texture_options,
+    )));
+    let tonemapping_routine = Arc::new(Mutex::new(rend3_pbr::TonemappingRoutine::new(
+        &renderer,
+        render_texture_options.resolution,
         format,
     )));
 
-    routine.lock().set_ambient_color(glam::Vec4::new(0.15, 0.15, 0.15, 1.0));
+    pbr_routine
+        .lock()
+        .set_ambient_color(glam::Vec4::new(0.15, 0.15, 0.15, 1.0));
 
-    let routine_clone = Arc::clone(&routine);
+    let skybox_routine_clone = Arc::clone(&skybox_routine);
     let renderer_clone = Arc::clone(&renderer);
     let _loaded_gltf = std::thread::spawn(move || {
         profiling::register_thread!("asset loading");
-        if let Err(e) = load_skybox(&renderer_clone, &routine_clone) {
+        if let Err(e) = load_skybox(&renderer_clone, &skybox_routine_clone) {
             println!("Failed to load skybox {}", e)
         };
         load_gltf(
@@ -354,12 +365,15 @@ fn main() {
             // Tell the renderer about the new aspect ratio.
             renderer.set_aspect_ratio(size.x as f32 / size.y as f32);
             // Resize the internal buffers to the same size as the screen.
-            routine.lock().resize(
+            pbr_routine.lock().resize(
                 &renderer,
                 rend3_pbr::RenderTextureOptions {
                     resolution: size,
-                    samples: rend3_pbr::SampleCount::Four,
+                    samples: rend3_pbr::SampleCount::One,
                 },
+            );
+            tonemapping_routine.lock().resize(
+                size,
             );
         }
         // Render!
@@ -371,7 +385,7 @@ fn main() {
             let view = view * Mat4::from_translation((-camera_location).into());
 
             renderer.set_camera_data(Camera {
-                projection: CameraProjection::Projection {
+                projection: CameraProjection::Perspective {
                     vfov: 60.0,
                     near: 0.1,
                 },
@@ -379,11 +393,19 @@ fn main() {
             });
 
             // Get a frame
-            let frame = rend3::util::output::OutputFrame::from_surface(&surface).unwrap();
+            let frame = rend3::util::output::OutputFrame::Surface { surface: Arc::clone(&surface) };
+            // Lock all the routines
+            let pbr_routine = pbr_routine.lock();
+            let skybox_routine = skybox_routine.lock();
+            let tonemapping_routine = tonemapping_routine.lock();
+            // Build a rendergraph
+            let mut graph = rend3::RenderGraph::new();
+            pbr_routine.add_prepass_to_graph(graph.add_node());
+            skybox_routine.add_to_graph(graph.add_node());
+            pbr_routine.add_forward_to_graph(graph.add_node());
+            tonemapping_routine.add_to_graph(graph.add_node());
             // Dispatch a render!
-            previous_profiling_stats = renderer.render(&mut *routine.lock(), (), frame.as_view());
-            // Present the frame on screen
-            frame.present();
+            previous_profiling_stats = renderer.render(graph, frame);
             // mark the end of the frame for tracy/other profilers
             profiling::finish_frame!();
         }
