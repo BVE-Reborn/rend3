@@ -17,3 +17,4 @@ egui_wgpu_backend = { git = "https://github.com/hasenbanck/egui_wgpu_backend.git
 rend3 = { version = "^0.2.0", path = "../rend3" }
 wgpu = "0.11"
 flume = "0.10"
+glam = "0.19"

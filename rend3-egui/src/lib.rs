@@ -1,5 +1,5 @@
-use rend3::{ManagerReadyOutput, RenderRoutine, Renderer};
-use wgpu::{TextureFormat, TextureView};
+use rend3::{RenderGraphNodeBuilder, Renderer};
+use wgpu::TextureFormat;
 
 pub struct EguiRenderRoutine {
     internal: egui_wgpu_backend::RenderPass,
@@ -26,14 +26,7 @@ impl EguiRenderRoutine {
             },
         }
     }
-}
 
-pub struct Input<'a> {
-    pub clipped_meshes: &'a Vec<egui::ClippedMesh>,
-    pub context: egui::CtxRef,
-}
-
-impl EguiRenderRoutine {
     pub fn resize(&mut self, new_width: u32, new_height: u32, new_scale_factor: f32) {
         self.screen_descriptor = egui_wgpu_backend::ScreenDescriptor {
             physical_height: new_height,
@@ -41,43 +34,51 @@ impl EguiRenderRoutine {
             scale_factor: new_scale_factor,
         };
     }
-}
 
-impl RenderRoutine<&Input<'_>, &TextureView> for EguiRenderRoutine {
-    fn render(
-        &mut self,
-        renderer: std::sync::Arc<Renderer>,
-        cmd_bufs: flume::Sender<wgpu::CommandBuffer>,
-        _ready: ManagerReadyOutput,
-        input: &Input<'_>,
-        output: &TextureView,
-    ) {
-        let mut encoder = renderer.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("egui command encoder"),
-        });
+    pub fn add_to_graph<'node>(&'node mut self, mut builder: RenderGraphNodeBuilder<'_, 'node>, input: Input<'node>) {
+        // let output_handle = builder.add_render_target_output("egui", RenderTargetDescriptor {
+        //     dim: UVec2::new(self.screen_descriptor.physical_width, self.screen_descriptor.physical_height),
+        //     format: self.format,
+        //     usage: TextureUsages::RENDER_ATTACHMENT,
+        // });
 
-        self.internal
-            .update_texture(&renderer.device, &renderer.queue, &input.context.texture());
-        self.internal.update_user_textures(&renderer.device, &renderer.queue);
-        self.internal.update_buffers(
-            &renderer.device,
-            &renderer.queue,
-            input.clipped_meshes,
-            &self.screen_descriptor,
-        );
+        let output_handle = builder.add_surface_output();
 
-        self.internal
-            .execute(
-                &mut encoder,
-                output,
+        builder.build(move |renderer, _prefix_cmd_bufs, cmd_bufs, _ready, texture_store| {
+            let mut encoder = renderer.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("egui command encoder"),
+            });
+
+            self.internal
+                .update_texture(&renderer.device, &renderer.queue, &input.context.texture());
+            self.internal.update_user_textures(&renderer.device, &renderer.queue);
+            self.internal.update_buffers(
+                &renderer.device,
+                &renderer.queue,
                 input.clipped_meshes,
                 &self.screen_descriptor,
-                None,
-            )
-            .unwrap(); // TODO don't unwrap
+            );
 
-        cmd_bufs.send(encoder.finish()).unwrap();
+            let output = texture_store.get_render_target(output_handle);
+
+            self.internal
+                .execute(
+                    &mut encoder,
+                    output,
+                    input.clipped_meshes,
+                    &self.screen_descriptor,
+                    None,
+                )
+                .unwrap();
+
+            cmd_bufs.send(encoder.finish()).unwrap();
+        });
     }
+}
+
+pub struct Input<'a> {
+    pub clipped_meshes: &'a Vec<egui::ClippedMesh>,
+    pub context: egui::CtxRef,
 }
 
 impl epi::TextureAllocator for EguiRenderRoutine {
