@@ -28,6 +28,7 @@ Per Keep a Changelog there are 6 main categories of changes:
 
 ## Unreleased
 
+- rend3: Add example `textured-quad`.
 - rend3: Rename `CameraProjection::Projection` to `CameraProjection::Perspective`.
 
 ## v0.2.0
