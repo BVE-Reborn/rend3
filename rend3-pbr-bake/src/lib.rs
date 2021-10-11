@@ -93,8 +93,8 @@ impl PbrBakerRenderRoutine {
     }
 }
 
-impl rend3::RenderRoutine<Vec<BakeData>, PbrBakerOutput<'_>> for PbrBakerRenderRoutine {
-    fn render(
+impl PbrBakerRenderRoutine {
+    pub fn render(
         &mut self,
         renderer: Arc<Renderer>,
         encoders: flume::Sender<wgpu::CommandBuffer>,

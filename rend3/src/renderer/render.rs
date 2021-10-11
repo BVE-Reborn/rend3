@@ -1,15 +1,12 @@
 use crate::{
-    instruction::Instruction, util::typedefs::RendererStatistics, ManagerReadyOutput, RenderRoutine, Renderer,
+    instruction::Instruction,
+    util::{output::OutputFrame, typedefs::RendererStatistics},
+    ManagerReadyOutput, RenderGraph, Renderer,
 };
 use std::sync::Arc;
 use wgpu::CommandEncoderDescriptor;
 
-pub fn render_loop<Input, Output>(
-    renderer: Arc<Renderer>,
-    routine: &mut dyn RenderRoutine<Input, Output>,
-    input: Input,
-    output: Output,
-) -> Option<RendererStatistics> {
+pub fn render_loop(renderer: Arc<Renderer>, graph: RenderGraph<'_>, output: OutputFrame) -> Option<RendererStatistics> {
     profiling::scope!("render_loop");
 
     renderer.instructions.swap();
@@ -129,23 +126,7 @@ pub fn render_loop<Input, Output>(
         profiler,
     ));
 
-    let (sender, reciever) = flume::unbounded();
     cmd_bufs.push(encoder.finish());
 
-    routine.render(Arc::clone(&renderer), sender, ready, input, output);
-    // Recieve buffers from the render routine
-    while let Ok(cmd_buf) = reciever.try_recv() {
-        cmd_bufs.push(cmd_buf)
-    }
-
-    let mut encoder = renderer.device.create_command_encoder(&CommandEncoderDescriptor {
-        label: Some("resolve encoder"),
-    });
-    renderer.profiler.lock().resolve_queries(&mut encoder);
-    cmd_bufs.push(encoder.finish());
-    renderer.queue.submit(cmd_bufs);
-
-    let mut profiler = renderer.profiler.lock();
-    profiler.end_frame().unwrap();
-    profiler.process_finished_frame()
+    graph.execute(&renderer, output, cmd_bufs, &ready)
 }
