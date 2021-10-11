@@ -270,7 +270,6 @@ pub struct RenderGraphNodeBuilder<'a, 'node> {
     outputs: Vec<Option<SsoString>>,
 }
 impl<'a, 'node> RenderGraphNodeBuilder<'a, 'node> {
-    // TODO: resolve input/output matching; input should never _create_ a target
     pub fn add_input<S>(&mut self, name: S) -> RenderTargetHandle
     where
         SsoString: From<S>,

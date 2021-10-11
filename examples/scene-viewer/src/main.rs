@@ -7,7 +7,7 @@ use rend3::{
     util::typedefs::FastHashMap,
     Renderer,
 };
-use rend3_pbr::PbrRenderRoutine;
+use rend3_pbr::{SkyboxRoutine};
 use std::{
     collections::HashMap,
     hash::BuildHasher,
@@ -25,7 +25,7 @@ use winit::{
 
 mod platform;
 
-fn load_skybox(renderer: &Renderer, pbr_routine: &Mutex<PbrRenderRoutine>) -> Result<(), Box<dyn std::error::Error>> {
+fn load_skybox(renderer: &Renderer, skybox_routine: &Mutex<SkyboxRoutine>) -> Result<(), Box<dyn std::error::Error>> {
     profiling::scope!("load skybox");
 
     let name = concat!(env!("CARGO_MANIFEST_DIR"), "/data/skybox.basis");
@@ -72,7 +72,7 @@ fn load_skybox(renderer: &Renderer, pbr_routine: &Mutex<PbrRenderRoutine>) -> Re
         mip_count: rend3::types::MipmapCount::Specific(NonZeroU32::new(mips).unwrap()),
         mip_source: rend3::types::MipmapSource::Uploaded,
     });
-    pbr_routine.lock().set_background_texture(Some(handle));
+    skybox_routine.lock().set_background_texture(Some(handle));
     Ok(())
 }
 
@@ -167,13 +167,19 @@ fn main() {
     // Make us a renderer.
     let renderer = rend3::Renderer::new(iad, Some(window_size.width as f32 / window_size.height as f32)).unwrap();
 
+    let render_texture_options = rend3_pbr::RenderTextureOptions {
+        resolution: UVec2::new(window_size.width, window_size.height),
+        samples: rend3_pbr::SampleCount::One,
+    };
+
     // Create the pbr pipeline with the same internal resolution and 4x multisampling
     let pbr_routine = Arc::new(Mutex::new(rend3_pbr::PbrRenderRoutine::new(
         &renderer,
-        rend3_pbr::RenderTextureOptions {
-            resolution: UVec2::new(window_size.width, window_size.height),
-            samples: rend3_pbr::SampleCount::One,
-        },
+        render_texture_options,
+    )));
+    let skybox_routine = Arc::new(Mutex::new(rend3_pbr::SkyboxRoutine::new(
+        &renderer,
+        render_texture_options,
     )));
     let tonemapping_routine = Arc::new(Mutex::new(rend3_pbr::TonemappingRoutine::new(
         &renderer,
@@ -185,11 +191,11 @@ fn main() {
         .lock()
         .set_ambient_color(glam::Vec4::new(0.15, 0.15, 0.15, 1.0));
 
-    let pbr_routine_clone = Arc::clone(&pbr_routine);
+    let skybox_routine_clone = Arc::clone(&skybox_routine);
     let renderer_clone = Arc::clone(&renderer);
     let _loaded_gltf = std::thread::spawn(move || {
         profiling::register_thread!("asset loading");
-        if let Err(e) = load_skybox(&renderer_clone, &pbr_routine_clone) {
+        if let Err(e) = load_skybox(&renderer_clone, &skybox_routine_clone) {
             println!("Failed to load skybox {}", e)
         };
         load_gltf(
@@ -390,11 +396,14 @@ fn main() {
             // Get a frame
             let frame = rend3::util::output::OutputFrame::Surface { surface: Arc::clone(&surface) };
             // Lock all the routines
-            let mut pbr_routine = pbr_routine.lock();
-            let mut tonemapping_routine = tonemapping_routine.lock();
+            let pbr_routine = pbr_routine.lock();
+            let skybox_routine = skybox_routine.lock();
+            let tonemapping_routine = tonemapping_routine.lock();
             // Build a rendergraph
             let mut graph = rend3::RenderGraph::new();
-            pbr_routine.add_to_graph(graph.add_node());
+            pbr_routine.add_to_prepass_to_graph(graph.add_node());
+            skybox_routine.add_to_graph(graph.add_node());
+            pbr_routine.add_to_forward_to_graph(graph.add_node());
             tonemapping_routine.add_to_graph(graph.add_node());
             // Dispatch a render!
             previous_profiling_stats = renderer.render(graph, frame);
