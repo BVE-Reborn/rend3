@@ -91,10 +91,7 @@ fn main() {
 
     // Add PBR material with all defaults except a single color.
     let material = rend3_pbr::material::PbrMaterial {
-        albedo: rend3_pbr::material::AlbedoComponent::TextureValue {
-            texture: texture_checker_handle,
-            value: glam::Vec4::new(1.0, 1.0, 1.0, 1.0),
-        },
+        albedo: rend3_pbr::material::AlbedoComponent::Texture(texture_checker_handle),
         unlit: true,
         sample_type: rend3_pbr::material::SampleType::Nearest,
         ..rend3_pbr::material::PbrMaterial::default()
