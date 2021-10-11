@@ -113,7 +113,7 @@ impl PbrRenderRoutine {
         self.render_texture_options = options;
     }
 
-    pub fn add_to_prepass_to_graph<'node>(&'node self, mut builder: RenderGraphNodeBuilder<'_, 'node>) {
+    pub fn add_prepass_to_graph<'node>(&'node self, mut builder: RenderGraphNodeBuilder<'_, 'node>) {
         let hdr_color_handle = builder.add_output(
             "hdr color",
             RenderTargetDescriptor {
@@ -290,7 +290,7 @@ impl PbrRenderRoutine {
         });
     }
 
-    pub fn add_to_forward_to_graph<'node>(&'node self, mut builder: RenderGraphNodeBuilder<'_, 'node>) {
+    pub fn add_forward_to_graph<'node>(&'node self, mut builder: RenderGraphNodeBuilder<'_, 'node>) {
         let hdr_color_handle = builder.add_output(
             "hdr color",
             RenderTargetDescriptor {

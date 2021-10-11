@@ -184,8 +184,8 @@ fn main() {
             };
             // Build a rendergraph
             let mut graph = rend3::RenderGraph::new();
-            pbr_routine.add_to_prepass_to_graph(graph.add_node());
-            pbr_routine.add_to_forward_to_graph(graph.add_node());
+            pbr_routine.add_prepass_to_graph(graph.add_node());
+            pbr_routine.add_forward_to_graph(graph.add_node());
             tonemapping_routine.add_to_graph(graph.add_node());
             // Dispatch a render!
             renderer.render(graph, frame);
