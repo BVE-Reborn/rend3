@@ -87,12 +87,12 @@ fn main() {
         mip_count: rend3::types::MipmapCount::ONE,
         mip_source: rend3::types::MipmapSource::Uploaded,
     };
-    let texture_handle = renderer.add_texture_2d(texture_checker);
+    let texture_checker_handle = renderer.add_texture_2d(texture_checker);
 
     // Add PBR material with all defaults except a single color.
     let material = rend3_pbr::material::PbrMaterial {
         albedo: rend3_pbr::material::AlbedoComponent::TextureValue {
-            texture: texture_handle,
+            texture: texture_checker_handle,
             value: glam::Vec4::new(1.0, 1.0, 1.0, 1.0),
         },
         unlit: true,
