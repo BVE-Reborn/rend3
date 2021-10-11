@@ -1,7 +1,7 @@
 [package]
 name = "rend3-pbr-bake"
 version = "0.2.0"
-authors = ["Connor Fitzgerald <connorwadefitzgerald@gmail.com>"]
+authors = ["The rend3 Developers"]
 edition = "2018"
 description = "PBR light baking RenderRoutine for rend3"
 readme = "../README.md"
