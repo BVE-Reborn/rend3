@@ -69,7 +69,7 @@ impl<'node> RenderGraph<'node> {
         // Iterate the nodes backwards to track dependencies
         for node in self.nodes.into_iter().rev() {
             // If any of our outputs are used by a previous node, we have reason to exist
-            let outputs_used = node.outputs.iter().any(|o| awaiting_inputs.remove(&o));
+            let outputs_used = node.outputs.iter().any(|o| awaiting_inputs.remove(o));
 
             if outputs_used {
                 // Add our inputs to be matched up with outputs.
@@ -228,6 +228,12 @@ impl<'node> RenderGraph<'node> {
     }
 }
 
+impl<'node> Default for RenderGraph<'node> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub struct RenderTargetHandle {
     name: Option<SsoString>,
 }
@@ -250,6 +256,7 @@ impl<'a> RenderGraphTextureStore<'a> {
     }
 }
 
+#[allow(clippy::type_complexity)]
 pub struct RenderGraphNode<'node> {
     inputs: Vec<Option<SsoString>>,
     outputs: Vec<Option<SsoString>>,

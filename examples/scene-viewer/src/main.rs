@@ -7,7 +7,7 @@ use rend3::{
     util::typedefs::FastHashMap,
     Renderer,
 };
-use rend3_pbr::{SkyboxRoutine};
+use rend3_pbr::SkyboxRoutine;
 use std::{
     collections::HashMap,
     hash::BuildHasher,
@@ -167,12 +167,11 @@ fn main() {
     // Make us a renderer.
     let renderer = rend3::Renderer::new(iad, Some(window_size.width as f32 / window_size.height as f32)).unwrap();
 
+    // Create the pbr pipeline with the same internal resolution and 4x multisampling
     let render_texture_options = rend3_pbr::RenderTextureOptions {
         resolution: UVec2::new(window_size.width, window_size.height),
         samples: rend3_pbr::SampleCount::One,
     };
-
-    // Create the pbr pipeline with the same internal resolution and 4x multisampling
     let pbr_routine = Arc::new(Mutex::new(rend3_pbr::PbrRenderRoutine::new(
         &renderer,
         render_texture_options,
@@ -183,7 +182,7 @@ fn main() {
     )));
     let tonemapping_routine = Arc::new(Mutex::new(rend3_pbr::TonemappingRoutine::new(
         &renderer,
-        UVec2::new(window_size.width, window_size.height),
+        render_texture_options.resolution,
         format,
     )));
 

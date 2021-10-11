@@ -382,9 +382,9 @@ impl Renderer {
     /// Render a frame of the scene onto the given output, using the given RenderRoutine.
     ///
     /// The RendererStatistics may not be the results from this frame, but might be the results from multiple frames ago.
-    pub fn render<'node>(
+    pub fn render(
         self: &Arc<Self>,
-        graph: RenderGraph<'node>,
+        graph: RenderGraph<'_>,
         output: OutputFrame,
     ) -> Option<RendererStatistics> {
         render::render_loop(Arc::clone(self), graph, output)
