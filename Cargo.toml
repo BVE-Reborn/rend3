@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "examples/textured-quad",
     "examples/cube",
     "examples/gltf",
     "examples/scene-viewer",
