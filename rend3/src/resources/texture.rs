@@ -146,6 +146,7 @@ impl TextureManager {
 }
 
 /// Output of readying up a [`TextureManager`].
+#[derive(Clone)]
 pub struct TextureManagerReadyOutput {
     pub bg: ModeData<(), Arc<BindGroup>>,
 }

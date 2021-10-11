@@ -9,8 +9,8 @@ use crate::{
         Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, MaterialHandle, Mesh, MeshHandle,
         Object, ObjectHandle, Texture, TextureHandle,
     },
-    util::{mipmap::MipmapGenerator, typedefs::RendererStatistics},
-    ExtendedAdapterInfo, InstanceAdapterDevice, RenderRoutine, RendererInitializationError, RendererMode,
+    util::{mipmap::MipmapGenerator, output::OutputFrame, typedefs::RendererStatistics},
+    ExtendedAdapterInfo, InstanceAdapterDevice, RenderGraph, RendererInitializationError, RendererMode,
 };
 use glam::Mat4;
 use parking_lot::{Mutex, RwLock};
@@ -382,12 +382,11 @@ impl Renderer {
     /// Render a frame of the scene onto the given output, using the given RenderRoutine.
     ///
     /// The RendererStatistics may not be the results from this frame, but might be the results from multiple frames ago.
-    pub fn render<Input, Output>(
+    pub fn render<'node>(
         self: &Arc<Self>,
-        routine: &mut dyn RenderRoutine<Input, Output>,
-        input: Input,
-        output: Output,
+        graph: RenderGraph<'node>,
+        output: OutputFrame,
     ) -> Option<RendererStatistics> {
-        render::render_loop(Arc::clone(self), routine, input, output)
+        render::render_loop(Arc::clone(self), graph, output)
     }
 }
