@@ -4,6 +4,9 @@
 [![Crates.io](https://img.shields.io/crates/v/rend3)](https://crates.io/crates/rend3)
 [![Documentation](https://docs.rs/rend3/badge.svg)](https://docs.rs/rend3)
 ![License](https://img.shields.io/crates/l/rend3)
+[![Matrix](https://img.shields.io/static/v1?label=rend3%20matrix&message=%23rend3&color=blueviolet&logo=matrix)](https://matrix.to/#/#rend3:matrix.org)
+[![Discord](https://img.shields.io/discord/451037457475960852?color=7289DA&label=discord)](https://discord.gg/mjxXTVzaDg)
+
 
 {{readme}}
 
