@@ -96,6 +96,7 @@ fn main() {
             value: glam::Vec4::new(1.0, 1.0, 1.0, 1.0),
         },
         unlit: true,
+        sample_type: rend3_pbr::material::SampleType::Nearest,
         ..rend3_pbr::material::PbrMaterial::default()
     };
     let material_handle = renderer.add_material(material);
