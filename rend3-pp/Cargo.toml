@@ -1,0 +1,15 @@
+[package]
+name = "rend3-pp"
+version = "0.2.0"
+authors = ["The rend3 Developers"]
+edition = "2018"
+description = "Postprocessing and tonemapping utilities for rend3"
+readme = "../README.md"
+repository = "https://github.com/BVE-Reborn/rend3"
+license = "MIT OR Apache-2.0 OR Zlib"
+keywords = ["3d", "graphics", "gpu", "renderer", "wgpu"]
+categories = ["game-development", "graphics", "rendering", "rendering::engine"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]

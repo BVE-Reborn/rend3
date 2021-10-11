@@ -9,6 +9,7 @@ members = [
     "rend3-gltf",
     "rend3-pbr",
     "rend3-pbr-bake",
+    "rend3-pp",
     "rend3-types"
 ]
 
