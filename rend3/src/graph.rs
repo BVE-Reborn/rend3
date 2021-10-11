@@ -244,7 +244,7 @@ pub struct RenderGraphTextureStore<'a> {
 }
 
 impl<'a> RenderGraphTextureStore<'a> {
-    pub fn get_target(&self, handle: RenderTargetHandle) -> &TextureView {
+    pub fn get_render_target(&self, handle: RenderTargetHandle) -> &TextureView {
         if let Some(name) = handle.name {
             self.mapping
                 .get(&name)
@@ -277,7 +277,7 @@ pub struct RenderGraphNodeBuilder<'a, 'node> {
     outputs: Vec<Option<SsoString>>,
 }
 impl<'a, 'node> RenderGraphNodeBuilder<'a, 'node> {
-    pub fn add_input<S>(&mut self, name: S) -> RenderTargetHandle
+    pub fn add_render_target_input<S>(&mut self, name: S) -> RenderTargetHandle
     where
         SsoString: From<S>,
     {
@@ -286,7 +286,7 @@ impl<'a, 'node> RenderGraphNodeBuilder<'a, 'node> {
         RenderTargetHandle { name: Some(name) }
     }
 
-    pub fn add_output<S>(&mut self, name: S, desc: RenderTargetDescriptor) -> RenderTargetHandle
+    pub fn add_render_target_output<S>(&mut self, name: S, desc: RenderTargetDescriptor) -> RenderTargetHandle
     where
         SsoString: From<S>,
     {

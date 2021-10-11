@@ -110,13 +110,13 @@ pub mod util {
 
 mod instruction;
 mod mode;
-mod routine;
+mod graph;
 mod setup;
 mod surface;
 
 pub use mode::*;
 pub use renderer::{error::*, Renderer};
-pub use routine::*;
+pub use graph::*;
 pub use setup::*;
 pub use surface::*;
 

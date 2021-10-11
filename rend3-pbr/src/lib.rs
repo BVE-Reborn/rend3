@@ -114,7 +114,7 @@ impl PbrRenderRoutine {
     }
 
     pub fn add_prepass_to_graph<'node>(&'node self, mut builder: RenderGraphNodeBuilder<'_, 'node>) {
-        let hdr_color_handle = builder.add_output(
+        let hdr_color_handle = builder.add_render_target_output(
             "hdr color",
             RenderTargetDescriptor {
                 dim: self.render_texture_options.resolution,
@@ -123,7 +123,7 @@ impl PbrRenderRoutine {
             },
         );
 
-        let hdr_depth_handle = builder.add_output(
+        let hdr_depth_handle = builder.add_render_target_output(
             "hdr depth",
             RenderTargetDescriptor {
                 dim: self.render_texture_options.resolution,
@@ -133,8 +133,8 @@ impl PbrRenderRoutine {
         );
 
         builder.build(move |renderer, _prefix_cmd_bufs, cmd_bufs, ready, texture_store| {
-            let hdr_color = texture_store.get_target(hdr_color_handle);
-            let hdr_depth = texture_store.get_target(hdr_depth_handle);
+            let hdr_color = texture_store.get_render_target(hdr_color_handle);
+            let hdr_depth = texture_store.get_render_target(hdr_depth_handle);
             profiling::scope!("PBR Render Routine");
 
             let mut encoder = renderer.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -291,7 +291,7 @@ impl PbrRenderRoutine {
     }
 
     pub fn add_forward_to_graph<'node>(&'node self, mut builder: RenderGraphNodeBuilder<'_, 'node>) {
-        let hdr_color_handle = builder.add_output(
+        let hdr_color_handle = builder.add_render_target_output(
             "hdr color",
             RenderTargetDescriptor {
                 dim: self.render_texture_options.resolution,
@@ -300,7 +300,7 @@ impl PbrRenderRoutine {
             },
         );
 
-        let hdr_depth_handle = builder.add_output(
+        let hdr_depth_handle = builder.add_render_target_output(
             "hdr depth",
             RenderTargetDescriptor {
                 dim: self.render_texture_options.resolution,
@@ -310,8 +310,8 @@ impl PbrRenderRoutine {
         );
 
         builder.build(move |renderer, _prefix_cmd_bufs, cmd_bufs, ready, texture_store| {
-            let hdr_color = texture_store.get_target(hdr_color_handle);
-            let hdr_depth = texture_store.get_target(hdr_depth_handle);
+            let hdr_color = texture_store.get_render_target(hdr_color_handle);
+            let hdr_depth = texture_store.get_render_target(hdr_depth_handle);
             profiling::scope!("PBR Render Routine");
 
             let mut encoder = renderer.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -631,7 +631,7 @@ impl SkyboxRoutine {
     }
 
     pub fn add_to_graph<'node>(&'node self, mut builder: RenderGraphNodeBuilder<'_, 'node>) {
-        let hdr_color_handle = builder.add_output(
+        let hdr_color_handle = builder.add_render_target_output(
             "hdr color",
             RenderTargetDescriptor {
                 dim: self.options.resolution,
@@ -640,11 +640,11 @@ impl SkyboxRoutine {
             },
         );
 
-        let hdr_depth_handle = builder.add_input("hdr depth");
+        let hdr_depth_handle = builder.add_render_target_input("hdr depth");
 
         builder.build(move |renderer, _prefix_cmd_bufs, cmd_bufs, _ready, texture_store| {
-            let hdr_color = texture_store.get_target(hdr_color_handle);
-            let hdr_depth = texture_store.get_target(hdr_depth_handle);
+            let hdr_color = texture_store.get_render_target(hdr_color_handle);
+            let hdr_depth = texture_store.get_render_target(hdr_depth_handle);
             let mut encoder = renderer.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("tonemapper encoder"),
             });
@@ -740,13 +740,13 @@ impl TonemappingRoutine {
     }
 
     pub fn add_to_graph<'node>(&'node self, mut builder: RenderGraphNodeBuilder<'_, 'node>) {
-        let hdr_color_handle = builder.add_input("hdr color");
+        let hdr_color_handle = builder.add_render_target_input("hdr color");
 
         let output_handle = builder.add_surface_output();
 
         builder.build(move |renderer, _prefix_cmd_bufs, cmd_bufs, _ready, texture_store| {
-            let hdr_color = texture_store.get_target(hdr_color_handle);
-            let output = texture_store.get_target(output_handle);
+            let hdr_color = texture_store.get_render_target(hdr_color_handle);
+            let output = texture_store.get_render_target(output_handle);
             let mut encoder = renderer.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("tonemapper encoder"),
             });
