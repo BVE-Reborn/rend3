@@ -1,19 +1,19 @@
 [package]
-name = "rend3-egui"
-version = "0.1.0"
-authors = ["Juri Furer <juri.furer@protonmail.com>"]
-edition = "2018"
+authors = ["The rend3 Developers"]
+categories = ["game-development", "graphics", "rendering", "rendering::engine"]
 description = "Egui Render Routine for rend3"
+edition = "2018"
+keywords = ["3d", "graphics", "gpu", "renderer", "wgpu"]
+license = "MIT OR Apache-2.0 OR Zlib"
+name = "rend3-egui"
 readme = "../README.md"
 repository = "https://github.com/BVE-Reborn/rend3"
-license = "MIT OR Apache-2.0 OR Zlib"
-keywords = ["3d", "graphics", "gpu", "renderer", "wgpu"]
-categories = ["game-development", "graphics", "rendering", "rendering::engine"]
+version = "0.1.0"
 
 [dependencies]
-egui = "0.14.2"
-epi = "0.14.0"
-egui_wgpu_backend = { git = "https://github.com/hasenbanck/egui_wgpu_backend.git", rev = "6f1f59be1054a523cd28e3ba020b3c7490793e9a" }
+egui = "0.14"
+epi = "0.14"
+egui_wgpu_backend = "0.13"
 rend3 = { version = "^0.2.0", path = "../rend3" }
 wgpu = "0.11"
 flume = "0.10"
