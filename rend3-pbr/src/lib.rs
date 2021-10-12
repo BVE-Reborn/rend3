@@ -10,7 +10,7 @@ use parking_lot::Mutex;
 use rend3::{
     resources::{DirectionalLightManager, MaterialManager, TextureManager},
     types::{TextureFormat, TextureHandle, TextureUsages},
-    ModeData, RenderGraphNodeBuilder, RenderTargetDescriptor, Renderer, RendererMode,
+    ModeData, RenderGraph, RenderGraphNodeBuilder, RenderTargetDescriptor, Renderer, RendererMode,
 };
 use wgpu::{
     Color, Device, LoadOp, Operations, RenderPassColorAttachment, RenderPassDepthStencilAttachment,
@@ -113,7 +113,9 @@ impl PbrRenderRoutine {
         self.render_texture_options = options;
     }
 
-    pub fn add_prepass_to_graph<'node>(&'node self, mut builder: RenderGraphNodeBuilder<'_, 'node>) {
+    pub fn add_prepass_to_graph<'node>(&'node self, graph: &mut RenderGraph<'node>) {
+        let mut builder = graph.add_node();
+
         let hdr_color_handle = builder.add_render_target_output(
             "hdr color",
             RenderTargetDescriptor {
@@ -290,7 +292,9 @@ impl PbrRenderRoutine {
         });
     }
 
-    pub fn add_forward_to_graph<'node>(&'node self, mut builder: RenderGraphNodeBuilder<'_, 'node>) {
+    pub fn add_forward_to_graph<'node>(&'node self, graph: &mut RenderGraph<'node>) {
+        let mut builder = graph.add_node();
+
         let hdr_color_handle = builder.add_render_target_output(
             "hdr color",
             RenderTargetDescriptor {
@@ -630,7 +634,9 @@ impl SkyboxRoutine {
         self.options = options;
     }
 
-    pub fn add_to_graph<'node>(&'node self, mut builder: RenderGraphNodeBuilder<'_, 'node>) {
+    pub fn add_to_graph<'node>(&'node self, graph: &mut RenderGraph<'node>) {
+        let mut builder = graph.add_node();
+
         let hdr_color_handle = builder.add_render_target_output(
             "hdr color",
             RenderTargetDescriptor {
@@ -739,7 +745,9 @@ impl TonemappingRoutine {
         self.size = size;
     }
 
-    pub fn add_to_graph<'node>(&'node self, mut builder: RenderGraphNodeBuilder<'_, 'node>) {
+    pub fn add_to_graph<'node>(&'node self, graph: &mut RenderGraph<'node>) {
+        let mut builder = graph.add_node();
+
         let hdr_color_handle = builder.add_render_target_input("hdr color");
 
         let output_handle = builder.add_surface_output();

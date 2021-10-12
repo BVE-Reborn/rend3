@@ -398,14 +398,16 @@ fn main() {
             let pbr_routine = pbr_routine.lock();
             let skybox_routine = skybox_routine.lock();
             let tonemapping_routine = tonemapping_routine.lock();
+            // Ready up the renderer
+            let (cmd_bufs, ready) = renderer.ready();
             // Build a rendergraph
             let mut graph = rend3::RenderGraph::new();
-            pbr_routine.add_prepass_to_graph(graph.add_node());
-            skybox_routine.add_to_graph(graph.add_node());
-            pbr_routine.add_forward_to_graph(graph.add_node());
-            tonemapping_routine.add_to_graph(graph.add_node());
+            pbr_routine.add_prepass_to_graph(&mut graph);
+            skybox_routine.add_to_graph(&mut graph);
+            pbr_routine.add_forward_to_graph(&mut graph);
+            tonemapping_routine.add_to_graph(&mut graph);
             // Dispatch a render!
-            previous_profiling_stats = renderer.render(graph, frame);
+            graph.execute(&renderer, frame, cmd_bufs, &ready);
             // mark the end of the frame for tracy/other profilers
             profiling::finish_frame!();
         }

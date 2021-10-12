@@ -1,12 +1,7 @@
-use crate::{
-    instruction::Instruction,
-    util::{output::OutputFrame, typedefs::RendererStatistics},
-    ManagerReadyOutput, RenderGraph, Renderer,
-};
-use std::sync::Arc;
-use wgpu::CommandEncoderDescriptor;
+use crate::{instruction::Instruction, ReadyData, Renderer};
+use wgpu::{CommandBuffer, CommandEncoderDescriptor};
 
-pub fn render_loop(renderer: Arc<Renderer>, graph: RenderGraph<'_>, output: OutputFrame) -> Option<RendererStatistics> {
+pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
     profiling::scope!("render_loop");
 
     renderer.instructions.swap();
@@ -109,12 +104,6 @@ pub fn render_loop(renderer: Arc<Renderer>, graph: RenderGraph<'_>, output: Outp
     let directional_light_cameras = directional_light_manager.ready(&renderer.device, &renderer.queue, &camera_manager);
     mesh_manager.ready();
 
-    let ready = ManagerReadyOutput {
-        d2_texture,
-        d2c_texture,
-        directional_light_cameras,
-    };
-
     drop((
         camera_manager,
         mesh_manager,
@@ -126,7 +115,15 @@ pub fn render_loop(renderer: Arc<Renderer>, graph: RenderGraph<'_>, output: Outp
         profiler,
     ));
 
+    let mut cmd_bufs = Vec::with_capacity(32);
     cmd_bufs.push(encoder.finish());
 
-    graph.execute(&renderer, output, cmd_bufs, &ready)
+    (
+        cmd_bufs,
+        ReadyData {
+            d2_texture,
+            d2c_texture,
+            directional_light_cameras,
+        },
+    )
 }

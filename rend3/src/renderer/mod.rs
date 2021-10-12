@@ -1,29 +1,19 @@
-use crate::{
-    format_sso,
-    instruction::{Instruction, InstructionStreamPair},
-    resources::{
+use crate::{ExtendedAdapterInfo, InstanceAdapterDevice, ReadyData, RenderGraph, RendererInitializationError, RendererMode, format_sso, instruction::{Instruction, InstructionStreamPair}, resources::{
         CameraManager, DirectionalLightManager, InternalTexture, MaterialManager, MeshManager, ObjectManager,
         TextureManager,
-    },
-    types::{
+    }, types::{
         Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, MaterialHandle, Mesh, MeshHandle,
         Object, ObjectHandle, Texture, TextureHandle,
-    },
-    util::{mipmap::MipmapGenerator, output::OutputFrame, typedefs::RendererStatistics},
-    ExtendedAdapterInfo, InstanceAdapterDevice, RenderGraph, RendererInitializationError, RendererMode,
-};
+    }, util::{mipmap::MipmapGenerator, output::OutputFrame, typedefs::RendererStatistics}};
 use glam::Mat4;
 use parking_lot::{Mutex, RwLock};
 use rend3_types::{Material, MipmapCount, MipmapSource, TextureFromTexture, TextureUsages};
 use std::{num::NonZeroU32, sync::Arc};
-use wgpu::{
-    util::DeviceExt, CommandEncoderDescriptor, Device, Extent3d, ImageCopyTexture, ImageDataLayout, Origin3d, Queue,
-    TextureAspect, TextureDescriptor, TextureDimension, TextureViewDescriptor, TextureViewDimension,
-};
+use wgpu::{CommandBuffer, CommandEncoderDescriptor, Device, Extent3d, ImageCopyTexture, ImageDataLayout, Origin3d, Queue, TextureAspect, TextureDescriptor, TextureDimension, TextureViewDescriptor, TextureViewDimension, util::DeviceExt};
 use wgpu_profiler::GpuProfiler;
 
 pub mod error;
-mod render;
+mod ready;
 mod setup;
 
 /// Core struct which contains the renderer world. Primary way to interact with the world.
@@ -382,7 +372,7 @@ impl Renderer {
     /// Render a frame of the scene onto the given output, using the given RenderRoutine.
     ///
     /// The RendererStatistics may not be the results from this frame, but might be the results from multiple frames ago.
-    pub fn render(self: &Arc<Self>, graph: RenderGraph<'_>, output: OutputFrame) -> Option<RendererStatistics> {
-        render::render_loop(Arc::clone(self), graph, output)
+    pub fn ready(&self) -> (Vec<CommandBuffer>, ReadyData) {
+        ready::ready(self)
     }
 }
