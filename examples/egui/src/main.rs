@@ -1,7 +1,4 @@
-use std::{
-    sync::{Arc, Mutex},
-    time::Instant,
-};
+use std::{sync::Arc, time::Instant};
 
 use egui_winit_platform::{Platform, PlatformDescriptor};
 use glam::UVec2;
@@ -41,14 +38,14 @@ fn main() {
     let renderer = rend3::Renderer::new(iad, Some(window_size.width as f32 / window_size.height as f32)).unwrap();
 
     // Create the egui render egui_routine
-    let egui_routine = Arc::new(Mutex::new(rend3_egui::EguiRenderRoutine::new(
+    let mut egui_routine = rend3_egui::EguiRenderRoutine::new(
         &renderer,
         format,
         1, // For now this has to be 1, until rendergraphs support multisampling
         window_size.width,
         window_size.height,
         window.scale_factor() as f32,
-    )));
+    );
 
     let render_texture_options = rend3_pbr::RenderTextureOptions {
         resolution: UVec2::new(window_size.width, window_size.height),
@@ -56,21 +53,12 @@ fn main() {
     };
 
     // Create the pbr pipeline with the same internal resolution and 4x multisampling
-    let pbr_routine = Arc::new(Mutex::new(rend3_pbr::PbrRenderRoutine::new(
-        &renderer,
-        render_texture_options,
-    )));
+    let mut pbr_routine = rend3_pbr::PbrRenderRoutine::new(&renderer, render_texture_options);
 
-    let tonemapping_routine = Arc::new(Mutex::new(rend3_pbr::TonemappingRoutine::new(
-        &renderer,
-        render_texture_options.resolution,
-        format,
-    )));
+    let mut tonemapping_routine =
+        rend3_pbr::TonemappingRoutine::new(&renderer, render_texture_options.resolution, format);
 
-    pbr_routine
-        .lock()
-        .unwrap()
-        .set_ambient_color(glam::Vec4::new(0.15, 0.15, 0.15, 1.0));
+    pbr_routine.set_ambient_color(glam::Vec4::new(0.15, 0.15, 0.15, 1.0));
 
     // Create mesh and calculate smooth normals based on vertices
     let mesh = create_mesh();
@@ -176,11 +164,6 @@ fn main() {
                     surface: Arc::clone(&surface),
                 };
 
-                // Lock all the routines
-                let pbr_routine = pbr_routine.lock().unwrap();
-                let tonemapping_routine = tonemapping_routine.lock().unwrap();
-                let mut egui_routine = egui_routine.lock().unwrap();
-
                 // Build a rendergraph
                 let mut graph = rend3::RenderGraph::new();
                 pbr_routine.add_prepass_to_graph(graph.add_node());
@@ -190,11 +173,6 @@ fn main() {
 
                 // Dispatch a render
                 let _stats = renderer.render(graph, frame);
-
-                // For now we'll have to render our routines separately
-                // Check out https://github.com/BVE-Reborn/rend3/issues/229 for progress
-                // let _stats = renderer.render(&mut pbr_routine, (), frame.as_view());
-                // let _stats = renderer.render(&mut egui_routine, &input, frame.as_view());
 
                 *control_flow = ControlFlow::Poll;
             }
@@ -213,10 +191,9 @@ fn main() {
                         rend3::types::PresentMode::Mailbox,
                     );
 
-                    let mut egui_routine = egui_routine.lock().unwrap();
-                    egui_routine.resize(size.x, size.y, window.scale_factor() as f32);
+                    renderer.set_aspect_ratio(size.x as f32 / size.y as f32);
 
-                    let mut pbr_routine = pbr_routine.lock().unwrap();
+                    egui_routine.resize(size.x, size.y, window.scale_factor() as f32);
                     pbr_routine.resize(
                         &renderer,
                         rend3_pbr::RenderTextureOptions {
@@ -224,8 +201,6 @@ fn main() {
                             samples: rend3_pbr::SampleCount::One,
                         },
                     );
-
-                    let mut tonemapping_routine = tonemapping_routine.lock().unwrap();
                     tonemapping_routine.resize(size);
                 }
                 winit::event::WindowEvent::CloseRequested => {

@@ -36,12 +36,6 @@ impl EguiRenderRoutine {
     }
 
     pub fn add_to_graph<'node>(&'node mut self, mut builder: RenderGraphNodeBuilder<'_, 'node>, input: Input<'node>) {
-        // let output_handle = builder.add_render_target_output("egui", RenderTargetDescriptor {
-        //     dim: UVec2::new(self.screen_descriptor.physical_width, self.screen_descriptor.physical_height),
-        //     format: self.format,
-        //     usage: TextureUsages::RENDER_ATTACHMENT,
-        // });
-
         let output_handle = builder.add_surface_output();
 
         builder.build(move |renderer, _prefix_cmd_bufs, cmd_bufs, _ready, texture_store| {
