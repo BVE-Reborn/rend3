@@ -407,7 +407,7 @@ fn main() {
             pbr_routine.add_forward_to_graph(&mut graph);
             tonemapping_routine.add_to_graph(&mut graph);
             // Dispatch a render!
-            graph.execute(&renderer, frame, cmd_bufs, &ready);
+            previous_profiling_stats = graph.execute(&renderer, frame, cmd_bufs, &ready);
             // mark the end of the frame for tracy/other profilers
             profiling::finish_frame!();
         }
