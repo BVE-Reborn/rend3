@@ -2,10 +2,7 @@ use std::sync::Arc;
 
 use glam::UVec2;
 use rend3_types::{TextureFormat, TextureUsages};
-use wgpu::{
-    CommandBuffer, CommandEncoderDescriptor, Extent3d, Texture, TextureDescriptor, TextureDimension, TextureView,
-    TextureViewDescriptor,
-};
+use wgpu::{Buffer, CommandBuffer, CommandEncoder, CommandEncoderDescriptor, Extent3d, Texture, TextureDescriptor, TextureDimension, TextureView, TextureViewDescriptor};
 
 use crate::{
     resources::{CameraManager, TextureManagerReadyOutput},
@@ -18,7 +15,7 @@ use crate::{
 
 /// Output of calling ready on various managers.
 #[derive(Clone)]
-pub struct ManagerReadyOutput {
+pub struct ReadyData {
     pub d2_texture: TextureManagerReadyOutput,
     pub d2c_texture: TextureManagerReadyOutput,
     pub directional_light_cameras: Vec<CameraManager>,
@@ -60,7 +57,7 @@ impl<'node> RenderGraph<'node> {
         renderer: &Arc<Renderer>,
         mut output: OutputFrame,
         mut cmd_bufs: Vec<CommandBuffer>,
-        ready_output: &ManagerReadyOutput,
+        ready_output: &ReadyData,
     ) -> Option<RendererStatistics> {
         let mut awaiting_inputs = FastHashSet::default();
         awaiting_inputs.insert(None);
@@ -309,7 +306,7 @@ impl<'a, 'node> RenderGraphNodeBuilder<'a, 'node> {
                 &Arc<Renderer>,
                 flume::Sender<CommandBuffer>,
                 flume::Sender<CommandBuffer>,
-                &ManagerReadyOutput,
+                &ReadyData,
                 &RenderGraphTextureStore<'_>,
             ) + 'node,
     ) {

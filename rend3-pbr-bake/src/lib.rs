@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use glam::Vec4;
-use rend3::{ManagerReadyOutput, Renderer};
+use rend3::{ReadyData, Renderer};
 use wgpu::{Color, LoadOp, Operations, RenderPassColorAttachment, RenderPassDescriptor, TextureView};
 
 pub struct PbrBakerOutput<'a> {
@@ -98,7 +98,7 @@ impl PbrBakerRenderRoutine {
         &mut self,
         renderer: Arc<Renderer>,
         encoders: flume::Sender<wgpu::CommandBuffer>,
-        ready: ManagerReadyOutput,
+        ready: ReadyData,
         input: Vec<BakeData>,
         output: PbrBakerOutput,
     ) {
