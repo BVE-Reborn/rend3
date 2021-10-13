@@ -33,6 +33,13 @@ pub struct RenderTargetDescriptor {
     pub usage: TextureUsages,
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub struct BufferTargetDescriptor {
+    pub dim: UVec2,
+    pub format: TextureFormat,
+    pub usage: TextureUsages,
+}
+
 pub struct RenderTarget {
     desc: RenderTargetDescriptor,
 }
@@ -120,6 +127,8 @@ impl<'node> RenderGraph<'node> {
         let mut active_textures = FastHashMap::default();
         // Maps a name to its actual texture view.
         let mut active_views = FastHashMap::default();
+        // Maps a name to a buffer
+        let mut buffers = FastHashMap::<
         // Which node index needs acquire to happen.
         let mut acquire_idx = None;
         for (idx, (starting, ending)) in resource_changes.into_iter().enumerate() {
@@ -156,9 +165,7 @@ impl<'node> RenderGraph<'node> {
                             active_views.insert(name.clone(), view);
                         }
                     }
-                    RenderResource::Shadow(..) => {
-                        todo!()
-                    }
+                    RenderResource::Shadow(..) => {}
                     RenderResource::Buffer(..) => {
                         todo!()
                     }
@@ -179,9 +186,7 @@ impl<'node> RenderGraph<'node> {
                         let desc = self.targets[&name].desc;
                         textures.entry(desc).or_insert_with(|| Vec::with_capacity(16)).push(tex);
                     }
-                    RenderResource::Shadow(..) => {
-                        todo!()
-                    }
+                    RenderResource::Shadow(..) => {}
                     RenderResource::Buffer(..) => {
                         todo!()
                     }
@@ -313,7 +318,9 @@ enum RenderResource {
 pub struct RenderTargetHandle {
     resource: RenderResource,
 }
-pub struct ShadowTargetHandle(usize);
+pub struct ShadowTargetHandle {
+    idx: usize,
+}
 
 pub struct ShadowArrayHandle(());
 
@@ -349,7 +356,7 @@ impl<'a> RenderGraphTextureStore<'a> {
     pub fn get_shadow(&self, handle: ShadowTargetHandle) -> ShadowTarget<'_> {
         let coords = self
             .shadow_mapping
-            .get(&handle.0)
+            .get(&handle.idx)
             .expect("internal rendergraph error: failed to get shadow mapping");
         ShadowTarget {
             view: self
@@ -439,12 +446,12 @@ impl<'a, 'node> RenderGraphNodeBuilder<'a, 'node> {
         ShadowArrayHandle(())
     }
 
-    pub fn add_shadow_output(&mut self, index: usize, size: usize) -> RenderTargetHandle {
-        let resource = RenderResource::Shadow(index);
-        self.graph.shadows.insert(index, size);
+    pub fn add_shadow_output(&mut self, idx: usize, size: usize) -> ShadowTargetHandle {
+        let resource = RenderResource::Shadow(idx);
+        self.graph.shadows.insert(idx, size);
         self.inputs.push(resource.clone());
         self.outputs.push(resource.clone());
-        RenderTargetHandle { resource }
+        ShadowTargetHandle { idx }
     }
 
     pub fn build(

@@ -7,11 +7,7 @@ use std::sync::Arc;
 
 use glam::{UVec2, Vec4};
 use parking_lot::Mutex;
-use rend3::{
-    resources::{DirectionalLightManager, MaterialManager, TextureManager},
-    types::{TextureFormat, TextureHandle, TextureUsages},
-    ModeData, RenderGraph, RenderGraphNodeBuilder, RenderTargetDescriptor, Renderer, RendererMode,
-};
+use rend3::{ModeData, ReadyData, RenderGraph, RenderGraphNodeBuilder, RenderTargetDescriptor, Renderer, RendererMode, SHADOW_DIMENSIONS, resources::{DirectionalLightManager, MaterialManager, TextureManager}, types::{TextureFormat, TextureHandle, TextureUsages}};
 use wgpu::{
     Color, Device, LoadOp, Operations, RenderPassColorAttachment, RenderPassDepthStencilAttachment,
     RenderPassDescriptor,
@@ -111,6 +107,20 @@ impl PbrRenderRoutine {
             });
         }
         self.render_texture_options = options;
+    }
+
+    pub fn add_shadows_to_graph<'node>(&'node self, graph: &mut RenderGraph<'node>, ready: &ReadyData) {
+        for idx in 0..ready.directional_light_cameras.len() {
+            let mut builder = graph.add_node();
+
+            let shadow_map_handle = builder.add_shadow_output(idx, SHADOW_DIMENSIONS as usize);
+
+            builder.build(move |renderer, _prefix_cmd_bufs, cmd_bufs, ready, texture_store| {
+                let shadow_map = texture_store.get_shadow(shadow_map_handle);
+
+                
+            });
+        }
     }
 
     pub fn add_prepass_to_graph<'node>(&'node self, graph: &mut RenderGraph<'node>) {
