@@ -132,9 +132,7 @@ impl DirectionalLightManager {
         let registered_count: usize = self.registry.values().len();
         let recreate_view = registered_count != self.layer_views.len() && registered_count != 0;
         if recreate_view {
-            let (extent, coords) = allocate_shadows(
-                self.registry.values().map(|_i| SHADOW_DIMENSIONS as usize)
-            );
+            let (extent, coords) = allocate_shadows(self.registry.values().map(|_i| SHADOW_DIMENSIONS as usize));
             let (view, layer_views) = create_shadow_texture(device, extent);
             self.view = view;
             self.layer_views = layer_views;
