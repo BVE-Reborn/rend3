@@ -3,16 +3,15 @@
 /// Contains [`PbrMaterial`] and the [`PbrRenderRoutine`] which serve as the default render routines.
 ///
 /// Tries to strike a balance between photorealism and performance.
-use std::{borrow::Cow, mem, sync::Arc};
+use std::{mem, sync::Arc};
 
 use glam::{UVec2, Vec4};
-use ordered_float::OrderedFloat;
 use parking_lot::Mutex;
 use rend3::{
     resources::{DirectionalLightManager, GpuCullingInput, MaterialManager, TextureManager},
     types::{TextureFormat, TextureHandle, TextureUsages},
-    BufferTargetDescriptor, ModeData, ReadyData, RenderGraph, RenderGraphNodeBuilder, RenderTargetDescriptor, Renderer,
-    RendererMode, SHADOW_DIMENSIONS,
+    BufferTargetDescriptor, ModeData, ReadyData, RenderGraph, RenderTargetDescriptor, Renderer, RendererMode,
+    SHADOW_DIMENSIONS,
 };
 use wgpu::{
     BufferUsages, Color, CommandEncoderDescriptor, Device, LoadOp, Operations, RenderPassColorAttachment,
@@ -130,13 +129,11 @@ impl PbrRenderRoutine {
                 },
             );
 
-            builder.build(move |renderer, _prefix_cmd_bufs, cmd_bufs, ready, texture_store| {
+            builder.build(move |renderer, _prefix_cmd_bufs, _cmd_bufs, _ready, texture_store| {
                 let object_manager = renderer.object_manager.read();
                 let camera_manager = renderer.camera_manager.read();
 
                 let objects = object_manager.get_objects::<PbrMaterial>(transparency as u64);
-                let count = objects.len();
-
                 let objects = common::sorting::sort_objects(objects, &camera_manager, transparency.to_sorting());
                 let buffer = texture_store.get_buffer(handle);
                 culling::gpu::build_cull_data(buffer, &objects);
@@ -164,13 +161,14 @@ impl PbrRenderRoutine {
 
                 builder.build(move |renderer, _prefix_cmd_bufs, cmd_bufs, ready, texture_store| {
                     let shadow_map = texture_store.get_shadow(shadow_map_handle);
-                    let culling_input_opaque = pre_cull_handle.map_gpu(|handle| texture_store.get_buffer(handle));
+                    let culling_input = pre_cull_handle.map_gpu(|handle| texture_store.get_buffer(handle));
 
                     let mut encoder = renderer
                         .device
                         .create_command_encoder(&CommandEncoderDescriptor::default());
 
-                    let camera_manager = renderer.camera_manager.read();
+                    let mut profiler = renderer.profiler.lock();
+
                     let object_manager = renderer.object_manager.read();
                     let material_manager = renderer.material_manager.read();
 
@@ -179,21 +177,23 @@ impl PbrRenderRoutine {
                     let culled_objects = match self.gpu_culler {
                         ModeData::CPU(_) => self.cpu_culler.cull(culling::cpu::CpuCullerCullArgs {
                             device: &renderer.device,
-                            camera: &camera_manager,
+                            camera: &ready.directional_light_cameras[idx],
                             interfaces: &self.interfaces,
                             objects: &object_manager,
                             transparency,
                         }),
-                        ModeData::GPU(gpu_culler) => gpu_culler.cull(culling::gpu::GpuCullerCullArgs {
+                        ModeData::GPU(ref gpu_culler) => gpu_culler.cull(culling::gpu::GpuCullerCullArgs {
                             device: &renderer.device,
                             encoder: &mut encoder,
                             interfaces: &self.interfaces,
-                            camera: &camera_manager,
-                            input_buffer: culling_input_opaque.into_gpu(),
+                            camera: &ready.directional_light_cameras[idx],
+                            input_buffer: culling_input.into_gpu(),
                             input_count: count,
                             transparency,
                         }),
                     };
+
+                    profiler.begin_scope("shadow", &mut encoder, &renderer.device);
 
                     let mut rpass = encoder.begin_render_pass(&RenderPassDescriptor {
                         label: None,
@@ -211,6 +211,15 @@ impl PbrRenderRoutine {
                         }),
                     });
                     rpass.set_pipeline(&self.primary_passes.shadow_passes.opaque_pipeline);
+                    // TODO: Properly read viewport
+                    rpass.set_viewport(
+                        shadow_map.offset.x as f32,
+                        shadow_map.offset.y as f32,
+                        shadow_map.size as f32,
+                        shadow_map.size as f32,
+                        0.0,
+                        1.0,
+                    );
                     rpass.set_bind_group(0, &self.samplers.linear_nearest_bg, &[]);
                     rpass.set_bind_group(1, &culled_objects.output_bg, &[]);
 
@@ -225,6 +234,10 @@ impl PbrRenderRoutine {
                         }
                     }
 
+                    drop(rpass);
+
+                    profiler.end_scope(&mut encoder);
+
                     cmd_bufs.send(encoder.finish()).unwrap();
                 });
             }
@@ -232,128 +245,105 @@ impl PbrRenderRoutine {
     }
 
     pub fn add_prepass_to_graph<'node>(&'node self, graph: &mut RenderGraph<'node>) {
-        let mut builder = graph.add_node();
+        for (transparency, pre_cull_name) in [
+            (TransparencyType::Opaque, "Opaque Pre-Cull Data"),
+            (TransparencyType::Cutout, "Cutout Pre-Cull Data"),
+        ] {
+            let mut builder = graph.add_node();
 
-        let hdr_color_handle = builder.add_render_target_output(
-            "hdr color",
-            RenderTargetDescriptor {
-                dim: self.render_texture_options.resolution,
-                format: TextureFormat::Rgba16Float,
-                usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
-            },
-        );
+            let hdr_color_handle = builder.add_render_target_output(
+                "hdr color",
+                RenderTargetDescriptor {
+                    dim: self.render_texture_options.resolution,
+                    format: TextureFormat::Rgba16Float,
+                    usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
+                },
+            );
 
-        let hdr_depth_handle = builder.add_render_target_output(
-            "hdr depth",
-            RenderTargetDescriptor {
-                dim: self.render_texture_options.resolution,
-                format: TextureFormat::Depth32Float,
-                usage: TextureUsages::RENDER_ATTACHMENT,
-            },
-        );
+            let hdr_depth_handle = builder.add_render_target_output(
+                "hdr depth",
+                RenderTargetDescriptor {
+                    dim: self.render_texture_options.resolution,
+                    format: TextureFormat::Depth32Float,
+                    usage: TextureUsages::RENDER_ATTACHMENT,
+                },
+            );
 
-        builder.build(move |renderer, _prefix_cmd_bufs, cmd_bufs, ready, texture_store| {
-            let hdr_color = texture_store.get_render_target(hdr_color_handle);
-            let hdr_depth = texture_store.get_render_target(hdr_depth_handle);
-            profiling::scope!("PBR Render Routine");
+            let pre_cull_handle = self
+                .gpu_culler
+                .mode()
+                .into_data(|| (), || builder.add_buffer_input(pre_cull_name));
 
-            let mut encoder = renderer.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("primary encoder"),
-            });
+            builder.build(move |renderer, _prefix_cmd_bufs, cmd_bufs, ready, texture_store| {
+                let hdr_color = texture_store.get_render_target(hdr_color_handle);
+                let hdr_depth = texture_store.get_render_target(hdr_depth_handle);
+                let culling_input = pre_cull_handle.map_gpu(|handle| texture_store.get_buffer(handle));
+                profiling::scope!("PBR Render Routine");
 
-            let mut profiler = renderer.profiler.lock();
+                let mut encoder = renderer.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("primary encoder"),
+                });
 
-            let mesh_manager = renderer.mesh_manager.read();
-            let directional_light = renderer.directional_light_manager.read();
-            let materials = renderer.material_manager.read();
-            let camera_manager = renderer.camera_manager.read();
-            // TODO(material): let this be read
-            let mut object_manager = renderer.object_manager.write();
+                let mut profiler = renderer.profiler.lock();
 
-            let culler = self.gpu_culler.as_ref().map_cpu(|_| &self.cpu_culler);
+                let mesh_manager = renderer.mesh_manager.read();
+                let materials = renderer.material_manager.read();
+                let camera_manager = renderer.camera_manager.read();
+                let object_manager = renderer.object_manager.read();
 
-            let culled_lights =
-                self.primary_passes
-                    .shadow_passes
-                    .cull_shadows(directional::DirectionalShadowPassCullShadowsArgs {
-                        device: &renderer.device,
-                        profiler: &mut profiler,
-                        encoder: &mut encoder,
-                        culler,
-                        interfaces: &self.interfaces,
-                        lights: &directional_light,
-                        directional_light_cameras: &ready.directional_light_cameras,
-                        objects: &mut object_manager,
-                        culling_input_opaque: culling_input_opaque.as_gpu_only_mut(),
-                        culling_input_cutout: culling_input_cutout.as_gpu_only_mut(),
-                    });
+                let culler = self.gpu_culler.as_ref().map_cpu(|_| &self.cpu_culler);
 
-            profiler.begin_scope("forward culling", &mut encoder, &renderer.device);
-            let cutout_culled_objects = self.primary_passes.cutout_pass.cull(forward::ForwardPassCullArgs {
-                device: &renderer.device,
-                profiler: &mut profiler,
-                encoder: &mut encoder,
-                culler,
-                interfaces: &self.interfaces,
-                camera: &camera_manager,
-                objects: &mut object_manager,
-                culling_input: culling_input_cutout.as_gpu_only_mut(),
-            });
+                profiler.begin_scope("forward culling", &mut encoder, &renderer.device);
+                let pass = match transparency {
+                    TransparencyType::Opaque => &self.primary_passes.opaque_pass,
+                    TransparencyType::Cutout => &self.primary_passes.cutout_pass,
+                    TransparencyType::Blend => unreachable!(),
+                };
 
-            let opaque_culled_objects = self.primary_passes.opaque_pass.cull(forward::ForwardPassCullArgs {
-                device: &renderer.device,
-                profiler: &mut profiler,
-                encoder: &mut encoder,
-                culler,
-                interfaces: &self.interfaces,
-                camera: &camera_manager,
-                objects: &mut object_manager,
-                culling_input: culling_input_opaque.as_gpu_only_mut(),
-            });
-
-            profiler.end_scope(&mut encoder);
-
-            let d2_texture_output_bg_ref = ready.d2_texture.bg.as_ref().map(|_| (), |a| &**a);
-
-            // shadows being part of the code renderpass now makes no sense
-            self.primary_passes.shadow_passes.draw_culled_shadows(
-                directional::DirectionalShadowPassDrawCulledShadowsArgs {
+                let culled_objects = pass.cull(forward::ForwardPassCullArgs {
                     device: &renderer.device,
                     profiler: &mut profiler,
                     encoder: &mut encoder,
-                    materials: &materials,
-                    meshes: mesh_manager.buffers(),
-                    samplers: &self.samplers,
-                    texture_bg: d2_texture_output_bg_ref,
-                    culled_lights: &culled_lights,
-                },
-            );
-
-            {
-                let mut rpass = encoder.begin_render_pass(&RenderPassDescriptor {
-                    label: None,
-                    color_attachments: &[RenderPassColorAttachment {
-                        view: hdr_color,
-                        resolve_target: None,
-                        ops: Operations {
-                            load: LoadOp::Clear(Color::BLACK),
-                            store: true,
-                        },
-                    }],
-                    depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
-                        view: hdr_depth,
-                        depth_ops: Some(Operations {
-                            load: LoadOp::Clear(0.0),
-                            store: true,
-                        }),
-                        stencil_ops: None,
-                    }),
+                    culler,
+                    interfaces: &self.interfaces,
+                    camera: &camera_manager,
+                    objects: &object_manager,
+                    culling_input,
                 });
 
-                profiler.begin_scope("depth prepass", &mut rpass, &renderer.device);
-                self.primary_passes
-                    .opaque_pass
-                    .prepass(forward::ForwardPassPrepassArgs {
+                profiler.end_scope(&mut encoder);
+
+                let d2_texture_output_bg_ref = ready.d2_texture.bg.as_ref().map(|_| (), |a| &**a);
+
+                {
+                    let mut rpass = encoder.begin_render_pass(&RenderPassDescriptor {
+                        label: None,
+                        color_attachments: &[RenderPassColorAttachment {
+                            view: hdr_color,
+                            resolve_target: None,
+                            ops: Operations {
+                                load: match transparency {
+                                    TransparencyType::Opaque => LoadOp::Clear(Color::BLACK),
+                                    _ => LoadOp::Load,
+                                },
+                                store: true,
+                            },
+                        }],
+                        depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
+                            view: hdr_depth,
+                            depth_ops: Some(Operations {
+                                load: match transparency {
+                                    TransparencyType::Opaque => LoadOp::Clear(0.0),
+                                    _ => LoadOp::Load,
+                                },
+                                store: true,
+                            }),
+                            stencil_ops: None,
+                        }),
+                    });
+
+                    profiler.begin_scope("depth prepass", &mut rpass, &renderer.device);
+                    pass.prepass(forward::ForwardPassPrepassArgs {
                         device: &renderer.device,
                         profiler: &mut profiler,
                         rpass: &mut rpass,
@@ -361,222 +351,145 @@ impl PbrRenderRoutine {
                         meshes: mesh_manager.buffers(),
                         samplers: &self.samplers,
                         texture_bg: d2_texture_output_bg_ref,
-                        culled_objects: &opaque_culled_objects,
+                        culled_objects: &culled_objects,
                     });
 
-                self.primary_passes
-                    .cutout_pass
-                    .prepass(forward::ForwardPassPrepassArgs {
-                        device: &renderer.device,
-                        profiler: &mut profiler,
-                        rpass: &mut rpass,
-                        materials: &materials,
-                        meshes: mesh_manager.buffers(),
-                        samplers: &self.samplers,
-                        texture_bg: d2_texture_output_bg_ref,
-                        culled_objects: &cutout_culled_objects,
-                    });
+                    profiler.end_scope(&mut rpass);
 
-                profiler.end_scope(&mut rpass);
-
-                drop(rpass);
-            }
-            cmd_bufs.send(encoder.finish()).unwrap();
-        });
+                    drop(rpass);
+                }
+                cmd_bufs.send(encoder.finish()).unwrap();
+            });
+        }
     }
 
     pub fn add_forward_to_graph<'node>(&'node self, graph: &mut RenderGraph<'node>) {
-        let mut builder = graph.add_node();
+        for (transparency, pre_cull_name) in [
+            (TransparencyType::Opaque, "Opaque Pre-Cull Data"),
+            (TransparencyType::Cutout, "Cutout Pre-Cull Data"),
+            (TransparencyType::Blend, "Blend Pre-Cull Data"),
+        ] {
+            let mut builder = graph.add_node();
 
-        let hdr_color_handle = builder.add_render_target_output(
-            "hdr color",
-            RenderTargetDescriptor {
-                dim: self.render_texture_options.resolution,
-                format: TextureFormat::Rgba16Float,
-                usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
-            },
-        );
-
-        let hdr_depth_handle = builder.add_render_target_output(
-            "hdr depth",
-            RenderTargetDescriptor {
-                dim: self.render_texture_options.resolution,
-                format: TextureFormat::Depth32Float,
-                usage: TextureUsages::RENDER_ATTACHMENT,
-            },
-        );
-
-        builder.build(move |renderer, _prefix_cmd_bufs, cmd_bufs, ready, texture_store| {
-            let hdr_color = texture_store.get_render_target(hdr_color_handle);
-            let hdr_depth = texture_store.get_render_target(hdr_depth_handle);
-            profiling::scope!("PBR Render Routine");
-
-            let mut encoder = renderer.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("primary encoder"),
-            });
-
-            let mut profiler = renderer.profiler.lock();
-
-            let mesh_manager = renderer.mesh_manager.read();
-            let directional_light = renderer.directional_light_manager.read();
-            let materials = renderer.material_manager.read();
-            let camera_manager = renderer.camera_manager.read();
-            // TODO(material): let this be read
-            let mut object_manager = renderer.object_manager.write();
-
-            let culler = self.gpu_culler.as_ref().map_cpu(|_| &self.cpu_culler);
-
-            let mut culling_input_opaque = culler.map(
-                |_| (),
-                |culler| {
-                    culler.pre_cull(culling::gpu::GpuCullerPreCullArgs {
-                        device: &renderer.device,
-                        camera: &camera_manager,
-                        objects: &mut object_manager,
-                        transparency: TransparencyType::Opaque,
-                        sort: None,
-                    })
-                },
-            );
-            let mut culling_input_cutout = culler.map(
-                |_| (),
-                |culler| {
-                    culler.pre_cull(culling::gpu::GpuCullerPreCullArgs {
-                        device: &renderer.device,
-                        camera: &camera_manager,
-                        objects: &mut object_manager,
-                        transparency: TransparencyType::Cutout,
-                        sort: None,
-                    })
-                },
-            );
-            let mut culling_input_blend = culler.map(
-                |_| (),
-                |culler| {
-                    culler.pre_cull(culling::gpu::GpuCullerPreCullArgs {
-                        device: &renderer.device,
-                        camera: &camera_manager,
-                        objects: &mut object_manager,
-                        transparency: TransparencyType::Blend,
-                        sort: Some(culling::Sorting::FrontToBack),
-                    })
+            let hdr_color_handle = builder.add_render_target_output(
+                "hdr color",
+                RenderTargetDescriptor {
+                    dim: self.render_texture_options.resolution,
+                    format: TextureFormat::Rgba16Float,
+                    usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
                 },
             );
 
-            profiler.begin_scope("forward culling", &mut encoder, &renderer.device);
+            let hdr_depth_handle = builder.add_render_target_output(
+                "hdr depth",
+                RenderTargetDescriptor {
+                    dim: self.render_texture_options.resolution,
+                    format: TextureFormat::Depth32Float,
+                    usage: TextureUsages::RENDER_ATTACHMENT,
+                },
+            );
 
-            let transparent_culled_objects = self.primary_passes.transparent_pass.cull(forward::ForwardPassCullArgs {
-                device: &renderer.device,
-                profiler: &mut profiler,
-                encoder: &mut encoder,
-                culler,
-                interfaces: &self.interfaces,
-                camera: &camera_manager,
-                objects: &mut object_manager,
-                culling_input: culling_input_blend.as_gpu_only_mut(),
-            });
+            let shadow_handle = builder.add_shadow_array_input();
 
-            let cutout_culled_objects = self.primary_passes.cutout_pass.cull(forward::ForwardPassCullArgs {
-                device: &renderer.device,
-                profiler: &mut profiler,
-                encoder: &mut encoder,
-                culler,
-                interfaces: &self.interfaces,
-                camera: &camera_manager,
-                objects: &mut object_manager,
-                culling_input: culling_input_cutout.as_gpu_only_mut(),
-            });
+            let pre_cull_handle = self
+                .gpu_culler
+                .mode()
+                .into_data(|| (), || builder.add_buffer_input(pre_cull_name));
 
-            let opaque_culled_objects = self.primary_passes.opaque_pass.cull(forward::ForwardPassCullArgs {
-                device: &renderer.device,
-                profiler: &mut profiler,
-                encoder: &mut encoder,
-                culler,
-                interfaces: &self.interfaces,
-                camera: &camera_manager,
-                objects: &mut object_manager,
-                culling_input: culling_input_opaque.as_gpu_only_mut(),
-            });
+            builder.build(move |renderer, _prefix_cmd_bufs, cmd_bufs, ready, texture_store| {
+                let hdr_color = texture_store.get_render_target(hdr_color_handle);
+                let hdr_depth = texture_store.get_render_target(hdr_depth_handle);
+                let culling_input = pre_cull_handle.map_gpu(|handle| texture_store.get_buffer(handle));
+                let (shadow, coords) = texture_store.get_shadow_array(shadow_handle);
+                profiling::scope!("PBR Render Routine");
 
-            profiler.end_scope(&mut encoder);
+                let mut encoder = renderer.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("primary encoder"),
+                });
 
-            let d2_texture_output_bg_ref = ready.d2_texture.bg.as_ref().map(|_| (), |a| &**a);
+                let mut profiler = renderer.profiler.lock();
 
-            let primary_camera_uniform_bg = uniforms::create_shader_uniform(uniforms::CreateShaderUniformArgs {
-                device: &renderer.device,
-                camera: &camera_manager,
-                interfaces: &self.interfaces,
-                ambient: self.ambient,
-            });
+                let mesh_manager = renderer.mesh_manager.read();
+                let directional_light = renderer.directional_light_manager.read();
+                let materials = renderer.material_manager.read();
+                let camera_manager = renderer.camera_manager.read();
+                let mut object_manager = renderer.object_manager.read();
 
-            {
-                let mut rpass = encoder.begin_render_pass(&RenderPassDescriptor {
-                    label: None,
-                    color_attachments: &[RenderPassColorAttachment {
-                        view: hdr_color,
-                        resolve_target: None,
-                        ops: Operations {
-                            load: LoadOp::Load,
-                            store: true,
-                        },
-                    }],
-                    depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
-                        view: hdr_depth,
-                        depth_ops: Some(Operations {
-                            load: LoadOp::Load,
-                            store: true,
+                let culler = self.gpu_culler.as_ref().map_cpu(|_| &self.cpu_culler);
+
+                profiler.begin_scope("forward culling", &mut encoder, &renderer.device);
+
+                let pass = match transparency {
+                    TransparencyType::Opaque => &self.primary_passes.opaque_pass,
+                    TransparencyType::Cutout => &self.primary_passes.cutout_pass,
+                    TransparencyType::Blend => &self.primary_passes.transparent_pass,
+                };
+
+                let culled_objects = pass.cull(forward::ForwardPassCullArgs {
+                    device: &renderer.device,
+                    profiler: &mut profiler,
+                    encoder: &mut encoder,
+                    culler,
+                    interfaces: &self.interfaces,
+                    camera: &camera_manager,
+                    objects: &mut object_manager,
+                    culling_input,
+                });
+
+                profiler.end_scope(&mut encoder);
+
+                let d2_texture_output_bg_ref = ready.d2_texture.bg.as_ref().map(|_| (), |a| &**a);
+
+                let primary_camera_uniform_bg = uniforms::create_shader_uniform(uniforms::CreateShaderUniformArgs {
+                    device: &renderer.device,
+                    camera: &camera_manager,
+                    interfaces: &self.interfaces,
+                    ambient: self.ambient,
+                });
+
+                {
+                    let mut rpass = encoder.begin_render_pass(&RenderPassDescriptor {
+                        label: None,
+                        color_attachments: &[RenderPassColorAttachment {
+                            view: hdr_color,
+                            resolve_target: None,
+                            ops: Operations {
+                                load: LoadOp::Load,
+                                store: true,
+                            },
+                        }],
+                        depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
+                            view: hdr_depth,
+                            depth_ops: Some(Operations {
+                                load: LoadOp::Load,
+                                store: true,
+                            }),
+                            stencil_ops: None,
                         }),
-                        stencil_ops: None,
-                    }),
-                });
+                    });
 
-                profiler.begin_scope("forward", &mut rpass, &renderer.device);
+                    profiler.begin_scope("forward", &mut rpass, &renderer.device);
 
-                self.primary_passes.opaque_pass.draw(forward::ForwardPassDrawArgs {
-                    device: &renderer.device,
-                    profiler: &mut profiler,
-                    rpass: &mut rpass,
-                    materials: &materials,
-                    meshes: mesh_manager.buffers(),
-                    samplers: &self.samplers,
-                    directional_light_bg: directional_light.get_bg(),
-                    texture_bg: d2_texture_output_bg_ref,
-                    shader_uniform_bg: &primary_camera_uniform_bg,
-                    culled_objects: &opaque_culled_objects,
-                });
+                    pass.draw(forward::ForwardPassDrawArgs {
+                        device: &renderer.device,
+                        profiler: &mut profiler,
+                        rpass: &mut rpass,
+                        materials: &materials,
+                        meshes: mesh_manager.buffers(),
+                        samplers: &self.samplers,
+                        directional_light_bg: directional_light.get_bg(),
+                        texture_bg: d2_texture_output_bg_ref,
+                        shader_uniform_bg: &primary_camera_uniform_bg,
+                        culled_objects: &culled_objects,
+                    });
 
-                self.primary_passes.cutout_pass.draw(forward::ForwardPassDrawArgs {
-                    device: &renderer.device,
-                    profiler: &mut profiler,
-                    rpass: &mut rpass,
-                    materials: &materials,
-                    meshes: mesh_manager.buffers(),
-                    samplers: &self.samplers,
-                    directional_light_bg: directional_light.get_bg(),
-                    texture_bg: d2_texture_output_bg_ref,
-                    shader_uniform_bg: &primary_camera_uniform_bg,
-                    culled_objects: &cutout_culled_objects,
-                });
+                    profiler.end_scope(&mut rpass);
 
-                self.primary_passes.transparent_pass.draw(forward::ForwardPassDrawArgs {
-                    device: &renderer.device,
-                    profiler: &mut profiler,
-                    rpass: &mut rpass,
-                    materials: &materials,
-                    meshes: mesh_manager.buffers(),
-                    samplers: &self.samplers,
-                    directional_light_bg: directional_light.get_bg(),
-                    texture_bg: d2_texture_output_bg_ref,
-                    shader_uniform_bg: &primary_camera_uniform_bg,
-                    culled_objects: &transparent_culled_objects,
-                });
-
-                profiler.end_scope(&mut rpass);
-
-                drop(rpass);
-            }
-            cmd_bufs.send(encoder.finish()).unwrap();
-        });
+                    drop(rpass);
+                }
+                cmd_bufs.send(encoder.finish()).unwrap();
+            });
+        }
     }
 }
 

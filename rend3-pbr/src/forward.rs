@@ -5,15 +5,15 @@ use rend3::{
     resources::{CameraManager, MaterialManager, MeshBuffers, ObjectManager},
     ModeData,
 };
-use wgpu::{BindGroup, CommandEncoder, Device, RenderPass, RenderPipeline};
+use wgpu::{BindGroup, Buffer, CommandEncoder, Device, RenderPass, RenderPipeline};
 use wgpu_profiler::GpuProfiler;
 
 use crate::{
     common::{interfaces::ShaderInterfaces, samplers::Samplers},
     culling::{
         cpu::{CpuCuller, CpuCullerCullArgs},
-        gpu::{GpuCuller, GpuCullerCullArgs, PreCulledBuffer},
-        CulledObjectSet, Sorting,
+        gpu::{GpuCuller, GpuCullerCullArgs},
+        CulledObjectSet, 
     },
     material::{PbrMaterial, TransparencyType},
 };
@@ -30,9 +30,9 @@ pub struct ForwardPassCullArgs<'a> {
     pub interfaces: &'a ShaderInterfaces,
 
     pub camera: &'a CameraManager,
-    pub objects: &'a mut ObjectManager,
+    pub objects: &'a ObjectManager,
 
-    pub culling_input: ModeData<(), &'a mut PreCulledBuffer>,
+    pub culling_input: ModeData<(), &'a Buffer>,
 }
 
 pub struct ForwardPassPrepassArgs<'rpass, 'b> {
@@ -98,12 +98,15 @@ impl ForwardPass {
             }),
             ModeData::GPU(gpu_culler) => {
                 args.profiler.begin_scope(&label, args.encoder, args.device);
+                let object_count = args.objects.get_objects::<PbrMaterial>(self.transparency as u64).len();
                 let culled = gpu_culler.cull(GpuCullerCullArgs {
                     device: args.device,
                     encoder: args.encoder,
                     interfaces: args.interfaces,
                     camera: args.camera,
                     input_buffer: args.culling_input.as_gpu(),
+                    input_count: object_count,
+                    transparency: self.transparency,
                 });
                 args.profiler.end_scope(args.encoder);
                 culled

@@ -15,7 +15,7 @@ pub fn sort_objects<'a>(
 
         let camera_location = camera_manager.location().into();
 
-        let sorted_objects = objects.to_vec();
+        let mut sorted_objects = objects.to_vec();
 
         match sorting {
             Sorting::FrontToBack => {
