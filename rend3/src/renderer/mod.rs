@@ -1,15 +1,25 @@
-use crate::{ExtendedAdapterInfo, InstanceAdapterDevice, ReadyData, RendererInitializationError, RendererMode, format_sso, instruction::{Instruction, InstructionStreamPair}, resources::{
+use crate::{
+    format_sso,
+    instruction::{Instruction, InstructionStreamPair},
+    resources::{
         CameraManager, DirectionalLightManager, InternalTexture, MaterialManager, MeshManager, ObjectManager,
         TextureManager,
-    }, types::{
+    },
+    types::{
         Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, MaterialHandle, Mesh, MeshHandle,
         Object, ObjectHandle, Texture, TextureHandle,
-    }, util::{mipmap::MipmapGenerator}};
+    },
+    util::mipmap::MipmapGenerator,
+    ExtendedAdapterInfo, InstanceAdapterDevice, ReadyData, RendererInitializationError, RendererMode,
+};
 use glam::Mat4;
 use parking_lot::{Mutex, RwLock};
 use rend3_types::{Material, MipmapCount, MipmapSource, TextureFromTexture, TextureUsages};
 use std::{num::NonZeroU32, sync::Arc};
-use wgpu::{CommandBuffer, CommandEncoderDescriptor, Device, Extent3d, ImageCopyTexture, ImageDataLayout, Origin3d, Queue, TextureAspect, TextureDescriptor, TextureDimension, TextureViewDescriptor, TextureViewDimension, util::DeviceExt};
+use wgpu::{
+    util::DeviceExt, CommandBuffer, CommandEncoderDescriptor, Device, Extent3d, ImageCopyTexture, ImageDataLayout,
+    Origin3d, Queue, TextureAspect, TextureDescriptor, TextureDimension, TextureViewDescriptor, TextureViewDimension,
+};
 use wgpu_profiler::GpuProfiler;
 
 pub mod error;

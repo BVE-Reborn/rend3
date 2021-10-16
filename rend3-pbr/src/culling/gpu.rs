@@ -17,7 +17,7 @@ use wgpu::{
 use crate::{
     common::interfaces::{PerObjectData, ShaderInterfaces},
     culling::{CulledObjectSet, GPUIndirectData, Sorting},
-    material::{TransparencyType},
+    material::TransparencyType,
     shaders::SPIRV_SHADERS,
 };
 
@@ -405,6 +405,8 @@ pub fn build_cull_data(buffer: &Buffer, objects: &[InternalObject]) {
     profiling::scope!("Building Input Data");
 
     let mut data = buffer.slice(..).get_mapped_range_mut();
+
+    assert!(data.len() >= objects.len() * mem::size_of::<GpuCullingInput>());
 
     // This unsafe block measured a bit faster in my tests, and as this is basically _the_ hot path, so this is worthwhile.
     unsafe {

@@ -1,4 +1,4 @@
-use std::{sync::Arc};
+use std::sync::Arc;
 
 use glam::UVec2;
 use rend3_types::{BufferUsages, TextureFormat, TextureUsages};

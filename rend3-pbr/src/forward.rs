@@ -13,7 +13,7 @@ use crate::{
     culling::{
         cpu::{CpuCuller, CpuCullerCullArgs},
         gpu::{GpuCuller, GpuCullerCullArgs},
-        CulledObjectSet, 
+        CulledObjectSet,
     },
     material::{PbrMaterial, TransparencyType},
 };

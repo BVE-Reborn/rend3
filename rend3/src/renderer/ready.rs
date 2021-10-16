@@ -115,7 +115,6 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
         profiler,
     ));
 
-    let mut cmd_bufs = Vec::with_capacity(32);
     cmd_bufs.push(encoder.finish());
 
     (
