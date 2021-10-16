@@ -60,8 +60,8 @@ pub struct DirectionalShadowPassDrawCulledShadowsArgs<'a> {
 }
 
 pub struct DirectionalShadowPass {
-    cutout_pipeline: Arc<RenderPipeline>,
-    opaque_pipeline: Arc<RenderPipeline>,
+    pub cutout_pipeline: Arc<RenderPipeline>,
+    pub opaque_pipeline: Arc<RenderPipeline>,
 }
 
 impl DirectionalShadowPass {

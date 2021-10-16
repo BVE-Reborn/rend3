@@ -3,14 +3,20 @@
 /// Contains [`PbrMaterial`] and the [`PbrRenderRoutine`] which serve as the default render routines.
 ///
 /// Tries to strike a balance between photorealism and performance.
-use std::sync::Arc;
+use std::{borrow::Cow, mem, sync::Arc};
 
 use glam::{UVec2, Vec4};
+use ordered_float::OrderedFloat;
 use parking_lot::Mutex;
-use rend3::{ModeData, ReadyData, RenderGraph, RenderGraphNodeBuilder, RenderTargetDescriptor, Renderer, RendererMode, SHADOW_DIMENSIONS, resources::{DirectionalLightManager, MaterialManager, TextureManager}, types::{TextureFormat, TextureHandle, TextureUsages}};
+use rend3::{
+    resources::{DirectionalLightManager, GpuCullingInput, MaterialManager, TextureManager},
+    types::{TextureFormat, TextureHandle, TextureUsages},
+    BufferTargetDescriptor, ModeData, ReadyData, RenderGraph, RenderGraphNodeBuilder, RenderTargetDescriptor, Renderer,
+    RendererMode, SHADOW_DIMENSIONS,
+};
 use wgpu::{
-    Color, Device, LoadOp, Operations, RenderPassColorAttachment, RenderPassDepthStencilAttachment,
-    RenderPassDescriptor,
+    BufferUsages, Color, CommandEncoderDescriptor, Device, LoadOp, Operations, RenderPassColorAttachment,
+    RenderPassDepthStencilAttachment, RenderPassDescriptor,
 };
 
 pub use utils::*;
@@ -109,17 +115,119 @@ impl PbrRenderRoutine {
         self.render_texture_options = options;
     }
 
-    pub fn add_shadows_to_graph<'node>(&'node self, graph: &mut RenderGraph<'node>, ready: &ReadyData) {
-        for idx in 0..ready.directional_light_cameras.len() {
-            let mut builder = graph.add_node();
+    pub fn add_pre_cull_to_graph<'node>(&'node self, graph: &mut RenderGraph<'node>, renderer: &Renderer) {
+        let object_manager = renderer.object_manager.read();
 
-            let shadow_map_handle = builder.add_shadow_output(idx, SHADOW_DIMENSIONS as usize);
+        let mut declare_pre_cull = |name, transparency: TransparencyType| {
+            let mut builder = graph.add_node();
+            let handle = builder.add_buffer_output(
+                name,
+                BufferTargetDescriptor {
+                    length: (object_manager.get_objects::<PbrMaterial>(transparency as u64).len()
+                        * mem::size_of::<GpuCullingInput>()) as _,
+                    usage: BufferUsages::STORAGE,
+                    mapped: true,
+                },
+            );
 
             builder.build(move |renderer, _prefix_cmd_bufs, cmd_bufs, ready, texture_store| {
-                let shadow_map = texture_store.get_shadow(shadow_map_handle);
+                let object_manager = renderer.object_manager.read();
+                let camera_manager = renderer.camera_manager.read();
 
-                
+                let objects = object_manager.get_objects::<PbrMaterial>(transparency as u64);
+                let count = objects.len();
+
+                let objects = common::sorting::sort_objects(objects, &camera_manager, transparency.to_sorting());
+                let buffer = texture_store.get_buffer(handle);
+                culling::gpu::build_cull_data(buffer, &objects);
             });
+        };
+
+        declare_pre_cull("Opaque Pre-Cull Data", material::TransparencyType::Opaque);
+        declare_pre_cull("Cutout Pre-Cull Data", material::TransparencyType::Cutout);
+        declare_pre_cull("Blend Pre-Cull Data", material::TransparencyType::Blend);
+    }
+
+    pub fn add_shadows_to_graph<'node>(&'node self, graph: &mut RenderGraph<'node>, ready: &ReadyData) {
+        for idx in 0..ready.directional_light_cameras.len() {
+            for (transparency, pre_cull_name) in [
+                (TransparencyType::Opaque, "Opaque Pre-Cull Data"),
+                (TransparencyType::Cutout, "Cutout Pre-Cull Data"),
+            ] {
+                let mut builder = graph.add_node();
+
+                let pre_cull_handle = self
+                    .gpu_culler
+                    .mode()
+                    .into_data(|| (), || builder.add_buffer_input(pre_cull_name));
+                let shadow_map_handle = builder.add_shadow_output(idx, SHADOW_DIMENSIONS as usize);
+
+                builder.build(move |renderer, _prefix_cmd_bufs, cmd_bufs, ready, texture_store| {
+                    let shadow_map = texture_store.get_shadow(shadow_map_handle);
+                    let culling_input_opaque = pre_cull_handle.map_gpu(|handle| texture_store.get_buffer(handle));
+
+                    let mut encoder = renderer
+                        .device
+                        .create_command_encoder(&CommandEncoderDescriptor::default());
+
+                    let camera_manager = renderer.camera_manager.read();
+                    let object_manager = renderer.object_manager.read();
+                    let material_manager = renderer.material_manager.read();
+
+                    let count = object_manager.get_objects::<PbrMaterial>(transparency as u64).len();
+
+                    let culled_objects = match self.gpu_culler {
+                        ModeData::CPU(_) => self.cpu_culler.cull(culling::cpu::CpuCullerCullArgs {
+                            device: &renderer.device,
+                            camera: &camera_manager,
+                            interfaces: &self.interfaces,
+                            objects: &object_manager,
+                            transparency,
+                        }),
+                        ModeData::GPU(gpu_culler) => gpu_culler.cull(culling::gpu::GpuCullerCullArgs {
+                            device: &renderer.device,
+                            encoder: &mut encoder,
+                            interfaces: &self.interfaces,
+                            camera: &camera_manager,
+                            input_buffer: culling_input_opaque.into_gpu(),
+                            input_count: count,
+                            transparency,
+                        }),
+                    };
+
+                    let mut rpass = encoder.begin_render_pass(&RenderPassDescriptor {
+                        label: None,
+                        color_attachments: &[],
+                        depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
+                            view: &shadow_map.view,
+                            depth_ops: Some(Operations {
+                                load: match transparency {
+                                    TransparencyType::Opaque => LoadOp::Clear(1.0),
+                                    _ => LoadOp::Load,
+                                },
+                                store: true,
+                            }),
+                            stencil_ops: None,
+                        }),
+                    });
+                    rpass.set_pipeline(&self.primary_passes.shadow_passes.opaque_pipeline);
+                    rpass.set_bind_group(0, &self.samplers.linear_nearest_bg, &[]);
+                    rpass.set_bind_group(1, &culled_objects.output_bg, &[]);
+
+                    match culled_objects.calls {
+                        ModeData::CPU(ref draws) => {
+                            culling::cpu::run(&mut rpass, draws, &self.samplers, 0, &material_manager, 2)
+                        }
+                        ModeData::GPU(ref data) => {
+                            rpass.set_bind_group(2, material_manager.get_bind_group_gpu::<PbrMaterial>(), &[]);
+                            rpass.set_bind_group(3, ready.d2_texture.bg.as_gpu(), &[]);
+                            culling::gpu::run(&mut rpass, data);
+                        }
+                    }
+
+                    cmd_bufs.send(encoder.finish()).unwrap();
+                });
+            }
         }
     }
 
@@ -163,31 +271,6 @@ impl PbrRenderRoutine {
             let mut object_manager = renderer.object_manager.write();
 
             let culler = self.gpu_culler.as_ref().map_cpu(|_| &self.cpu_culler);
-
-            let mut culling_input_opaque = culler.map(
-                |_| (),
-                |culler| {
-                    culler.pre_cull(culling::gpu::GpuCullerPreCullArgs {
-                        device: &renderer.device,
-                        camera: &camera_manager,
-                        objects: &mut object_manager,
-                        transparency: TransparencyType::Opaque,
-                        sort: None,
-                    })
-                },
-            );
-            let mut culling_input_cutout = culler.map(
-                |_| (),
-                |culler| {
-                    culler.pre_cull(culling::gpu::GpuCullerPreCullArgs {
-                        device: &renderer.device,
-                        camera: &camera_manager,
-                        objects: &mut object_manager,
-                        transparency: TransparencyType::Cutout,
-                        sort: None,
-                    })
-                },
-            );
 
             let culled_lights =
                 self.primary_passes

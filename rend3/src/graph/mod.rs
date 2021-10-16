@@ -1,10 +1,10 @@
 use std::{num::NonZeroU32, sync::Arc};
 
 use glam::UVec2;
-use rend3_types::{TextureFormat, TextureUsages};
+use rend3_types::{BufferUsages, TextureFormat, TextureUsages};
 use wgpu::{
-    Buffer, CommandBuffer, CommandEncoder, CommandEncoderDescriptor, Extent3d, Texture, TextureDescriptor,
-    TextureDimension, TextureView, TextureViewDescriptor,
+    Buffer, BufferDescriptor, CommandBuffer, CommandEncoderDescriptor, Extent3d, Texture,
+    TextureDescriptor, TextureDimension, TextureView, TextureViewDescriptor,
 };
 
 use crate::{
@@ -35,9 +35,9 @@ pub struct RenderTargetDescriptor {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct BufferTargetDescriptor {
-    pub dim: UVec2,
-    pub format: TextureFormat,
-    pub usage: TextureUsages,
+    pub length: u64,
+    pub usage: BufferUsages,
+    pub mapped: bool,
 }
 
 pub struct RenderTarget {
@@ -47,6 +47,7 @@ pub struct RenderTarget {
 pub struct RenderGraph<'node> {
     targets: FastHashMap<SsoString, RenderTarget>,
     shadows: FastHashMap<usize, usize>,
+    buffers: FastHashMap<SsoString, BufferTargetDescriptor>,
     nodes: Vec<RenderGraphNode<'node>>,
 }
 impl<'node> RenderGraph<'node> {
@@ -54,6 +55,7 @@ impl<'node> RenderGraph<'node> {
         Self {
             targets: FastHashMap::with_capacity_and_hasher(32, Default::default()),
             shadows: FastHashMap::with_capacity_and_hasher(32, Default::default()),
+            buffers: FastHashMap::with_capacity_and_hasher(32, Default::default()),
             nodes: Vec::with_capacity(64),
         }
     }
@@ -127,8 +129,6 @@ impl<'node> RenderGraph<'node> {
         let mut active_textures = FastHashMap::default();
         // Maps a name to its actual texture view.
         let mut active_views = FastHashMap::default();
-        // Maps a name to a buffer
-        let mut buffers = FastHashMap::<
         // Which node index needs acquire to happen.
         let mut acquire_idx = None;
         for (idx, (starting, ending)) in resource_changes.into_iter().enumerate() {
@@ -166,9 +166,7 @@ impl<'node> RenderGraph<'node> {
                         }
                     }
                     RenderResource::Shadow(..) => {}
-                    RenderResource::Buffer(..) => {
-                        todo!()
-                    }
+                    RenderResource::Buffer(..) => {}
                     RenderResource::OutputTexture => {
                         acquire_idx = Some(idx);
                         continue;
@@ -187,9 +185,7 @@ impl<'node> RenderGraph<'node> {
                         textures.entry(desc).or_insert_with(|| Vec::with_capacity(16)).push(tex);
                     }
                     RenderResource::Shadow(..) => {}
-                    RenderResource::Buffer(..) => {
-                        todo!()
-                    }
+                    RenderResource::Buffer(..) => {}
                     RenderResource::OutputTexture => continue,
                 };
             }
@@ -228,6 +224,20 @@ impl<'node> RenderGraph<'node> {
 
         let shadow_coords = tagged_shadow_coords.into_iter().map(|(_, coords)| *coords).collect();
 
+        let buffers = self
+            .buffers
+            .into_iter()
+            .map(|(name, desc)| {
+                let buffer = renderer.device.create_buffer(&BufferDescriptor {
+                    label: Some(&name),
+                    size: desc.length,
+                    usage: desc.usage,
+                    mapped_at_creation: desc.mapped,
+                });
+                (name, buffer)
+            })
+            .collect::<FastHashMap<_, _>>();
+
         let (prefix_cmd_buf_sender, prefix_cmd_buf_reciever) = flume::unbounded();
         let (cmd_buf_sender, cmd_buf_reciever) = flume::unbounded();
 
@@ -255,6 +265,7 @@ impl<'node> RenderGraph<'node> {
                 shadow_array_view: &shadow_array_view,
                 shadow_views: &shadow_views,
                 output: output.as_view(),
+                buffers: &buffers,
             };
             (node.exec)(
                 renderer,
@@ -312,7 +323,7 @@ enum RenderResource {
     OutputTexture,
     Texture(SsoString),
     Shadow(usize),
-    Buffer(usize),
+    Buffer(SsoString),
 }
 
 pub struct RenderTargetHandle {
@@ -324,7 +335,7 @@ pub struct ShadowTargetHandle {
 
 pub struct ShadowArrayHandle(());
 
-pub struct RenderBufferHandle {
+pub struct BufferTargetHandle {
     resource: RenderResource,
 }
 
@@ -334,6 +345,7 @@ pub struct RenderGraphTextureStore<'a> {
     shadow_coord_array: &'a Vec<ShadowCoordinates>,
     shadow_array_view: &'a Option<TextureView>,
     shadow_views: &'a Vec<TextureView>,
+    buffers: &'a FastHashMap<SsoString, Buffer>,
     output: Option<&'a TextureView>,
 }
 
@@ -377,11 +389,12 @@ impl<'a> RenderGraphTextureStore<'a> {
         (view, &self.shadow_coord_array)
     }
 
-    pub fn get_buffer(&self, handle: RenderBufferHandle) -> &Buffer {
+    pub fn get_buffer(&self, handle: BufferTargetHandle) -> &Buffer {
         match handle.resource {
-            RenderResource::Buffer(..) => {
-                todo!()
-            }
+            RenderResource::Buffer(name) => self
+                .buffers
+                .get(&name)
+                .expect("internal rendergraph error: failed to get buffer"),
             r => {
                 panic!("internal rendergraph error: tried to get a {:?} as a render target", r)
             }
@@ -452,6 +465,28 @@ impl<'a, 'node> RenderGraphNodeBuilder<'a, 'node> {
         self.inputs.push(resource.clone());
         self.outputs.push(resource.clone());
         ShadowTargetHandle { idx }
+    }
+
+    pub fn add_buffer_input<S>(&mut self, name: S) -> BufferTargetHandle
+    where
+        SsoString: From<S>,
+    {
+        let name = SsoString::from(name);
+        let resource = RenderResource::Buffer(name.clone());
+        self.inputs.push(resource.clone());
+        BufferTargetHandle { resource }
+    }
+
+    pub fn add_buffer_output<S>(&mut self, name: S, buffer: BufferTargetDescriptor) -> BufferTargetHandle
+    where
+        SsoString: From<S>,
+    {
+        let name = SsoString::from(name);
+        let resource = RenderResource::Buffer(name.clone());
+        self.graph.buffers.insert(name.clone(), buffer);
+        self.inputs.push(resource.clone());
+        self.outputs.push(resource.clone());
+        BufferTargetHandle { resource }
     }
 
     pub fn build(
