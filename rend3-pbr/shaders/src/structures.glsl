@@ -136,6 +136,8 @@ struct DirectionalLight {
     mat4 view_proj;
     vec3 color;
     vec3 direction;
+    vec2 offset;
+    float size;
 };
 
 #endif

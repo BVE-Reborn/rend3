@@ -1,19 +1,19 @@
-use std::{num::NonZeroU32, sync::Arc};
+use std::{sync::Arc};
 
 use glam::UVec2;
 use rend3_types::{BufferUsages, TextureFormat, TextureUsages};
 use wgpu::{
-    Buffer, BufferDescriptor, CommandBuffer, CommandEncoderDescriptor, Extent3d, Texture,
-    TextureDescriptor, TextureDimension, TextureView, TextureViewDescriptor,
+    BindGroup, Buffer, BufferDescriptor, CommandBuffer, CommandEncoderDescriptor, Extent3d, Texture, TextureDescriptor,
+    TextureDimension, TextureView, TextureViewDescriptor,
 };
 
 use crate::{
-    resources::{CameraManager, TextureManagerReadyOutput},
+    resources::{CameraManager, ShadowCoordinates, TextureManagerReadyOutput},
     util::{
         output::OutputFrame,
         typedefs::{FastHashMap, FastHashSet, RendererStatistics, SsoString},
     },
-    Renderer, INTERNAL_SHADOW_DEPTH_FORMAT,
+    Renderer,
 };
 
 mod shadow_alloc;
@@ -191,39 +191,6 @@ impl<'node> RenderGraph<'node> {
             }
         }
 
-        let (shadow_mapping, shadow_views, shadow_array_view) =
-            if let Some((size, coordinates)) = shadow_alloc::allocate_shadows(&self.shadows) {
-                let shadow_texture = renderer.device.create_texture(&TextureDescriptor {
-                    label: Some("shadow map"),
-                    size,
-                    mip_level_count: 1,
-                    sample_count: 1,
-                    dimension: TextureDimension::D2,
-                    format: INTERNAL_SHADOW_DEPTH_FORMAT,
-                    usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
-                });
-
-                let array_view = shadow_texture.create_view(&TextureViewDescriptor::default());
-
-                let mut views = Vec::with_capacity(size.depth_or_array_layers as usize);
-                for _ in 0..size.depth_or_array_layers {
-                    views.push(shadow_texture.create_view(&TextureViewDescriptor {
-                        base_array_layer: 0,
-                        array_layer_count: Some(NonZeroU32::new(1).unwrap()),
-                        ..TextureViewDescriptor::default()
-                    }))
-                }
-
-                (coordinates, views, Some(array_view))
-            } else {
-                (FastHashMap::default(), Vec::new(), None)
-            };
-
-        let mut tagged_shadow_coords: Vec<_> = shadow_mapping.iter().collect();
-        tagged_shadow_coords.sort_by_key(|(idx, _)| **idx);
-
-        let shadow_coords = tagged_shadow_coords.into_iter().map(|(_, coords)| *coords).collect();
-
         let buffers = self
             .buffers
             .into_iter()
@@ -240,6 +207,8 @@ impl<'node> RenderGraph<'node> {
 
         let (prefix_cmd_buf_sender, prefix_cmd_buf_reciever) = flume::unbounded();
         let (cmd_buf_sender, cmd_buf_reciever) = flume::unbounded();
+
+        let directional_light_manager = renderer.directional_light_manager.read();
 
         // Iterate through all the nodes and actually execute them.
         for (idx, node) in pruned_node_list.into_iter().enumerate() {
@@ -260,12 +229,11 @@ impl<'node> RenderGraph<'node> {
 
             let store = RenderGraphTextureStore {
                 texture_mapping: &active_views,
-                shadow_mapping: &shadow_mapping,
-                shadow_coord_array: &shadow_coords,
-                shadow_array_view: &shadow_array_view,
-                shadow_views: &shadow_views,
-                output: output.as_view(),
+                shadow_array_view: directional_light_manager.get_bg(),
+                shadow_coordinates: directional_light_manager.get_coords(),
+                shadow_views: directional_light_manager.get_layer_views(),
                 buffers: &buffers,
+                output: output.as_view(),
             };
             (node.exec)(
                 renderer,
@@ -311,13 +279,6 @@ pub struct ShadowTarget<'a> {
     pub size: usize,
 }
 
-#[derive(Debug, Clone, Copy)]
-pub struct ShadowCoordinates {
-    pub layer: usize,
-    pub offset: UVec2,
-    pub size: usize,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 enum RenderResource {
     OutputTexture,
@@ -341,10 +302,9 @@ pub struct BufferTargetHandle {
 
 pub struct RenderGraphTextureStore<'a> {
     texture_mapping: &'a FastHashMap<SsoString, TextureView>,
-    shadow_mapping: &'a FastHashMap<usize, ShadowCoordinates>,
-    shadow_coord_array: &'a Vec<ShadowCoordinates>,
-    shadow_array_view: &'a Option<TextureView>,
-    shadow_views: &'a Vec<TextureView>,
+    shadow_array_view: &'a BindGroup,
+    shadow_coordinates: &'a [ShadowCoordinates],
+    shadow_views: &'a [TextureView],
     buffers: &'a FastHashMap<SsoString, Buffer>,
     output: Option<&'a TextureView>,
 }
@@ -367,8 +327,8 @@ impl<'a> RenderGraphTextureStore<'a> {
 
     pub fn get_shadow(&self, handle: ShadowTargetHandle) -> ShadowTarget<'_> {
         let coords = self
-            .shadow_mapping
-            .get(&handle.idx)
+            .shadow_coordinates
+            .get(handle.idx)
             .expect("internal rendergraph error: failed to get shadow mapping");
         ShadowTarget {
             view: self
@@ -380,13 +340,8 @@ impl<'a> RenderGraphTextureStore<'a> {
         }
     }
 
-    pub fn get_shadow_array(&self, _: ShadowArrayHandle) -> (&TextureView, &[ShadowCoordinates]) {
-        let view = self
-            .shadow_array_view
-            .as_ref()
-            .expect("internal rendergraph error: tried to get a shadow array when there is none");
-
-        (view, &self.shadow_coord_array)
+    pub fn get_shadow_array(&self, _: ShadowArrayHandle) -> &BindGroup {
+        self.shadow_array_view
     }
 
     pub fn get_buffer(&self, handle: BufferTargetHandle) -> &Buffer {
@@ -452,7 +407,7 @@ impl<'a, 'node> RenderGraphNodeBuilder<'a, 'node> {
     }
 
     pub fn add_shadow_array_input(&mut self) -> ShadowArrayHandle {
-        for (i, _size) in &self.graph.shadows {
+        for i in self.graph.shadows.keys() {
             let resource = RenderResource::Shadow(*i);
             self.inputs.push(resource.clone());
         }
@@ -463,7 +418,7 @@ impl<'a, 'node> RenderGraphNodeBuilder<'a, 'node> {
         let resource = RenderResource::Shadow(idx);
         self.graph.shadows.insert(idx, size);
         self.inputs.push(resource.clone());
-        self.outputs.push(resource.clone());
+        self.outputs.push(resource);
         ShadowTargetHandle { idx }
     }
 
@@ -472,7 +427,7 @@ impl<'a, 'node> RenderGraphNodeBuilder<'a, 'node> {
         SsoString: From<S>,
     {
         let name = SsoString::from(name);
-        let resource = RenderResource::Buffer(name.clone());
+        let resource = RenderResource::Buffer(name);
         self.inputs.push(resource.clone());
         BufferTargetHandle { resource }
     }
@@ -483,7 +438,7 @@ impl<'a, 'node> RenderGraphNodeBuilder<'a, 'node> {
     {
         let name = SsoString::from(name);
         let resource = RenderResource::Buffer(name.clone());
-        self.graph.buffers.insert(name.clone(), buffer);
+        self.graph.buffers.insert(name, buffer);
         self.inputs.push(resource.clone());
         self.outputs.push(resource.clone());
         BufferTargetHandle { resource }

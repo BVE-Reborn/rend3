@@ -44,7 +44,7 @@ impl CpuCuller {
 
         let objects = args.objects.get_objects::<PbrMaterial>(args.transparency as u64);
 
-        let objects = crate::common::sorting::sort_objects(objects, &args.camera, args.transparency.to_sorting());
+        let objects = crate::common::sorting::sort_objects(objects, args.camera, args.transparency.to_sorting());
 
         let (mut outputs, calls) = cull_internal(&objects, frustum, view, view_proj);
 
