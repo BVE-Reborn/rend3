@@ -171,6 +171,7 @@ impl PbrRenderRoutine {
 
                     let object_manager = renderer.object_manager.read();
                     let material_manager = renderer.material_manager.read();
+                    let mesh_manager = renderer.mesh_manager.read();
 
                     let count = object_manager.get_objects::<PbrMaterial>(transparency as u64).len();
 
@@ -199,7 +200,7 @@ impl PbrRenderRoutine {
                         label: None,
                         color_attachments: &[],
                         depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
-                            view: &shadow_map.view,
+                            view: shadow_map.view,
                             depth_ops: Some(Operations {
                                 load: match transparency {
                                     TransparencyType::Opaque => LoadOp::Clear(1.0),
@@ -210,6 +211,7 @@ impl PbrRenderRoutine {
                             stencil_ops: None,
                         }),
                     });
+                    mesh_manager.buffers().bind(&mut rpass);
                     rpass.set_pipeline(&self.primary_passes.shadow_passes.opaque_pipeline);
                     // TODO: Properly read viewport
                     rpass.set_viewport(
@@ -400,7 +402,7 @@ impl PbrRenderRoutine {
                 let hdr_color = texture_store.get_render_target(hdr_color_handle);
                 let hdr_depth = texture_store.get_render_target(hdr_depth_handle);
                 let culling_input = pre_cull_handle.map_gpu(|handle| texture_store.get_buffer(handle));
-                let (shadow, coords) = texture_store.get_shadow_array(shadow_handle);
+                let shadow_bg = texture_store.get_shadow_array(shadow_handle);
                 profiling::scope!("PBR Render Routine");
 
                 let mut encoder = renderer.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -410,7 +412,6 @@ impl PbrRenderRoutine {
                 let mut profiler = renderer.profiler.lock();
 
                 let mesh_manager = renderer.mesh_manager.read();
-                let directional_light = renderer.directional_light_manager.read();
                 let materials = renderer.material_manager.read();
                 let camera_manager = renderer.camera_manager.read();
                 let mut object_manager = renderer.object_manager.read();
@@ -477,7 +478,7 @@ impl PbrRenderRoutine {
                         materials: &materials,
                         meshes: mesh_manager.buffers(),
                         samplers: &self.samplers,
-                        directional_light_bg: directional_light.get_bg(),
+                        directional_light_bg: shadow_bg,
                         texture_bg: d2_texture_output_bg_ref,
                         shader_uniform_bg: &primary_camera_uniform_bg,
                         culled_objects: &culled_objects,

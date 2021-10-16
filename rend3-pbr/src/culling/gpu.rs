@@ -323,7 +323,7 @@ impl GpuCuller {
                 });
 
                 let bg_a = BindGroupBuilder::new(Some("prefix cull A bg"))
-                    .with_buffer(&args.input_buffer)
+                    .with_buffer(args.input_buffer)
                     .with_buffer(&uniform_buffer)
                     .with_buffer(&buffer_a)
                     .with_buffer(&buffer_b)
@@ -332,7 +332,7 @@ impl GpuCuller {
                     .build(args.device, &self.prefix_bgl);
 
                 let bg_b = BindGroupBuilder::new(Some("prefix cull B bg"))
-                    .with_buffer(&args.input_buffer)
+                    .with_buffer(args.input_buffer)
                     .with_buffer(&uniform_buffer)
                     .with_buffer(&buffer_b)
                     .with_buffer(&buffer_a)
@@ -367,7 +367,7 @@ impl GpuCuller {
                 cpass.dispatch(dispatch_count, 1, 1);
             } else {
                 let bg = BindGroupBuilder::new(Some("atomic culling bg"))
-                    .with_buffer(&args.input_buffer)
+                    .with_buffer(args.input_buffer)
                     .with_buffer(&uniform_buffer)
                     .with_buffer(&output_buffer)
                     .with_buffer(&indirect_buffer)
