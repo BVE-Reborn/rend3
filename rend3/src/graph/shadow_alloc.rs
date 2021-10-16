@@ -1,7 +1,7 @@
 use glam::UVec2;
 use wgpu::Extent3d;
 
-use crate::{ShadowCoordinates, util::typedefs::FastHashMap};
+use crate::{util::typedefs::FastHashMap, ShadowCoordinates};
 
 pub fn allocate_shadows(
     shadows: &FastHashMap<usize, usize>,
@@ -25,7 +25,7 @@ pub fn allocate_shadows(
         },
     );
 
-    let mut current_layer = 0usize;
+    let mut current_layer = 1usize;
     let mut current_size = 0usize;
     let mut current_count = 0usize;
 

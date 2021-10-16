@@ -1,7 +1,6 @@
 use std::{mem, num::NonZeroU64};
 
 use glam::Mat4;
-use ordered_float::OrderedFloat;
 use rend3::{
     resources::{CameraManager, GpuCullingInput, InternalObject, ObjectManager},
     util::{bind_merge::BindGroupBuilder, frustum::ShaderFrustum},
@@ -18,7 +17,7 @@ use wgpu::{
 use crate::{
     common::interfaces::{PerObjectData, ShaderInterfaces},
     culling::{CulledObjectSet, GPUIndirectData, Sorting},
-    material::{PbrMaterial, TransparencyType},
+    material::{TransparencyType},
     shaders::SPIRV_SHADERS,
 };
 
