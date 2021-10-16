@@ -431,6 +431,14 @@ impl TransparencyType {
             TransparencyType::Blend => "blend",
         }
     }
+
+    pub fn to_sorting(self) -> Option<crate::culling::Sorting> {
+        match self {
+            Self::Opaque => None,
+            Self::Cutout => None,
+            Self::Blend => Some(crate::culling::Sorting::FrontToBack),
+        }
+    }
 }
 
 #[allow(clippy::cmp_owned)] // This thinks making a temporary TransparencyType is the end of the world

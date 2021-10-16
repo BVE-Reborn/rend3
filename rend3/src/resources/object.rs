@@ -10,7 +10,7 @@ use rend3_types::{Material, MaterialHandle, RawObjectHandle};
 
 #[repr(C, align(16))]
 #[derive(Debug, Copy, Clone)]
-pub struct GPUCullingInput {
+pub struct GpuCullingInput {
     pub start_idx: u32,
     pub count: u32,
     pub vertex_offset: i32,
@@ -20,8 +20,8 @@ pub struct GPUCullingInput {
     pub bounding_sphere: BoundingSphere,
 }
 
-unsafe impl bytemuck::Pod for GPUCullingInput {}
-unsafe impl bytemuck::Zeroable for GPUCullingInput {}
+unsafe impl bytemuck::Pod for GpuCullingInput {}
+unsafe impl bytemuck::Zeroable for GpuCullingInput {}
 
 /// Internal representation of a Object.
 #[repr(C, align(16))]
@@ -30,7 +30,7 @@ pub struct InternalObject {
     pub material_handle: MaterialHandle,
     // Index into the material archetype array
     pub location: Vec3A,
-    pub input: GPUCullingInput,
+    pub input: GpuCullingInput,
 }
 
 impl InternalObject {
@@ -69,7 +69,7 @@ impl ObjectManager {
 
         let shader_object = InternalObject {
             location: object.transform.transform_point3a(Vec3A::ZERO),
-            input: GPUCullingInput {
+            input: GpuCullingInput {
                 material_index: material_manager.get_internal_index(object.material.get_raw()) as u32,
                 transform: object.transform,
                 bounding_sphere: mesh.bounding_sphere,

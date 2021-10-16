@@ -199,7 +199,7 @@ macro_rules! changeable_struct {
 
 // WGPU REEXPORTS
 #[doc(inline)]
-pub use wgt::{Backend, Backends, DeviceType, PresentMode, TextureFormat, TextureUsages};
+pub use wgt::{Backend, Backends, BufferUsages, DeviceType, PresentMode, TextureFormat, TextureUsages};
 
 /// Easy to use builder for a [`Mesh`] that deals with common operations for you.
 #[derive(Debug, Default)]

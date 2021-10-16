@@ -1,5 +1,4 @@
 use glam::{Mat3, Mat3A, Mat4};
-use ordered_float::OrderedFloat;
 use rend3::{
     resources::{CameraManager, InternalObject, MaterialManager, ObjectManager},
     util::frustum::ShaderFrustum,
@@ -15,7 +14,7 @@ use crate::{
         interfaces::{PerObjectData, ShaderInterfaces},
         samplers::Samplers,
     },
-    culling::{CPUDrawCall, CulledObjectSet, Sorting},
+    culling::{CPUDrawCall, CulledObjectSet},
     material::{PbrMaterial, SampleType, TransparencyType},
 };
 
@@ -25,11 +24,9 @@ pub struct CpuCullerCullArgs<'a> {
 
     pub interfaces: &'a ShaderInterfaces,
 
-    pub objects: &'a mut ObjectManager,
+    pub objects: &'a ObjectManager,
 
     pub transparency: TransparencyType,
-
-    pub sort: Option<Sorting>,
 }
 
 pub struct CpuCuller {}
@@ -45,25 +42,11 @@ impl CpuCuller {
         let view = args.camera.view();
         let view_proj = args.camera.view_proj();
 
-        let objects = args.objects.get_objects_mut::<PbrMaterial>(args.transparency as u64);
+        let objects = args.objects.get_objects::<PbrMaterial>(args.transparency as u64);
 
-        if let Some(sorting) = args.sort {
-            profiling::scope!("Sorting");
+        let objects = crate::common::sorting::sort_objects(objects, &args.camera, args.transparency.to_sorting());
 
-            let camera_location = args.camera.location().into();
-
-            match sorting {
-                Sorting::FrontToBack => {
-                    objects.sort_unstable_by_key(|o| OrderedFloat(o.mesh_location().distance_squared(camera_location)));
-                }
-                Sorting::BackToFront => {
-                    objects
-                        .sort_unstable_by_key(|o| OrderedFloat(-o.mesh_location().distance_squared(camera_location)));
-                }
-            }
-        }
-
-        let (mut outputs, calls) = cull_internal(objects, frustum, view, view_proj);
+        let (mut outputs, calls) = cull_internal(&objects, frustum, view, view_proj);
 
         assert_eq!(calls.len(), outputs.len());
 

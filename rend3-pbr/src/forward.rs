@@ -88,12 +88,6 @@ impl ForwardPass {
         let label = format_sso!("forward cull {}", self.transparency.to_debug_str());
         profiling::scope!(&label);
 
-        let sort = if self.transparency == TransparencyType::Blend {
-            Some(Sorting::BackToFront)
-        } else {
-            None
-        };
-
         match args.culler {
             ModeData::CPU(cpu_culler) => cpu_culler.cull(CpuCullerCullArgs {
                 device: args.device,
@@ -101,7 +95,6 @@ impl ForwardPass {
                 interfaces: args.interfaces,
                 objects: args.objects,
                 transparency: self.transparency,
-                sort,
             }),
             ModeData::GPU(gpu_culler) => {
                 args.profiler.begin_scope(&label, args.encoder, args.device);
@@ -111,7 +104,6 @@ impl ForwardPass {
                     interfaces: args.interfaces,
                     camera: args.camera,
                     input_buffer: args.culling_input.as_gpu(),
-                    sort,
                 });
                 args.profiler.end_scope(args.encoder);
                 culled

@@ -3,7 +3,7 @@ use std::{mem, num::NonZeroU64};
 use glam::Mat4;
 use ordered_float::OrderedFloat;
 use rend3::{
-    resources::{CameraManager, GPUCullingInput, InternalObject, ObjectManager},
+    resources::{CameraManager, GpuCullingInput, InternalObject, ObjectManager},
     util::{bind_merge::BindGroupBuilder, frustum::ShaderFrustum},
     ModeData,
 };
@@ -21,11 +21,6 @@ use crate::{
     material::{PbrMaterial, TransparencyType},
     shaders::SPIRV_SHADERS,
 };
-
-pub struct PreCulledBuffer {
-    inner: Buffer,
-    count: usize,
-}
 
 #[repr(C, align(16))]
 #[derive(Debug, Copy, Clone)]
@@ -58,9 +53,10 @@ pub struct GpuCullerCullArgs<'a> {
 
     pub camera: &'a CameraManager,
 
-    pub input_buffer: &'a PreCulledBuffer,
+    pub input_buffer: &'a Buffer,
+    pub input_count: usize,
 
-    pub sort: Option<Sorting>,
+    pub transparency: TransparencyType,
 }
 
 pub struct GpuCuller {
@@ -85,7 +81,7 @@ impl GpuCuller {
                     ty: BindingType::Buffer {
                         ty: BufferBindingType::Storage { read_only: true },
                         has_dynamic_offset: false,
-                        min_binding_size: NonZeroU64::new(mem::size_of::<GPUCullingInput>() as _),
+                        min_binding_size: NonZeroU64::new(mem::size_of::<GpuCullingInput>() as _),
                     },
                     count: None,
                 },
@@ -131,7 +127,7 @@ impl GpuCuller {
                     ty: BindingType::Buffer {
                         ty: BufferBindingType::Storage { read_only: true },
                         has_dynamic_offset: false,
-                        min_binding_size: NonZeroU64::new(mem::size_of::<GPUCullingInput>() as _),
+                        min_binding_size: NonZeroU64::new(mem::size_of::<GpuCullingInput>() as _),
                     },
                     count: None,
                 },
@@ -276,34 +272,10 @@ impl GpuCuller {
         }
     }
 
-    pub fn pre_cull(&self, args: GpuCullerPreCullArgs<'_>) -> PreCulledBuffer {
-        let objects = args.objects.get_objects_mut::<PbrMaterial>(args.transparency as u64);
-        let count = objects.len();
-
-        if let Some(sorting) = args.sort {
-            profiling::scope!("Sorting");
-
-            let camera_location = args.camera.location().into();
-
-            match sorting {
-                Sorting::FrontToBack => {
-                    objects.sort_unstable_by_key(|o| OrderedFloat(o.mesh_location().distance_squared(camera_location)));
-                }
-                Sorting::BackToFront => {
-                    objects
-                        .sort_unstable_by_key(|o| OrderedFloat(-o.mesh_location().distance_squared(camera_location)));
-                }
-            }
-        }
-        let buffer = build_cull_data(args.device, objects);
-
-        PreCulledBuffer { inner: buffer, count }
-    }
-
     pub fn cull(&self, args: GpuCullerCullArgs<'_>) -> CulledObjectSet {
         profiling::scope!("Record GPU Culling");
 
-        let count = args.input_buffer.count;
+        let count = args.input_count;
 
         let uniform = GPUCullingUniforms {
             view: args.camera.view(),
@@ -336,7 +308,7 @@ impl GpuCuller {
         if count != 0 {
             let dispatch_count = ((count + 255) / 256) as u32;
 
-            if args.sort.is_some() {
+            if args.transparency.to_sorting().is_some() {
                 let buffer_a = args.device.create_buffer(&BufferDescriptor {
                     label: Some("cull result index buffer A"),
                     size: (count * 4) as _,
@@ -352,7 +324,7 @@ impl GpuCuller {
                 });
 
                 let bg_a = BindGroupBuilder::new(Some("prefix cull A bg"))
-                    .with_buffer(&args.input_buffer.inner)
+                    .with_buffer(&args.input_buffer)
                     .with_buffer(&uniform_buffer)
                     .with_buffer(&buffer_a)
                     .with_buffer(&buffer_b)
@@ -361,7 +333,7 @@ impl GpuCuller {
                     .build(args.device, &self.prefix_bgl);
 
                 let bg_b = BindGroupBuilder::new(Some("prefix cull B bg"))
-                    .with_buffer(&args.input_buffer.inner)
+                    .with_buffer(&args.input_buffer)
                     .with_buffer(&uniform_buffer)
                     .with_buffer(&buffer_b)
                     .with_buffer(&buffer_a)
@@ -396,7 +368,7 @@ impl GpuCuller {
                 cpass.dispatch(dispatch_count, 1, 1);
             } else {
                 let bg = BindGroupBuilder::new(Some("atomic culling bg"))
-                    .with_buffer(&args.input_buffer.inner)
+                    .with_buffer(&args.input_buffer)
                     .with_buffer(&uniform_buffer)
                     .with_buffer(&output_buffer)
                     .with_buffer(&indirect_buffer)
@@ -430,23 +402,14 @@ impl GpuCuller {
     }
 }
 
-fn build_cull_data(device: &Device, objects: &[InternalObject]) -> Buffer {
+pub fn build_cull_data(buffer: &Buffer, objects: &[InternalObject]) {
     profiling::scope!("Building Input Data");
-
-    let total_length = objects.len() * mem::size_of::<GPUCullingInput>();
-
-    let buffer = device.create_buffer(&BufferDescriptor {
-        label: Some("culling inputs"),
-        size: total_length as u64,
-        usage: BufferUsages::STORAGE,
-        mapped_at_creation: true,
-    });
 
     let mut data = buffer.slice(..).get_mapped_range_mut();
 
     // This unsafe block measured a bit faster in my tests, and as this is basically _the_ hot path, so this is worthwhile.
     unsafe {
-        let data_ptr = data.as_mut_ptr() as *mut GPUCullingInput;
+        let data_ptr = data.as_mut_ptr() as *mut GpuCullingInput;
 
         // Iterate over the objects
         for idx in 0..objects.len() {
@@ -460,8 +423,6 @@ fn build_cull_data(device: &Device, objects: &[InternalObject]) -> Buffer {
 
     drop(data);
     buffer.unmap();
-
-    buffer
 }
 
 pub fn run<'rpass>(rpass: &mut RenderPass<'rpass>, indirect_data: &'rpass GPUIndirectData) {
