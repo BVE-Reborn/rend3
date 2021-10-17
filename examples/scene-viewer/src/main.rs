@@ -402,8 +402,10 @@ fn main() {
             let (cmd_bufs, ready) = renderer.ready();
             // Build a rendergraph
             let mut graph = rend3::RenderGraph::new();
-            pbr_routine.add_pre_cull_to_graph(&mut graph, &renderer);
-            pbr_routine.add_shadows_to_graph(&mut graph, &ready);
+            pbr_routine.add_pre_cull_to_graph(&mut graph);
+            pbr_routine.add_shadow_culling_to_graph(&mut graph, &ready);
+            pbr_routine.add_shadow_rendering_to_graph(&mut graph, &ready);
+            pbr_routine.add_culling_to_graph(&mut graph);
             pbr_routine.add_prepass_to_graph(&mut graph);
             skybox_routine.add_to_graph(&mut graph);
             pbr_routine.add_forward_to_graph(&mut graph);
