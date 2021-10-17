@@ -401,12 +401,12 @@ fn main() {
 
             // Ready up the renderer
             let (cmd_bufs, ready) = renderer.ready();
-            
+
             // Build a rendergraph
             let mut graph = rend3::RenderGraph::new();
             // Upload culling information to the GPU and into the graph.
             pbr_routine.add_pre_cull_to_graph(&mut graph);
-            
+
             // Run all culling for shadows and the camera.
             pbr_routine.add_shadow_culling_to_graph(&mut graph, &ready);
             pbr_routine.add_culling_to_graph(&mut graph);
