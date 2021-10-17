@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use rend3::{
-    format_sso,
     resources::{CameraManager, MaterialManager, MeshBuffers, ObjectManager},
     ModeData,
 };
@@ -22,7 +21,6 @@ use super::culling;
 
 pub struct ForwardPassCullArgs<'a> {
     pub device: &'a Device,
-    pub profiler: &'a mut GpuProfiler,
     pub encoder: &'a mut CommandEncoder,
 
     pub culler: ModeData<&'a CpuCuller, &'a GpuCuller>,
@@ -85,9 +83,6 @@ impl ForwardPass {
     }
 
     pub fn cull(&self, args: ForwardPassCullArgs<'_>) -> CulledObjectSet {
-        let label = format_sso!("forward cull {}", self.transparency.to_debug_str());
-        profiling::scope!(&label);
-
         match args.culler {
             ModeData::CPU(cpu_culler) => cpu_culler.cull(CpuCullerCullArgs {
                 device: args.device,
@@ -97,7 +92,6 @@ impl ForwardPass {
                 transparency: self.transparency,
             }),
             ModeData::GPU(gpu_culler) => {
-                args.profiler.begin_scope(&label, args.encoder, args.device);
                 let object_count = args.objects.get_objects::<PbrMaterial>(self.transparency as u64).len();
                 let culled = gpu_culler.cull(GpuCullerCullArgs {
                     device: args.device,
@@ -108,7 +102,6 @@ impl ForwardPass {
                     input_count: object_count,
                     transparency: self.transparency,
                 });
-                args.profiler.end_scope(args.encoder);
                 culled
             }
         }
@@ -142,10 +135,6 @@ impl ForwardPass {
     }
 
     pub fn draw<'rpass>(&'rpass self, args: ForwardPassDrawArgs<'rpass, '_>) {
-        let label = self.transparency.to_debug_str();
-        profiling::scope!(label);
-        args.profiler.begin_scope(label, args.rpass, args.device);
-
         args.meshes.bind(args.rpass);
 
         args.rpass.set_pipeline(&self.forward_pipeline);
@@ -163,7 +152,5 @@ impl ForwardPass {
                 culling::gpu::run(args.rpass, data);
             }
         }
-
-        args.profiler.end_scope(args.rpass);
     }
 }
