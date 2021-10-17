@@ -118,13 +118,15 @@ impl PbrRenderRoutine {
     }
 
     pub fn add_pre_cull_to_graph<'node>(&'node self, graph: &mut RenderGraph<'node>) {
-        let mut declare_pre_cull = |name, transparency: TransparencyType| {
+        let mut declare_pre_cull = |name: &'node str, transparency: TransparencyType| {
             let mut builder = graph.add_node();
             let handle = builder.add_data_output::<_, Buffer>(name);
 
             builder.build(move |renderer, _prefix_cmd_bufs, _cmd_bufs, _ready, texture_store| {
                 let object_manager = renderer.object_manager.read();
                 let camera_manager = renderer.camera_manager.read();
+
+                profiling::scope!(&name[..(name.len() - 5)]);
 
                 let objects = object_manager.get_objects::<PbrMaterial>(transparency as u64);
                 let objects = common::sorting::sort_objects(objects, &camera_manager, transparency.to_sorting());
@@ -158,7 +160,7 @@ impl PbrRenderRoutine {
                     .gpu_culler
                     .mode()
                     .into_data(|| (), || builder.add_data_input(pre_cull_name));
-                let cull_handle = builder.add_data_output::<_, CulledObjectSet>(cull_name);
+                let cull_handle = builder.add_data_output::<_, CulledObjectSet>(cull_name.clone());
 
                 builder.build(move |renderer, _prefix_cmd_bufs, cmd_bufs, ready, texture_store| {
                     let culling_input =
@@ -168,7 +170,11 @@ impl PbrRenderRoutine {
                         .device
                         .create_command_encoder(&CommandEncoderDescriptor::default());
 
+                    let mut profiler = renderer.profiler.lock();
                     let object_manager = renderer.object_manager.read();
+
+                    profiling::scope!(&cull_name);
+                    profiler.begin_scope(&cull_name, &mut encoder, &renderer.device);
 
                     let count = object_manager.get_objects::<PbrMaterial>(transparency as u64).len();
 
@@ -192,6 +198,8 @@ impl PbrRenderRoutine {
                     };
 
                     texture_store.set_data::<CulledObjectSet>(cull_handle, Some(culled_objects));
+
+                    profiler.end_scope(&mut encoder);
 
                     cmd_bufs.send(encoder.finish()).unwrap();
                 });
@@ -219,11 +227,12 @@ impl PbrRenderRoutine {
                         .create_command_encoder(&CommandEncoderDescriptor::default());
 
                     let mut profiler = renderer.profiler.lock();
-
                     let mesh_manager = renderer.mesh_manager.read();
                     let material_manager = renderer.material_manager.read();
 
-                    profiler.begin_scope("shadow", &mut encoder, &renderer.device);
+                    let name = format_sso!("{} S{} Render", transparency.to_debug_str(), idx);
+                    profiling::scope!(&name);
+                    profiler.begin_scope(&name, &mut encoder, &renderer.device);
 
                     let mut rpass = encoder.begin_render_pass(&RenderPassDescriptor {
                         label: None,
@@ -292,7 +301,6 @@ impl PbrRenderRoutine {
 
             builder.build(move |renderer, _prefix_cmd_bufs, cmd_bufs, _ready, texture_store| {
                 let culling_input = pre_cull_handle.map_gpu(|handle| texture_store.get_data(handle).as_ref().unwrap());
-                profiling::scope!("PBR Render Routine");
 
                 let mut encoder = renderer.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
                     label: Some("primary encoder"),
@@ -305,7 +313,8 @@ impl PbrRenderRoutine {
 
                 let culler = self.gpu_culler.as_ref().map_cpu(|_| &self.cpu_culler);
 
-                profiler.begin_scope("forward culling", &mut encoder, &renderer.device);
+                profiling::scope!(post_cull_name);
+                profiler.begin_scope(post_cull_name, &mut encoder, &renderer.device);
                 let pass = match transparency {
                     TransparencyType::Opaque => &self.primary_passes.opaque_pass,
                     TransparencyType::Cutout => &self.primary_passes.cutout_pass,
@@ -314,7 +323,6 @@ impl PbrRenderRoutine {
 
                 let culled_objects = pass.cull(forward::ForwardPassCullArgs {
                     device: &renderer.device,
-                    profiler: &mut profiler,
                     encoder: &mut encoder,
                     culler,
                     interfaces: &self.interfaces,
@@ -333,9 +341,9 @@ impl PbrRenderRoutine {
     }
 
     pub fn add_prepass_to_graph<'node>(&'node self, graph: &mut RenderGraph<'node>) {
-        for (transparency, cull_name) in [
-            (TransparencyType::Opaque, "Opaque Forward Cull"),
-            (TransparencyType::Cutout, "Cutout Forward Cull"),
+        for (transparency, cull_name, pass_name) in [
+            (TransparencyType::Opaque, "Opaque Forward Cull", "Opaque Prepass"),
+            (TransparencyType::Cutout, "Cutout Forward Cull", "Cutout Prepass"),
         ] {
             let mut builder = graph.add_node();
 
@@ -363,16 +371,17 @@ impl PbrRenderRoutine {
                 let hdr_color = texture_store.get_render_target(hdr_color_handle);
                 let hdr_depth = texture_store.get_render_target(hdr_depth_handle);
                 let culled_objects = texture_store.get_data(cull_handle).as_ref().unwrap();
-                profiling::scope!("PBR Render Routine");
 
                 let mut encoder = renderer.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
                     label: Some("primary encoder"),
                 });
 
                 let mut profiler = renderer.profiler.lock();
-
                 let mesh_manager = renderer.mesh_manager.read();
                 let materials = renderer.material_manager.read();
+
+                profiling::scope!(pass_name);
+                profiler.begin_scope(pass_name, &mut encoder, &renderer.device);
 
                 let pass = match transparency {
                     TransparencyType::Opaque => &self.primary_passes.opaque_pass,
@@ -409,7 +418,6 @@ impl PbrRenderRoutine {
                         }),
                     });
 
-                    profiler.begin_scope("depth prepass", &mut rpass, &renderer.device);
                     pass.prepass(forward::ForwardPassPrepassArgs {
                         device: &renderer.device,
                         profiler: &mut profiler,
@@ -421,20 +429,20 @@ impl PbrRenderRoutine {
                         culled_objects,
                     });
 
-                    profiler.end_scope(&mut rpass);
-
                     drop(rpass);
                 }
+
+                profiler.end_scope(&mut encoder);
                 cmd_bufs.send(encoder.finish()).unwrap();
             });
         }
     }
 
     pub fn add_forward_to_graph<'node>(&'node self, graph: &mut RenderGraph<'node>) {
-        for (transparency, cull_name) in [
-            (TransparencyType::Opaque, "Opaque Forward Cull"),
-            (TransparencyType::Cutout, "Cutout Forward Cull"),
-            (TransparencyType::Blend, "Blend Forward Cull"),
+        for (transparency, cull_name, pass_name) in [
+            (TransparencyType::Opaque, "Opaque Forward Cull", "Opaque Forward"),
+            (TransparencyType::Cutout, "Cutout Forward Cull", "Cutout Forward"),
+            (TransparencyType::Blend, "Blend Forward Cull", "Blend Forward"),
         ] {
             let mut builder = graph.add_node();
 
@@ -465,7 +473,6 @@ impl PbrRenderRoutine {
                 let hdr_depth = texture_store.get_render_target(hdr_depth_handle);
                 let culled_objects = texture_store.get_data(culled_objects_handle).as_ref().unwrap();
                 let shadow_bg = texture_store.get_shadow_array(shadow_handle);
-                profiling::scope!("PBR Render Routine");
 
                 let mut encoder = renderer.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
                     label: Some("primary encoder"),
@@ -476,6 +483,9 @@ impl PbrRenderRoutine {
                 let mesh_manager = renderer.mesh_manager.read();
                 let materials = renderer.material_manager.read();
                 let camera_manager = renderer.camera_manager.read();
+
+                profiling::scope!(pass_name);
+                profiler.begin_scope(pass_name, &mut encoder, &renderer.device);
 
                 let pass = match transparency {
                     TransparencyType::Opaque => &self.primary_passes.opaque_pass,
@@ -513,8 +523,6 @@ impl PbrRenderRoutine {
                         }),
                     });
 
-                    profiler.begin_scope("forward", &mut rpass, &renderer.device);
-
                     pass.draw(forward::ForwardPassDrawArgs {
                         device: &renderer.device,
                         profiler: &mut profiler,
@@ -528,10 +536,10 @@ impl PbrRenderRoutine {
                         culled_objects,
                     });
 
-                    profiler.end_scope(&mut rpass);
-
                     drop(rpass);
                 }
+
+                profiler.end_scope(&mut encoder);
                 cmd_bufs.send(encoder.finish()).unwrap();
             });
         }
