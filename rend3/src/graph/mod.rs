@@ -1,10 +1,10 @@
-use std::sync::Arc;
+use std::{any::Any, marker::PhantomData, sync::Arc};
 
 use glam::UVec2;
 use rend3_types::{BufferUsages, TextureFormat, TextureUsages};
 use wgpu::{
-    BindGroup, Buffer, BufferDescriptor, CommandBuffer, CommandEncoderDescriptor, Extent3d, Texture, TextureDescriptor,
-    TextureDimension, TextureView, TextureViewDescriptor,
+    BindGroup, CommandBuffer, CommandEncoderDescriptor, Extent3d, Texture, TextureDescriptor, TextureDimension,
+    TextureView, TextureViewDescriptor,
 };
 
 use crate::{
@@ -46,16 +46,16 @@ pub struct RenderTarget {
 
 pub struct RenderGraph<'node> {
     targets: FastHashMap<SsoString, RenderTarget>,
-    shadows: FastHashMap<usize, usize>,
-    buffers: FastHashMap<SsoString, BufferTargetDescriptor>,
+    shadows: FastHashSet<usize>,
+    data: FastHashMap<SsoString, Box<dyn Any>>, // Any is Option<T> where T is the stored data
     nodes: Vec<RenderGraphNode<'node>>,
 }
 impl<'node> RenderGraph<'node> {
     pub fn new() -> Self {
         Self {
             targets: FastHashMap::with_capacity_and_hasher(32, Default::default()),
-            shadows: FastHashMap::with_capacity_and_hasher(32, Default::default()),
-            buffers: FastHashMap::with_capacity_and_hasher(32, Default::default()),
+            shadows: FastHashSet::with_capacity_and_hasher(32, Default::default()),
+            data: FastHashMap::with_capacity_and_hasher(32, Default::default()),
             nodes: Vec::with_capacity(64),
         }
     }
@@ -69,7 +69,7 @@ impl<'node> RenderGraph<'node> {
     }
 
     pub fn execute(
-        self,
+        mut self,
         renderer: &Arc<Renderer>,
         mut output: OutputFrame,
         mut cmd_bufs: Vec<CommandBuffer>,
@@ -166,7 +166,7 @@ impl<'node> RenderGraph<'node> {
                         }
                     }
                     RenderResource::Shadow(..) => {}
-                    RenderResource::Buffer(..) => {}
+                    RenderResource::Data(..) => {}
                     RenderResource::OutputTexture => {
                         acquire_idx = Some(idx);
                         continue;
@@ -185,25 +185,11 @@ impl<'node> RenderGraph<'node> {
                         textures.entry(desc).or_insert_with(|| Vec::with_capacity(16)).push(tex);
                     }
                     RenderResource::Shadow(..) => {}
-                    RenderResource::Buffer(..) => {}
+                    RenderResource::Data(..) => {}
                     RenderResource::OutputTexture => continue,
                 };
             }
         }
-
-        let buffers = self
-            .buffers
-            .into_iter()
-            .map(|(name, desc)| {
-                let buffer = renderer.device.create_buffer(&BufferDescriptor {
-                    label: Some(&name),
-                    size: desc.length,
-                    usage: desc.usage,
-                    mapped_at_creation: desc.mapped,
-                });
-                (name, buffer)
-            })
-            .collect::<FastHashMap<_, _>>();
 
         let (prefix_cmd_buf_sender, prefix_cmd_buf_reciever) = flume::unbounded();
         let (cmd_buf_sender, cmd_buf_reciever) = flume::unbounded();
@@ -227,12 +213,12 @@ impl<'node> RenderGraph<'node> {
                 output.acquire().unwrap();
             }
 
-            let store = RenderGraphTextureStore {
+            let mut store = RenderGraphTextureStore {
                 texture_mapping: &active_views,
                 shadow_array_view: directional_light_manager.get_bg(),
                 shadow_coordinates: directional_light_manager.get_coords(),
                 shadow_views: directional_light_manager.get_layer_views(),
-                buffers: &buffers,
+                data: &mut self.data,
                 output: output.as_view(),
             };
             (node.exec)(
@@ -240,7 +226,7 @@ impl<'node> RenderGraph<'node> {
                 prefix_cmd_buf_sender.clone(),
                 cmd_buf_sender.clone(),
                 ready_output,
-                &store,
+                &mut store,
             );
         }
 
@@ -284,7 +270,7 @@ enum RenderResource {
     OutputTexture,
     Texture(SsoString),
     Shadow(usize),
-    Buffer(SsoString),
+    Data(SsoString),
 }
 
 pub struct RenderTargetHandle {
@@ -296,8 +282,9 @@ pub struct ShadowTargetHandle {
 
 pub struct ShadowArrayHandle(());
 
-pub struct BufferTargetHandle {
+pub struct DataHandle<T> {
     resource: RenderResource,
+    _phantom: PhantomData<T>,
 }
 
 pub struct RenderGraphTextureStore<'a> {
@@ -305,7 +292,7 @@ pub struct RenderGraphTextureStore<'a> {
     shadow_array_view: &'a BindGroup,
     shadow_coordinates: &'a [ShadowCoordinates],
     shadow_views: &'a [TextureView],
-    buffers: &'a FastHashMap<SsoString, Buffer>,
+    data: &'a mut FastHashMap<SsoString, Box<dyn Any>>, // Any is Option<T> where T is the stored data
     output: Option<&'a TextureView>,
 }
 
@@ -344,12 +331,30 @@ impl<'a> RenderGraphTextureStore<'a> {
         self.shadow_array_view
     }
 
-    pub fn get_buffer(&self, handle: BufferTargetHandle) -> &Buffer {
+    pub fn set_data<T: 'static>(&mut self, handle: DataHandle<T>, data: Option<T>) {
         match handle.resource {
-            RenderResource::Buffer(name) => self
-                .buffers
+            RenderResource::Data(name) => {
+                *self
+                    .data
+                    .get_mut(&name)
+                    .expect("internal rendergraph error: failed to get buffer")
+                    .downcast_mut::<Option<T>>()
+                    .expect("internal rendergraph error: downcasting failed") = data
+            }
+            r => {
+                panic!("internal rendergraph error: tried to get a {:?} as a render target", r)
+            }
+        }
+    }
+
+    pub fn get_data<T: 'static>(&self, handle: DataHandle<T>) -> &Option<T> {
+        match handle.resource {
+            RenderResource::Data(name) => self
+                .data
                 .get(&name)
-                .expect("internal rendergraph error: failed to get buffer"),
+                .expect("internal rendergraph error: failed to get buffer")
+                .downcast_ref::<Option<T>>()
+                .expect("internal rendergraph error: downcasting failed"),
             r => {
                 panic!("internal rendergraph error: tried to get a {:?} as a render target", r)
             }
@@ -367,7 +372,7 @@ pub struct RenderGraphNode<'node> {
                 flume::Sender<CommandBuffer>,
                 flume::Sender<CommandBuffer>,
                 &ReadyData,
-                &RenderGraphTextureStore<'_>,
+                &mut RenderGraphTextureStore<'_>,
             ) + 'node,
     >,
 }
@@ -407,41 +412,57 @@ impl<'a, 'node> RenderGraphNodeBuilder<'a, 'node> {
     }
 
     pub fn add_shadow_array_input(&mut self) -> ShadowArrayHandle {
-        for i in self.graph.shadows.keys() {
+        for i in &self.graph.shadows {
             let resource = RenderResource::Shadow(*i);
             self.inputs.push(resource.clone());
         }
         ShadowArrayHandle(())
     }
 
-    pub fn add_shadow_output(&mut self, idx: usize, size: usize) -> ShadowTargetHandle {
+    pub fn add_shadow_output(&mut self, idx: usize) -> ShadowTargetHandle {
         let resource = RenderResource::Shadow(idx);
-        self.graph.shadows.insert(idx, size);
+        self.graph.shadows.insert(idx);
         self.inputs.push(resource.clone());
         self.outputs.push(resource);
         ShadowTargetHandle { idx }
     }
 
-    pub fn add_buffer_input<S>(&mut self, name: S) -> BufferTargetHandle
+    pub fn add_data_input<S, T>(&mut self, name: S) -> DataHandle<T>
     where
         SsoString: From<S>,
+        T: 'static,
     {
         let name = SsoString::from(name);
-        let resource = RenderResource::Buffer(name);
+        // TODO: error handling
+        // TODO: move this validation to all types
+        self.graph
+            .data
+            .get(&name)
+            .expect("used input which has not been previously declared as a node's output")
+            .downcast_ref::<Option<T>>()
+            .expect("used custom data that was previously declared with a different type");
+        let resource = RenderResource::Data(name);
         self.inputs.push(resource.clone());
-        BufferTargetHandle { resource }
+        DataHandle {
+            resource,
+            _phantom: PhantomData,
+        }
     }
 
-    pub fn add_buffer_output<S>(&mut self, name: S, buffer: BufferTargetDescriptor) -> BufferTargetHandle
+    pub fn add_data_output<S, T>(&mut self, name: S) -> DataHandle<T>
     where
         SsoString: From<S>,
+        T: 'static,
     {
         let name = SsoString::from(name);
-        let resource = RenderResource::Buffer(name.clone());
-        self.graph.buffers.insert(name, buffer);
+        let resource = RenderResource::Data(name.clone());
+        self.graph.data.insert(name, Box::new(None::<T>));
         self.inputs.push(resource.clone());
         self.outputs.push(resource.clone());
-        BufferTargetHandle { resource }
+        DataHandle {
+            resource,
+            _phantom: PhantomData,
+        }
     }
 
     pub fn build(
@@ -451,7 +472,7 @@ impl<'a, 'node> RenderGraphNodeBuilder<'a, 'node> {
                 flume::Sender<CommandBuffer>,
                 flume::Sender<CommandBuffer>,
                 &ReadyData,
-                &RenderGraphTextureStore<'_>,
+                &mut RenderGraphTextureStore<'_>,
             ) + 'node,
     ) {
         self.graph.nodes.push(RenderGraphNode {

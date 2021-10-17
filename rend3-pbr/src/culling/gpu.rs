@@ -401,12 +401,19 @@ impl GpuCuller {
     }
 }
 
-pub fn build_cull_data(buffer: &Buffer, objects: &[InternalObject]) {
+pub fn build_cull_data(device: &Device, objects: &[InternalObject]) -> Buffer {
     profiling::scope!("Building Input Data");
 
-    let mut data = buffer.slice(..).get_mapped_range_mut();
+    let total_length = objects.len() * mem::size_of::<GpuCullingInput>();
 
-    assert!(data.len() >= objects.len() * mem::size_of::<GpuCullingInput>());
+    let buffer = device.create_buffer(&BufferDescriptor {
+        label: Some("culling inputs"),
+        size: total_length as u64,
+        usage: BufferUsages::STORAGE,
+        mapped_at_creation: true,
+    });
+
+    let mut data = buffer.slice(..).get_mapped_range_mut();
 
     // This unsafe block measured a bit faster in my tests, and as this is basically _the_ hot path, so this is worthwhile.
     unsafe {
@@ -424,6 +431,8 @@ pub fn build_cull_data(buffer: &Buffer, objects: &[InternalObject]) {
 
     drop(data);
     buffer.unmap();
+
+    buffer
 }
 
 pub fn run<'rpass>(rpass: &mut RenderPass<'rpass>, indirect_data: &'rpass GPUIndirectData) {
