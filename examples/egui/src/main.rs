@@ -91,7 +91,7 @@ fn main() {
     let camera_pitch = std::f32::consts::FRAC_PI_4;
     let camera_yaw = -std::f32::consts::FRAC_PI_4;
     // These values may seem arbitrary, but they center the camera on the cube in the scene
-    let camera_location = glam::Vec3A::new(10.0, 15.0, -10.0);
+    let camera_location = glam::Vec3A::new(5.0, 7.5, -5.0);
     let view = glam::Mat4::from_euler(glam::EulerRot::XYZ, -camera_pitch, -camera_yaw, 0.0);
     let view = view * glam::Mat4::from_translation((-camera_location).into());
 
