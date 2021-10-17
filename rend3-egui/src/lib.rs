@@ -1,4 +1,4 @@
-use rend3::{RenderGraphNodeBuilder, Renderer};
+use rend3::{RenderGraph, Renderer};
 use wgpu::TextureFormat;
 
 pub struct EguiRenderRoutine {
@@ -35,7 +35,9 @@ impl EguiRenderRoutine {
         };
     }
 
-    pub fn add_to_graph<'node>(&'node mut self, mut builder: RenderGraphNodeBuilder<'_, 'node>, input: Input<'node>) {
+    pub fn add_to_graph<'node>(&'node mut self, graph: &mut RenderGraph<'node>, input: Input<'node>) {
+        let mut builder = graph.add_node();
+
         let output_handle = builder.add_surface_output();
 
         builder.build(move |renderer, _prefix_cmd_bufs, cmd_bufs, _ready, texture_store| {

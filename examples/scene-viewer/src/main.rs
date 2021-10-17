@@ -398,19 +398,31 @@ fn main() {
             let pbr_routine = pbr_routine.lock();
             let skybox_routine = skybox_routine.lock();
             let tonemapping_routine = tonemapping_routine.lock();
+
             // Ready up the renderer
             let (cmd_bufs, ready) = renderer.ready();
+            
             // Build a rendergraph
             let mut graph = rend3::RenderGraph::new();
+            // Upload culling information to the GPU and into the graph.
             pbr_routine.add_pre_cull_to_graph(&mut graph);
+            
+            // Run all culling for shadows and the camera.
             pbr_routine.add_shadow_culling_to_graph(&mut graph, &ready);
-            pbr_routine.add_shadow_rendering_to_graph(&mut graph, &ready);
             pbr_routine.add_culling_to_graph(&mut graph);
+
+            // Render shadows.
+            pbr_routine.add_shadow_rendering_to_graph(&mut graph, &ready);
+
+            // Depth prepass and forward pass.
             pbr_routine.add_prepass_to_graph(&mut graph);
             skybox_routine.add_to_graph(&mut graph);
             pbr_routine.add_forward_to_graph(&mut graph);
+
+            // Tonemap onto the output.
             tonemapping_routine.add_to_graph(&mut graph);
-            // Dispatch a render!
+
+            // Dispatch a render using the built up rendergraph!
             previous_profiling_stats = graph.execute(&renderer, frame, cmd_bufs, &ready);
             // mark the end of the frame for tracy/other profilers
             profiling::finish_frame!();

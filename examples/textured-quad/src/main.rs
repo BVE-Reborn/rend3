@@ -180,13 +180,29 @@ fn main() {
             let frame = rend3::util::output::OutputFrame::Surface {
                 surface: Arc::clone(&surface),
             };
+
+            // Ready up the renderer
+            let (cmd_bufs, ready) = renderer.ready();
+
             // Build a rendergraph
             let mut graph = rend3::RenderGraph::new();
-            pbr_routine.add_prepass_to_graph(graph.add_node());
-            pbr_routine.add_forward_to_graph(graph.add_node());
-            tonemapping_routine.add_to_graph(graph.add_node());
-            // Dispatch a render!
-            renderer.render(graph, frame);
+            // Upload culling information to the GPU and into the graph.
+            pbr_routine.add_pre_cull_to_graph(&mut graph);
+
+            // Run all culling for the camera.
+            pbr_routine.add_culling_to_graph(&mut graph);
+
+            // We're all unlit anyway, so we don't add any shadow things to the graph.
+
+            // Depth prepass and forward pass.
+            pbr_routine.add_prepass_to_graph(&mut graph);
+            pbr_routine.add_forward_to_graph(&mut graph);
+
+            // Tonemap onto the output.
+            tonemapping_routine.add_to_graph(&mut graph);
+
+            // Dispatch a render using the built up rendergraph!
+            graph.execute(&renderer, frame, cmd_bufs, &ready);
         }
         // Other events we don't care about
         _ => {}
