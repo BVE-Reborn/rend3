@@ -73,6 +73,7 @@ impl<'node> RenderGraph<'node> {
             graph: self,
             inputs: Vec::with_capacity(16),
             outputs: Vec::with_capacity(16),
+            passthrough: PassthroughDataContainer::none(),
             rpass: None,
         }
     }
@@ -291,6 +292,7 @@ impl<'node> RenderGraph<'node> {
                 None => RenderGraphEncoderOrPassInner::Encoder(unsafe { &mut *encoder_cell.get() }),
             };
             (node.exec)(
+                node.passthrough,
                 renderer,
                 RenderGraphEncoderOrPass(encoder_or_rpass),
                 ready_output,
@@ -583,6 +585,40 @@ impl<'a, 'pass> RenderGraphEncoderOrPass<'a, 'pass> {
     }
 }
 
+pub struct PassthroughDataHandle<T> {
+    _phantom: PhantomData<T>,
+}
+
+pub struct PassthroughDataContainer<'node> {
+    data: Option<*const ()>,
+    _phantom: PhantomData<&'node ()>,
+}
+
+impl<'node> PassthroughDataContainer<'node> {
+    fn new<T>(data: &'node T) -> Self {
+        Self {
+            data: Some(data as *const T as *const ()),
+            _phantom: PhantomData,
+        }
+    }
+
+    fn none() -> Self {
+        Self {
+            data: None,
+            _phantom: PhantomData,
+        }
+    }
+
+    pub fn get<T>(self, _handle: PassthroughDataHandle<T>) -> &'node T {
+        unsafe {
+            &*(self
+                .data
+                .expect("internal rendergraph error: passthrough data handle corresponds to no passthrough data")
+                as *const T)
+        }
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub struct RenderPassTargets {
     pub name: Option<SsoString>,
@@ -615,8 +651,10 @@ pub struct RenderGraphNode<'node> {
     inputs: Vec<GraphResource>,
     outputs: Vec<GraphResource>,
     rpass: Option<RenderPassTargets>,
+    passthrough: PassthroughDataContainer<'node>,
     exec: Box<
         dyn for<'b, 'pass> FnOnce(
+                PassthroughDataContainer<'pass>,
                 &Arc<Renderer>,
                 RenderGraphEncoderOrPass<'b, 'pass>,
                 &'pass ReadyData,
@@ -629,6 +667,7 @@ pub struct RenderGraphNodeBuilder<'a, 'node> {
     graph: &'a mut RenderGraph<'node>,
     inputs: Vec<GraphResource>,
     outputs: Vec<GraphResource>,
+    passthrough: PassthroughDataContainer<'node>,
     rpass: Option<RenderPassTargets>,
 }
 impl<'a, 'node> RenderGraphNodeBuilder<'a, 'node> {
@@ -723,9 +762,20 @@ impl<'a, 'node> RenderGraphNodeBuilder<'a, 'node> {
         }
     }
 
+    pub fn passthrough_data<T>(&mut self, data: &'node T) -> PassthroughDataHandle<T> {
+        assert!(
+            self.passthrough.data.is_none(),
+            "Cannot have more than piece of passthrough data per node."
+        );
+        self.passthrough = PassthroughDataContainer::new(data);
+
+        PassthroughDataHandle { _phantom: PhantomData }
+    }
+
     pub fn build<F>(self, exec: F)
     where
         F: for<'b, 'pass> FnOnce(
+                PassthroughDataContainer<'pass>,
                 &Arc<Renderer>,
                 RenderGraphEncoderOrPass<'b, 'pass>,
                 &'pass ReadyData,
@@ -736,6 +786,7 @@ impl<'a, 'node> RenderGraphNodeBuilder<'a, 'node> {
             inputs: self.inputs,
             outputs: self.outputs,
             rpass: self.rpass,
+            passthrough: self.passthrough,
             exec: Box::new(exec),
         });
     }

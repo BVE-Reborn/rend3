@@ -35,7 +35,7 @@ pub struct ForwardPassCullArgs<'a> {
 
 pub struct ForwardPassPrepassArgs<'rpass, 'b> {
     pub device: &'b Device,
-    pub profiler: &'b mut GpuProfiler,
+    // pub profiler: &'b mut GpuProfiler,
     pub rpass: &'b mut RenderPass<'rpass>,
 
     pub materials: &'rpass MaterialManager,
@@ -49,7 +49,7 @@ pub struct ForwardPassPrepassArgs<'rpass, 'b> {
 
 pub struct ForwardPassDrawArgs<'rpass, 'b> {
     pub device: &'b Device,
-    pub profiler: &'b mut GpuProfiler,
+    // pub profiler: &'b mut GpuProfiler,
     pub rpass: &'b mut RenderPass<'rpass>,
 
     pub materials: &'rpass MaterialManager,
@@ -108,10 +108,6 @@ impl ForwardPass {
     }
 
     pub fn prepass<'rpass>(&'rpass self, args: ForwardPassPrepassArgs<'rpass, '_>) {
-        let label = self.transparency.to_debug_str();
-        profiling::scope!(label);
-        args.profiler.begin_scope(label, args.rpass, args.device);
-
         args.meshes.bind(args.rpass);
 
         args.rpass.set_pipeline(
@@ -131,7 +127,6 @@ impl ForwardPass {
                 culling::gpu::run(args.rpass, data);
             }
         }
-        args.profiler.end_scope(args.rpass);
     }
 
     pub fn draw<'rpass>(&'rpass self, args: ForwardPassDrawArgs<'rpass, '_>) {
