@@ -1,23 +1,20 @@
 /// PBR Render Routine for rend3.
-/// target: todo!(), clear: todo!(), resolve: todo!()  target: todo!(), clear: todo!(), resolve: todo!()  target: todo!(), clear: todo!(), resolve: todo!()
+/// target: todo!(), clear: todo!(), resolve: todo!()  target: todo!(), clear: todo!(), resolve: todo!()  target: todo!(), clear: todo!(), resolve: todo!()  target: todo!(), clear: todo!(), resolve: todo!()
 /// Contains [`PbrMaterial`] and the [`PbrRenderRoutine`] which serve as the default render routines.
 ///
 /// Tries to strike a balance between photorealism and performance.
-use std::sync::Arc;
+use std::{ops::Deref, sync::Arc};
 
 use glam::{UVec2, Vec4};
-use parking_lot::Mutex;
 use rend3::{
     format_sso,
     resources::{DirectionalLightManager, MaterialManager, TextureManager},
     types::{TextureFormat, TextureHandle, TextureUsages},
+    util::typedefs::SsoString,
     DepthHandle, ModeData, ReadyData, RenderGraph, RenderPassDepthTarget, RenderPassTarget, RenderPassTargets,
     RenderTargetDescriptor, Renderer, RendererMode,
 };
-use wgpu::{
-    Buffer, Color, CommandEncoderDescriptor, Device, LoadOp, Operations, RenderPassColorAttachment,
-    RenderPassDepthStencilAttachment, RenderPassDescriptor,
-};
+use wgpu::{Buffer, Color, Device};
 
 pub use utils::*;
 
@@ -123,14 +120,14 @@ impl PbrRenderRoutine {
             let mut builder = graph.add_node();
             let handle = builder.add_data_output::<_, Buffer>(name);
 
-            builder.build(move |renderer, _prefix_cmd_bufs, _cmd_bufs, _ready, texture_store| {
-                let object_manager = renderer.object_manager.read();
-                let camera_manager = renderer.camera_manager.read();
-
+            builder.build(move |_data, renderer, _encoder_or_pass, _ready, texture_store| {
                 profiling::scope!(&name[..(name.len() - 5)]);
 
-                let objects = object_manager.get_objects::<PbrMaterial>(transparency as u64);
-                let objects = common::sorting::sort_objects(objects, &camera_manager, transparency.to_sorting());
+                let objects = texture_store
+                    .object_manager
+                    .get_objects::<PbrMaterial>(transparency as u64);
+                let objects =
+                    common::sorting::sort_objects(objects, &texture_store.camera_manager, transparency.to_sorting());
                 let buffer = culling::gpu::build_cull_data(&renderer.device, &objects);
                 texture_store.set_data::<Buffer>(handle, Some(buffer));
             });
@@ -163,28 +160,23 @@ impl PbrRenderRoutine {
                     .into_data(|| (), || builder.add_data_input(pre_cull_name));
                 let cull_handle = builder.add_data_output::<_, CulledObjectSet>(cull_name.clone());
 
-                builder.build(move |renderer, _prefix_cmd_bufs, cmd_bufs, ready, texture_store| {
+                builder.build(move |_data, renderer, encoder_or_rpass, ready, texture_store| {
+                    let encoder = encoder_or_rpass.get_encoder();
+
                     let culling_input =
                         pre_cull_handle.map_gpu(|handle| texture_store.get_data::<Buffer>(handle).as_ref().unwrap());
 
-                    let mut encoder = renderer
-                        .device
-                        .create_command_encoder(&CommandEncoderDescriptor::default());
-
-                    let mut profiler = renderer.profiler.lock();
-                    let object_manager = renderer.object_manager.read();
-
-                    profiling::scope!(&cull_name);
-                    profiler.begin_scope(&cull_name, &mut encoder, &renderer.device);
-
-                    let count = object_manager.get_objects::<PbrMaterial>(transparency as u64).len();
+                    let count = texture_store
+                        .object_manager
+                        .get_objects::<PbrMaterial>(transparency as u64)
+                        .len();
 
                     let culled_objects = match self.gpu_culler {
                         ModeData::CPU(_) => self.cpu_culler.cull(culling::cpu::CpuCullerCullArgs {
                             device: &renderer.device,
                             camera: &ready.directional_light_cameras[idx],
                             interfaces: &self.interfaces,
-                            objects: &object_manager,
+                            objects: &texture_store.object_manager,
                             transparency,
                         }),
                         ModeData::GPU(ref gpu_culler) => gpu_culler.cull(culling::gpu::GpuCullerCullArgs {
@@ -199,10 +191,6 @@ impl PbrRenderRoutine {
                     };
 
                     texture_store.set_data::<CulledObjectSet>(cull_handle, Some(culled_objects));
-
-                    profiler.end_scope(&mut encoder);
-
-                    cmd_bufs.send(encoder.finish()).unwrap();
                 });
             }
         }
@@ -229,18 +217,21 @@ impl PbrRenderRoutine {
                     }),
                 });
 
-                builder.build(move |renderer, encoder_or_pass, ready, texture_store| {
+                let passthrough = builder.passthrough_data(self);
+
+                builder.build(move |data, _renderer, encoder_or_pass, ready, texture_store| {
+                    let this = data.get(passthrough);
                     let rpass = encoder_or_pass.get_rpass(rpass_handle);
                     let culled_objects = texture_store.get_data(culled_objects_handle).as_ref().unwrap();
 
                     texture_store.mesh_manager.buffers().bind(rpass);
-                    rpass.set_pipeline(&self.primary_passes.shadow_passes.opaque_pipeline);
-                    rpass.set_bind_group(0, &self.samplers.linear_nearest_bg, &[]);
+                    rpass.set_pipeline(&this.primary_passes.shadow_passes.opaque_pipeline);
+                    rpass.set_bind_group(0, &this.samplers.linear_nearest_bg, &[]);
                     rpass.set_bind_group(1, &culled_objects.output_bg, &[]);
 
                     match culled_objects.calls {
                         ModeData::CPU(ref draws) => {
-                            culling::cpu::run(&mut rpass, draws, &self.samplers, 0, texture_store.material_manager, 2)
+                            culling::cpu::run(&mut rpass, draws, &this.samplers, 0, texture_store.material_manager, 2)
                         }
                         ModeData::GPU(ref data) => {
                             rpass.set_bind_group(
@@ -272,7 +263,7 @@ impl PbrRenderRoutine {
 
             let cull_handle = builder.add_data_output::<_, CulledObjectSet>(post_cull_name);
 
-            builder.build(move |renderer, encoder_or_pass, _ready, texture_store| {
+            builder.build(move |_data, renderer, encoder_or_pass, _ready, texture_store| {
                 let encoder = encoder_or_pass.get_encoder();
 
                 let culling_input = pre_cull_handle.map_gpu(|handle| texture_store.get_data(handle).as_ref().unwrap());
@@ -336,73 +327,44 @@ impl PbrRenderRoutine {
 
             let cull_handle = builder.add_data_input::<_, CulledObjectSet>(cull_name);
 
-            builder.build(move |renderer, _prefix_cmd_bufs, cmd_bufs, ready, texture_store| {
-                let hdr_color = texture_store.get_render_target(hdr_color_handle);
-                let hdr_depth = texture_store.get_render_target(hdr_depth_handle);
+            let rpass_handle = builder.add_renderpass(RenderPassTargets {
+                name: Some(SsoString::from(pass_name)),
+                targets: vec![RenderPassTarget {
+                    target: hdr_color_handle,
+                    clear: Color::BLACK,
+                    resolve: None,
+                }],
+                depth_stencil: Some(RenderPassDepthTarget {
+                    target: DepthHandle::RenderTarget(hdr_depth_handle),
+                    depth_clear: Some(0.0),
+                    stencil_clear: None,
+                }),
+            });
+
+            let passthrough = builder.passthrough_data(self);
+
+            builder.build(move |data, renderer, encoder_or_pass, ready, texture_store| {
+                let this = data.get(passthrough);
+                let rpass = encoder_or_pass.get_rpass(rpass_handle);
                 let culled_objects = texture_store.get_data(cull_handle).as_ref().unwrap();
 
-                let mut encoder = renderer.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("primary encoder"),
-                });
-
-                let mut profiler = renderer.profiler.lock();
-                let mesh_manager = renderer.mesh_manager.read();
-                let materials = renderer.material_manager.read();
-
-                profiling::scope!(pass_name);
-                profiler.begin_scope(pass_name, &mut encoder, &renderer.device);
-
                 let pass = match transparency {
-                    TransparencyType::Opaque => &self.primary_passes.opaque_pass,
-                    TransparencyType::Cutout => &self.primary_passes.cutout_pass,
+                    TransparencyType::Opaque => &this.primary_passes.opaque_pass,
+                    TransparencyType::Cutout => &this.primary_passes.cutout_pass,
                     TransparencyType::Blend => unreachable!(),
                 };
 
                 let d2_texture_output_bg_ref = ready.d2_texture.bg.as_ref().map(|_| (), |a| &**a);
 
-                {
-                    let mut rpass = encoder.begin_render_pass(&RenderPassDescriptor {
-                        label: None,
-                        color_attachments: &[RenderPassColorAttachment {
-                            view: hdr_color,
-                            resolve_target: None,
-                            ops: Operations {
-                                load: match transparency {
-                                    TransparencyType::Opaque => LoadOp::Clear(Color::BLACK),
-                                    _ => LoadOp::Load,
-                                },
-                                store: true,
-                            },
-                        }],
-                        depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
-                            view: hdr_depth,
-                            depth_ops: Some(Operations {
-                                load: match transparency {
-                                    TransparencyType::Opaque => LoadOp::Clear(0.0),
-                                    _ => LoadOp::Load,
-                                },
-                                store: true,
-                            }),
-                            stencil_ops: None,
-                        }),
-                    });
-
-                    pass.prepass(forward::ForwardPassPrepassArgs {
-                        device: &renderer.device,
-                        profiler: &mut profiler,
-                        rpass: &mut rpass,
-                        materials: &materials,
-                        meshes: mesh_manager.buffers(),
-                        samplers: &self.samplers,
-                        texture_bg: d2_texture_output_bg_ref,
-                        culled_objects,
-                    });
-
-                    drop(rpass);
-                }
-
-                profiler.end_scope(&mut encoder);
-                cmd_bufs.send(encoder.finish()).unwrap();
+                pass.prepass(forward::ForwardPassPrepassArgs {
+                    device: &renderer.device,
+                    rpass,
+                    materials: texture_store.material_manager,
+                    meshes: texture_store.mesh_manager.buffers(),
+                    samplers: &this.samplers,
+                    texture_bg: d2_texture_output_bg_ref,
+                    culled_objects,
+                });
             });
         }
     }
@@ -433,83 +395,58 @@ impl PbrRenderRoutine {
                 },
             );
 
+            let rpass_handle = builder.add_renderpass(RenderPassTargets {
+                name: Some(SsoString::from(pass_name)),
+                targets: vec![RenderPassTarget {
+                    target: hdr_color_handle,
+                    clear: Color::BLACK,
+                    resolve: None,
+                }],
+                depth_stencil: Some(RenderPassDepthTarget {
+                    target: DepthHandle::RenderTarget(hdr_depth_handle),
+                    depth_clear: Some(0.0),
+                    stencil_clear: None,
+                }),
+            });
+
             let shadow_handle = builder.add_shadow_array_input();
 
             let culled_objects_handle = builder.add_data_input::<_, CulledObjectSet>(cull_name);
 
-            builder.build(move |renderer, _prefix_cmd_bufs, cmd_bufs, ready, texture_store| {
-                let hdr_color = texture_store.get_render_target(hdr_color_handle);
-                let hdr_depth = texture_store.get_render_target(hdr_depth_handle);
-                let culled_objects = texture_store.get_data(culled_objects_handle).as_ref().unwrap();
+            let passthrough = builder.passthrough_data(self);
+
+            builder.build(move |data, renderer, encoder_or_pass, ready, texture_store| {
+                let this = data.get(passthrough);
+                let rpass = encoder_or_pass.get_rpass(rpass_handle);
+                let culled_objects = texture_store.get_data(culled_objects_handle);
                 let shadow_bg = texture_store.get_shadow_array(shadow_handle);
 
-                let mut encoder = renderer.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("primary encoder"),
-                });
-
-                let mut profiler = renderer.profiler.lock();
-
-                let mesh_manager = renderer.mesh_manager.read();
-                let materials = renderer.material_manager.read();
-                let camera_manager = renderer.camera_manager.read();
-
-                profiling::scope!(pass_name);
-                profiler.begin_scope(pass_name, &mut encoder, &renderer.device);
-
                 let pass = match transparency {
-                    TransparencyType::Opaque => &self.primary_passes.opaque_pass,
-                    TransparencyType::Cutout => &self.primary_passes.cutout_pass,
-                    TransparencyType::Blend => &self.primary_passes.transparent_pass,
+                    TransparencyType::Opaque => &this.primary_passes.opaque_pass,
+                    TransparencyType::Cutout => &this.primary_passes.cutout_pass,
+                    TransparencyType::Blend => &this.primary_passes.transparent_pass,
                 };
 
                 let d2_texture_output_bg_ref = ready.d2_texture.bg.as_ref().map(|_| (), |a| &**a);
 
                 let primary_camera_uniform_bg = uniforms::create_shader_uniform(uniforms::CreateShaderUniformArgs {
                     device: &renderer.device,
-                    camera: &camera_manager,
+                    camera: texture_store.camera_manager,
                     interfaces: &self.interfaces,
                     ambient: self.ambient,
                 });
 
-                {
-                    let mut rpass = encoder.begin_render_pass(&RenderPassDescriptor {
-                        label: None,
-                        color_attachments: &[RenderPassColorAttachment {
-                            view: hdr_color,
-                            resolve_target: None,
-                            ops: Operations {
-                                load: LoadOp::Load,
-                                store: true,
-                            },
-                        }],
-                        depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
-                            view: hdr_depth,
-                            depth_ops: Some(Operations {
-                                load: LoadOp::Load,
-                                store: true,
-                            }),
-                            stencil_ops: None,
-                        }),
-                    });
-
-                    pass.draw(forward::ForwardPassDrawArgs {
-                        device: &renderer.device,
-                        profiler: &mut profiler,
-                        rpass: &mut rpass,
-                        materials: &materials,
-                        meshes: mesh_manager.buffers(),
-                        samplers: &self.samplers,
-                        directional_light_bg: shadow_bg,
-                        texture_bg: d2_texture_output_bg_ref,
-                        shader_uniform_bg: &primary_camera_uniform_bg,
-                        culled_objects,
-                    });
-
-                    drop(rpass);
-                }
-
-                profiler.end_scope(&mut encoder);
-                cmd_bufs.send(encoder.finish()).unwrap();
+                pass.draw(forward::ForwardPassDrawArgs {
+                    device: &renderer.device,
+                    rpass,
+                    materials: texture_store.material_manager,
+                    meshes: texture_store.mesh_manager.buffers(),
+                    samplers: &this.samplers,
+                    directional_light_bg: shadow_bg,
+                    texture_bg: d2_texture_output_bg_ref,
+                    shader_uniform_bg: &primary_camera_uniform_bg,
+                    culled_objects: culled_objects.deref().as_ref().unwrap(),
+                });
             });
         }
     }
@@ -613,7 +550,7 @@ impl PrimaryPasses {
 pub struct SkyboxRoutine {
     pub interfaces: common::interfaces::ShaderInterfaces,
     pub samplers: common::samplers::Samplers,
-    pub skybox_pass: Mutex<skybox::SkyboxPass>,
+    pub skybox_pass: skybox::SkyboxPass,
     pub options: RenderTextureOptions,
 
     pub skybox_texture: Option<TextureHandle>,
@@ -632,7 +569,7 @@ impl SkyboxRoutine {
             samples: SampleCount::One,
         });
 
-        let skybox_pass = Mutex::new(skybox::SkyboxPass::new(skybox_pipeline));
+        let skybox_pass = skybox::SkyboxPass::new(skybox_pipeline);
 
         Self {
             skybox_pass,
@@ -643,7 +580,14 @@ impl SkyboxRoutine {
         }
     }
 
-    pub fn set_background_texture(&mut self, texture: Option<TextureHandle>) {
+    pub fn set_background_texture(&mut self, renderer: &Renderer, texture: Option<TextureHandle>) {
+        let d2c_texture_manager = renderer.d2c_texture_manager.read();
+        self.skybox_pass.update_skybox(skybox::UpdateSkyboxArgs {
+            device: &renderer.device,
+            interfaces: &self.interfaces,
+            d2c_texture_manager: &d2c_texture_manager,
+            new_skybox_handle: self.skybox_texture.clone(),
+        });
         self.skybox_texture = texture;
     }
 
@@ -656,7 +600,7 @@ impl SkyboxRoutine {
                     interfaces: &self.interfaces,
                     samples: options.samples,
                 });
-            self.skybox_pass = Mutex::new(skybox::SkyboxPass::new(skybox_pipeline));
+            self.skybox_pass = skybox::SkyboxPass::new(skybox_pipeline);
         }
 
         self.options = options;
@@ -676,25 +620,25 @@ impl SkyboxRoutine {
 
         let hdr_depth_handle = builder.add_render_target_input("hdr depth");
 
-        builder.build(move |renderer, _prefix_cmd_bufs, cmd_bufs, _ready, texture_store| {
-            let hdr_color = texture_store.get_render_target(hdr_color_handle);
-            let hdr_depth = texture_store.get_render_target(hdr_depth_handle);
-            let mut encoder = renderer.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("tonemapper encoder"),
-            });
+        let rpass_handle = builder.add_renderpass(RenderPassTargets {
+            name: Some(SsoString::from("Skybox")),
+            targets: vec![RenderPassTarget {
+                target: hdr_color_handle,
+                clear: Color::BLACK,
+                resolve: None,
+            }],
+            depth_stencil: Some(RenderPassDepthTarget {
+                target: DepthHandle::RenderTarget(hdr_depth_handle),
+                depth_clear: Some(0.0),
+                stencil_clear: None,
+            }),
+        });
 
-            let d2c_texture_manager = renderer.d2c_texture_manager.read();
-            let mut profiler = renderer.profiler.lock();
-            let mut skybox_pass = self.skybox_pass.lock();
+        let passthrough = builder.passthrough_data(self);
 
-            skybox_pass.update_skybox(skybox::UpdateSkyboxArgs {
-                device: &renderer.device,
-                interfaces: &self.interfaces,
-                d2c_texture_manager: &d2c_texture_manager,
-                new_skybox_handle: self.skybox_texture.clone(),
-            });
-
-            drop(d2c_texture_manager);
+        builder.build(move |data, renderer, encoder_or_pass, _ready, _texture_store| {
+            let this = data.get(passthrough);
+            let rpass = encoder_or_pass.get_rpass(rpass_handle);
 
             let camera_manager = renderer.camera_manager.read();
 
@@ -705,39 +649,11 @@ impl SkyboxRoutine {
                 ambient: Vec4::ZERO,
             });
 
-            let mut rpass = encoder.begin_render_pass(&RenderPassDescriptor {
-                label: None,
-                color_attachments: &[RenderPassColorAttachment {
-                    view: hdr_color,
-                    resolve_target: None,
-                    ops: Operations {
-                        load: LoadOp::Load,
-                        store: true,
-                    },
-                }],
-                depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
-                    view: hdr_depth,
-                    depth_ops: Some(Operations {
-                        load: LoadOp::Load,
-                        store: true,
-                    }),
-                    stencil_ops: None,
-                }),
-            });
-
-            profiler.begin_scope("forward", &mut rpass, &renderer.device);
-
-            skybox_pass.draw_skybox(skybox::SkyboxPassDrawArgs {
-                rpass: &mut rpass,
-                samplers: &self.samplers,
+            this.skybox_pass.draw_skybox(skybox::SkyboxPassDrawArgs {
+                rpass,
+                samplers: &this.samplers,
                 shader_uniform_bg: &primary_camera_uniform_bg,
             });
-
-            profiler.end_scope(&mut rpass);
-
-            drop(rpass);
-
-            cmd_bufs.send(encoder.finish()).unwrap();
         });
     }
 }
@@ -780,26 +696,19 @@ impl TonemappingRoutine {
 
         let output_handle = builder.add_surface_output();
 
-        builder.build(move |renderer, _prefix_cmd_bufs, cmd_bufs, _ready, texture_store| {
+        builder.build(move |_data, renderer, encoder_or_pass, _ready, texture_store| {
+            let encoder = encoder_or_pass.get_encoder();
             let hdr_color = texture_store.get_render_target(hdr_color_handle);
             let output = texture_store.get_render_target(output_handle);
-            let mut encoder = renderer.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("tonemapper encoder"),
-            });
-
-            let mut profiler = renderer.profiler.lock();
 
             self.tonemapping_pass.blit(tonemapping::TonemappingPassBlitArgs {
                 device: &renderer.device,
-                profiler: &mut profiler,
-                encoder: &mut encoder,
+                encoder,
                 interfaces: &self.interfaces,
                 samplers: &self.samplers,
                 source: hdr_color,
                 target: output,
             });
-
-            cmd_bufs.send(encoder.finish()).unwrap();
         });
     }
 }

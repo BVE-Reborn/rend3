@@ -22,7 +22,6 @@ pub struct TonemappingPassNewArgs<'a> {
 
 pub struct TonemappingPassBlitArgs<'a> {
     pub device: &'a Device,
-    pub profiler: &'a mut GpuProfiler,
     pub encoder: &'a mut CommandEncoder,
 
     pub interfaces: &'a ShaderInterfaces,
@@ -103,8 +102,6 @@ impl TonemappingPass {
             .with_texture_view(args.source)
             .build(args.device, &args.interfaces.blit_bgl);
 
-        args.profiler.begin_scope("tonemapping pass", args.encoder, args.device);
-
         let mut rpass = args.encoder.begin_render_pass(&RenderPassDescriptor {
             label: None, // We use the begin_scope below
             color_attachments: &[RenderPassColorAttachment {
@@ -124,7 +121,5 @@ impl TonemappingPass {
         rpass.draw(0..3, 0..1);
 
         drop(rpass);
-
-        args.profiler.end_scope(args.encoder);
     }
 }
