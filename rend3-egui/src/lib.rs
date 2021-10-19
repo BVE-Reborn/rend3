@@ -40,7 +40,7 @@ impl EguiRenderRoutine {
 
         let output_handle = builder.add_surface_output();
 
-        builder.build(move |_data, renderer, encoder_or_pass, _temps, _ready, texture_store| {
+        builder.build(move |_pt, renderer, encoder_or_pass, _temps, _ready, graph_data| {
             let encoder = encoder_or_pass.get_encoder();
 
             self.internal
@@ -53,7 +53,7 @@ impl EguiRenderRoutine {
                 &self.screen_descriptor,
             );
 
-            let output = texture_store.get_render_target(output_handle);
+            let output = graph_data.get_render_target(output_handle);
 
             self.internal
                 .execute(encoder, output, input.clipped_meshes, &self.screen_descriptor, None)

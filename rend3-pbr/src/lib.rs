@@ -120,19 +120,17 @@ impl PbrRenderRoutine {
             let mut builder = graph.add_node();
             let handle = builder.add_data_output::<_, Buffer>(name);
 
-            builder.build(
-                move |_data, renderer, _encoder_or_pass, _temps, _ready, texture_store| {
-                    profiling::scope!(&name[..(name.len() - 5)]);
+            builder.build(move |_pt, renderer, _encoder_or_pass, _temps, _ready, graph_data| {
+                profiling::scope!(&name[..(name.len() - 5)]);
 
-                    let objects = texture_store
-                        .object_manager
-                        .get_objects::<PbrMaterial>(transparency as u64);
-                    let objects =
-                        common::sorting::sort_objects(objects, texture_store.camera_manager, transparency.to_sorting());
-                    let buffer = culling::gpu::build_cull_data(&renderer.device, &objects);
-                    texture_store.set_data::<Buffer>(handle, Some(buffer));
-                },
-            );
+                let objects = graph_data
+                    .object_manager
+                    .get_objects::<PbrMaterial>(transparency as u64);
+                let objects =
+                    common::sorting::sort_objects(objects, graph_data.camera_manager, transparency.to_sorting());
+                let buffer = culling::gpu::build_cull_data(&renderer.device, &objects);
+                graph_data.set_data::<Buffer>(handle, Some(buffer));
+            });
         };
 
         declare_pre_cull("Opaque Pre-Cull Data", material::TransparencyType::Opaque);
@@ -162,13 +160,13 @@ impl PbrRenderRoutine {
                     .into_data(|| (), || builder.add_data_input(pre_cull_name));
                 let cull_handle = builder.add_data_output::<_, CulledObjectSet>(cull_name.clone());
 
-                builder.build(move |_data, renderer, encoder_or_rpass, temps, ready, texture_store| {
+                builder.build(move |_pt, renderer, encoder_or_rpass, temps, ready, graph_data| {
                     let encoder = encoder_or_rpass.get_encoder();
 
                     let culling_input =
-                        pre_cull_handle.map_gpu(|handle| texture_store.get_data::<Buffer>(temps, handle).unwrap());
+                        pre_cull_handle.map_gpu(|handle| graph_data.get_data::<Buffer>(temps, handle).unwrap());
 
-                    let count = texture_store
+                    let count = graph_data
                         .object_manager
                         .get_objects::<PbrMaterial>(transparency as u64)
                         .len();
@@ -178,7 +176,7 @@ impl PbrRenderRoutine {
                             device: &renderer.device,
                             camera: &ready.directional_light_cameras[idx],
                             interfaces: &self.interfaces,
-                            objects: texture_store.object_manager,
+                            objects: graph_data.object_manager,
                             transparency,
                         }),
                         ModeData::GPU(ref gpu_culler) => gpu_culler.cull(culling::gpu::GpuCullerCullArgs {
@@ -192,7 +190,7 @@ impl PbrRenderRoutine {
                         }),
                     };
 
-                    texture_store.set_data::<CulledObjectSet>(cull_handle, Some(culled_objects));
+                    graph_data.set_data::<CulledObjectSet>(cull_handle, Some(culled_objects));
                 });
             }
         }
@@ -219,26 +217,26 @@ impl PbrRenderRoutine {
                     }),
                 });
 
-                let passthrough = builder.passthrough_data(self);
+                let pt_handle = builder.passthrough_data(self);
 
-                builder.build(move |data, _renderer, encoder_or_pass, temps, ready, texture_store| {
-                    let this = data.get(passthrough);
+                builder.build(move |pt, _renderer, encoder_or_pass, temps, ready, graph_data| {
+                    let this = pt.get(pt_handle);
                     let rpass = encoder_or_pass.get_rpass(rpass_handle);
-                    let culled_objects = texture_store.get_data(temps, culled_objects_handle).unwrap();
+                    let culled_objects = graph_data.get_data(temps, culled_objects_handle).unwrap();
 
-                    texture_store.mesh_manager.buffers().bind(rpass);
+                    graph_data.mesh_manager.buffers().bind(rpass);
                     rpass.set_pipeline(&this.primary_passes.shadow_passes.opaque_pipeline);
                     rpass.set_bind_group(0, &this.samplers.linear_nearest_bg, &[]);
                     rpass.set_bind_group(1, &culled_objects.output_bg, &[]);
 
                     match culled_objects.calls {
                         ModeData::CPU(ref draws) => {
-                            culling::cpu::run(rpass, draws, &this.samplers, 0, texture_store.material_manager, 2)
+                            culling::cpu::run(rpass, draws, &this.samplers, 0, graph_data.material_manager, 2)
                         }
                         ModeData::GPU(ref data) => {
                             rpass.set_bind_group(
                                 2,
-                                texture_store.material_manager.get_bind_group_gpu::<PbrMaterial>(),
+                                graph_data.material_manager.get_bind_group_gpu::<PbrMaterial>(),
                                 &[],
                             );
                             rpass.set_bind_group(3, ready.d2_texture.bg.as_gpu(), &[]);
@@ -265,10 +263,10 @@ impl PbrRenderRoutine {
 
             let cull_handle = builder.add_data_output::<_, CulledObjectSet>(post_cull_name);
 
-            builder.build(move |_data, renderer, encoder_or_pass, temps, _ready, texture_store| {
+            builder.build(move |_pt, renderer, encoder_or_pass, temps, _ready, graph_data| {
                 let encoder = encoder_or_pass.get_encoder();
 
-                let culling_input = pre_cull_handle.map_gpu(|handle| texture_store.get_data(temps, handle).unwrap());
+                let culling_input = pre_cull_handle.map_gpu(|handle| graph_data.get_data(temps, handle).unwrap());
 
                 let culler = self.gpu_culler.as_ref().map_cpu(|_| &self.cpu_culler);
 
@@ -283,12 +281,12 @@ impl PbrRenderRoutine {
                     encoder,
                     culler,
                     interfaces: &self.interfaces,
-                    camera: texture_store.camera_manager,
-                    objects: texture_store.object_manager,
+                    camera: graph_data.camera_manager,
+                    objects: graph_data.object_manager,
                     culling_input,
                 });
 
-                texture_store.set_data(cull_handle, Some(culled_objects));
+                graph_data.set_data(cull_handle, Some(culled_objects));
             });
         }
     }
@@ -334,12 +332,12 @@ impl PbrRenderRoutine {
                 }),
             });
 
-            let passthrough = builder.passthrough_data(self);
+            let pt_handle = builder.passthrough_data(self);
 
-            builder.build(move |data, renderer, encoder_or_pass, temps, ready, texture_store| {
-                let this = data.get(passthrough);
+            builder.build(move |pt, renderer, encoder_or_pass, temps, ready, graph_data| {
+                let this = pt.get(pt_handle);
                 let rpass = encoder_or_pass.get_rpass(rpass_handle);
-                let culled_objects = texture_store.get_data(temps, cull_handle);
+                let culled_objects = graph_data.get_data(temps, cull_handle);
 
                 let pass = match transparency {
                     TransparencyType::Opaque => &this.primary_passes.opaque_pass,
@@ -352,8 +350,8 @@ impl PbrRenderRoutine {
                 pass.prepass(forward::ForwardPassPrepassArgs {
                     device: &renderer.device,
                     rpass,
-                    materials: texture_store.material_manager,
-                    meshes: texture_store.mesh_manager.buffers(),
+                    materials: graph_data.material_manager,
+                    meshes: graph_data.mesh_manager.buffers(),
                     samplers: &this.samplers,
                     texture_bg: d2_texture_output_bg_ref,
                     culled_objects: culled_objects.as_ref().unwrap(),
@@ -406,13 +404,13 @@ impl PbrRenderRoutine {
 
             let culled_objects_handle = builder.add_data_input::<_, CulledObjectSet>(cull_name);
 
-            let passthrough = builder.passthrough_data(self);
+            let pt_handle = builder.passthrough_data(self);
 
-            builder.build(move |data, renderer, encoder_or_pass, temps, ready, texture_store| {
-                let this = data.get(passthrough);
+            builder.build(move |pt, renderer, encoder_or_pass, temps, ready, graph_data| {
+                let this = pt.get(pt_handle);
                 let rpass = encoder_or_pass.get_rpass(rpass_handle);
-                let culled_objects = texture_store.get_data(temps, culled_objects_handle);
-                let shadow_bg = texture_store.get_shadow_array(shadow_handle);
+                let culled_objects = graph_data.get_data(temps, culled_objects_handle);
+                let shadow_bg = graph_data.get_shadow_array(shadow_handle);
 
                 let pass = match transparency {
                     TransparencyType::Opaque => &this.primary_passes.opaque_pass,
@@ -425,7 +423,7 @@ impl PbrRenderRoutine {
                 let primary_camera_uniform_bg =
                     temps.add(uniforms::create_shader_uniform(uniforms::CreateShaderUniformArgs {
                         device: &renderer.device,
-                        camera: texture_store.camera_manager,
+                        camera: graph_data.camera_manager,
                         interfaces: &self.interfaces,
                         ambient: self.ambient,
                     }));
@@ -433,8 +431,8 @@ impl PbrRenderRoutine {
                 pass.draw(forward::ForwardPassDrawArgs {
                     device: &renderer.device,
                     rpass,
-                    materials: texture_store.material_manager,
-                    meshes: texture_store.mesh_manager.buffers(),
+                    materials: graph_data.material_manager,
+                    meshes: graph_data.mesh_manager.buffers(),
                     samplers: &this.samplers,
                     directional_light_bg: shadow_bg,
                     texture_bg: d2_texture_output_bg_ref,
@@ -628,16 +626,16 @@ impl SkyboxRoutine {
             }),
         });
 
-        let passthrough = builder.passthrough_data(self);
+        let pt_handle = builder.passthrough_data(self);
 
-        builder.build(move |data, renderer, encoder_or_pass, temps, _ready, texture_store| {
-            let this = data.get(passthrough);
+        builder.build(move |pt, renderer, encoder_or_pass, temps, _ready, graph_data| {
+            let this = pt.get(pt_handle);
             let rpass = encoder_or_pass.get_rpass(rpass_handle);
 
             let primary_camera_uniform_bg =
                 temps.add(uniforms::create_shader_uniform(uniforms::CreateShaderUniformArgs {
                     device: &renderer.device,
-                    camera: texture_store.camera_manager,
+                    camera: graph_data.camera_manager,
                     interfaces: &self.interfaces,
                     ambient: Vec4::ZERO,
                 }));
@@ -689,10 +687,10 @@ impl TonemappingRoutine {
 
         let output_handle = builder.add_surface_output();
 
-        builder.build(move |_data, renderer, encoder_or_pass, _temps, _ready, texture_store| {
+        builder.build(move |_pt, renderer, encoder_or_pass, _temps, _ready, graph_data| {
             let encoder = encoder_or_pass.get_encoder();
-            let hdr_color = texture_store.get_render_target(hdr_color_handle);
-            let output = texture_store.get_render_target(output_handle);
+            let hdr_color = graph_data.get_render_target(hdr_color_handle);
+            let output = graph_data.get_render_target(output_handle);
 
             self.tonemapping_pass.blit(tonemapping::TonemappingPassBlitArgs {
                 device: &renderer.device,
