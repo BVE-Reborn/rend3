@@ -5,7 +5,6 @@ use wgpu::{
     RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptor, TextureFormat, TextureView,
     VertexState,
 };
-use wgpu_profiler::GpuProfiler;
 
 use crate::{
     common::{interfaces::ShaderInterfaces, samplers::Samplers},

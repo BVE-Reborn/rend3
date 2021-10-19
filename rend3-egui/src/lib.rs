@@ -40,10 +40,8 @@ impl EguiRenderRoutine {
 
         let output_handle = builder.add_surface_output();
 
-        builder.build(move |renderer, _prefix_cmd_bufs, cmd_bufs, _ready, texture_store| {
-            let mut encoder = renderer.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("egui command encoder"),
-            });
+        builder.build(move |_data, renderer, encoder_or_pass, _temps, _ready, texture_store| {
+            let encoder = encoder_or_pass.get_encoder();
 
             self.internal
                 .update_texture(&renderer.device, &renderer.queue, &input.context.texture());
@@ -58,16 +56,8 @@ impl EguiRenderRoutine {
             let output = texture_store.get_render_target(output_handle);
 
             self.internal
-                .execute(
-                    &mut encoder,
-                    output,
-                    input.clipped_meshes,
-                    &self.screen_descriptor,
-                    None,
-                )
+                .execute(encoder, output, input.clipped_meshes, &self.screen_descriptor, None)
                 .unwrap();
-
-            cmd_bufs.send(encoder.finish()).unwrap();
         });
     }
 }

@@ -72,7 +72,7 @@ fn load_skybox(renderer: &Renderer, skybox_routine: &Mutex<SkyboxRoutine>) -> Re
         mip_count: rend3::types::MipmapCount::Specific(NonZeroU32::new(mips).unwrap()),
         mip_source: rend3::types::MipmapSource::Uploaded,
     });
-    skybox_routine.lock().set_background_texture(Some(handle));
+    skybox_routine.lock().set_background_texture(renderer, Some(handle));
     Ok(())
 }
 

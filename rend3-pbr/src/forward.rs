@@ -5,7 +5,6 @@ use rend3::{
     ModeData,
 };
 use wgpu::{BindGroup, Buffer, CommandEncoder, Device, RenderPass, RenderPipeline};
-use wgpu_profiler::GpuProfiler;
 
 use crate::{
     common::{interfaces::ShaderInterfaces, samplers::Samplers},

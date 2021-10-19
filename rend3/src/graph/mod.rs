@@ -3,10 +3,10 @@ use std::{
     cell::{RefCell, UnsafeCell},
     marker::PhantomData,
     mem,
-    ops::Deref,
     sync::Arc,
 };
 
+use bumpalo::Bump;
 use glam::UVec2;
 use rend3_types::{BufferUsages, TextureFormat, TextureUsages};
 use wgpu::{
@@ -201,14 +201,7 @@ impl<'node> RenderGraph<'node> {
             }
         }
 
-        let output_cell = UnsafeCell::new(output);
-        let encoder_cell = UnsafeCell::new(
-            renderer
-                .device
-                .create_command_encoder(&CommandEncoderDescriptor::default()),
-        );
-
-        let profiler = renderer.profiler.lock();
+        let mut profiler = renderer.profiler.lock();
         let camera_manager = renderer.camera_manager.read();
         let directional_light_manager = renderer.directional_light_manager.read();
         let material_manager = renderer.material_manager.read();
@@ -219,24 +212,13 @@ impl<'node> RenderGraph<'node> {
 
         let shadow_views = directional_light_manager.get_layer_views();
 
-        let store = RenderGraphDataStore {
-            texture_mapping: &active_views,
-            shadow_array_view: directional_light_manager.get_bg(),
-            shadow_coordinates: directional_light_manager.get_coords(),
-            shadow_views: directional_light_manager.get_layer_views(),
-            data: &self.data,
-            // SAFETY: This is only viewed mutably when no renderpass exists
-            output: unsafe { &*output_cell.get() }.as_view(),
-
-            profiler: &profiler,
-            camera_manager: &camera_manager,
-            directional_light_manager: &directional_light_manager,
-            material_manager: &material_manager,
-            mesh_manager: &mesh_manager,
-            object_manager: &object_manager,
-            d2_texture_manager: &d2_texture_manager,
-            d2c_texture_manager: &d2c_texture_manager,
-        };
+        let output_cell = UnsafeCell::new(output);
+        let encoder_cell = UnsafeCell::new(
+            renderer
+                .device
+                .create_command_encoder(&CommandEncoderDescriptor::default()),
+        );
+        let rpass_temps_cell = UnsafeCell::new(RpassTemporaryPool::new());
 
         let mut current_rpass_desc = None;
         let mut rpass = None;
@@ -247,6 +229,9 @@ impl<'node> RenderGraph<'node> {
                 // SAFETY: this drops the renderpass, letting us into everything it was borrowing.
                 rpass = None;
                 current_rpass_desc = None;
+
+                // SAFETY: the renderpass has died, so there are no outstanding immutible borrows of the structure, and all uses of the temporaries have died.
+                unsafe { (&mut *rpass_temps_cell.get()).clear() };
 
                 cmd_bufs.push(
                     mem::replace(
@@ -267,7 +252,7 @@ impl<'node> RenderGraph<'node> {
                 unsafe { &mut *output_cell.get() }.acquire().unwrap();
             }
 
-            if current_rpass_desc != node.rpass {
+            if !RenderPassTargets::compatible(&current_rpass_desc, &node.rpass) {
                 // SAFETY: this drops the renderpass, letting us into everything it was borrowing when we make the new renderpass.
                 rpass = None;
                 current_rpass_desc = node.rpass;
@@ -282,10 +267,30 @@ impl<'node> RenderGraph<'node> {
                         unsafe { &mut *output_cell.get() },
                         &resource_spans,
                         &active_views,
-                        &shadow_views,
+                        shadow_views,
                     ));
                 }
             }
+
+            let store = RenderGraphDataStore {
+                texture_mapping: &active_views,
+                shadow_array_view: directional_light_manager.get_bg(),
+                shadow_coordinates: directional_light_manager.get_coords(),
+                shadow_views: directional_light_manager.get_layer_views(),
+                data: &self.data,
+                // SAFETY: This is only viewed mutably when no renderpass exists
+                output: unsafe { &*output_cell.get() }.as_view(),
+
+                profiler: &profiler,
+                camera_manager: &camera_manager,
+                directional_light_manager: &directional_light_manager,
+                material_manager: &material_manager,
+                mesh_manager: &mesh_manager,
+                object_manager: &object_manager,
+                d2_texture_manager: &d2_texture_manager,
+                d2c_texture_manager: &d2c_texture_manager,
+            };
+
             let encoder_or_rpass = match rpass {
                 Some(ref mut rpass) => RenderGraphEncoderOrPassInner::RenderPass(rpass),
                 // SAFETY: There is no active renderpass to borrow this. This reference lasts for the duration of the call to exec.
@@ -295,13 +300,19 @@ impl<'node> RenderGraph<'node> {
                 node.passthrough,
                 renderer,
                 RenderGraphEncoderOrPass(encoder_or_rpass),
+                // SAFETY: This borrow, and all the objects allocated from it, lasts as long as the renderpass, and isn't used mutably until after the rpass dies
+                unsafe { &*rpass_temps_cell.get() },
                 ready_output,
-                &store,
+                store,
             );
         }
 
         // SAFETY: We drop the renderpass to make sure we can access both encoder_cell and output_cell safely
         drop(rpass);
+
+        // SAFETY: the renderpass has dropped, and so has all the uses of the data, and the immutable borrows of the allocator.
+        unsafe { (&mut *rpass_temps_cell.get()).clear() }
+        drop(rpass_temps_cell);
 
         // SAFETY: this is safe as we've dropped all renderpasses that possibly borrowed it
         cmd_bufs.push(encoder_cell.into_inner().finish());
@@ -309,7 +320,7 @@ impl<'node> RenderGraph<'node> {
         let mut resolve_encoder = renderer.device.create_command_encoder(&CommandEncoderDescriptor {
             label: Some("profile resolve encoder"),
         });
-        renderer.profiler.lock().resolve_queries(&mut resolve_encoder);
+        profiler.resolve_queries(&mut resolve_encoder);
         cmd_bufs.push(resolve_encoder.finish());
 
         renderer.queue.submit(cmd_bufs);
@@ -317,7 +328,6 @@ impl<'node> RenderGraph<'node> {
         // SAFETY: this is safe as we've dropped all renderpasses that possibly borrowed it
         output_cell.into_inner().present();
 
-        let mut profiler = renderer.profiler.lock();
         profiler.end_frame().unwrap();
         profiler.process_finished_frame()
     }
@@ -343,7 +353,7 @@ impl<'node> RenderGraph<'node> {
                     LoadOp::Load
                 };
 
-                let store = if view_span.1 == pass_idx { false } else { true };
+                let store = view_span.1 != pass_idx;
 
                 RenderPassColorAttachment {
                     view: match &target.target.resource {
@@ -376,7 +386,7 @@ impl<'node> RenderGraph<'node> {
 
             let view_span = resource_spans[&resource];
 
-            let store = if view_span.1 == pass_idx { false } else { true };
+            let store = view_span.1 != pass_idx;
 
             let depth_ops = target.depth_clear.map(|clear| {
                 let load = if view_span.0 == pass_idx {
@@ -487,7 +497,7 @@ pub struct RenderGraphDataStore<'a> {
 }
 
 impl<'a> RenderGraphDataStore<'a> {
-    pub fn get_render_target(&self, handle: RenderTargetHandle) -> &TextureView {
+    pub fn get_render_target(&self, handle: RenderTargetHandle) -> &'a TextureView {
         match handle.resource {
             GraphResource::Texture(name) => self
                 .texture_mapping
@@ -517,7 +527,7 @@ impl<'a> RenderGraphDataStore<'a> {
         }
     }
 
-    pub fn get_shadow_array(&self, _: ShadowArrayHandle) -> &BindGroup {
+    pub fn get_shadow_array(&self, _: ShadowArrayHandle) -> &'a BindGroup {
         self.shadow_array_view
     }
 
@@ -539,16 +549,19 @@ impl<'a> RenderGraphDataStore<'a> {
         }
     }
 
-    pub fn get_data<T: 'static>(&self, handle: DataHandle<T>) -> impl Deref<Target = Option<T>> + 'a {
+    pub fn get_data<T: 'static>(&self, temps: &'a RpassTemporaryPool<'a>, handle: DataHandle<T>) -> Option<&'a T> {
         match handle.resource {
-            GraphResource::Data(name) => self
-                .data
-                .get(&name)
-                .expect("internal rendergraph error: failed to get buffer")
-                .downcast_ref::<RefCell<Option<T>>>()
-                .expect("internal rendergraph error: downcasting failed")
-                .try_borrow()
-                .expect("internal rendergraph error: read-only borrow failed"),
+            GraphResource::Data(name) => temps
+                .add(
+                    self.data
+                        .get(&name)
+                        .expect("internal rendergraph error: failed to get buffer")
+                        .downcast_ref::<RefCell<Option<T>>>()
+                        .expect("internal rendergraph error: downcasting failed")
+                        .try_borrow()
+                        .expect("internal rendergraph error: read-only borrow failed"),
+                )
+                .as_ref(),
             r => {
                 panic!("internal rendergraph error: tried to get a {:?} as a render target", r)
             }
@@ -619,11 +632,65 @@ impl<'node> PassthroughDataContainer<'node> {
     }
 }
 
+pub struct RpassTemporaryPool<'rpass> {
+    bump: Bump,
+    dtors: RefCell<Vec<Box<dyn FnOnce() + 'rpass>>>,
+}
+impl<'rpass> RpassTemporaryPool<'rpass> {
+    fn new() -> Self {
+        Self {
+            bump: Bump::new(),
+            dtors: RefCell::new(Vec::new()),
+        }
+    }
+
+    #[allow(clippy::mut_from_ref)]
+    pub fn add<T: 'rpass>(&'rpass self, v: T) -> &'rpass mut T {
+        let r = self.bump.alloc(v);
+        let ptr = r as *mut T;
+        self.dtors
+            .borrow_mut()
+            .push(Box::new(move || unsafe { std::ptr::drop_in_place(ptr) }));
+        r
+    }
+
+    unsafe fn clear(&mut self) {
+        for dtor in self.dtors.get_mut().drain(..) {
+            dtor()
+        }
+        self.bump.reset();
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub struct RenderPassTargets {
     pub name: Option<SsoString>,
     pub targets: Vec<RenderPassTarget>,
     pub depth_stencil: Option<RenderPassDepthTarget>,
+}
+
+impl RenderPassTargets {
+    fn compatible(this: &Option<Self>, other: &Option<Self>) -> bool {
+        match (this, other) {
+            (Some(this), Some(other)) => {
+                let targets_compatible = this
+                    .targets
+                    .iter()
+                    .zip(other.targets.iter())
+                    .all(|(me, you)| me.target == you.target && me.resolve == you.resolve);
+
+                let depth_compatible = this
+                    .depth_stencil
+                    .as_ref()
+                    .zip(other.depth_stencil.as_ref())
+                    .map_or(false, |(me, you)| me.target == you.target);
+
+                targets_compatible && depth_compatible
+            }
+            (None, None) => true,
+            _ => false,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -657,8 +724,9 @@ pub struct RenderGraphNode<'node> {
                 PassthroughDataContainer<'pass>,
                 &Arc<Renderer>,
                 RenderGraphEncoderOrPass<'b, 'pass>,
+                &'pass RpassTemporaryPool<'pass>,
                 &'pass ReadyData,
-                &'pass RenderGraphDataStore<'pass>,
+                RenderGraphDataStore<'pass>,
             ) + 'node,
     >,
 }
@@ -736,7 +804,7 @@ impl<'a, 'node> RenderGraphNodeBuilder<'a, 'node> {
             .data
             .get(&name)
             .expect("used input which has not been previously declared as a node's output")
-            .downcast_ref::<Option<T>>()
+            .downcast_ref::<RefCell<Option<T>>>()
             .expect("used custom data that was previously declared with a different type");
         let resource = GraphResource::Data(name);
         self.inputs.push(resource.clone());
@@ -778,8 +846,9 @@ impl<'a, 'node> RenderGraphNodeBuilder<'a, 'node> {
                 PassthroughDataContainer<'pass>,
                 &Arc<Renderer>,
                 RenderGraphEncoderOrPass<'b, 'pass>,
+                &'pass RpassTemporaryPool<'pass>,
                 &'pass ReadyData,
-                &'pass RenderGraphDataStore<'pass>,
+                RenderGraphDataStore<'pass>,
             ) + 'node,
     {
         self.graph.nodes.push(RenderGraphNode {
