@@ -572,14 +572,7 @@ impl SkyboxRoutine {
         }
     }
 
-    pub fn set_background_texture(&mut self, renderer: &Renderer, texture: Option<TextureHandle>) {
-        let d2c_texture_manager = renderer.d2c_texture_manager.read();
-        self.skybox_pass.update_skybox(skybox::UpdateSkyboxArgs {
-            device: &renderer.device,
-            interfaces: &self.interfaces,
-            d2c_texture_manager: &d2c_texture_manager,
-            new_skybox_handle: texture.clone(),
-        });
+    pub fn set_background_texture(&mut self, texture: Option<TextureHandle>) {
         self.skybox_texture = texture;
     }
 
@@ -596,6 +589,16 @@ impl SkyboxRoutine {
         }
 
         self.options = options;
+    }
+
+    pub fn ready(&mut self, renderer: &Renderer) {
+        let d2c_texture_manager = renderer.d2c_texture_manager.read();
+        self.skybox_pass.update_skybox(skybox::UpdateSkyboxArgs {
+            device: &renderer.device,
+            interfaces: &self.interfaces,
+            d2c_texture_manager: &d2c_texture_manager,
+            new_skybox_handle: self.skybox_texture.clone(),
+        });
     }
 
     pub fn add_to_graph<'node>(&'node self, graph: &mut RenderGraph<'node>) {
