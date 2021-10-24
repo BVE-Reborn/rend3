@@ -15,6 +15,7 @@ Per Keep a Changelog there are 6 main categories of changes:
 - Security
 
 - [Unreleased](#unreleased)
+- [v0.2.2](#v022)
 - [v0.2.1](#v021)
 - [v0.2.0](#v020)
 - [v0.1.1](#v011)
@@ -28,6 +29,10 @@ Per Keep a Changelog there are 6 main categories of changes:
 - [Diffs](#diffs)
 
 ## Unreleased
+
+## v0.2.2
+
+Released 2021-10-24
 
 ### Fixed
 - rend3: Fixed bug where in gpu mode, changing textures would cause a brief flash.
@@ -205,7 +210,8 @@ Released 2021-03-06
 
 ## Diffs
 
-- [Unreleased](https://github.com/BVE-Reborn/rend3/compare/v0.2.1...HEAD)
+- [Unreleased](https://github.com/BVE-Reborn/rend3/compare/v0.2.2...HEAD)
+- [v0.2.2](https://github.com/BVE-Reborn/rend3/compare/v0.2.1...v0.2.2)
 - [v0.2.1](https://github.com/BVE-Reborn/rend3/compare/v0.2.0...v0.2.1)
 - [v0.2.0](https://github.com/BVE-Reborn/rend3/compare/v0.1.1...v0.2.0)
 - [v0.1.1](https://github.com/BVE-Reborn/rend3/compare/v0.1.0...v0.1.1)
