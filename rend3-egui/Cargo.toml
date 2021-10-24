@@ -2,7 +2,7 @@
 authors = ["The rend3 Developers"]
 categories = ["game-development", "graphics", "rendering", "rendering::engine"]
 description = "Egui Render Routine for rend3"
-edition = "2018"
+edition = "2021"
 keywords = ["3d", "graphics", "gpu", "renderer", "wgpu"]
 license = "MIT OR Apache-2.0 OR Zlib"
 name = "rend3-egui"

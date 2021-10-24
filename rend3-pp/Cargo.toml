@@ -2,7 +2,7 @@
 name = "rend3-pp"
 version = "0.2.0"
 authors = ["The rend3 Developers"]
-edition = "2018"
+edition = "2021"
 description = "Postprocessing and tonemapping utilities for rend3"
 readme = "../README.md"
 repository = "https://github.com/BVE-Reborn/rend3"

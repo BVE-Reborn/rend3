@@ -10,7 +10,6 @@ use rend3::{
     format_sso,
     resources::{DirectionalLightManager, MaterialManager, TextureManager},
     types::{TextureFormat, TextureHandle, TextureUsages},
-    util::typedefs::SsoString,
     DepthHandle, ModeData, ReadyData, RenderGraph, RenderPassDepthTarget, RenderPassTarget, RenderPassTargets,
     RenderTargetDescriptor, Renderer, RendererMode,
 };
@@ -116,13 +115,11 @@ impl PbrRenderRoutine {
     }
 
     pub fn add_pre_cull_to_graph<'node>(&'node self, graph: &mut RenderGraph<'node>) {
-        let mut declare_pre_cull = |name: &'node str, transparency: TransparencyType| {
-            let mut builder = graph.add_node();
-            let handle = builder.add_data_output::<_, Buffer>(name);
+        let mut declare_pre_cull = |node_name: &'node str, buf_name: &'node str, transparency: TransparencyType| {
+            let mut builder = graph.add_node(node_name);
+            let handle = builder.add_data_output::<_, Buffer>(buf_name);
 
             builder.build(move |_pt, renderer, _encoder_or_pass, _temps, _ready, graph_data| {
-                profiling::scope!(&name[..(name.len() - 5)]);
-
                 let objects = graph_data
                     .object_manager
                     .get_objects::<PbrMaterial>(transparency as u64);
@@ -133,9 +130,21 @@ impl PbrRenderRoutine {
             });
         };
 
-        declare_pre_cull("Opaque Pre-Cull Data", material::TransparencyType::Opaque);
-        declare_pre_cull("Cutout Pre-Cull Data", material::TransparencyType::Cutout);
-        declare_pre_cull("Blend Pre-Cull Data", material::TransparencyType::Blend);
+        declare_pre_cull(
+            "Opaque Pre-Cull",
+            "Opaque Pre-Cull Data",
+            material::TransparencyType::Opaque,
+        );
+        declare_pre_cull(
+            "Cutout Pre-Cull",
+            "Cutout Pre-Cull Data",
+            material::TransparencyType::Cutout,
+        );
+        declare_pre_cull(
+            "Blend Pre-Cull",
+            "Blend Pre-Cull Data",
+            material::TransparencyType::Blend,
+        );
     }
 
     pub fn add_shadow_culling_to_graph<'node>(&'node self, graph: &mut RenderGraph<'node>, ready: &ReadyData) {
@@ -152,7 +161,7 @@ impl PbrRenderRoutine {
                     format_sso!("Cutout S{} Cull", idx),
                 ),
             ] {
-                let mut builder = graph.add_node();
+                let mut builder = graph.add_node(cull_name.clone());
 
                 let pre_cull_handle = self
                     .gpu_culler
@@ -202,13 +211,12 @@ impl PbrRenderRoutine {
                 (TransparencyType::Opaque, format_sso!("Opaque S{} Cull", idx)),
                 (TransparencyType::Cutout, format_sso!("Cutout S{} Cull", idx)),
             ] {
-                let mut builder = graph.add_node();
+                let mut builder = graph.add_node(format_sso!("{} S{} Render", transparency.to_debug_str(), idx));
 
                 let culled_objects_handle = builder.add_data_input::<_, CulledObjectSet>(cull_name);
                 let shadow_output_handle = builder.add_shadow_output(idx);
 
                 let rpass_handle = builder.add_renderpass(RenderPassTargets {
-                    name: Some(format_sso!("{} S{} Render", transparency.to_debug_str(), idx)),
                     targets: vec![],
                     depth_stencil: Some(RenderPassDepthTarget {
                         target: DepthHandle::Shadow(shadow_output_handle),
@@ -254,7 +262,7 @@ impl PbrRenderRoutine {
             (TransparencyType::Cutout, "Cutout Pre-Cull Data", "Cutout Forward Cull"),
             (TransparencyType::Blend, "Blend Pre-Cull Data", "Blend Forward Cull"),
         ] {
-            let mut builder = graph.add_node();
+            let mut builder = graph.add_node(post_cull_name);
 
             let pre_cull_handle = self
                 .gpu_culler
@@ -296,7 +304,7 @@ impl PbrRenderRoutine {
             (TransparencyType::Opaque, "Opaque Forward Cull", "Opaque Prepass"),
             (TransparencyType::Cutout, "Cutout Forward Cull", "Cutout Prepass"),
         ] {
-            let mut builder = graph.add_node();
+            let mut builder = graph.add_node(pass_name);
 
             let hdr_color_handle = builder.add_render_target_output(
                 "hdr color",
@@ -319,7 +327,6 @@ impl PbrRenderRoutine {
             let cull_handle = builder.add_data_input::<_, CulledObjectSet>(cull_name);
 
             let rpass_handle = builder.add_renderpass(RenderPassTargets {
-                name: Some(SsoString::from(pass_name)),
                 targets: vec![RenderPassTarget {
                     target: hdr_color_handle,
                     clear: Color::BLACK,
@@ -366,7 +373,7 @@ impl PbrRenderRoutine {
             (TransparencyType::Cutout, "Cutout Forward Cull", "Cutout Forward"),
             (TransparencyType::Blend, "Blend Forward Cull", "Blend Forward"),
         ] {
-            let mut builder = graph.add_node();
+            let mut builder = graph.add_node(pass_name);
 
             let hdr_color_handle = builder.add_render_target_output(
                 "hdr color",
@@ -387,7 +394,6 @@ impl PbrRenderRoutine {
             );
 
             let rpass_handle = builder.add_renderpass(RenderPassTargets {
-                name: Some(SsoString::from(pass_name)),
                 targets: vec![RenderPassTarget {
                     target: hdr_color_handle,
                     clear: Color::BLACK,
@@ -602,7 +608,7 @@ impl SkyboxRoutine {
     }
 
     pub fn add_to_graph<'node>(&'node self, graph: &mut RenderGraph<'node>) {
-        let mut builder = graph.add_node();
+        let mut builder = graph.add_node("Skybox");
 
         let hdr_color_handle = builder.add_render_target_output(
             "hdr color",
@@ -616,7 +622,6 @@ impl SkyboxRoutine {
         let hdr_depth_handle = builder.add_render_target_input("hdr depth");
 
         let rpass_handle = builder.add_renderpass(RenderPassTargets {
-            name: Some(SsoString::from("Skybox")),
             targets: vec![RenderPassTarget {
                 target: hdr_color_handle,
                 clear: Color::BLACK,
@@ -684,7 +689,7 @@ impl TonemappingRoutine {
     }
 
     pub fn add_to_graph<'node>(&'node self, graph: &mut RenderGraph<'node>) {
-        let mut builder = graph.add_node();
+        let mut builder = graph.add_node("Tonemapping");
 
         let hdr_color_handle = builder.add_render_target_input("hdr color");
 

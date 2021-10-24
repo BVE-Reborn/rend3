@@ -1,5 +1,10 @@
 #version 440
 
+#ifdef ATOMIC_CULL
+#extension GL_KHR_shader_subgroup_ballot : require
+#extension GL_KHR_shader_subgroup_arithmetic : require
+#endif
+
 #include "structures.glsl"
 
 layout(local_size_x = 256) in;
@@ -116,7 +121,14 @@ void main() {
         return;
     }
 
-    uint output_idx = atomicAdd(draw_call_count, 1);
+    uint total_count = subgroupBallotBitCount(subgroupBallot(true));
+    uint local_index = subgroupExclusiveAdd(1);
+    uint output_base;
+    if (subgroupElect()) {
+        output_base = atomicAdd(draw_call_count, total_count);
+    }
+    output_base = subgroupBroadcastFirst(output_base);
+    uint output_idx = output_base + local_index;
 
     write_output(in_data, output_idx);
 }
