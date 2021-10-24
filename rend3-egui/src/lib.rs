@@ -36,7 +36,7 @@ impl EguiRenderRoutine {
     }
 
     pub fn add_to_graph<'node>(&'node mut self, graph: &mut RenderGraph<'node>, input: Input<'node>) {
-        let mut builder = graph.add_node();
+        let mut builder = graph.add_node("egui");
 
         let output_handle = builder.add_surface_output();
 

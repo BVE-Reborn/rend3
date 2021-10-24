@@ -14,7 +14,7 @@ use wgpu::{
     RenderPass, RenderPassColorAttachment, RenderPassDepthStencilAttachment, RenderPassDescriptor, Texture,
     TextureDescriptor, TextureDimension, TextureView, TextureViewDescriptor,
 };
-use wgpu_profiler::GpuProfiler;
+use wgpu_profiler::ProfilerCommandRecorder;
 
 use crate::{
     resources::{
@@ -68,8 +68,12 @@ impl<'node> RenderGraph<'node> {
         }
     }
 
-    pub fn add_node<'a>(&'a mut self) -> RenderGraphNodeBuilder<'a, 'node> {
+    pub fn add_node<'a, S>(&'a mut self, label: S) -> RenderGraphNodeBuilder<'a, 'node>
+    where
+        SsoString: From<S>,
+    {
         RenderGraphNodeBuilder {
+            label: SsoString::from(label),
             graph: self,
             inputs: Vec::with_capacity(16),
             outputs: Vec::with_capacity(16),
@@ -85,50 +89,61 @@ impl<'node> RenderGraph<'node> {
         mut cmd_bufs: Vec<CommandBuffer>,
         ready_output: &ReadyData,
     ) -> Option<RendererStatistics> {
+        profiling::scope!("RenderGraph::execute");
+
         let mut awaiting_inputs = FastHashSet::default();
         // The surface is used externally
         awaiting_inputs.insert(GraphResource::OutputTexture);
 
         let mut pruned_node_list = Vec::with_capacity(self.nodes.len());
-        // Iterate the nodes backwards to track dependencies
-        for node in self.nodes.into_iter().rev() {
-            // If any of our outputs are used by a previous node, we have reason to exist
-            let outputs_used = node.outputs.iter().any(|o| awaiting_inputs.remove(o));
+        {
+            profiling::scope!("Dead Node Elimination");
+            // Iterate the nodes backwards to track dependencies
+            for node in self.nodes.into_iter().rev() {
+                // If any of our outputs are used by a previous node, we have reason to exist
+                let outputs_used = node.outputs.iter().any(|o| awaiting_inputs.remove(o));
 
-            if outputs_used {
-                // Add our inputs to be matched up with outputs.
-                awaiting_inputs.extend(node.inputs.iter().cloned());
-                // Push our node on the new list
-                pruned_node_list.push(node)
+                if outputs_used {
+                    // Add our inputs to be matched up with outputs.
+                    awaiting_inputs.extend(node.inputs.iter().cloned());
+                    // Push our node on the new list
+                    pruned_node_list.push(node)
+                }
             }
+            // We iterated backwards to prune nodes, so flip it back to normal.
+            pruned_node_list.reverse();
         }
-        // We iterated backwards to prune nodes, so flip it back to normal.
-        pruned_node_list.reverse();
 
         let mut resource_spans = FastHashMap::<_, (usize, usize)>::default();
-        // Iterate through all the nodes, tracking the index where they are first used, and the index where they are last used.
-        for (idx, node) in pruned_node_list.iter().enumerate() {
-            // Add or update the range for all inputs
-            for input in &node.inputs {
-                resource_spans
-                    .entry(input.clone())
-                    .and_modify(|range| range.1 = idx)
-                    .or_insert((idx, idx));
-            }
-            // And the outputs
-            for output in &node.outputs {
-                resource_spans
-                    .entry(output.clone())
-                    .and_modify(|range| range.1 = idx)
-                    .or_insert((idx, idx));
+        {
+            profiling::scope!("Resource Span Analysis");
+            // Iterate through all the nodes, tracking the index where they are first used, and the index where they are last used.
+            for (idx, node) in pruned_node_list.iter().enumerate() {
+                // Add or update the range for all inputs
+                for input in &node.inputs {
+                    resource_spans
+                        .entry(input.clone())
+                        .and_modify(|range| range.1 = idx)
+                        .or_insert((idx, idx));
+                }
+                // And the outputs
+                for output in &node.outputs {
+                    resource_spans
+                        .entry(output.clone())
+                        .and_modify(|range| range.1 = idx)
+                        .or_insert((idx, idx));
+                }
             }
         }
 
         // For each node, record the list of textures whose spans start and the list of textures whose spans end.
         let mut resource_changes = vec![(Vec::new(), Vec::new()); pruned_node_list.len()];
-        for (resource, span) in &resource_spans {
-            resource_changes[span.0].0.push(resource.clone());
-            resource_changes[span.1].1.push(resource.clone());
+        {
+            profiling::scope!("Compute Resource Span Deltas");
+            for (resource, span) in &resource_spans {
+                resource_changes[span.0].0.push(resource.clone());
+                resource_changes[span.1].1.push(resource.clone());
+            }
         }
 
         // Iterate through every node, allocating and deallocating textures as we go.
@@ -141,65 +156,70 @@ impl<'node> RenderGraph<'node> {
         let mut active_views = FastHashMap::default();
         // Which node index needs acquire to happen.
         let mut acquire_idx = None;
-        for (idx, (starting, ending)) in resource_changes.into_iter().enumerate() {
-            for start in starting {
-                match start {
-                    GraphResource::Texture(name) => {
-                        let desc = self.targets[&name];
-                        if let Some(tex) = textures.get_mut(&desc).and_then(Vec::pop) {
-                            let view = tex.create_view(&TextureViewDescriptor {
-                                label: Some(&name),
-                                ..TextureViewDescriptor::default()
-                            });
-                            active_views.insert(name.clone(), view);
-                        } else {
-                            let tex = renderer.device.create_texture(&TextureDescriptor {
-                                label: None,
-                                size: Extent3d {
-                                    width: desc.dim.x,
-                                    height: desc.dim.y,
-                                    depth_or_array_layers: 1,
-                                },
-                                mip_level_count: 1,
-                                // TODO: multisampling
-                                sample_count: 1,
-                                dimension: TextureDimension::D2,
-                                format: desc.format,
-                                usage: desc.usage,
-                            });
-                            let view = tex.create_view(&TextureViewDescriptor {
-                                label: Some(&name),
-                                ..TextureViewDescriptor::default()
-                            });
-                            active_textures.insert(name.clone(), tex);
-                            active_views.insert(name.clone(), view);
+        {
+            profiling::scope!("Render Target Allocation");
+            for (idx, (starting, ending)) in resource_changes.into_iter().enumerate() {
+                for start in starting {
+                    match start {
+                        GraphResource::Texture(name) => {
+                            let desc = self.targets[&name];
+                            if let Some(tex) = textures.get_mut(&desc).and_then(Vec::pop) {
+                                let view = tex.create_view(&TextureViewDescriptor {
+                                    label: Some(&name),
+                                    ..TextureViewDescriptor::default()
+                                });
+                                active_views.insert(name.clone(), view);
+                            } else {
+                                let tex = renderer.device.create_texture(&TextureDescriptor {
+                                    label: None,
+                                    size: Extent3d {
+                                        width: desc.dim.x,
+                                        height: desc.dim.y,
+                                        depth_or_array_layers: 1,
+                                    },
+                                    mip_level_count: 1,
+                                    // TODO: multisampling
+                                    sample_count: 1,
+                                    dimension: TextureDimension::D2,
+                                    format: desc.format,
+                                    usage: desc.usage,
+                                });
+                                let view = tex.create_view(&TextureViewDescriptor {
+                                    label: Some(&name),
+                                    ..TextureViewDescriptor::default()
+                                });
+                                active_textures.insert(name.clone(), tex);
+                                active_views.insert(name.clone(), view);
+                            }
                         }
-                    }
-                    GraphResource::Shadow(..) => {}
-                    GraphResource::Data(..) => {}
-                    GraphResource::OutputTexture => {
-                        acquire_idx = Some(idx);
-                        continue;
-                    }
-                };
-            }
+                        GraphResource::Shadow(..) => {}
+                        GraphResource::Data(..) => {}
+                        GraphResource::OutputTexture => {
+                            acquire_idx = Some(idx);
+                            continue;
+                        }
+                    };
+                }
 
-            for end in ending {
-                match end {
-                    GraphResource::Texture(name) => {
-                        let tex = active_textures
-                            .remove(&name)
-                            .expect("internal rendergraph error: texture end with no start");
+                for end in ending {
+                    match end {
+                        GraphResource::Texture(name) => {
+                            let tex = active_textures
+                                .remove(&name)
+                                .expect("internal rendergraph error: texture end with no start");
 
-                        let desc = self.targets[&name];
-                        textures.entry(desc).or_insert_with(|| Vec::with_capacity(16)).push(tex);
-                    }
-                    GraphResource::Shadow(..) => {}
-                    GraphResource::Data(..) => {}
-                    GraphResource::OutputTexture => continue,
-                };
+                            let desc = self.targets[&name];
+                            textures.entry(desc).or_insert_with(|| Vec::with_capacity(16)).push(tex);
+                        }
+                        GraphResource::Shadow(..) => {}
+                        GraphResource::Data(..) => {}
+                        GraphResource::OutputTexture => continue,
+                    };
+                }
             }
         }
+
+        profiling::scope!("Run Nodes");
 
         let mut profiler = renderer.profiler.lock();
         let camera_manager = renderer.camera_manager.read();
@@ -272,39 +292,53 @@ impl<'node> RenderGraph<'node> {
                 }
             }
 
-            let store = RenderGraphDataStore {
-                texture_mapping: &active_views,
-                shadow_array_view: directional_light_manager.get_bg(),
-                shadow_coordinates: directional_light_manager.get_coords(),
-                shadow_views: directional_light_manager.get_layer_views(),
-                data: &self.data,
-                // SAFETY: This is only viewed mutably when no renderpass exists
-                output: unsafe { &*output_cell.get() }.as_view(),
+            {
+                let store = RenderGraphDataStore {
+                    texture_mapping: &active_views,
+                    shadow_array_view: directional_light_manager.get_bg(),
+                    shadow_coordinates: directional_light_manager.get_coords(),
+                    shadow_views: directional_light_manager.get_layer_views(),
+                    data: &self.data,
+                    // SAFETY: This is only viewed mutably when no renderpass exists
+                    output: unsafe { &*output_cell.get() }.as_view(),
 
-                profiler: &profiler,
-                camera_manager: &camera_manager,
-                directional_light_manager: &directional_light_manager,
-                material_manager: &material_manager,
-                mesh_manager: &mesh_manager,
-                object_manager: &object_manager,
-                d2_texture_manager: &d2_texture_manager,
-                d2c_texture_manager: &d2c_texture_manager,
-            };
+                    camera_manager: &camera_manager,
+                    directional_light_manager: &directional_light_manager,
+                    material_manager: &material_manager,
+                    mesh_manager: &mesh_manager,
+                    object_manager: &object_manager,
+                    d2_texture_manager: &d2_texture_manager,
+                    d2c_texture_manager: &d2c_texture_manager,
+                };
 
-            let encoder_or_rpass = match rpass {
-                Some(ref mut rpass) => RenderGraphEncoderOrPassInner::RenderPass(rpass),
-                // SAFETY: There is no active renderpass to borrow this. This reference lasts for the duration of the call to exec.
-                None => RenderGraphEncoderOrPassInner::Encoder(unsafe { &mut *encoder_cell.get() }),
-            };
-            (node.exec)(
-                node.passthrough,
-                renderer,
-                RenderGraphEncoderOrPass(encoder_or_rpass),
-                // SAFETY: This borrow, and all the objects allocated from it, lasts as long as the renderpass, and isn't used mutably until after the rpass dies
-                unsafe { &*rpass_temps_cell.get() },
-                ready_output,
-                store,
-            );
+                let mut encoder_or_rpass = match rpass {
+                    Some(ref mut rpass) => RenderGraphEncoderOrPassInner::RenderPass(rpass),
+                    // SAFETY: There is no active renderpass to borrow this. This reference lasts for the duration of the call to exec.
+                    None => RenderGraphEncoderOrPassInner::Encoder(unsafe { &mut *encoder_cell.get() }),
+                };
+
+                profiling::scope!(&node.label);
+
+                profiler.begin_scope(&node.label, &mut encoder_or_rpass, &renderer.device);
+
+                (node.exec)(
+                    node.passthrough,
+                    renderer,
+                    RenderGraphEncoderOrPass(encoder_or_rpass),
+                    // SAFETY: This borrow, and all the objects allocated from it, lasts as long as the renderpass, and isn't used mutably until after the rpass dies
+                    unsafe { &*rpass_temps_cell.get() },
+                    ready_output,
+                    store,
+                );
+
+                let mut encoder_or_rpass = match rpass {
+                    Some(ref mut rpass) => RenderGraphEncoderOrPassInner::RenderPass(rpass),
+                    // SAFETY: There is no active renderpass to borrow this. This reference lasts for the duration of the call to exec.
+                    None => RenderGraphEncoderOrPassInner::Encoder(unsafe { &mut *encoder_cell.get() }),
+                };
+
+                profiler.end_scope(&mut encoder_or_rpass);
+            }
         }
 
         // SAFETY: We drop the renderpass to make sure we can access both encoder_cell and output_cell safely
@@ -486,7 +520,6 @@ pub struct RenderGraphDataStore<'a> {
     data: &'a FastHashMap<SsoString, Box<dyn Any>>, // Any is RefCell<Option<T>> where T is the stored data
     output: Option<&'a TextureView>,
 
-    pub profiler: &'a GpuProfiler,
     pub camera_manager: &'a CameraManager,
     pub directional_light_manager: &'a DirectionalLightManager,
     pub material_manager: &'a MaterialManager,
@@ -574,6 +607,29 @@ pub struct RenderPassHandle;
 enum RenderGraphEncoderOrPassInner<'a, 'pass> {
     Encoder(&'a mut CommandEncoder),
     RenderPass(&'a mut RenderPass<'pass>),
+}
+
+impl<'a, 'pass> ProfilerCommandRecorder for RenderGraphEncoderOrPassInner<'a, 'pass> {
+    fn write_timestamp(&mut self, query_set: &wgpu::QuerySet, query_index: u32) {
+        match self {
+            RenderGraphEncoderOrPassInner::Encoder(e) => e.write_timestamp(query_set, query_index),
+            RenderGraphEncoderOrPassInner::RenderPass(rp) => rp.write_timestamp(query_set, query_index),
+        }
+    }
+
+    fn push_debug_group(&mut self, label: &str) {
+        match self {
+            RenderGraphEncoderOrPassInner::Encoder(e) => e.push_debug_group(label),
+            RenderGraphEncoderOrPassInner::RenderPass(rp) => rp.push_debug_group(label),
+        }
+    }
+
+    fn pop_debug_group(&mut self) {
+        match self {
+            RenderGraphEncoderOrPassInner::Encoder(e) => e.pop_debug_group(),
+            RenderGraphEncoderOrPassInner::RenderPass(rp) => rp.pop_debug_group(),
+        }
+    }
 }
 
 pub struct RenderGraphEncoderOrPass<'a, 'pass>(RenderGraphEncoderOrPassInner<'a, 'pass>);
@@ -664,7 +720,6 @@ impl<'rpass> RpassTemporaryPool<'rpass> {
 
 #[derive(Debug, PartialEq)]
 pub struct RenderPassTargets {
-    pub name: Option<SsoString>,
     pub targets: Vec<RenderPassTarget>,
     pub depth_stencil: Option<RenderPassDepthTarget>,
 }
@@ -717,6 +772,7 @@ pub enum DepthHandle {
 pub struct RenderGraphNode<'node> {
     inputs: Vec<GraphResource>,
     outputs: Vec<GraphResource>,
+    label: SsoString,
     rpass: Option<RenderPassTargets>,
     passthrough: PassthroughDataContainer<'node>,
     exec: Box<
@@ -733,6 +789,7 @@ pub struct RenderGraphNode<'node> {
 
 pub struct RenderGraphNodeBuilder<'a, 'node> {
     graph: &'a mut RenderGraph<'node>,
+    label: SsoString,
     inputs: Vec<GraphResource>,
     outputs: Vec<GraphResource>,
     passthrough: PassthroughDataContainer<'node>,
@@ -852,6 +909,7 @@ impl<'a, 'node> RenderGraphNodeBuilder<'a, 'node> {
             ) + 'node,
     {
         self.graph.nodes.push(RenderGraphNode {
+            label: self.label,
             inputs: self.inputs,
             outputs: self.outputs,
             rpass: self.rpass,

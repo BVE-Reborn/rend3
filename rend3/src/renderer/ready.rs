@@ -2,7 +2,7 @@ use crate::{instruction::Instruction, ReadyData, Renderer};
 use wgpu::{CommandBuffer, CommandEncoderDescriptor};
 
 pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
-    profiling::scope!("render_loop");
+    profiling::scope!("Renderer::ready");
 
     renderer.instructions.swap();
 
