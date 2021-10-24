@@ -29,6 +29,11 @@ Per Keep a Changelog there are 6 main categories of changes:
 
 ## Unreleased
 
+### Fixed
+- rend3: Fixed bug where in gpu mode, changing textures would cause a brief flash.
+- rend3-pbr: Fixed normal mapping.
+- rend3-pbr: Fixed some UV transforms.
+
 ## v0.2.1
 
 Released 2021-10-24
