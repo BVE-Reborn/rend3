@@ -63,11 +63,12 @@ void main() {
 
     o_color = i_color;
 
-    o_coords0 = vec2(material.uv_transform0 * vec3(i_coords0, 1.0));
-    o_coords1 = vec2(material.uv_transform1 * vec3(i_coords1, 1.0));
+    o_coords0 = i_coords0;
+    o_coords1 = i_coords1;
 
     #ifdef BAKING
-    gl_Position = vec4(o_coords1 * 2.0 - 1.0, 0.0, 1.0);
+    vec2 coord1_adj = vec2(material.uv_transform1 * vec3(i_coords1, 1.0));
+    gl_Position = vec4(coord1_adj * 2.0 - 1.0, 0.0, 1.0);
     #else
     gl_Position = data.model_view_proj * vec4(i_position, 1.0);
     #endif

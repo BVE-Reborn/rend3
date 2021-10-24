@@ -42,7 +42,7 @@ struct PixelData {
 PixelData get_per_pixel_data_sampled(MATERIAL_TYPE material, sampler s) {
     PixelData pixel;
     
-    vec2 coords = i_coords0;
+    vec2 coords = vec2(material.uv_transform0 * vec3(i_coords0, 1.0));
     vec2 uvdx = dFdx(coords);
     vec2 uvdy = dFdy(coords);
 

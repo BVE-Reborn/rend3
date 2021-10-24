@@ -15,7 +15,7 @@ layout(location = 7) in uint i_object_idx;
 #endif
 
 layout(location = 0) out vec4 o_position;
-layout(location = 1) out vec2 o_coords;
+layout(location = 1) out vec2 o_coords0;
 layout(location = 2) out vec4 o_color;
 layout(location = 3) flat out uint o_material;
 
@@ -54,5 +54,5 @@ void main() {
 
     o_color = i_color;
 
-    o_coords = vec2(material.uv_transform0 * vec3(i_coords0, 1.0));
+    o_coords0 = i_coords0;
 }
