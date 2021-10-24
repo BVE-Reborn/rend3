@@ -82,7 +82,7 @@ PixelData get_per_pixel_data_sampled(MATERIAL_TYPE material, sampler s) {
 
                 normal = vec3(bicomp, sqrt(1 - (bicomp.r * bicomp.r) - (bicomp.g * bicomp.g)));
             } else {
-                normal = normalize(texture_read.rgb);
+                normal = normalize(texture_read.rgb * 2.0 - 1.0);
             }
             vec3 in_normal = normalize(i_normal);
             vec3 in_tangent = normalize(i_tangent);
