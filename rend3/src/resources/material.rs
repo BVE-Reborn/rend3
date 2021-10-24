@@ -236,7 +236,11 @@ impl MaterialManager {
         // TODO(material): if this doesn't change archetype, this should do a buffer write cpu side.
         let internal = self.fill_inner(device, mode, texture_manager_2d, &material);
 
-        let archetype_changed = self.registry.update(handle, material);
+        let archetype_changed = self.registry.update(handle, material, |internal, idx| {
+            for object in &internal.objects {
+                object_manager.set_material_index(*object, idx)
+            }
+        });
 
         if archetype_changed {
             let new_index = self.registry.get_index(handle.get_raw());
@@ -320,9 +324,19 @@ impl MaterialManager {
         self.registry.get_index(handle)
     }
 
-    pub fn ready(&mut self, device: &Device, queue: &Queue, texture_manager: &TextureManager) {
+    pub fn ready(
+        &mut self,
+        device: &Device,
+        queue: &Queue,
+        object_manager: &mut ObjectManager,
+        texture_manager: &TextureManager,
+    ) {
         profiling::scope!("Material Ready");
-        self.registry.remove_all_dead();
+        self.registry.remove_all_dead(|internal, idx| {
+            for object in &internal.objects {
+                object_manager.set_material_index(*object, idx);
+            }
+        });
 
         if let ModeData::GPU(ref mut buffer) = self.buffer {
             profiling::scope!("Update GPU Material Buffer");
