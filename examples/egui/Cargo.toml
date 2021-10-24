@@ -3,7 +3,7 @@ name = "rend3-egui-example"
 license = "MIT OR Apache-2.0 OR Zlib"
 version = "0.1.0"
 authors = ["Juri Furer <juri.furer@protonmail.com>"]
-edition = "2018"
+edition = "2021"
 publish = false
 
 [[bin]]

@@ -2,7 +2,7 @@
 name = "rend3-gltf"
 version = "0.2.0"
 authors = ["The rend3 Developers"]
-edition = "2018"
+edition = "2021"
 description = "gltf scene and model loader for rend3"
 repository = "https://github.com/BVE-Reborn/rend3"
 license = "MIT OR Apache-2.0 OR Zlib"

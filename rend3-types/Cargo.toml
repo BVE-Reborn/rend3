@@ -2,7 +2,7 @@
 name = "rend3-types"
 version = "0.2.0"
 authors = ["The rend3 Developers"]
-edition = "2018"
+edition = "2021"
 description = "Type definitions for rend3"
 readme = "../README.md"
 repository = "https://github.com/BVE-Reborn/rend3"
