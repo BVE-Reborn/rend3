@@ -12,8 +12,8 @@ pub const STARTING_2D_TEXTURES: usize = 1 << 8;
 /// When using GPU mode, we start the Cubemap texture manager with a bind group with this many textures.
 pub const STARTING_CUBE_TEXTURES: usize = 1 << 3;
 /// Largest amount of supported textures per type
-// TODO: Add a higher limit for !intel
-pub const MAX_TEXTURE_COUNT: u32 = 1 << 13;
+pub const MAX_TEXTURE_COUNT: u32 = 1 << 17;
+
 /// Internal representation of a Texture.
 pub struct InternalTexture {
     pub texture: Texture,
