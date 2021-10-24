@@ -72,7 +72,7 @@ fn load_skybox(renderer: &Renderer, skybox_routine: &Mutex<SkyboxRoutine>) -> Re
         mip_count: rend3::types::MipmapCount::Specific(NonZeroU32::new(mips).unwrap()),
         mip_source: rend3::types::MipmapSource::Uploaded,
     });
-    skybox_routine.lock().set_background_texture(renderer, Some(handle));
+    skybox_routine.lock().set_background_texture(Some(handle));
     Ok(())
 }
 
@@ -396,11 +396,13 @@ fn main() {
             let frame = rend3::util::output::OutputFrame::Surface { surface: Arc::clone(&surface) };
             // Lock all the routines
             let pbr_routine = pbr_routine.lock();
-            let skybox_routine = skybox_routine.lock();
+            let mut skybox_routine = skybox_routine.lock();
             let tonemapping_routine = tonemapping_routine.lock();
 
             // Ready up the renderer
             let (cmd_bufs, ready) = renderer.ready();
+            // Ready up the routines
+            skybox_routine.ready(&renderer);
 
             // Build a rendergraph
             let mut graph = rend3::RenderGraph::new();
