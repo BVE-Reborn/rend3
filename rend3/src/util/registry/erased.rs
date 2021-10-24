@@ -102,7 +102,7 @@ impl<HandleType, Metadata> ArchitypicalErasedRegistry<HandleType, Metadata> {
         self.handle_map.insert(
             handle_value,
             PerHandleData {
-                index: handle_value,
+                index: vec_index,
                 ty: type_id,
             },
         );
