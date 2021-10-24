@@ -8,7 +8,7 @@
 #include "structures.glsl"
 
 layout(location = 0) in vec4 i_position;
-layout(location = 1) in vec2 i_coords;
+layout(location = 1) in vec2 i_coords0;
 layout(location = 2) in vec4 i_color;
 layout(location = 3) flat in uint i_material;
 
@@ -44,7 +44,7 @@ void main() {
 
     bool has_albedo = HAS_ALBEDO_TEXTURE;
 
-    vec2 coords = i_coords;
+    vec2 coords = vec2(material.uv_transform0 * vec3(i_coords0, 1.0));
     vec2 uvdx = dFdx(coords);
     vec2 uvdy = dFdy(coords);
 
