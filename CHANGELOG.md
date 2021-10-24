@@ -28,6 +28,11 @@ Per Keep a Changelog there are 6 main categories of changes:
 
 ## Unreleased
 
+### Fixed
+- rend3: Fixed bug where materials would slowly drift out of sync with their internal tracking indices.
+- rend3: Fixed bug where the renderer would crash on close.
+- rend3: Fixed bug where changing a material's type would cause materials to go haywire.
+
 ## v0.2.0
 
 Released 2021-10-09

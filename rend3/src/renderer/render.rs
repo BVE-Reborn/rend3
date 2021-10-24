@@ -104,7 +104,12 @@ pub fn render_loop<Input, Output>(
     object_manager.ready(&mut material_manager);
 
     // Level 1
-    material_manager.ready(&renderer.device, &renderer.queue, &texture_manager_2d);
+    material_manager.ready(
+        &renderer.device,
+        &renderer.queue,
+        &mut object_manager,
+        &texture_manager_2d,
+    );
 
     // Level 0
     let d2_texture = texture_manager_2d.ready(&renderer.device);

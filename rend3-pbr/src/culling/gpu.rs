@@ -1,4 +1,4 @@
-use std::{mem, num::NonZeroU64};
+use std::{borrow::Cow, mem, num::NonZeroU64};
 
 use glam::Mat4;
 use ordered_float::OrderedFloat;
@@ -277,25 +277,32 @@ impl GpuCuller {
     }
 
     pub fn pre_cull(&self, args: GpuCullerPreCullArgs<'_>) -> PreCulledBuffer {
-        let objects = args.objects.get_objects_mut::<PbrMaterial>(args.transparency as u64);
+        let objects = args.objects.get_objects::<PbrMaterial>(args.transparency as u64);
         let count = objects.len();
 
-        if let Some(sorting) = args.sort {
+        let objects = if let Some(sorting) = args.sort {
             profiling::scope!("Sorting");
+
+            let mut sort_objects = objects.to_vec();
 
             let camera_location = args.camera.location().into();
 
             match sorting {
                 Sorting::FrontToBack => {
-                    objects.sort_unstable_by_key(|o| OrderedFloat(o.mesh_location().distance_squared(camera_location)));
+                    sort_objects
+                        .sort_unstable_by_key(|o| OrderedFloat(o.mesh_location().distance_squared(camera_location)));
                 }
                 Sorting::BackToFront => {
-                    objects
+                    sort_objects
                         .sort_unstable_by_key(|o| OrderedFloat(-o.mesh_location().distance_squared(camera_location)));
                 }
             }
-        }
-        let buffer = build_cull_data(args.device, objects);
+
+            Cow::Owned(sort_objects)
+        } else {
+            Cow::Borrowed(objects)
+        };
+        let buffer = build_cull_data(args.device, &objects);
 
         PreCulledBuffer { inner: buffer, count }
     }

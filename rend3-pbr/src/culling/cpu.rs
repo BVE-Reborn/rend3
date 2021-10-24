@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use glam::{Mat3, Mat3A, Mat4};
 use ordered_float::OrderedFloat;
 use rend3::{
@@ -45,25 +47,32 @@ impl CpuCuller {
         let view = args.camera.view();
         let view_proj = args.camera.view_proj();
 
-        let objects = args.objects.get_objects_mut::<PbrMaterial>(args.transparency as u64);
+        let objects = args.objects.get_objects::<PbrMaterial>(args.transparency as u64);
 
-        if let Some(sorting) = args.sort {
+        let objects = if let Some(sorting) = args.sort {
             profiling::scope!("Sorting");
+
+            let mut sort_objects = objects.to_vec();
 
             let camera_location = args.camera.location().into();
 
             match sorting {
                 Sorting::FrontToBack => {
-                    objects.sort_unstable_by_key(|o| OrderedFloat(o.mesh_location().distance_squared(camera_location)));
+                    sort_objects
+                        .sort_unstable_by_key(|o| OrderedFloat(o.mesh_location().distance_squared(camera_location)));
                 }
                 Sorting::BackToFront => {
-                    objects
+                    sort_objects
                         .sort_unstable_by_key(|o| OrderedFloat(-o.mesh_location().distance_squared(camera_location)));
                 }
             }
-        }
 
-        let (mut outputs, calls) = cull_internal(objects, frustum, view, view_proj);
+            Cow::Owned(sort_objects)
+        } else {
+            Cow::Borrowed(objects)
+        };
+
+        let (mut outputs, calls) = cull_internal(&objects, frustum, view, view_proj);
 
         assert_eq!(calls.len(), outputs.len());
 

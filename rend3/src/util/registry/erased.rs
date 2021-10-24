@@ -27,8 +27,19 @@ struct PerHandleData {
 pub struct Archetype<Metadata> {
     pub vec: VecAny,
     pub non_erased: Vec<NonErasedData<Metadata>>,
-    remove_single: fn(&mut VecAny, &mut Vec<NonErasedData<Metadata>>, &mut FastHashMap<usize, PerHandleData>, usize),
-    remove_all_dead: fn(&mut VecAny, &mut Vec<NonErasedData<Metadata>>, &mut FastHashMap<usize, PerHandleData>),
+    remove_single: fn(
+        &mut VecAny,
+        &mut Vec<NonErasedData<Metadata>>,
+        &mut FastHashMap<usize, PerHandleData>,
+        usize,
+        &mut dyn FnMut(&Metadata, usize),
+    ) -> Metadata,
+    remove_all_dead: fn(
+        &mut VecAny,
+        &mut Vec<NonErasedData<Metadata>>,
+        &mut FastHashMap<usize, PerHandleData>,
+        &mut dyn FnMut(&Metadata, usize),
+    ),
 }
 
 pub struct ArchitypicalErasedRegistry<HandleType, Metadata> {
@@ -91,7 +102,7 @@ impl<HandleType, Metadata> ArchitypicalErasedRegistry<HandleType, Metadata> {
         self.handle_map.insert(
             handle_value,
             PerHandleData {
-                index: handle_value,
+                index: vec_index,
                 ty: type_id,
             },
         );
@@ -99,7 +110,12 @@ impl<HandleType, Metadata> ArchitypicalErasedRegistry<HandleType, Metadata> {
         &mut archetype.non_erased[vec_index].inner
     }
 
-    pub fn update<T: Send + Sync + 'static>(&mut self, handle: &ResourceHandle<HandleType>, data: T) -> bool {
+    pub fn update<T: Send + Sync + 'static>(
+        &mut self,
+        handle: &ResourceHandle<HandleType>,
+        data: T,
+        mut renormalize: impl FnMut(&Metadata, usize),
+    ) -> bool {
         let per_handle_data = self.handle_map.get_mut(&handle.get_raw().idx).unwrap();
         let index = per_handle_data.index;
         let current_type_id = &mut per_handle_data.ty;
@@ -113,21 +129,29 @@ impl<HandleType, Metadata> ArchitypicalErasedRegistry<HandleType, Metadata> {
             false
         } else {
             // We need to change archetype, so we clean up, then insert with the old handle. We must clean up first, so the value in the index map is still accurate.
-            (archetype.remove_single)(
+            let metadata = (archetype.remove_single)(
                 &mut archetype.vec,
                 &mut archetype.non_erased,
                 &mut self.handle_map,
                 index,
+                &mut renormalize,
             );
+
+            self.insert(handle, data, metadata);
 
             true
         }
     }
 
-    pub fn remove_all_dead(&mut self) {
+    pub fn remove_all_dead(&mut self, mut renormalize: impl FnMut(&Metadata, usize)) {
         profiling::scope!("ResourceRegistry::remove_all_dead");
         for archetype in self.archetype_map.values_mut() {
-            (archetype.remove_all_dead)(&mut archetype.vec, &mut archetype.non_erased, &mut self.handle_map);
+            (archetype.remove_all_dead)(
+                &mut archetype.vec,
+                &mut archetype.non_erased,
+                &mut self.handle_map,
+                &mut renormalize,
+            );
         }
     }
 
@@ -200,24 +224,29 @@ fn remove_single<T: Send + Sync + 'static, Metadata>(
     non_erased: &mut Vec<NonErasedData<Metadata>>,
     per_handle_map: &mut FastHashMap<usize, PerHandleData>,
     idx: usize,
-) {
+    renormalize: &mut dyn FnMut(&Metadata, usize),
+) -> Metadata {
     let mut vec = vec_any.downcast_mut::<T>().unwrap();
 
     vec.swap_remove(idx);
-    non_erased.swap_remove(idx);
+    let deleted_metadata = non_erased.swap_remove(idx);
     // We don't need to remove our value from the index map or the archetype map because
     // this is only called in the context of an update, where going to update these values anyway.
 
     // If we swapped an element, update its value in the index map
     if let Some(metadata) = non_erased.get(idx) {
         per_handle_map.get_mut(&metadata.handle).unwrap().index = idx;
+        renormalize(&metadata.inner, idx);
     }
+
+    deleted_metadata.inner
 }
 
 fn remove_all_dead<T: Send + Sync + 'static, Metadata>(
     vec_any: &mut VecAny,
     non_erased: &mut Vec<NonErasedData<Metadata>>,
     per_handle_map: &mut FastHashMap<usize, PerHandleData>,
+    renormalize: &mut dyn FnMut(&Metadata, usize),
 ) {
     let mut vec = vec_any.downcast_mut::<T>().unwrap();
 
@@ -239,6 +268,7 @@ fn remove_all_dead<T: Send + Sync + 'static, Metadata>(
             // If we swapped an element, update its value in the index map
             if let Some(metadata) = non_erased.get(idx) {
                 per_handle_map.get_mut(&metadata.handle).unwrap().index = idx;
+                renormalize(&metadata.inner, idx);
             }
         }
     }

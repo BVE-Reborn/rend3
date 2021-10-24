@@ -116,16 +116,6 @@ impl ObjectManager {
             })
             .unwrap_or(&[])
     }
-
-    pub fn get_objects_mut<M: Material>(&mut self, key: u64) -> &mut [InternalObject] {
-        self.registry
-            .get_archetype_vector_mut(&MaterialKeyPair {
-                // TODO(material): unify a M -> TypeId method
-                ty: TypeId::of::<M>(),
-                key,
-            })
-            .unwrap_or(&mut [])
-    }
 }
 
 impl Default for ObjectManager {
