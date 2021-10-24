@@ -92,10 +92,14 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
     }
 
     // Do these in dependency order
-    // Level 2
+    // Level 3
     object_manager.ready(&mut material_manager);
 
+    // Level 2
+    let d2_texture = texture_manager_2d.ready(&renderer.device);
+
     // Level 1
+    // The material manager needs to be able to pull correct internal indices from the d2 texture manager, so it has to go first.
     material_manager.ready(
         &renderer.device,
         &renderer.queue,
@@ -104,7 +108,6 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
     );
 
     // Level 0
-    let d2_texture = texture_manager_2d.ready(&renderer.device);
     let d2c_texture = texture_manager_cube.ready(&renderer.device);
     let directional_light_cameras = directional_light_manager.ready(&renderer.device, &renderer.queue, &camera_manager);
     mesh_manager.ready();
