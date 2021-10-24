@@ -6,7 +6,7 @@
 //! To use rend3 add the following to your Cargo.toml:
 //!
 //! ```text
-//! rend3 = "0.2.0"
+//! rend3 = "0.2.1"
 //! ```
 //!
 //! # Screenshots
