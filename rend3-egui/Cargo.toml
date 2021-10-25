@@ -12,7 +12,7 @@ version = "0.1.0"
 
 [dependencies]
 egui = "0.14"
-epi = "0.14"
+epi = "0.15"
 egui_wgpu_backend = "0.13"
 rend3 = { version = "^0.2.0", path = "../rend3" }
 wgpu = "0.11"
