@@ -11,7 +11,7 @@ repository = "https://github.com/BVE-Reborn/rend3"
 version = "0.1.0"
 
 [dependencies]
-egui = "0.14"
+egui = "0.15"
 epi = "0.14"
 egui_wgpu_backend = "0.13"
 rend3 = { version = "^0.2.0", path = "../rend3" }
