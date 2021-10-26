@@ -52,8 +52,23 @@ fn create_mesh() -> rend3::types::Mesh {
         .build()
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn main() {
+    pollster::block_on(async_main());
+}
+#[cfg(target_arch = "wasm32")]
+fn main() {
+    wasm_bindgen_futures::spawn_local(async_main());
+}
+
+async fn async_main() {
+    #[cfg(target_arch = "wasm32")]
+    std::panic::set_hook(Box::new(console_error_panic_hook::hook));
+    #[cfg(target_arch = "wasm32")]
+    console_log::init().unwrap();
+
     // Setup logging
+    #[cfg(not(target_arch = "wasm32"))]
     env_logger::init();
 
     // Create event loop and window
@@ -64,10 +79,20 @@ fn main() {
         builder.build(&event_loop).expect("Could not build window")
     };
 
+    #[cfg(target_arch = "wasm32")]
+    {
+        use winit::platform::web::WindowExtWebSys;
+        web_sys::window()
+            .and_then(|win| win.document())
+            .and_then(|doc| doc.body())
+            .and_then(|body| body.append_child(&web_sys::Element::from(window.canvas())).ok())
+            .expect("couldn't append canvas to document body");
+    }
+
     let window_size = window.inner_size();
 
     // Create the Instance, Adapter, and Device. We can specify preferred backend, device name, or rendering mode. In this case we let rend3 choose for us.
-    let iad = pollster::block_on(rend3::create_iad(None, None, None)).unwrap();
+    let iad = rend3::create_iad(None, None, None).await.unwrap();
 
     // The one line of unsafe needed. We just need to guarentee that the window outlives the use of the surface.
     let surface = Arc::new(unsafe { iad.instance.create_surface(&window) });
@@ -142,7 +167,7 @@ fn main() {
         distance: 400.0,
     });
 
-    event_loop.run(move |event, _, control| match event {
+    winit_run(event_loop, move |event, _, control| match event {
         // Close button was clicked, we should close.
         winit::event::Event::WindowEvent {
             event: winit::event::WindowEvent::CloseRequested,
@@ -210,4 +235,51 @@ fn main() {
         // Other events we don't care about
         _ => {}
     });
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub fn winit_run<F, T>(event_loop: winit::event_loop::EventLoop<T>, event_handler: F) -> !
+where
+    F: 'static
+        + FnMut(
+            winit::event::Event<'_, T>,
+            &winit::event_loop::EventLoopWindowTarget<T>,
+            &mut winit::event_loop::ControlFlow,
+        ),
+{
+    event_loop.run(event_handler)
+}
+
+#[cfg(target_arch = "wasm32")]
+pub fn winit_run<F, T>(event_loop: winit::event_loop::EventLoop<T>, event_handler: F)
+where
+    F: 'static
+        + FnMut(
+            winit::event::Event<'_, T>,
+            &winit::event_loop::EventLoopWindowTarget<T>,
+            &mut winit::event_loop::ControlFlow,
+        ),
+{
+    use wasm_bindgen::{prelude::*, JsCast};
+
+    let winit_closure = Closure::once_into_js(move || event_loop.run(event_handler));
+
+    // make sure to handle JS exceptions thrown inside start.
+    // Otherwise wasm_bindgen_futures Queue would break and never handle any tasks again.
+    // This is required, because winit uses JS exception for control flow to escape from `run`.
+    if let Err(error) = call_catch(&winit_closure) {
+        let is_control_flow_exception = error
+            .dyn_ref::<js_sys::Error>()
+            .map_or(false, |e| e.message().includes("Using exceptions for control flow", 0));
+
+        if !is_control_flow_exception {
+            web_sys::console::error_1(&error);
+        }
+    }
+
+    #[wasm_bindgen]
+    extern "C" {
+        #[wasm_bindgen(catch, js_namespace = Function, js_name = "prototype.call.call")]
+        fn call_catch(this: &JsValue) -> Result<(), JsValue>;
+    }
 }

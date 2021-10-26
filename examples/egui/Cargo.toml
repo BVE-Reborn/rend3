@@ -30,4 +30,4 @@ rend3-egui = { version = "^0.1.0",path = "../../rend3-egui" }
 # Programmable render list that dictates how the scene renders
 rend3-pbr = { version = "^0.2.0",path = "../../rend3-pbr" }
 # Windowing
-winit = "0.25.0"
+winit = { version = "0.25", features = ["web-sys"] }

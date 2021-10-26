@@ -26,4 +26,4 @@ rend3-pbr = { version = "^0.2.0", path = "../../rend3-pbr" }
 # Provides `block_on` to wait for futures from sync code
 pollster = "0.2"
 # windowing
-winit = "0.25"
+winit = { version = "0.25", features = ["web-sys"] }
