@@ -1,6 +1,6 @@
 use std::{mem, num::NonZeroU64};
 
-use glam::{Mat3A, Mat4};
+use glam::{Mat4, Vec3A};
 use wgpu::{
     BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, BufferBindingType, Device,
     ShaderStages, TextureSampleType, TextureViewDimension,
@@ -13,7 +13,7 @@ use crate::uniforms::ShaderCommonUniform;
 pub struct PerObjectData {
     pub model_view: Mat4,
     pub model_view_proj: Mat4,
-    pub inv_trans_model_view: Mat3A,
+    pub inv_squared_scale: Vec3A,
     // Unused in shader
     pub material_idx: u32,
 }

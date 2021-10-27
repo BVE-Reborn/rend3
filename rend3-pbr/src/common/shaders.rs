@@ -1,7 +1,9 @@
-use rend3::RendererMode;
-use wgpu::{Device, ShaderModule, ShaderModuleDescriptor, ShaderModuleDescriptorSpirV};
+use std::borrow::Cow;
 
-use crate::shaders::SPIRV_SHADERS;
+use rend3::RendererMode;
+use wgpu::{Device, ShaderModule, ShaderModuleDescriptor, ShaderModuleDescriptorSpirV, ShaderSource};
+
+use crate::shaders::{SPIRV_SHADERS, WGSL_SHADERS};
 
 /// # Safety
 ///
@@ -12,9 +14,13 @@ pub unsafe fn mode_safe_shader(
     label: &str,
     cpu_source: &str,
     gpu_source: &str,
-    unsafe_override: bool,
 ) -> ShaderModule {
-    let source = SPIRV_SHADERS
+    let shader_dir = match mode {
+        RendererMode::CPUPowered => &WGSL_SHADERS,
+        RendererMode::GPUPowered => &SPIRV_SHADERS,
+    };
+
+    let source = shader_dir
         .get_file(match mode {
             RendererMode::CPUPowered => cpu_source,
             RendererMode::GPUPowered => gpu_source,
@@ -22,12 +28,12 @@ pub unsafe fn mode_safe_shader(
         .unwrap()
         .contents();
 
-    let use_unsafe = mode == RendererMode::GPUPowered || unsafe_override;
+    let use_unsafe = mode == RendererMode::GPUPowered;
 
     match use_unsafe {
         false => device.create_shader_module(&ShaderModuleDescriptor {
             label: Some(label),
-            source: wgpu::util::make_spirv(source),
+            source: ShaderSource::Wgsl(Cow::Borrowed(std::str::from_utf8(source).unwrap())),
         }),
         true => device.create_shader_module_spirv(&ShaderModuleDescriptorSpirV {
             label: Some(label),

@@ -1,4 +1,4 @@
-use glam::{Mat3, Mat3A, Mat4};
+use glam::{Mat4, Vec3A};
 use rend3::{
     resources::{CameraManager, InternalObject, MaterialManager, ObjectManager},
     util::frustum::ShaderFrustum,
@@ -55,7 +55,7 @@ impl CpuCuller {
             outputs.push(PerObjectData {
                 model_view: Mat4::ZERO,
                 model_view_proj: Mat4::ZERO,
-                inv_trans_model_view: Mat3A::ZERO,
+                inv_squared_scale: Vec3A::ZERO,
                 material_idx: 0,
             });
         }
@@ -108,8 +108,6 @@ pub fn cull_internal(
 
         let model_view_proj = view_proj * model;
 
-        let inv_trans_model_view = Mat3::from_mat4(model_view.inverse().transpose());
-
         calls.push(CPUDrawCall {
             start_idx: object.input.start_idx,
             end_idx: object.input.start_idx + object.input.count,
@@ -117,10 +115,18 @@ pub fn cull_internal(
             material_index: object.input.material_index,
         });
 
+        let squared_scale = Vec3A::new(
+            model_view.x_axis.length_squared() * model_view.determinant().signum(),
+            model_view.y_axis.length_squared(),
+            model_view.z_axis.length_squared(),
+        );
+
+        let inv_squared_scale = squared_scale.recip();
+
         outputs.push(PerObjectData {
             model_view,
             model_view_proj,
-            inv_trans_model_view: inv_trans_model_view.into(),
+            inv_squared_scale,
             material_idx: 0,
         });
     }

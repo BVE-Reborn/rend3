@@ -1,14 +1,16 @@
+use std::borrow::Cow;
+
 use rend3::util::bind_merge::BindGroupBuilder;
 use wgpu::{
     Color, ColorTargetState, ColorWrites, CommandEncoder, Device, FragmentState, FrontFace, LoadOp, MultisampleState,
     Operations, PipelineLayoutDescriptor, PolygonMode, PrimitiveState, PrimitiveTopology, RenderPassColorAttachment,
-    RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptor, TextureFormat, TextureView,
-    VertexState,
+    RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptor, ShaderSource,
+    TextureFormat, TextureView, VertexState,
 };
 
 use crate::{
     common::{interfaces::ShaderInterfaces, samplers::Samplers},
-    shaders::SPIRV_SHADERS,
+    shaders::WGSL_SHADERS,
 };
 
 pub struct TonemappingPassNewArgs<'a> {
@@ -39,20 +41,27 @@ impl TonemappingPass {
         profiling::scope!("TonemappingPass::new");
         let blit_vert = args.device.create_shader_module(&ShaderModuleDescriptor {
             label: Some("tonemapping vert"),
-            source: wgpu::util::make_spirv(SPIRV_SHADERS.get_file("blit.vert.spv").unwrap().contents()),
+            source: ShaderSource::Wgsl(Cow::Borrowed(
+                WGSL_SHADERS
+                    .get_file("blit.vert.wgsl")
+                    .unwrap()
+                    .contents_utf8()
+                    .unwrap(),
+            )),
         });
 
         let blit_frag = args.device.create_shader_module(&ShaderModuleDescriptor {
             label: Some("tonemapping frag"),
-            source: wgpu::util::make_spirv(
-                SPIRV_SHADERS
+            source: ShaderSource::Wgsl(Cow::Borrowed(
+                WGSL_SHADERS
                     .get_file(match args.output_format.describe().srgb {
-                        true => "blit-linear.frag.spv",
-                        false => "blit-srgb.frag.spv",
+                        true => "blit-linear.frag.wgsl",
+                        false => "blit-srgb.frag.wgsl",
                     })
                     .unwrap()
-                    .contents(),
-            ),
+                    .contents_utf8()
+                    .unwrap(),
+            )),
         });
 
         let pll = args.device.create_pipeline_layout(&PipelineLayoutDescriptor {

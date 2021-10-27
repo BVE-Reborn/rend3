@@ -47,9 +47,8 @@ pub fn build_depth_pass_pipeline(args: BuildDepthPassShaderArgs) -> DepthPassPip
             args.device,
             args.mode,
             "depth pass vert",
-            "depth.vert.cpu.spv",
+            "depth.vert.cpu.wgsl",
             "depth.vert.gpu.spv",
-            false,
         )
     };
 
@@ -58,9 +57,8 @@ pub fn build_depth_pass_pipeline(args: BuildDepthPassShaderArgs) -> DepthPassPip
             args.device,
             args.mode,
             "depth pass opaque frag",
-            "depth-opaque.frag.cpu.spv",
+            "depth-opaque.frag.cpu.wgsl",
             "depth-opaque.frag.gpu.spv",
-            false,
         )
     };
 
@@ -69,9 +67,8 @@ pub fn build_depth_pass_pipeline(args: BuildDepthPassShaderArgs) -> DepthPassPip
             args.device,
             args.mode,
             "depth pass cutout frag",
-            "depth-cutout.frag.cpu.spv",
+            "depth-cutout.frag.cpu.wgsl",
             "depth-cutout.frag.gpu.spv",
-            false,
         )
     };
 

@@ -57,7 +57,7 @@ fn create_sampler(device: &Device, filter: FilterMode, compare: Option<CompareFu
         mag_filter: filter,
         min_filter: filter,
         mipmap_filter: filter,
-        lod_min_clamp: -100.0,
+        lod_min_clamp: 0.0,
         lod_max_clamp: 100.0,
         compare,
         anisotropy_clamp: NonZeroU8::new(16),
