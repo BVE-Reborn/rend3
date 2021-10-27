@@ -12,11 +12,11 @@ path = "src/main.rs"
 
 [dependencies]
 # The egui immediate mode gui library
-egui = "0.14.2"
+egui = "0.15.0"
 # Backend-agnostic interface for writing apps using egui
-epi = "0.14.0"
+epi = "0.15.0"
 # Winit integration with egui
-egui_winit_platform = "0.10.0"
+egui_winit_platform = { version = "0.11.0", git = "https://github.com/cwfitzgerald/egui_winit_platform.git", rev = "eaef13fd5d70bb5b3251424711012ceedb71994b" }
 # logging
 env_logger = { version = "0.9", default-features = false, features = ["termcolor", "atty"] }
 # Linear algebra library
