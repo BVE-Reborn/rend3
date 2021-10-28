@@ -1,4 +1,4 @@
-use std::{mem, num::NonZeroU64};
+use std::{borrow::Cow, mem, num::NonZeroU64};
 
 use glam::Mat4;
 use rend3::{
@@ -11,14 +11,14 @@ use wgpu::{
     BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType,
     Buffer, BufferBindingType, BufferDescriptor, BufferUsages, CommandEncoder, ComputePassDescriptor, ComputePipeline,
     ComputePipelineDescriptor, Device, PipelineLayoutDescriptor, PushConstantRange, RenderPass, ShaderModuleDescriptor,
-    ShaderModuleDescriptorSpirV, ShaderStages,
+    ShaderModuleDescriptorSpirV, ShaderSource, ShaderStages,
 };
 
 use crate::{
     common::interfaces::{PerObjectData, ShaderInterfaces},
     culling::{CulledObjectSet, GPUIndirectData, Sorting},
     material::TransparencyType,
-    shaders::SPIRV_SHADERS,
+    shaders::{SPIRV_SHADERS, WGSL_SHADERS},
 };
 
 #[repr(C, align(16))]
@@ -215,22 +215,35 @@ impl GpuCuller {
 
         let prefix_cull_sm = device.create_shader_module(&ShaderModuleDescriptor {
             label: Some("cull-prefix-cull"),
-            source: wgpu::util::make_spirv(SPIRV_SHADERS.get_file("cull-prefix-cull.comp.spv").unwrap().contents()),
+            source: ShaderSource::Wgsl(Cow::Borrowed(
+                WGSL_SHADERS
+                    .get_file("cull-prefix-cull.comp.spv")
+                    .unwrap()
+                    .contents_utf8()
+                    .unwrap(),
+            )),
         });
 
         let prefix_sum_sm = device.create_shader_module(&ShaderModuleDescriptor {
             label: Some("cull-prefix-sum"),
-            source: wgpu::util::make_spirv(SPIRV_SHADERS.get_file("cull-prefix-sum.comp.spv").unwrap().contents()),
+            source: ShaderSource::Wgsl(Cow::Borrowed(
+                WGSL_SHADERS
+                    .get_file("cull-prefix-sum.comp.spv")
+                    .unwrap()
+                    .contents_utf8()
+                    .unwrap(),
+            )),
         });
 
         let prefix_output_sm = device.create_shader_module(&ShaderModuleDescriptor {
             label: Some("cull-prefix-output"),
-            source: wgpu::util::make_spirv(
-                SPIRV_SHADERS
+            source: ShaderSource::Wgsl(Cow::Borrowed(
+                WGSL_SHADERS
                     .get_file("cull-prefix-output.comp.spv")
                     .unwrap()
-                    .contents(),
-            ),
+                    .contents_utf8()
+                    .unwrap(),
+            )),
         });
 
         let atomic_pipeline = device.create_compute_pipeline(&ComputePipelineDescriptor {
