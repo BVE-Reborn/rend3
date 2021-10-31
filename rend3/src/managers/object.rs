@@ -1,7 +1,7 @@
 use std::any::TypeId;
 
 use crate::{
-    resources::{MaterialKeyPair, MaterialManager, MeshManager},
+    managers::{MaterialKeyPair, MaterialManager, MeshManager},
     types::{Object, ObjectHandle},
     util::{frustum::BoundingSphere, registry::ArchetypicalRegistry},
 };

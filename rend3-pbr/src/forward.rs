@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use rend3::{
-    resources::{CameraManager, MaterialManager, MeshBuffers, ObjectManager},
+    managers::{CameraManager, MaterialManager, MeshBuffers, ObjectManager},
     ModeData,
 };
 use wgpu::{BindGroup, Buffer, CommandEncoder, Device, RenderPass, RenderPipeline};

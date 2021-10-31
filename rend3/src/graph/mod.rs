@@ -17,7 +17,7 @@ use wgpu::{
 use wgpu_profiler::ProfilerCommandRecorder;
 
 use crate::{
-    resources::{
+    managers::{
         CameraManager, DirectionalLightManager, MaterialManager, MeshManager, ObjectManager, ShadowCoordinates,
         TextureManager, TextureManagerReadyOutput,
     },

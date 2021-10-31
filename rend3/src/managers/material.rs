@@ -1,6 +1,6 @@
 use crate::{
     mode::ModeData,
-    resources::{ObjectManager, TextureManager},
+    managers::{ObjectManager, TextureManager},
     types::{MaterialHandle, TextureHandle},
     util::{
         bind_merge::BindGroupBuilder, buffer::WrappedPotBuffer, math::round_up_pot,

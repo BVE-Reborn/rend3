@@ -8,7 +8,7 @@ use std::sync::Arc;
 use glam::{UVec2, Vec4};
 use rend3::{
     format_sso,
-    resources::{DirectionalLightManager, MaterialManager, TextureManager},
+    managers::{DirectionalLightManager, MaterialManager, TextureManager},
     types::{TextureFormat, TextureHandle, TextureUsages},
     DepthHandle, ModeData, ReadyData, RenderGraph, RenderPassDepthTarget, RenderPassTarget, RenderPassTargets,
     RenderTargetDescriptor, Renderer, RendererMode,

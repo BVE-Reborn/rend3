@@ -1,5 +1,5 @@
 use crate::{
-    resources::CameraManager,
+    managers::CameraManager,
     types::{Camera, CameraProjection, DirectionalLight, DirectionalLightHandle},
     util::{bind_merge::BindGroupBuilder, buffer::WrappedPotBuffer, registry::ResourceRegistry, typedefs::FastHashMap},
     INTERNAL_SHADOW_DEPTH_FORMAT, SHADOW_DIMENSIONS,

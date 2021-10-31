@@ -66,7 +66,7 @@
 
 mod renderer;
 /// Managers for various type of resources.
-pub mod resources {
+pub mod managers {
     mod camera;
     mod directional;
     mod material;

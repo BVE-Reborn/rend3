@@ -1,6 +1,6 @@
 use glam::{Mat4, Vec3A};
 use rend3::{
-    resources::{CameraManager, InternalObject, MaterialManager, ObjectManager},
+    managers::{CameraManager, InternalObject, MaterialManager, ObjectManager},
     util::frustum::ShaderFrustum,
     ModeData,
 };

@@ -1,7 +1,7 @@
 use crate::{
     format_sso,
     instruction::{Instruction, InstructionStreamPair},
-    resources::{
+    managers::{
         CameraManager, DirectionalLightManager, InternalTexture, MaterialManager, MeshManager, ObjectManager,
         TextureManager,
     },

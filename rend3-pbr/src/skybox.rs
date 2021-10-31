@@ -1,4 +1,4 @@
-use rend3::{resources::TextureManager, types::TextureHandle, util::bind_merge::BindGroupBuilder};
+use rend3::{managers::TextureManager, types::TextureHandle, util::bind_merge::BindGroupBuilder};
 use wgpu::{BindGroup, Device, RenderPass, RenderPipeline};
 
 use crate::common::{interfaces::ShaderInterfaces, samplers::Samplers};

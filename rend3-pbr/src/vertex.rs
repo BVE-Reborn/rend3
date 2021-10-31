@@ -3,7 +3,7 @@ use wgpu::{VertexAttribute, VertexBufferLayout, VertexFormat, VertexStepMode};
 pub const fn cpu_vertex_buffers() -> [VertexBufferLayout<'static>; 7] {
     [
         VertexBufferLayout {
-            array_stride: rend3::resources::VERTEX_POSITION_SIZE as u64,
+            array_stride: rend3::managers::VERTEX_POSITION_SIZE as u64,
             step_mode: VertexStepMode::Vertex,
             attributes: &[VertexAttribute {
                 format: VertexFormat::Float32x3,
@@ -12,7 +12,7 @@ pub const fn cpu_vertex_buffers() -> [VertexBufferLayout<'static>; 7] {
             }],
         },
         VertexBufferLayout {
-            array_stride: rend3::resources::VERTEX_NORMAL_SIZE as u64,
+            array_stride: rend3::managers::VERTEX_NORMAL_SIZE as u64,
             step_mode: VertexStepMode::Vertex,
             attributes: &[VertexAttribute {
                 format: VertexFormat::Float32x3,
@@ -21,7 +21,7 @@ pub const fn cpu_vertex_buffers() -> [VertexBufferLayout<'static>; 7] {
             }],
         },
         VertexBufferLayout {
-            array_stride: rend3::resources::VERTEX_TANGENT_SIZE as u64,
+            array_stride: rend3::managers::VERTEX_TANGENT_SIZE as u64,
             step_mode: VertexStepMode::Vertex,
             attributes: &[VertexAttribute {
                 format: VertexFormat::Float32x3,
@@ -30,7 +30,7 @@ pub const fn cpu_vertex_buffers() -> [VertexBufferLayout<'static>; 7] {
             }],
         },
         VertexBufferLayout {
-            array_stride: rend3::resources::VERTEX_UV_SIZE as u64,
+            array_stride: rend3::managers::VERTEX_UV_SIZE as u64,
             step_mode: VertexStepMode::Vertex,
             attributes: &[VertexAttribute {
                 format: VertexFormat::Float32x2,
@@ -39,7 +39,7 @@ pub const fn cpu_vertex_buffers() -> [VertexBufferLayout<'static>; 7] {
             }],
         },
         VertexBufferLayout {
-            array_stride: rend3::resources::VERTEX_UV_SIZE as u64,
+            array_stride: rend3::managers::VERTEX_UV_SIZE as u64,
             step_mode: VertexStepMode::Vertex,
             attributes: &[VertexAttribute {
                 format: VertexFormat::Float32x2,
@@ -48,7 +48,7 @@ pub const fn cpu_vertex_buffers() -> [VertexBufferLayout<'static>; 7] {
             }],
         },
         VertexBufferLayout {
-            array_stride: rend3::resources::VERTEX_COLOR_SIZE as u64,
+            array_stride: rend3::managers::VERTEX_COLOR_SIZE as u64,
             step_mode: VertexStepMode::Vertex,
             attributes: &[VertexAttribute {
                 format: VertexFormat::Unorm8x4,
@@ -57,7 +57,7 @@ pub const fn cpu_vertex_buffers() -> [VertexBufferLayout<'static>; 7] {
             }],
         },
         VertexBufferLayout {
-            array_stride: rend3::resources::VERTEX_MATERIAL_INDEX_SIZE as u64,
+            array_stride: rend3::managers::VERTEX_MATERIAL_INDEX_SIZE as u64,
             step_mode: VertexStepMode::Vertex,
             attributes: &[VertexAttribute {
                 format: VertexFormat::Uint32,
@@ -71,7 +71,7 @@ pub const fn cpu_vertex_buffers() -> [VertexBufferLayout<'static>; 7] {
 pub const fn gpu_vertex_buffers() -> [VertexBufferLayout<'static>; 8] {
     [
         VertexBufferLayout {
-            array_stride: rend3::resources::VERTEX_POSITION_SIZE as u64,
+            array_stride: rend3::managers::VERTEX_POSITION_SIZE as u64,
             step_mode: VertexStepMode::Vertex,
             attributes: &[VertexAttribute {
                 format: VertexFormat::Float32x3,
@@ -80,7 +80,7 @@ pub const fn gpu_vertex_buffers() -> [VertexBufferLayout<'static>; 8] {
             }],
         },
         VertexBufferLayout {
-            array_stride: rend3::resources::VERTEX_NORMAL_SIZE as u64,
+            array_stride: rend3::managers::VERTEX_NORMAL_SIZE as u64,
             step_mode: VertexStepMode::Vertex,
             attributes: &[VertexAttribute {
                 format: VertexFormat::Float32x3,
@@ -89,7 +89,7 @@ pub const fn gpu_vertex_buffers() -> [VertexBufferLayout<'static>; 8] {
             }],
         },
         VertexBufferLayout {
-            array_stride: rend3::resources::VERTEX_TANGENT_SIZE as u64,
+            array_stride: rend3::managers::VERTEX_TANGENT_SIZE as u64,
             step_mode: VertexStepMode::Vertex,
             attributes: &[VertexAttribute {
                 format: VertexFormat::Float32x3,
@@ -98,7 +98,7 @@ pub const fn gpu_vertex_buffers() -> [VertexBufferLayout<'static>; 8] {
             }],
         },
         VertexBufferLayout {
-            array_stride: rend3::resources::VERTEX_UV_SIZE as u64,
+            array_stride: rend3::managers::VERTEX_UV_SIZE as u64,
             step_mode: VertexStepMode::Vertex,
             attributes: &[VertexAttribute {
                 format: VertexFormat::Float32x2,
@@ -107,7 +107,7 @@ pub const fn gpu_vertex_buffers() -> [VertexBufferLayout<'static>; 8] {
             }],
         },
         VertexBufferLayout {
-            array_stride: rend3::resources::VERTEX_UV_SIZE as u64,
+            array_stride: rend3::managers::VERTEX_UV_SIZE as u64,
             step_mode: VertexStepMode::Vertex,
             attributes: &[VertexAttribute {
                 format: VertexFormat::Float32x2,
@@ -116,7 +116,7 @@ pub const fn gpu_vertex_buffers() -> [VertexBufferLayout<'static>; 8] {
             }],
         },
         VertexBufferLayout {
-            array_stride: rend3::resources::VERTEX_COLOR_SIZE as u64,
+            array_stride: rend3::managers::VERTEX_COLOR_SIZE as u64,
             step_mode: VertexStepMode::Vertex,
             attributes: &[VertexAttribute {
                 format: VertexFormat::Unorm8x4,
@@ -125,7 +125,7 @@ pub const fn gpu_vertex_buffers() -> [VertexBufferLayout<'static>; 8] {
             }],
         },
         VertexBufferLayout {
-            array_stride: rend3::resources::VERTEX_MATERIAL_INDEX_SIZE as u64,
+            array_stride: rend3::managers::VERTEX_MATERIAL_INDEX_SIZE as u64,
             step_mode: VertexStepMode::Vertex,
             attributes: &[VertexAttribute {
                 format: VertexFormat::Uint32,

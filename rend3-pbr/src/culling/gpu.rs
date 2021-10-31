@@ -2,7 +2,7 @@ use std::{borrow::Cow, mem, num::NonZeroU64};
 
 use glam::Mat4;
 use rend3::{
-    resources::{CameraManager, GpuCullingInput, InternalObject, ObjectManager},
+    managers::{CameraManager, GpuCullingInput, InternalObject, ObjectManager},
     util::{bind_merge::BindGroupBuilder, frustum::ShaderFrustum},
     ModeData,
 };

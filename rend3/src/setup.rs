@@ -9,7 +9,7 @@ use wgpu::{
 #[allow(unused_imports)]
 use crate::format_sso;
 use crate::{
-    resources::STARTING_2D_TEXTURES, util::typedefs::FastHashMap, LimitType, RendererInitializationError, RendererMode,
+    managers::STARTING_2D_TEXTURES, util::typedefs::FastHashMap, LimitType, RendererInitializationError, RendererMode,
 };
 
 /// Largest uniform buffer binding needed to run rend3.
