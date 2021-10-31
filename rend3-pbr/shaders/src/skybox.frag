@@ -6,10 +6,10 @@ layout(location = 0) in vec2 i_clip_position;
 layout(location = 0) out vec4 o_color;
 
 layout(set = 0, binding = 0) uniform sampler primary_sampler;
-layout(set = 1, binding = 0) uniform textureCube skybox;
-layout(set = 2, binding = 0) uniform UniformBuffer {
+layout(set = 0, binding = 6) uniform UniformBuffer {
     UniformData uniforms;
 };
+layout(set = 1, binding = 0) uniform textureCube skybox;
 
 void main() {
     // We use the near plane as depth here, as if we used the far plane, it would all NaN out. Doesn't _really_ matter,

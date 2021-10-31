@@ -27,7 +27,8 @@ unsafe impl bytemuck::Pod for PerObjectData {}
 unsafe impl bytemuck::Zeroable for PerObjectData {}
 
 pub struct ShaderInterfaces {
-    pub bulk_bgl: BindGroupLayout,
+    pub uniform_bgl: BindGroupLayout,
+    pub per_material_bgl: BindGroupLayout,
 
     pub blit_bgl: BindGroupLayout,
     pub skybox_bgl: BindGroupLayout,
@@ -37,23 +38,12 @@ impl ShaderInterfaces {
     pub fn new(device: &Device, mode: RendererMode) -> Self {
         profiling::scope!("ShaderInterfaces::new");
 
-        let mut bglb = BindGroupLayoutBuilder::new();
+        let mut uniform_bglb = BindGroupLayoutBuilder::new();
 
-        Samplers::add_to_bgl(&mut bglb);
+        Samplers::add_to_bgl(&mut uniform_bglb);
+        DirectionalLightManager::add_to_bgl(&mut uniform_bglb);
 
-        bglb.append(
-            ShaderStages::VERTEX,
-            BindingType::Buffer {
-                ty: BufferBindingType::Storage { read_only: true },
-                has_dynamic_offset: false,
-                min_binding_size: NonZeroU64::new(mem::size_of::<PerObjectData>() as _),
-            },
-            None,
-        );
-        
-        DirectionalLightManager::add_to_bgl(&mut bglb);
-
-        bglb.append(
+        uniform_bglb.append(
             ShaderStages::VERTEX_FRAGMENT,
             BindingType::Buffer {
                 ty: BufferBindingType::Uniform,
@@ -63,11 +53,25 @@ impl ShaderInterfaces {
             None,
         );
 
+        let uniform_bgl = uniform_bglb.build(device, Some("uniform bgl"));
+
+        let mut per_material_bglb = BindGroupLayoutBuilder::new();
+
+        per_material_bglb.append(
+            ShaderStages::VERTEX,
+            BindingType::Buffer {
+                ty: BufferBindingType::Storage { read_only: true },
+                has_dynamic_offset: false,
+                min_binding_size: NonZeroU64::new(mem::size_of::<PerObjectData>() as _),
+            },
+            None,
+        );
+
         if mode == RendererMode::GPUPowered {
-            MaterialManager::add_to_bgl_gpu::<PbrMaterial>(&mut bglb);
+            MaterialManager::add_to_bgl_gpu::<PbrMaterial>(&mut per_material_bglb);
         }
 
-        let bulk_bgl = bglb.build(device, Some("bulk bglb"));
+        let per_material_bgl = per_material_bglb.build(device, Some("per material bgl"));
 
         let blit_bgl = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
             label: Some("blit bgl"),
@@ -98,7 +102,8 @@ impl ShaderInterfaces {
         });
 
         Self {
-            bulk_bgl,
+            uniform_bgl,
+            per_material_bgl,
             blit_bgl,
             skybox_bgl,
         }

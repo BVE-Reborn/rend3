@@ -25,7 +25,7 @@ struct UniformBuffer {
 };
 
 var<private> i_clip_position1: vec2<f32>;
-[[group(2), binding(0)]]
+[[group(0), binding(6)]]
 var<uniform> global: UniformBuffer;
 [[group(1), binding(0)]]
 var skybox: texture_cube<f32>;

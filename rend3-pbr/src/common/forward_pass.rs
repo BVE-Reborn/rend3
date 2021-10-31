@@ -73,7 +73,8 @@ pub fn build_forward_pass_pipeline(args: BuildForwardPassShaderArgs<'_>) -> Rend
     };
 
     let mut bgls: ArrayVec<&BindGroupLayout, 6> = ArrayVec::new();
-    bgls.push(&args.interfaces.bulk_bgl);
+    bgls.push(&args.interfaces.uniform_bgl);
+    bgls.push(&args.interfaces.per_material_bgl);
     if args.mode == RendererMode::GPUPowered {
         bgls.push(args.texture_bgl.as_gpu())
     } else {

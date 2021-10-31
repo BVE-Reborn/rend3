@@ -15,7 +15,6 @@ use list_any::VecAny;
 use rend3_types::{Material, MaterialTag, RawMaterialHandle, RawObjectHandle};
 use std::{
     any::TypeId,
-    mem,
     num::{NonZeroU32, NonZeroU64},
 };
 use wgpu::{

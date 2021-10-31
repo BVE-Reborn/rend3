@@ -23,19 +23,19 @@ layout(location = 4) out vec2 o_coords1;
 layout(location = 5) out vec4 o_color;
 layout(location = 6) flat out uint o_material;
 
-layout(set = 0, binding = 3, std430) restrict readonly buffer ObjectOutputDataBuffer {
-    ObjectOutputData object_output[];
-};
-layout(set = 0, binding = 6) uniform UniformBuffer {
+layout(set = 0, binding = 5) uniform UniformBuffer {
     UniformData uniforms;
 };
+layout(set = 1, binding = 0, std430) restrict readonly buffer ObjectOutputDataBuffer {
+    ObjectOutputData object_output[];
+};
 #ifdef GPU_MODE
-layout(set = 0, binding = 7, std430) readonly buffer MaterialBuffer {
+layout(set = 1, binding = 1, std430) readonly buffer MaterialBuffer {
     GPUMaterialData materials[];
 };
 #endif
 #ifdef CPU_MODE
-layout(set = 1, binding = 10) uniform TextureData {
+layout(set = 2, binding = 10) uniform TextureData {
     CPUMaterialData material;
 };
 #endif

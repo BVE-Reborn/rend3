@@ -2,14 +2,14 @@ use std::borrow::Cow;
 
 use rend3::util::bind_merge::BindGroupBuilder;
 use wgpu::{
-    Color, ColorTargetState, ColorWrites, CommandEncoder, Device, FragmentState, FrontFace, LoadOp, MultisampleState,
-    Operations, PipelineLayoutDescriptor, PolygonMode, PrimitiveState, PrimitiveTopology, RenderPassColorAttachment,
-    RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptor, ShaderSource,
-    TextureFormat, TextureView, VertexState,
+    BindGroup, Color, ColorTargetState, ColorWrites, CommandEncoder, Device, FragmentState, FrontFace, LoadOp,
+    MultisampleState, Operations, PipelineLayoutDescriptor, PolygonMode, PrimitiveState, PrimitiveTopology,
+    RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptor,
+    ShaderSource, TextureFormat, TextureView, VertexState,
 };
 
 use crate::{
-    common::{interfaces::ShaderInterfaces, samplers::Samplers},
+    common::{interfaces::ShaderInterfaces},
     shaders::WGSL_SHADERS,
 };
 
@@ -26,8 +26,7 @@ pub struct TonemappingPassBlitArgs<'a> {
     pub encoder: &'a mut CommandEncoder,
 
     pub interfaces: &'a ShaderInterfaces,
-
-    pub samplers: &'a Samplers,
+    pub uniform_bg: &'a BindGroup,
 
     pub source: &'a TextureView,
     pub target: &'a TextureView,
@@ -66,7 +65,7 @@ impl TonemappingPass {
 
         let pll = args.device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: Some("tonemapping pass"),
-            bind_group_layouts: &[&args.interfaces.samplers_bgl, &args.interfaces.blit_bgl],
+            bind_group_layouts: &[&args.interfaces.uniform_bgl, &args.interfaces.blit_bgl],
             push_constant_ranges: &[],
         });
 
@@ -106,9 +105,11 @@ impl TonemappingPass {
     pub fn blit(&self, args: TonemappingPassBlitArgs<'_>) {
         profiling::scope!("tonemapping");
 
-        let blit_src_bg = BindGroupBuilder::new()
-            .append_texture_view(args.source)
-            .build(args.device, Some("blit src bg"), &args.interfaces.blit_bgl);
+        let blit_src_bg = BindGroupBuilder::new().append_texture_view(args.source).build(
+            args.device,
+            Some("blit src bg"),
+            &args.interfaces.blit_bgl,
+        );
 
         let mut rpass = args.encoder.begin_render_pass(&RenderPassDescriptor {
             label: None, // We use the begin_scope below
@@ -124,7 +125,7 @@ impl TonemappingPass {
         });
 
         rpass.set_pipeline(&self.pipeline);
-        rpass.set_bind_group(0, &args.samplers.linear_nearest_bg, &[]);
+        rpass.set_bind_group(0, args.uniform_bg, &[]);
         rpass.set_bind_group(1, &blit_src_bg, &[]);
         rpass.draw(0..3, 0..1);
 

@@ -73,7 +73,8 @@ pub fn build_depth_pass_pipeline(args: BuildDepthPassShaderArgs) -> DepthPassPip
     };
 
     let mut bgls: ArrayVec<&BindGroupLayout, 4> = ArrayVec::new();
-    bgls.push(&args.interfaces.bulk_bgl);
+    bgls.push(&args.interfaces.uniform_bgl);
+    bgls.push(&args.interfaces.per_material_bgl);
     if args.mode == RendererMode::GPUPowered {
         bgls.push(args.texture_bgl.as_gpu())
     } else {

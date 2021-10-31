@@ -27,7 +27,7 @@ struct VertexOutput {
 };
 
 var<private> gl_InstanceIndex1: i32;
-[[group(0), binding(3)]]
+[[group(1), binding(0)]]
 var<storage> global: ObjectOutputDataBuffer;
 var<private> o_material: u32;
 var<private> o_view_position: vec4<f32>;

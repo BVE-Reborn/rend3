@@ -10,11 +10,9 @@ use wgpu::{
 };
 
 use crate::{
-    common::{
-        interfaces::{PerObjectData, ShaderInterfaces},
-    },
+    common::interfaces::{PerObjectData, ShaderInterfaces},
     culling::{CPUDrawCall, CulledObjectSet},
-    material::{PbrMaterial, SampleType, TransparencyType},
+    material::{PbrMaterial, TransparencyType},
 };
 
 pub struct CpuCullerCullArgs<'a> {
@@ -130,16 +128,13 @@ pub fn run<'rpass>(
     materials: &'rpass MaterialManager,
     material_binding_index: u32,
 ) {
-    let mut state_sample_type = SampleType::Linear;
-
     let mut previous_mat_handle = None;
     for (idx, draw) in draws.iter().enumerate() {
         if previous_mat_handle != Some(draw.material_index) {
             previous_mat_handle = Some(draw.material_index);
             // TODO(material): only resolve the archetype lookup once
-            let (material, internal) =
+            let (_, internal) =
                 materials.get_internal_material_full_by_index::<PbrMaterial>(draw.material_index as usize);
-            let sample_type = material.sample_type;
 
             // TODO: GL always gets linear sampling.
 

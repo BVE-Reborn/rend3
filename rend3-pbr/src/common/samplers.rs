@@ -2,10 +2,9 @@ use std::num::NonZeroU8;
 
 use rend3::{
     util::bind_merge::{BindGroupBuilder, BindGroupLayoutBuilder},
-    RendererMode,
 };
 use wgpu::{
-    AddressMode, BindGroupLayout, BindingType, CompareFunction, Device, FilterMode, Sampler, SamplerDescriptor,
+    AddressMode, BindingType, CompareFunction, Device, FilterMode, Sampler, SamplerDescriptor,
     ShaderStages,
 };
 
@@ -16,7 +15,7 @@ pub struct Samplers {
 }
 
 impl Samplers {
-    pub fn new(device: &Device, mode: RendererMode, samplers_bgl: &BindGroupLayout) -> Self {
+    pub fn new(device: &Device) -> Self {
         profiling::scope!("Samplers::new");
 
         let linear = create_sampler(device, FilterMode::Linear, None);
