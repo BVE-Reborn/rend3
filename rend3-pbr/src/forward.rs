@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use rend3::{
-    managers::{CameraManager, MaterialManager, MeshBuffers, ObjectManager},
+    resources::{CameraManager, MaterialManager, MeshBuffers, ObjectManager},
     ModeData,
 };
 use wgpu::{BindGroup, Buffer, CommandEncoder, Device, RenderPass, RenderPipeline};
@@ -37,10 +37,10 @@ pub struct ForwardPassPrepassArgs<'rpass, 'b> {
     // pub profiler: &'b mut GpuProfiler,
     pub rpass: &'b mut RenderPass<'rpass>,
 
+    pub bulk_bg: &'rpass BindGroup,
     pub materials: &'rpass MaterialManager,
     pub meshes: &'rpass MeshBuffers,
 
-    pub samplers: &'rpass Samplers,
     pub texture_bg: ModeData<(), &'rpass BindGroup>,
 
     pub culled_objects: &'rpass CulledObjectSet,
@@ -51,6 +51,7 @@ pub struct ForwardPassDrawArgs<'rpass, 'b> {
     // pub profiler: &'b mut GpuProfiler,
     pub rpass: &'b mut RenderPass<'rpass>,
 
+    pub bulk_bg: &'rpass BindGroup,
     pub materials: &'rpass MaterialManager,
     pub meshes: &'rpass MeshBuffers,
 
@@ -114,15 +115,12 @@ impl ForwardPass {
                 .as_ref()
                 .expect("prepass called on a forward pass with no depth pipeline"),
         );
-        args.rpass.set_bind_group(0, &args.samplers.linear_nearest_bg, &[]);
-        args.rpass.set_bind_group(1, &args.culled_objects.output_bg, &[]);
+        args.rpass.set_bind_group(0, &args.bulk_bg, &[]);
 
         match args.culled_objects.calls {
-            ModeData::CPU(ref draws) => culling::cpu::run(args.rpass, draws, args.samplers, 0, args.materials, 2),
+            ModeData::CPU(ref draws) => culling::cpu::run(args.rpass, draws, args.materials, 1),
             ModeData::GPU(ref data) => {
-                args.rpass
-                    .set_bind_group(2, args.materials.get_bind_group_gpu::<PbrMaterial>(), &[]);
-                args.rpass.set_bind_group(3, args.texture_bg.as_gpu(), &[]);
+                args.rpass.set_bind_group(1, args.texture_bg.as_gpu(), &[]);
                 culling::gpu::run(args.rpass, data);
             }
         }
@@ -132,17 +130,12 @@ impl ForwardPass {
         args.meshes.bind(args.rpass);
 
         args.rpass.set_pipeline(&self.forward_pipeline);
-        args.rpass.set_bind_group(0, &args.samplers.linear_nearest_bg, &[]);
-        args.rpass.set_bind_group(1, &args.culled_objects.output_bg, &[]);
-        args.rpass.set_bind_group(2, args.directional_light_bg, &[]);
-        args.rpass.set_bind_group(3, args.shader_uniform_bg, &[]);
+        args.rpass.set_bind_group(0, &args.bulk_bg, &[]);
 
         match args.culled_objects.calls {
-            ModeData::CPU(ref draws) => culling::cpu::run(args.rpass, draws, args.samplers, 0, args.materials, 4),
+            ModeData::CPU(ref draws) => culling::cpu::run(args.rpass, draws, args.materials, 1),
             ModeData::GPU(ref data) => {
-                args.rpass
-                    .set_bind_group(4, args.materials.get_bind_group_gpu::<PbrMaterial>(), &[]);
-                args.rpass.set_bind_group(5, args.texture_bg.as_gpu(), &[]);
+                args.rpass.set_bind_group(1, args.texture_bg.as_gpu(), &[]);
                 culling::gpu::run(args.rpass, data);
             }
         }

@@ -6,13 +6,12 @@ use rend3::{
 };
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
-    BindGroupDescriptor, BindGroupEntry, BufferUsages, Device, RenderPass,
+    BufferUsages, Device, RenderPass,
 };
 
 use crate::{
     common::{
         interfaces::{PerObjectData, ShaderInterfaces},
-        samplers::Samplers,
     },
     culling::{CPUDrawCall, CulledObjectSet},
     material::{PbrMaterial, SampleType, TransparencyType},
@@ -66,18 +65,9 @@ impl CpuCuller {
             usage: BufferUsages::STORAGE,
         });
 
-        let output_bg = args.device.create_bind_group(&BindGroupDescriptor {
-            label: Some("culling input bg"),
-            layout: &args.interfaces.culled_object_bgl,
-            entries: &[BindGroupEntry {
-                binding: 0,
-                resource: output_buffer.as_entire_binding(),
-            }],
-        });
-
         CulledObjectSet {
             calls: ModeData::CPU(calls),
-            output_bg,
+            output_buffer,
         }
     }
 }
@@ -137,8 +127,6 @@ pub fn cull_internal(
 pub fn run<'rpass>(
     rpass: &mut RenderPass<'rpass>,
     draws: &'rpass [CPUDrawCall],
-    samplers: &'rpass Samplers,
-    samplers_binding_index: u32,
     materials: &'rpass MaterialManager,
     material_binding_index: u32,
 ) {
@@ -153,15 +141,7 @@ pub fn run<'rpass>(
                 materials.get_internal_material_full_by_index::<PbrMaterial>(draw.material_index as usize);
             let sample_type = material.sample_type;
 
-            // As a workaround for OpenGL's combined samplers, we need to manually swap the linear and nearest samplers so that shader code can think it's always using linear.
-            if state_sample_type != sample_type {
-                let bg = match sample_type {
-                    SampleType::Nearest => samplers.nearest_linear_bg.as_ref().as_cpu(),
-                    SampleType::Linear => &samplers.linear_nearest_bg,
-                };
-                state_sample_type = sample_type;
-                rpass.set_bind_group(samplers_binding_index, bg, &[]);
-            }
+            // TODO: GL always gets linear sampling.
 
             rpass.set_bind_group(material_binding_index, internal.bind_group.as_ref().as_cpu(), &[]);
         }

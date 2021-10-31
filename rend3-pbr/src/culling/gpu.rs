@@ -398,18 +398,9 @@ impl GpuCuller {
             }
         }
 
-        let output_bg = args.device.create_bind_group(&BindGroupDescriptor {
-            label: Some("culling input bg"),
-            layout: &args.interfaces.culled_object_bgl,
-            entries: &[BindGroupEntry {
-                binding: 0,
-                resource: output_buffer.as_entire_binding(),
-            }],
-        });
-
         CulledObjectSet {
             calls: ModeData::GPU(GPUIndirectData { indirect_buffer, count }),
-            output_bg,
+            output_buffer,
         }
     }
 }

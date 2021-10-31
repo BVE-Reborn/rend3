@@ -31,7 +31,6 @@ pub struct BuildForwardPassShaderArgs<'a> {
 
     pub interfaces: &'a ShaderInterfaces,
 
-    pub directional_light_bgl: &'a BindGroupLayout,
     pub texture_bgl: ModeData<(), &'a BindGroupLayout>,
 
     pub materials: &'a MaterialManager,
@@ -74,13 +73,11 @@ pub fn build_forward_pass_pipeline(args: BuildForwardPassShaderArgs<'_>) -> Rend
     };
 
     let mut bgls: ArrayVec<&BindGroupLayout, 6> = ArrayVec::new();
-    bgls.push(&args.interfaces.samplers_bgl);
-    bgls.push(&args.interfaces.culled_object_bgl);
-    bgls.push(args.directional_light_bgl);
-    bgls.push(&args.interfaces.uniform_bgl);
-    bgls.push(args.materials.get_bind_group_layout::<PbrMaterial>());
+    bgls.push(&args.interfaces.bulk_bgl);
     if args.mode == RendererMode::GPUPowered {
         bgls.push(args.texture_bgl.as_gpu())
+    } else {
+        bgls.push(args.materials.get_bind_group_layout_cpu::<PbrMaterial>());
     }
 
     let pll = args.device.create_pipeline_layout(&PipelineLayoutDescriptor {

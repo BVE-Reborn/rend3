@@ -1,16 +1,18 @@
 use std::num::NonZeroU8;
 
-use rend3::{util::bind_merge::BindGroupBuilder, ModeData, RendererMode};
-use wgpu::{AddressMode, BindGroup, BindGroupLayout, CompareFunction, Device, FilterMode, Sampler, SamplerDescriptor};
+use rend3::{
+    util::bind_merge::{BindGroupBuilder, BindGroupLayoutBuilder},
+    RendererMode,
+};
+use wgpu::{
+    AddressMode, BindGroupLayout, BindingType, CompareFunction, Device, FilterMode, Sampler, SamplerDescriptor,
+    ShaderStages,
+};
 
 pub struct Samplers {
     pub linear: Sampler,
     pub nearest: Sampler,
     pub shadow: Sampler,
-
-    pub linear_nearest_bg: BindGroup,
-    // OpenGL doesn't allow runtime switching of samplers, so we swap them out cpu side.
-    pub nearest_linear_bg: ModeData<BindGroup, ()>,
 }
 
 impl Samplers {
@@ -21,30 +23,44 @@ impl Samplers {
         let nearest = create_sampler(device, FilterMode::Nearest, None);
         let shadow = create_sampler(device, FilterMode::Linear, Some(CompareFunction::LessEqual));
 
-        let linear_nearest_bg = BindGroupBuilder::new()
-            .append_sampler(&linear)
-            .append_sampler(&nearest)
-            .append_sampler(&shadow)
-            .build(device, Some("linear-nearest samplers"), samplers_bgl);
-
-        let nearest_linear_bg = mode.into_data(
-            || {
-                BindGroupBuilder::new()
-                    .append_sampler(&nearest)
-                    .append_sampler(&linear)
-                    .append_sampler(&shadow)
-                    .build(device, Some("samplers"), samplers_bgl)
-            },
-            || (),
-        );
-
         Self {
             linear,
             nearest,
             shadow,
-            linear_nearest_bg,
-            nearest_linear_bg,
         }
+    }
+
+    pub fn add_to_bgl(bglb: &mut BindGroupLayoutBuilder) {
+        bglb.append(
+            ShaderStages::FRAGMENT,
+            BindingType::Sampler {
+                filtering: true,
+                comparison: false,
+            },
+            None,
+        )
+        .append(
+            ShaderStages::FRAGMENT,
+            BindingType::Sampler {
+                filtering: true,
+                comparison: false,
+            },
+            None,
+        )
+        .append(
+            ShaderStages::FRAGMENT,
+            BindingType::Sampler {
+                filtering: true,
+                comparison: true,
+            },
+            None,
+        );
+    }
+
+    pub fn add_to_bg<'a>(&'a self, bgb: &mut BindGroupBuilder<'a>) {
+        bgb.append_sampler(&self.linear)
+            .append_sampler(&self.nearest)
+            .append_sampler(&self.shadow);
     }
 }
 

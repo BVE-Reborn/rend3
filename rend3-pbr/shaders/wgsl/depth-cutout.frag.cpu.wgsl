@@ -20,10 +20,10 @@ struct TextureData {
     material: CPUMaterialData;
 };
 
-[[group(2), binding(10)]]
+[[group(1), binding(10)]]
 var<uniform> global: TextureData;
 var<private> i_coords0_1: vec2<f32>;
-[[group(2), binding(0)]]
+[[group(1), binding(0)]]
 var albedo_tex: texture_2d<f32>;
 [[group(0), binding(0)]]
 var primary_sampler: sampler;

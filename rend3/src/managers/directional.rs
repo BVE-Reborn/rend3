@@ -1,7 +1,12 @@
 use crate::{
     managers::CameraManager,
     types::{Camera, CameraProjection, DirectionalLight, DirectionalLightHandle},
-    util::{bind_merge::BindGroupBuilder, buffer::WrappedPotBuffer, registry::ResourceRegistry, typedefs::FastHashMap},
+    util::{
+        bind_merge::{BindGroupBuilder, BindGroupLayoutBuilder},
+        buffer::WrappedPotBuffer,
+        registry::ResourceRegistry,
+        typedefs::FastHashMap,
+    },
     INTERNAL_SHADOW_DEPTH_FORMAT, SHADOW_DIMENSIONS,
 };
 use arrayvec::ArrayVec;
@@ -112,12 +117,32 @@ impl DirectionalLightManager {
         internal.inner.update_from_changes(change);
     }
 
-    pub fn get_bgl(&self) -> &BindGroupLayout {
-        &self.bgl
+    pub fn add_to_bgl(bglb: &mut BindGroupLayoutBuilder) {
+        bglb.append(
+            ShaderStages::FRAGMENT,
+            BindingType::Buffer {
+                ty: BufferBindingType::Storage { read_only: true },
+                has_dynamic_offset: false,
+                min_binding_size: NonZeroU64::new(
+                    (mem::size_of::<ShaderDirectionalLightBufferHeader>() + mem::size_of::<ShaderDirectionalLight>())
+                        as _,
+                ),
+            },
+            None,
+        )
+        .append(
+            ShaderStages::FRAGMENT,
+            BindingType::Texture {
+                sample_type: TextureSampleType::Depth,
+                view_dimension: TextureViewDimension::D2Array,
+                multisampled: false,
+            },
+            None,
+        );
     }
 
-    pub fn get_bg(&self) -> &BindGroup {
-        &self.bg
+    pub fn add_to_bg<'a>(&'a self, bgb: &mut BindGroupBuilder<'a>) {
+        bgb.append_buffer(&self.buffer).append_texture_view(&self.view);
     }
 
     pub fn get_coords(&self) -> &[ShadowCoordinates] {

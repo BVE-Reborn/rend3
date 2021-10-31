@@ -73,11 +73,11 @@ pub fn build_depth_pass_pipeline(args: BuildDepthPassShaderArgs) -> DepthPassPip
     };
 
     let mut bgls: ArrayVec<&BindGroupLayout, 4> = ArrayVec::new();
-    bgls.push(&args.interfaces.samplers_bgl);
-    bgls.push(&args.interfaces.culled_object_bgl);
-    bgls.push(args.materials.get_bind_group_layout::<PbrMaterial>());
+    bgls.push(&args.interfaces.bulk_bgl);
     if args.mode == RendererMode::GPUPowered {
         bgls.push(args.texture_bgl.as_gpu())
+    } else {
+        bgls.push(args.materials.get_bind_group_layout_cpu::<PbrMaterial>());
     }
 
     let pll = args.device.create_pipeline_layout(&PipelineLayoutDescriptor {

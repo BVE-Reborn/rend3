@@ -65,38 +65,38 @@ struct DirectionalLightBuffer {
 };
 
 var<private> i_coords0_1: vec2<f32>;
-[[group(4), binding(0)]]
+[[group(1), binding(0)]]
 var albedo_tex: texture_2d<f32>;
 var<private> i_color1: vec4<f32>;
 var<private> i_normal1: vec3<f32>;
-[[group(4), binding(1)]]
+[[group(1), binding(1)]]
 var normal_tex: texture_2d<f32>;
 var<private> i_tangent1: vec3<f32>;
-[[group(4), binding(2)]]
+[[group(1), binding(2)]]
 var roughness_tex: texture_2d<f32>;
-[[group(4), binding(9)]]
+[[group(1), binding(9)]]
 var ambient_occlusion_tex: texture_2d<f32>;
-[[group(4), binding(3)]]
+[[group(1), binding(3)]]
 var metallic_tex: texture_2d<f32>;
-[[group(4), binding(4)]]
+[[group(1), binding(4)]]
 var reflectance_tex: texture_2d<f32>;
-[[group(4), binding(5)]]
+[[group(1), binding(5)]]
 var clear_coat_tex: texture_2d<f32>;
-[[group(4), binding(6)]]
+[[group(1), binding(6)]]
 var clear_coat_roughness_tex: texture_2d<f32>;
-[[group(4), binding(7)]]
+[[group(1), binding(7)]]
 var emissive_tex: texture_2d<f32>;
 [[group(0), binding(0)]]
 var primary_sampler: sampler;
-[[group(3), binding(0)]]
+[[group(0), binding(6)]]
 var<uniform> global: UniformBuffer;
-[[group(4), binding(10)]]
+[[group(1), binding(10)]]
 var<uniform> global1: TextureData;
 var<private> o_color: vec4<f32>;
 var<private> i_view_position1: vec4<f32>;
-[[group(2), binding(0)]]
+[[group(0), binding(4)]]
 var<storage> global2: DirectionalLightBuffer;
-[[group(2), binding(1)]]
+[[group(0), binding(5)]]
 var shadow: texture_depth_2d_array;
 [[group(0), binding(2)]]
 var shadow_sampler: sampler_comparison;
