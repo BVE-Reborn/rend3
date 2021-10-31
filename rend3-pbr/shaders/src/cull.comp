@@ -43,9 +43,9 @@ layout(set = 0, binding = OBJECT_OUTPUT_DATA_BUFFER_BINDING, std430) restrict bu
 };
 layout(set = 0, binding = INDIRECT_BUFFER_BINDING, std430) restrict buffer IndirectBuffer {
     uint draw_call_count;
-    uint _2;
-    uint _3;
-    uint _4;
+    uint pad0;
+    uint pad1;
+    uint pad2;
     IndirectCall indirect_call[];
 };
 

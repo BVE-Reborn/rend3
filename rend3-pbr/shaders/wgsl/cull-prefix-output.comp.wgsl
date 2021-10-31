@@ -45,9 +45,9 @@ struct IndirectCall {
 [[block]]
 struct IndirectBuffer {
     draw_call_count: u32;
-    : u32;
-    1: u32;
-    2: u32;
+    pad0: u32;
+    pad1: u32;
+    pad2: u32;
     indirect_call: [[stride(20)]] array<IndirectCall>;
 };
 
