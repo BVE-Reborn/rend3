@@ -5,13 +5,11 @@ use wgpu::{
 };
 
 pub struct BindGroupBuilder<'a> {
-    label: Option<SsoString>,
     bg_entries: Vec<BindGroupEntry<'a>>,
 }
 impl<'a> BindGroupBuilder<'a> {
-    pub fn new(label: Option<&str>) -> Self {
+    pub fn new() -> Self {
         Self {
-            label: label.map(SsoString::from),
             bg_entries: Vec::with_capacity(16),
         }
     }
@@ -45,9 +43,9 @@ impl<'a> BindGroupBuilder<'a> {
         self
     }
 
-    pub fn build(&mut self, device: &Device, bgl: &BindGroupLayout) -> BindGroup {
+    pub fn build(&self, device: &Device, label: Option<&str>, bgl: &BindGroupLayout) -> BindGroup {
         device.create_bind_group(&BindGroupDescriptor {
-            label: self.label.as_deref(),
+            label,
             layout: bgl,
             entries: &self.bg_entries,
         })

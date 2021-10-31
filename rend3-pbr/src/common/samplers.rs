@@ -21,19 +21,19 @@ impl Samplers {
         let nearest = create_sampler(device, FilterMode::Nearest, None);
         let shadow = create_sampler(device, FilterMode::Linear, Some(CompareFunction::LessEqual));
 
-        let linear_nearest_bg = BindGroupBuilder::new(Some("linear-nearest samplers"))
+        let linear_nearest_bg = BindGroupBuilder::new()
             .append_sampler(&linear)
             .append_sampler(&nearest)
             .append_sampler(&shadow)
-            .build(device, samplers_bgl);
+            .build(device, Some("linear-nearest samplers"), samplers_bgl);
 
         let nearest_linear_bg = mode.into_data(
             || {
-                BindGroupBuilder::new(Some("samplers"))
+                BindGroupBuilder::new()
                     .append_sampler(&nearest)
                     .append_sampler(&linear)
                     .append_sampler(&shadow)
-                    .build(device, samplers_bgl)
+                    .build(device, Some("samplers"), samplers_bgl)
             },
             || (),
         );

@@ -106,9 +106,9 @@ impl TonemappingPass {
     pub fn blit(&self, args: TonemappingPassBlitArgs<'_>) {
         profiling::scope!("tonemapping");
 
-        let blit_src_bg = BindGroupBuilder::new(Some("blit src bg"))
+        let blit_src_bg = BindGroupBuilder::new()
             .append_texture_view(args.source)
-            .build(args.device, &args.interfaces.blit_bgl);
+            .build(args.device, Some("blit src bg"), &args.interfaces.blit_bgl);
 
         let mut rpass = args.encoder.begin_render_pass(&RenderPassDescriptor {
             label: None, // We use the begin_scope below

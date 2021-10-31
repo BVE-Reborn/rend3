@@ -335,23 +335,23 @@ impl GpuCuller {
                     mapped_at_creation: false,
                 });
 
-                let bg_a = BindGroupBuilder::new(Some("prefix cull A bg"))
+                let bg_a = BindGroupBuilder::new()
                     .append_buffer(args.input_buffer)
                     .append_buffer(&uniform_buffer)
                     .append_buffer(&buffer_a)
                     .append_buffer(&buffer_b)
                     .append_buffer(&output_buffer)
                     .append_buffer(&indirect_buffer)
-                    .build(args.device, &self.prefix_bgl);
+                    .build(args.device, Some("prefix cull A bg"), &self.prefix_bgl);
 
-                let bg_b = BindGroupBuilder::new(Some("prefix cull B bg"))
+                let bg_b = BindGroupBuilder::new()
                     .append_buffer(args.input_buffer)
                     .append_buffer(&uniform_buffer)
                     .append_buffer(&buffer_b)
                     .append_buffer(&buffer_a)
                     .append_buffer(&output_buffer)
                     .append_buffer(&indirect_buffer)
-                    .build(args.device, &self.prefix_bgl);
+                    .build(args.device, Some("prefix cull B bg"), &self.prefix_bgl);
 
                 let mut cpass = args.encoder.begin_compute_pass(&ComputePassDescriptor {
                     label: Some("prefix cull"),
@@ -379,12 +379,12 @@ impl GpuCuller {
                 cpass.set_bind_group(0, bind_group, &[]);
                 cpass.dispatch(dispatch_count, 1, 1);
             } else {
-                let bg = BindGroupBuilder::new(Some("atomic culling bg"))
+                let bg = BindGroupBuilder::new()
                     .append_buffer(args.input_buffer)
                     .append_buffer(&uniform_buffer)
                     .append_buffer(&output_buffer)
                     .append_buffer(&indirect_buffer)
-                    .build(args.device, &self.atomic_bgl);
+                    .build(args.device, Some("atomic culling bg"), &self.atomic_bgl);
 
                 let mut cpass = args.encoder.begin_compute_pass(&ComputePassDescriptor {
                     label: Some("atomic cull"),

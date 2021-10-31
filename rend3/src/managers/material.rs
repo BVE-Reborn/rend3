@@ -174,7 +174,7 @@ impl MaterialManager {
             let mut data = vec![0u8; actual_size as usize];
             material.to_data(&mut data[..M::DATA_SIZE as usize]);
 
-            let mut builder = BindGroupBuilder::new(None);
+            let mut builder = BindGroupBuilder::new();
             let mut texture_mask = 0_u32;
             for (idx, texture) in textures.into_iter().enumerate() {
                 builder.append(BindingResource::TextureView(
@@ -196,7 +196,7 @@ impl MaterialManager {
 
             let bind_group = builder
                 .append_buffer(&material_buffer)
-                .build(device, type_info.bgl.as_ref().as_cpu());
+                .build(device, None, type_info.bgl.as_ref().as_cpu());
 
             (ModeData::CPU(bind_group), ModeData::CPU(material_buffer))
         } else {
@@ -394,13 +394,13 @@ fn create_gpu_buffer_bg(
     offset: usize,
     size: usize,
 ) -> BindGroup {
-    BindGroupBuilder::new(Some("gpu material bg"))
+    BindGroupBuilder::new()
         .append(BindingResource::Buffer(BufferBinding {
             buffer,
             offset: offset as u64,
             size: Some(NonZeroU64::new(size as u64).unwrap()),
         }))
-        .build(device, bgl)
+        .build(device, None, bgl)
 }
 
 fn write_gpu_materials<M: Material>(
