@@ -1,8 +1,38 @@
-use crate::util::typedefs::SsoString;
+use std::num::NonZeroU32;
+
 use wgpu::{
-    BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindingResource, Buffer, Device, Sampler,
-    TextureView,
+    BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
+    BindingResource, BindingType, Buffer, Device, Sampler, ShaderStages, TextureView,
 };
+
+pub struct BindGroupLayoutBuilder {
+    bgl_entries: Vec<BindGroupLayoutEntry>,
+}
+impl BindGroupLayoutBuilder {
+    pub fn new() -> Self {
+        Self {
+            bgl_entries: Vec::with_capacity(16),
+        }
+    }
+
+    pub fn append(&mut self, visibility: ShaderStages, ty: BindingType, count: Option<NonZeroU32>) -> &mut Self {
+        let binding = self.bgl_entries.len() as u32;
+        self.bgl_entries.push(BindGroupLayoutEntry {
+            binding,
+            visibility,
+            ty,
+            count,
+        });
+        self
+    }
+
+    pub fn build(&self, device: &Device, label: Option<&str>) -> BindGroupLayout {
+        device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+            label,
+            entries: &self.bgl_entries,
+        })
+    }
+}
 
 pub struct BindGroupBuilder<'a> {
     bg_entries: Vec<BindGroupEntry<'a>>,
