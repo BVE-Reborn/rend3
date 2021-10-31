@@ -92,9 +92,7 @@ async fn async_main() {
     let window_size = window.inner_size();
 
     // Create the Instance, Adapter, and Device. We can specify preferred backend, device name, or rendering mode. In this case we let rend3 choose for us.
-    let iad = rend3::create_iad(None, None, Some(rend3::RendererMode::CPUPowered))
-        .await
-        .unwrap();
+    let iad = rend3::create_iad(None, None, None).await.unwrap();
 
     // The one line of unsafe needed. We just need to guarentee that the window outlives the use of the surface.
     let surface = Arc::new(unsafe { iad.instance.create_surface(&window) });

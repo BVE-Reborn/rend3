@@ -1,4 +1,4 @@
-use glam::{Mat4, Vec3A};
+use glam::{Mat4, Vec3};
 use rend3::{
     managers::{CameraManager, InternalObject, MaterialManager, ObjectManager},
     util::frustum::ShaderFrustum,
@@ -52,7 +52,7 @@ impl CpuCuller {
             outputs.push(PerObjectData {
                 model_view: Mat4::ZERO,
                 model_view_proj: Mat4::ZERO,
-                inv_squared_scale: Vec3A::ZERO,
+                inv_squared_scale: Vec3::ZERO,
                 material_idx: 0,
             });
         }

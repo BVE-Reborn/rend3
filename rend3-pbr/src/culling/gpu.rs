@@ -217,7 +217,7 @@ impl GpuCuller {
             label: Some("cull-prefix-cull"),
             source: ShaderSource::Wgsl(Cow::Borrowed(
                 WGSL_SHADERS
-                    .get_file("cull-prefix-cull.comp.spv")
+                    .get_file("cull-prefix-cull.comp.wgsl")
                     .unwrap()
                     .contents_utf8()
                     .unwrap(),
@@ -228,7 +228,7 @@ impl GpuCuller {
             label: Some("cull-prefix-sum"),
             source: ShaderSource::Wgsl(Cow::Borrowed(
                 WGSL_SHADERS
-                    .get_file("cull-prefix-sum.comp.spv")
+                    .get_file("cull-prefix-sum.comp.wgsl")
                     .unwrap()
                     .contents_utf8()
                     .unwrap(),
@@ -239,7 +239,7 @@ impl GpuCuller {
             label: Some("cull-prefix-output"),
             source: ShaderSource::Wgsl(Cow::Borrowed(
                 WGSL_SHADERS
-                    .get_file("cull-prefix-output.comp.spv")
+                    .get_file("cull-prefix-output.comp.wgsl")
                     .unwrap()
                     .contents_utf8()
                     .unwrap(),

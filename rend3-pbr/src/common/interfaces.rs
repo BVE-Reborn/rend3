@@ -1,6 +1,6 @@
 use std::{mem, num::NonZeroU64};
 
-use glam::{Mat4, Vec3A};
+use glam::{Mat4, Vec3};
 use rend3::{
     managers::{DirectionalLightManager, MaterialManager},
     util::bind_merge::BindGroupLayoutBuilder,
@@ -18,7 +18,7 @@ use crate::{common::samplers::Samplers, material::PbrMaterial, uniforms::ShaderC
 pub struct PerObjectData {
     pub model_view: Mat4,
     pub model_view_proj: Mat4,
-    pub inv_squared_scale: Vec3A,
+    pub inv_squared_scale: Vec3,
     // Unused in shader
     pub material_idx: u32,
 }
