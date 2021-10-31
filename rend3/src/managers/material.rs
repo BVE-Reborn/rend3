@@ -195,7 +195,7 @@ impl MaterialManager {
             });
 
             let bind_group = builder
-                .with_buffer(&material_buffer)
+                .append_buffer(&material_buffer)
                 .build(device, type_info.bgl.as_ref().as_cpu());
 
             (ModeData::CPU(bind_group), ModeData::CPU(material_buffer))
@@ -395,7 +395,7 @@ fn create_gpu_buffer_bg(
     size: usize,
 ) -> BindGroup {
     BindGroupBuilder::new(Some("gpu material bg"))
-        .with(BindingResource::Buffer(BufferBinding {
+        .append(BindingResource::Buffer(BufferBinding {
             buffer,
             offset: offset as u64,
             size: Some(NonZeroU64::new(size as u64).unwrap()),

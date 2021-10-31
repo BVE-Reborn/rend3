@@ -16,40 +16,36 @@ impl<'a> BindGroupBuilder<'a> {
         }
     }
 
-    pub fn append(&mut self, resource: BindingResource<'a>) {
+    pub fn append(&mut self, resource: BindingResource<'a>) -> &mut Self {
         let index = self.bg_entries.len();
         self.bg_entries.push(BindGroupEntry {
             binding: index as u32,
             resource,
         });
-    }
-
-    pub fn with(mut self, resource: BindingResource<'a>) -> Self {
-        self.append(resource);
         self
     }
 
-    pub fn with_buffer(mut self, buffer: &'a Buffer) -> Self {
+    pub fn append_buffer(&mut self, buffer: &'a Buffer) -> &mut Self {
         self.append(buffer.as_entire_binding());
         self
     }
 
-    pub fn with_sampler(mut self, sampler: &'a Sampler) -> Self {
+    pub fn append_sampler(&mut self, sampler: &'a Sampler) -> &mut Self {
         self.append(BindingResource::Sampler(sampler));
         self
     }
 
-    pub fn with_texture_view(mut self, texture_view: &'a TextureView) -> Self {
+    pub fn append_texture_view(&mut self, texture_view: &'a TextureView) -> &mut Self {
         self.append(BindingResource::TextureView(texture_view));
         self
     }
 
-    pub fn with_texture_view_array(mut self, texture_view_array: &'a [&'a TextureView]) -> Self {
+    pub fn append_texture_view_array(&mut self, texture_view_array: &'a [&'a TextureView]) -> &mut Self {
         self.append(BindingResource::TextureViewArray(texture_view_array));
         self
     }
 
-    pub fn build(self, device: &Device, bgl: &BindGroupLayout) -> BindGroup {
+    pub fn build(&mut self, device: &Device, bgl: &BindGroupLayout) -> BindGroup {
         device.create_bind_group(&BindGroupDescriptor {
             label: self.label.as_deref(),
             layout: bgl,

@@ -22,17 +22,17 @@ impl Samplers {
         let shadow = create_sampler(device, FilterMode::Linear, Some(CompareFunction::LessEqual));
 
         let linear_nearest_bg = BindGroupBuilder::new(Some("linear-nearest samplers"))
-            .with_sampler(&linear)
-            .with_sampler(&nearest)
-            .with_sampler(&shadow)
+            .append_sampler(&linear)
+            .append_sampler(&nearest)
+            .append_sampler(&shadow)
             .build(device, samplers_bgl);
 
         let nearest_linear_bg = mode.into_data(
             || {
                 BindGroupBuilder::new(Some("samplers"))
-                    .with_sampler(&nearest)
-                    .with_sampler(&linear)
-                    .with_sampler(&shadow)
+                    .append_sampler(&nearest)
+                    .append_sampler(&linear)
+                    .append_sampler(&shadow)
                     .build(device, samplers_bgl)
             },
             || (),

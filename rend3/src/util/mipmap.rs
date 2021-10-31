@@ -73,7 +73,7 @@ impl MipmapGenerator {
         });
 
         let sampler_bg = BindGroupBuilder::new(Some("mipmap generator sampler bg"))
-            .with_sampler(&sampler)
+            .append_sampler(&sampler)
             .build(device, &sampler_bgl);
 
         let sm = device.create_shader_module(&wgpu::include_wgsl!("mipmap.wgsl"));
@@ -186,7 +186,7 @@ impl MipmapGenerator {
             // profiler.lock().begin_scope(&dst_label, encoder, device);
 
             let bg = BindGroupBuilder::new(Some(&src_label))
-                .with_texture_view(src_view)
+                .append_texture_view(src_view)
                 .build(device, &self.texture_bgl);
 
             let mut rpass = encoder.begin_render_pass(&RenderPassDescriptor {

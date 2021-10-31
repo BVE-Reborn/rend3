@@ -107,7 +107,7 @@ impl TonemappingPass {
         profiling::scope!("tonemapping");
 
         let blit_src_bg = BindGroupBuilder::new(Some("blit src bg"))
-            .with_texture_view(args.source)
+            .append_texture_view(args.source)
             .build(args.device, &args.interfaces.blit_bgl);
 
         let mut rpass = args.encoder.begin_render_pass(&RenderPassDescriptor {

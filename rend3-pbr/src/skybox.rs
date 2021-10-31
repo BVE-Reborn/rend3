@@ -46,7 +46,7 @@ impl SkyboxPass {
             }
 
             let bg = BindGroupBuilder::new(Some("skybox"))
-                .with_texture_view(args.d2c_texture_manager.get_view(handle.get_raw()))
+                .append_texture_view(args.d2c_texture_manager.get_view(handle.get_raw()))
                 .build(args.device, &args.interfaces.skybox_bgl);
 
             self.current_skybox = Some(StoredSkybox { bg, handle })

@@ -54,6 +54,6 @@ pub fn create_shader_uniform(args: CreateShaderUniformArgs<'_>) -> BindGroup {
     });
 
     BindGroupBuilder::new(Some("shader uniform"))
-        .with_buffer(&buffer)
+        .append_buffer(&buffer)
         .build(args.device, &args.interfaces.uniform_bgl)
 }
