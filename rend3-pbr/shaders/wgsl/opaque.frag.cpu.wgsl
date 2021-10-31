@@ -88,15 +88,15 @@ var clear_coat_roughness_tex: texture_2d<f32>;
 var emissive_tex: texture_2d<f32>;
 [[group(0), binding(0)]]
 var primary_sampler: sampler;
-[[group(0), binding(5)]]
+[[group(0), binding(3)]]
 var<uniform> global: UniformBuffer;
 [[group(2), binding(10)]]
 var<uniform> global1: TextureData;
 var<private> o_color: vec4<f32>;
 var<private> i_view_position1: vec4<f32>;
-[[group(0), binding(3)]]
-var<storage> global2: DirectionalLightBuffer;
 [[group(0), binding(4)]]
+var<storage> global2: DirectionalLightBuffer;
+[[group(0), binding(5)]]
 var shadow: texture_depth_2d_array;
 [[group(0), binding(2)]]
 var shadow_sampler: sampler_comparison;

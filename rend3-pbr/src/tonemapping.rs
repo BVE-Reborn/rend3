@@ -26,7 +26,7 @@ pub struct TonemappingPassBlitArgs<'a> {
     pub encoder: &'a mut CommandEncoder,
 
     pub interfaces: &'a ShaderInterfaces,
-    pub uniform_bg: &'a BindGroup,
+    pub forward_uniform_bg: &'a BindGroup,
 
     pub source: &'a TextureView,
     pub target: &'a TextureView,
@@ -65,7 +65,7 @@ impl TonemappingPass {
 
         let pll = args.device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: Some("tonemapping pass"),
-            bind_group_layouts: &[&args.interfaces.uniform_bgl, &args.interfaces.blit_bgl],
+            bind_group_layouts: &[&args.interfaces.forward_uniform_bgl, &args.interfaces.blit_bgl],
             push_constant_ranges: &[],
         });
 
@@ -125,7 +125,7 @@ impl TonemappingPass {
         });
 
         rpass.set_pipeline(&self.pipeline);
-        rpass.set_bind_group(0, args.uniform_bg, &[]);
+        rpass.set_bind_group(0, args.forward_uniform_bg, &[]);
         rpass.set_bind_group(1, &blit_src_bg, &[]);
         rpass.draw(0..3, 0..1);
 

@@ -6,7 +6,7 @@ layout(location = 0) in vec2 i_clip_position;
 layout(location = 0) out vec4 o_color;
 
 layout(set = 0, binding = 0) uniform sampler primary_sampler;
-layout(set = 0, binding = 6) uniform UniformBuffer {
+layout(set = 0, binding = 3) uniform UniformBuffer {
     UniformData uniforms;
 };
 layout(set = 1, binding = 0) uniform textureCube skybox;

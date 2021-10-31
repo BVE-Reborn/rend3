@@ -15,7 +15,7 @@ pub struct UpdateSkyboxArgs<'a> {
 pub struct SkyboxPassDrawArgs<'rpass, 'b> {
     pub rpass: &'b mut RenderPass<'rpass>,
 
-    pub shader_uniform_bg: &'rpass BindGroup,
+    pub forward_uniform_bg: &'rpass BindGroup,
 }
 
 pub struct StoredSkybox {
@@ -55,7 +55,7 @@ impl SkyboxPass {
     pub fn draw_skybox<'rpass>(&'rpass self, args: SkyboxPassDrawArgs<'rpass, '_>) {
         if let Some(ref skybox) = self.current_skybox {
             args.rpass.set_pipeline(&self.skybox_pipeline);
-            args.rpass.set_bind_group(0, args.shader_uniform_bg, &[]);
+            args.rpass.set_bind_group(0, args.forward_uniform_bg, &[]);
             args.rpass.set_bind_group(1, &skybox.bg, &[]);
             args.rpass.draw(0..3, 0..1);
         }

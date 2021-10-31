@@ -40,7 +40,7 @@ pub struct ForwardPassPrepassArgs<'rpass, 'b> {
     pub materials: &'rpass MaterialManager,
     pub meshes: &'rpass MeshBuffers,
 
-    pub uniform_bg: &'rpass BindGroup,
+    pub forward_uniform_bg: &'rpass BindGroup,
     pub per_material_bg: &'rpass BindGroup,
     pub texture_bg: ModeData<(), &'rpass BindGroup>,
 
@@ -56,7 +56,7 @@ pub struct ForwardPassDrawArgs<'rpass, 'b> {
     pub meshes: &'rpass MeshBuffers,
 
     pub samplers: &'rpass Samplers,
-    pub uniform_bg: &'rpass BindGroup,
+    pub forward_uniform_bg: &'rpass BindGroup,
     pub per_material_bg: &'rpass BindGroup,
     pub texture_bg: ModeData<(), &'rpass BindGroup>,
 
@@ -115,7 +115,7 @@ impl ForwardPass {
                 .as_ref()
                 .expect("prepass called on a forward pass with no depth pipeline"),
         );
-        args.rpass.set_bind_group(0, &args.uniform_bg, &[]);
+        args.rpass.set_bind_group(0, &args.forward_uniform_bg, &[]);
         args.rpass.set_bind_group(1, &args.per_material_bg, &[]);
 
         match args.culled_objects.calls {
@@ -131,7 +131,7 @@ impl ForwardPass {
         args.meshes.bind(args.rpass);
 
         args.rpass.set_pipeline(&self.forward_pipeline);
-        args.rpass.set_bind_group(0, &args.uniform_bg, &[]);
+        args.rpass.set_bind_group(0, &args.forward_uniform_bg, &[]);
         args.rpass.set_bind_group(1, &args.per_material_bg, &[]);
 
         match args.culled_objects.calls {

@@ -283,7 +283,7 @@ impl MaterialManager {
 
     pub fn add_to_bgl_gpu<M: Material>(bglb: &mut BindGroupLayoutBuilder) {
         bglb.append(
-            ShaderStages::VERTEX,
+            ShaderStages::VERTEX_FRAGMENT,
             BindingType::Buffer {
                 ty: BufferBindingType::Storage { read_only: true },
                 has_dynamic_offset: false,

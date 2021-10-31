@@ -23,7 +23,7 @@ layout(location = 4) out vec2 o_coords1;
 layout(location = 5) out vec4 o_color;
 layout(location = 6) flat out uint o_material;
 
-layout(set = 0, binding = 5) uniform UniformBuffer {
+layout(set = 0, binding = 3) uniform UniformBuffer {
     UniformData uniforms;
 };
 layout(set = 1, binding = 0, std430) restrict readonly buffer ObjectOutputDataBuffer {

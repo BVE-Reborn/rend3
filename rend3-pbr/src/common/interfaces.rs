@@ -27,7 +27,8 @@ unsafe impl bytemuck::Pod for PerObjectData {}
 unsafe impl bytemuck::Zeroable for PerObjectData {}
 
 pub struct ShaderInterfaces {
-    pub uniform_bgl: BindGroupLayout,
+    pub shadow_uniform_bgl: BindGroupLayout,
+    pub forward_uniform_bgl: BindGroupLayout,
     pub per_material_bgl: BindGroupLayout,
 
     pub blit_bgl: BindGroupLayout,
@@ -41,7 +42,6 @@ impl ShaderInterfaces {
         let mut uniform_bglb = BindGroupLayoutBuilder::new();
 
         Samplers::add_to_bgl(&mut uniform_bglb);
-        DirectionalLightManager::add_to_bgl(&mut uniform_bglb);
 
         uniform_bglb.append(
             ShaderStages::VERTEX_FRAGMENT,
@@ -53,7 +53,11 @@ impl ShaderInterfaces {
             None,
         );
 
-        let uniform_bgl = uniform_bglb.build(device, Some("uniform bgl"));
+        let shadow_uniform_bgl = uniform_bglb.build(device, Some("shadow uniform bgl"));
+
+        DirectionalLightManager::add_to_bgl(&mut uniform_bglb);
+
+        let forward_uniform_bgl = uniform_bglb.build(device, Some("forward uniform bgl"));
 
         let mut per_material_bglb = BindGroupLayoutBuilder::new();
 
@@ -102,7 +106,8 @@ impl ShaderInterfaces {
         });
 
         Self {
-            uniform_bgl,
+            shadow_uniform_bgl,
+            forward_uniform_bgl,
             per_material_bgl,
             blit_bgl,
             skybox_bgl,
