@@ -52,16 +52,17 @@ fn main1() {
     let e33: vec3<f32> = i_position1;
     let e37: vec4<f32> = vec4<f32>(e33.x, e33.y, e33.z, 1.0);
     o_view_position = (e28.model_view * e37);
-    let e39: vec3<f32> = i_normal1;
-    o_normal = (e28.inv_squared_scale * e39);
-    let e41: vec3<f32> = i_tangent1;
-    o_tangent = (e28.inv_squared_scale * e41);
-    let e43: vec4<f32> = i_color1;
-    o_color = e43;
-    let e44: vec2<f32> = i_coords0_1;
-    o_coords0 = e44;
-    let e45: vec2<f32> = i_coords1_1;
-    o_coords1 = e45;
+    let e45: mat3x3<f32> = mat3x3<f32>(e28.model_view[0].xyz, e28.model_view[1].xyz, e28.model_view[2].xyz);
+    let e46: vec3<f32> = i_normal1;
+    o_normal = (e45 * (e28.inv_squared_scale * e46));
+    let e49: vec3<f32> = i_tangent1;
+    o_tangent = (e45 * (e28.inv_squared_scale * e49));
+    let e52: vec4<f32> = i_color1;
+    o_color = e52;
+    let e53: vec2<f32> = i_coords0_1;
+    o_coords0 = e53;
+    let e54: vec2<f32> = i_coords1_1;
+    o_coords1 = e54;
     perVertexStruct.gl_Position = (e28.model_view_proj * e37);
     return;
 }

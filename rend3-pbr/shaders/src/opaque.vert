@@ -57,9 +57,9 @@ void main() {
 
     o_view_position = data.model_view * vec4(i_position, 1.0);
 
-    o_normal = data.inv_squared_scale * i_normal;
+    o_normal = mat3(data.model_view) * (data.inv_squared_scale * i_normal);
 
-    o_tangent = data.inv_squared_scale * i_tangent;
+    o_tangent = mat3(data.model_view) * (data.inv_squared_scale * i_tangent);
 
     o_color = i_color;
 

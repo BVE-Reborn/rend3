@@ -112,7 +112,7 @@ fn main1() {
             let e76: vec3<f32> = e66[2].xyz;
             global1.object_output[e38].model_view = e66;
             global1.object_output[e38].model_view_proj = (e69 * e62);
-            global1.object_output[e38].inv_squared_scale = (vec3<f32>(1.0, 1.0, 1.0) / vec3<f32>((dot(e72, e72) * sign(determinant(mat3x3<f32>(e72, e74, e76)))), dot(e74, e74), dot(e76, e76)));
+            global1.object_output[e38].inv_squared_scale = (vec3<f32>(1.0, 1.0, 1.0) / vec3<f32>(dot(e72, e72), dot(e74, e74), dot(e76, e76)));
             global1.object_output[e38].material_idx = e60;
             global2.indirect_call[e38].vertex_count = e56;
             global2.indirect_call[e38].instance_count = 1u;

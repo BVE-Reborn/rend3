@@ -103,10 +103,10 @@ pub fn cull_internal(
             material_index: object.input.material_index,
         });
 
-        let squared_scale = Vec3A::new(
-            model_view.x_axis.length_squared() * model_view.determinant().signum(),
-            model_view.y_axis.length_squared(),
-            model_view.z_axis.length_squared(),
+        let squared_scale = Vec3::new(
+            model_view.x_axis.truncate().length_squared(),
+            model_view.y_axis.truncate().length_squared(),
+            model_view.z_axis.truncate().length_squared(),
         );
 
         let inv_squared_scale = squared_scale.recip();
