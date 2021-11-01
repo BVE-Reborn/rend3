@@ -26,7 +26,7 @@ tracy = ["profiling/profile-with-tracy", "tracy-client"]
 [dependencies]
 cfg-if = "1"
 env_logger = { version = "0.9", default-features = false, features = ["termcolor", "atty"] }
-glam = "0.20"
+glam = "0.20.0"
 histogram = "0.6"
 image = { version = "0.23", default-features = false, features = ["png", "jpeg", "tiff"]}
 log = "0.4"

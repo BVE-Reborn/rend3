@@ -16,11 +16,11 @@ egui = "0.15.0"
 # Backend-agnostic interface for writing apps using egui
 epi = "0.15.0"
 # Winit integration with egui
-egui_winit_platform = { version = "0.11.0", git = "https://github.com/cwfitzgerald/egui_winit_platform.git", rev = "eaef13fd5d70bb5b3251424711012ceedb71994b" }
+egui_winit_platform = "0.11.0"
 # logging
 env_logger = { version = "0.9", default-features = false, features = ["termcolor", "atty"] }
 # Linear algebra library
-glam = "0.20"
+glam = "0.20.0"
 # Provides `block_on` to wait for futures from sync code
 pollster = "0.2"
 # Renderer core
