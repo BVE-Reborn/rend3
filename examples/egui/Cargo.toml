@@ -20,7 +20,7 @@ egui_winit_platform = { version = "0.11.0", git = "https://github.com/cwfitzgera
 # logging
 env_logger = { version = "0.9", default-features = false, features = ["termcolor", "atty"] }
 # Linear algebra library
-glam = "0.19"
+glam = "0.20"
 # Provides `block_on` to wait for futures from sync code
 pollster = "0.2"
 # Renderer core

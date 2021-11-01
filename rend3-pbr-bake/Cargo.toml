@@ -13,7 +13,7 @@ publish = false
 
 [dependencies]
 flume = "0.10"
-glam = "0.19"
+glam = "0.20"
 profiling = {version = "1", default-features = false }
 rend3 = { version = "^0.2.0", path = "../rend3" }
 rend3-pbr = { version = "^0.2.0", path = "../rend3-pbr" }
