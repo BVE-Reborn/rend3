@@ -24,7 +24,7 @@ tracy = ["profiling/profile-with-tracy", "tracy-client"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-basis-universal  = "0.1"
+cfg-if = "1"
 env_logger = { version = "0.9", default-features = false, features = ["termcolor", "atty"] }
 glam = "0.20"
 histogram = "0.6"
@@ -42,3 +42,6 @@ smallvec = "1"
 tracy-client = { version = "0.12", optional = true }
 wgpu-profiler = "0.7.0"
 winit = { version = "0.25", features = ["web-sys"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+reqwest = "0.11"

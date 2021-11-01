@@ -148,7 +148,7 @@ pub enum GltfLoadError<E: std::error::Error + 'static> {
 ///
 /// The first argumnet is the directory all relative paths should be considered against. This is more than likely
 /// the directory the gltf/glb is in.
-pub async fn filesystem_io_func(parent_director: impl AsRef<Path>, uri: SsoString) -> Result<Vec<u8>, std::io::Error> {
+pub async fn filesystem_io_func(parent_directory: impl AsRef<Path>, uri: SsoString) -> Result<Vec<u8>, std::io::Error> {
     let octet_stream_header = "data:";
     if let Some(base64_data) = uri.strip_prefix(octet_stream_header) {
         let (_mime, rest) = base64_data.split_once(";").unwrap();
@@ -159,7 +159,7 @@ pub async fn filesystem_io_func(parent_director: impl AsRef<Path>, uri: SsoStrin
         // TODO: errors
         Ok(base64::decode(data).unwrap())
     } else {
-        let path_resolved = parent_director.as_ref().join(&*uri);
+        let path_resolved = parent_directory.as_ref().join(&*uri);
         let display = path_resolved.as_os_str().to_string_lossy();
         profiling::scope!("loading file", &display);
         log::info!("loading file '{}' from disk", &display);

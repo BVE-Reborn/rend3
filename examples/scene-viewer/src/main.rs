@@ -2,6 +2,7 @@ use glam::{DVec2, Mat3A, Mat4, UVec2, Vec3, Vec3A};
 use parking_lot::Mutex;
 use pico_args::Arguments;
 use rend3::{
+    format_sso,
     types::{Backend, Camera, CameraProjection, DirectionalLight, Texture, TextureFormat},
     util::typedefs::FastHashMap,
     Renderer,
@@ -24,51 +25,37 @@ use winit::{
 
 mod platform;
 
-fn load_skybox(renderer: &Renderer, skybox_routine: &Mutex<SkyboxRoutine>) -> Result<(), Box<dyn std::error::Error>> {
-    profiling::scope!("load skybox");
-
-    let name = concat!(env!("CARGO_MANIFEST_DIR"), "/data/skybox.basis");
-    let file = std::fs::read(name)?;
-
-    let mut transcoder = basis_universal::Transcoder::new();
-    let image_info = transcoder.image_info(&file, 0).ok_or("skybox image missing")?;
-
-    let mips = transcoder.image_level_count(&file, 0);
-
-    {
-        profiling::scope!("prepare basis transcoding");
-        transcoder
-            .prepare_transcoding(&file)
-            .map_err(|_| "could not prepare skybox transcoding")?
-    }
-    let mut image = Vec::with_capacity(image_info.m_total_blocks as usize * 16 * 6);
-    for i in 0..6 {
-        for mip in 0..mips {
-            profiling::scope!("basis transcoding", &format_sso!("layer {} mip {}", i, mip));
-            let mip_info = transcoder.image_level_info(&file, 0, mip).unwrap();
-            let data = transcoder
-                .transcode_image_level(
-                    &file,
-                    basis_universal::TranscoderTextureFormat::RGBA32,
-                    basis_universal::TranscodeParameters {
-                        image_index: i,
-                        level_index: mip,
-                        decode_flags: None,
-                        output_row_pitch_in_blocks_or_pixels: None,
-                        output_rows_in_pixels: None,
-                    },
-                )
-                .map_err(|_| "failed to transcode")?;
-            image.extend_from_slice(&data[0..(mip_info.m_orig_width * mip_info.m_orig_height * 4) as usize]);
+async fn load_skybox_image(data: &mut Vec<u8>, path: &str) {
+    cfg_if::cfg_if! {
+        if #[cfg(target_arch = "wasm32")] {
+            let image = reqwest::get(format_sso!("resources/skybox/{}", path)).await.unwrap().bytes().await.unwrap();
+        } else {
+            let image = std::fs::read(path).unwrap();
         }
     }
 
+    let decoded = image::load_from_memory(&image).unwrap().into_rgba8();
+
+    data.extend_from_slice(decoded.as_raw());
+}
+
+async fn load_skybox(renderer: &Renderer, skybox_routine: &Mutex<SkyboxRoutine>) -> Result<(), Box<dyn std::error::Error>> {
+    profiling::scope!("load skybox");
+
+    let mut data = Vec::new();
+    load_skybox_image(&mut data, "right.jpg").await;
+    load_skybox_image(&mut data, "left.jpg").await;
+    load_skybox_image(&mut data, "top.jpg").await;
+    load_skybox_image(&mut data, "bottom.jpg").await;
+    load_skybox_image(&mut data, "back.jpg").await;
+    load_skybox_image(&mut data, "front.jpg").await;
+
     let handle = renderer.add_texture_cube(Texture {
         format: TextureFormat::Rgba8UnormSrgb,
-        size: UVec2::new(image_info.m_width, image_info.m_height),
-        data: image,
+        size: UVec2::new(2048, 2048),
+        data,
         label: Some("background".into()),
-        mip_count: rend3::types::MipmapCount::Specific(NonZeroU32::new(mips).unwrap()),
+        mip_count: rend3::types::MipmapCount::ONE,
         mip_source: rend3::types::MipmapSource::Uploaded,
     });
     skybox_routine.lock().set_background_texture(Some(handle));
