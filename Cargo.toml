@@ -9,6 +9,7 @@ members = [
     "rend3",
     "rend3-gltf",
     "rend3-egui",
+    "rend3-framework",
     "rend3-pbr",
     "rend3-pp",
     "rend3-types"
