@@ -39,7 +39,10 @@ async fn load_skybox_image(data: &mut Vec<u8>, path: &str) {
     data.extend_from_slice(decoded.as_raw());
 }
 
-async fn load_skybox(renderer: &Renderer, skybox_routine: &Mutex<SkyboxRoutine>) -> Result<(), Box<dyn std::error::Error>> {
+async fn load_skybox(
+    renderer: &Renderer,
+    skybox_routine: &Mutex<SkyboxRoutine>,
+) -> Result<(), Box<dyn std::error::Error>> {
     profiling::scope!("load skybox");
 
     let mut data = Vec::new();

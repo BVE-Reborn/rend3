@@ -1,5 +1,5 @@
 use rend3::ModeData;
-use wgpu::{Buffer};
+use wgpu::Buffer;
 
 pub mod cpu;
 pub mod gpu;

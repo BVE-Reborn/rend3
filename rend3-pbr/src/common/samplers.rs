@@ -1,12 +1,7 @@
 use std::num::NonZeroU8;
 
-use rend3::{
-    util::bind_merge::{BindGroupBuilder, BindGroupLayoutBuilder},
-};
-use wgpu::{
-    AddressMode, BindingType, CompareFunction, Device, FilterMode, Sampler, SamplerDescriptor,
-    ShaderStages,
-};
+use rend3::util::bind_merge::{BindGroupBuilder, BindGroupLayoutBuilder};
+use wgpu::{AddressMode, BindingType, CompareFunction, Device, FilterMode, Sampler, SamplerDescriptor, ShaderStages};
 
 pub struct Samplers {
     pub linear: Sampler,

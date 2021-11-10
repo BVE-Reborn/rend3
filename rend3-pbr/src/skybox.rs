@@ -1,7 +1,7 @@
 use rend3::{managers::TextureManager, types::TextureHandle, util::bind_merge::BindGroupBuilder};
 use wgpu::{BindGroup, Device, RenderPass, RenderPipeline};
 
-use crate::common::{interfaces::ShaderInterfaces};
+use crate::common::interfaces::ShaderInterfaces;
 
 pub struct UpdateSkyboxArgs<'a> {
     pub device: &'a Device,

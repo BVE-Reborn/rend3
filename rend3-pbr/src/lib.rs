@@ -169,11 +169,19 @@ impl PbrRenderRoutine {
 
             bgb.append_buffer(&uniform_buffer);
 
-            let shadow_uniform_bg = bgb.build(&renderer.device, Some("shadow uniform bg"), &self.interfaces.shadow_uniform_bgl);
+            let shadow_uniform_bg = bgb.build(
+                &renderer.device,
+                Some("shadow uniform bg"),
+                &self.interfaces.shadow_uniform_bgl,
+            );
 
             graph_data.directional_light_manager.add_to_bg(&mut bgb);
 
-            let forward_uniform_bg = bgb.build(&renderer.device, Some("forward uniform bg"), &self.interfaces.forward_uniform_bgl);
+            let forward_uniform_bg = bgb.build(
+                &renderer.device,
+                Some("forward uniform bg"),
+                &self.interfaces.forward_uniform_bgl,
+            );
 
             graph_data.set_data(shadow_handle, Some(shadow_uniform_bg));
             graph_data.set_data(forward_handle, Some(forward_uniform_bg));

@@ -8,10 +8,7 @@ use wgpu::{
     ShaderSource, TextureFormat, TextureView, VertexState,
 };
 
-use crate::{
-    common::{interfaces::ShaderInterfaces},
-    shaders::WGSL_SHADERS,
-};
+use crate::{common::interfaces::ShaderInterfaces, shaders::WGSL_SHADERS};
 
 pub struct TonemappingPassNewArgs<'a> {
     pub device: &'a Device,

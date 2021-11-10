@@ -44,10 +44,7 @@ pub fn build_skybox_pipeline(args: BuildSkyboxShaderArgs<'_>) -> RenderPipeline 
 
     let pll = args.device.create_pipeline_layout(&PipelineLayoutDescriptor {
         label: Some("skybox pass"),
-        bind_group_layouts: &[
-            &args.interfaces.forward_uniform_bgl,
-            &args.interfaces.skybox_bgl,
-        ],
+        bind_group_layouts: &[&args.interfaces.forward_uniform_bgl, &args.interfaces.skybox_bgl],
         push_constant_ranges: &[],
     });
 

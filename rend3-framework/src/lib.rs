@@ -146,8 +146,6 @@ pub async fn async_start<A: App>(mut app: A, window_builder: WindowBuilder) {
     app.setup(&renderer, &routines).await;
 
     spawn(app.async_setup(Arc::clone(&renderer), Arc::clone(&routines)));
-
-
 }
 
 #[cfg(not(target_arch = "wasm32"))]
