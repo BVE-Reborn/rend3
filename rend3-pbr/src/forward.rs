@@ -115,8 +115,8 @@ impl ForwardPass {
                 .as_ref()
                 .expect("prepass called on a forward pass with no depth pipeline"),
         );
-        args.rpass.set_bind_group(0, &args.forward_uniform_bg, &[]);
-        args.rpass.set_bind_group(1, &args.per_material_bg, &[]);
+        args.rpass.set_bind_group(0, args.forward_uniform_bg, &[]);
+        args.rpass.set_bind_group(1, args.per_material_bg, &[]);
 
         match args.culled_objects.calls {
             ModeData::CPU(ref draws) => culling::cpu::run(args.rpass, draws, args.materials, 2),
@@ -131,8 +131,8 @@ impl ForwardPass {
         args.meshes.bind(args.rpass);
 
         args.rpass.set_pipeline(&self.forward_pipeline);
-        args.rpass.set_bind_group(0, &args.forward_uniform_bg, &[]);
-        args.rpass.set_bind_group(1, &args.per_material_bg, &[]);
+        args.rpass.set_bind_group(0, args.forward_uniform_bg, &[]);
+        args.rpass.set_bind_group(1, args.per_material_bg, &[]);
 
         match args.culled_objects.calls {
             ModeData::CPU(ref draws) => culling::cpu::run(args.rpass, draws, args.materials, 2),

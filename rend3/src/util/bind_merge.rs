@@ -34,6 +34,12 @@ impl BindGroupLayoutBuilder {
     }
 }
 
+impl Default for BindGroupLayoutBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub struct BindGroupBuilder<'a> {
     bg_entries: Vec<BindGroupEntry<'a>>,
 }
@@ -79,5 +85,11 @@ impl<'a> BindGroupBuilder<'a> {
             layout: bgl,
             entries: &self.bg_entries,
         })
+    }
+}
+
+impl<'a> Default for BindGroupBuilder<'a> {
+    fn default() -> Self {
+        Self::new()
     }
 }

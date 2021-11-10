@@ -2,7 +2,6 @@ use glam::{DVec2, Mat3A, Mat4, UVec2, Vec3, Vec3A};
 use parking_lot::Mutex;
 use pico_args::Arguments;
 use rend3::{
-    format_sso,
     types::{Backend, Camera, CameraProjection, DirectionalLight, Texture, TextureFormat},
     util::typedefs::FastHashMap,
     Renderer,
@@ -11,7 +10,6 @@ use rend3_pbr::SkyboxRoutine;
 use std::{
     collections::HashMap,
     hash::BuildHasher,
-    num::NonZeroU32,
     path::Path,
     sync::Arc,
     time::{Duration, Instant},
