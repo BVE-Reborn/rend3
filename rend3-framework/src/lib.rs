@@ -1,12 +1,10 @@
 use std::{future::Future, pin::Pin, sync::Arc};
 
 use futures_intrusive::sync::Mutex;
-use rend3::{util::typedefs::SsoString, InstanceAdapterDevice, Renderer};
-use winit::event_loop::ControlFlow;
-use winit::event_loop::EventLoopWindowTarget;
+use rend3::{types::Surface, util::typedefs::SsoString, InstanceAdapterDevice, Renderer};
 use winit::{
     event::Event,
-    event_loop::EventLoop,
+    event_loop::{ControlFlow, EventLoop, EventLoopWindowTarget},
     window::{Window, WindowBuilder},
 };
 
@@ -24,8 +22,6 @@ pub trait NativeSendFuture<O>: Future<Output = O> + NativeSend {}
 impl<T, O> NativeSendFuture<O> for T where T: Future<Output = O> + NativeSend {}
 
 pub trait App {
-    type RoutineContainer;
-
     fn register_logger(&mut self) {
         #[cfg(target_arch = "wasm32")]
         console_log::init().unwrap();
@@ -66,8 +62,9 @@ pub trait App {
         &'a mut self,
         renderer: &'a Renderer,
         routines: &'a DefaultRoutines,
-    ) -> Pin<Box<dyn NativeSendFuture<()>>> {
-        let _ = (renderer, routines);
+        surface: &'a Surface,
+    ) -> Pin<Box<dyn NativeSendFuture<()> + 'a>> {
+        let _ = (renderer, routines, surface);
         Box::pin(async move {})
     }
 
@@ -75,19 +72,21 @@ pub trait App {
         &mut self,
         renderer: Arc<Renderer>,
         routines: Arc<DefaultRoutines>,
+        surface: Arc<Surface>,
     ) -> Pin<Box<dyn NativeSendFuture<()>>> {
-        let _ = (renderer, routines);
+        let _ = (renderer, routines, surface);
         Box::pin(async move {})
     }
 
-    fn handle_event<'a, T>(
+    fn handle_event<'a, T: NativeSend>(
         &mut self,
-        renderer: &'a Renderer,
-        routines: &'a DefaultRoutines,
-        event: Event<'_, T>,
+        renderer: &'a Arc<rend3::Renderer>,
+        routines: &'a Arc<DefaultRoutines>,
+        surface: &'a Arc<Surface>,
+        event: Event<'a, T>,
         control_flow: &'a mut winit::event_loop::ControlFlow,
     ) -> Pin<Box<dyn NativeSendFuture<()> + 'a>> {
-        let _ = (renderer, routines, event, control_flow);
+        let _ = (renderer, routines, surface, event, control_flow);
         Box::pin(async move {})
     }
 }
@@ -236,18 +235,22 @@ pub async fn async_start<A: App + NativeSend + 'static>(mut app: A, window_build
         ),
     });
 
-    app.setup(&renderer, &routines).await;
+    app.setup(&renderer, &routines, &surface).await;
 
-    spawn(app.async_setup(Arc::clone(&renderer), Arc::clone(&routines)));
+    spawn(app.async_setup(Arc::clone(&renderer), Arc::clone(&routines), Arc::clone(&surface)));
 
     let (sender, reciever) = flume::unbounded();
 
     spawn(async move {
+        let mut flow = ControlFlow::Poll;
+        let mut redraw = Vec::with_capacity(16);
         loop {
             let mut event_opt = match reciever.recv_async().await {
                 Ok(e) => Some(e),
                 Err(_) => break,
             };
+            let mut main_events_cleared = false;
+            let mut redraw_events_cleared = false;
             while let Some(event) = event_opt.take() {
                 match event {
                     // Window was resized, need to resize renderer.
@@ -279,14 +282,59 @@ pub async fn async_start<A: App + NativeSend + 'static>(mut app: A, window_build
                     _ => {}
                 }
 
-                let mut flow = ControlFlow::Poll;
-                app.handle_event(&renderer, &routines, event, &mut flow).await;
+                match event {
+                    Event::MainEventsCleared => {
+                        main_events_cleared = true;
+                    }
+                    Event::RedrawEventsCleared => {
+                        redraw_events_cleared = true;
+                    }
+                    Event::RedrawRequested(w) => {
+                        redraw.push(w);
+                    }
+                    e => {
+                        app.handle_event(&renderer, &routines, &surface, e, &mut flow).await;
+                    }
+                }
 
                 event_opt = match reciever.try_recv() {
                     Ok(e) => Some(e),
                     Err(flume::TryRecvError::Empty) => None,
                     Err(flume::TryRecvError::Disconnected) => break,
                 };
+            }
+
+            if main_events_cleared {
+                app.handle_event(
+                    &renderer,
+                    &routines,
+                    &surface,
+                    Event::<()>::MainEventsCleared,
+                    &mut flow,
+                )
+                .await;
+            }
+
+            for w in redraw.drain(..) {
+                app.handle_event(
+                    &renderer,
+                    &routines,
+                    &surface,
+                    Event::<()>::RedrawRequested(w),
+                    &mut flow,
+                )
+                .await;
+            }
+
+            if redraw_events_cleared {
+                app.handle_event(
+                    &renderer,
+                    &routines,
+                    &surface,
+                    Event::<()>::RedrawEventsCleared,
+                    &mut flow,
+                )
+                .await;
             }
         }
     });
