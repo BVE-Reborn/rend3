@@ -110,7 +110,7 @@ pub struct LoadedGltfScene {
 
 /// Describes how loading gltf failed.
 #[derive(Debug, Error)]
-pub enum GltfLoadError<E: std::error::Error + 'static> {
+pub enum GltfLoadError<E: AsRef<dyn std::error::Error> + 'static> {
     #[error("Gltf parsing or validation error")]
     Gltf(#[from] gltf::Error),
     #[error("Buffer {0} failed to be loaded from the fs")]
@@ -189,7 +189,7 @@ pub async fn load_gltf<F, Fut, E>(
 where
     F: FnMut(SsoString) -> Fut,
     Fut: Future<Output = Result<Vec<u8>, E>>,
-    E: std::error::Error + 'static,
+    E: AsRef<dyn std::error::Error> + 'static,
 {
     profiling::scope!("loading gltf");
 
@@ -229,7 +229,7 @@ pub async fn load_gltf_data<F, Fut, E>(
 where
     F: FnMut(SsoString) -> Fut,
     Fut: Future<Output = Result<Vec<u8>, E>>,
-    E: std::error::Error + 'static,
+    E: AsRef<dyn std::error::Error> + 'static,
 {
     profiling::scope!("loading gltf data");
     let blob = file.blob.take();
@@ -253,7 +253,7 @@ where
 
 /// Adds a single mesh from the [`LoadedGltfScene`] found by its index,
 /// as an object to the scene.
-pub fn add_mesh_by_index<E: std::error::Error + 'static>(
+pub fn add_mesh_by_index<E: AsRef<dyn std::error::Error> + 'static>(
     renderer: &Renderer,
     loaded: &LoadedGltfScene,
     mesh_index: usize,
@@ -291,7 +291,7 @@ pub fn add_mesh_by_index<E: std::error::Error + 'static>(
     ))
 }
 
-pub fn load_gltf_nodes<'a, E: std::error::Error + 'static>(
+pub fn load_gltf_nodes<'a, E: AsRef<dyn std::error::Error> + 'static>(
     renderer: &Renderer,
     loaded: &mut LoadedGltfScene,
     nodes: impl Iterator<Item = gltf::Node<'a>>,
@@ -361,7 +361,7 @@ pub async fn load_buffers<F, Fut, E>(
 where
     F: FnMut(SsoString) -> Fut,
     Fut: Future<Output = Result<Vec<u8>, E>>,
-    E: std::error::Error + 'static,
+    E: AsRef<dyn std::error::Error> + 'static,
 {
     profiling::scope!("loading buffers");
     let mut buffers = Vec::with_capacity(file.len());
@@ -387,7 +387,7 @@ where
 /// Loads meshes from a [`gltf::Mesh`] iterator.
 ///
 /// All binary data buffers must be provided. Call this with [`gltf::Document::meshes`] as the mesh argument.
-pub fn load_meshes<'a, E: std::error::Error + 'static>(
+pub fn load_meshes<'a, E: AsRef<dyn std::error::Error> + 'static>(
     renderer: &Renderer,
     meshes: impl Iterator<Item = gltf::Mesh<'a>>,
     buffers: &[Vec<u8>],
@@ -493,7 +493,7 @@ pub async fn load_materials_and_textures<F, Fut, E>(
 where
     F: FnMut(SsoString) -> Fut,
     Fut: Future<Output = Result<Vec<u8>, E>>,
-    E: std::error::Error + 'static,
+    E: AsRef<dyn std::error::Error> + 'static,
 {
     profiling::scope!("loading materials and textures");
 
@@ -640,7 +640,7 @@ pub async fn load_image_cached<F, Fut, E>(
 where
     F: FnMut(SsoString) -> Fut,
     Fut: Future<Output = Result<Vec<u8>, E>>,
-    E: std::error::Error + 'static,
+    E: AsRef<dyn std::error::Error> + 'static,
 {
     let key = ImageKey {
         index: image.index(),
@@ -674,7 +674,7 @@ pub async fn load_image<F, Fut, E>(
 where
     F: FnMut(SsoString) -> Fut,
     Fut: Future<Output = Result<Vec<u8>, E>>,
-    E: std::error::Error + 'static,
+    E: AsRef<dyn std::error::Error> + 'static,
 {
     profiling::scope!("load image", image.name().unwrap_or_default());
     let (data, uri) = match image.source() {

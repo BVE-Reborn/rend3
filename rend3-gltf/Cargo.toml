@@ -10,7 +10,7 @@ keywords = ["3d", "graphics", "gltf", "loading", "rend3"]
 categories = ["game-development", "graphics", "parser-implementations", "rendering", "rendering::engine"]
 
 [features]
-default = ["image/default", "ddsfile", "ktx2"]
+default = ["ddsfile", "ktx2"]
 
 [dependencies]
 arrayvec = "0.7"

@@ -53,7 +53,8 @@ case $1 in
         fi
         RUSTFLAGS=--cfg=web_sys_unstable_apis cargo build --target wasm32-unknown-unknown $BUILD_FLAGS --bin $@
         mkdir -p target/generated/
-        cp examples/resources/index.html target/generated/index.html
+        cp -r examples/resources/ target/generated/
+        sed "s/{{example}}/$1/g" > target/generated/index.html < examples/resources/index.html
         wasm-bindgen --out-dir target/generated --target web target/wasm32-unknown-unknown/$WASM_BUILD_DIR/$1.wasm
     ;;
     serve)

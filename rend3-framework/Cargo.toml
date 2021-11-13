@@ -15,6 +15,7 @@ categories = ["game-development", "graphics", "rendering", "rendering::engine"]
 [dependencies]
 anyhow = "1"
 cfg-if = "1"
+log = "0.4"
 flume = "0.10"
 futures-intrusive = "0.4"
 glam = "0.20"

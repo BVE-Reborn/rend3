@@ -15,6 +15,9 @@ members = [
     "rend3-types"
 ]
 
+[profile.dev.package."*"]
+opt-level = 3
+
 [profile.release]
 debug = true
 lto = "thin"

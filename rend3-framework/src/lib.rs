@@ -1,6 +1,5 @@
 use std::{future::Future, pin::Pin, sync::Arc};
 
-use futures_intrusive::sync::Mutex;
 use rend3::{types::Surface, util::typedefs::SsoString, InstanceAdapterDevice, Renderer};
 use winit::{
     event::Event,
@@ -20,6 +19,8 @@ impl<T> NativeSend for T where T: Send {}
 
 pub trait NativeSendFuture<O>: Future<Output = O> + NativeSend {}
 impl<T, O> NativeSendFuture<O> for T where T: Future<Output = O> + NativeSend {}
+
+pub type AsyncMutex<T> = futures_intrusive::sync::Mutex<T>;
 
 pub trait App {
     fn register_logger(&mut self) {
@@ -79,7 +80,7 @@ pub trait App {
     }
 
     fn handle_event<'a, T: NativeSend>(
-        &mut self,
+        &'a mut self,
         renderer: &'a Arc<rend3::Renderer>,
         routines: &'a Arc<DefaultRoutines>,
         surface: &'a Arc<Surface>,
@@ -92,9 +93,9 @@ pub trait App {
 }
 
 pub struct DefaultRoutines {
-    pub pbr: Mutex<rend3_pbr::PbrRenderRoutine>,
-    pub skybox: Mutex<rend3_pbr::SkyboxRoutine>,
-    pub tonemapping: Mutex<rend3_pbr::TonemappingRoutine>,
+    pub pbr: AsyncMutex<rend3_pbr::PbrRenderRoutine>,
+    pub skybox: AsyncMutex<rend3_pbr::SkyboxRoutine>,
+    pub tonemapping: AsyncMutex<rend3_pbr::TonemappingRoutine>,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -123,7 +124,7 @@ pub struct AssetLoader {
 impl AssetLoader {
     pub fn new_local(_base_file: &str, _base_url: &str) -> Self {
         cfg_if::cfg_if!(
-            if #[cfg(target_arch = "wasm32")] {
+            if #[cfg(not(target_arch = "wasm32"))] {
                 let base = _base_file;
             } else {
                 let base = _base_url;
@@ -137,12 +138,16 @@ impl AssetLoader {
 
     #[cfg(not(target_arch = "wasm32"))]
     pub async fn get_asset(&self, path: &str) -> anyhow::Result<Vec<u8>> {
-        Ok(std::fs::read(&*(self.base.clone() + path))?)
+        let full_path = self.base.clone() + path;
+        Ok(std::fs::read(&*full_path).map_err(|e| anyhow::anyhow!("Failure to load {}: {}", &full_path, e))?)
     }
 
     #[cfg(target_arch = "wasm32")]
     pub async fn get_asset(&self, path: &str) -> anyhow::Result<Vec<u8>> {
-        let response = reqwest::get(&*(self.base.clone() + path)).await?;
+        let full_path = self.base.clone() + path;
+        let response = reqwest::get(&*full_path)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failure to load {}: {}", &full_path, e))?;
 
         if !response.status().is_success() {
             return Err(anyhow::anyhow!(
@@ -204,6 +209,7 @@ pub async fn async_start<A: App + NativeSend + 'static>(mut app: A, window_build
 
     // The one line of unsafe needed. We just need to guarentee that the window outlives the use of the surface.
     let surface = Arc::new(unsafe { iad.instance.create_surface(&window) });
+
     // Get the preferred format for the surface.
     let format = surface.get_preferred_format(&iad.adapter).unwrap();
     // Configure the surface to be ready for rendering.
@@ -224,12 +230,12 @@ pub async fn async_start<A: App + NativeSend + 'static>(mut app: A, window_build
         samples: rend3_pbr::SampleCount::One,
     };
     let routines = Arc::new(DefaultRoutines {
-        pbr: Mutex::new(
+        pbr: AsyncMutex::new(
             rend3_pbr::PbrRenderRoutine::new(&renderer, render_texture_options),
             false,
         ),
-        skybox: Mutex::new(rend3_pbr::SkyboxRoutine::new(&renderer, render_texture_options), false),
-        tonemapping: Mutex::new(
+        skybox: AsyncMutex::new(rend3_pbr::SkyboxRoutine::new(&renderer, render_texture_options), false),
+        tonemapping: AsyncMutex::new(
             rend3_pbr::TonemappingRoutine::new(&renderer, render_texture_options.resolution, format),
             false,
         ),
@@ -242,6 +248,8 @@ pub async fn async_start<A: App + NativeSend + 'static>(mut app: A, window_build
     let (sender, reciever) = flume::unbounded();
 
     spawn(async move {
+        // Need to keep the window alive.
+        let _window = window;
         let mut flow = ControlFlow::Poll;
         let mut redraw = Vec::with_capacity(16);
         loop {
