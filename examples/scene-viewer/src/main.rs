@@ -362,19 +362,6 @@ impl rend3_framework::App for SceneViewer {
                     );
                 }
                 Event::DeviceEvent {
-                    event: DeviceEvent::Key(KeyboardInput { scancode, state, .. }),
-                    ..
-                } => {
-                    log::info!("DE scancode {:x}", scancode);
-                    self.scancode_status.insert(
-                        scancode,
-                        match state {
-                            ElementState::Pressed => true,
-                            ElementState::Released => false,
-                        },
-                    );
-                }
-                Event::DeviceEvent {
                     event:
                         DeviceEvent::MouseMotion {
                             delta: (delta_x, delta_y),
