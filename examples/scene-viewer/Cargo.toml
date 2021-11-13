@@ -25,6 +25,7 @@ tracy = ["profiling/profile-with-tracy", "tracy-client"]
 
 [dependencies]
 anyhow = "1"
+cfg-if = "1"
 glam = "0.20.0"
 histogram = "0.6"
 image = { version = "0.23", default-features = false, features = ["png", "jpeg", "tiff"]}

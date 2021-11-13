@@ -352,7 +352,7 @@ impl rend3_framework::App for SceneViewer {
                         },
                     ..
                 } => {
-                    log::info!("WE scancode {}", scancode);
+                    log::info!("WE scancode {:x}", scancode);
                     self.scancode_status.insert(
                         scancode,
                         match state {
@@ -365,7 +365,7 @@ impl rend3_framework::App for SceneViewer {
                     event: DeviceEvent::Key(KeyboardInput { scancode, state, .. }),
                     ..
                 } => {
-                    log::info!("DE scancode {}", scancode);
+                    log::info!("DE scancode {:x}", scancode);
                     self.scancode_status.insert(
                         scancode,
                         match state {
