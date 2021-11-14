@@ -61,6 +61,7 @@ struct CubeExample {
 impl rend3_framework::App for CubeExample {
     fn setup<'a>(
         &'a mut self,
+        _window: &'a winit::window::Window,
         renderer: &'a rend3::Renderer,
         _routines: &'a rend3_framework::DefaultRoutines,
         _surface: &'a rend3::types::Surface,
@@ -118,6 +119,7 @@ impl rend3_framework::App for CubeExample {
 
     fn handle_event<'a, T: rend3_framework::NativeSend>(
         &mut self,
+        _window: &'a winit::window::Window,
         renderer: &'a Arc<rend3::Renderer>,
         routines: &'a Arc<rend3_framework::DefaultRoutines>,
         surface: &'a Arc<rend3::types::Surface>,
@@ -137,7 +139,7 @@ impl rend3_framework::App for CubeExample {
                 winit::event::Event::MainEventsCleared => {
                     // Get a frame
                     let frame = rend3::util::output::OutputFrame::Surface {
-                        surface: Arc::clone(&surface),
+                        surface: Arc::clone(surface),
                     };
                     // Ready up the renderer
                     let (cmd_bufs, ready) = renderer.ready();
@@ -166,7 +168,7 @@ impl rend3_framework::App for CubeExample {
                     tonemapping_routine.add_to_graph(&mut graph);
 
                     // Dispatch a render using the built up rendergraph!
-                    graph.execute(&renderer, frame, cmd_bufs, &ready);
+                    graph.execute(renderer, frame, cmd_bufs, &ready);
                 }
                 // Other events we don't care about
                 _ => {}

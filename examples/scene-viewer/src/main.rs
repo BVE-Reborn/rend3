@@ -10,11 +10,7 @@ use rend3_framework::AsyncMutex;
 use rend3_pbr::SkyboxRoutine;
 use std::{collections::HashMap, hash::BuildHasher, path::Path, sync::Arc, time::Duration};
 use wgpu_profiler::GpuTimerScopeResult;
-use winit::{
-    event::{DeviceEvent, ElementState, Event, KeyboardInput, WindowEvent},
-    event_loop::ControlFlow,
-    window::WindowBuilder,
-};
+use winit::{event::{DeviceEvent, ElementState, Event, KeyboardInput, MouseButton, WindowEvent}, event_loop::ControlFlow, window::WindowBuilder};
 
 mod platform;
 
@@ -125,6 +121,8 @@ struct SceneViewer {
     timestamp_last_frame: Instant,
     frame_times: histogram::Histogram,
     last_mouse_delta: Option<DVec2>,
+
+    grabber: Option<rend3_framework::Grabber>,
 }
 impl SceneViewer {
     pub fn new() -> Self {
@@ -156,6 +154,8 @@ impl SceneViewer {
             timestamp_last_frame: Instant::now(),
             frame_times: histogram::Histogram::new(),
             last_mouse_delta: None,
+
+            grabber: None,
         }
     }
 }
@@ -175,6 +175,7 @@ impl rend3_framework::App for SceneViewer {
 
     fn setup<'a>(
         &'a mut self,
+        window: &'a winit::window::Window,
         renderer: &'a Renderer,
         routines: &'a rend3_framework::DefaultRoutines,
         _surface: &'a rend3::types::Surface,
@@ -192,6 +193,8 @@ impl rend3_framework::App for SceneViewer {
                 direction: Vec3::new(-1.0, -1.0, 0.0),
                 distance: 400.0,
             }));
+
+            self.grabber = Some(rend3_framework::Grabber::new(window));
         })
     }
 
@@ -223,6 +226,7 @@ impl rend3_framework::App for SceneViewer {
 
     fn handle_event<'a, T: rend3_framework::NativeSend>(
         &'a mut self,
+        window: &'a winit::window::Window,
         renderer: &'a Arc<rend3::Renderer>,
         routines: &'a Arc<rend3_framework::DefaultRoutines>,
         surface: &'a Arc<rend3::types::Surface>,
@@ -287,6 +291,10 @@ impl rend3_framework::App for SceneViewer {
                         self.camera_location -= up * velocity * delta_time.as_secs_f32();
                     }
 
+                    if button_pressed(&self.scancode_status, platform::Scancodes::ESCAPE) {
+                        self.grabber.as_mut().unwrap().request_ungrab(window);
+                    }
+
                     if button_pressed(&self.scancode_status, platform::Scancodes::P) {
                         // write out gpu side performance info into a trace readable by chrome://tracing
                         if let Some(ref stats) = self.previous_profiling_stats {
@@ -307,7 +315,7 @@ impl rend3_framework::App for SceneViewer {
 
                     // Get a frame
                     let frame = rend3::util::output::OutputFrame::Surface {
-                        surface: Arc::clone(&surface),
+                        surface: Arc::clone(surface),
                     };
                     // Lock all the routines
                     let pbr_routine = routines.pbr.lock().await;
@@ -317,7 +325,7 @@ impl rend3_framework::App for SceneViewer {
                     // Ready up the renderer
                     let (cmd_bufs, ready) = renderer.ready();
                     // Ready up the routines
-                    skybox_routine.ready(&renderer);
+                    skybox_routine.ready(renderer);
 
                     // Build a rendergraph
                     let mut graph = rend3::RenderGraph::new();
@@ -340,9 +348,18 @@ impl rend3_framework::App for SceneViewer {
                     tonemapping_routine.add_to_graph(&mut graph);
 
                     // Dispatch a render using the built up rendergraph!
-                    self.previous_profiling_stats = graph.execute(&renderer, frame, cmd_bufs, &ready);
+                    self.previous_profiling_stats = graph.execute(renderer, frame, cmd_bufs, &ready);
                     // mark the end of the frame for tracy/other profilers
                     profiling::finish_frame!();
+                }
+                Event::WindowEvent {
+                    event:
+                        WindowEvent::Focused(focus),
+                    ..
+                } => {
+                    if !focus {
+                        self.grabber.as_mut().unwrap().request_ungrab(window);
+                    }
                 }
                 Event::WindowEvent {
                     event:
@@ -361,6 +378,17 @@ impl rend3_framework::App for SceneViewer {
                         },
                     );
                 }
+                Event::WindowEvent {
+                    event:
+                        WindowEvent::MouseInput { button: MouseButton::Left, state: ElementState::Pressed, .. },
+                    ..
+                } => {
+                    let grabber = self.grabber.as_mut().unwrap();
+
+                    if !grabber.grabbed() {
+                        grabber.request_grab(window);
+                    }
+                }
                 Event::DeviceEvent {
                     event:
                         DeviceEvent::MouseMotion {
@@ -369,6 +397,10 @@ impl rend3_framework::App for SceneViewer {
                         },
                     ..
                 } => {
+                    if !self.grabber.as_ref().unwrap().grabbed() {
+                        return;
+                    }
+
                     const TAU: f32 = std::f32::consts::PI * 2.0;
 
                     let mouse_delta = if self.absolute_mouse {

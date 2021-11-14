@@ -1,11 +1,17 @@
 use std::{future::Future, pin::Pin, sync::Arc};
 
-use rend3::{types::Surface, util::typedefs::SsoString, InstanceAdapterDevice, Renderer};
+use rend3::{types::Surface, InstanceAdapterDevice, Renderer};
 use winit::{
     event::Event,
     event_loop::{ControlFlow, EventLoop, EventLoopWindowTarget},
     window::{Window, WindowBuilder},
 };
+
+mod assets;
+mod grab;
+
+pub use assets::*;
+pub use grab::*;
 
 #[cfg(target_arch = "wasm32")]
 pub trait NativeSend {}
@@ -45,10 +51,16 @@ pub trait App {
         #[cfg(target_arch = "wasm32")]
         {
             use winit::platform::web::WindowExtWebSys;
+
+            let canvas = window.canvas();
+            let style = canvas.style();
+            style.set_property("width", "100%").unwrap();
+            style.set_property("height", "100%").unwrap();
+
             web_sys::window()
                 .and_then(|win| win.document())
                 .and_then(|doc| doc.body())
-                .and_then(|body| body.append_child(&web_sys::Element::from(window.canvas())).ok())
+                .and_then(|body| body.append_child(&canvas).ok())
                 .expect("couldn't append canvas to document body");
         }
 
@@ -61,11 +73,12 @@ pub trait App {
 
     fn setup<'a>(
         &'a mut self,
+        window: &'a Window,
         renderer: &'a Renderer,
         routines: &'a DefaultRoutines,
         surface: &'a Surface,
     ) -> Pin<Box<dyn NativeSendFuture<()> + 'a>> {
-        let _ = (renderer, routines, surface);
+        let _ = (window, renderer, routines, surface);
         Box::pin(async move {})
     }
 
@@ -81,13 +94,14 @@ pub trait App {
 
     fn handle_event<'a, T: NativeSend>(
         &'a mut self,
+        window: &'a Window,
         renderer: &'a Arc<rend3::Renderer>,
         routines: &'a Arc<DefaultRoutines>,
         surface: &'a Arc<Surface>,
         event: Event<'a, T>,
         control_flow: &'a mut winit::event_loop::ControlFlow,
     ) -> Pin<Box<dyn NativeSendFuture<()> + 'a>> {
-        let _ = (renderer, routines, surface, event, control_flow);
+        let _ = (window, renderer, routines, surface, event, control_flow);
         Box::pin(async move {})
     }
 }
@@ -116,49 +130,6 @@ where
     wasm_bindgen_futures::spawn_local(async move {
         fut.await;
     });
-}
-
-pub struct AssetLoader {
-    base: SsoString,
-}
-impl AssetLoader {
-    pub fn new_local(_base_file: &str, _base_url: &str) -> Self {
-        cfg_if::cfg_if!(
-            if #[cfg(not(target_arch = "wasm32"))] {
-                let base = _base_file;
-            } else {
-                let base = _base_url;
-            }
-        );
-
-        Self {
-            base: SsoString::from(base),
-        }
-    }
-
-    #[cfg(not(target_arch = "wasm32"))]
-    pub async fn get_asset(&self, path: &str) -> anyhow::Result<Vec<u8>> {
-        let full_path = self.base.clone() + path;
-        Ok(std::fs::read(&*full_path).map_err(|e| anyhow::anyhow!("Failure to load {}: {}", &full_path, e))?)
-    }
-
-    #[cfg(target_arch = "wasm32")]
-    pub async fn get_asset(&self, path: &str) -> anyhow::Result<Vec<u8>> {
-        let full_path = self.base.clone() + path;
-        let response = reqwest::get(&*full_path)
-            .await
-            .map_err(|e| anyhow::anyhow!("Failure to load {}: {}", &full_path, e))?;
-
-        if !response.status().is_success() {
-            return Err(anyhow::anyhow!(
-                "Non success status requesting {}: {}",
-                path,
-                response.status()
-            ));
-        }
-
-        Ok(response.bytes().await?.to_vec())
-    }
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -241,22 +212,17 @@ pub async fn async_start<A: App + NativeSend + 'static>(mut app: A, window_build
         ),
     });
 
-    app.setup(&renderer, &routines, &surface).await;
+    app.setup(&window, &renderer, &routines, &surface).await;
 
     spawn(app.async_setup(Arc::clone(&renderer), Arc::clone(&routines), Arc::clone(&surface)));
 
     let (sender, reciever) = flume::unbounded();
 
     spawn(async move {
-        // Need to keep the window alive.
-        let _window = window;
         let mut flow = ControlFlow::Poll;
         let mut redraw = Vec::with_capacity(16);
-        loop {
-            let mut event_opt = match reciever.recv_async().await {
-                Ok(e) => Some(e),
-                Err(_) => break,
-            };
+        while let Ok(e) = reciever.recv_async().await {
+            let mut event_opt = Some(e);
             let mut main_events_cleared = false;
             let mut redraw_events_cleared = false;
             while let Some(event) = event_opt.take() {
@@ -301,7 +267,8 @@ pub async fn async_start<A: App + NativeSend + 'static>(mut app: A, window_build
                         redraw.push(w);
                     }
                     e => {
-                        app.handle_event(&renderer, &routines, &surface, e, &mut flow).await;
+                        app.handle_event(&window, &renderer, &routines, &surface, e, &mut flow)
+                            .await;
                     }
                 }
 
@@ -314,6 +281,7 @@ pub async fn async_start<A: App + NativeSend + 'static>(mut app: A, window_build
 
             if main_events_cleared {
                 app.handle_event(
+                    &window,
                     &renderer,
                     &routines,
                     &surface,
@@ -325,6 +293,7 @@ pub async fn async_start<A: App + NativeSend + 'static>(mut app: A, window_build
 
             for w in redraw.drain(..) {
                 app.handle_event(
+                    &window,
                     &renderer,
                     &routines,
                     &surface,
@@ -336,6 +305,7 @@ pub async fn async_start<A: App + NativeSend + 'static>(mut app: A, window_build
 
             if redraw_events_cleared {
                 app.handle_event(
+                    &window,
                     &renderer,
                     &routines,
                     &surface,
