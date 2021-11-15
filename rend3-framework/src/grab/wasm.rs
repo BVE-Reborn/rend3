@@ -29,7 +29,11 @@ impl Grabber {
         let document = canvas.owner_document().unwrap();
 
         let function: Box<dyn FnMut()> = Box::new(move || {
-            if document.pointer_lock_element().as_ref() != Some(&*canvas) {
+            if document.pointer_lock_element().as_ref() == Some(&*canvas) {
+                log::info!("true");
+                inner_clone.grabbed.store(true, Ordering::Release);
+            } else {
+                log::info!("false");
                 document
                     .remove_event_listener_with_callback("pointerlockchange", inner_clone.callback.get().unwrap())
                     .unwrap();

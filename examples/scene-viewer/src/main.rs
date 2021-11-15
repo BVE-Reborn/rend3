@@ -10,7 +10,11 @@ use rend3_framework::AsyncMutex;
 use rend3_pbr::SkyboxRoutine;
 use std::{collections::HashMap, hash::BuildHasher, path::Path, sync::Arc, time::Duration};
 use wgpu_profiler::GpuTimerScopeResult;
-use winit::{event::{DeviceEvent, ElementState, Event, KeyboardInput, MouseButton, WindowEvent}, event_loop::ControlFlow, window::WindowBuilder};
+use winit::{
+    event::{DeviceEvent, ElementState, Event, KeyboardInput, MouseButton, WindowEvent},
+    event_loop::ControlFlow,
+    window::WindowBuilder,
+};
 
 mod platform;
 
@@ -353,8 +357,7 @@ impl rend3_framework::App for SceneViewer {
                     profiling::finish_frame!();
                 }
                 Event::WindowEvent {
-                    event:
-                        WindowEvent::Focused(focus),
+                    event: WindowEvent::Focused(focus),
                     ..
                 } => {
                     if !focus {
@@ -380,12 +383,17 @@ impl rend3_framework::App for SceneViewer {
                 }
                 Event::WindowEvent {
                     event:
-                        WindowEvent::MouseInput { button: MouseButton::Left, state: ElementState::Pressed, .. },
+                        WindowEvent::MouseInput {
+                            button: MouseButton::Left,
+                            state: ElementState::Pressed,
+                            ..
+                        },
                     ..
                 } => {
                     let grabber = self.grabber.as_mut().unwrap();
 
                     if !grabber.grabbed() {
+                        log::info!("poking");
                         grabber.request_grab(window);
                     }
                 }
