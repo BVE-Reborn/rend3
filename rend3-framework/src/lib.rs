@@ -9,6 +9,8 @@ use winit::{
 
 mod assets;
 mod grab;
+#[cfg(target_arch = "wasm32")]
+mod resize_observer;
 
 pub use assets::*;
 pub use grab::*;
@@ -218,7 +220,13 @@ pub async fn async_start<A: App + NativeSend + 'static>(mut app: A, window_build
 
     let (sender, reciever) = flume::unbounded();
 
+    #[cfg(target_arch = "wasm32")]
+    let observer = resize_observer::ResizeObserver::new(&window, sender.clone());
+
     spawn(async move {
+        #[cfg(target_arch = "wasm32")]
+        let _observer = observer;
+
         let mut flow = ControlFlow::Poll;
         let mut redraw = Vec::with_capacity(16);
         while let Ok(e) = reciever.recv_async().await {

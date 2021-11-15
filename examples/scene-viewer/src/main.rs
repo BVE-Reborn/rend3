@@ -393,7 +393,6 @@ impl rend3_framework::App for SceneViewer {
                     let grabber = self.grabber.as_mut().unwrap();
 
                     if !grabber.grabbed() {
-                        log::info!("poking");
                         grabber.request_grab(window);
                     }
                 }
