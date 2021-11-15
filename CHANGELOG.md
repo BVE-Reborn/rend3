@@ -30,6 +30,9 @@ Per Keep a Changelog there are 6 main categories of changes:
 
 ## Unreleased
 
+### Fixed
+- rend3: Objects weren't properly holding their meshes alive.
+
 ## v0.2.2
 
 Released 2021-10-24
