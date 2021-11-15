@@ -12,7 +12,6 @@ use std::{collections::HashMap, hash::BuildHasher, path::Path, sync::Arc, time::
 use wgpu_profiler::GpuTimerScopeResult;
 use winit::{
     event::{DeviceEvent, ElementState, Event, KeyboardInput, MouseButton, WindowEvent},
-    event_loop::ControlFlow,
     window::WindowBuilder,
 };
 
@@ -228,14 +227,14 @@ impl rend3_framework::App for SceneViewer {
         })
     }
 
-    fn handle_event<'a, T: rend3_framework::NativeSend>(
+    fn handle_event<'a>(
         &'a mut self,
         window: &'a winit::window::Window,
         renderer: &'a Arc<rend3::Renderer>,
         routines: &'a Arc<rend3_framework::DefaultRoutines>,
         surface: &'a Arc<rend3::types::Surface>,
-        event: Event<'a, T>,
-        control_flow: &'a mut winit::event_loop::ControlFlow,
+        event: rend3_framework::Event,
+        control_flow: impl FnOnce(winit::event_loop::ControlFlow) + rend3_framework::NativeSend + 'a,
     ) -> std::pin::Pin<Box<dyn rend3_framework::NativeSendFuture<()> + 'a>> {
         Box::pin(async move {
             match event {
@@ -437,7 +436,7 @@ impl rend3_framework::App for SceneViewer {
                     event: WindowEvent::CloseRequested,
                     ..
                 } => {
-                    *control_flow = ControlFlow::Exit;
+                    control_flow(winit::event_loop::ControlFlow::Exit);
                 }
                 _ => {}
             }

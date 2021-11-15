@@ -123,20 +123,20 @@ impl rend3_framework::App for CubeExample {
         renderer: &'a Arc<rend3::Renderer>,
         routines: &'a Arc<rend3_framework::DefaultRoutines>,
         surface: &'a Arc<rend3::types::Surface>,
-        event: winit::event::Event<'a, T>,
-        control_flow: &'a mut winit::event_loop::ControlFlow,
+        event: rend3_framework::Event,
+        control_flow: impl FnOnce(winit::event_loop::ControlFlow) + rend3_framework::NativeSend + 'a,
     ) -> std::pin::Pin<Box<dyn rend3_framework::NativeSendFuture<()> + 'a>> {
         Box::pin(async move {
             match event {
                 // Close button was clicked, we should close.
-                winit::event::Event::WindowEvent {
+                rend3_framework::Event::WindowEvent {
                     event: winit::event::WindowEvent::CloseRequested,
                     ..
                 } => {
-                    *control_flow = winit::event_loop::ControlFlow::Exit;
+                    control_flow(winit::event_loop::ControlFlow::Exit);
                 }
                 // Render!
-                winit::event::Event::MainEventsCleared => {
+                rend3_framework::Event::MainEventsCleared => {
                     // Get a frame
                     let frame = rend3::util::output::OutputFrame::Surface {
                         surface: Arc::clone(surface),

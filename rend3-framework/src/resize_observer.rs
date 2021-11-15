@@ -3,6 +3,7 @@ use wasm_bindgen::prelude::*;
 use winit::{
     dpi::PhysicalSize,
     event::{Event, WindowEvent},
+    event_loop::ControlFlow,
     platform::web::WindowExtWebSys,
     window::Window,
 };
@@ -37,7 +38,7 @@ pub struct ResizeObserver {
     _callback: JsValue,
 }
 impl ResizeObserver {
-    pub fn new(window: &Window, sender: Sender<Event<'static, ()>>) -> Self {
+    pub fn new(window: &Window, sender: Sender<Event<'static, ControlFlow>>) -> Self {
         let canvas = window.canvas();
         let id = window.id();
         let callback: Box<dyn FnMut(u32, u32)> = Box::new(move |width, height| {
