@@ -1,5 +1,6 @@
 use std::{future::Future, pin::Pin, sync::Arc};
 
+use glam::UVec2;
 use rend3::{types::Surface, InstanceAdapterDevice, Renderer};
 use winit::{
     event_loop::{ControlFlow, EventLoop, EventLoopWindowTarget},
@@ -79,8 +80,9 @@ pub trait App {
         renderer: &'a Renderer,
         routines: &'a DefaultRoutines,
         surface: &'a Surface,
+        surface_format: rend3::types::TextureFormat,
     ) -> Pin<Box<dyn NativeSendFuture<()> + 'a>> {
-        let _ = (window, renderer, routines, surface);
+        let _ = (window, renderer, routines, surface, surface_format);
         Box::pin(async move {})
     }
 
@@ -175,13 +177,17 @@ pub async fn async_start<A: App + NativeSend + 'static>(mut app: A, window_build
     app.register_logger();
     app.register_panic_hook();
 
-    let (event_loop, window) = app.create_window(window_builder);
+    // Create the window invisible until we are rendering
+    let (event_loop, window) = app.create_window(window_builder.with_visible(false));
     let window_size = window.inner_size();
 
     let iad = app.create_iad().await.unwrap();
 
     // The one line of unsafe needed. We just need to guarentee that the window outlives the use of the surface.
     let surface = Arc::new(unsafe { iad.instance.create_surface(&window) });
+
+    // Make us a renderer.
+    let renderer = rend3::Renderer::new(iad.clone(), Some(window_size.width as f32 / window_size.height as f32)).unwrap();
 
     // Get the preferred format for the surface.
     let format = surface.get_preferred_format(&iad.adapter).unwrap();
@@ -193,9 +199,6 @@ pub async fn async_start<A: App + NativeSend + 'static>(mut app: A, window_build
         glam::UVec2::new(window_size.width, window_size.height),
         rend3::types::PresentMode::Mailbox,
     );
-
-    // Make us a renderer.
-    let renderer = rend3::Renderer::new(iad, Some(window_size.width as f32 / window_size.height as f32)).unwrap();
 
     // Create the pbr pipeline with the same internal resolution and 4x multisampling
     let render_texture_options = rend3_pbr::RenderTextureOptions {
@@ -214,7 +217,7 @@ pub async fn async_start<A: App + NativeSend + 'static>(mut app: A, window_build
         ),
     });
 
-    app.setup(&window, &renderer, &routines, &surface).await;
+    app.setup(&window, &renderer, &routines, &surface, format).await;
 
     spawn(app.async_setup(Arc::clone(&renderer), Arc::clone(&routines), Arc::clone(&surface)));
 
@@ -224,6 +227,9 @@ pub async fn async_start<A: App + NativeSend + 'static>(mut app: A, window_build
     let observer = resize_observer::ResizeObserver::new(&window, sender.clone());
 
     let proxy = event_loop.create_proxy();
+    
+    // We're ready, so lets make things visible
+    window.set_visible(true);
 
     spawn(async move {
         #[cfg(target_arch = "wasm32")]
@@ -355,7 +361,8 @@ async fn handle_resize(
             event: winit::event::WindowEvent::Resized(size),
             ..
         } => {
-            let size = glam::UVec2::new(size.width, size.height);
+            let size = UVec2::new(size.width, size.height);
+
             // Reconfigure the surface for the new size.
             rend3::configure_surface(
                 surface,
@@ -380,13 +387,15 @@ async fn handle_resize(
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
-pub fn start<A: App + Send + 'static>(app: A, window_builder: WindowBuilder) {
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    rt.block_on(async_start(app, window_builder));
-}
+pub fn start<A: App + NativeSend + 'static>(app: A, window_builder: WindowBuilder) {
+    #[cfg(target_arch = "wasm32")]
+    {
+        wasm_bindgen_futures::spawn_local(async_start(app, window_builder));
+    }
 
-#[cfg(target_arch = "wasm32")]
-pub fn start<A: App + 'static>(app: A, window_builder: WindowBuilder) {
-    wasm_bindgen_futures::spawn_local(async_start(app, window_builder));
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async_start(app, window_builder));
+    }
 }

@@ -182,6 +182,7 @@ impl rend3_framework::App for SceneViewer {
         renderer: &'a Renderer,
         routines: &'a rend3_framework::DefaultRoutines,
         _surface: &'a rend3::types::Surface,
+        _surface_format: rend3::types::TextureFormat,
     ) -> std::pin::Pin<Box<dyn rend3_framework::NativeSendFuture<()> + 'a>> {
         Box::pin(async move {
             routines

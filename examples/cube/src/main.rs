@@ -65,6 +65,7 @@ impl rend3_framework::App for CubeExample {
         renderer: &'a rend3::Renderer,
         _routines: &'a rend3_framework::DefaultRoutines,
         _surface: &'a rend3::types::Surface,
+        _surface_format: rend3::types::TextureFormat,
     ) -> std::pin::Pin<Box<dyn rend3_framework::NativeSendFuture<()> + 'a>> {
         Box::pin(async move {
             // Create mesh and calculate smooth normals based on vertices
@@ -117,7 +118,7 @@ impl rend3_framework::App for CubeExample {
         })
     }
 
-    fn handle_event<'a, T: rend3_framework::NativeSend>(
+    fn handle_event<'a>(
         &mut self,
         _window: &'a winit::window::Window,
         renderer: &'a Arc<rend3::Renderer>,

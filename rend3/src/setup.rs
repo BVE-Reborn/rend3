@@ -335,6 +335,7 @@ impl From<AdapterInfo> for ExtendedAdapterInfo {
 /// Container for Instance/Adapter/Device/Queue etc.
 ///
 /// Create these yourself, or call [`create_iad`].
+#[derive(Clone)]
 pub struct InstanceAdapterDevice {
     pub instance: Arc<Instance>,
     pub adapter: Arc<Adapter>,
