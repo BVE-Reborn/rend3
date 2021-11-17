@@ -187,7 +187,8 @@ pub async fn async_start<A: App + NativeSend + 'static>(mut app: A, window_build
     let surface = Arc::new(unsafe { iad.instance.create_surface(&window) });
 
     // Make us a renderer.
-    let renderer = rend3::Renderer::new(iad.clone(), Some(window_size.width as f32 / window_size.height as f32)).unwrap();
+    let renderer =
+        rend3::Renderer::new(iad.clone(), Some(window_size.width as f32 / window_size.height as f32)).unwrap();
 
     // Get the preferred format for the surface.
     let format = surface.get_preferred_format(&iad.adapter).unwrap();
@@ -208,12 +209,12 @@ pub async fn async_start<A: App + NativeSend + 'static>(mut app: A, window_build
     let routines = Arc::new(DefaultRoutines {
         pbr: AsyncMutex::new(
             rend3_pbr::PbrRenderRoutine::new(&renderer, render_texture_options),
-            false,
+            true,
         ),
-        skybox: AsyncMutex::new(rend3_pbr::SkyboxRoutine::new(&renderer, render_texture_options), false),
+        skybox: AsyncMutex::new(rend3_pbr::SkyboxRoutine::new(&renderer, render_texture_options), true),
         tonemapping: AsyncMutex::new(
             rend3_pbr::TonemappingRoutine::new(&renderer, render_texture_options.resolution, format),
-            false,
+            true,
         ),
     });
 
@@ -227,7 +228,7 @@ pub async fn async_start<A: App + NativeSend + 'static>(mut app: A, window_build
     let observer = resize_observer::ResizeObserver::new(&window, sender.clone());
 
     let proxy = event_loop.create_proxy();
-    
+
     // We're ready, so lets make things visible
     window.set_visible(true);
 
