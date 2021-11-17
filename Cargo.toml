@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "examples/textured-quad",
     "examples/cube",
+    "examples/cube-no-framework",
     "examples/egui",
     "examples/gltf",
     "examples/scene-viewer",
