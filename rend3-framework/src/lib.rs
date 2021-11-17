@@ -362,6 +362,7 @@ async fn handle_resize(
             event: winit::event::WindowEvent::Resized(size),
             ..
         } => {
+            println!("resize! {:?}", size);
             let size = UVec2::new(size.width, size.height);
 
             // Reconfigure the surface for the new size.

@@ -180,5 +180,10 @@ impl rend3_framework::App for CubeExample {
 
 fn main() {
     let app = CubeExample::default();
-    rend3_framework::start(app, winit::window::WindowBuilder::new().with_title("cube-example"));
+    rend3_framework::start(
+        app,
+        winit::window::WindowBuilder::new()
+            .with_title("cube-example")
+            .with_maximized(true),
+    );
 }

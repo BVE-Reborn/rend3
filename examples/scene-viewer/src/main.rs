@@ -447,5 +447,8 @@ impl rend3_framework::App for SceneViewer {
 
 fn main() {
     let app = SceneViewer::new();
-    rend3_framework::start(app, WindowBuilder::new().with_title("scene-viewer"));
+    rend3_framework::start(
+        app,
+        WindowBuilder::new().with_title("scene-viewer").with_maximized(true),
+    );
 }
