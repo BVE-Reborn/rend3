@@ -5,6 +5,9 @@ on:
     branches: ["trunk", "CI/**"]
   pull_request:
 
+env:
+  RUSTFLAGS: --cfg=web_sys_unstable_apis -D warnings
+
 jobs:
   build:
     timeout-minutes: 30
@@ -71,13 +74,13 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: --target ${{ matrix.target }} -p rend3-gltf --no-default-features -- -D warnings
+          args: --target ${{ matrix.target }} -p rend3-gltf --no-default-features
 
       - name: clippy
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: --target ${{ matrix.target }} -- -D warnings
+          args: --target ${{ matrix.target }}
         if: matrix.rust_version == 'stable'
 
   cargo-fmt:
