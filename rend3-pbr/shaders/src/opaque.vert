@@ -23,19 +23,19 @@ layout(location = 4) out vec2 o_coords1;
 layout(location = 5) out vec4 o_color;
 layout(location = 6) flat out uint o_material;
 
+layout(set = 0, binding = 3) uniform UniformBuffer {
+    UniformData uniforms;
+};
 layout(set = 1, binding = 0, std430) restrict readonly buffer ObjectOutputDataBuffer {
     ObjectOutputData object_output[];
 };
-layout(set = 3, binding = 0) uniform UniformBuffer {
-    UniformData uniforms;
-};
 #ifdef GPU_MODE
-layout(set = 4, binding = 0, std430) readonly buffer MaterialBuffer {
+layout(set = 1, binding = 1, std430) readonly buffer MaterialBuffer {
     GPUMaterialData materials[];
 };
 #endif
 #ifdef CPU_MODE
-layout(set = 4, binding = 10) uniform TextureData {
+layout(set = 2, binding = 10) uniform TextureData {
     CPUMaterialData material;
 };
 #endif
@@ -57,9 +57,9 @@ void main() {
 
     o_view_position = data.model_view * vec4(i_position, 1.0);
 
-    o_normal = data.inv_trans_model_view * i_normal;
+    o_normal = mat3(data.model_view) * (data.inv_squared_scale * i_normal);
 
-    o_tangent = data.inv_trans_model_view * i_tangent;
+    o_tangent = mat3(data.model_view) * (data.inv_squared_scale * i_tangent);
 
     o_color = i_color;
 

@@ -28,7 +28,7 @@ struct ObjectInputData {
 struct ObjectOutputData {
     mat4 model_view;
     mat4 model_view_proj;
-    mat3 inv_trans_model_view;
+    vec3 inv_squared_scale;
     uint material_idx;
 };
 

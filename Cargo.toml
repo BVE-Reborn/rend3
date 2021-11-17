@@ -3,17 +3,21 @@ resolver = "2"
 members = [
     "examples/textured-quad",
     "examples/cube",
+    "examples/cube-no-framework",
     "examples/egui",
     "examples/gltf",
     "examples/scene-viewer",
     "rend3",
     "rend3-gltf",
     "rend3-egui",
+    "rend3-framework",
     "rend3-pbr",
-    "rend3-pbr-bake",
     "rend3-pp",
     "rend3-types"
 ]
+
+[profile.dev.package."*"]
+opt-level = 3
 
 [profile.release]
 debug = true

@@ -1,21 +1,18 @@
-use glam::{Mat3, Mat3A, Mat4};
+use glam::{Mat4, Vec3};
 use rend3::{
-    resources::{CameraManager, InternalObject, MaterialManager, ObjectManager},
+    managers::{CameraManager, InternalObject, MaterialManager, ObjectManager},
     util::frustum::ShaderFrustum,
     ModeData,
 };
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
-    BindGroupDescriptor, BindGroupEntry, BufferUsages, Device, RenderPass,
+    BufferUsages, Device, RenderPass,
 };
 
 use crate::{
-    common::{
-        interfaces::{PerObjectData, ShaderInterfaces},
-        samplers::Samplers,
-    },
+    common::interfaces::{PerObjectData, ShaderInterfaces},
     culling::{CPUDrawCall, CulledObjectSet},
-    material::{PbrMaterial, SampleType, TransparencyType},
+    material::{PbrMaterial, TransparencyType},
 };
 
 pub struct CpuCullerCullArgs<'a> {
@@ -55,7 +52,7 @@ impl CpuCuller {
             outputs.push(PerObjectData {
                 model_view: Mat4::ZERO,
                 model_view_proj: Mat4::ZERO,
-                inv_trans_model_view: Mat3A::ZERO,
+                inv_squared_scale: Vec3::ZERO,
                 material_idx: 0,
             });
         }
@@ -66,18 +63,9 @@ impl CpuCuller {
             usage: BufferUsages::STORAGE,
         });
 
-        let output_bg = args.device.create_bind_group(&BindGroupDescriptor {
-            label: Some("culling input bg"),
-            layout: &args.interfaces.culled_object_bgl,
-            entries: &[BindGroupEntry {
-                binding: 0,
-                resource: output_buffer.as_entire_binding(),
-            }],
-        });
-
         CulledObjectSet {
             calls: ModeData::CPU(calls),
-            output_bg,
+            output_buffer,
         }
     }
 }
@@ -108,8 +96,6 @@ pub fn cull_internal(
 
         let model_view_proj = view_proj * model;
 
-        let inv_trans_model_view = Mat3::from_mat4(model_view.inverse().transpose());
-
         calls.push(CPUDrawCall {
             start_idx: object.input.start_idx,
             end_idx: object.input.start_idx + object.input.count,
@@ -117,10 +103,18 @@ pub fn cull_internal(
             material_index: object.input.material_index,
         });
 
+        let squared_scale = Vec3::new(
+            model_view.x_axis.truncate().length_squared(),
+            model_view.y_axis.truncate().length_squared(),
+            model_view.z_axis.truncate().length_squared(),
+        );
+
+        let inv_squared_scale = squared_scale.recip();
+
         outputs.push(PerObjectData {
             model_view,
             model_view_proj,
-            inv_trans_model_view: inv_trans_model_view.into(),
+            inv_squared_scale,
             material_idx: 0,
         });
     }
@@ -131,31 +125,18 @@ pub fn cull_internal(
 pub fn run<'rpass>(
     rpass: &mut RenderPass<'rpass>,
     draws: &'rpass [CPUDrawCall],
-    samplers: &'rpass Samplers,
-    samplers_binding_index: u32,
     materials: &'rpass MaterialManager,
     material_binding_index: u32,
 ) {
-    let mut state_sample_type = SampleType::Linear;
-
     let mut previous_mat_handle = None;
     for (idx, draw) in draws.iter().enumerate() {
         if previous_mat_handle != Some(draw.material_index) {
             previous_mat_handle = Some(draw.material_index);
             // TODO(material): only resolve the archetype lookup once
-            let (material, internal) =
+            let (_, internal) =
                 materials.get_internal_material_full_by_index::<PbrMaterial>(draw.material_index as usize);
-            let sample_type = material.sample_type;
 
-            // As a workaround for OpenGL's combined samplers, we need to manually swap the linear and nearest samplers so that shader code can think it's always using linear.
-            if state_sample_type != sample_type {
-                let bg = match sample_type {
-                    SampleType::Nearest => samplers.nearest_linear_bg.as_ref().as_cpu(),
-                    SampleType::Linear => &samplers.linear_nearest_bg,
-                };
-                state_sample_type = sample_type;
-                rpass.set_bind_group(samplers_binding_index, bg, &[]);
-            }
+            // TODO: GL always gets linear sampling.
 
             rpass.set_bind_group(material_binding_index, internal.bind_group.as_ref().as_cpu(), &[]);
         }

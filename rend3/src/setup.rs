@@ -9,7 +9,7 @@ use wgpu::{
 #[allow(unused_imports)]
 use crate::format_sso;
 use crate::{
-    resources::STARTING_2D_TEXTURES, util::typedefs::FastHashMap, LimitType, RendererInitializationError, RendererMode,
+    managers::STARTING_2D_TEXTURES, util::typedefs::FastHashMap, LimitType, RendererInitializationError, RendererMode,
 };
 
 /// Largest uniform buffer binding needed to run rend3.
@@ -33,11 +33,12 @@ pub const GPU_REQUIRED_FEATURES: Features = {
 };
 
 /// Features required to run in cpu-mode.
-pub const CPU_REQUIRED_FEATURES: Features = Features::from_bits_truncate(Features::DEPTH_CLAMPING.bits());
+pub const CPU_REQUIRED_FEATURES: Features = Features::from_bits_truncate(0);
 
 /// Features that rend3 can use if it they are available, but we don't require.
 pub const OPTIONAL_FEATURES: Features = Features::from_bits_truncate(
-    Features::TEXTURE_COMPRESSION_BC.bits()
+    Features::DEPTH_CLAMPING.bits()
+        | Features::TEXTURE_COMPRESSION_BC.bits()
         | Features::TEXTURE_COMPRESSION_ETC2.bits()
         | Features::TEXTURE_COMPRESSION_ASTC_LDR.bits()
         | Features::TIMESTAMP_QUERY.bits(),
@@ -63,8 +64,8 @@ pub const GPU_REQUIRED_LIMITS: Limits = Limits {
     max_texture_dimension_1d: 2048,
     max_texture_dimension_2d: 2048,
     max_texture_dimension_3d: 512,
-    max_texture_array_layers: 512,
-    max_bind_groups: 8,
+    max_texture_array_layers: 256,
+    max_bind_groups: 6,
     max_dynamic_uniform_buffers_per_pipeline_layout: 0,
     max_dynamic_storage_buffers_per_pipeline_layout: 0,
     max_sampled_textures_per_shader_stage: STARTING_2D_TEXTURES as _,
@@ -87,8 +88,8 @@ pub const CPU_REQUIRED_LIMITS: Limits = Limits {
     max_texture_dimension_1d: 2048,
     max_texture_dimension_2d: 2048,
     max_texture_dimension_3d: 512,
-    max_texture_array_layers: 512,
-    max_bind_groups: 8,
+    max_texture_array_layers: 256,
+    max_bind_groups: 4,
     max_dynamic_uniform_buffers_per_pipeline_layout: 0,
     max_dynamic_storage_buffers_per_pipeline_layout: 0,
     max_sampled_textures_per_shader_stage: 10,
@@ -334,6 +335,7 @@ impl From<AdapterInfo> for ExtendedAdapterInfo {
 /// Container for Instance/Adapter/Device/Queue etc.
 ///
 /// Create these yourself, or call [`create_iad`].
+#[derive(Clone)]
 pub struct InstanceAdapterDevice {
     pub instance: Arc<Instance>,
     pub adapter: Arc<Adapter>,
@@ -350,7 +352,11 @@ pub async fn create_iad(
     desired_mode: Option<RendererMode>,
 ) -> Result<InstanceAdapterDevice, RendererInitializationError> {
     profiling::scope!("create_iad");
+    #[cfg(not(target_arch = "wasm32"))]
     let backend_bits = Backends::VULKAN | Backends::DX12 | Backends::DX11 | Backends::METAL | Backends::GL;
+    #[cfg(target_arch = "wasm32")]
+    let backend_bits = Backends::BROWSER_WEBGPU;
+    #[cfg(not(target_arch = "wasm32"))]
     let default_backend_order = [
         Backend::Vulkan,
         Backend::Metal,
@@ -358,14 +364,26 @@ pub async fn create_iad(
         Backend::Dx11,
         Backend::Gl,
     ];
+    #[cfg(target_arch = "wasm32")]
+    let default_backend_order = [Backend::BrowserWebGpu];
 
     let instance = Instance::new(backend_bits);
 
-    let mut valid_adapters = FastHashMap::default();
+    let mut valid_adapters = FastHashMap::<Backend, ArrayVec<PotentialAdapter<Adapter>, 4>>::default();
 
     for backend in &default_backend_order {
         profiling::scope!("enumerating backend", &format_sso!("{:?}", backend));
+        #[cfg(not(target_arch = "wasm32"))]
         let adapters = instance.enumerate_adapters(Backends::from(*backend));
+        #[cfg(target_arch = "wasm32")]
+        let adapters = instance
+            .request_adapter(&wgpu::RequestAdapterOptions {
+                power_preference: wgpu::PowerPreference::HighPerformance,
+                force_fallback_adapter: false,
+                compatible_surface: None,
+            })
+            .await
+            .into_iter();
 
         let mut potential_adapters = ArrayVec::<PotentialAdapter<Adapter>, 4>::new();
         for (idx, adapter) in adapters.enumerate() {
@@ -374,7 +392,7 @@ pub async fn create_iad(
             let features = adapter.features();
             let potential = PotentialAdapter::new(adapter, info, limits, features, desired_mode);
 
-            log::debug!(
+            log::info!(
                 "{:?} Adapter {}: {:#?}",
                 backend,
                 idx,

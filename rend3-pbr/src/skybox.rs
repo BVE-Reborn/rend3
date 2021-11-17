@@ -1,7 +1,7 @@
-use rend3::{resources::TextureManager, types::TextureHandle, util::bind_merge::BindGroupBuilder};
+use rend3::{managers::TextureManager, types::TextureHandle, util::bind_merge::BindGroupBuilder};
 use wgpu::{BindGroup, Device, RenderPass, RenderPipeline};
 
-use crate::common::{interfaces::ShaderInterfaces, samplers::Samplers};
+use crate::common::interfaces::ShaderInterfaces;
 
 pub struct UpdateSkyboxArgs<'a> {
     pub device: &'a Device,
@@ -15,8 +15,7 @@ pub struct UpdateSkyboxArgs<'a> {
 pub struct SkyboxPassDrawArgs<'rpass, 'b> {
     pub rpass: &'b mut RenderPass<'rpass>,
 
-    pub samplers: &'rpass Samplers,
-    pub shader_uniform_bg: &'rpass BindGroup,
+    pub forward_uniform_bg: &'rpass BindGroup,
 }
 
 pub struct StoredSkybox {
@@ -45,9 +44,9 @@ impl SkyboxPass {
                 return;
             }
 
-            let bg = BindGroupBuilder::new(Some("skybox"))
-                .with_texture_view(args.d2c_texture_manager.get_view(handle.get_raw()))
-                .build(args.device, &args.interfaces.skybox_bgl);
+            let bg = BindGroupBuilder::new()
+                .append_texture_view(args.d2c_texture_manager.get_view(handle.get_raw()))
+                .build(args.device, Some("skybox"), &args.interfaces.skybox_bgl);
 
             self.current_skybox = Some(StoredSkybox { bg, handle })
         }
@@ -56,9 +55,8 @@ impl SkyboxPass {
     pub fn draw_skybox<'rpass>(&'rpass self, args: SkyboxPassDrawArgs<'rpass, '_>) {
         if let Some(ref skybox) = self.current_skybox {
             args.rpass.set_pipeline(&self.skybox_pipeline);
-            args.rpass.set_bind_group(0, &args.samplers.linear_nearest_bg, &[]);
+            args.rpass.set_bind_group(0, args.forward_uniform_bg, &[]);
             args.rpass.set_bind_group(1, &skybox.bg, &[]);
-            args.rpass.set_bind_group(2, args.shader_uniform_bg, &[]);
             args.rpass.draw(0..3, 0..1);
         }
     }

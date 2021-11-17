@@ -13,5 +13,5 @@ categories = ["game-development", "graphics", "rendering", "rendering::engine"]
 
 [dependencies]
 bitflags = "1"
-glam = "0.20"
+glam = "0.20.0"
 wgt = { package = "wgpu-types", version = "0.11" }

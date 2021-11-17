@@ -8,12 +8,13 @@ use std::sync::Arc;
 use glam::{UVec2, Vec4};
 use rend3::{
     format_sso,
-    resources::{DirectionalLightManager, MaterialManager, TextureManager},
+    managers::{DirectionalLightManager, MaterialManager, TextureManager},
     types::{TextureFormat, TextureHandle, TextureUsages},
+    util::bind_merge::BindGroupBuilder,
     DepthHandle, ModeData, ReadyData, RenderGraph, RenderPassDepthTarget, RenderPassTarget, RenderPassTargets,
     RenderTargetDescriptor, Renderer, RendererMode,
 };
-use wgpu::{Buffer, Color, Device};
+use wgpu::{BindGroup, Buffer, Color, Device};
 
 pub use utils::*;
 
@@ -34,6 +35,11 @@ pub mod uniforms;
 mod utils;
 pub mod vertex;
 
+struct CulledPerMaterial {
+    inner: CulledObjectSet,
+    per_material: BindGroup,
+}
+
 /// Render routine that renders the using PBR materials and gpu based culling.
 pub struct PbrRenderRoutine {
     pub interfaces: common::interfaces::ShaderInterfaces,
@@ -51,9 +57,9 @@ impl PbrRenderRoutine {
     pub fn new(renderer: &Renderer, render_texture_options: RenderTextureOptions) -> Self {
         profiling::scope!("PbrRenderRoutine::new");
 
-        let interfaces = common::interfaces::ShaderInterfaces::new(&renderer.device);
+        let interfaces = common::interfaces::ShaderInterfaces::new(&renderer.device, renderer.mode);
 
-        let samplers = common::samplers::Samplers::new(&renderer.device, renderer.mode, &interfaces.samplers_bgl);
+        let samplers = common::samplers::Samplers::new(&renderer.device);
 
         let cpu_culler = culling::cpu::CpuCuller::new();
         let gpu_culler = renderer
@@ -145,6 +151,41 @@ impl PbrRenderRoutine {
             "Blend Pre-Cull Data",
             material::TransparencyType::Blend,
         );
+
+        let mut builder = graph.add_node("build uniform data");
+        let shadow_handle = builder.add_data_output::<_, BindGroup>("Shadow Uniform Data");
+        let forward_handle = builder.add_data_output::<_, BindGroup>("Forward Uniform Data");
+        builder.build(move |_pt, renderer, _encoder_or_pass, _temps, _ready, graph_data| {
+            let mut bgb = BindGroupBuilder::new();
+
+            self.samplers.add_to_bg(&mut bgb);
+
+            let uniform_buffer = uniforms::create_shader_uniform(uniforms::CreateShaderUniformArgs {
+                device: &renderer.device,
+                camera: graph_data.camera_manager,
+                interfaces: &self.interfaces,
+                ambient: self.ambient,
+            });
+
+            bgb.append_buffer(&uniform_buffer);
+
+            let shadow_uniform_bg = bgb.build(
+                &renderer.device,
+                Some("shadow uniform bg"),
+                &self.interfaces.shadow_uniform_bgl,
+            );
+
+            graph_data.directional_light_manager.add_to_bg(&mut bgb);
+
+            let forward_uniform_bg = bgb.build(
+                &renderer.device,
+                Some("forward uniform bg"),
+                &self.interfaces.forward_uniform_bgl,
+            );
+
+            graph_data.set_data(shadow_handle, Some(shadow_uniform_bg));
+            graph_data.set_data(forward_handle, Some(forward_uniform_bg));
+        })
     }
 
     pub fn add_shadow_culling_to_graph<'node>(&'node self, graph: &mut RenderGraph<'node>, ready: &ReadyData) {
@@ -167,7 +208,7 @@ impl PbrRenderRoutine {
                     .gpu_culler
                     .mode()
                     .into_data(|| (), || builder.add_data_input(pre_cull_name));
-                let cull_handle = builder.add_data_output::<_, CulledObjectSet>(cull_name.clone());
+                let cull_handle = builder.add_data_output::<_, CulledPerMaterial>(cull_name.clone());
 
                 builder.build(move |_pt, renderer, encoder_or_rpass, temps, ready, graph_data| {
                     let encoder = encoder_or_rpass.get_encoder();
@@ -199,7 +240,25 @@ impl PbrRenderRoutine {
                         }),
                     };
 
-                    graph_data.set_data::<CulledObjectSet>(cull_handle, Some(culled_objects));
+                    let mut per_material_bgb = BindGroupBuilder::new();
+                    per_material_bgb.append_buffer(&culled_objects.output_buffer);
+
+                    if renderer.mode == RendererMode::GPUPowered {
+                        graph_data
+                            .material_manager
+                            .add_to_bg_gpu::<PbrMaterial>(&mut per_material_bgb);
+                    }
+
+                    let per_material_bg =
+                        per_material_bgb.build(&renderer.device, None, &self.interfaces.per_material_bgl);
+
+                    graph_data.set_data(
+                        cull_handle,
+                        Some(CulledPerMaterial {
+                            inner: culled_objects,
+                            per_material: per_material_bg,
+                        }),
+                    );
                 });
             }
         }
@@ -213,7 +272,8 @@ impl PbrRenderRoutine {
             ] {
                 let mut builder = graph.add_node(format_sso!("{} S{} Render", transparency.to_debug_str(), idx));
 
-                let culled_objects_handle = builder.add_data_input::<_, CulledObjectSet>(cull_name);
+                let shadow_uniform_handle = builder.add_data_input::<_, BindGroup>("Shadow Uniform Data");
+                let culled_handle = builder.add_data_input::<_, CulledPerMaterial>(cull_name);
                 let shadow_output_handle = builder.add_shadow_output(idx);
 
                 let rpass_handle = builder.add_renderpass(RenderPassTargets {
@@ -230,24 +290,18 @@ impl PbrRenderRoutine {
                 builder.build(move |pt, _renderer, encoder_or_pass, temps, ready, graph_data| {
                     let this = pt.get(pt_handle);
                     let rpass = encoder_or_pass.get_rpass(rpass_handle);
-                    let culled_objects = graph_data.get_data(temps, culled_objects_handle).unwrap();
+                    let shadow_uniform = graph_data.get_data(temps, shadow_uniform_handle).unwrap();
+                    let culled = graph_data.get_data(temps, culled_handle).unwrap();
 
                     graph_data.mesh_manager.buffers().bind(rpass);
                     rpass.set_pipeline(&this.primary_passes.shadow_passes.opaque_pipeline);
-                    rpass.set_bind_group(0, &this.samplers.linear_nearest_bg, &[]);
-                    rpass.set_bind_group(1, &culled_objects.output_bg, &[]);
+                    rpass.set_bind_group(0, shadow_uniform, &[]);
+                    rpass.set_bind_group(1, &culled.per_material, &[]);
 
-                    match culled_objects.calls {
-                        ModeData::CPU(ref draws) => {
-                            culling::cpu::run(rpass, draws, &this.samplers, 0, graph_data.material_manager, 2)
-                        }
+                    match culled.inner.calls {
+                        ModeData::CPU(ref draws) => culling::cpu::run(rpass, draws, graph_data.material_manager, 2),
                         ModeData::GPU(ref data) => {
-                            rpass.set_bind_group(
-                                2,
-                                graph_data.material_manager.get_bind_group_gpu::<PbrMaterial>(),
-                                &[],
-                            );
-                            rpass.set_bind_group(3, ready.d2_texture.bg.as_gpu(), &[]);
+                            rpass.set_bind_group(2, ready.d2_texture.bg.as_gpu(), &[]);
                             culling::gpu::run(rpass, data);
                         }
                     }
@@ -269,7 +323,7 @@ impl PbrRenderRoutine {
                 .mode()
                 .into_data(|| (), || builder.add_data_input::<_, Buffer>(pre_cull_name));
 
-            let cull_handle = builder.add_data_output::<_, CulledObjectSet>(post_cull_name);
+            let cull_handle = builder.add_data_output::<_, CulledPerMaterial>(post_cull_name);
 
             builder.build(move |_pt, renderer, encoder_or_pass, temps, _ready, graph_data| {
                 let encoder = encoder_or_pass.get_encoder();
@@ -294,7 +348,24 @@ impl PbrRenderRoutine {
                     culling_input,
                 });
 
-                graph_data.set_data(cull_handle, Some(culled_objects));
+                let mut per_material_bgb = BindGroupBuilder::new();
+                per_material_bgb.append_buffer(&culled_objects.output_buffer);
+
+                if renderer.mode == RendererMode::GPUPowered {
+                    graph_data
+                        .material_manager
+                        .add_to_bg_gpu::<PbrMaterial>(&mut per_material_bgb);
+                }
+
+                let per_material_bg = per_material_bgb.build(&renderer.device, None, &self.interfaces.per_material_bgl);
+
+                graph_data.set_data(
+                    cull_handle,
+                    Some(CulledPerMaterial {
+                        inner: culled_objects,
+                        per_material: per_material_bg,
+                    }),
+                );
             });
         }
     }
@@ -324,7 +395,8 @@ impl PbrRenderRoutine {
                 },
             );
 
-            let cull_handle = builder.add_data_input::<_, CulledObjectSet>(cull_name);
+            let forward_uniform_handle = builder.add_data_input::<_, BindGroup>("Forward Uniform Data");
+            let cull_handle = builder.add_data_input::<_, CulledPerMaterial>(cull_name);
 
             let rpass_handle = builder.add_renderpass(RenderPassTargets {
                 targets: vec![RenderPassTarget {
@@ -344,7 +416,8 @@ impl PbrRenderRoutine {
             builder.build(move |pt, renderer, encoder_or_pass, temps, ready, graph_data| {
                 let this = pt.get(pt_handle);
                 let rpass = encoder_or_pass.get_rpass(rpass_handle);
-                let culled_objects = graph_data.get_data(temps, cull_handle);
+                let forward_uniform_bg = graph_data.get_data(temps, forward_uniform_handle).unwrap();
+                let culled = graph_data.get_data(temps, cull_handle).unwrap();
 
                 let pass = match transparency {
                     TransparencyType::Opaque => &this.primary_passes.opaque_pass,
@@ -359,9 +432,10 @@ impl PbrRenderRoutine {
                     rpass,
                     materials: graph_data.material_manager,
                     meshes: graph_data.mesh_manager.buffers(),
-                    samplers: &this.samplers,
+                    forward_uniform_bg,
+                    per_material_bg: &culled.per_material,
                     texture_bg: d2_texture_output_bg_ref,
-                    culled_objects: culled_objects.as_ref().unwrap(),
+                    culled_objects: &culled.inner,
                 });
             });
         }
@@ -406,17 +480,18 @@ impl PbrRenderRoutine {
                 }),
             });
 
-            let shadow_handle = builder.add_shadow_array_input();
+            let _ = builder.add_shadow_array_input();
 
-            let culled_objects_handle = builder.add_data_input::<_, CulledObjectSet>(cull_name);
+            let forward_uniform_handle = builder.add_data_input::<_, BindGroup>("Forward Uniform Data");
+            let cull_handle = builder.add_data_input::<_, CulledPerMaterial>(cull_name);
 
             let pt_handle = builder.passthrough_data(self);
 
             builder.build(move |pt, renderer, encoder_or_pass, temps, ready, graph_data| {
                 let this = pt.get(pt_handle);
                 let rpass = encoder_or_pass.get_rpass(rpass_handle);
-                let culled_objects = graph_data.get_data(temps, culled_objects_handle);
-                let shadow_bg = graph_data.get_shadow_array(shadow_handle);
+                let forward_uniform_bg = graph_data.get_data(temps, forward_uniform_handle).unwrap();
+                let culled = graph_data.get_data(temps, cull_handle).unwrap();
 
                 let pass = match transparency {
                     TransparencyType::Opaque => &this.primary_passes.opaque_pass,
@@ -426,24 +501,16 @@ impl PbrRenderRoutine {
 
                 let d2_texture_output_bg_ref = ready.d2_texture.bg.as_ref().map(|_| (), |a| &**a);
 
-                let primary_camera_uniform_bg =
-                    temps.add(uniforms::create_shader_uniform(uniforms::CreateShaderUniformArgs {
-                        device: &renderer.device,
-                        camera: graph_data.camera_manager,
-                        interfaces: &self.interfaces,
-                        ambient: self.ambient,
-                    }));
-
                 pass.draw(forward::ForwardPassDrawArgs {
                     device: &renderer.device,
                     rpass,
                     materials: graph_data.material_manager,
                     meshes: graph_data.mesh_manager.buffers(),
                     samplers: &this.samplers,
-                    directional_light_bg: shadow_bg,
+                    forward_uniform_bg,
+                    per_material_bg: &culled.per_material,
                     texture_bg: d2_texture_output_bg_ref,
-                    shader_uniform_bg: &*primary_camera_uniform_bg,
-                    culled_objects: culled_objects.as_ref().unwrap(),
+                    culled_objects: &culled.inner,
                 });
             });
         }
@@ -499,7 +566,6 @@ impl PrimaryPasses {
             mode: args.mode,
             device: args.device,
             interfaces: args.interfaces,
-            directional_light_bgl: args.directional_lights.get_bgl(),
             texture_bgl: gpu_d2_texture_bgl,
             materials: args.materials,
             samples: args.samples,
@@ -547,7 +613,6 @@ impl PrimaryPasses {
 
 pub struct SkyboxRoutine {
     pub interfaces: common::interfaces::ShaderInterfaces,
-    pub samplers: common::samplers::Samplers,
     pub skybox_pass: skybox::SkyboxPass,
     pub options: RenderTextureOptions,
 
@@ -557,8 +622,7 @@ pub struct SkyboxRoutine {
 impl SkyboxRoutine {
     pub fn new(renderer: &Renderer, options: RenderTextureOptions) -> Self {
         // TODO: clean up
-        let interfaces = common::interfaces::ShaderInterfaces::new(&renderer.device);
-        let samplers = common::samplers::Samplers::new(&renderer.device, renderer.mode, &interfaces.samplers_bgl);
+        let interfaces = common::interfaces::ShaderInterfaces::new(&renderer.device, renderer.mode);
 
         let skybox_pipeline = common::skybox_pass::build_skybox_pipeline(common::skybox_pass::BuildSkyboxShaderArgs {
             mode: renderer.mode,
@@ -572,7 +636,6 @@ impl SkyboxRoutine {
         Self {
             skybox_pass,
             options,
-            samplers,
             interfaces,
             skybox_texture: None,
         }
@@ -634,24 +697,18 @@ impl SkyboxRoutine {
             }),
         });
 
+        let forward_uniform_handle = builder.add_data_input::<_, BindGroup>("Forward Uniform Data");
         let pt_handle = builder.passthrough_data(self);
 
-        builder.build(move |pt, renderer, encoder_or_pass, temps, _ready, graph_data| {
+        builder.build(move |pt, _renderer, encoder_or_pass, temps, _ready, graph_data| {
             let this = pt.get(pt_handle);
             let rpass = encoder_or_pass.get_rpass(rpass_handle);
 
-            let primary_camera_uniform_bg =
-                temps.add(uniforms::create_shader_uniform(uniforms::CreateShaderUniformArgs {
-                    device: &renderer.device,
-                    camera: graph_data.camera_manager,
-                    interfaces: &self.interfaces,
-                    ambient: Vec4::ZERO,
-                }));
+            let forward_uniform_bg = graph_data.get_data(temps, forward_uniform_handle).unwrap();
 
             this.skybox_pass.draw_skybox(skybox::SkyboxPassDrawArgs {
                 rpass,
-                samplers: &this.samplers,
-                shader_uniform_bg: &*primary_camera_uniform_bg,
+                forward_uniform_bg,
             });
         });
     }
@@ -659,7 +716,6 @@ impl SkyboxRoutine {
 
 pub struct TonemappingRoutine {
     pub interfaces: common::interfaces::ShaderInterfaces,
-    pub samplers: common::samplers::Samplers,
     pub tonemapping_pass: tonemapping::TonemappingPass,
     pub size: UVec2,
 }
@@ -667,8 +723,7 @@ pub struct TonemappingRoutine {
 impl TonemappingRoutine {
     pub fn new(renderer: &Renderer, size: UVec2, output_format: TextureFormat) -> Self {
         // TODO: clean up
-        let interfaces = common::interfaces::ShaderInterfaces::new(&renderer.device);
-        let samplers = common::samplers::Samplers::new(&renderer.device, renderer.mode, &interfaces.samplers_bgl);
+        let interfaces = common::interfaces::ShaderInterfaces::new(&renderer.device, renderer.mode);
 
         let tonemapping_pass = tonemapping::TonemappingPass::new(tonemapping::TonemappingPassNewArgs {
             device: &renderer.device,
@@ -679,7 +734,6 @@ impl TonemappingRoutine {
         Self {
             tonemapping_pass,
             size,
-            samplers,
             interfaces,
         }
     }
@@ -693,10 +747,12 @@ impl TonemappingRoutine {
 
         let hdr_color_handle = builder.add_render_target_input("hdr color");
 
+        let forward_uniform_handle = builder.add_data_input::<_, BindGroup>("Forward Uniform Data");
         let output_handle = builder.add_surface_output();
 
-        builder.build(move |_pt, renderer, encoder_or_pass, _temps, _ready, graph_data| {
+        builder.build(move |_pt, renderer, encoder_or_pass, temps, _ready, graph_data| {
             let encoder = encoder_or_pass.get_encoder();
+            let forward_uniform_bg = graph_data.get_data(temps, forward_uniform_handle).unwrap();
             let hdr_color = graph_data.get_render_target(hdr_color_handle);
             let output = graph_data.get_render_target(output_handle);
 
@@ -704,7 +760,7 @@ impl TonemappingRoutine {
                 device: &renderer.device,
                 encoder,
                 interfaces: &self.interfaces,
-                samplers: &self.samplers,
+                forward_uniform_bg,
                 source: hdr_color,
                 target: output,
             });

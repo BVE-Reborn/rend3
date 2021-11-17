@@ -43,9 +43,9 @@ layout(set = 0, binding = OBJECT_OUTPUT_DATA_BUFFER_BINDING, std430) restrict bu
 };
 layout(set = 0, binding = INDIRECT_BUFFER_BINDING, std430) restrict buffer IndirectBuffer {
     uint draw_call_count;
-    uint _2;
-    uint _3;
-    uint _4;
+    uint pad0;
+    uint pad1;
+    uint pad2;
     IndirectCall indirect_call[];
 };
 
@@ -83,12 +83,20 @@ vec4 transform_sphere(vec4 sphere, mat4 transform) {
     return vec4(center.xyz, sphere.w * max_scale);
 }
 
+float self_dot(vec3 me) {
+    return dot(me, me);
+}
+
+vec3 inv_squared_scale(mat3 matrix) {
+    return 1.0 / vec3(self_dot(matrix[0].xyz), self_dot(matrix[1].xyz), self_dot(matrix[2].xyz));
+}
+
 void write_output(ObjectInputData in_data, uint index) {
     ObjectOutputData out_data;
 
     out_data.model_view = uniforms.view * in_data.transform;
     out_data.model_view_proj = uniforms.view_proj * in_data.transform;
-    out_data.inv_trans_model_view = inverse(transpose(mat3(uniforms.view * in_data.transform)));
+    out_data.inv_squared_scale = inv_squared_scale(mat3(out_data.model_view));
     out_data.material_idx = in_data.material_idx;
 
     object_output[index] = out_data;

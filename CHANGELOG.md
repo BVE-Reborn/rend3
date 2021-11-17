@@ -14,6 +14,8 @@ Per Keep a Changelog there are 6 main categories of changes:
 - Fixed
 - Security
 
+## Versions
+
 - [Unreleased](#unreleased)
 - [v0.2.0](#v020)
 - [v0.1.1](#v011)

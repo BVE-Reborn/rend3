@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use ordered_float::OrderedFloat;
-use rend3::resources::{CameraManager, InternalObject};
+use rend3::managers::{CameraManager, InternalObject};
 
 use crate::culling::Sorting;
 

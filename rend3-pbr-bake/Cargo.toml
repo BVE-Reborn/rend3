@@ -17,4 +17,4 @@ glam = "0.20"
 profiling = {version = "1", default-features = false }
 rend3 = { version = "^0.2.0", path = "../rend3" }
 rend3-pbr = { version = "^0.2.0", path = "../rend3-pbr" }
-wgpu = { version = "0.11", features = ["spirv"] }
+wgpu = { version = "0.11" }

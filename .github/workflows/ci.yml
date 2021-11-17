@@ -5,16 +5,38 @@ on:
     branches: ["trunk", "CI/**"]
   pull_request:
 
+env:
+  RUSTFLAGS: --cfg=web_sys_unstable_apis -D warnings
+
 jobs:
   build:
     timeout-minutes: 30
 
     strategy:
       matrix:
-        rust_version: [stable]
-        os: [windows-latest, macos-latest, ubuntu-latest]
+        include:
+          # wasm stable
+          - name: 'stable wasm'
+            os: 'ubuntu-latest'
+            target: 'wasm32-unknown-unknown'
+            rust_version: 'stable'
+
+          # native stable
+          - name: 'stable linux'
+            os: 'ubuntu-latest'
+            target: 'x86_64-unknown-linux-gnu'
+            rust_version: 'stable'
+          - name: 'stable mac'
+            os: 'macos-latest'
+            target: 'x86_64-apple-darwin'
+            rust_version: 'stable'
+          - name: 'stable windows'
+            os: 'windows-latest'
+            target: 'x86_64-pc-windows-msvc'
+            rust_version: 'stable'
       fail-fast: false
     runs-on: ${{ matrix.os }}
+    name: ${{ matrix.name }}
 
     steps:
       - uses: actions/checkout@v2
@@ -26,6 +48,7 @@ jobs:
         with:
           profile: minimal
           toolchain: ${{ matrix.rust_version }}
+          target: ${{ matrix.target }}
           components: clippy
           default: true
           override: true
@@ -39,23 +62,26 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: build
+          args: --target ${{ matrix.target }}
 
       - name: test
         uses: actions-rs/cargo@v1
         with:
           command: test
+          args: --target ${{ matrix.target }}
+        if: matrix.target != 'wasm32-unknown-unknown'
 
       - name: clippy (rend3-gltf featureless)
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: -p rend3-gltf --no-default-features -- -D warnings
+          args: --target ${{ matrix.target }} -p rend3-gltf --no-default-features
 
       - name: clippy
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: -- -D warnings
+          args: --target ${{ matrix.target }}
         if: matrix.rust_version == 'stable'
 
   cargo-fmt:

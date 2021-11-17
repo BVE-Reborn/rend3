@@ -1,10 +1,13 @@
 use crate::{
+    managers::{ObjectManager, TextureManager},
     mode::ModeData,
-    resources::{ObjectManager, TextureManager},
     types::{MaterialHandle, TextureHandle},
     util::{
-        bind_merge::BindGroupBuilder, buffer::WrappedPotBuffer, math::round_up_pot,
-        registry::ArchitypicalErasedRegistry, typedefs::FastHashMap,
+        bind_merge::{BindGroupBuilder, BindGroupLayoutBuilder},
+        buffer::WrappedPotBuffer,
+        math::round_up_pot,
+        registry::ArchitypicalErasedRegistry,
+        typedefs::FastHashMap,
     },
     RendererMode,
 };
@@ -33,7 +36,7 @@ pub struct InternalMaterial {
 
 #[allow(clippy::type_complexity)]
 struct PerTypeInfo {
-    bgl: ModeData<BindGroupLayout, BindGroupLayout>,
+    bgl: ModeData<BindGroupLayout, ()>,
     data_size: u32,
     texture_count: u32,
     write_gpu_materials_fn: fn(&mut [u8], &VecAny, &mut (dyn FnMut(&TextureHandle) -> NonZeroU32 + '_)) -> usize,
@@ -49,9 +52,14 @@ pub struct MaterialKeyPair {
     pub key: u64,
 }
 
+struct BufferRange {
+    offset: u64,
+    size: NonZeroU64,
+}
+
 /// Manages materials and their associated BindGroups in CPU modes.
 pub struct MaterialManager {
-    bg: FastHashMap<TypeId, ModeData<(), BindGroup>>,
+    bg: FastHashMap<TypeId, ModeData<(), BufferRange>>,
     type_info: FastHashMap<TypeId, PerTypeInfo>,
 
     buffer: ModeData<(), WrappedPotBuffer>,
@@ -120,21 +128,7 @@ impl MaterialManager {
                         entries: &entries,
                     })
                 },
-                || {
-                    device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-                        label: Some("gpu material bgl"),
-                        entries: &[BindGroupLayoutEntry {
-                            binding: 0,
-                            visibility: ShaderStages::VERTEX_FRAGMENT,
-                            ty: BindingType::Buffer {
-                                ty: BufferBindingType::Storage { read_only: true },
-                                has_dynamic_offset: false,
-                                min_binding_size: NonZeroU64::new((M::TEXTURE_COUNT * 4 + M::DATA_SIZE) as _),
-                            },
-                            count: None,
-                        }],
-                    })
-                },
+                || (),
             )
         };
 
@@ -174,7 +168,7 @@ impl MaterialManager {
             let mut data = vec![0u8; actual_size as usize];
             material.to_data(&mut data[..M::DATA_SIZE as usize]);
 
-            let mut builder = BindGroupBuilder::new(None);
+            let mut builder = BindGroupBuilder::new();
             let mut texture_mask = 0_u32;
             for (idx, texture) in textures.into_iter().enumerate() {
                 builder.append(BindingResource::TextureView(
@@ -194,9 +188,10 @@ impl MaterialManager {
                 usage: BufferUsages::COPY_DST | BufferUsages::UNIFORM,
             });
 
-            let bind_group = builder
-                .with_buffer(&material_buffer)
-                .build(device, type_info.bgl.as_ref().as_cpu());
+            let bind_group =
+                builder
+                    .append_buffer(&material_buffer)
+                    .build(device, None, type_info.bgl.as_ref().as_cpu());
 
             (ModeData::CPU(bind_group), ModeData::CPU(material_buffer))
         } else {
@@ -282,8 +277,29 @@ impl MaterialManager {
         self.registry.get_ref::<M>(handle)
     }
 
-    pub fn get_bind_group_layout<M: Material>(&self) -> &BindGroupLayout {
-        self.type_info[&TypeId::of::<M>()].bgl.as_ref().into_common()
+    pub fn get_bind_group_layout_cpu<M: Material>(&self) -> &BindGroupLayout {
+        self.type_info[&TypeId::of::<M>()].bgl.as_cpu()
+    }
+
+    pub fn add_to_bgl_gpu<M: Material>(bglb: &mut BindGroupLayoutBuilder) {
+        bglb.append(
+            ShaderStages::VERTEX_FRAGMENT,
+            BindingType::Buffer {
+                ty: BufferBindingType::Storage { read_only: true },
+                has_dynamic_offset: false,
+                min_binding_size: NonZeroU64::new((M::TEXTURE_COUNT * 4 + M::DATA_SIZE) as _),
+            },
+            None,
+        );
+    }
+
+    pub fn add_to_bg_gpu<'a, M: Material>(&'a self, bgb: &mut BindGroupBuilder<'a>) {
+        let range = self.bg[&TypeId::of::<M>()].as_gpu();
+        bgb.append(BindingResource::Buffer(BufferBinding {
+            buffer: self.buffer.as_gpu(),
+            offset: range.offset,
+            size: Some(range.size),
+        }));
     }
 
     pub fn get_internal_material_full<M: Material>(&self, handle: RawMaterialHandle) -> (&M, &InternalMaterial) {
@@ -292,10 +308,6 @@ impl MaterialManager {
 
     pub fn get_internal_material_full_by_index<M: Material>(&self, index: usize) -> (&M, &InternalMaterial) {
         self.registry.get_ref_full_by_index::<M>(index)
-    }
-
-    pub fn get_bind_group_gpu<M: Material>(&self) -> &BindGroup {
-        self.bg[&TypeId::of::<M>()].as_gpu()
     }
 
     pub fn get_material_key_and_objects(
@@ -369,13 +381,10 @@ impl MaterialManager {
 
                 self.bg.insert(
                     ty,
-                    ModeData::GPU(create_gpu_buffer_bg(
-                        device,
-                        type_info.bgl.as_gpu(),
-                        buffer,
-                        offset,
-                        size,
-                    )),
+                    ModeData::GPU(BufferRange {
+                        offset: offset as u64,
+                        size: NonZeroU64::new(size as u64).unwrap(),
+                    }),
                 );
 
                 offset += size;
@@ -385,22 +394,6 @@ impl MaterialManager {
             buffer.write_to_buffer(device, queue, bytemuck::cast_slice(&data));
         }
     }
-}
-
-fn create_gpu_buffer_bg(
-    device: &Device,
-    bgl: &BindGroupLayout,
-    buffer: &Buffer,
-    offset: usize,
-    size: usize,
-) -> BindGroup {
-    BindGroupBuilder::new(Some("gpu material bg"))
-        .with(BindingResource::Buffer(BufferBinding {
-            buffer,
-            offset: offset as u64,
-            size: Some(NonZeroU64::new(size as u64).unwrap()),
-        }))
-        .build(device, bgl)
 }
 
 fn write_gpu_materials<M: Material>(

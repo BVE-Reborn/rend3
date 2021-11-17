@@ -1,12 +1,12 @@
 use std::any::TypeId;
 
 use crate::{
-    resources::{MaterialKeyPair, MaterialManager, MeshManager},
+    managers::{MaterialKeyPair, MaterialManager, MeshManager},
     types::{Object, ObjectHandle},
     util::{frustum::BoundingSphere, registry::ArchetypicalRegistry},
 };
 use glam::{Mat4, Vec3A};
-use rend3_types::{Material, MaterialHandle, RawObjectHandle};
+use rend3_types::{Material, MaterialHandle, MeshHandle, RawObjectHandle};
 
 #[repr(C, align(16))]
 #[derive(Debug, Copy, Clone)]
@@ -27,6 +27,7 @@ unsafe impl bytemuck::Zeroable for GpuCullingInput {}
 #[repr(C, align(16))]
 #[derive(Debug, Clone)]
 pub struct InternalObject {
+    pub mesh_handle: MeshHandle,
     pub material_handle: MaterialHandle,
     // Index into the material archetype array
     pub location: Vec3A,
@@ -78,6 +79,7 @@ impl ObjectManager {
                 vertex_offset: mesh.vertex_range.start as i32,
             },
             material_handle: object.material,
+            mesh_handle: object.mesh,
         };
 
         self.registry.insert(handle, shader_object, material_key);

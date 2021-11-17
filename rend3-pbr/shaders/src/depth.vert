@@ -23,7 +23,7 @@ layout(set = 1, binding = 0, std430) readonly buffer ObjectOutputDataBuffer {
     ObjectOutputData object_output[];
 };
 #ifdef GPU_MODE
-layout(set = 2, binding = 0, std430) readonly buffer MaterialBuffer {
+layout(set = 1, binding = 1, std430) readonly buffer MaterialBuffer {
     GPUMaterialData materials[];
 };
 #endif

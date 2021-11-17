@@ -1,7 +1,7 @@
 use arrayvec::ArrayVec;
 #[allow(unused_imports)]
 use rend3::format_sso;
-use rend3::{resources::MaterialManager, ModeData, RendererMode};
+use rend3::{managers::MaterialManager, ModeData, RendererMode};
 use wgpu::{
     BindGroupLayout, BlendState, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState, DepthStencilState,
     Device, Face, FragmentState, FrontFace, MultisampleState, PipelineLayoutDescriptor, PolygonMode, PrimitiveState,
@@ -31,7 +31,6 @@ pub struct BuildForwardPassShaderArgs<'a> {
 
     pub interfaces: &'a ShaderInterfaces,
 
-    pub directional_light_bgl: &'a BindGroupLayout,
     pub texture_bgl: ModeData<(), &'a BindGroupLayout>,
 
     pub materials: &'a MaterialManager,
@@ -53,14 +52,13 @@ pub fn build_forward_pass_pipeline(args: BuildForwardPassShaderArgs<'_>) -> Rend
             args.mode,
             "forward pass vert",
             match args.baking {
-                Baking::Disabled => "opaque.vert.cpu.spv",
-                Baking::Enabled => "opaque-baking.vert.cpu.spv",
+                Baking::Disabled => "opaque.vert.cpu.wgsl",
+                Baking::Enabled => "opaque-baking.vert.cpu.wgsl",
             },
             match args.baking {
                 Baking::Disabled => "opaque.vert.gpu.spv",
                 Baking::Enabled => "opaque-baking.vert.gpu.spv",
             },
-            false,
         )
     };
 
@@ -69,20 +67,18 @@ pub fn build_forward_pass_pipeline(args: BuildForwardPassShaderArgs<'_>) -> Rend
             args.device,
             args.mode,
             "forward pass frag",
-            "opaque.frag.cpu.spv",
+            "opaque.frag.cpu.wgsl",
             "opaque.frag.gpu.spv",
-            false,
         )
     };
 
     let mut bgls: ArrayVec<&BindGroupLayout, 6> = ArrayVec::new();
-    bgls.push(&args.interfaces.samplers_bgl);
-    bgls.push(&args.interfaces.culled_object_bgl);
-    bgls.push(args.directional_light_bgl);
-    bgls.push(&args.interfaces.uniform_bgl);
-    bgls.push(args.materials.get_bind_group_layout::<PbrMaterial>());
+    bgls.push(&args.interfaces.forward_uniform_bgl);
+    bgls.push(&args.interfaces.per_material_bgl);
     if args.mode == RendererMode::GPUPowered {
         bgls.push(args.texture_bgl.as_gpu())
+    } else {
+        bgls.push(args.materials.get_bind_group_layout_cpu::<PbrMaterial>());
     }
 
     let pll = args.device.create_pipeline_layout(&PipelineLayoutDescriptor {

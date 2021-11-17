@@ -18,24 +18,28 @@ exclude = [
 name = "scene-viewer"
 path = "src/main.rs"
 
+[features]
+tracy = ["profiling/profile-with-tracy", "tracy-client"]
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-basis-universal  = "0.1"
-env_logger = { version = "0.9", default-features = false, features = ["termcolor", "atty"] }
-glam = "0.20"
+anyhow = "1"
+cfg-if = "1"
+glam = "0.20.0"
 histogram = "0.6"
 image = { version = "0.23", default-features = false, features = ["png", "jpeg", "tiff"]}
+instant = { version = "0.1", features = ["wasm-bindgen"] }
 log = "0.4"
-parking_lot = "0.11"
 pico-args = "0.4"
-pollster = "0.2"
-profiling = { version = "1", default-features = false, features = ["profile-with-tracy"] }
+profiling = { version = "1", default-features = false }
 rend3 = { version = "^0.2.0", path = "../../rend3" }
-rend3-gltf = { version = "^0.2.0", path = "../../rend3-gltf" }
+rend3-gltf = { version = "^0.2.0", default-features = false, path = "../../rend3-gltf", features = ["ddsfile", "ktx2"] }
+rend3-framework = { version = "^0.2.0", path = "../../rend3-framework" }
 rend3-pbr = { version = "^0.2.0", path = "../../rend3-pbr" }
 rustc-hash = "1"
 smallvec = "1"
-tracy-client = "0.12"
+tracy-client = { version = "0.12", optional = true }
 wgpu-profiler = "0.7.0"
-winit = "0.25"
+winit = { version = "0.25", features = ["web-sys"] }
+

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use arrayvec::ArrayVec;
-use rend3::{resources::MaterialManager, ModeData, RendererMode};
+use rend3::{managers::MaterialManager, ModeData, RendererMode};
 use wgpu::{
     BindGroupLayout, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState, DepthStencilState, Device, Face,
     FragmentState, FrontFace, MultisampleState, PipelineLayoutDescriptor, PolygonMode, PrimitiveState,
@@ -47,9 +47,8 @@ pub fn build_depth_pass_pipeline(args: BuildDepthPassShaderArgs) -> DepthPassPip
             args.device,
             args.mode,
             "depth pass vert",
-            "depth.vert.cpu.spv",
+            "depth.vert.cpu.wgsl",
             "depth.vert.gpu.spv",
-            false,
         )
     };
 
@@ -58,9 +57,8 @@ pub fn build_depth_pass_pipeline(args: BuildDepthPassShaderArgs) -> DepthPassPip
             args.device,
             args.mode,
             "depth pass opaque frag",
-            "depth-opaque.frag.cpu.spv",
+            "depth-opaque.frag.cpu.wgsl",
             "depth-opaque.frag.gpu.spv",
-            false,
         )
     };
 
@@ -69,18 +67,21 @@ pub fn build_depth_pass_pipeline(args: BuildDepthPassShaderArgs) -> DepthPassPip
             args.device,
             args.mode,
             "depth pass cutout frag",
-            "depth-cutout.frag.cpu.spv",
+            "depth-cutout.frag.cpu.wgsl",
             "depth-cutout.frag.gpu.spv",
-            false,
         )
     };
 
     let mut bgls: ArrayVec<&BindGroupLayout, 4> = ArrayVec::new();
-    bgls.push(&args.interfaces.samplers_bgl);
-    bgls.push(&args.interfaces.culled_object_bgl);
-    bgls.push(args.materials.get_bind_group_layout::<PbrMaterial>());
+    bgls.push(match args.ty {
+        DepthPassType::Shadow => &args.interfaces.shadow_uniform_bgl,
+        DepthPassType::Prepass => &args.interfaces.forward_uniform_bgl,
+    });
+    bgls.push(&args.interfaces.per_material_bgl);
     if args.mode == RendererMode::GPUPowered {
         bgls.push(args.texture_bgl.as_gpu())
+    } else {
+        bgls.push(args.materials.get_bind_group_layout_cpu::<PbrMaterial>());
     }
 
     let pll = args.device.create_pipeline_layout(&PipelineLayoutDescriptor {

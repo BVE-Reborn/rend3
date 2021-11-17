@@ -1,24 +1,24 @@
-use std::{mem, num::NonZeroU64};
+use std::{borrow::Cow, mem, num::NonZeroU64};
 
 use glam::Mat4;
 use rend3::{
-    resources::{CameraManager, GpuCullingInput, InternalObject, ObjectManager},
+    managers::{CameraManager, GpuCullingInput, InternalObject, ObjectManager},
     util::{bind_merge::BindGroupBuilder, frustum::ShaderFrustum},
     ModeData,
 };
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
-    BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType,
-    Buffer, BufferBindingType, BufferDescriptor, BufferUsages, CommandEncoder, ComputePassDescriptor, ComputePipeline,
-    ComputePipelineDescriptor, Device, PipelineLayoutDescriptor, PushConstantRange, RenderPass, ShaderModuleDescriptor,
-    ShaderModuleDescriptorSpirV, ShaderStages,
+    BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, Buffer, BufferBindingType,
+    BufferDescriptor, BufferUsages, CommandEncoder, ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor,
+    Device, PipelineLayoutDescriptor, PushConstantRange, RenderPass, ShaderModuleDescriptor,
+    ShaderModuleDescriptorSpirV, ShaderSource, ShaderStages,
 };
 
 use crate::{
     common::interfaces::{PerObjectData, ShaderInterfaces},
     culling::{CulledObjectSet, GPUIndirectData, Sorting},
     material::TransparencyType,
-    shaders::SPIRV_SHADERS,
+    shaders::{SPIRV_SHADERS, WGSL_SHADERS},
 };
 
 #[repr(C, align(16))]
@@ -215,22 +215,35 @@ impl GpuCuller {
 
         let prefix_cull_sm = device.create_shader_module(&ShaderModuleDescriptor {
             label: Some("cull-prefix-cull"),
-            source: wgpu::util::make_spirv(SPIRV_SHADERS.get_file("cull-prefix-cull.comp.spv").unwrap().contents()),
+            source: ShaderSource::Wgsl(Cow::Borrowed(
+                WGSL_SHADERS
+                    .get_file("cull-prefix-cull.comp.wgsl")
+                    .unwrap()
+                    .contents_utf8()
+                    .unwrap(),
+            )),
         });
 
         let prefix_sum_sm = device.create_shader_module(&ShaderModuleDescriptor {
             label: Some("cull-prefix-sum"),
-            source: wgpu::util::make_spirv(SPIRV_SHADERS.get_file("cull-prefix-sum.comp.spv").unwrap().contents()),
+            source: ShaderSource::Wgsl(Cow::Borrowed(
+                WGSL_SHADERS
+                    .get_file("cull-prefix-sum.comp.wgsl")
+                    .unwrap()
+                    .contents_utf8()
+                    .unwrap(),
+            )),
         });
 
         let prefix_output_sm = device.create_shader_module(&ShaderModuleDescriptor {
             label: Some("cull-prefix-output"),
-            source: wgpu::util::make_spirv(
-                SPIRV_SHADERS
-                    .get_file("cull-prefix-output.comp.spv")
+            source: ShaderSource::Wgsl(Cow::Borrowed(
+                WGSL_SHADERS
+                    .get_file("cull-prefix-output.comp.wgsl")
                     .unwrap()
-                    .contents(),
-            ),
+                    .contents_utf8()
+                    .unwrap(),
+            )),
         });
 
         let atomic_pipeline = device.create_compute_pipeline(&ComputePipelineDescriptor {
@@ -322,23 +335,23 @@ impl GpuCuller {
                     mapped_at_creation: false,
                 });
 
-                let bg_a = BindGroupBuilder::new(Some("prefix cull A bg"))
-                    .with_buffer(args.input_buffer)
-                    .with_buffer(&uniform_buffer)
-                    .with_buffer(&buffer_a)
-                    .with_buffer(&buffer_b)
-                    .with_buffer(&output_buffer)
-                    .with_buffer(&indirect_buffer)
-                    .build(args.device, &self.prefix_bgl);
+                let bg_a = BindGroupBuilder::new()
+                    .append_buffer(args.input_buffer)
+                    .append_buffer(&uniform_buffer)
+                    .append_buffer(&buffer_a)
+                    .append_buffer(&buffer_b)
+                    .append_buffer(&output_buffer)
+                    .append_buffer(&indirect_buffer)
+                    .build(args.device, Some("prefix cull A bg"), &self.prefix_bgl);
 
-                let bg_b = BindGroupBuilder::new(Some("prefix cull B bg"))
-                    .with_buffer(args.input_buffer)
-                    .with_buffer(&uniform_buffer)
-                    .with_buffer(&buffer_b)
-                    .with_buffer(&buffer_a)
-                    .with_buffer(&output_buffer)
-                    .with_buffer(&indirect_buffer)
-                    .build(args.device, &self.prefix_bgl);
+                let bg_b = BindGroupBuilder::new()
+                    .append_buffer(args.input_buffer)
+                    .append_buffer(&uniform_buffer)
+                    .append_buffer(&buffer_b)
+                    .append_buffer(&buffer_a)
+                    .append_buffer(&output_buffer)
+                    .append_buffer(&indirect_buffer)
+                    .build(args.device, Some("prefix cull B bg"), &self.prefix_bgl);
 
                 let mut cpass = args.encoder.begin_compute_pass(&ComputePassDescriptor {
                     label: Some("prefix cull"),
@@ -366,12 +379,12 @@ impl GpuCuller {
                 cpass.set_bind_group(0, bind_group, &[]);
                 cpass.dispatch(dispatch_count, 1, 1);
             } else {
-                let bg = BindGroupBuilder::new(Some("atomic culling bg"))
-                    .with_buffer(args.input_buffer)
-                    .with_buffer(&uniform_buffer)
-                    .with_buffer(&output_buffer)
-                    .with_buffer(&indirect_buffer)
-                    .build(args.device, &self.atomic_bgl);
+                let bg = BindGroupBuilder::new()
+                    .append_buffer(args.input_buffer)
+                    .append_buffer(&uniform_buffer)
+                    .append_buffer(&output_buffer)
+                    .append_buffer(&indirect_buffer)
+                    .build(args.device, Some("atomic culling bg"), &self.atomic_bgl);
 
                 let mut cpass = args.encoder.begin_compute_pass(&ComputePassDescriptor {
                     label: Some("atomic cull"),
@@ -385,18 +398,9 @@ impl GpuCuller {
             }
         }
 
-        let output_bg = args.device.create_bind_group(&BindGroupDescriptor {
-            label: Some("culling input bg"),
-            layout: &args.interfaces.culled_object_bgl,
-            entries: &[BindGroupEntry {
-                binding: 0,
-                resource: output_buffer.as_entire_binding(),
-            }],
-        });
-
         CulledObjectSet {
             calls: ModeData::GPU(GPUIndirectData { indirect_buffer, count }),
-            output_bg,
+            output_buffer,
         }
     }
 }

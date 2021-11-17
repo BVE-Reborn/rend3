@@ -10,14 +10,14 @@ use bumpalo::Bump;
 use glam::UVec2;
 use rend3_types::{BufferUsages, TextureFormat, TextureUsages};
 use wgpu::{
-    BindGroup, Color, CommandBuffer, CommandEncoder, CommandEncoderDescriptor, Extent3d, LoadOp, Operations,
-    RenderPass, RenderPassColorAttachment, RenderPassDepthStencilAttachment, RenderPassDescriptor, Texture,
-    TextureDescriptor, TextureDimension, TextureView, TextureViewDescriptor,
+    Color, CommandBuffer, CommandEncoder, CommandEncoderDescriptor, Extent3d, LoadOp, Operations, RenderPass,
+    RenderPassColorAttachment, RenderPassDepthStencilAttachment, RenderPassDescriptor, Texture, TextureDescriptor,
+    TextureDimension, TextureView, TextureViewDescriptor,
 };
 use wgpu_profiler::ProfilerCommandRecorder;
 
 use crate::{
-    resources::{
+    managers::{
         CameraManager, DirectionalLightManager, MaterialManager, MeshManager, ObjectManager, ShadowCoordinates,
         TextureManager, TextureManagerReadyOutput,
     },
@@ -295,7 +295,6 @@ impl<'node> RenderGraph<'node> {
             {
                 let store = RenderGraphDataStore {
                     texture_mapping: &active_views,
-                    shadow_array_view: directional_light_manager.get_bg(),
                     shadow_coordinates: directional_light_manager.get_coords(),
                     shadow_views: directional_light_manager.get_layer_views(),
                     data: &self.data,
@@ -514,7 +513,6 @@ pub struct DataHandle<T> {
 
 pub struct RenderGraphDataStore<'a> {
     texture_mapping: &'a FastHashMap<SsoString, TextureView>,
-    shadow_array_view: &'a BindGroup,
     shadow_coordinates: &'a [ShadowCoordinates],
     shadow_views: &'a [TextureView],
     data: &'a FastHashMap<SsoString, Box<dyn Any>>, // Any is RefCell<Option<T>> where T is the stored data
@@ -558,10 +556,6 @@ impl<'a> RenderGraphDataStore<'a> {
             offset: coords.offset,
             size: coords.size,
         }
-    }
-
-    pub fn get_shadow_array(&self, _: ShadowArrayHandle) -> &'a BindGroup {
-        self.shadow_array_view
     }
 
     pub fn set_data<T: 'static>(&self, handle: DataHandle<T>, data: Option<T>) {

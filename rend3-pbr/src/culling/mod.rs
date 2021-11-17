@@ -1,12 +1,12 @@
 use rend3::ModeData;
-use wgpu::{BindGroup, Buffer};
+use wgpu::Buffer;
 
 pub mod cpu;
 pub mod gpu;
 
 pub struct CulledObjectSet {
     pub calls: ModeData<Vec<CPUDrawCall>, GPUIndirectData>,
-    pub output_bg: BindGroup,
+    pub output_buffer: Buffer,
 }
 
 pub struct GPUIndirectData {

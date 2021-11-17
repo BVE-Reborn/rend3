@@ -1,11 +1,14 @@
+use std::borrow::Cow;
+
 use rend3::RendererMode;
 use wgpu::{
     ColorTargetState, ColorWrites, CompareFunction, DepthBiasState, DepthStencilState, Device, Face, FragmentState,
     FrontFace, MultisampleState, PipelineLayoutDescriptor, PolygonMode, PrimitiveState, PrimitiveTopology,
-    RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptor, StencilState, TextureFormat, VertexState,
+    RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptor, ShaderSource, StencilState, TextureFormat,
+    VertexState,
 };
 
-use crate::{common::interfaces::ShaderInterfaces, shaders::SPIRV_SHADERS, SampleCount};
+use crate::{common::interfaces::ShaderInterfaces, shaders::WGSL_SHADERS, SampleCount};
 
 pub struct BuildSkyboxShaderArgs<'a> {
     pub mode: RendererMode,
@@ -20,20 +23,28 @@ pub fn build_skybox_pipeline(args: BuildSkyboxShaderArgs<'_>) -> RenderPipeline 
     profiling::scope!("build skybox pipeline");
     let skybox_pass_vert = args.device.create_shader_module(&ShaderModuleDescriptor {
         label: Some("skybox vert"),
-        source: wgpu::util::make_spirv(SPIRV_SHADERS.get_file("skybox.vert.spv").unwrap().contents()),
+        source: ShaderSource::Wgsl(Cow::Borrowed(
+            WGSL_SHADERS
+                .get_file("skybox.vert.wgsl")
+                .unwrap()
+                .contents_utf8()
+                .unwrap(),
+        )),
     });
     let skybox_pass_frag = args.device.create_shader_module(&ShaderModuleDescriptor {
         label: Some("skybox frag"),
-        source: wgpu::util::make_spirv(SPIRV_SHADERS.get_file("skybox.frag.spv").unwrap().contents()),
+        source: ShaderSource::Wgsl(Cow::Borrowed(
+            WGSL_SHADERS
+                .get_file("skybox.frag.wgsl")
+                .unwrap()
+                .contents_utf8()
+                .unwrap(),
+        )),
     });
 
     let pll = args.device.create_pipeline_layout(&PipelineLayoutDescriptor {
         label: Some("skybox pass"),
-        bind_group_layouts: &[
-            &args.interfaces.samplers_bgl,
-            &args.interfaces.skybox_bgl,
-            &args.interfaces.uniform_bgl,
-        ],
+        bind_group_layouts: &[&args.interfaces.forward_uniform_bgl, &args.interfaces.skybox_bgl],
         push_constant_ranges: &[],
     });
 
