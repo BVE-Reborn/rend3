@@ -69,6 +69,7 @@ jobs:
         with:
           command: test
           args: --target ${{ matrix.target }}
+        if: ${{ matrix.target }} != 'wasm32-unknown-unknown'
 
       - name: clippy (rend3-gltf featureless)
         uses: actions-rs/cargo@v1
