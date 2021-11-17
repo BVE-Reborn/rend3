@@ -356,36 +356,33 @@ async fn handle_resize(
     format: rend3::types::TextureFormat,
     routines: &Arc<DefaultRoutines>,
 ) {
-    match *event {
-        // Window was resized, need to resize renderer.
-        Event::WindowEvent {
-            event: winit::event::WindowEvent::Resized(size),
-            ..
-        } => {
-            println!("resize! {:?}", size);
-            let size = UVec2::new(size.width, size.height);
+    if let Event::WindowEvent {
+        event: winit::event::WindowEvent::Resized(size),
+        ..
+    } = *event
+    {
+        println!("resize! {:?}", size);
+        let size = UVec2::new(size.width, size.height);
 
-            // Reconfigure the surface for the new size.
-            rend3::configure_surface(
-                surface,
-                &renderer.device,
-                format,
-                glam::UVec2::new(size.x, size.y),
-                rend3::types::PresentMode::Mailbox,
-            );
-            // Tell the renderer about the new aspect ratio.
-            renderer.set_aspect_ratio(size.x as f32 / size.y as f32);
-            // Resize the internal buffers to the same size as the screen.
-            routines.pbr.lock().await.resize(
-                renderer,
-                rend3_pbr::RenderTextureOptions {
-                    resolution: size,
-                    samples: rend3_pbr::SampleCount::One,
-                },
-            );
-            routines.tonemapping.lock().await.resize(size);
-        }
-        _ => {}
+        // Reconfigure the surface for the new size.
+        rend3::configure_surface(
+            surface,
+            &renderer.device,
+            format,
+            glam::UVec2::new(size.x, size.y),
+            rend3::types::PresentMode::Mailbox,
+        );
+        // Tell the renderer about the new aspect ratio.
+        renderer.set_aspect_ratio(size.x as f32 / size.y as f32);
+        // Resize the internal buffers to the same size as the screen.
+        routines.pbr.lock().await.resize(
+            renderer,
+            rend3_pbr::RenderTextureOptions {
+                resolution: size,
+                samples: rend3_pbr::SampleCount::One,
+            },
+        );
+        routines.tonemapping.lock().await.resize(size);
     }
 }
 

@@ -29,7 +29,7 @@ impl rend3_framework::App for EguiExample {
 
             // Create the egui render routine
             let egui_routine = rend3_egui::EguiRenderRoutine::new(
-                &renderer,
+                renderer,
                 surface_format,
                 1, // For now this has to be 1, until rendergraphs support multisampling
                 window_size.width,
@@ -150,7 +150,7 @@ impl rend3_framework::App for EguiExample {
                     });
 
                     // End the UI frame. Now let's draw the UI with our Backend, we could also handle the output here
-                    let (_output, paint_commands) = data.platform.end_frame(Some(&window));
+                    let (_output, paint_commands) = data.platform.end_frame(Some(window));
                     let paint_jobs = data.platform.context().tessellate(paint_commands);
 
                     let input = rend3_egui::Input {
@@ -160,7 +160,7 @@ impl rend3_framework::App for EguiExample {
 
                     // Get a frame
                     let frame = rend3::util::output::OutputFrame::Surface {
-                        surface: Arc::clone(&surface),
+                        surface: Arc::clone(surface),
                     };
 
                     // Ready up the renderer
@@ -193,7 +193,7 @@ impl rend3_framework::App for EguiExample {
                     data.egui_routine.add_to_graph(&mut graph, input);
 
                     // Dispatch a render using the built up rendergraph!
-                    graph.execute(&renderer, frame, cmd_bufs, &ready);
+                    graph.execute(renderer, frame, cmd_bufs, &ready);
 
                     control_flow(winit::event_loop::ControlFlow::Poll);
                 }

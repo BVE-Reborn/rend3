@@ -67,7 +67,7 @@ impl rend3_framework::App for GltfExample {
             // Create mesh and calculate smooth normals based on vertices.
             //
             // We do not need to keep these handles alive once we make the object
-            let (mesh, material) = load_gltf(&renderer, concat!(env!("CARGO_MANIFEST_DIR"), "/data.glb"));
+            let (mesh, material) = load_gltf(renderer, concat!(env!("CARGO_MANIFEST_DIR"), "/data.glb"));
 
             // Combine the mesh and the material with a location to give an object.
             let object = rend3::types::Object {
