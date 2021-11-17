@@ -25,7 +25,5 @@ rend3 = { version = "^0.2.0", path = "../../rend3"}
 rend3-framework = { version = "^0.2.0", path = "../../rend3-framework" }
 # Programmable render list that dictates how the scene renders
 rend3-pbr = { version = "^0.2.0", path = "../../rend3-pbr" }
-# Provides `block_on` to wait for futures from sync code
-pollster = "0.2"
 # windowing
 winit = { version = "0.25", features = ["web-sys"] }

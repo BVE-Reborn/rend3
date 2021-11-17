@@ -23,8 +23,6 @@ rend3 = { version = "^0.2.0", path = "../../rend3" }
 rend3-pbr = { version = "^0.2.0", path = "../../rend3-pbr" }
 # Framework that deals with the event loop, setting up the renderer, and platform differences.
 rend3-framework = { version = "^0.2.0", path = "../../rend3-framework" }
-# Provides `block_on` to wait for futures from sync code
-pollster = "0.2"
 # windowing
 winit = { version = "0.25", features = ["web-sys"] }
 

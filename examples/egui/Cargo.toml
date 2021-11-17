@@ -23,8 +23,6 @@ env_logger = { version = "0.9", default-features = false, features = ["termcolor
 glam = "0.20.0"
 # Portable implementation of Instant.
 instant = { version = "0.1", features = ["wasm-bindgen"] }
-# Provides `block_on` to wait for futures from sync code
-pollster = "0.2"
 # Renderer core
 rend3 = { version = "^0.2.0",path = "../../rend3" }
 # Egui renderer integration
