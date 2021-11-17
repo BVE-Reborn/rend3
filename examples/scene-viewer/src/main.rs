@@ -77,9 +77,7 @@ async fn load_gltf(
     rend3_gltf::load_gltf(renderer, &gltf_data, |uri| async {
         let uri = uri;
         let full_uri = parent_str.clone() + "/" + uri.as_str();
-        loader
-            .get_asset(&full_uri)
-            .await
+        loader.get_asset(&full_uri).await
     })
     .await
     .unwrap()
