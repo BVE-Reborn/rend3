@@ -40,7 +40,7 @@ impl CameraManager {
     }
 
     pub fn set_aspect_data(&mut self, data: Camera, aspect_ratio: f32) {
-        self.proj = compute_projection_matrix(data, self.aspect_ratio);
+        self.proj = compute_projection_matrix(data, aspect_ratio);
         self.orig_view = compute_origin_matrix(data);
         self.inv_view = data.view.inverse();
         self.data = data;
