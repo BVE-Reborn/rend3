@@ -201,6 +201,17 @@ macro_rules! changeable_struct {
 #[doc(inline)]
 pub use wgt::{Backend, Backends, BufferUsages, DeviceType, PresentMode, TextureFormat, TextureUsages};
 
+/// Token that validates a mesh has passed mesh validation.
+#[derive(Debug)]
+pub struct MeshValidationToken(());
+
+impl MeshValidationToken {
+    /// Create a new validation token. Asserts that all vertex arrays are the same length and all indices are in-bounds.
+    pub unsafe fn new() -> Self {
+        Self(())
+    }
+}
+
 /// Easy to use builder for a [`Mesh`] that deals with common operations for you.
 #[derive(Debug, Default)]
 pub struct MeshBuilder {
@@ -214,6 +225,7 @@ pub struct MeshBuilder {
     vertex_count: usize,
 
     indices: Option<Vec<u32>>,
+    without_validation: bool,
 
     right_handed: bool,
 }
@@ -327,13 +339,20 @@ impl MeshBuilder {
         self
     }
 
+    /// Asserts that all vertex arrays are the same length and all indices are in-bounds.
+    pub unsafe fn without_validation(mut self) -> Self {
+        self.without_validation = true;
+        self
+    }
+
     /// Build a mesh, adding whatever components weren't provided.
     ///
     /// If normals weren't provided, they will be calculated. If mesh
     /// is right handed, will be converted to left handed.
     ///
     /// All others will be filled with defaults.
-    pub fn build(self) -> Mesh {
+    // TODO: Errors
+    pub fn build(self) -> Option<Mesh> {
         let length = self.vertex_count;
         debug_assert_ne!(length, 0, "Length should be guarded by validation");
 
@@ -349,6 +368,7 @@ impl MeshBuilder {
             vertex_colors: self.vertex_colors.unwrap_or_else(|| vec![[255; 4]; length]),
             vertex_material_indices: self.vertex_material_indices.unwrap_or_else(|| vec![0; length]),
             indices: self.indices.unwrap_or_else(|| (0..length as u32).collect()),
+            validation: Some(MeshValidationToken(())),
         };
 
         // We need to flip winding order first, so the normals will be facing the right direction.
@@ -364,7 +384,13 @@ impl MeshBuilder {
             mesh.calculate_tangents();
         }
 
-        mesh
+        if !self.without_validation {
+            if !mesh.validate() {
+                return None;
+            }
+        }
+
+        Some(mesh)
     }
 }
 
@@ -374,7 +400,7 @@ impl MeshBuilder {
 /// This condition can be checked with the [`Mesh::validate`] function.
 ///
 /// These can be annoying to construct, so use the [`MeshBuilder`] to make it easier.
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default)]
 pub struct Mesh {
     pub vertex_positions: Vec<Vec3>,
     pub vertex_normals: Vec<Vec3>,
@@ -385,13 +411,32 @@ pub struct Mesh {
     pub vertex_material_indices: Vec<u32>,
 
     pub indices: Vec<u32>,
+
+    pub validation: Option<MeshValidationToken>,
+}
+
+impl Clone for Mesh {
+    fn clone(&self) -> Self {
+        Self {
+            vertex_positions: self.vertex_positions.clone(),
+            vertex_normals: self.vertex_normals.clone(),
+            vertex_tangents: self.vertex_tangents.clone(),
+            vertex_uv0: self.vertex_uv0.clone(),
+            vertex_uv1: self.vertex_uv1.clone(),
+            vertex_colors: self.vertex_colors.clone(),
+            vertex_material_indices: self.vertex_material_indices.clone(),
+            indices: self.indices.clone(),
+            validation: self.validation.as_ref().map(|_| MeshValidationToken(())),
+        }
+    }
 }
 
 impl Mesh {
     /// Validates that all vertex attributes have the same length.
+    // TODO: Error
     pub fn validate(&self) -> bool {
-        let position_lenth = self.vertex_positions.len();
-        [
+        let position_length = self.vertex_positions.len();
+        let lengths_same = [
             self.vertex_normals.len(),
             self.vertex_tangents.len(),
             self.vertex_uv0.len(),
@@ -400,7 +445,12 @@ impl Mesh {
             self.vertex_material_indices.len(),
         ]
         .iter()
-        .all(|v| *v == position_lenth)
+        .all(|v| *v == position_length);
+        if !lengths_same {
+            return false;
+        }
+
+        self.indices.iter().all(|&i| (i as usize) < position_length)
     }
 
     /// Calculate normals for the given mesh, assuming smooth shading and per-vertex normals.
