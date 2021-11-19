@@ -23,7 +23,7 @@ use rend3::{
     util::typedefs::{FastHashMap, SsoString},
     Renderer,
 };
-use rend3_pbr::material;
+use rend3_routine::material;
 use std::{borrow::Cow, collections::hash_map::Entry, future::Future, path::Path};
 use thiserror::Error;
 

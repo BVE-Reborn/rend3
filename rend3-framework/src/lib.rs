@@ -111,9 +111,9 @@ pub trait App {
 }
 
 pub struct DefaultRoutines {
-    pub pbr: AsyncMutex<rend3_pbr::PbrRenderRoutine>,
-    pub skybox: AsyncMutex<rend3_pbr::SkyboxRoutine>,
-    pub tonemapping: AsyncMutex<rend3_pbr::TonemappingRoutine>,
+    pub pbr: AsyncMutex<rend3_routine::PbrRenderRoutine>,
+    pub skybox: AsyncMutex<rend3_routine::SkyboxRoutine>,
+    pub tonemapping: AsyncMutex<rend3_routine::TonemappingRoutine>,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -202,18 +202,21 @@ pub async fn async_start<A: App + NativeSend + 'static>(mut app: A, window_build
     );
 
     // Create the pbr pipeline with the same internal resolution and 4x multisampling
-    let render_texture_options = rend3_pbr::RenderTextureOptions {
+    let render_texture_options = rend3_routine::RenderTextureOptions {
         resolution: glam::UVec2::new(window_size.width, window_size.height),
-        samples: rend3_pbr::SampleCount::One,
+        samples: rend3_routine::SampleCount::One,
     };
     let routines = Arc::new(DefaultRoutines {
         pbr: AsyncMutex::new(
-            rend3_pbr::PbrRenderRoutine::new(&renderer, render_texture_options),
+            rend3_routine::PbrRenderRoutine::new(&renderer, render_texture_options),
             true,
         ),
-        skybox: AsyncMutex::new(rend3_pbr::SkyboxRoutine::new(&renderer, render_texture_options), true),
+        skybox: AsyncMutex::new(
+            rend3_routine::SkyboxRoutine::new(&renderer, render_texture_options),
+            true,
+        ),
         tonemapping: AsyncMutex::new(
-            rend3_pbr::TonemappingRoutine::new(&renderer, render_texture_options.resolution, format),
+            rend3_routine::TonemappingRoutine::new(&renderer, render_texture_options.resolution, format),
             true,
         ),
     });
@@ -377,9 +380,9 @@ async fn handle_resize(
         // Resize the internal buffers to the same size as the screen.
         routines.pbr.lock().await.resize(
             renderer,
-            rend3_pbr::RenderTextureOptions {
+            rend3_routine::RenderTextureOptions {
                 resolution: size,
-                samples: rend3_pbr::SampleCount::One,
+                samples: rend3_routine::SampleCount::One,
             },
         );
         routines.tonemapping.lock().await.resize(size);

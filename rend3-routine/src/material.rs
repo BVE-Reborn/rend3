@@ -1,4 +1,4 @@
-//! Types which make up `rend3-pbr`'s material [`PbrMaterial`]
+//! Types which make up `rend3-routine`'s material [`PbrMaterial`]
 
 use std::mem;
 

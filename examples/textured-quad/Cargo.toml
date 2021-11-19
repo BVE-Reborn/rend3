@@ -20,7 +20,7 @@ glam = "0.20.0"
 # Renderer core
 rend3 = { version = "^0.2.0", path = "../../rend3" }
 # Programmable render list that dictates how the scene renders
-rend3-pbr = { version = "^0.2.0", path = "../../rend3-pbr" }
+rend3-routine = { version = "^0.2.0", path = "../../rend3-routine" }
 # Provides `block_on` to wait for futures from sync code
 pollster = "0.2"
 # windowing

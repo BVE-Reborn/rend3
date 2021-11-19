@@ -36,7 +36,7 @@
 //!
 //! This is the primary crate which holds the main [`Renderer`] struct. We have some other crates:
 //! - `rend3-gltf`: contains code to load from a .gltf or .glb file.
-//! - `rend3-pbr`: contains render routines for drawing PBR-style objects.
+//! - `rend3-routine`: contains render routines for drawing PBR-style objects.
 //!
 //! # GPU Culling
 //!

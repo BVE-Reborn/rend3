@@ -21,7 +21,7 @@ glam = "0.20"
 log = "0.4"
 profiling = { version = "1", default-features = false }
 rend3 = { version = "0.2.0", path = "../rend3" }
-rend3-pbr = { version = "0.2.0", path = "../rend3-pbr" }
+rend3-routine = { version = "0.2.0", path = "../rend3-routine" }
 thiserror = { version = "1" }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]

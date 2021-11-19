@@ -7,7 +7,7 @@ use rend3::{
     Renderer, RendererMode,
 };
 use rend3_framework::AsyncMutex;
-use rend3_pbr::SkyboxRoutine;
+use rend3_routine::SkyboxRoutine;
 use std::{collections::HashMap, hash::BuildHasher, path::Path, sync::Arc, time::Duration};
 use wgpu_profiler::GpuTimerScopeResult;
 use winit::{

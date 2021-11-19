@@ -77,9 +77,9 @@ impl rend3_framework::App for CubeExample {
             let mesh_handle = renderer.add_mesh(mesh);
 
             // Add PBR material with all defaults except a single color.
-            let material = rend3_pbr::material::PbrMaterial {
-                albedo: rend3_pbr::material::AlbedoComponent::Value(glam::Vec4::new(0.0, 0.5, 0.5, 1.0)),
-                ..rend3_pbr::material::PbrMaterial::default()
+            let material = rend3_routine::material::PbrMaterial {
+                albedo: rend3_routine::material::AlbedoComponent::Value(glam::Vec4::new(0.0, 0.5, 0.5, 1.0)),
+                ..rend3_routine::material::PbrMaterial::default()
             };
             let material_handle = renderer.add_material(material);
 
