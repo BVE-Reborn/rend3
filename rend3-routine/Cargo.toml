@@ -1,20 +1,26 @@
 [package]
-name = "rend3-pbr-bake"
+name = "rend3-routine"
 version = "0.2.0"
 authors = ["The rend3 Developers"]
 edition = "2021"
-description = "PBR light baking RenderRoutine for rend3"
+description = "PBR Render Routine for rend3"
 readme = "../README.md"
 repository = "https://github.com/BVE-Reborn/rend3"
 license = "MIT OR Apache-2.0 OR Zlib"
 keywords = ["3d", "graphics", "gpu", "renderer", "wgpu"]
 categories = ["game-development", "graphics", "rendering", "rendering::engine"]
-publish = false
 
 [dependencies]
+arrayvec = "0.7"
+bitflags = "1"
+bytemuck = "1"
 flume = "0.10"
-glam = "0.20"
+glam = { version = "0.20.0", features = ["bytemuck"] }
+include_dir = "0.7.0"
+log = "0.4"
+ordered-float = "2"
+parking_lot = "0.11.2"
 profiling = {version = "1", default-features = false }
 rend3 = { version = "^0.2.0", path = "../rend3" }
-rend3-pbr = { version = "^0.2.0", path = "../rend3-pbr" }
-wgpu = { version = "0.11" }
+wgpu = "0.11"
+wgpu-profiler = "0.7.0"

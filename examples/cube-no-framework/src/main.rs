@@ -86,13 +86,13 @@ fn main() {
     let renderer = rend3::Renderer::new(iad, Some(window_size.width as f32 / window_size.height as f32)).unwrap();
 
     // Create the pbr pipeline with the same internal resolution and 4x multisampling
-    let render_texture_options = rend3_pbr::RenderTextureOptions {
+    let render_texture_options = rend3_routine::RenderTextureOptions {
         resolution: glam::UVec2::new(window_size.width, window_size.height),
-        samples: rend3_pbr::SampleCount::One,
+        samples: rend3_routine::SampleCount::One,
     };
-    let mut pbr_routine = rend3_pbr::PbrRenderRoutine::new(&renderer, render_texture_options);
+    let mut pbr_routine = rend3_routine::PbrRenderRoutine::new(&renderer, render_texture_options);
     let mut tonemapping_routine =
-        rend3_pbr::TonemappingRoutine::new(&renderer, render_texture_options.resolution, format);
+        rend3_routine::TonemappingRoutine::new(&renderer, render_texture_options.resolution, format);
 
     // Create mesh and calculate smooth normals based on vertices
     let mesh = create_mesh();
@@ -103,9 +103,9 @@ fn main() {
     let mesh_handle = renderer.add_mesh(mesh);
 
     // Add PBR material with all defaults except a single color.
-    let material = rend3_pbr::material::PbrMaterial {
-        albedo: rend3_pbr::material::AlbedoComponent::Value(glam::Vec4::new(0.0, 0.5, 0.5, 1.0)),
-        ..rend3_pbr::material::PbrMaterial::default()
+    let material = rend3_routine::material::PbrMaterial {
+        albedo: rend3_routine::material::AlbedoComponent::Value(glam::Vec4::new(0.0, 0.5, 0.5, 1.0)),
+        ..rend3_routine::material::PbrMaterial::default()
     };
     let material_handle = renderer.add_material(material);
 
@@ -169,9 +169,9 @@ fn main() {
             // Resize the internal buffers to the same size as the screen.
             pbr_routine.resize(
                 &renderer,
-                rend3_pbr::RenderTextureOptions {
+                rend3_routine::RenderTextureOptions {
                     resolution: size,
-                    samples: rend3_pbr::SampleCount::One,
+                    samples: rend3_routine::SampleCount::One,
                 },
             );
             tonemapping_routine.resize(size);

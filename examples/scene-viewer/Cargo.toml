@@ -36,7 +36,7 @@ profiling = { version = "1", default-features = false }
 rend3 = { version = "^0.2.0", path = "../../rend3" }
 rend3-gltf = { version = "^0.2.0", default-features = false, path = "../../rend3-gltf", features = ["ddsfile", "ktx2"] }
 rend3-framework = { version = "^0.2.0", path = "../../rend3-framework" }
-rend3-pbr = { version = "^0.2.0", path = "../../rend3-pbr" }
+rend3-routine = { version = "^0.2.0", path = "../../rend3-routine" }
 rustc-hash = "1"
 smallvec = "1"
 tracy-client = { version = "0.12", optional = true }
