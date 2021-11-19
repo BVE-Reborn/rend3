@@ -7,6 +7,7 @@ use std::{
     num::NonZeroU32,
     sync::{Arc, Weak},
 };
+use thiserror::Error;
 
 /// Non-owning resource handle. Not part of rend3's external interface, but needed to interface with rend3's internal datastructures if writing your own structures or render routines.
 pub struct RawResourceHandle<T> {
@@ -201,6 +202,62 @@ macro_rules! changeable_struct {
 #[doc(inline)]
 pub use wgt::{Backend, Backends, BufferUsages, DeviceType, PresentMode, TextureFormat, TextureUsages};
 
+/// Token that validates a mesh has passed mesh validation.
+#[derive(Debug)]
+pub struct MeshValidationToken(());
+
+impl MeshValidationToken {
+    /// Creates a new validation token.
+    ///
+    /// # Safety
+    ///
+    /// This asserts the following are true about the mesh when any method is called on it or it is passed to add_mesh:
+    /// - All vertex arrays are the same length.
+    /// - There is a non-zero count of vertices.
+    /// - The count of vertices is less than [`MAX_VERTEX_COUNT`].
+    /// - All indexes are in bounds for the given vertex arrays.
+    /// - There is a non-zero count of indices.
+    /// - There is a multiple-of-three count of indices.
+    pub unsafe fn new() -> Self {
+        Self(())
+    }
+}
+
+pub const MAX_VERTEX_COUNT: usize = 1 << 24;
+
+#[derive(Debug, Copy, Clone)]
+pub enum VertexBufferType {
+    Position,
+    Normal,
+    Tangent,
+    Uv0,
+    Uv1,
+    Colors,
+    MaterialIndices,
+}
+
+#[derive(Debug, Error)]
+pub enum MeshValidationError {
+    #[error("Mesh has zero position vertices")]
+    ZeroVertices,
+    #[error("Mesh's {ty:?} buffer has {actual} vertices but the position buffer has {expected}")]
+    MismatchedVertexCount {
+        ty: VertexBufferType,
+        expected: usize,
+        actual: usize,
+    },
+    #[error("Mesh has {count} vertices when the vertex limit is {}", MAX_VERTEX_COUNT)]
+    ExceededMaxVertexCount { count: usize },
+    #[error("Mesh has zero indices")]
+    ZeroIndices,
+    #[error("Mesh has {count} indices which is not a multiple of three. Meshes are always composed of triangles")]
+    IndexCountNotMultipleOfThree { count: usize },
+    #[error(
+        "Index at position {index} has the value {value} which is out of bounds for vertex buffers of {max} length"
+    )]
+    IndexOutOfBounds { index: usize, value: u32, max: usize },
+}
+
 /// Easy to use builder for a [`Mesh`] that deals with common operations for you.
 #[derive(Debug, Default)]
 pub struct MeshBuilder {
@@ -214,6 +271,7 @@ pub struct MeshBuilder {
     vertex_count: usize,
 
     indices: Option<Vec<u32>>,
+    without_validation: bool,
 
     right_handed: bool,
 }
@@ -226,17 +284,11 @@ impl MeshBuilder {
     ///
     /// Will panic if the length is zero.
     pub fn new(vertex_positions: Vec<Vec3>) -> Self {
-        let me = Self {
+        Self {
             vertex_count: vertex_positions.len(),
             vertex_positions,
             ..Self::default()
-        };
-        assert_ne!(me.vertex_positions.len(), 0, "Cannot have a mesh with zero vertices");
-        me
-    }
-
-    fn validate_len(&self, len: usize) {
-        assert_eq!(self.vertex_count, len)
+        }
     }
 
     /// Add vertex normals to the given mesh.
@@ -245,7 +297,6 @@ impl MeshBuilder {
     ///
     /// Will panic if the length is different from the position buffer length.
     pub fn with_vertex_normals(mut self, normals: Vec<Vec3>) -> Self {
-        self.validate_len(normals.len());
         self.vertex_normals = Some(normals);
         self
     }
@@ -256,7 +307,6 @@ impl MeshBuilder {
     ///
     /// Will panic if the length is different from the position buffer length.
     pub fn with_vertex_tangents(mut self, tangents: Vec<Vec3>) -> Self {
-        self.validate_len(tangents.len());
         self.vertex_tangents = Some(tangents);
         self
     }
@@ -267,7 +317,6 @@ impl MeshBuilder {
     ///
     /// Will panic if the length is different from the position buffer length.
     pub fn with_vertex_uv0(mut self, uvs: Vec<Vec2>) -> Self {
-        self.validate_len(uvs.len());
         self.vertex_uv0 = Some(uvs);
         self
     }
@@ -278,7 +327,6 @@ impl MeshBuilder {
     ///
     /// Will panic if the length is different from the position buffer length.
     pub fn with_vertex_uv1(mut self, uvs: Vec<Vec2>) -> Self {
-        self.validate_len(uvs.len());
         self.vertex_uv1 = Some(uvs);
         self
     }
@@ -289,7 +337,6 @@ impl MeshBuilder {
     ///
     /// Will panic if the length is different from the position buffer length.
     pub fn with_vertex_colors(mut self, colors: Vec<[u8; 4]>) -> Self {
-        self.validate_len(colors.len());
         self.vertex_colors = Some(colors);
         self
     }
@@ -300,7 +347,6 @@ impl MeshBuilder {
     ///
     /// Will panic if the length is different from the position buffer length.
     pub fn with_vertex_material_indices(mut self, material_indices: Vec<u32>) -> Self {
-        self.validate_len(material_indices.len());
         self.vertex_material_indices = Some(material_indices);
         self
     }
@@ -311,7 +357,6 @@ impl MeshBuilder {
     ///
     /// Will panic if the length is zero.
     pub fn with_indices(mut self, indices: Vec<u32>) -> Self {
-        assert_ne!(indices.len(), 0, "Cannot have a mesh with zero indices");
         self.indices = Some(indices);
         self
     }
@@ -327,18 +372,35 @@ impl MeshBuilder {
         self
     }
 
+    /// Doesn't run validation on the mesh.
+    ///
+    /// # Safety
+    ///
+    /// This asserts the following are true about the mesh when any method is called on it or it is passed to add_mesh:
+    /// - All vertex arrays are the same length.
+    /// - There is a non-zero count of vertices.
+    /// - The count of vertices is less than [`MAX_VERTEX_COUNT`].
+    /// - All indexes are in bounds for the given vertex arrays.
+    /// - There is a non-zero count of indices.
+    /// - There is a multiple-of-three count of indices.
+    pub unsafe fn without_validation(mut self) -> Self {
+        self.without_validation = true;
+        self
+    }
+
     /// Build a mesh, adding whatever components weren't provided.
     ///
     /// If normals weren't provided, they will be calculated. If mesh
     /// is right handed, will be converted to left handed.
     ///
     /// All others will be filled with defaults.
-    pub fn build(self) -> Mesh {
+    pub fn build(self) -> Result<Mesh, MeshValidationError> {
         let length = self.vertex_count;
         debug_assert_ne!(length, 0, "Length should be guarded by validation");
 
         let has_normals = self.vertex_normals.is_some();
         let has_tangents = self.vertex_tangents.is_some();
+        let has_uvs = self.vertex_uv0.is_some();
 
         let mut mesh = Mesh {
             vertex_positions: self.vertex_positions,
@@ -349,7 +411,13 @@ impl MeshBuilder {
             vertex_colors: self.vertex_colors.unwrap_or_else(|| vec![[255; 4]; length]),
             vertex_material_indices: self.vertex_material_indices.unwrap_or_else(|| vec![0; length]),
             indices: self.indices.unwrap_or_else(|| (0..length as u32).collect()),
+            // SAFETY: Before we do _anything_ with this mesh, we will validate it. If validation is off, the user has unsafely validated that this is safe to construct.
+            validation: unsafe { MeshValidationToken::new() },
         };
+
+        if !self.without_validation {
+            mesh.validate()?;
+        }
 
         // We need to flip winding order first, so the normals will be facing the right direction.
         if self.right_handed {
@@ -357,14 +425,15 @@ impl MeshBuilder {
         }
 
         if !has_normals {
-            mesh.calculate_normals();
+            mesh.calculate_normals(true);
         }
 
-        if !has_tangents {
-            mesh.calculate_tangents();
+        // Don't need to bother with tangents if there are no meaningful UVs
+        if !has_tangents && has_uvs {
+            mesh.calculate_tangents(true);
         }
 
-        mesh
+        Ok(mesh)
     }
 }
 
@@ -374,7 +443,7 @@ impl MeshBuilder {
 /// This condition can be checked with the [`Mesh::validate`] function.
 ///
 /// These can be annoying to construct, so use the [`MeshBuilder`] to make it easier.
-#[derive(Debug, Default, Clone)]
+#[derive(Debug)]
 pub struct Mesh {
     pub vertex_positions: Vec<Vec3>,
     pub vertex_normals: Vec<Vec3>,
@@ -385,64 +454,144 @@ pub struct Mesh {
     pub vertex_material_indices: Vec<u32>,
 
     pub indices: Vec<u32>,
+
+    pub validation: MeshValidationToken,
+}
+
+impl Clone for Mesh {
+    fn clone(&self) -> Self {
+        Self {
+            vertex_positions: self.vertex_positions.clone(),
+            vertex_normals: self.vertex_normals.clone(),
+            vertex_tangents: self.vertex_tangents.clone(),
+            vertex_uv0: self.vertex_uv0.clone(),
+            vertex_uv1: self.vertex_uv1.clone(),
+            vertex_colors: self.vertex_colors.clone(),
+            vertex_material_indices: self.vertex_material_indices.clone(),
+            indices: self.indices.clone(),
+            // SAFETY: The old mesh had a validation token, so this one must as well.
+            validation: unsafe { MeshValidationToken::new() },
+        }
+    }
 }
 
 impl Mesh {
     /// Validates that all vertex attributes have the same length.
-    pub fn validate(&self) -> bool {
-        let position_lenth = self.vertex_positions.len();
-        [
-            self.vertex_normals.len(),
-            self.vertex_tangents.len(),
-            self.vertex_uv0.len(),
-            self.vertex_uv1.len(),
-            self.vertex_colors.len(),
-            self.vertex_material_indices.len(),
+    pub fn validate(&self) -> Result<(), MeshValidationError> {
+        let position_length = self.vertex_positions.len();
+        let indices_length = self.indices.len();
+
+        if position_length == 0 {
+            return Err(MeshValidationError::ZeroVertices);
+        }
+
+        if position_length > MAX_VERTEX_COUNT {
+            return Err(MeshValidationError::ExceededMaxVertexCount { count: position_length });
+        }
+
+        let first_different_length = [
+            (self.vertex_normals.len(), VertexBufferType::Normal),
+            (self.vertex_tangents.len(), VertexBufferType::Tangent),
+            (self.vertex_uv0.len(), VertexBufferType::Uv0),
+            (self.vertex_uv1.len(), VertexBufferType::Uv1),
+            (self.vertex_colors.len(), VertexBufferType::Colors),
+            (self.vertex_material_indices.len(), VertexBufferType::MaterialIndices),
         ]
         .iter()
-        .all(|v| *v == position_lenth)
+        .find_map(|&(len, ty)| if len != position_length { Some((len, ty)) } else { None });
+
+        if let Some((len, ty)) = first_different_length {
+            return Err(MeshValidationError::MismatchedVertexCount {
+                ty,
+                actual: len,
+                expected: position_length,
+            });
+        }
+
+        if indices_length == 0 {
+            return Err(MeshValidationError::ZeroIndices);
+        }
+
+        if indices_length % 3 != 0 {
+            return Err(MeshValidationError::IndexCountNotMultipleOfThree { count: indices_length });
+        }
+
+        let first_oob_index = self.indices.iter().enumerate().find_map(|(idx, &i)| {
+            if (i as usize) >= position_length {
+                Some((idx, i))
+            } else {
+                None
+            }
+        });
+
+        if let Some((index, value)) = first_oob_index {
+            return Err(MeshValidationError::IndexOutOfBounds {
+                index,
+                value,
+                max: position_length,
+            });
+        }
+
+        Ok(())
     }
 
     /// Calculate normals for the given mesh, assuming smooth shading and per-vertex normals.
     ///
     /// Use left-handed normal calculation. Call [`Mesh::flip_winding_order`] first if you have
     /// a right handed mesh you want to use with rend3.
-    pub fn calculate_normals(&mut self) {
-        Self::calculate_normals_for_buffers(&mut self.vertex_normals, &self.vertex_positions, &self.indices);
+    ///
+    /// If zeroed is true, the normals will not be zeroed before hand.
+    pub fn calculate_normals(&mut self, zeroed: bool) {
+        // SAFETY: The mesh unconditionally has a validation token, so it must be valid.
+        unsafe {
+            Self::calculate_normals_for_buffers(&mut self.vertex_normals, &self.vertex_positions, &self.indices, zeroed)
+        };
     }
 
     /// Calculate normals for the given buffers representing a mesh, assuming smooth shading and per-vertex normals.
     ///
-    /// Positions and normals must be the same length.
-    pub fn calculate_normals_for_buffers(normals: &mut [Vec3], positions: &[Vec3], indices: &[u32]) {
-        assert_eq!(normals.len(), positions.len());
+    /// If zeroed is true, the normals will not be zeroed before hand. If this is falsely set, it is safe, just returns incorrect results.
+    ///
+    /// # Safety
+    ///
+    /// The following must be true:
+    /// - Normals and positions must be the same length.
+    /// - All indices must be in-bounds for the buffers.
+    pub unsafe fn calculate_normals_for_buffers(
+        normals: &mut [Vec3],
+        positions: &[Vec3],
+        indices: &[u32],
+        zeroed: bool,
+    ) {
+        debug_assert_eq!(normals.len(), positions.len());
 
-        for norm in normals.iter_mut() {
-            *norm = Vec3::ZERO;
+        if !zeroed {
+            for norm in normals.iter_mut() {
+                *norm = Vec3::ZERO;
+            }
         }
 
         for idx in indices.chunks_exact(3) {
             let (idx0, idx1, idx2) = match *idx {
                 [idx0, idx1, idx2] => (idx0, idx1, idx2),
                 // SAFETY: This is guaranteed by chunks_exact(3)
-                _ => unsafe { std::hint::unreachable_unchecked() },
+                _ => std::hint::unreachable_unchecked(),
             };
 
-            let pos1 = positions[idx0 as usize];
-            let pos2 = positions[idx1 as usize];
-            let pos3 = positions[idx2 as usize];
+            // SAFETY: The conditions of this function assert all thes indices are in-bounds
+            let pos1 = *positions.get_unchecked(idx0 as usize);
+            let pos2 = *positions.get_unchecked(idx1 as usize);
+            let pos3 = *positions.get_unchecked(idx2 as usize);
 
             let edge1 = pos2 - pos1;
             let edge2 = pos3 - pos1;
 
             let normal = edge1.cross(edge2);
 
-            // SAFETY: All vectors are the same length by the assert, and indexing succeeded on positions, therefore it's safe on normals
-            unsafe {
-                *normals.get_unchecked_mut(idx0 as usize) += normal;
-                *normals.get_unchecked_mut(idx1 as usize) += normal;
-                *normals.get_unchecked_mut(idx2 as usize) += normal;
-            }
+            // SAFETY: The conditions of this function assert all thes indices are in-bounds
+            *normals.get_unchecked_mut(idx0 as usize) += normal;
+            *normals.get_unchecked_mut(idx1 as usize) += normal;
+            *normals.get_unchecked_mut(idx2 as usize) += normal;
         }
 
         for normal in normals.iter_mut() {
@@ -450,50 +599,64 @@ impl Mesh {
         }
     }
 
-    /// Calculate tangents for the given mesh, based on normals and texture coordinates
-    pub fn calculate_tangents(&mut self) {
-        Self::calculate_tangents_for_buffers(
-            &mut self.vertex_tangents,
-            &self.vertex_positions,
-            &self.vertex_normals,
-            &self.vertex_uv0,
-            &self.indices,
-        );
+    /// Calculate tangents for the given mesh, based on normals and texture coordinates.
+    ///
+    /// If zeroed is true, the normals will not be zeroed before hand.
+    pub fn calculate_tangents(&mut self, zeroed: bool) {
+        // SAFETY: The mesh unconditionally has a validation token, so it must be valid.
+        unsafe {
+            Self::calculate_tangents_for_buffers(
+                &mut self.vertex_tangents,
+                &self.vertex_positions,
+                &self.vertex_normals,
+                &self.vertex_uv0,
+                &self.indices,
+                zeroed,
+            )
+        };
     }
 
-    fn calculate_tangents_for_buffers(
+    /// Calculate tangents for the given set of buffers, based on normals and texture coordinates.
+    ///
+    /// If zeroed is true, the normals will not be zeroed before hand. If this is falsely set, it is safe, just returns incorrect results.
+    ///
+    /// # Safety
+    ///
+    /// The following must be true:
+    /// - Tangents, positions, normals, and uvs must be the same length.
+    /// - All indices must be in-bounds for the buffers.
+    pub unsafe fn calculate_tangents_for_buffers(
         tangents: &mut [Vec3],
         positions: &[Vec3],
         normals: &[Vec3],
         uvs: &[Vec2],
         indices: &[u32],
+        zeroed: bool,
     ) {
-        assert_eq!(tangents.len(), positions.len());
-        assert_eq!(uvs.len(), positions.len());
+        debug_assert_eq!(tangents.len(), positions.len());
+        debug_assert_eq!(uvs.len(), positions.len());
 
-        for tan in tangents.iter_mut() {
-            *tan = Vec3::ZERO;
+        if !zeroed {
+            for tan in tangents.iter_mut() {
+                *tan = Vec3::ZERO;
+            }
         }
 
         for idx in indices.chunks_exact(3) {
             let (idx0, idx1, idx2) = match *idx {
                 [idx0, idx1, idx2] => (idx0, idx1, idx2),
                 // SAFETY: This is guaranteed by chunks_exact(3)
-                _ => unsafe { std::hint::unreachable_unchecked() },
+                _ => std::hint::unreachable_unchecked(),
             };
 
-            let pos1 = positions[idx0 as usize];
-            let pos2 = positions[idx1 as usize];
-            let pos3 = positions[idx2 as usize];
+            // SAFETY: The conditions of this function assert all thes indices are in-bounds
+            let pos1 = *positions.get_unchecked(idx0 as usize);
+            let pos2 = *positions.get_unchecked(idx1 as usize);
+            let pos3 = *positions.get_unchecked(idx2 as usize);
 
-            // SAFETY: All vectors are the same length by the assert, and indexing succeeded on positions, therefore it's safe on uvs
-            let (tex1, tex2, tex3) = unsafe {
-                (
-                    *uvs.get_unchecked(idx0 as usize),
-                    *uvs.get_unchecked(idx1 as usize),
-                    *uvs.get_unchecked(idx2 as usize),
-                )
-            };
+            let tex1 = *uvs.get_unchecked(idx0 as usize);
+            let tex2 = *uvs.get_unchecked(idx1 as usize);
+            let tex3 = *uvs.get_unchecked(idx2 as usize);
 
             let edge1 = pos2 - pos1;
             let edge2 = pos3 - pos1;
@@ -509,12 +672,10 @@ impl Mesh {
                 ((edge1.z * uv2.y) - (edge2.z * uv1.y)) * r,
             );
 
-            // SAFETY: All vectors are the same length by the assert, and indexing succeeded on positions, therefore it's safe on tangents
-            unsafe {
-                *tangents.get_unchecked_mut(idx0 as usize) += tangent;
-                *tangents.get_unchecked_mut(idx1 as usize) += tangent;
-                *tangents.get_unchecked_mut(idx2 as usize) += tangent;
-            }
+            // SAFETY: The conditions of this function assert all thes indices are in-bounds
+            *tangents.get_unchecked_mut(idx0 as usize) += tangent;
+            *tangents.get_unchecked_mut(idx1 as usize) += tangent;
+            *tangents.get_unchecked_mut(idx2 as usize) += tangent;
         }
 
         for (tan, norm) in tangents.iter_mut().zip(normals) {

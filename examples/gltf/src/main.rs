@@ -32,7 +32,8 @@ fn load_gltf(
         .with_vertex_uv0(vertex_uvs)
         .with_indices(indices)
         .with_right_handed()
-        .build();
+        .build()
+        .unwrap();
 
     // Add mesh to renderer's world
     let mesh_handle = renderer.add_mesh(mesh);

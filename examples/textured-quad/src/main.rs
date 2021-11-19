@@ -24,6 +24,7 @@ fn create_quad(size: f32) -> rend3::types::Mesh {
         .with_vertex_uv0(uv_positions.to_vec())
         .with_indices(index_data.to_vec())
         .build()
+        .unwrap()
 }
 
 fn main() {

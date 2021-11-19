@@ -114,8 +114,6 @@ impl MeshManager {
     ) {
         profiling::scope!("MeshManager::fill");
 
-        assert!(mesh.validate());
-
         let vertex_count = mesh.vertex_positions.len();
         let index_count = mesh.indices.len();
 

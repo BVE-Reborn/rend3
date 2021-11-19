@@ -278,4 +278,5 @@ fn create_mesh() -> rend3::types::Mesh {
     rend3::types::MeshBuilder::new(vertex_positions.to_vec())
         .with_indices(index_data.to_vec())
         .build()
+        .unwrap()
 }
