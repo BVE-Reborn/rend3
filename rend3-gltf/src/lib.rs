@@ -19,7 +19,7 @@ use glam::{Mat3, Mat4, UVec2, Vec2, Vec3, Vec4, Vec4Swizzles};
 use gltf::buffer::Source;
 use image::GenericImageView;
 use rend3::{
-    types::{self, ObjectHandle},
+    types::{self, MeshValidationError, ObjectHandle},
     util::typedefs::{FastHashMap, SsoString},
     Renderer,
 };
@@ -140,8 +140,10 @@ pub enum GltfLoadError<E: std::error::Error + 'static> {
     MissingMesh(usize),
     #[error("Gltf file references material {0} but material does not exist")]
     MissingMaterial(usize),
-    #[error("Mesh {0} primitive {1} uses unsupported mode {2:?}. Only triangles are supported.")]
+    #[error("Mesh {0} primitive {1} uses unsupported mode {2:?}. Only triangles are supported")]
     UnsupportedPrimitiveMode(usize, usize, gltf::mesh::Mode),
+    #[error("Mesh {0} failed validation")]
+    MeshValidationError(usize, #[source] MeshValidationError),
 }
 
 /// Default implementation of [`load_gltf`]'s `io_func` that loads from the filesystem relative to the gltf.
@@ -441,7 +443,9 @@ pub fn load_meshes<'a, E: std::error::Error + 'static>(
                     builder = builder.with_indices(indices.into_u32().collect())
                 }
 
-                let mesh = builder.build();
+                let mesh = builder
+                    .build()
+                    .map_err(|valid| GltfLoadError::MeshValidationError(mesh.index(), valid))?;
 
                 let handle = renderer.add_mesh(mesh);
 

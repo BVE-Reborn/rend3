@@ -35,13 +35,17 @@ Per Keep a Changelog there are 6 main categories of changes:
 
 ### Added
 - rend3-egui: An integration with the immediate mode GUI [egui](https://github.com/emilk/egui) @MindSwipe
+- rend3-textured-quad: Add example of simple 2D rendering.
 
 ### Changes
 - rend3: Instead of passing a render routine to the render function, you now add them to a rendergraph, then pass that rendergraph into the renderer.
-  - rend3-routine: split the PbrRoutine into two parts `add_prepass_to_graph` and `add_forward_to_graph`. 
-  - rend3-routine: Split out the skybox renderer into `SkyboxRoutine`.
-  - rend3-routine: Split out tonemapping into the `TonemappingRoutine`.
-- rend3: Add example `textured-quad`.
+  - rend3-routine:
+    - Split the PbrRoutine into two parts `add_prepass_to_graph` and `add_forward_to_graph`. 
+    - Split out the skybox renderer into `SkyboxRoutine`.
+    - Split out tonemapping into the `TonemappingRoutine`.
+- rend3: All meshes now require validation.
+  - `MeshBuilder::build()` now returns a `Result<Mesh, MeshValidationError>`. This validation can be unsafely omitted.
+  - The implementation functions `Mesh::calculate_normals_for_buffers` and `Mesh::calculate_tangents_for_buffers` are now unsafe.
 - rend3: Rename `CameraProjection::Projection` to `CameraProjection::Perspective`.
 
 ## v0.2.0
