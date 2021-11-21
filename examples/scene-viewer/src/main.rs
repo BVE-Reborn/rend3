@@ -309,6 +309,9 @@ impl rend3_framework::App for SceneViewer {
                         }
                     }
 
+                    window.request_redraw()
+                }
+                Event::RedrawRequested(_) => {
                     let view = Mat4::from_euler(glam::EulerRot::XYZ, -self.camera_pitch, -self.camera_yaw, 0.0);
                     let view = view * Mat4::from_translation((-self.camera_location).into());
 
