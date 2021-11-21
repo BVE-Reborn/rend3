@@ -40,13 +40,16 @@ Per Keep a Changelog there are 6 main categories of changes:
 ### Changes
 - rend3: Instead of passing a render routine to the render function, you now add them to a rendergraph, then pass that rendergraph into the renderer.
   - rend3-routine:
-    - Split the PbrRoutine into two parts `add_prepass_to_graph` and `add_forward_to_graph`. 
+    - Split the PbrRoutine into two parts `add_prepass_to_graph` and `add_forward_to_graph`.
     - Split out the skybox renderer into `SkyboxRoutine`.
     - Split out tonemapping into the `TonemappingRoutine`.
 - rend3: All meshes now require validation.
   - `MeshBuilder::build()` now returns a `Result<Mesh, MeshValidationError>`. This validation can be unsafely omitted.
   - The implementation functions `Mesh::calculate_normals_for_buffers` and `Mesh::calculate_tangents_for_buffers` are now unsafe.
 - rend3: Rename `CameraProjection::Projection` to `CameraProjection::Perspective`.
+
+### Fixes
+- rend3: Get vertex/index counts from RangeAllocator. @jamen
 
 ## v0.2.0
 
@@ -126,7 +129,7 @@ Released 2021-09-11
 - rend3: `Texture::mip_levels` was split into `mip_count` and `mip_source` allowing you to easily auto-generate mipmaps.
 - rend3: Changed limits such that intel gets CPU mode until [wgpu#1111](https://github.com/gfx-rs/wgpu/issues/1111) gets resolved.
 - rend3-pbr: creation and resizing's `resolution` argument replaced with options containing resolution and sample count.
-  
+
 ### Updated
 - Dependencies:
   - `glam` 0.17 -> 0.18

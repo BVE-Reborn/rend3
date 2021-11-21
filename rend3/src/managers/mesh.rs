@@ -67,10 +67,7 @@ impl MeshBuffers {
 pub struct MeshManager {
     buffers: MeshBuffers,
 
-    vertex_count: usize,
     vertex_alloc: RangeAllocator<usize>,
-
-    index_count: usize,
     index_alloc: RangeAllocator<usize>,
 
     registry: ResourceRegistry<InternalMesh, Mesh>,
@@ -82,19 +79,14 @@ impl MeshManager {
 
         let buffers = create_buffers(device, STARTING_VERTICES, STARTING_INDICES);
 
-        let vertex_count = STARTING_VERTICES;
-        let index_count = STARTING_INDICES;
-
-        let vertex_alloc = RangeAllocator::new(0..vertex_count);
-        let index_alloc = RangeAllocator::new(0..index_count);
+        let vertex_alloc = RangeAllocator::new(0..STARTING_VERTICES);
+        let index_alloc = RangeAllocator::new(0..STARTING_INDICES);
 
         let registry = ResourceRegistry::new();
 
         Self {
             buffers,
-            vertex_count,
             vertex_alloc,
-            index_count,
             index_alloc,
             registry,
         }
@@ -216,17 +208,17 @@ impl MeshManager {
     ) {
         profiling::scope!("reallocate mesh buffers");
 
-        let new_vert_count = (self.vertex_count + needed_verts as usize).next_power_of_two();
-        let new_index_count = (self.index_count + needed_indices as usize).next_power_of_two();
+        let new_vert_count = (self.vertex_count() + needed_verts as usize).next_power_of_two();
+        let new_index_count = (self.index_count() + needed_indices as usize).next_power_of_two();
 
         log::debug!(
             "Recreating vertex buffer from {} to {}",
-            self.vertex_count,
+            self.vertex_count(),
             new_vert_count
         );
         log::debug!(
             "Recreating index buffer from {} to {}",
-            self.index_count,
+            self.index_count(),
             new_index_count
         );
 
@@ -313,10 +305,16 @@ impl MeshManager {
         }
 
         self.buffers = new_buffers;
-        self.vertex_count = new_vert_count;
-        self.index_count = new_index_count;
         self.vertex_alloc = new_vert_alloc;
         self.index_alloc = new_index_alloc;
+    }
+
+    fn vertex_count(&self) -> usize {
+        self.vertex_alloc.initial_range().end
+    }
+
+    fn index_count(&self) -> usize {
+        self.index_alloc.initial_range().end
     }
 }
 
