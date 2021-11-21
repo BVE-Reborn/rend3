@@ -6,11 +6,16 @@ use crate::{
 use glam::Mat4;
 use parking_lot::Mutex;
 use rend3_types::{MaterialHandle, MeshHandle, ObjectHandle, RawDirectionalLightHandle, TextureHandle};
-use std::mem;
+use std::{mem, panic::Location};
 use wgpu::{CommandBuffer, Device, Texture, TextureDescriptor, TextureView};
 
+pub struct Instruction {
+    pub kind: InstructionKind,
+    pub location: Location<'static>,
+}
+
 #[allow(clippy::type_complexity)]
-pub enum Instruction {
+pub enum InstructionKind {
     AddMesh {
         handle: MeshHandle,
         mesh: Mesh,
@@ -84,5 +89,9 @@ impl InstructionStreamPair {
         let mut consume = self.consumer.lock();
 
         mem::swap(&mut *produce, &mut *consume);
+    }
+
+    pub fn push(&self, kind: InstructionKind, location: Location<'static>) {
+        self.producer.lock().push(Instruction { kind, location })
     }
 }

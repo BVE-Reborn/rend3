@@ -1,6 +1,6 @@
 use crate::{
     format_sso,
-    instruction::{Instruction, InstructionStreamPair},
+    instruction::{InstructionKind, InstructionStreamPair},
     managers::{
         CameraManager, DirectionalLightManager, InternalTexture, MaterialManager, MeshManager, ObjectManager,
         TextureManager,
@@ -14,11 +14,12 @@ use crate::{
 };
 use glam::Mat4;
 use parking_lot::{Mutex, RwLock};
-use rend3_types::{Material, MipmapCount, MipmapSource, TextureFromTexture, TextureUsages};
-use std::{num::NonZeroU32, sync::Arc};
+use rend3_types::{Material, MipmapCount, MipmapSource, TextureFormat, TextureFromTexture, TextureUsages};
+use std::{num::NonZeroU32, panic::Location, sync::Arc};
 use wgpu::{
     util::DeviceExt, CommandBuffer, CommandEncoderDescriptor, Device, Extent3d, ImageCopyTexture, ImageDataLayout,
-    Origin3d, Queue, TextureAspect, TextureDescriptor, TextureDimension, TextureViewDescriptor, TextureViewDimension,
+    Origin3d, Queue, TextureAspect, TextureDescriptor, TextureDimension, TextureSampleType, TextureViewDescriptor,
+    TextureViewDimension,
 };
 use wgpu_profiler::GpuProfiler;
 
@@ -76,13 +77,17 @@ impl Renderer {
     /// Adds a 3D mesh to the renderer. This doesn't instantiate it to world. To show this in the world, you need to create an [`Object`] using this mesh.
     ///
     /// The handle will keep the mesh alive. All objects created will also keep the mesh alive.
+    #[track_caller]
     pub fn add_mesh(&self, mesh: Mesh) -> MeshHandle {
         let handle = self.mesh_manager.read().allocate();
 
-        self.instructions.producer.lock().push(Instruction::AddMesh {
-            handle: handle.clone(),
-            mesh,
-        });
+        self.instructions.push(
+            InstructionKind::AddMesh {
+                handle: handle.clone(),
+                mesh,
+            },
+            *Location::caller(),
+        );
 
         handle
     }
@@ -90,8 +95,12 @@ impl Renderer {
     /// Add a 2D texture to the renderer. This can be used in a [`Material`].
     ///
     /// The handle will keep the texture alive. All materials created with this texture will also keep the texture alive.
+    #[track_caller]
     pub fn add_texture_2d(&self, texture: Texture) -> TextureHandle {
         profiling::scope!("Add Texture 2D");
+
+        Self::validation_texture_format(texture.format);
+
         let handle = self.d2_texture_manager.read().allocate();
         let size = Extent3d {
             width: texture.size.x,
@@ -158,20 +167,24 @@ impl Renderer {
         };
 
         let view = tex.create_view(&TextureViewDescriptor::default());
-        self.instructions.producer.lock().push(Instruction::AddTexture {
-            handle: handle.clone(),
-            desc,
-            texture: tex,
-            view,
-            buffer,
-            cube: false,
-        });
+        self.instructions.push(
+            InstructionKind::AddTexture {
+                handle: handle.clone(),
+                desc,
+                texture: tex,
+                view,
+                buffer,
+                cube: false,
+            },
+            *Location::caller(),
+        );
         handle
     }
 
     /// Add a 2D texture to the renderer by copying a set of mipmaps from an existing texture. This new can be used in a [`Material`].
     ///
     /// The handle will keep the texture alive. All materials created with this texture will also keep the texture alive.
+    #[track_caller]
     pub fn add_texture_2d_from_texture(&self, texture: TextureFromTexture) -> TextureHandle {
         profiling::scope!("Add Texture 2D From Texture");
 
@@ -230,22 +243,29 @@ impl Renderer {
             // self.profiler.lock().end_scope(&mut encoder);
         }
         // self.profiler.lock().end_scope(&mut encoder);
-        self.instructions.producer.lock().push(Instruction::AddTexture {
-            handle: handle.clone(),
-            texture: tex,
-            desc,
-            view,
-            buffer: Some(encoder.finish()),
-            cube: false,
-        });
+        self.instructions.push(
+            InstructionKind::AddTexture {
+                handle: handle.clone(),
+                texture: tex,
+                desc,
+                view,
+                buffer: Some(encoder.finish()),
+                cube: false,
+            },
+            *Location::caller(),
+        );
         handle
     }
 
     /// Adds a Cube texture to the renderer. This can be used as a cube environment map by a render routine.
     ///
     /// The handle will keep the texture alive.
+    #[track_caller]
     pub fn add_texture_cube(&self, texture: Texture) -> TextureHandle {
         profiling::scope!("Add Texture Cube");
+
+        Self::validation_texture_format(texture.format);
+
         let handle = self.d2c_texture_manager.read().allocate();
         let size = Extent3d {
             width: texture.size.x,
@@ -274,15 +294,35 @@ impl Renderer {
             dimension: Some(TextureViewDimension::Cube),
             ..TextureViewDescriptor::default()
         });
-        self.instructions.producer.lock().push(Instruction::AddTexture {
-            handle: handle.clone(),
-            texture: tex,
-            desc,
-            view,
-            buffer: None,
-            cube: true,
-        });
+        self.instructions.push(
+            InstructionKind::AddTexture {
+                handle: handle.clone(),
+                texture: tex,
+                desc,
+                view,
+                buffer: None,
+                cube: true,
+            },
+            *Location::caller(),
+        );
         handle
+    }
+
+    fn validation_texture_format(format: TextureFormat) {
+        let sample_type = format.describe().sample_type;
+        if let TextureSampleType::Float { filterable } = sample_type {
+            if !filterable {
+                panic!(
+                    "Textures formats must allow filtering with a linear filter. {:?} has sample type {:?} which does not.",
+                    format, sample_type
+                )
+            }
+        } else {
+            panic!(
+                "Textures formats must be sample-able as floating point. {:?} has sample type {:?}.",
+                format, sample_type
+            )
+        }
     }
 
     /// Adds a material to the renderer. This can be used in an [`Object`].
@@ -290,27 +330,35 @@ impl Renderer {
     /// The handle will keep the material alive. All objects created with this material will also keep this material alive.
     ///
     /// The material will keep the inside textures alive.
+    #[track_caller]
     pub fn add_material<M: Material>(&self, material: M) -> MaterialHandle {
         let handle = self.material_manager.read().allocate();
-        self.instructions.producer.lock().push(Instruction::AddMaterial {
-            handle: handle.clone(),
-            fill_invoke: Box::new(move |material_manager, device, mode, d2_manager, mat_handle| {
-                material_manager.fill(device, mode, d2_manager, mat_handle, material)
-            }),
-        });
+        self.instructions.push(
+            InstructionKind::AddMaterial {
+                handle: handle.clone(),
+                fill_invoke: Box::new(move |material_manager, device, mode, d2_manager, mat_handle| {
+                    material_manager.fill(device, mode, d2_manager, mat_handle, material)
+                }),
+            },
+            *Location::caller(),
+        );
         handle
     }
 
     /// Updates a given material. Old references will be dropped.
+    #[track_caller]
     pub fn update_material<M: Material>(&self, handle: &MaterialHandle, material: M) {
-        self.instructions.producer.lock().push(Instruction::ChangeMaterial {
-            handle: handle.clone(),
-            change_invoke: Box::new(
-                move |material_manager, device, mode, d2_manager, object_manager, mat_handle| {
-                    material_manager.update(device, mode, d2_manager, object_manager, mat_handle, material)
-                },
-            ),
-        })
+        self.instructions.push(
+            InstructionKind::ChangeMaterial {
+                handle: handle.clone(),
+                change_invoke: Box::new(
+                    move |material_manager, device, mode, d2_manager, object_manager, mat_handle| {
+                        material_manager.update(device, mode, d2_manager, object_manager, mat_handle, material)
+                    },
+                ),
+            },
+            *Location::caller(),
+        )
     }
 
     /// Adds an object to the renderer. This will create a visible object using the given mesh and materal.
@@ -318,65 +366,73 @@ impl Renderer {
     /// The handle will keep the material alive.
     ///
     /// The object will keep all materials, textures, and meshes alive.
+    #[track_caller]
     pub fn add_object(&self, object: Object) -> ObjectHandle {
         let handle = self.object_manager.read().allocate();
-        self.instructions.producer.lock().push(Instruction::AddObject {
-            handle: handle.clone(),
-            object,
-        });
+        self.instructions.push(
+            InstructionKind::AddObject {
+                handle: handle.clone(),
+                object,
+            },
+            *Location::caller(),
+        );
         handle
     }
 
     /// Move the given object to a new transform location.
+    #[track_caller]
     pub fn set_object_transform(&self, handle: &ObjectHandle, transform: Mat4) {
-        self.instructions.producer.lock().push(Instruction::SetObjectTransform {
-            handle: handle.get_raw(),
-            transform,
-        });
+        self.instructions.push(
+            InstructionKind::SetObjectTransform {
+                handle: handle.get_raw(),
+                transform,
+            },
+            *Location::caller(),
+        );
     }
 
     /// Add a sun-like light into the world.
     ///
     /// The handle will keep the light alive.
+    #[track_caller]
     pub fn add_directional_light(&self, light: DirectionalLight) -> DirectionalLightHandle {
         let handle = self.directional_light_manager.read().allocate();
 
-        self.instructions
-            .producer
-            .lock()
-            .push(Instruction::AddDirectionalLight {
+        self.instructions.push(
+            InstructionKind::AddDirectionalLight {
                 handle: handle.clone(),
                 light,
-            });
+            },
+            *Location::caller(),
+        );
 
         handle
     }
 
     /// Updates the settings for given directional light.
+    #[track_caller]
     pub fn update_directional_light(&self, handle: &DirectionalLightHandle, change: DirectionalLightChange) {
-        self.instructions
-            .producer
-            .lock()
-            .push(Instruction::ChangeDirectionalLight {
+        self.instructions.push(
+            InstructionKind::ChangeDirectionalLight {
                 handle: handle.get_raw(),
                 change,
-            })
+            },
+            *Location::caller(),
+        )
     }
 
     /// Sets the aspect ratio of the camera. This should correspond with the aspect ratio of the user.
+    #[track_caller]
     pub fn set_aspect_ratio(&self, ratio: f32) {
         self.instructions
-            .producer
-            .lock()
-            .push(Instruction::SetAspectRatio { ratio })
+            .push(InstructionKind::SetAspectRatio { ratio }, *Location::caller())
     }
 
     /// Sets the position, pov, or projection mode of the camera.
+    #[track_caller]
     pub fn set_camera_data(&self, data: Camera) {
         self.instructions
-            .producer
-            .lock()
-            .push(Instruction::SetCameraData { data })
+            .push(InstructionKind::SetCameraData { data }, *Location::caller())
     }
 
     /// Render a frame of the scene onto the given output, using the given RenderRoutine.
