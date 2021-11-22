@@ -81,6 +81,7 @@ fn compute_projection_matrix(data: Camera, aspect_ratio: f32) -> Mat4 {
         CameraProjection::Perspective { vfov, near, .. } => {
             Mat4::perspective_infinite_reverse_lh(vfov.to_radians(), aspect_ratio, near)
         }
+        CameraProjection::Raw(proj) => proj,
     }
 }
 

@@ -866,6 +866,7 @@ pub enum CameraProjection {
         /// Near plane distance. All projection uses a infinite far plane.
         near: f32,
     },
+    Raw(Mat4),
 }
 
 impl Default for CameraProjection {
