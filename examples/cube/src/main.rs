@@ -63,9 +63,9 @@ impl rend3_framework::App for CubeExample {
     fn setup<'a>(
         &'a mut self,
         _window: &'a winit::window::Window,
-        renderer: &'a rend3::Renderer,
-        _routines: &'a rend3_framework::DefaultRoutines,
-        _surface: &'a rend3::types::Surface,
+        renderer: &'a Arc<rend3::Renderer>,
+        _routines: &'a Arc<rend3_framework::DefaultRoutines>,
+        _surface: &'a Arc<rend3::types::Surface>,
         _surface_format: rend3::types::TextureFormat,
     ) -> std::pin::Pin<Box<dyn rend3_framework::NativeSendFuture<()> + 'a>> {
         Box::pin(async move {
@@ -121,7 +121,7 @@ impl rend3_framework::App for CubeExample {
 
     fn handle_event<'a>(
         &mut self,
-        _window: &'a winit::window::Window,
+        window: &'a winit::window::Window,
         renderer: &'a Arc<rend3::Renderer>,
         routines: &'a Arc<rend3_framework::DefaultRoutines>,
         surface: &'a Arc<rend3::types::Surface>,
@@ -137,8 +137,11 @@ impl rend3_framework::App for CubeExample {
                 } => {
                     control_flow(winit::event_loop::ControlFlow::Exit);
                 }
-                // Render!
                 rend3_framework::Event::MainEventsCleared => {
+                    window.request_redraw();
+                }
+                // Render!
+                rend3_framework::Event::RedrawRequested(_) => {
                     // Get a frame
                     let frame = rend3::util::output::OutputFrame::Surface {
                         surface: Arc::clone(surface),

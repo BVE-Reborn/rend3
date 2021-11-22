@@ -274,6 +274,7 @@ pub struct MeshBuilder {
     without_validation: bool,
 
     right_handed: bool,
+    double_sided: bool,
 }
 impl MeshBuilder {
     /// Create a new [`MeshBuilder`] with a given set of positions.
@@ -369,6 +370,12 @@ impl MeshBuilder {
     /// See [`Mesh::flip_winding_order`] for more information.
     pub fn with_right_handed(mut self) -> Self {
         self.right_handed = true;
+        self
+    }
+
+    /// Mark this mesh as needing to be double sided. This will duplicate all faces with the opposite winding order. This acts as if backface culling was disabled.
+    pub fn with_double_sided(mut self) -> Self {
+        self.double_sided = true;
         self
     }
 
@@ -681,6 +688,39 @@ impl Mesh {
         for (tan, norm) in tangents.iter_mut().zip(normals) {
             let t = *tan - (*norm * norm.dot(*tan));
             *tan = t.normalize();
+        }
+    }
+
+    /// Converts the mesh from single sided to double sided.
+    pub fn double_side(&mut self) {
+        let starting_len = self.indices.len();
+        // This floors, so the following unsafe is in-bounds.
+        let primative_count = starting_len / 3;
+        // reserve additional space -- this "doubles" the capasity
+        self.indices.reserve(starting_len);
+
+        let ptr = self.indices.as_mut_ptr();
+
+        #[allow(clippy::identity_op)]
+        unsafe {
+            // Iterate in reverse as to not stomp on ourself
+            for prim in (0..primative_count).rev() {
+                let i1 = *ptr.add(prim * 3 + 0);
+                let i2 = *ptr.add(prim * 3 + 1);
+                let i3 = *ptr.add(prim * 3 + 2);
+
+                // One triangle forward.
+                ptr.add(prim * 6 + 0).write(i1);
+                ptr.add(prim * 6 + 1).write(i2);
+                ptr.add(prim * 6 + 2).write(i3);
+
+                // One triangle reverse.
+                ptr.add(prim * 6 + 3).write(i3);
+                ptr.add(prim * 6 + 4).write(i2);
+                ptr.add(prim * 6 + 5).write(i1);
+            }
+
+            self.indices.set_len(starting_len * 2);
         }
     }
 

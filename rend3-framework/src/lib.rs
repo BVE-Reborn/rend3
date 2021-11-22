@@ -77,25 +77,16 @@ pub trait App {
     fn setup<'a>(
         &'a mut self,
         window: &'a Window,
-        renderer: &'a Renderer,
-        routines: &'a DefaultRoutines,
-        surface: &'a Surface,
+        renderer: &'a Arc<Renderer>,
+        routines: &'a Arc<DefaultRoutines>,
+        surface: &'a Arc<Surface>,
         surface_format: rend3::types::TextureFormat,
     ) -> Pin<Box<dyn NativeSendFuture<()> + 'a>> {
         let _ = (window, renderer, routines, surface, surface_format);
         Box::pin(async move {})
     }
 
-    fn async_setup(
-        &mut self,
-        renderer: Arc<Renderer>,
-        routines: Arc<DefaultRoutines>,
-        surface: Arc<Surface>,
-    ) -> Pin<Box<dyn NativeSendFuture<()>>> {
-        let _ = (renderer, routines, surface);
-        Box::pin(async move {})
-    }
-
+    /// RedrawRequested/RedrawEventsCleared will only be fired if the window size is nonz-ero. As such you should always render in RedrawRequested and use MainEventsCleared for things that need to keep running when minimized.
     fn handle_event<'a>(
         &'a mut self,
         window: &'a Window,
@@ -223,8 +214,6 @@ pub async fn async_start<A: App + NativeSend + 'static>(mut app: A, window_build
 
     app.setup(&window, &renderer, &routines, &surface, format).await;
 
-    spawn(app.async_setup(Arc::clone(&renderer), Arc::clone(&routines), Arc::clone(&surface)));
-
     let (sender, reciever) = flume::unbounded();
 
     #[cfg(target_arch = "wasm32")]
@@ -239,13 +228,16 @@ pub async fn async_start<A: App + NativeSend + 'static>(mut app: A, window_build
         #[cfg(target_arch = "wasm32")]
         let _observer = observer;
         let mut redraw = Vec::with_capacity(16);
+        let mut allow_redraw = true;
 
         while let Ok(e) = reciever.recv_async().await {
             let mut event_opt = Some(e);
             let mut main_events_cleared = false;
             let mut redraw_events_cleared = false;
             while let Some(event) = event_opt.take() {
-                handle_resize(&event, &surface, &renderer, format, &routines).await;
+                if let Some(allow) = handle_resize(&event, &surface, &renderer, format, &routines).await {
+                    allow_redraw = allow;
+                }
 
                 match event {
                     Event::MainEventsCleared => {
@@ -294,40 +286,44 @@ pub async fn async_start<A: App + NativeSend + 'static>(mut app: A, window_build
                 }
             }
 
-            for w in redraw.drain(..) {
-                let mut flow = None;
-                app.handle_event(
-                    &window,
-                    &renderer,
-                    &routines,
-                    &surface,
-                    Event::RedrawRequested(w),
-                    |c: ControlFlow| {
-                        flow = Some(c);
-                    },
-                )
-                .await;
-                if let Some(flow) = flow {
-                    let _ = proxy.send_event(flow);
+            if allow_redraw {
+                for w in redraw.drain(..) {
+                    let mut flow = None;
+                    app.handle_event(
+                        &window,
+                        &renderer,
+                        &routines,
+                        &surface,
+                        Event::RedrawRequested(w),
+                        |c: ControlFlow| {
+                            flow = Some(c);
+                        },
+                    )
+                    .await;
+                    if let Some(flow) = flow {
+                        let _ = proxy.send_event(flow);
+                    }
                 }
-            }
 
-            if redraw_events_cleared {
-                let mut flow = None;
-                app.handle_event(
-                    &window,
-                    &renderer,
-                    &routines,
-                    &surface,
-                    Event::RedrawEventsCleared,
-                    |c: ControlFlow| {
-                        flow = Some(c);
-                    },
-                )
-                .await;
-                if let Some(flow) = flow {
-                    let _ = proxy.send_event(flow);
+                if redraw_events_cleared {
+                    let mut flow = None;
+                    app.handle_event(
+                        &window,
+                        &renderer,
+                        &routines,
+                        &surface,
+                        Event::RedrawEventsCleared,
+                        |c: ControlFlow| {
+                            flow = Some(c);
+                        },
+                    )
+                    .await;
+                    if let Some(flow) = flow {
+                        let _ = proxy.send_event(flow);
+                    }
                 }
+            } else {
+                redraw.clear();
             }
         }
     });
@@ -358,14 +354,18 @@ async fn handle_resize(
     renderer: &Arc<Renderer>,
     format: rend3::types::TextureFormat,
     routines: &Arc<DefaultRoutines>,
-) {
+) -> Option<bool> {
     if let Event::WindowEvent {
         event: winit::event::WindowEvent::Resized(size),
         ..
     } = *event
     {
-        println!("resize! {:?}", size);
+        log::debug!("resize {:?}", size);
         let size = UVec2::new(size.width, size.height);
+
+        if size.x == 0 || size.y == 0 {
+            return Some(false);
+        }
 
         // Reconfigure the surface for the new size.
         rend3::configure_surface(
@@ -386,6 +386,9 @@ async fn handle_resize(
             },
         );
         routines.tonemapping.lock().await.resize(size);
+        Some(true)
+    } else {
+        None
     }
 }
 

@@ -118,10 +118,7 @@ fn build_forward_pass_inner(
             topology: PrimitiveTopology::TriangleList,
             strip_index_format: None,
             front_face: FrontFace::Cw,
-            cull_mode: match args.transparency {
-                TransparencyType::Opaque | TransparencyType::Cutout => Some(Face::Back),
-                TransparencyType::Blend => None,
-            },
+            cull_mode: Some(Face::Back),
             clamp_depth: false,
             polygon_mode: PolygonMode::Fill,
             conservative: false,

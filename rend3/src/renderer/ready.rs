@@ -1,4 +1,7 @@
-use crate::{instruction::Instruction, ReadyData, Renderer};
+use crate::{
+    instruction::{Instruction, InstructionKind},
+    ReadyData, Renderer,
+};
 use wgpu::{CommandBuffer, CommandEncoderDescriptor};
 
 pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
@@ -26,15 +29,15 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
 
     {
         profiling::scope!("Instruction Processing");
-        for cmd in instructions.drain(..) {
-            match cmd {
-                Instruction::AddMesh { handle, mesh } => {
+        for Instruction { kind, location: _ } in instructions.drain(..) {
+            match kind {
+                InstructionKind::AddMesh { handle, mesh } => {
                     profiling::scope!("Add Mesh");
                     profiler.begin_scope("Add Mesh", &mut encoder, &renderer.device);
                     mesh_manager.fill(&renderer.device, &renderer.queue, &mut encoder, &handle, mesh);
                     profiler.end_scope(&mut encoder);
                 }
-                Instruction::AddTexture {
+                InstructionKind::AddTexture {
                     handle,
                     desc,
                     texture,
@@ -49,7 +52,7 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
                         texture_manager_2d.fill(&handle, desc, texture, view);
                     }
                 }
-                Instruction::AddMaterial { handle, fill_invoke } => {
+                InstructionKind::AddMaterial { handle, fill_invoke } => {
                     profiling::scope!("Add Material");
                     fill_invoke(
                         &mut material_manager,
@@ -59,7 +62,7 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
                         &handle,
                     );
                 }
-                Instruction::ChangeMaterial { handle, change_invoke } => {
+                InstructionKind::ChangeMaterial { handle, change_invoke } => {
                     profiling::scope!("Change Material");
 
                     change_invoke(
@@ -71,20 +74,20 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
                         &handle,
                     )
                 }
-                Instruction::AddObject { handle, object } => {
+                InstructionKind::AddObject { handle, object } => {
                     object_manager.fill(&handle, object, &mesh_manager, &mut material_manager);
                 }
-                Instruction::SetObjectTransform { handle, transform } => {
+                InstructionKind::SetObjectTransform { handle, transform } => {
                     object_manager.set_object_transform(handle, transform);
                 }
-                Instruction::AddDirectionalLight { handle, light } => {
+                InstructionKind::AddDirectionalLight { handle, light } => {
                     directional_light_manager.fill(&handle, light);
                 }
-                Instruction::ChangeDirectionalLight { handle, change } => {
+                InstructionKind::ChangeDirectionalLight { handle, change } => {
                     directional_light_manager.update_directional_light(handle, change);
                 }
-                Instruction::SetAspectRatio { ratio } => camera_manager.set_aspect_ratio(Some(ratio)),
-                Instruction::SetCameraData { data } => {
+                InstructionKind::SetAspectRatio { ratio } => camera_manager.set_aspect_ratio(Some(ratio)),
+                InstructionKind::SetCameraData { data } => {
                     camera_manager.set_data(data);
                 }
             }

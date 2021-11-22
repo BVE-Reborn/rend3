@@ -47,6 +47,7 @@ Per Keep a Changelog there are 6 main categories of changes:
   - `MeshBuilder::build()` now returns a `Result<Mesh, MeshValidationError>`. This validation can be unsafely omitted.
   - The implementation functions `Mesh::calculate_normals_for_buffers` and `Mesh::calculate_tangents_for_buffers` are now unsafe.
 - rend3: Rename `CameraProjection::Projection` to `CameraProjection::Perspective`.
+- rend3-routine: All transparency now has backface culling enabled. Use `Mesh::double_side` or `MeshBuilder::with_double_side` to re-enable double sided transparency.
 
 ### Fixes
 - rend3: Get vertex/index counts from RangeAllocator. @jamen
