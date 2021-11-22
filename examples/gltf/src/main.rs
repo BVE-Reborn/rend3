@@ -59,9 +59,9 @@ impl rend3_framework::App for GltfExample {
     fn setup<'a>(
         &'a mut self,
         _window: &'a winit::window::Window,
-        renderer: &'a rend3::Renderer,
-        _routines: &'a rend3_framework::DefaultRoutines,
-        _surface: &'a rend3::types::Surface,
+        renderer: &'a Arc<rend3::Renderer>,
+        _routines: &'a Arc<rend3_framework::DefaultRoutines>,
+        _surface: &'a Arc<rend3::types::Surface>,
         _surface_format: rend3::types::TextureFormat,
     ) -> std::pin::Pin<Box<dyn rend3_framework::NativeSendFuture<()> + 'a>> {
         Box::pin(async move {

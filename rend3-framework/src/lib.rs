@@ -77,22 +77,12 @@ pub trait App {
     fn setup<'a>(
         &'a mut self,
         window: &'a Window,
-        renderer: &'a Renderer,
-        routines: &'a DefaultRoutines,
-        surface: &'a Surface,
+        renderer: &'a Arc<Renderer>,
+        routines: &'a Arc<DefaultRoutines>,
+        surface: &'a Arc<Surface>,
         surface_format: rend3::types::TextureFormat,
     ) -> Pin<Box<dyn NativeSendFuture<()> + 'a>> {
         let _ = (window, renderer, routines, surface, surface_format);
-        Box::pin(async move {})
-    }
-
-    fn async_setup(
-        &mut self,
-        renderer: Arc<Renderer>,
-        routines: Arc<DefaultRoutines>,
-        surface: Arc<Surface>,
-    ) -> Pin<Box<dyn NativeSendFuture<()>>> {
-        let _ = (renderer, routines, surface);
         Box::pin(async move {})
     }
 
@@ -223,8 +213,6 @@ pub async fn async_start<A: App + NativeSend + 'static>(mut app: A, window_build
     });
 
     app.setup(&window, &renderer, &routines, &surface, format).await;
-
-    spawn(app.async_setup(Arc::clone(&renderer), Arc::clone(&routines), Arc::clone(&surface)));
 
     let (sender, reciever) = flume::unbounded();
 

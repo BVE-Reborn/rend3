@@ -701,6 +701,7 @@ impl Mesh {
 
         let ptr = self.indices.as_mut_ptr();
 
+        #[allow(clippy::identity_op)]
         unsafe {
             // Iterate in reverse as to not stomp on ourself
             for prim in (0..primative_count).rev() {

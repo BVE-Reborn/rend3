@@ -179,9 +179,9 @@ impl rend3_framework::App for SceneViewer {
     fn setup<'a>(
         &'a mut self,
         window: &'a winit::window::Window,
-        renderer: &'a Renderer,
-        routines: &'a rend3_framework::DefaultRoutines,
-        _surface: &'a rend3::types::Surface,
+        renderer: &'a Arc<Renderer>,
+        routines: &'a Arc<rend3_framework::DefaultRoutines>,
+        _surface: &'a Arc<rend3::types::Surface>,
         _surface_format: rend3::types::TextureFormat,
     ) -> std::pin::Pin<Box<dyn rend3_framework::NativeSendFuture<()> + 'a>> {
         Box::pin(async move {
@@ -199,32 +199,27 @@ impl rend3_framework::App for SceneViewer {
             }));
 
             self.grabber = Some(rend3_framework::Grabber::new(window));
-        })
-    }
 
-    fn async_setup(
-        &mut self,
-        renderer: Arc<Renderer>,
-        routines: Arc<rend3_framework::DefaultRoutines>,
-        _surface: Arc<rend3::types::Surface>,
-    ) -> std::pin::Pin<Box<dyn rend3_framework::NativeSendFuture<()>>> {
-        let file_to_load = self.file_to_load.take();
-        Box::pin(async move {
-            let loader = rend3_framework::AssetLoader::new_local(
-                concat!(env!("CARGO_MANIFEST_DIR"), "/../resources/"),
-                "http://localhost:8000/resources/",
-            );
-            if let Err(e) = load_skybox(&renderer, &loader, &routines.skybox).await {
-                println!("Failed to load skybox {}", e)
-            };
-            Box::leak(Box::new(
-                load_gltf(
-                    &renderer,
-                    &loader,
-                    file_to_load.unwrap_or_else(|| "/default-scene/scene.gltf".to_owned()),
-                )
-                .await,
-            ));
+            let file_to_load = self.file_to_load.take();
+            let renderer = Arc::clone(renderer);
+            let routines = Arc::clone(routines);
+            rend3_framework::spawn(async move {
+                let loader = rend3_framework::AssetLoader::new_local(
+                    concat!(env!("CARGO_MANIFEST_DIR"), "/../resources/"),
+                    "http://localhost:8000/resources/",
+                );
+                if let Err(e) = load_skybox(&renderer, &loader, &routines.skybox).await {
+                    println!("Failed to load skybox {}", e)
+                };
+                Box::leak(Box::new(
+                    load_gltf(
+                        &renderer,
+                        &loader,
+                        file_to_load.unwrap_or_else(|| "/default-scene/scene.gltf".to_owned()),
+                    )
+                    .await,
+                ));
+            });
         })
     }
 
