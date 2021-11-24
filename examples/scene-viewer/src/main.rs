@@ -18,6 +18,7 @@ use winit::{
 mod platform;
 
 async fn load_skybox_image(loader: &rend3_framework::AssetLoader, data: &mut Vec<u8>, path: &str) {
+    log::info!("Loading skybox image {}", path);
     let decoded = image::load_from_memory(
         &loader
             .get_asset(path)
@@ -63,6 +64,7 @@ async fn load_gltf(
     location: String,
 ) -> rend3_gltf::LoadedGltfScene {
     profiling::scope!("loading gltf");
+    let gltf_start = Instant::now();
     let path = Path::new(&location);
     let parent = path.parent().unwrap();
 
@@ -74,14 +76,22 @@ async fn load_gltf(
         loader.get_asset(&path_str).await.unwrap()
     };
 
-    rend3_gltf::load_gltf(renderer, &gltf_data, |uri| async {
+    let gltf_elapsed = gltf_start.elapsed();
+    let resources_start = Instant::now();
+    let scene = rend3_gltf::load_gltf(renderer, &gltf_data, |uri| async {
         log::info!("Loading resource {}", uri);
         let uri = uri;
         let full_uri = parent_str.clone() + "/" + uri.as_str();
         loader.get_asset(&full_uri).await
     })
     .await
-    .unwrap()
+    .unwrap();
+    log::info!(
+        "Loaded gltf in {:.3?}, resources loaded in {:.3?}",
+        gltf_elapsed,
+        resources_start.elapsed()
+    );
+    scene
 }
 
 fn button_pressed<Hash: BuildHasher>(map: &HashMap<u32, bool, Hash>, key: u32) -> bool {
