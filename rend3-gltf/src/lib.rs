@@ -131,7 +131,7 @@ pub enum GltfLoadError<E: std::error::Error + 'static> {
     #[error("Texture {0} failed to be loaded as it has 0 levels")]
     TextureZeroLevels(SsoString),
     #[error("Texture {0} failed to be loaded as it has 0 layers")]
-    TextureZeroLayers(SsoString),
+    TextureTooManyLayers(SsoString),
     #[error("Gltf file must have at least one scene")]
     MissingScene,
     #[error("Mesh {0} does not have positions")]
@@ -714,22 +714,30 @@ where
         if header.level_count == 0 {
             return Err(GltfLoadError::TextureZeroLevels(uri.take().unwrap()));
         }
-        if header.layer_count == 0 {
-            return Err(GltfLoadError::TextureZeroLayers(uri.take().unwrap()));
+        if header.layer_count >= 2 {
+            return Err(GltfLoadError::TextureTooManyLayers(uri.take().unwrap()));
         }
 
-        let guaranteed_format = format.describe().guaranteed_format_features;
+        let describe = format.describe();
+        let guaranteed_format = describe.guaranteed_format_features;
         let generate = header.level_count == 1
             && guaranteed_format.filterable
             && guaranteed_format.allowed_usages.contains(
                 rend3::types::TextureUsages::TEXTURE_BINDING | rend3::types::TextureUsages::RENDER_ATTACHMENT,
             );
 
+        let size: usize = reader.levels().map(|s| s.len()).sum();
+
+        let mut data = Vec::with_capacity(size);
+        for level in reader.levels() {
+            data.extend_from_slice(level);
+        }
+
         texture = Some(types::Texture {
             label: image.name().map(str::to_owned),
             format,
             size: UVec2::new(header.pixel_width, header.pixel_height),
-            data: reader.data().to_vec(),
+            data,
             mip_count: if generate {
                 types::MipmapCount::Maximum
             } else {
@@ -775,7 +783,7 @@ where
 
             let data = dds
                 .get_data(0)
-                .map_err(|_| GltfLoadError::TextureZeroLayers(uri.take().unwrap()))?;
+                .map_err(|_| GltfLoadError::TextureTooManyLayers(uri.take().unwrap()))?;
 
             texture = Some(types::Texture {
                 label: image.name().map(str::to_owned),
