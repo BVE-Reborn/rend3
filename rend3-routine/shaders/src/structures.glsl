@@ -28,8 +28,9 @@ struct ObjectInputData {
 struct ObjectOutputData {
     mat4 model_view;
     mat4 model_view_proj;
-    vec3 inv_squared_scale;
     uint material_idx;
+    // Work around https://github.com/gfx-rs/naga/issues/1561
+    vec3 inv_squared_scale;
 };
 
 struct IndirectCall {
