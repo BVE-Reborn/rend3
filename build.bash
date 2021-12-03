@@ -8,7 +8,7 @@ case $1 in
         glslc rend3-routine/shaders/src/blit.vert                                        -O -g -o rend3-routine/shaders/spirv/blit.vert.spv
         glslc rend3-routine/shaders/src/blit.frag                                        -O -g -o rend3-routine/shaders/spirv/blit-linear.frag.spv
         glslc rend3-routine/shaders/src/blit.frag   -DSRGB_CONVERT                       -O -g -o rend3-routine/shaders/spirv/blit-srgb.frag.spv
-        glslc rend3-routine/shaders/src/cull.comp   -DATOMIC_CULL --target-env=vulkan1.2 -O -g -o rend3-routine/shaders/spirv/cull-atomic-cull.comp.spv
+        glslc rend3-routine/shaders/src/cull.comp   -DATOMIC_CULL                        -O -g -o rend3-routine/shaders/spirv/cull-atomic-cull.comp.spv
         glslc rend3-routine/shaders/src/cull.comp   -DPREFIX_CULL                        -O -g -o rend3-routine/shaders/spirv/cull-prefix-cull.comp.spv
         glslc rend3-routine/shaders/src/cull.comp   -DPREFIX_SUM                         -O -g -o rend3-routine/shaders/spirv/cull-prefix-sum.comp.spv
         glslc rend3-routine/shaders/src/cull.comp   -DPREFIX_OUTPUT                      -O -g -o rend3-routine/shaders/spirv/cull-prefix-output.comp.spv

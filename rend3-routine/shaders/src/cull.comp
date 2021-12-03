@@ -129,14 +129,7 @@ void main() {
         return;
     }
 
-    uint total_count = subgroupBallotBitCount(subgroupBallot(true));
-    uint local_index = subgroupExclusiveAdd(1);
-    uint output_base;
-    if (subgroupElect()) {
-        output_base = atomicAdd(draw_call_count, total_count);
-    }
-    output_base = subgroupBroadcastFirst(output_base);
-    uint output_idx = output_base + local_index;
+    uint output_idx = atomicAdd(draw_call_count, 1);
 
     write_output(in_data, output_idx);
 }
