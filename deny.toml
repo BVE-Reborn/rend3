@@ -16,11 +16,11 @@ skip = [
     # everything
     { name = "base64", version = "0.12.3" }, # gltf uses old version
     { name = "cfg-if", version = "0.1.10" },
-    { name = "hashbrown", version = "0.9.1" },
     # graphics
     { name = "core-foundation", version = "0.7.0" }, # winit uses old version
     { name = "core-foundation-sys", version = "0.7.0" }, # winit uses old version
     { name = "core-graphics", version = "0.19.2" }, # winit uses old version
+    { name = "raw-window-handle", version = "0.3.4" }, # semver trick
     # image
     { name = "miniz_oxide", version = "0.3.7" }, # png uses old version
     # winit
@@ -33,7 +33,6 @@ skip = [
     # wayland grrr
     { name = "wasi", version = "0.10.2" },
     # egui
-    { name = "ahash", version = "0.4.7" },
     { name = "owned_ttf_parser", version = "0.6.0" },
     { name = "ttf-parser", version = "0.6.2" }
 ]
