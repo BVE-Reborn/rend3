@@ -52,8 +52,9 @@ impl CpuCuller {
             outputs.push(PerObjectData {
                 model_view: Mat4::ZERO,
                 model_view_proj: Mat4::ZERO,
-                inv_squared_scale: Vec3::ZERO,
+                pad0: [0; 12],
                 material_idx: 0,
+                inv_squared_scale: Vec3::ZERO,
             });
         }
 
@@ -114,8 +115,9 @@ pub fn cull_internal(
         outputs.push(PerObjectData {
             model_view,
             model_view_proj,
-            inv_squared_scale,
             material_idx: 0,
+            pad0: [0; 12],
+            inv_squared_scale,
         });
     }
 

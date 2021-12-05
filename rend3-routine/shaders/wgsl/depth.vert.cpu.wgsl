@@ -1,13 +1,13 @@
 struct ObjectOutputData {
     model_view: mat4x4<f32>;
     model_view_proj: mat4x4<f32>;
-    inv_squared_scale: vec3<f32>;
     material_idx: u32;
+    inv_squared_scale: vec3<f32>;
 };
 
 [[block]]
 struct ObjectOutputDataBuffer {
-    object_output: [[stride(144)]] array<ObjectOutputData>;
+    object_output: [[stride(160)]] array<ObjectOutputData>;
 };
 
 [[block]]

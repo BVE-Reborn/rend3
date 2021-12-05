@@ -25,13 +25,13 @@ struct ObjectInputUniforms {
 struct ObjectOutputData {
     model_view: mat4x4<f32>;
     model_view_proj: mat4x4<f32>;
-    inv_squared_scale: vec3<f32>;
     material_idx: u32;
+    inv_squared_scale: vec3<f32>;
 };
 
 [[block]]
 struct ObjectOutputDataBuffer {
-    object_output: [[stride(144)]] array<ObjectOutputData>;
+    object_output: [[stride(160)]] array<ObjectOutputData>;
 };
 
 struct IndirectCall {
@@ -112,8 +112,8 @@ fn main1() {
             let e76: vec3<f32> = e66[2].xyz;
             global1.object_output[e38].model_view = e66;
             global1.object_output[e38].model_view_proj = (e69 * e62);
-            global1.object_output[e38].inv_squared_scale = (vec3<f32>(1.0, 1.0, 1.0) / vec3<f32>(dot(e72, e72), dot(e74, e74), dot(e76, e76)));
             global1.object_output[e38].material_idx = e60;
+            global1.object_output[e38].inv_squared_scale = (vec3<f32>(1.0, 1.0, 1.0) / vec3<f32>(dot(e72, e72), dot(e74, e74), dot(e76, e76)));
             global2.indirect_call[e38].vertex_count = e56;
             global2.indirect_call[e38].instance_count = 1u;
             global2.indirect_call[e38].base_index = e54;

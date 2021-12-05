@@ -11,8 +11,8 @@ use rend3::{
     managers::{DirectionalLightManager, MaterialManager, TextureManager},
     types::{TextureFormat, TextureHandle, TextureUsages},
     util::bind_merge::BindGroupBuilder,
-    DepthHandle, ModeData, ReadyData, RenderGraph, RenderPassDepthTarget, RenderPassTarget, RenderPassTargets,
-    RenderTargetDescriptor, Renderer, RendererMode,
+    DataHandle, DepthHandle, ModeData, ReadyData, RenderGraph, RenderPassDepthTarget, RenderPassTarget,
+    RenderPassTargets, RenderTargetDescriptor, RenderTargetHandle, Renderer, RendererMode,
 };
 use wgpu::{BindGroup, Buffer, Color, Device};
 
@@ -35,7 +35,7 @@ pub mod uniforms;
 mod utils;
 pub mod vertex;
 
-struct CulledPerMaterial {
+pub struct CulledPerMaterial {
     inner: CulledObjectSet,
     per_material: BindGroup,
 }
@@ -120,41 +120,34 @@ impl PbrRenderRoutine {
         self.render_texture_options = options;
     }
 
-    pub fn add_pre_cull_to_graph<'node>(&'node self, graph: &mut RenderGraph<'node>) {
-        let mut declare_pre_cull = |node_name: &'node str, buf_name: &'node str, transparency: TransparencyType| {
-            let mut builder = graph.add_node(node_name);
-            let handle = builder.add_data_output::<_, Buffer>(buf_name);
+    pub fn add_pre_cull_to_graph<'node>(
+        &'node self,
+        graph: &mut RenderGraph<'node>,
+        transparency: TransparencyType,
+        pre_cull_data: DataHandle<Buffer>,
+    ) {
+        let mut builder = graph.add_node(format_sso!("pre-cull {:?}", transparency));
+        let data_handle = builder.add_data_output(pre_cull_data);
 
-            builder.build(move |_pt, renderer, _encoder_or_pass, _temps, _ready, graph_data| {
-                let objects = graph_data
-                    .object_manager
-                    .get_objects::<PbrMaterial>(transparency as u64);
-                let objects =
-                    common::sorting::sort_objects(objects, graph_data.camera_manager, transparency.to_sorting());
-                let buffer = culling::gpu::build_cull_data(&renderer.device, &objects);
-                graph_data.set_data::<Buffer>(handle, Some(buffer));
-            });
-        };
+        builder.build(move |_pt, renderer, _encoder_or_pass, _temps, _ready, graph_data| {
+            let objects = graph_data
+                .object_manager
+                .get_objects::<PbrMaterial>(transparency as u64);
+            let objects = common::sorting::sort_objects(objects, graph_data.camera_manager, transparency.to_sorting());
+            let buffer = culling::gpu::build_cull_data(&renderer.device, &objects);
+            graph_data.set_data::<Buffer>(data_handle, Some(buffer));
+        });
+    }
 
-        declare_pre_cull(
-            "Opaque Pre-Cull",
-            "Opaque Pre-Cull Data",
-            material::TransparencyType::Opaque,
-        );
-        declare_pre_cull(
-            "Cutout Pre-Cull",
-            "Cutout Pre-Cull Data",
-            material::TransparencyType::Cutout,
-        );
-        declare_pre_cull(
-            "Blend Pre-Cull",
-            "Blend Pre-Cull Data",
-            material::TransparencyType::Blend,
-        );
-
+    pub fn add_uniform_bg_creation_to_graph<'node>(
+        &'node self,
+        graph: &mut RenderGraph<'node>,
+        shadow_uniform_bg: DataHandle<BindGroup>,
+        forward_uniform_bg: DataHandle<BindGroup>,
+    ) {
         let mut builder = graph.add_node("build uniform data");
-        let shadow_handle = builder.add_data_output::<_, BindGroup>("Shadow Uniform Data");
-        let forward_handle = builder.add_data_output::<_, BindGroup>("Forward Uniform Data");
+        let shadow_handle = builder.add_data_output(shadow_uniform_bg);
+        let forward_handle = builder.add_data_output(forward_uniform_bg);
         builder.build(move |_pt, renderer, _encoder_or_pass, _temps, _ready, graph_data| {
             let mut bgb = BindGroupBuilder::new();
 
@@ -188,332 +181,299 @@ impl PbrRenderRoutine {
         })
     }
 
-    pub fn add_shadow_culling_to_graph<'node>(&'node self, graph: &mut RenderGraph<'node>, ready: &ReadyData) {
-        for idx in 0..ready.directional_light_cameras.len() {
-            for (transparency, pre_cull_name, cull_name) in [
-                (
-                    TransparencyType::Opaque,
-                    "Opaque Pre-Cull Data",
-                    format_sso!("Opaque S{} Cull", idx),
-                ),
-                (
-                    TransparencyType::Cutout,
-                    "Cutout Pre-Cull Data",
-                    format_sso!("Cutout S{} Cull", idx),
-                ),
-            ] {
-                let mut builder = graph.add_node(cull_name.clone());
+    pub fn add_shadow_culling_to_graph<'node>(
+        &'node self,
+        graph: &mut RenderGraph<'node>,
+        transparency: TransparencyType,
+        shadow_index: usize,
+        pre_cull_data: DataHandle<Buffer>,
+        culled: DataHandle<CulledPerMaterial>,
+    ) {
+        let mut builder = graph.add_node(format_sso!("Shadow Culling C{} {:?}", shadow_index, transparency));
 
-                let pre_cull_handle = self
-                    .gpu_culler
-                    .mode()
-                    .into_data(|| (), || builder.add_data_input(pre_cull_name));
-                let cull_handle = builder.add_data_output::<_, CulledPerMaterial>(cull_name.clone());
+        let pre_cull_handle = self
+            .gpu_culler
+            .mode()
+            .into_data(|| (), || builder.add_data_input(pre_cull_data));
+        let cull_handle = builder.add_data_output(culled);
 
-                builder.build(move |_pt, renderer, encoder_or_rpass, temps, ready, graph_data| {
-                    let encoder = encoder_or_rpass.get_encoder();
+        builder.build(move |_pt, renderer, encoder_or_rpass, temps, ready, graph_data| {
+            let encoder = encoder_or_rpass.get_encoder();
 
-                    let culling_input =
-                        pre_cull_handle.map_gpu(|handle| graph_data.get_data::<Buffer>(temps, handle).unwrap());
+            let culling_input = pre_cull_handle.map_gpu(|handle| graph_data.get_data::<Buffer>(temps, handle).unwrap());
 
-                    let count = graph_data
-                        .object_manager
-                        .get_objects::<PbrMaterial>(transparency as u64)
-                        .len();
+            let count = graph_data
+                .object_manager
+                .get_objects::<PbrMaterial>(transparency as u64)
+                .len();
 
-                    let culled_objects = match self.gpu_culler {
-                        ModeData::CPU(_) => self.cpu_culler.cull(culling::cpu::CpuCullerCullArgs {
-                            device: &renderer.device,
-                            camera: &ready.directional_light_cameras[idx],
-                            interfaces: &self.interfaces,
-                            objects: graph_data.object_manager,
-                            transparency,
-                        }),
-                        ModeData::GPU(ref gpu_culler) => gpu_culler.cull(culling::gpu::GpuCullerCullArgs {
-                            device: &renderer.device,
-                            encoder,
-                            interfaces: &self.interfaces,
-                            camera: &ready.directional_light_cameras[idx],
-                            input_buffer: culling_input.into_gpu(),
-                            input_count: count,
-                            transparency,
-                        }),
-                    };
-
-                    let mut per_material_bgb = BindGroupBuilder::new();
-                    per_material_bgb.append_buffer(&culled_objects.output_buffer);
-
-                    if renderer.mode == RendererMode::GPUPowered {
-                        graph_data
-                            .material_manager
-                            .add_to_bg_gpu::<PbrMaterial>(&mut per_material_bgb);
-                    }
-
-                    let per_material_bg =
-                        per_material_bgb.build(&renderer.device, None, &self.interfaces.per_material_bgl);
-
-                    graph_data.set_data(
-                        cull_handle,
-                        Some(CulledPerMaterial {
-                            inner: culled_objects,
-                            per_material: per_material_bg,
-                        }),
-                    );
-                });
-            }
-        }
-    }
-
-    pub fn add_shadow_rendering_to_graph<'node>(&'node self, graph: &mut RenderGraph<'node>, ready: &ReadyData) {
-        for idx in 0..ready.directional_light_cameras.len() {
-            for (transparency, cull_name) in [
-                (TransparencyType::Opaque, format_sso!("Opaque S{} Cull", idx)),
-                (TransparencyType::Cutout, format_sso!("Cutout S{} Cull", idx)),
-            ] {
-                let mut builder = graph.add_node(format_sso!("{} S{} Render", transparency.to_debug_str(), idx));
-
-                let shadow_uniform_handle = builder.add_data_input::<_, BindGroup>("Shadow Uniform Data");
-                let culled_handle = builder.add_data_input::<_, CulledPerMaterial>(cull_name);
-                let shadow_output_handle = builder.add_shadow_output(idx);
-
-                let rpass_handle = builder.add_renderpass(RenderPassTargets {
-                    targets: vec![],
-                    depth_stencil: Some(RenderPassDepthTarget {
-                        target: DepthHandle::Shadow(shadow_output_handle),
-                        depth_clear: Some(1.0),
-                        stencil_clear: None,
-                    }),
-                });
-
-                let pt_handle = builder.passthrough_data(self);
-
-                builder.build(move |pt, _renderer, encoder_or_pass, temps, ready, graph_data| {
-                    let this = pt.get(pt_handle);
-                    let rpass = encoder_or_pass.get_rpass(rpass_handle);
-                    let shadow_uniform = graph_data.get_data(temps, shadow_uniform_handle).unwrap();
-                    let culled = graph_data.get_data(temps, culled_handle).unwrap();
-
-                    graph_data.mesh_manager.buffers().bind(rpass);
-                    rpass.set_pipeline(&this.primary_passes.shadow_passes.opaque_pipeline);
-                    rpass.set_bind_group(0, shadow_uniform, &[]);
-                    rpass.set_bind_group(1, &culled.per_material, &[]);
-
-                    match culled.inner.calls {
-                        ModeData::CPU(ref draws) => culling::cpu::run(rpass, draws, graph_data.material_manager, 2),
-                        ModeData::GPU(ref data) => {
-                            rpass.set_bind_group(2, ready.d2_texture.bg.as_gpu(), &[]);
-                            culling::gpu::run(rpass, data);
-                        }
-                    }
-                });
-            }
-        }
-    }
-
-    pub fn add_culling_to_graph<'node>(&'node self, graph: &mut RenderGraph<'node>) {
-        for (transparency, pre_cull_name, post_cull_name) in [
-            (TransparencyType::Opaque, "Opaque Pre-Cull Data", "Opaque Forward Cull"),
-            (TransparencyType::Cutout, "Cutout Pre-Cull Data", "Cutout Forward Cull"),
-            (TransparencyType::Blend, "Blend Pre-Cull Data", "Blend Forward Cull"),
-        ] {
-            let mut builder = graph.add_node(post_cull_name);
-
-            let pre_cull_handle = self
-                .gpu_culler
-                .mode()
-                .into_data(|| (), || builder.add_data_input::<_, Buffer>(pre_cull_name));
-
-            let cull_handle = builder.add_data_output::<_, CulledPerMaterial>(post_cull_name);
-
-            builder.build(move |_pt, renderer, encoder_or_pass, temps, _ready, graph_data| {
-                let encoder = encoder_or_pass.get_encoder();
-
-                let culling_input = pre_cull_handle.map_gpu(|handle| graph_data.get_data(temps, handle).unwrap());
-
-                let culler = self.gpu_culler.as_ref().map_cpu(|_| &self.cpu_culler);
-
-                let pass = match transparency {
-                    TransparencyType::Opaque => &self.primary_passes.opaque_pass,
-                    TransparencyType::Cutout => &self.primary_passes.cutout_pass,
-                    TransparencyType::Blend => &self.primary_passes.transparent_pass,
-                };
-
-                let culled_objects = pass.cull(forward::ForwardPassCullArgs {
+            let culled_objects = match self.gpu_culler {
+                ModeData::CPU(_) => self.cpu_culler.cull(culling::cpu::CpuCullerCullArgs {
+                    device: &renderer.device,
+                    camera: &ready.directional_light_cameras[shadow_index],
+                    interfaces: &self.interfaces,
+                    objects: graph_data.object_manager,
+                    transparency,
+                }),
+                ModeData::GPU(ref gpu_culler) => gpu_culler.cull(culling::gpu::GpuCullerCullArgs {
                     device: &renderer.device,
                     encoder,
-                    culler,
                     interfaces: &self.interfaces,
-                    camera: graph_data.camera_manager,
-                    objects: graph_data.object_manager,
-                    culling_input,
-                });
+                    camera: &ready.directional_light_cameras[shadow_index],
+                    input_buffer: culling_input.into_gpu(),
+                    input_count: count,
+                    transparency,
+                }),
+            };
 
-                let mut per_material_bgb = BindGroupBuilder::new();
-                per_material_bgb.append_buffer(&culled_objects.output_buffer);
+            let mut per_material_bgb = BindGroupBuilder::new();
+            per_material_bgb.append_buffer(&culled_objects.output_buffer);
 
-                if renderer.mode == RendererMode::GPUPowered {
-                    graph_data
-                        .material_manager
-                        .add_to_bg_gpu::<PbrMaterial>(&mut per_material_bgb);
+            if renderer.mode == RendererMode::GPUPowered {
+                graph_data
+                    .material_manager
+                    .add_to_bg_gpu::<PbrMaterial>(&mut per_material_bgb);
+            }
+
+            let per_material_bg = per_material_bgb.build(&renderer.device, None, &self.interfaces.per_material_bgl);
+
+            graph_data.set_data(
+                cull_handle,
+                Some(CulledPerMaterial {
+                    inner: culled_objects,
+                    per_material: per_material_bg,
+                }),
+            );
+        });
+    }
+
+    pub fn add_shadow_rendering_to_graph<'node>(
+        &'node self,
+        graph: &mut RenderGraph<'node>,
+        transparency: TransparencyType,
+        shadow_index: usize,
+        shadow_uniform_bg: DataHandle<BindGroup>,
+        culled: DataHandle<CulledPerMaterial>,
+    ) {
+        let mut builder = graph.add_node(format_sso!("{} S{} Render", transparency.to_debug_str(), shadow_index));
+
+        let shadow_uniform_handle = builder.add_data_input(shadow_uniform_bg);
+        let culled_handle = builder.add_data_input(culled);
+        let shadow_output_handle = builder.add_shadow_output(shadow_index);
+
+        let rpass_handle = builder.add_renderpass(RenderPassTargets {
+            targets: vec![],
+            depth_stencil: Some(RenderPassDepthTarget {
+                target: DepthHandle::Shadow(shadow_output_handle),
+                depth_clear: Some(1.0),
+                stencil_clear: None,
+            }),
+        });
+
+        let pt_handle = builder.passthrough_data(self);
+
+        builder.build(move |pt, _renderer, encoder_or_pass, temps, ready, graph_data| {
+            let this = pt.get(pt_handle);
+            let rpass = encoder_or_pass.get_rpass(rpass_handle);
+            let shadow_uniform = graph_data.get_data(temps, shadow_uniform_handle).unwrap();
+            let culled = graph_data.get_data(temps, culled_handle).unwrap();
+
+            graph_data.mesh_manager.buffers().bind(rpass);
+            rpass.set_pipeline(&this.primary_passes.shadow_passes.opaque_pipeline);
+            rpass.set_bind_group(0, shadow_uniform, &[]);
+            rpass.set_bind_group(1, &culled.per_material, &[]);
+
+            match culled.inner.calls {
+                ModeData::CPU(ref draws) => culling::cpu::run(rpass, draws, graph_data.material_manager, 2),
+                ModeData::GPU(ref data) => {
+                    rpass.set_bind_group(2, ready.d2_texture.bg.as_gpu(), &[]);
+                    culling::gpu::run(rpass, data);
                 }
-
-                let per_material_bg = per_material_bgb.build(&renderer.device, None, &self.interfaces.per_material_bgl);
-
-                graph_data.set_data(
-                    cull_handle,
-                    Some(CulledPerMaterial {
-                        inner: culled_objects,
-                        per_material: per_material_bg,
-                    }),
-                );
-            });
-        }
+            }
+        });
     }
 
-    pub fn add_prepass_to_graph<'node>(&'node self, graph: &mut RenderGraph<'node>) {
-        for (transparency, cull_name, pass_name) in [
-            (TransparencyType::Opaque, "Opaque Forward Cull", "Opaque Prepass"),
-            (TransparencyType::Cutout, "Cutout Forward Cull", "Cutout Prepass"),
-        ] {
-            let mut builder = graph.add_node(pass_name);
+    pub fn add_culling_to_graph<'node>(
+        &'node self,
+        graph: &mut RenderGraph<'node>,
+        transparency: TransparencyType,
+        pre_cull_data: DataHandle<Buffer>,
+        culled: DataHandle<CulledPerMaterial>,
+    ) {
+        let mut builder = graph.add_node(format_sso!("Primary Culling {:?}", transparency));
 
-            let hdr_color_handle = builder.add_render_target_output(
-                "hdr color",
-                RenderTargetDescriptor {
-                    dim: self.render_texture_options.resolution,
-                    format: TextureFormat::Rgba16Float,
-                    usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
-                },
-            );
+        let pre_cull_handle = self
+            .gpu_culler
+            .mode()
+            .into_data(|| (), || builder.add_data_input(pre_cull_data));
 
-            let hdr_depth_handle = builder.add_render_target_output(
-                "hdr depth",
-                RenderTargetDescriptor {
-                    dim: self.render_texture_options.resolution,
-                    format: TextureFormat::Depth32Float,
-                    usage: TextureUsages::RENDER_ATTACHMENT,
-                },
-            );
+        let cull_handle = builder.add_data_output(culled);
 
-            let forward_uniform_handle = builder.add_data_input::<_, BindGroup>("Forward Uniform Data");
-            let cull_handle = builder.add_data_input::<_, CulledPerMaterial>(cull_name);
+        builder.build(move |_pt, renderer, encoder_or_pass, temps, _ready, graph_data| {
+            let encoder = encoder_or_pass.get_encoder();
 
-            let rpass_handle = builder.add_renderpass(RenderPassTargets {
-                targets: vec![RenderPassTarget {
-                    target: hdr_color_handle,
-                    clear: Color::BLACK,
-                    resolve: None,
-                }],
-                depth_stencil: Some(RenderPassDepthTarget {
-                    target: DepthHandle::RenderTarget(hdr_depth_handle),
-                    depth_clear: Some(0.0),
-                    stencil_clear: None,
+            let culling_input = pre_cull_handle.map_gpu(|handle| graph_data.get_data(temps, handle).unwrap());
+
+            let culler = self.gpu_culler.as_ref().map_cpu(|_| &self.cpu_culler);
+
+            let pass = match transparency {
+                TransparencyType::Opaque => &self.primary_passes.opaque_pass,
+                TransparencyType::Cutout => &self.primary_passes.cutout_pass,
+                TransparencyType::Blend => &self.primary_passes.transparent_pass,
+            };
+
+            let culled_objects = pass.cull(forward::ForwardPassCullArgs {
+                device: &renderer.device,
+                encoder,
+                culler,
+                interfaces: &self.interfaces,
+                camera: graph_data.camera_manager,
+                objects: graph_data.object_manager,
+                culling_input,
+            });
+
+            let mut per_material_bgb = BindGroupBuilder::new();
+            per_material_bgb.append_buffer(&culled_objects.output_buffer);
+
+            if renderer.mode == RendererMode::GPUPowered {
+                graph_data
+                    .material_manager
+                    .add_to_bg_gpu::<PbrMaterial>(&mut per_material_bgb);
+            }
+
+            let per_material_bg = per_material_bgb.build(&renderer.device, None, &self.interfaces.per_material_bgl);
+
+            graph_data.set_data(
+                cull_handle,
+                Some(CulledPerMaterial {
+                    inner: culled_objects,
+                    per_material: per_material_bg,
                 }),
-            });
-
-            let pt_handle = builder.passthrough_data(self);
-
-            builder.build(move |pt, renderer, encoder_or_pass, temps, ready, graph_data| {
-                let this = pt.get(pt_handle);
-                let rpass = encoder_or_pass.get_rpass(rpass_handle);
-                let forward_uniform_bg = graph_data.get_data(temps, forward_uniform_handle).unwrap();
-                let culled = graph_data.get_data(temps, cull_handle).unwrap();
-
-                let pass = match transparency {
-                    TransparencyType::Opaque => &this.primary_passes.opaque_pass,
-                    TransparencyType::Cutout => &this.primary_passes.cutout_pass,
-                    TransparencyType::Blend => unreachable!(),
-                };
-
-                let d2_texture_output_bg_ref = ready.d2_texture.bg.as_ref().map(|_| (), |a| &**a);
-
-                pass.prepass(forward::ForwardPassPrepassArgs {
-                    device: &renderer.device,
-                    rpass,
-                    materials: graph_data.material_manager,
-                    meshes: graph_data.mesh_manager.buffers(),
-                    forward_uniform_bg,
-                    per_material_bg: &culled.per_material,
-                    texture_bg: d2_texture_output_bg_ref,
-                    culled_objects: &culled.inner,
-                });
-            });
-        }
+            );
+        });
     }
 
-    pub fn add_forward_to_graph<'node>(&'node self, graph: &mut RenderGraph<'node>) {
-        for (transparency, cull_name, pass_name) in [
-            (TransparencyType::Opaque, "Opaque Forward Cull", "Opaque Forward"),
-            (TransparencyType::Cutout, "Cutout Forward Cull", "Cutout Forward"),
-            (TransparencyType::Blend, "Blend Forward Cull", "Blend Forward"),
-        ] {
-            let mut builder = graph.add_node(pass_name);
+    pub fn add_prepass_to_graph<'node>(
+        &'node self,
+        graph: &mut RenderGraph<'node>,
+        transparency: TransparencyType,
+        color: RenderTargetHandle,
+        depth: RenderTargetHandle,
+        forward_uniform_bg: DataHandle<BindGroup>,
+        culled: DataHandle<CulledPerMaterial>,
+    ) {
+        let mut builder = graph.add_node(format_sso!("Primary Prepass {:?}", transparency));
 
-            let hdr_color_handle = builder.add_render_target_output(
-                "hdr color",
-                RenderTargetDescriptor {
-                    dim: self.render_texture_options.resolution,
-                    format: TextureFormat::Rgba16Float,
-                    usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
-                },
-            );
+        let hdr_color_handle = builder.add_render_target_output(color);
 
-            let hdr_depth_handle = builder.add_render_target_output(
-                "hdr depth",
-                RenderTargetDescriptor {
-                    dim: self.render_texture_options.resolution,
-                    format: TextureFormat::Depth32Float,
-                    usage: TextureUsages::RENDER_ATTACHMENT,
-                },
-            );
+        let hdr_depth_handle = builder.add_render_target_output(depth);
 
-            let rpass_handle = builder.add_renderpass(RenderPassTargets {
-                targets: vec![RenderPassTarget {
-                    target: hdr_color_handle,
-                    clear: Color::BLACK,
-                    resolve: None,
-                }],
-                depth_stencil: Some(RenderPassDepthTarget {
-                    target: DepthHandle::RenderTarget(hdr_depth_handle),
-                    depth_clear: Some(0.0),
-                    stencil_clear: None,
-                }),
+        let forward_uniform_handle = builder.add_data_input(forward_uniform_bg);
+        let cull_handle = builder.add_data_input(culled);
+
+        let rpass_handle = builder.add_renderpass(RenderPassTargets {
+            targets: vec![RenderPassTarget {
+                color: hdr_color_handle,
+                clear: Color::BLACK,
+                resolve: None,
+            }],
+            depth_stencil: Some(RenderPassDepthTarget {
+                target: DepthHandle::RenderTarget(hdr_depth_handle),
+                depth_clear: Some(0.0),
+                stencil_clear: None,
+            }),
+        });
+
+        let pt_handle = builder.passthrough_data(self);
+
+        builder.build(move |pt, renderer, encoder_or_pass, temps, ready, graph_data| {
+            let this = pt.get(pt_handle);
+            let rpass = encoder_or_pass.get_rpass(rpass_handle);
+            let forward_uniform_bg = graph_data.get_data(temps, forward_uniform_handle).unwrap();
+            let culled = graph_data.get_data(temps, cull_handle).unwrap();
+
+            let pass = match transparency {
+                TransparencyType::Opaque => &this.primary_passes.opaque_pass,
+                TransparencyType::Cutout => &this.primary_passes.cutout_pass,
+                TransparencyType::Blend => unreachable!(),
+            };
+
+            let d2_texture_output_bg_ref = ready.d2_texture.bg.as_ref().map(|_| (), |a| &**a);
+
+            pass.prepass(forward::ForwardPassPrepassArgs {
+                device: &renderer.device,
+                rpass,
+                materials: graph_data.material_manager,
+                meshes: graph_data.mesh_manager.buffers(),
+                forward_uniform_bg,
+                per_material_bg: &culled.per_material,
+                texture_bg: d2_texture_output_bg_ref,
+                culled_objects: &culled.inner,
             });
+        });
+    }
 
-            let _ = builder.add_shadow_array_input();
+    pub fn add_forward_to_graph<'node>(
+        &'node self,
+        graph: &mut RenderGraph<'node>,
+        transparency: TransparencyType,
+        color: RenderTargetHandle,
+        depth: RenderTargetHandle,
+        forward_uniform_bg: DataHandle<BindGroup>,
+        culled: DataHandle<CulledPerMaterial>,
+    ) {
+        let mut builder = graph.add_node(format_sso!("Primary Forward {:?}", transparency));
 
-            let forward_uniform_handle = builder.add_data_input::<_, BindGroup>("Forward Uniform Data");
-            let cull_handle = builder.add_data_input::<_, CulledPerMaterial>(cull_name);
+        let hdr_color_handle = builder.add_render_target_output(color);
 
-            let pt_handle = builder.passthrough_data(self);
+        let hdr_depth_handle = builder.add_render_target_output(depth);
 
-            builder.build(move |pt, renderer, encoder_or_pass, temps, ready, graph_data| {
-                let this = pt.get(pt_handle);
-                let rpass = encoder_or_pass.get_rpass(rpass_handle);
-                let forward_uniform_bg = graph_data.get_data(temps, forward_uniform_handle).unwrap();
-                let culled = graph_data.get_data(temps, cull_handle).unwrap();
+        let rpass_handle = builder.add_renderpass(RenderPassTargets {
+            targets: vec![RenderPassTarget {
+                color: hdr_color_handle,
+                clear: Color::BLACK,
+                resolve: None,
+            }],
+            depth_stencil: Some(RenderPassDepthTarget {
+                target: DepthHandle::RenderTarget(hdr_depth_handle),
+                depth_clear: Some(0.0),
+                stencil_clear: None,
+            }),
+        });
 
-                let pass = match transparency {
-                    TransparencyType::Opaque => &this.primary_passes.opaque_pass,
-                    TransparencyType::Cutout => &this.primary_passes.cutout_pass,
-                    TransparencyType::Blend => &this.primary_passes.transparent_pass,
-                };
+        let _ = builder.add_shadow_array_input();
 
-                let d2_texture_output_bg_ref = ready.d2_texture.bg.as_ref().map(|_| (), |a| &**a);
+        let forward_uniform_handle = builder.add_data_input(forward_uniform_bg);
+        let cull_handle = builder.add_data_input(culled);
 
-                pass.draw(forward::ForwardPassDrawArgs {
-                    device: &renderer.device,
-                    rpass,
-                    materials: graph_data.material_manager,
-                    meshes: graph_data.mesh_manager.buffers(),
-                    samplers: &this.samplers,
-                    forward_uniform_bg,
-                    per_material_bg: &culled.per_material,
-                    texture_bg: d2_texture_output_bg_ref,
-                    culled_objects: &culled.inner,
-                });
+        let pt_handle = builder.passthrough_data(self);
+
+        builder.build(move |pt, renderer, encoder_or_pass, temps, ready, graph_data| {
+            let this = pt.get(pt_handle);
+            let rpass = encoder_or_pass.get_rpass(rpass_handle);
+            let forward_uniform_bg = graph_data.get_data(temps, forward_uniform_handle).unwrap();
+            let culled = graph_data.get_data(temps, cull_handle).unwrap();
+
+            let pass = match transparency {
+                TransparencyType::Opaque => &this.primary_passes.opaque_pass,
+                TransparencyType::Cutout => &this.primary_passes.cutout_pass,
+                TransparencyType::Blend => &this.primary_passes.transparent_pass,
+            };
+
+            let d2_texture_output_bg_ref = ready.d2_texture.bg.as_ref().map(|_| (), |a| &**a);
+
+            pass.draw(forward::ForwardPassDrawArgs {
+                device: &renderer.device,
+                rpass,
+                materials: graph_data.material_manager,
+                meshes: graph_data.mesh_manager.buffers(),
+                samplers: &this.samplers,
+                forward_uniform_bg,
+                per_material_bg: &culled.per_material,
+                texture_bg: d2_texture_output_bg_ref,
+                culled_objects: &culled.inner,
             });
-        }
+        });
     }
 }
 
@@ -670,23 +630,22 @@ impl SkyboxRoutine {
         });
     }
 
-    pub fn add_to_graph<'node>(&'node self, graph: &mut RenderGraph<'node>) {
+    pub fn add_to_graph<'node>(
+        &'node self,
+        graph: &mut RenderGraph<'node>,
+        color: RenderTargetHandle,
+        depth: RenderTargetHandle,
+        forward_uniform_bg: DataHandle<BindGroup>,
+    ) {
         let mut builder = graph.add_node("Skybox");
 
-        let hdr_color_handle = builder.add_render_target_output(
-            "hdr color",
-            RenderTargetDescriptor {
-                dim: self.options.resolution,
-                format: TextureFormat::Rgba16Float,
-                usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
-            },
-        );
+        let hdr_color_handle = builder.add_render_target_output(color);
 
-        let hdr_depth_handle = builder.add_render_target_input("hdr depth");
+        let hdr_depth_handle = builder.add_render_target_input(depth);
 
         let rpass_handle = builder.add_renderpass(RenderPassTargets {
             targets: vec![RenderPassTarget {
-                target: hdr_color_handle,
+                color: hdr_color_handle,
                 clear: Color::BLACK,
                 resolve: None,
             }],
@@ -697,7 +656,7 @@ impl SkyboxRoutine {
             }),
         });
 
-        let forward_uniform_handle = builder.add_data_input::<_, BindGroup>("Forward Uniform Data");
+        let forward_uniform_handle = builder.add_data_input(forward_uniform_bg);
         let pt_handle = builder.passthrough_data(self);
 
         builder.build(move |pt, _renderer, encoder_or_pass, temps, _ready, graph_data| {
@@ -742,18 +701,24 @@ impl TonemappingRoutine {
         self.size = size;
     }
 
-    pub fn add_to_graph<'node>(&'node self, graph: &mut RenderGraph<'node>) {
+    pub fn add_to_graph<'node>(
+        &'node self,
+        graph: &mut RenderGraph<'node>,
+        src: RenderTargetHandle,
+        dst: RenderTargetHandle,
+        forward_uniform_bg: DataHandle<BindGroup>,
+    ) {
         let mut builder = graph.add_node("Tonemapping");
 
-        let hdr_color_handle = builder.add_render_target_input("hdr color");
+        let input_handle = builder.add_render_target_input(src);
+        let output_handle = builder.add_render_target_output(dst);
 
-        let forward_uniform_handle = builder.add_data_input::<_, BindGroup>("Forward Uniform Data");
-        let output_handle = builder.add_surface_output();
+        let forward_uniform_handle = builder.add_data_input(forward_uniform_bg);
 
         builder.build(move |_pt, renderer, encoder_or_pass, temps, _ready, graph_data| {
             let encoder = encoder_or_pass.get_encoder();
             let forward_uniform_bg = graph_data.get_data(temps, forward_uniform_handle).unwrap();
-            let hdr_color = graph_data.get_render_target(hdr_color_handle);
+            let hdr_color = graph_data.get_render_target(input_handle);
             let output = graph_data.get_render_target(output_handle);
 
             self.tonemapping_pass.blit(tonemapping::TonemappingPassBlitArgs {
@@ -766,4 +731,107 @@ impl TonemappingRoutine {
             });
         });
     }
+}
+
+struct PerTransparencyInfo {
+    ty: TransparencyType,
+    pre_cull: DataHandle<Buffer>,
+    shadow_cull: Vec<DataHandle<CulledPerMaterial>>,
+    cull: DataHandle<CulledPerMaterial>,
+}
+
+pub fn add_default_rendergraph<'node>(
+    graph: &mut RenderGraph<'node>,
+    ready: &ReadyData,
+    pbr: &'node PbrRenderRoutine,
+    skybox: Option<&'node SkyboxRoutine>,
+    tonemapping: &'node TonemappingRoutine,
+) {
+    // We need to know how many shadows we need to render
+    let shadow_count = ready.directional_light_cameras.len();
+
+    // Setup all of our per-transparency data
+    let mut per_transparency = Vec::with_capacity(3);
+    for ty in [
+        TransparencyType::Opaque,
+        TransparencyType::Cutout,
+        TransparencyType::Blend,
+    ] {
+        per_transparency.push(PerTransparencyInfo {
+            ty,
+            pre_cull: graph.add_data(),
+            shadow_cull: {
+                let mut shadows = Vec::with_capacity(shadow_count);
+                shadows.resize_with(shadow_count, || graph.add_data());
+                shadows
+            },
+            cull: graph.add_data(),
+        })
+    }
+
+    // A lot of things don't deal with blending, so lets make a subslice for that situation.
+    let per_transparency_no_blend = &per_transparency[..2];
+
+    // Add pre-culling
+    for trans in &per_transparency {
+        pbr.add_pre_cull_to_graph(graph, trans.ty, trans.pre_cull);
+    }
+
+    // Create global bind group information
+    let shadow_uniform_bg = graph.add_data::<BindGroup>();
+    let forward_uniform_bg = graph.add_data::<BindGroup>();
+    pbr.add_uniform_bg_creation_to_graph(graph, shadow_uniform_bg, forward_uniform_bg);
+
+    // Add shadow culling
+    for trans in per_transparency_no_blend {
+        for (shadow_index, &shadow_culled) in trans.shadow_cull.iter().enumerate() {
+            pbr.add_shadow_culling_to_graph(graph, trans.ty, shadow_index, trans.pre_cull, shadow_culled);
+        }
+    }
+
+    // Add primary culling
+    for trans in &per_transparency {
+        pbr.add_culling_to_graph(graph, trans.ty, trans.pre_cull, trans.cull);
+    }
+
+    // Add shadow rendering
+    for trans in per_transparency_no_blend {
+        for (shadow_index, &shadow_culled) in trans.shadow_cull.iter().enumerate() {
+            pbr.add_shadow_rendering_to_graph(graph, trans.ty, shadow_index, shadow_uniform_bg, shadow_culled);
+        }
+    }
+
+    // Make the actual render targets we want to render to.
+    let color = graph.add_render_target(RenderTargetDescriptor {
+        label: Some("hdr color".into()),
+        dim: pbr.render_texture_options.resolution,
+        format: TextureFormat::Rgba16Float,
+        usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
+    });
+    let depth = graph.add_render_target(RenderTargetDescriptor {
+        label: Some("hdr depth".into()),
+        dim: pbr.render_texture_options.resolution,
+        format: TextureFormat::Depth32Float,
+        usage: TextureUsages::RENDER_ATTACHMENT,
+    });
+
+    // Add depth prepass
+    for trans in per_transparency_no_blend {
+        pbr.add_prepass_to_graph(graph, trans.ty, color, depth, forward_uniform_bg, trans.cull);
+    }
+
+    // Add skybox
+    if let Some(skybox) = skybox {
+        skybox.add_to_graph(graph, color, depth, forward_uniform_bg);
+    }
+
+    // Add primary rendering
+    for trans in &per_transparency {
+        pbr.add_forward_to_graph(graph, trans.ty, color, depth, forward_uniform_bg, trans.cull);
+    }
+
+    // Make the reference to the surface
+    let surface = graph.add_surface_texture();
+
+    tonemapping.add_to_graph(graph, color, surface, forward_uniform_bg);
 }

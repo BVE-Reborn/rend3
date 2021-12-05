@@ -18,9 +18,10 @@ use crate::{common::samplers::Samplers, material::PbrMaterial, uniforms::ShaderC
 pub struct PerObjectData {
     pub model_view: Mat4,
     pub model_view_proj: Mat4,
-    pub inv_squared_scale: Vec3,
     // Unused in shader
     pub material_idx: u32,
+    pub pad0: [u8; 12],
+    pub inv_squared_scale: Vec3,
 }
 
 unsafe impl bytemuck::Pod for PerObjectData {}

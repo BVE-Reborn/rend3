@@ -1,4 +1,4 @@
-use rend3::{RenderGraph, Renderer};
+use rend3::{RenderGraph, RenderTargetHandle, Renderer};
 use wgpu::TextureFormat;
 
 pub struct EguiRenderRoutine {
@@ -35,10 +35,15 @@ impl EguiRenderRoutine {
         };
     }
 
-    pub fn add_to_graph<'node>(&'node mut self, graph: &mut RenderGraph<'node>, input: Input<'node>) {
+    pub fn add_to_graph<'node>(
+        &'node mut self,
+        graph: &mut RenderGraph<'node>,
+        input: Input<'node>,
+        output: RenderTargetHandle,
+    ) {
         let mut builder = graph.add_node("egui");
 
-        let output_handle = builder.add_surface_output();
+        let output_dep = builder.add_render_target_output(output);
 
         builder.build(move |_pt, renderer, encoder_or_pass, _temps, _ready, graph_data| {
             let encoder = encoder_or_pass.get_encoder();
@@ -53,7 +58,7 @@ impl EguiRenderRoutine {
                 &self.screen_descriptor,
             );
 
-            let output = graph_data.get_render_target(output_handle);
+            let output = graph_data.get_render_target(output_dep);
 
             self.internal
                 .execute(encoder, output, input.clipped_meshes, &self.screen_descriptor, None)

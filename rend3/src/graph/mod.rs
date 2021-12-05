@@ -38,32 +38,34 @@ pub struct ReadyData {
     pub directional_light_cameras: Vec<CameraManager>,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct RenderTargetDescriptor {
+    pub label: Option<SsoString>,
     pub dim: UVec2,
     pub format: TextureFormat,
     pub usage: TextureUsages,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct BufferTargetDescriptor {
+    pub label: Option<SsoString>,
     pub length: u64,
     pub usage: BufferUsages,
     pub mapped: bool,
 }
 
 pub struct RenderGraph<'node> {
-    targets: FastHashMap<SsoString, RenderTargetDescriptor>,
+    targets: Vec<RenderTargetDescriptor>,
     shadows: FastHashSet<usize>,
-    data: FastHashMap<SsoString, Box<dyn Any>>, // Any is Option<T> where T is the stored data
+    data: Vec<Box<dyn Any>>, // Any is RefCell<Option<T>> where T is the stored data
     nodes: Vec<RenderGraphNode<'node>>,
 }
 impl<'node> RenderGraph<'node> {
     pub fn new() -> Self {
         Self {
-            targets: FastHashMap::with_capacity_and_hasher(32, Default::default()),
+            targets: Vec::with_capacity(32),
             shadows: FastHashSet::with_capacity_and_hasher(32, Default::default()),
-            data: FastHashMap::with_capacity_and_hasher(32, Default::default()),
+            data: Vec::with_capacity(32),
             nodes: Vec::with_capacity(64),
         }
     }
@@ -79,6 +81,29 @@ impl<'node> RenderGraph<'node> {
             outputs: Vec::with_capacity(16),
             passthrough: PassthroughDataContainer::none(),
             rpass: None,
+        }
+    }
+
+    pub fn add_render_target(&mut self, desc: RenderTargetDescriptor) -> RenderTargetHandle {
+        let idx = self.targets.len();
+        self.targets.push(desc);
+        RenderTargetHandle {
+            resource: GraphResource::Texture(idx),
+        }
+    }
+
+    pub fn add_surface_texture(&mut self) -> RenderTargetHandle {
+        RenderTargetHandle {
+            resource: GraphResource::OutputTexture,
+        }
+    }
+
+    pub fn add_data<T: 'static>(&mut self) -> DataHandle<T> {
+        let idx = self.data.len();
+        self.data.push(Box::new(RefCell::new(None::<T>)));
+        DataHandle {
+            resource: GraphResource::Data(idx),
+            _phantom: PhantomData,
         }
     }
 
@@ -120,16 +145,16 @@ impl<'node> RenderGraph<'node> {
             // Iterate through all the nodes, tracking the index where they are first used, and the index where they are last used.
             for (idx, node) in pruned_node_list.iter().enumerate() {
                 // Add or update the range for all inputs
-                for input in &node.inputs {
+                for &input in &node.inputs {
                     resource_spans
-                        .entry(input.clone())
+                        .entry(input)
                         .and_modify(|range| range.1 = idx)
                         .or_insert((idx, idx));
                 }
                 // And the outputs
-                for output in &node.outputs {
+                for &output in &node.outputs {
                     resource_spans
-                        .entry(output.clone())
+                        .entry(output)
                         .and_modify(|range| range.1 = idx)
                         .or_insert((idx, idx));
                 }
@@ -140,9 +165,9 @@ impl<'node> RenderGraph<'node> {
         let mut resource_changes = vec![(Vec::new(), Vec::new()); pruned_node_list.len()];
         {
             profiling::scope!("Compute Resource Span Deltas");
-            for (resource, span) in &resource_spans {
-                resource_changes[span.0].0.push(resource.clone());
-                resource_changes[span.1].1.push(resource.clone());
+            for (&resource, span) in &resource_spans {
+                resource_changes[span.0].0.push(resource);
+                resource_changes[span.1].1.push(resource);
             }
         }
 
@@ -161,14 +186,14 @@ impl<'node> RenderGraph<'node> {
             for (idx, (starting, ending)) in resource_changes.into_iter().enumerate() {
                 for start in starting {
                     match start {
-                        GraphResource::Texture(name) => {
-                            let desc = self.targets[&name];
-                            if let Some(tex) = textures.get_mut(&desc).and_then(Vec::pop) {
+                        GraphResource::Texture(idx) => {
+                            let desc = &self.targets[idx];
+                            if let Some(tex) = textures.get_mut(desc).and_then(Vec::pop) {
                                 let view = tex.create_view(&TextureViewDescriptor {
-                                    label: Some(&name),
+                                    label: desc.label.as_deref(),
                                     ..TextureViewDescriptor::default()
                                 });
-                                active_views.insert(name.clone(), view);
+                                active_views.insert(idx, view);
                             } else {
                                 let tex = renderer.device.create_texture(&TextureDescriptor {
                                     label: None,
@@ -185,11 +210,11 @@ impl<'node> RenderGraph<'node> {
                                     usage: desc.usage,
                                 });
                                 let view = tex.create_view(&TextureViewDescriptor {
-                                    label: Some(&name),
+                                    label: desc.label.as_deref(),
                                     ..TextureViewDescriptor::default()
                                 });
-                                active_textures.insert(name.clone(), tex);
-                                active_views.insert(name.clone(), view);
+                                active_textures.insert(idx, tex);
+                                active_views.insert(idx, view);
                             }
                         }
                         GraphResource::Shadow(..) => {}
@@ -203,12 +228,12 @@ impl<'node> RenderGraph<'node> {
 
                 for end in ending {
                     match end {
-                        GraphResource::Texture(name) => {
+                        GraphResource::Texture(idx) => {
                             let tex = active_textures
-                                .remove(&name)
+                                .remove(&idx)
                                 .expect("internal rendergraph error: texture end with no start");
 
-                            let desc = self.targets[&name];
+                            let desc = self.targets[idx].clone();
                             textures.entry(desc).or_insert_with(|| Vec::with_capacity(16)).push(tex);
                         }
                         GraphResource::Shadow(..) => {}
@@ -371,14 +396,14 @@ impl<'node> RenderGraph<'node> {
         pass_idx: usize,
         output: &'rpass OutputFrame,
         resource_spans: &'rpass FastHashMap<GraphResource, (usize, usize)>,
-        active_views: &'rpass FastHashMap<SsoString, TextureView>,
+        active_views: &'rpass FastHashMap<usize, TextureView>,
         shadow_views: &'rpass [TextureView],
     ) -> RenderPass<'rpass> {
         let color_attachments: Vec<_> = desc
             .targets
             .iter()
             .map(|target| {
-                let view_span = resource_spans[&target.target.resource];
+                let view_span = resource_spans[&target.color.handle.resource];
 
                 let load = if view_span.0 == pass_idx {
                     LoadOp::Clear(target.clear)
@@ -389,7 +414,7 @@ impl<'node> RenderGraph<'node> {
                 let store = view_span.1 != pass_idx;
 
                 RenderPassColorAttachment {
-                    view: match &target.target.resource {
+                    view: match &target.color.handle.resource {
                         GraphResource::OutputTexture => output
                             .as_view()
                             .expect("internal rendergraph error: tried to use output texture before acquire"),
@@ -411,9 +436,9 @@ impl<'node> RenderGraph<'node> {
                 }
             })
             .collect();
-        let depth_stencil_attachment = desc.depth_stencil.as_ref().map(|target| {
-            let resource = match target.target {
-                DepthHandle::RenderTarget(ref h) => h.resource.clone(),
+        let depth_stencil_attachment = desc.depth_stencil.as_ref().map(|ds_target| {
+            let resource = match ds_target.target {
+                DepthHandle::RenderTarget(ref dep) => dep.handle.resource,
                 DepthHandle::Shadow(ref s) => GraphResource::Shadow(s.idx),
             };
 
@@ -421,7 +446,7 @@ impl<'node> RenderGraph<'node> {
 
             let store = view_span.1 != pass_idx;
 
-            let depth_ops = target.depth_clear.map(|clear| {
+            let depth_ops = ds_target.depth_clear.map(|clear| {
                 let load = if view_span.0 == pass_idx {
                     LoadOp::Clear(clear)
                 } else {
@@ -431,7 +456,7 @@ impl<'node> RenderGraph<'node> {
                 Operations { load, store }
             });
 
-            let stencil_load = target.stencil_clear.map(|clear| {
+            let stencil_load = ds_target.stencil_clear.map(|clear| {
                 let load = if view_span.0 == pass_idx {
                     LoadOp::Clear(clear)
                 } else {
@@ -486,24 +511,25 @@ pub struct ShadowTarget<'a> {
     pub size: usize,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 enum GraphResource {
     OutputTexture,
-    Texture(SsoString),
+    Texture(usize),
     Shadow(usize),
-    Data(SsoString),
+    Data(usize),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct RenderTargetHandle {
     resource: GraphResource,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct ShadowTargetHandle {
     idx: usize,
 }
 
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct ShadowArrayHandle;
 
 pub struct DataHandle<T> {
@@ -511,11 +537,34 @@ pub struct DataHandle<T> {
     _phantom: PhantomData<T>,
 }
 
+impl<T> std::fmt::Debug for DataHandle<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DataHandle").field("resource", &self.resource).finish()
+    }
+}
+
+impl<T> Copy for DataHandle<T> {}
+
+impl<T> Clone for DataHandle<T> {
+    fn clone(&self) -> Self {
+        Self {
+            resource: self.resource,
+            _phantom: self._phantom,
+        }
+    }
+}
+
+impl<T> PartialEq for DataHandle<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.resource == other.resource && self._phantom == other._phantom
+    }
+}
+
 pub struct RenderGraphDataStore<'a> {
-    texture_mapping: &'a FastHashMap<SsoString, TextureView>,
+    texture_mapping: &'a FastHashMap<usize, TextureView>,
     shadow_coordinates: &'a [ShadowCoordinates],
     shadow_views: &'a [TextureView],
-    data: &'a FastHashMap<SsoString, Box<dyn Any>>, // Any is RefCell<Option<T>> where T is the stored data
+    data: &'a [Box<dyn Any>], // Any is RefCell<Option<T>> where T is the stored data
     output: Option<&'a TextureView>,
 
     pub camera_manager: &'a CameraManager,
@@ -528,8 +577,8 @@ pub struct RenderGraphDataStore<'a> {
 }
 
 impl<'a> RenderGraphDataStore<'a> {
-    pub fn get_render_target(&self, handle: RenderTargetHandle) -> &'a TextureView {
-        match handle.resource {
+    pub fn get_render_target(&self, dep: DeclaredDependency<RenderTargetHandle>) -> &'a TextureView {
+        match dep.handle.resource {
             GraphResource::Texture(name) => self
                 .texture_mapping
                 .get(&name)
@@ -558,12 +607,12 @@ impl<'a> RenderGraphDataStore<'a> {
         }
     }
 
-    pub fn set_data<T: 'static>(&self, handle: DataHandle<T>, data: Option<T>) {
-        match handle.resource {
-            GraphResource::Data(name) => {
+    pub fn set_data<T: 'static>(&self, dep: DeclaredDependency<DataHandle<T>>, data: Option<T>) {
+        match dep.handle.resource {
+            GraphResource::Data(idx) => {
                 *self
                     .data
-                    .get(&name)
+                    .get(idx)
                     .expect("internal rendergraph error: failed to get buffer")
                     .downcast_ref::<RefCell<Option<T>>>()
                     .expect("internal rendergraph error: downcasting failed")
@@ -576,12 +625,16 @@ impl<'a> RenderGraphDataStore<'a> {
         }
     }
 
-    pub fn get_data<T: 'static>(&self, temps: &'a RpassTemporaryPool<'a>, handle: DataHandle<T>) -> Option<&'a T> {
-        match handle.resource {
-            GraphResource::Data(name) => temps
+    pub fn get_data<T: 'static>(
+        &self,
+        temps: &'a RpassTemporaryPool<'a>,
+        dep: DeclaredDependency<DataHandle<T>>,
+    ) -> Option<&'a T> {
+        match dep.handle.resource {
+            GraphResource::Data(idx) => temps
                 .add(
                     self.data
-                        .get(&name)
+                        .get(idx)
                         .expect("internal rendergraph error: failed to get buffer")
                         .downcast_ref::<RefCell<Option<T>>>()
                         .expect("internal rendergraph error: downcasting failed")
@@ -726,7 +779,7 @@ impl RenderPassTargets {
                     .targets
                     .iter()
                     .zip(other.targets.iter())
-                    .all(|(me, you)| me.target == you.target && me.resolve == you.resolve);
+                    .all(|(me, you)| me.color == you.color && me.resolve == you.resolve);
 
                 let depth_compatible = this
                     .depth_stencil
@@ -742,9 +795,14 @@ impl RenderPassTargets {
     }
 }
 
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct DeclaredDependency<Handle> {
+    handle: Handle,
+}
+
 #[derive(Debug, PartialEq)]
 pub struct RenderPassTarget {
-    pub target: RenderTargetHandle,
+    pub color: DeclaredDependency<RenderTargetHandle>,
     pub clear: Color,
     pub resolve: Option<RenderTargetHandle>,
 }
@@ -758,7 +816,7 @@ pub struct RenderPassDepthTarget {
 
 #[derive(Debug, PartialEq)]
 pub enum DepthHandle {
-    RenderTarget(RenderTargetHandle),
+    RenderTarget(DeclaredDependency<RenderTargetHandle>),
     Shadow(ShadowTargetHandle),
 }
 
@@ -790,32 +848,15 @@ pub struct RenderGraphNodeBuilder<'a, 'node> {
     rpass: Option<RenderPassTargets>,
 }
 impl<'a, 'node> RenderGraphNodeBuilder<'a, 'node> {
-    pub fn add_render_target_input<S>(&mut self, name: S) -> RenderTargetHandle
-    where
-        SsoString: From<S>,
-    {
-        let resource = GraphResource::Texture(SsoString::from(name));
-        self.inputs.push(resource.clone());
-        RenderTargetHandle { resource }
+    pub fn add_render_target_input(&mut self, handle: RenderTargetHandle) -> DeclaredDependency<RenderTargetHandle> {
+        self.inputs.push(handle.resource);
+        DeclaredDependency { handle }
     }
 
-    pub fn add_render_target_output<S>(&mut self, name: S, desc: RenderTargetDescriptor) -> RenderTargetHandle
-    where
-        SsoString: From<S>,
-    {
-        let name = SsoString::from(name);
-        self.graph.targets.entry(name.clone()).or_insert(desc);
-        let resource = GraphResource::Texture(name);
-        self.inputs.push(resource.clone());
-        self.outputs.push(resource.clone());
-        RenderTargetHandle { resource }
-    }
-
-    pub fn add_surface_output(&mut self) -> RenderTargetHandle {
-        let resource = GraphResource::OutputTexture;
-        self.inputs.push(resource.clone());
-        self.outputs.push(resource.clone());
-        RenderTargetHandle { resource }
+    pub fn add_render_target_output(&mut self, handle: RenderTargetHandle) -> DeclaredDependency<RenderTargetHandle> {
+        self.inputs.push(handle.resource);
+        self.outputs.push(handle.resource);
+        DeclaredDependency { handle }
     }
 
     pub fn add_renderpass(&mut self, targets: RenderPassTargets) -> RenderPassHandle {
@@ -830,7 +871,7 @@ impl<'a, 'node> RenderGraphNodeBuilder<'a, 'node> {
     pub fn add_shadow_array_input(&mut self) -> ShadowArrayHandle {
         for i in &self.graph.shadows {
             let resource = GraphResource::Shadow(*i);
-            self.inputs.push(resource.clone());
+            self.inputs.push(resource);
         }
         ShadowArrayHandle
     }
@@ -838,47 +879,48 @@ impl<'a, 'node> RenderGraphNodeBuilder<'a, 'node> {
     pub fn add_shadow_output(&mut self, idx: usize) -> ShadowTargetHandle {
         let resource = GraphResource::Shadow(idx);
         self.graph.shadows.insert(idx);
-        self.inputs.push(resource.clone());
+        self.inputs.push(resource);
         self.outputs.push(resource);
         ShadowTargetHandle { idx }
     }
 
-    pub fn add_data_input<S, T>(&mut self, name: S) -> DataHandle<T>
+    pub fn add_data_input<T>(&mut self, handle: DataHandle<T>) -> DeclaredDependency<DataHandle<T>>
     where
-        SsoString: From<S>,
         T: 'static,
     {
-        let name = SsoString::from(name);
+        self.add_data(handle, false)
+    }
+
+    pub fn add_data_output<T>(&mut self, handle: DataHandle<T>) -> DeclaredDependency<DataHandle<T>>
+    where
+        T: 'static,
+    {
+        self.add_data(handle, true)
+    }
+
+    fn add_data<T>(&mut self, handle: DataHandle<T>, output: bool) -> DeclaredDependency<DataHandle<T>>
+    where
+        T: 'static,
+    {
+        let idx = match handle.resource {
+            GraphResource::Data(idx) => idx,
+            _ => panic!("internal rendergraph error: tried to use a non-data resource as data"),
+        };
+
         // TODO: error handling
         // TODO: move this validation to all types
         self.graph
             .data
-            .get(&name)
-            .expect("used input which has not been previously declared as a node's output")
+            .get(idx)
+            .expect("internal rendergraph error: cannot find data handle")
             .downcast_ref::<RefCell<Option<T>>>()
             .expect("used custom data that was previously declared with a different type");
-        let resource = GraphResource::Data(name);
-        self.inputs.push(resource.clone());
-        DataHandle {
-            resource,
-            _phantom: PhantomData,
-        }
-    }
 
-    pub fn add_data_output<S, T>(&mut self, name: S) -> DataHandle<T>
-    where
-        SsoString: From<S>,
-        T: 'static,
-    {
-        let name = SsoString::from(name);
-        let resource = GraphResource::Data(name.clone());
-        self.graph.data.insert(name, Box::new(RefCell::new(None::<T>)));
-        self.inputs.push(resource.clone());
-        self.outputs.push(resource.clone());
-        DataHandle {
-            resource,
-            _phantom: PhantomData,
+        self.inputs.push(handle.resource);
+        if output {
+            self.outputs.push(handle.resource);
         }
+        DeclaredDependency { handle }
     }
 
     pub fn passthrough_data<T>(&mut self, data: &'node T) -> PassthroughDataHandle<T> {

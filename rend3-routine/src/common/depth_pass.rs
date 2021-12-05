@@ -98,7 +98,7 @@ pub fn build_depth_pass_pipeline(args: BuildDepthPassShaderArgs) -> DepthPassPip
             &depth_opaque_frag,
             match args.ty {
                 DepthPassType::Prepass => "depth opaque prepass",
-                DepthPassType::Shadow => "depth opaque prepass",
+                DepthPassType::Shadow => "shadow opaque prepass",
             },
         )),
         cutout: Arc::new(create_depth_inner(
@@ -108,7 +108,7 @@ pub fn build_depth_pass_pipeline(args: BuildDepthPassShaderArgs) -> DepthPassPip
             &depth_cutout_frag,
             match args.ty {
                 DepthPassType::Prepass => "depth cutout prepass",
-                DepthPassType::Shadow => "depth cutout prepass",
+                DepthPassType::Shadow => "shadow cutout prepass",
             },
         )),
     }

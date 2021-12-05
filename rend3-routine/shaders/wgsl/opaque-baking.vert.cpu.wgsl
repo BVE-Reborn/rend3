@@ -1,13 +1,13 @@
 struct ObjectOutputData {
     model_view: mat4x4<f32>;
     model_view_proj: mat4x4<f32>;
-    inv_squared_scale: vec3<f32>;
     material_idx: u32;
+    inv_squared_scale: vec3<f32>;
 };
 
 [[block]]
 struct ObjectOutputDataBuffer {
-    object_output: [[stride(144)]] array<ObjectOutputData>;
+    object_output: [[stride(160)]] array<ObjectOutputData>;
 };
 
 struct CPUMaterialData {
@@ -72,16 +72,16 @@ var<private> i_material1: u32;
 fn main1() {
     let e32: i32 = gl_InstanceIndex1;
     let e37: mat4x4<f32> = global.object_output[bitcast<u32>(e32)].model_view;
-    let e39: vec3<f32> = global.object_output[bitcast<u32>(e32)].inv_squared_scale;
-    let e41: u32 = global.object_output[bitcast<u32>(e32)].material_idx;
-    o_material = e41;
+    let e39: u32 = global.object_output[bitcast<u32>(e32)].material_idx;
+    let e41: vec3<f32> = global.object_output[bitcast<u32>(e32)].inv_squared_scale;
+    o_material = e39;
     let e42: vec3<f32> = i_position1;
     o_view_position = (e37 * vec4<f32>(e42.x, e42.y, e42.z, 1.0));
     let e54: mat3x3<f32> = mat3x3<f32>(e37[0].xyz, e37[1].xyz, e37[2].xyz);
     let e55: vec3<f32> = i_normal1;
-    o_normal = (e54 * (e39 * e55));
+    o_normal = (e54 * (e41 * e55));
     let e58: vec3<f32> = i_tangent1;
-    o_tangent = (e54 * (e39 * e58));
+    o_tangent = (e54 * (e41 * e58));
     let e61: vec4<f32> = i_color1;
     o_color = e61;
     let e62: vec2<f32> = i_coords0_1;
