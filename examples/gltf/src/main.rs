@@ -138,22 +138,15 @@ impl rend3_framework::App for GltfExample {
 
                     // Build a rendergraph
                     let mut graph = rend3::RenderGraph::new();
-                    // Upload culling information to the GPU and into the graph.
-                    pbr_routine.add_pre_cull_to_graph(&mut graph);
 
-                    // Run all culling for shadows and the camera.
-                    pbr_routine.add_shadow_culling_to_graph(&mut graph, &ready);
-                    pbr_routine.add_culling_to_graph(&mut graph);
-
-                    // Render shadows.
-                    pbr_routine.add_shadow_rendering_to_graph(&mut graph, &ready);
-
-                    // Depth prepass and forward pass.
-                    pbr_routine.add_prepass_to_graph(&mut graph);
-                    pbr_routine.add_forward_to_graph(&mut graph);
-
-                    // Tonemap onto the output.
-                    tonemapping_routine.add_to_graph(&mut graph);
+                    // Add the default rendergraph without a skybox
+                    rend3_routine::add_default_rendergraph(
+                        &mut graph,
+                        &ready,
+                        &pbr_routine,
+                        None,
+                        &tonemapping_routine,
+                    );
 
                     // Dispatch a render using the built up rendergraph!
                     graph.execute(renderer, frame, cmd_bufs, &ready);
