@@ -8,10 +8,11 @@ members = [
     "examples/gltf",
     "examples/scene-viewer",
     "rend3",
-    "rend3-gltf",
     "rend3-egui",
-    "rend3-routine",
     "rend3-framework",
+    "rend3-gltf",
+    "rend3-imgui",
+    "rend3-routine",
     "rend3-types"
 ]
 

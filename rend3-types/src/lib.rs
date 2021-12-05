@@ -200,7 +200,7 @@ macro_rules! changeable_struct {
 
 // WGPU REEXPORTS
 #[doc(inline)]
-pub use wgt::{Backend, Backends, BufferUsages, DeviceType, PresentMode, TextureFormat, TextureUsages};
+pub use wgt::{Backend, Backends, BufferUsages, Color, DeviceType, PresentMode, TextureFormat, TextureUsages};
 
 /// Token that validates a mesh has passed mesh validation.
 #[derive(Debug)]
