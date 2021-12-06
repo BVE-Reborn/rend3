@@ -16,7 +16,7 @@ egui = "0.15.0"
 # Backend-agnostic interface for writing apps using egui
 epi = "0.15.0"
 # Winit integration with egui
-egui_winit_platform = "0.11.0"
+egui_winit_platform = "0.12.0"
 # logging
 env_logger = { version = "0.9", default-features = false, features = ["termcolor", "atty"] }
 # Linear algebra library
