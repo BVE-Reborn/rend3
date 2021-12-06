@@ -189,7 +189,7 @@ fn main() {
     rend3_framework::start(
         app,
         winit::window::WindowBuilder::new()
-            .with_title("egui")
+            .with_title("imgui")
             .with_maximized(true),
     )
 }
