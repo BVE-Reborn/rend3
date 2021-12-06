@@ -1,4 +1,3 @@
-use glam::Vec4;
 use imgui_wgpu::RendererConfig;
 use rend3::{
     types::{Color, TextureFormat},
@@ -12,9 +11,9 @@ pub struct ImguiRenderRoutine {
 impl ImguiRenderRoutine {
     pub fn new(renderer: &Renderer, imgui: &mut imgui::Context, output_format: TextureFormat) -> Self {
         let base = if output_format.describe().srgb {
-            RendererConfig::new_srgb()
-        } else {
             RendererConfig::new()
+        } else {
+            RendererConfig::new_srgb()
         };
 
         let renderer = imgui_wgpu::Renderer::new(
@@ -33,7 +32,7 @@ impl ImguiRenderRoutine {
     pub fn add_to_graph<'node>(
         &'node mut self,
         graph: &mut RenderGraph<'node>,
-        draw_data: imgui::DrawData,
+        draw_data: &'node imgui::DrawData,
         output: RenderTargetHandle,
     ) {
         let mut builder = graph.add_node("imgui");
@@ -49,14 +48,15 @@ impl ImguiRenderRoutine {
             depth_stencil: None,
         });
 
-        let pt_handle = builder.passthrough_data(self);
+        let pt_handle = builder.passthrough_ref_mut(self);
 
-        builder.build(move |pt, renderer, encoder_or_pass, temps, _ready, graph_data| {
-            let this = pt.get(pt_handle);
+        builder.build(move |pt, renderer, encoder_or_pass, _temps, _ready, _graph_data| {
+            let this = pt.get_mut(pt_handle);
             let rpass = encoder_or_pass.get_rpass(rpass_handle);
 
             this.renderer
-                .render(&draw_data, &renderer.queue, &renderer.device, rpass);
+                .render(draw_data, &renderer.queue, &renderer.device, rpass)
+                .unwrap();
         })
     }
 }

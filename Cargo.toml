@@ -5,6 +5,7 @@ members = [
     "examples/cube",
     "examples/cube-no-framework",
     "examples/egui",
+    "examples/imgui",
     "examples/gltf",
     "examples/scene-viewer",
     "rend3",
