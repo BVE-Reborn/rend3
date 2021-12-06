@@ -270,7 +270,7 @@ impl PbrRenderRoutine {
             }),
         });
 
-        let pt_handle = builder.passthrough_data(self);
+        let pt_handle = builder.passthrough_ref(self);
 
         builder.build(move |pt, _renderer, encoder_or_pass, temps, ready, graph_data| {
             let this = pt.get(pt_handle);
@@ -384,7 +384,7 @@ impl PbrRenderRoutine {
             }),
         });
 
-        let pt_handle = builder.passthrough_data(self);
+        let pt_handle = builder.passthrough_ref(self);
 
         builder.build(move |pt, renderer, encoder_or_pass, temps, ready, graph_data| {
             let this = pt.get(pt_handle);
@@ -446,7 +446,7 @@ impl PbrRenderRoutine {
         let forward_uniform_handle = builder.add_data_input(forward_uniform_bg);
         let cull_handle = builder.add_data_input(culled);
 
-        let pt_handle = builder.passthrough_data(self);
+        let pt_handle = builder.passthrough_ref(self);
 
         builder.build(move |pt, renderer, encoder_or_pass, temps, ready, graph_data| {
             let this = pt.get(pt_handle);
@@ -657,7 +657,7 @@ impl SkyboxRoutine {
         });
 
         let forward_uniform_handle = builder.add_data_input(forward_uniform_bg);
-        let pt_handle = builder.passthrough_data(self);
+        let pt_handle = builder.passthrough_ref(self);
 
         builder.build(move |pt, _renderer, encoder_or_pass, temps, _ready, graph_data| {
             let this = pt.get(pt_handle);
