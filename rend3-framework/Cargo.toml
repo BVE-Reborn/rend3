@@ -36,5 +36,6 @@ js-sys = "0.3"
 reqwest = "0.11"
 once_cell = "1.8"
 wasm-bindgen = "=0.2.78"
+wasm-bindgen-futures = "0.4"
 web-sys = "0.3"
 winit = { version = "0.25", features = ["web-sys"] }

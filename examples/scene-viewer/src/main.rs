@@ -245,13 +245,13 @@ impl rend3_framework::App for SceneViewer {
         });
     }
 
-    fn handle_event<T: 'static>(
+    fn handle_event(
         &mut self,
         window: &winit::window::Window,
         renderer: &Arc<rend3::Renderer>,
         routines: &Arc<rend3_framework::DefaultRoutines>,
         surface: &Arc<rend3::types::Surface>,
-        event: rend3_framework::Event<T>,
+        event: rend3_framework::Event<'_, ()>,
         control_flow: impl FnOnce(winit::event_loop::ControlFlow),
     ) {
         match event {

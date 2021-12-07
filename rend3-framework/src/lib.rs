@@ -3,8 +3,10 @@ use std::{future::Future, pin::Pin, sync::Arc};
 use glam::UVec2;
 use rend3::{types::Surface, InstanceAdapterDevice, Renderer};
 use winit::{
+    dpi::PhysicalSize,
+    event::WindowEvent,
     event_loop::{ControlFlow, EventLoop, EventLoopWindowTarget},
-    window::{Window, WindowBuilder},
+    window::{Window, WindowBuilder, WindowId},
 };
 
 mod assets;
@@ -16,9 +18,21 @@ pub use assets::*;
 pub use grab::*;
 
 pub use parking_lot::{Mutex, MutexGuard};
-pub use winit::event::Event;
+pub type Event<'a, T> = winit::event::Event<'a, UserResizeEvent<T>>;
 
-pub trait App {
+/// User event which the framework uses to resize on wasm.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum UserResizeEvent<T: 'static> {
+    /// Used to fire off resizing on wasm
+    Resize {
+        window_id: WindowId,
+        size: PhysicalSize<u32>,
+    },
+    /// Custom user event type
+    Other(T),
+}
+
+pub trait App<T: 'static = ()> {
     fn register_logger(&mut self) {
         #[cfg(target_arch = "wasm32")]
         console_log::init().unwrap();
@@ -32,7 +46,7 @@ pub trait App {
         std::panic::set_hook(Box::new(console_error_panic_hook::hook));
     }
 
-    fn create_window(&mut self, builder: WindowBuilder) -> (EventLoop<ControlFlow>, Window) {
+    fn create_window(&mut self, builder: WindowBuilder) -> (EventLoop<UserResizeEvent<T>>, Window) {
         profiling::scope!("creating window");
 
         let event_loop = EventLoop::with_user_event();
@@ -72,8 +86,9 @@ pub trait App {
         let _ = (window, renderer, routines, surface, surface_format);
     }
 
-    /// RedrawRequested/RedrawEventsCleared will only be fired if the window size is nonz-ero. As such you should always render in RedrawRequested and use MainEventsCleared for things that need to keep running when minimized.
-    fn handle_event<T: 'static>(
+    /// RedrawRequested/RedrawEventsCleared will only be fired if the window size is non-zero. As such you should always render
+    /// in RedrawRequested and use MainEventsCleared for things that need to keep running when minimized.
+    fn handle_event(
         &mut self,
         window: &Window,
         renderer: &Arc<rend3::Renderer>,
@@ -186,31 +201,36 @@ pub async fn async_start<A: App + 'static>(mut app: A, window_builder: WindowBui
     app.setup(&window, &renderer, &routines, &surface, format);
 
     #[cfg(target_arch = "wasm32")]
-    let observer = resize_observer::ResizeObserver::new(&window, sender.clone());
+    let _observer = resize_observer::ResizeObserver::new(&window, event_loop.create_proxy());
 
     // We're ready, so lets make things visible
     window.set_visible(true);
 
     let mut allow_redraw = true;
 
-    winit_run(
-        event_loop,
-        move |event, _event_loop: &EventLoopWindowTarget<ControlFlow>, control_flow| {
-            if let Some(allow) = handle_resize(&event, &surface, &renderer, format, &routines) {
-                allow_redraw = allow;
-            }
+    winit_run(event_loop, move |event, _event_loop, control_flow| {
+        let event = match event {
+            Event::UserEvent(UserResizeEvent::Resize { size, window_id }) => Event::WindowEvent {
+                window_id,
+                event: WindowEvent::Resized(size),
+            },
+            e => e,
+        };
 
-            if let Event::RedrawRequested(_) = event {
-                if !allow_redraw {
-                    return;
-                }
-            }
+        if let Some(allow) = handle_resize(&event, &surface, &renderer, format, &routines) {
+            allow_redraw = allow;
+        }
 
-            app.handle_event(&window, &renderer, &routines, &surface, event, |c: ControlFlow| {
-                *control_flow = c;
-            })
-        },
-    );
+        if let Event::RedrawRequested(_) = event {
+            if !allow_redraw {
+                return;
+            }
+        }
+
+        app.handle_event(&window, &renderer, &routines, &surface, event, |c: ControlFlow| {
+            *control_flow = c;
+        })
+    });
 }
 
 fn handle_resize<T: 'static>(
