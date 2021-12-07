@@ -1,9 +1,14 @@
 [package]
 name = "rend3-imgui"
 version = "0.2.0"
+authors = ["The rend3 Developers"]
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+description = "Imgui Render Routine for rend3"
+readme = "../README.md"
+license = "MIT OR Apache-2.0 OR Zlib"
+repository = "https://github.com/BVE-Reborn/rend3"
+keywords = ["3d", "graphics", "gpu", "renderer", "wgpu"]
+categories = ["game-development", "graphics", "rendering", "rendering::engine"]
 
 [dependencies]
 imgui = "0.8"
