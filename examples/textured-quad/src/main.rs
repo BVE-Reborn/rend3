@@ -39,148 +39,138 @@ struct TexturedQuadExample {
     data: Option<TexturedQuadExampleData>,
 }
 impl rend3_framework::App for TexturedQuadExample {
-    fn setup<'a>(
-        &'a mut self,
-        window: &'a winit::window::Window,
-        renderer: &'a Arc<rend3::Renderer>,
-        _routines: &'a Arc<rend3_framework::DefaultRoutines>,
-        _surface: &'a Arc<rend3::types::Surface>,
+    fn setup(
+        &mut self,
+        window: &winit::window::Window,
+        renderer: &Arc<rend3::Renderer>,
+        _routines: &Arc<rend3_framework::DefaultRoutines>,
+        _surface: &Arc<rend3::types::Surface>,
         _surface_format: rend3::types::TextureFormat,
-    ) -> std::pin::Pin<Box<dyn rend3_framework::NativeSendFuture<()> + 'a>> {
-        Box::pin(async move {
-            // Create mesh and calculate smooth normals based on vertices
-            let mesh = create_quad(300.0);
+    ) {
+        // Create mesh and calculate smooth normals based on vertices
+        let mesh = create_quad(300.0);
 
-            // Add mesh to renderer's world.
-            //
-            // All handles are refcounted, so we only need to hang onto the handle until we make an object.
-            let mesh_handle = renderer.add_mesh(mesh);
+        // Add mesh to renderer's world.
+        //
+        // All handles are refcounted, so we only need to hang onto the handle until we make an object.
+        let mesh_handle = renderer.add_mesh(mesh);
 
-            // Add texture to renderer's world.
-            let image_checker =
-                image::load_from_memory(include_bytes!("checker.png")).expect("Failed to load image from memory");
-            let image_checker_rgba8 = image_checker.to_rgba8();
-            let texture_checker = rend3::types::Texture {
-                label: Option::None,
-                data: image_checker_rgba8.to_vec(),
-                format: rend3::types::TextureFormat::Rgba8UnormSrgb,
-                size: glam::UVec2::new(image_checker.dimensions().0, image_checker.dimensions().1),
-                mip_count: rend3::types::MipmapCount::ONE,
-                mip_source: rend3::types::MipmapSource::Uploaded,
-            };
-            let texture_checker_handle = renderer.add_texture_2d(texture_checker);
+        // Add texture to renderer's world.
+        let image_checker =
+            image::load_from_memory(include_bytes!("checker.png")).expect("Failed to load image from memory");
+        let image_checker_rgba8 = image_checker.to_rgba8();
+        let texture_checker = rend3::types::Texture {
+            label: Option::None,
+            data: image_checker_rgba8.to_vec(),
+            format: rend3::types::TextureFormat::Rgba8UnormSrgb,
+            size: glam::UVec2::new(image_checker.dimensions().0, image_checker.dimensions().1),
+            mip_count: rend3::types::MipmapCount::ONE,
+            mip_source: rend3::types::MipmapSource::Uploaded,
+        };
+        let texture_checker_handle = renderer.add_texture_2d(texture_checker);
 
-            // Add PBR material with all defaults except a single color.
-            let material = rend3_routine::material::PbrMaterial {
-                albedo: rend3_routine::material::AlbedoComponent::Texture(texture_checker_handle),
-                unlit: true,
-                sample_type: rend3_routine::material::SampleType::Nearest,
-                ..rend3_routine::material::PbrMaterial::default()
-            };
-            let material_handle = renderer.add_material(material);
+        // Add PBR material with all defaults except a single color.
+        let material = rend3_routine::material::PbrMaterial {
+            albedo: rend3_routine::material::AlbedoComponent::Texture(texture_checker_handle),
+            unlit: true,
+            sample_type: rend3_routine::material::SampleType::Nearest,
+            ..rend3_routine::material::PbrMaterial::default()
+        };
+        let material_handle = renderer.add_material(material);
 
-            // Combine the mesh and the material with a location to give an object.
-            let object = rend3::types::Object {
-                mesh: mesh_handle,
-                material: material_handle,
-                transform: glam::Mat4::from_scale_rotation_translation(
-                    glam::Vec3::new(1.0, 1.0, 1.0),
-                    glam::Quat::from_euler(glam::EulerRot::XYZ, 0.0, 0.0, 0.0),
-                    glam::Vec3::new(0.0, 0.0, 0.0),
+        // Combine the mesh and the material with a location to give an object.
+        let object = rend3::types::Object {
+            mesh: mesh_handle,
+            material: material_handle,
+            transform: glam::Mat4::from_scale_rotation_translation(
+                glam::Vec3::new(1.0, 1.0, 1.0),
+                glam::Quat::from_euler(glam::EulerRot::XYZ, 0.0, 0.0, 0.0),
+                glam::Vec3::new(0.0, 0.0, 0.0),
+            ),
+        };
+
+        // Creating an object will hold onto both the mesh and the material
+        // even if they are deleted.
+        //
+        // We need to keep the object handle alive.
+        let _object_handle = renderer.add_object(object);
+
+        let view_location = glam::Vec3::new(0.0, 0.0, -1.0);
+        let view = glam::Mat4::from_euler(glam::EulerRot::XYZ, 0.0, 0.0, 0.0);
+        let view = view * glam::Mat4::from_translation(-view_location);
+
+        // Set camera's location
+        renderer.set_camera_data(rend3::types::Camera {
+            projection: rend3::types::CameraProjection::Orthographic {
+                size: glam::Vec3A::new(
+                    window.inner_size().width as f32,
+                    window.inner_size().height as f32,
+                    CAMERA_DEPTH,
                 ),
-            };
+            },
+            view,
+        });
 
-            // Creating an object will hold onto both the mesh and the material
-            // even if they are deleted.
-            //
-            // We need to keep the object handle alive.
-            let _object_handle = renderer.add_object(object);
-
-            let view_location = glam::Vec3::new(0.0, 0.0, -1.0);
-            let view = glam::Mat4::from_euler(glam::EulerRot::XYZ, 0.0, 0.0, 0.0);
-            let view = view * glam::Mat4::from_translation(-view_location);
-
-            // Set camera's location
-            renderer.set_camera_data(rend3::types::Camera {
-                projection: rend3::types::CameraProjection::Orthographic {
-                    size: glam::Vec3A::new(
-                        window.inner_size().width as f32,
-                        window.inner_size().height as f32,
-                        CAMERA_DEPTH,
-                    ),
-                },
-                view,
-            });
-
-            self.data = Some(TexturedQuadExampleData { _object_handle, view })
-        })
+        self.data = Some(TexturedQuadExampleData { _object_handle, view })
     }
 
-    fn handle_event<'a>(
-        &'a mut self,
-        _window: &'a winit::window::Window,
-        renderer: &'a Arc<rend3::Renderer>,
-        routines: &'a Arc<rend3_framework::DefaultRoutines>,
-        surface: &'a Arc<rend3::types::Surface>,
-        event: rend3_framework::Event,
-        control_flow: impl FnOnce(winit::event_loop::ControlFlow) + rend3_framework::NativeSend + 'a,
-    ) -> std::pin::Pin<Box<dyn rend3_framework::NativeSendFuture<()> + 'a>> {
-        Box::pin(async move {
-            match event {
-                // Close button was clicked, we should close.
-                winit::event::Event::WindowEvent {
-                    event: winit::event::WindowEvent::CloseRequested,
-                    ..
-                } => {
-                    control_flow(winit::event_loop::ControlFlow::Exit);
-                }
-                // Window was resized, need to resize renderer.
-                winit::event::Event::WindowEvent {
-                    event: winit::event::WindowEvent::Resized(size),
-                    ..
-                } => {
-                    let size = glam::UVec2::new(size.width, size.height);
-                    // Reset camera
-                    renderer.set_camera_data(rend3::types::Camera {
-                        projection: rend3::types::CameraProjection::Orthographic {
-                            size: glam::Vec3A::new(size.x as f32, size.y as f32, CAMERA_DEPTH),
-                        },
-                        view: self.data.as_ref().unwrap().view,
-                    });
-                }
-                // Render!
-                winit::event::Event::MainEventsCleared => {
-                    // Get a frame
-                    let frame = rend3::util::output::OutputFrame::Surface {
-                        surface: Arc::clone(surface),
-                    };
-
-                    // Ready up the renderer
-                    let (cmd_bufs, ready) = renderer.ready();
-
-                    // Lock the routines
-                    let pbr_routine = routines.pbr.lock().await;
-                    let tonemapping_routine = routines.tonemapping.lock().await;
-
-                    // Build a rendergraph
-                    let mut graph = rend3::RenderGraph::new();
-
-                    // Add the default rendergraph
-                    rend3_routine::add_default_rendergraph(
-                        &mut graph,
-                        &ready,
-                        &pbr_routine,
-                        None,
-                        &tonemapping_routine,
-                    );
-
-                    // Dispatch a render using the built up rendergraph!
-                    graph.execute(renderer, frame, cmd_bufs, &ready);
-                }
-                // Other events we don't care about
-                _ => {}
+    fn handle_event<T: 'static>(
+        &mut self,
+        _window: &winit::window::Window,
+        renderer: &Arc<rend3::Renderer>,
+        routines: &Arc<rend3_framework::DefaultRoutines>,
+        surface: &Arc<rend3::types::Surface>,
+        event: rend3_framework::Event<'_, T>,
+        control_flow: impl FnOnce(winit::event_loop::ControlFlow),
+    ) {
+        match event {
+            // Close button was clicked, we should close.
+            winit::event::Event::WindowEvent {
+                event: winit::event::WindowEvent::CloseRequested,
+                ..
+            } => {
+                control_flow(winit::event_loop::ControlFlow::Exit);
             }
-        })
+            // Window was resized, need to resize renderer.
+            winit::event::Event::WindowEvent {
+                event: winit::event::WindowEvent::Resized(size),
+                ..
+            } => {
+                let size = glam::UVec2::new(size.width, size.height);
+                // Reset camera
+                renderer.set_camera_data(rend3::types::Camera {
+                    projection: rend3::types::CameraProjection::Orthographic {
+                        size: glam::Vec3A::new(size.x as f32, size.y as f32, CAMERA_DEPTH),
+                    },
+                    view: self.data.as_ref().unwrap().view,
+                });
+            }
+            // Render!
+            winit::event::Event::MainEventsCleared => {
+                // Get a frame
+                let frame = rend3::util::output::OutputFrame::Surface {
+                    surface: Arc::clone(surface),
+                };
+
+                // Ready up the renderer
+                let (cmd_bufs, ready) = renderer.ready();
+
+                // Lock the routines
+                let pbr_routine = rend3_framework::lock(&routines.pbr);
+                let tonemapping_routine = rend3_framework::lock(&routines.tonemapping);
+
+                // Build a rendergraph
+                let mut graph = rend3::RenderGraph::new();
+
+                // Add the default rendergraph
+                rend3_routine::add_default_rendergraph(&mut graph, &ready, &pbr_routine, None, &tonemapping_routine);
+
+                // Dispatch a render using the built up rendergraph!
+                graph.execute(renderer, frame, cmd_bufs, &ready);
+            }
+            // Other events we don't care about
+            _ => {}
+        }
     }
 }
 
