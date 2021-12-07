@@ -132,7 +132,9 @@ impl rend3_framework::App for ImguiExample {
         match event {
             rend3_framework::Event::RedrawRequested(..) => {
                 // Setup an imgui frame
-                data.platform.prepare_frame(data.imgui.io_mut(), window).expect("could not prepare imgui frame");
+                data.platform
+                    .prepare_frame(data.imgui.io_mut(), window)
+                    .expect("could not prepare imgui frame");
                 let ui = data.imgui.frame();
 
                 // Insert imgui commands here
@@ -176,9 +178,11 @@ impl rend3_framework::App for ImguiExample {
 
                 window.request_redraw();
             }
-            rend3_framework::Event::WindowEvent { event, .. } => if event == winit::event::WindowEvent::CloseRequested  {
-                control_flow(winit::event_loop::ControlFlow::Exit);
-            },
+            rend3_framework::Event::WindowEvent { event, .. } => {
+                if event == winit::event::WindowEvent::CloseRequested {
+                    control_flow(winit::event_loop::ControlFlow::Exit);
+                }
+            }
             _ => {}
         }
     }

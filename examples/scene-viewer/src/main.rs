@@ -6,9 +6,9 @@ use rend3::{
     util::typedefs::FastHashMap,
     Renderer, RendererMode,
 };
-use rend3_framework::AsyncMutex;
+use rend3_framework::{lock, Mutex};
 use rend3_routine::SkyboxRoutine;
-use std::{collections::HashMap, hash::BuildHasher, path::Path, sync::Arc, time::Duration};
+use std::{collections::HashMap, future::Future, hash::BuildHasher, path::Path, sync::Arc, time::Duration};
 use wgpu_profiler::GpuTimerScopeResult;
 use winit::{
     event::{DeviceEvent, ElementState, Event, KeyboardInput, MouseButton, WindowEvent},
@@ -18,7 +18,6 @@ use winit::{
 mod platform;
 
 async fn load_skybox_image(loader: &rend3_framework::AssetLoader, data: &mut Vec<u8>, path: &str) {
-    log::info!("Loading skybox image {}", path);
     let decoded = image::load_from_memory(
         &loader
             .get_asset(path)
@@ -34,10 +33,8 @@ async fn load_skybox_image(loader: &rend3_framework::AssetLoader, data: &mut Vec
 async fn load_skybox(
     renderer: &Renderer,
     loader: &rend3_framework::AssetLoader,
-    skybox_routine: &AsyncMutex<SkyboxRoutine>,
+    skybox_routine: &Mutex<SkyboxRoutine>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    profiling::scope!("load skybox");
-
     let mut data = Vec::new();
     load_skybox_image(loader, &mut data, "skybox/right.jpg").await;
     load_skybox_image(loader, &mut data, "skybox/left.jpg").await;
@@ -54,7 +51,7 @@ async fn load_skybox(
         mip_count: rend3::types::MipmapCount::ONE,
         mip_source: rend3::types::MipmapSource::Uploaded,
     });
-    skybox_routine.lock().await.set_background_texture(Some(handle));
+    lock(skybox_routine).set_background_texture(Some(handle));
     Ok(())
 }
 
@@ -63,7 +60,7 @@ async fn load_gltf(
     loader: &rend3_framework::AssetLoader,
     location: String,
 ) -> rend3_gltf::LoadedGltfScene {
-    profiling::scope!("loading gltf");
+    // profiling::scope!("loading gltf");
     let gltf_start = Instant::now();
     let path = Path::new(&location);
     let parent = path.parent().unwrap();
@@ -72,7 +69,7 @@ async fn load_gltf(
     let path_str = path.as_os_str().to_string_lossy();
     log::info!("Reading gltf file: {}", path_str);
     let gltf_data = {
-        profiling::scope!("reading gltf file", &path_str);
+        // profiling::scope!("reading gltf file", &path_str);
         loader.get_asset(&path_str).await.unwrap()
     };
 
@@ -115,6 +112,26 @@ fn extract_mode(value: &str) -> Result<rend3::RendererMode, &'static str> {
         "modern" | "g" | "gpu" => rend3::RendererMode::GPUPowered,
         _ => return Err("mode requested but not found"),
     })
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub fn spawn<Fut>(fut: Fut)
+where
+    Fut: Future + Send + 'static,
+    Fut::Output: Send + 'static,
+{
+    tokio::spawn(fut);
+}
+
+#[cfg(target_arch = "wasm32")]
+pub fn spawn<Fut>(fut: Fut)
+where
+    Fut: Future + 'static,
+    Fut::Output: 'static,
+{
+    wasm_bindgen_futures::spawn_local(async move {
+        fut.await;
+    });
 }
 
 struct SceneViewer {
@@ -194,68 +211,61 @@ impl rend3_framework::App for SceneViewer {
         routines: &'a Arc<rend3_framework::DefaultRoutines>,
         _surface: &'a Arc<rend3::types::Surface>,
         _surface_format: rend3::types::TextureFormat,
-    ) -> std::pin::Pin<Box<dyn rend3_framework::NativeSendFuture<()> + 'a>> {
-        Box::pin(async move {
-            routines
-                .pbr
-                .lock()
-                .await
-                .set_ambient_color(glam::Vec4::new(0.15, 0.15, 0.15, 1.0));
+    ) {
+        lock(&routines.pbr).set_ambient_color(glam::Vec4::new(0.15, 0.15, 0.15, 1.0));
 
-            self.directional_light_handle = Some(renderer.add_directional_light(DirectionalLight {
-                color: Vec3::ONE,
-                intensity: 10.0,
-                direction: Vec3::new(-1.0, -1.0, 0.0),
-                distance: 400.0,
-            }));
+        self.directional_light_handle = Some(renderer.add_directional_light(DirectionalLight {
+            color: Vec3::ONE,
+            intensity: 10.0,
+            direction: Vec3::new(-1.0, -1.0, 0.0),
+            distance: 400.0,
+        }));
 
-            self.grabber = Some(rend3_framework::Grabber::new(window));
+        self.grabber = Some(rend3_framework::Grabber::new(window));
 
-            let file_to_load = self.file_to_load.take();
-            let renderer = Arc::clone(renderer);
-            let routines = Arc::clone(routines);
-            rend3_framework::spawn(async move {
-                let loader = rend3_framework::AssetLoader::new_local(
-                    concat!(env!("CARGO_MANIFEST_DIR"), "/../resources/"),
-                    "http://localhost:8000/resources/",
-                );
-                if let Err(e) = load_skybox(&renderer, &loader, &routines.skybox).await {
-                    println!("Failed to load skybox {}", e)
-                };
-                Box::leak(Box::new(
-                    load_gltf(
-                        &renderer,
-                        &loader,
-                        file_to_load.unwrap_or_else(|| "/default-scene/scene.gltf".to_owned()),
-                    )
-                    .await,
-                ));
-            });
-        })
+        let file_to_load = self.file_to_load.take();
+        let renderer = Arc::clone(renderer);
+        let routines = Arc::clone(routines);
+        spawn(async move {
+            let loader = rend3_framework::AssetLoader::new_local(
+                concat!(env!("CARGO_MANIFEST_DIR"), "/../resources/"),
+                "http://localhost:8000/resources/",
+            );
+            if let Err(e) = load_skybox(&renderer, &loader, &routines.skybox).await {
+                println!("Failed to load skybox {}", e)
+            };
+            Box::leak(Box::new(
+                load_gltf(
+                    &renderer,
+                    &loader,
+                    file_to_load.unwrap_or_else(|| "/default-scene/scene.gltf".to_owned()),
+                )
+                .await,
+            ));
+        });
     }
 
-    fn handle_event<'a>(
-        &'a mut self,
-        window: &'a winit::window::Window,
-        renderer: &'a Arc<rend3::Renderer>,
-        routines: &'a Arc<rend3_framework::DefaultRoutines>,
-        surface: &'a Arc<rend3::types::Surface>,
-        event: rend3_framework::Event,
-        control_flow: impl FnOnce(winit::event_loop::ControlFlow) + rend3_framework::NativeSend + 'a,
-    ) -> std::pin::Pin<Box<dyn rend3_framework::NativeSendFuture<()> + 'a>> {
-        Box::pin(async move {
-            match event {
-                Event::MainEventsCleared => {
-                    profiling::scope!("MainEventsCleared");
-                    let now = Instant::now();
+    fn handle_event<T: 'static>(
+        &mut self,
+        window: &winit::window::Window,
+        renderer: &Arc<rend3::Renderer>,
+        routines: &Arc<rend3_framework::DefaultRoutines>,
+        surface: &Arc<rend3::types::Surface>,
+        event: rend3_framework::Event<T>,
+        control_flow: impl FnOnce(winit::event_loop::ControlFlow),
+    ) {
+        match event {
+            Event::MainEventsCleared => {
+                profiling::scope!("MainEventsCleared");
+                let now = Instant::now();
 
-                    let delta_time = now - self.timestamp_last_frame;
-                    self.frame_times.increment(delta_time.as_micros() as u64).unwrap();
+                let delta_time = now - self.timestamp_last_frame;
+                self.frame_times.increment(delta_time.as_micros() as u64).unwrap();
 
-                    let elapsed_since_second = now - self.timestamp_last_second;
-                    if elapsed_since_second > Duration::from_secs(1) {
-                        let count = self.frame_times.entries();
-                        println!(
+                let elapsed_since_second = now - self.timestamp_last_second;
+                if elapsed_since_second > Duration::from_secs(1) {
+                    let count = self.frame_times.entries();
+                    println!(
                             "{:0>5} frames over {:0>5.2}s. Min: {:0>5.2}ms; Average: {:0>5.2}ms; 95%: {:0>5.2}ms; 99%: {:0>5.2}ms; Max: {:0>5.2}ms; StdDev: {:0>5.2}ms",
                             count,
                             elapsed_since_second.as_secs_f32(),
@@ -266,187 +276,191 @@ impl rend3_framework::App for SceneViewer {
                             self.frame_times.maximum().unwrap() as f32 / 1_000.0,
                             self.frame_times.stddev().unwrap() as f32 / 1_000.0,
                         );
-                        self.timestamp_last_second = now;
-                        self.frame_times.clear();
-                    }
+                    self.timestamp_last_second = now;
+                    self.frame_times.clear();
+                }
 
-                    self.timestamp_last_frame = now;
+                self.timestamp_last_frame = now;
 
-                    let rotation =
-                        Mat3A::from_euler(glam::EulerRot::XYZ, -self.camera_pitch, -self.camera_yaw, 0.0).transpose();
-                    let forward = rotation.z_axis;
-                    let up = rotation.y_axis;
-                    let side = -rotation.x_axis;
-                    let velocity = if button_pressed(&self.scancode_status, platform::Scancodes::SHIFT) {
-                        50.0
+                let rotation =
+                    Mat3A::from_euler(glam::EulerRot::XYZ, -self.camera_pitch, -self.camera_yaw, 0.0).transpose();
+                let forward = rotation.z_axis;
+                let up = rotation.y_axis;
+                let side = -rotation.x_axis;
+                let velocity = if button_pressed(&self.scancode_status, platform::Scancodes::SHIFT) {
+                    50.0
+                } else {
+                    10.0
+                };
+                if button_pressed(&self.scancode_status, platform::Scancodes::W) {
+                    self.camera_location += forward * velocity * delta_time.as_secs_f32();
+                }
+                if button_pressed(&self.scancode_status, platform::Scancodes::S) {
+                    self.camera_location -= forward * velocity * delta_time.as_secs_f32();
+                }
+                if button_pressed(&self.scancode_status, platform::Scancodes::A) {
+                    self.camera_location += side * velocity * delta_time.as_secs_f32();
+                }
+                if button_pressed(&self.scancode_status, platform::Scancodes::D) {
+                    self.camera_location -= side * velocity * delta_time.as_secs_f32();
+                }
+                if button_pressed(&self.scancode_status, platform::Scancodes::Q) {
+                    self.camera_location += up * velocity * delta_time.as_secs_f32();
+                }
+                if button_pressed(&self.scancode_status, platform::Scancodes::Z) {
+                    self.camera_location -= up * velocity * delta_time.as_secs_f32();
+                }
+
+                if button_pressed(&self.scancode_status, platform::Scancodes::ESCAPE) {
+                    self.grabber.as_mut().unwrap().request_ungrab(window);
+                }
+
+                if button_pressed(&self.scancode_status, platform::Scancodes::P) {
+                    // write out gpu side performance info into a trace readable by chrome://tracing
+                    if let Some(ref stats) = self.previous_profiling_stats {
+                        println!("Outputing gpu timing chrome trace to profile.json");
+                        wgpu_profiler::chrometrace::write_chrometrace(Path::new("profile.json"), stats).unwrap();
                     } else {
-                        10.0
-                    };
-                    if button_pressed(&self.scancode_status, platform::Scancodes::W) {
-                        self.camera_location += forward * velocity * delta_time.as_secs_f32();
-                    }
-                    if button_pressed(&self.scancode_status, platform::Scancodes::S) {
-                        self.camera_location -= forward * velocity * delta_time.as_secs_f32();
-                    }
-                    if button_pressed(&self.scancode_status, platform::Scancodes::A) {
-                        self.camera_location += side * velocity * delta_time.as_secs_f32();
-                    }
-                    if button_pressed(&self.scancode_status, platform::Scancodes::D) {
-                        self.camera_location -= side * velocity * delta_time.as_secs_f32();
-                    }
-                    if button_pressed(&self.scancode_status, platform::Scancodes::Q) {
-                        self.camera_location += up * velocity * delta_time.as_secs_f32();
-                    }
-                    if button_pressed(&self.scancode_status, platform::Scancodes::Z) {
-                        self.camera_location -= up * velocity * delta_time.as_secs_f32();
-                    }
-
-                    if button_pressed(&self.scancode_status, platform::Scancodes::ESCAPE) {
-                        self.grabber.as_mut().unwrap().request_ungrab(window);
-                    }
-
-                    if button_pressed(&self.scancode_status, platform::Scancodes::P) {
-                        // write out gpu side performance info into a trace readable by chrome://tracing
-                        if let Some(ref stats) = self.previous_profiling_stats {
-                            println!("Outputing gpu timing chrome trace to profile.json");
-                            wgpu_profiler::chrometrace::write_chrometrace(Path::new("profile.json"), stats).unwrap();
-                        } else {
-                            println!("No gpu timing trace available, either timestamp queries are unsupported or not enough frames have elapsed yet!");
-                        }
-                    }
-
-                    window.request_redraw()
-                }
-                Event::RedrawRequested(_) => {
-                    let view = Mat4::from_euler(glam::EulerRot::XYZ, -self.camera_pitch, -self.camera_yaw, 0.0);
-                    let view = view * Mat4::from_translation((-self.camera_location).into());
-
-                    renderer.set_camera_data(Camera {
-                        projection: CameraProjection::Perspective { vfov: 60.0, near: 0.1 },
-                        view,
-                    });
-
-                    // Get a frame
-                    let frame = rend3::util::output::OutputFrame::Surface {
-                        surface: Arc::clone(surface),
-                    };
-                    // Lock all the routines
-                    let pbr_routine = routines.pbr.lock().await;
-                    let mut skybox_routine = routines.skybox.lock().await;
-                    let tonemapping_routine = routines.tonemapping.lock().await;
-
-                    // Ready up the renderer
-                    let (cmd_bufs, ready) = renderer.ready();
-                    // Ready up the routines
-                    skybox_routine.ready(renderer);
-
-                    // Build a rendergraph
-                    let mut graph = rend3::RenderGraph::new();
-
-                    // Add the default rendergraph
-                    rend3_routine::add_default_rendergraph(
-                        &mut graph,
-                        &ready,
-                        &pbr_routine,
-                        Some(&skybox_routine),
-                        &tonemapping_routine,
-                    );
-
-                    // Dispatch a render using the built up rendergraph!
-                    self.previous_profiling_stats = graph.execute(renderer, frame, cmd_bufs, &ready);
-                    // mark the end of the frame for tracy/other profilers
-                    profiling::finish_frame!();
-                }
-                Event::WindowEvent {
-                    event: WindowEvent::Focused(focus),
-                    ..
-                } => {
-                    if !focus {
-                        self.grabber.as_mut().unwrap().request_ungrab(window);
+                        println!("No gpu timing trace available, either timestamp queries are unsupported or not enough frames have elapsed yet!");
                     }
                 }
-                Event::WindowEvent {
-                    event:
-                        WindowEvent::KeyboardInput {
-                            input: KeyboardInput { scancode, state, .. },
-                            ..
-                        },
-                    ..
-                } => {
-                    log::info!("WE scancode {:x}", scancode);
-                    self.scancode_status.insert(
-                        scancode,
-                        match state {
-                            ElementState::Pressed => true,
-                            ElementState::Released => false,
-                        },
-                    );
-                }
-                Event::WindowEvent {
-                    event:
-                        WindowEvent::MouseInput {
-                            button: MouseButton::Left,
-                            state: ElementState::Pressed,
-                            ..
-                        },
-                    ..
-                } => {
-                    let grabber = self.grabber.as_mut().unwrap();
 
-                    if !grabber.grabbed() {
-                        grabber.request_grab(window);
-                    }
+                window.request_redraw()
+            }
+            Event::RedrawRequested(_) => {
+                let view = Mat4::from_euler(glam::EulerRot::XYZ, -self.camera_pitch, -self.camera_yaw, 0.0);
+                let view = view * Mat4::from_translation((-self.camera_location).into());
+
+                renderer.set_camera_data(Camera {
+                    projection: CameraProjection::Perspective { vfov: 60.0, near: 0.1 },
+                    view,
+                });
+
+                // Get a frame
+                let frame = rend3::util::output::OutputFrame::Surface {
+                    surface: Arc::clone(surface),
+                };
+                // Lock all the routines
+                let pbr_routine = lock(&routines.pbr);
+                let mut skybox_routine = lock(&routines.skybox);
+                let tonemapping_routine = lock(&routines.tonemapping);
+
+                // Ready up the renderer
+                let (cmd_bufs, ready) = renderer.ready();
+                // Ready up the routines
+                skybox_routine.ready(renderer);
+
+                // Build a rendergraph
+                let mut graph = rend3::RenderGraph::new();
+
+                // Add the default rendergraph
+                rend3_routine::add_default_rendergraph(
+                    &mut graph,
+                    &ready,
+                    &pbr_routine,
+                    Some(&skybox_routine),
+                    &tonemapping_routine,
+                );
+
+                // Dispatch a render using the built up rendergraph!
+                self.previous_profiling_stats = graph.execute(renderer, frame, cmd_bufs, &ready);
+                // mark the end of the frame for tracy/other profilers
+                profiling::finish_frame!();
+            }
+            Event::WindowEvent {
+                event: WindowEvent::Focused(focus),
+                ..
+            } => {
+                if !focus {
+                    self.grabber.as_mut().unwrap().request_ungrab(window);
                 }
-                Event::DeviceEvent {
-                    event:
-                        DeviceEvent::MouseMotion {
-                            delta: (delta_x, delta_y),
-                            ..
-                        },
-                    ..
-                } => {
-                    if !self.grabber.as_ref().unwrap().grabbed() {
+            }
+            Event::WindowEvent {
+                event:
+                    WindowEvent::KeyboardInput {
+                        input: KeyboardInput { scancode, state, .. },
+                        ..
+                    },
+                ..
+            } => {
+                log::info!("WE scancode {:x}", scancode);
+                self.scancode_status.insert(
+                    scancode,
+                    match state {
+                        ElementState::Pressed => true,
+                        ElementState::Released => false,
+                    },
+                );
+            }
+            Event::WindowEvent {
+                event:
+                    WindowEvent::MouseInput {
+                        button: MouseButton::Left,
+                        state: ElementState::Pressed,
+                        ..
+                    },
+                ..
+            } => {
+                let grabber = self.grabber.as_mut().unwrap();
+
+                if !grabber.grabbed() {
+                    grabber.request_grab(window);
+                }
+            }
+            Event::DeviceEvent {
+                event:
+                    DeviceEvent::MouseMotion {
+                        delta: (delta_x, delta_y),
+                        ..
+                    },
+                ..
+            } => {
+                if !self.grabber.as_ref().unwrap().grabbed() {
+                    return;
+                }
+
+                const TAU: f32 = std::f32::consts::PI * 2.0;
+
+                let mouse_delta = if self.absolute_mouse {
+                    let prev = self.last_mouse_delta.replace(DVec2::new(delta_x, delta_y));
+                    if let Some(prev) = prev {
+                        (DVec2::new(delta_x, delta_y) - prev) / 4.0
+                    } else {
                         return;
                     }
+                } else {
+                    DVec2::new(delta_x, delta_y)
+                };
 
-                    const TAU: f32 = std::f32::consts::PI * 2.0;
-
-                    let mouse_delta = if self.absolute_mouse {
-                        let prev = self.last_mouse_delta.replace(DVec2::new(delta_x, delta_y));
-                        if let Some(prev) = prev {
-                            (DVec2::new(delta_x, delta_y) - prev) / 4.0
-                        } else {
-                            return;
-                        }
-                    } else {
-                        DVec2::new(delta_x, delta_y)
-                    };
-
-                    self.camera_yaw += (mouse_delta.x / 1000.0) as f32;
-                    self.camera_pitch += (mouse_delta.y / 1000.0) as f32;
-                    if self.camera_yaw < 0.0 {
-                        self.camera_yaw += TAU;
-                    } else if self.camera_yaw >= TAU {
-                        self.camera_yaw -= TAU;
-                    }
-                    self.camera_pitch = self
-                        .camera_pitch
-                        .max(-std::f32::consts::FRAC_PI_2 + 0.0001)
-                        .min(std::f32::consts::FRAC_PI_2 - 0.0001);
+                self.camera_yaw += (mouse_delta.x / 1000.0) as f32;
+                self.camera_pitch += (mouse_delta.y / 1000.0) as f32;
+                if self.camera_yaw < 0.0 {
+                    self.camera_yaw += TAU;
+                } else if self.camera_yaw >= TAU {
+                    self.camera_yaw -= TAU;
                 }
-                Event::WindowEvent {
-                    event: WindowEvent::CloseRequested,
-                    ..
-                } => {
-                    control_flow(winit::event_loop::ControlFlow::Exit);
-                }
-                _ => {}
+                self.camera_pitch = self
+                    .camera_pitch
+                    .max(-std::f32::consts::FRAC_PI_2 + 0.0001)
+                    .min(std::f32::consts::FRAC_PI_2 - 0.0001);
             }
-        })
+            Event::WindowEvent {
+                event: WindowEvent::CloseRequested,
+                ..
+            } => {
+                control_flow(winit::event_loop::ControlFlow::Exit);
+            }
+            _ => {}
+        }
     }
 }
 
 fn main() {
+    #[cfg(not(target_arch = "wasm32"))]
+    let _rt = tokio::runtime::Runtime::new().unwrap();
+    #[cfg(not(target_arch = "wasm32"))]
+    let _guard = _rt.enter();
+
     let app = SceneViewer::new();
     rend3_framework::start(
         app,

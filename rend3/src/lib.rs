@@ -93,6 +93,7 @@ pub mod util {
     pub mod bind_merge;
     pub mod buffer;
     pub mod frustum;
+    pub mod graph_texture_store;
     pub mod math;
     pub mod mipmap;
     pub mod output;
