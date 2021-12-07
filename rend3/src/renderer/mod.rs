@@ -9,7 +9,7 @@ use crate::{
         Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, MaterialHandle, Mesh, MeshHandle,
         Object, ObjectHandle, Texture, TextureHandle,
     },
-    util::mipmap::MipmapGenerator,
+    util::{graph_texture_store::GraphTextureStore, mipmap::MipmapGenerator},
     ExtendedAdapterInfo, InstanceAdapterDevice, ReadyData, RendererInitializationError, RendererMode,
 };
 use glam::Mat4;
@@ -60,6 +60,9 @@ pub struct Renderer {
 
     /// Stores gpu timing and debug scopes.
     pub profiler: Mutex<GpuProfiler>,
+
+    /// Stores a cache of render targets between graph invocations.
+    pub(crate) graph_texture_store: Mutex<GraphTextureStore>,
 }
 impl Renderer {
     /// Create a new renderer with the given IAD.

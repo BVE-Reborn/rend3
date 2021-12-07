@@ -1,21 +1,22 @@
 use std::sync::Arc;
 
-struct EguiExampleData {
+struct ImguiExampleData {
     _object_handle: rend3::types::ObjectHandle,
-    material_handle: rend3::types::MaterialHandle,
     _directional_handle: rend3::types::DirectionalLightHandle,
 
-    egui_routine: rend3_egui::EguiRenderRoutine,
-    platform: egui_winit_platform::Platform,
-    start_time: instant::Instant,
-    color: [f32; 4],
+    imgui: imgui::Context,
+    platform: imgui_winit_support::WinitPlatform,
+    imgui_routine: rend3_imgui::ImguiRenderRoutine,
+    frame_start: instant::Instant,
+
+    demo_window_open: bool,
 }
 
 #[derive(Default)]
-struct EguiExample {
-    data: Option<EguiExampleData>,
+struct ImguiExample {
+    data: Option<ImguiExampleData>,
 }
-impl rend3_framework::App for EguiExample {
+impl rend3_framework::App for ImguiExample {
     fn setup(
         &mut self,
         window: &winit::window::Window,
@@ -24,17 +25,28 @@ impl rend3_framework::App for EguiExample {
         _surface: &Arc<rend3::types::Surface>,
         surface_format: rend3::types::TextureFormat,
     ) {
-        let window_size = window.inner_size();
+        // Set up imgui
+        let mut imgui = imgui::Context::create();
+        let mut platform = imgui_winit_support::WinitPlatform::init(&mut imgui);
+        platform.attach_window(imgui.io_mut(), window, imgui_winit_support::HiDpiMode::Default);
+        imgui.set_ini_filename(None);
 
-        // Create the egui render routine
-        let egui_routine = rend3_egui::EguiRenderRoutine::new(
-            renderer,
-            surface_format,
-            1, // For now this has to be 1, until rendergraphs support multisampling
-            window_size.width,
-            window_size.height,
-            window.scale_factor() as f32,
-        );
+        let hidpi_factor = window.scale_factor();
+
+        let font_size = (13.0 * hidpi_factor) as f32;
+        imgui.io_mut().font_global_scale = (1.0 / hidpi_factor) as f32;
+
+        imgui.fonts().add_font(&[imgui::FontSource::DefaultFontData {
+            config: Some(imgui::FontConfig {
+                oversample_h: 1,
+                pixel_snap_h: true,
+                size_pixels: font_size,
+                ..Default::default()
+            }),
+        }]);
+
+        // Create the imgui render routine
+        let imgui_routine = rend3_imgui::ImguiRenderRoutine::new(renderer, &mut imgui, surface_format);
 
         // Create mesh and calculate smooth normals based on vertices
         let mesh = create_mesh();
@@ -54,7 +66,7 @@ impl rend3_framework::App for EguiExample {
         // Combine the mesh and the material with a location to give an object.
         let object = rend3::types::Object {
             mesh: mesh_handle,
-            material: material_handle.clone(),
+            material: material_handle,
             transform: glam::Mat4::IDENTITY,
         };
 
@@ -88,27 +100,18 @@ impl rend3_framework::App for EguiExample {
             distance: 400.0,
         });
 
-        // Create the winit/egui integration, which manages our egui context for us.
-        let platform = egui_winit_platform::Platform::new(egui_winit_platform::PlatformDescriptor {
-            physical_width: window_size.width as u32,
-            physical_height: window_size.height as u32,
-            scale_factor: window.scale_factor(),
-            font_definitions: egui::FontDefinitions::default(),
-            style: Default::default(),
-        });
+        let frame_start = instant::Instant::now();
 
-        let start_time = instant::Instant::now();
-        let color: [f32; 4] = [0.0, 0.5, 0.5, 1.0];
-
-        self.data = Some(EguiExampleData {
+        self.data = Some(ImguiExampleData {
             _object_handle,
-            material_handle,
             _directional_handle,
 
-            egui_routine,
+            imgui,
             platform,
-            start_time,
-            color,
+            imgui_routine,
+            frame_start,
+
+            demo_window_open: true,
         })
     }
 
@@ -124,36 +127,21 @@ impl rend3_framework::App for EguiExample {
         let data = self.data.as_mut().unwrap();
 
         // Pass the winit events to the platform integration.
-        data.platform.handle_event(&event);
+        data.platform.handle_event(data.imgui.io_mut(), window, &event);
 
         match event {
             rend3_framework::Event::RedrawRequested(..) => {
-                data.platform.update_time(data.start_time.elapsed().as_secs_f64());
-                data.platform.begin_frame();
+                // Setup an imgui frame
+                data.platform
+                    .prepare_frame(data.imgui.io_mut(), window)
+                    .expect("could not prepare imgui frame");
+                let ui = data.imgui.frame();
 
-                // Insert egui commands here
-                let ctx = data.platform.context();
-                egui::Window::new("Change color").resizable(true).show(&ctx, |ui| {
-                    ui.label("Change the color of the cube");
-                    if ui.color_edit_button_rgba_unmultiplied(&mut data.color).changed() {
-                        renderer.update_material(
-                            &data.material_handle.clone(),
-                            rend3_routine::material::PbrMaterial {
-                                albedo: rend3_routine::material::AlbedoComponent::Value(glam::Vec4::from(data.color)),
-                                ..rend3_routine::material::PbrMaterial::default()
-                            },
-                        );
-                    }
-                });
+                // Insert imgui commands here
+                ui.show_demo_window(&mut data.demo_window_open);
 
-                // End the UI frame. Now let's draw the UI with our Backend, we could also handle the output here
-                let (_output, paint_commands) = data.platform.end_frame(Some(window));
-                let paint_jobs = data.platform.context().tessellate(paint_commands);
-
-                let input = rend3_egui::Input {
-                    clipped_meshes: &paint_jobs,
-                    context: data.platform.context(),
-                };
+                // Prepare for rendering
+                data.platform.prepare_render(&ui, window);
 
                 // Get a frame
                 let frame = rend3::util::output::OutputFrame::Surface {
@@ -173,9 +161,9 @@ impl rend3_framework::App for EguiExample {
                 // Add the default rendergraph without a skybox
                 rend3_routine::add_default_rendergraph(&mut graph, &ready, &pbr_routine, None, &tonemapping_routine);
 
-                // Add egui on top of all the other passes
+                // Add imgui on top of all the other passes
                 let surface = graph.add_surface_texture();
-                data.egui_routine.add_to_graph(&mut graph, input, surface);
+                data.imgui_routine.add_to_graph(&mut graph, ui.render(), surface);
 
                 // Dispatch a render using the built up rendergraph!
                 graph.execute(renderer, frame, cmd_bufs, &ready);
@@ -183,29 +171,29 @@ impl rend3_framework::App for EguiExample {
                 control_flow(winit::event_loop::ControlFlow::Poll);
             }
             rend3_framework::Event::MainEventsCleared => {
+                let now = instant::Instant::now();
+                let delta = now - data.frame_start;
+                data.frame_start = now;
+                data.imgui.io_mut().update_delta_time(delta);
+
                 window.request_redraw();
             }
-            rend3_framework::Event::WindowEvent { event, .. } => match event {
-                winit::event::WindowEvent::Resized(size) => {
-                    data.egui_routine
-                        .resize(size.width, size.height, window.scale_factor() as f32);
-                }
-                winit::event::WindowEvent::CloseRequested => {
+            rend3_framework::Event::WindowEvent { event, .. } => {
+                if event == winit::event::WindowEvent::CloseRequested {
                     control_flow(winit::event_loop::ControlFlow::Exit);
                 }
-                _ => {}
-            },
+            }
             _ => {}
         }
     }
 }
 
 fn main() {
-    let app = EguiExample::default();
+    let app = ImguiExample::default();
     rend3_framework::start(
         app,
         winit::window::WindowBuilder::new()
-            .with_title("egui")
+            .with_title("imgui")
             .with_maximized(true),
     )
 }

@@ -2,7 +2,7 @@ use rend3::{RenderGraph, RenderTargetHandle, Renderer};
 use wgpu::TextureFormat;
 
 pub struct EguiRenderRoutine {
-    internal: egui_wgpu_backend::RenderPass,
+    pub internal: egui_wgpu_backend::RenderPass,
     screen_descriptor: egui_wgpu_backend::ScreenDescriptor,
 }
 
@@ -70,14 +70,4 @@ impl EguiRenderRoutine {
 pub struct Input<'a> {
     pub clipped_meshes: &'a Vec<egui::ClippedMesh>,
     pub context: egui::CtxRef,
-}
-
-impl epi::TextureAllocator for EguiRenderRoutine {
-    fn alloc_srgba_premultiplied(&mut self, size: (usize, usize), srgba_pixels: &[egui::Color32]) -> egui::TextureId {
-        self.internal.alloc_srgba_premultiplied(size, srgba_pixels)
-    }
-
-    fn free(&mut self, id: egui::TextureId) {
-        self.internal.free(id);
-    }
 }

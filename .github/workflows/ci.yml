@@ -63,6 +63,14 @@ jobs:
         with:
           command: build
           args: --target ${{ matrix.target }}
+        if: matrix.target != 'wasm32-unknown-unknown'
+
+      - name: build (no imgui)
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --target ${{ matrix.target }} --workspace --exclude rend3-imgui --exclude rend3-imgui-example
+        if: matrix.target == 'wasm32-unknown-unknown'
 
       - name: test
         uses: actions-rs/cargo@v1
@@ -82,7 +90,14 @@ jobs:
         with:
           command: clippy
           args: --target ${{ matrix.target }}
-        if: matrix.rust_version == 'stable'
+        if: matrix.target != 'wasm32-unknown-unknown'
+
+      - name: clippy (no imgui)
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: --target ${{ matrix.target }} --workspace --exclude rend3-imgui --exclude rend3-imgui-example
+        if: matrix.target == 'wasm32-unknown-unknown'
 
   cargo-fmt:
     runs-on: ubuntu-latest

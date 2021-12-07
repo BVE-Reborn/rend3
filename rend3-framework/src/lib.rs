@@ -3,8 +3,10 @@ use std::{future::Future, pin::Pin, sync::Arc};
 use glam::UVec2;
 use rend3::{types::Surface, InstanceAdapterDevice, Renderer};
 use winit::{
+    dpi::PhysicalSize,
+    event::WindowEvent,
     event_loop::{ControlFlow, EventLoop, EventLoopWindowTarget},
-    window::{Window, WindowBuilder},
+    window::{Window, WindowBuilder, WindowId},
 };
 
 mod assets;
@@ -15,23 +17,22 @@ mod resize_observer;
 pub use assets::*;
 pub use grab::*;
 
-#[cfg(target_arch = "wasm32")]
-pub trait NativeSend {}
-#[cfg(target_arch = "wasm32")]
-impl<T> NativeSend for T {}
+pub use parking_lot::{Mutex, MutexGuard};
+pub type Event<'a, T> = winit::event::Event<'a, UserResizeEvent<T>>;
 
-#[cfg(not(target_arch = "wasm32"))]
-pub trait NativeSend: Send {}
-#[cfg(not(target_arch = "wasm32"))]
-impl<T> NativeSend for T where T: Send {}
+/// User event which the framework uses to resize on wasm.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum UserResizeEvent<T: 'static> {
+    /// Used to fire off resizing on wasm
+    Resize {
+        window_id: WindowId,
+        size: PhysicalSize<u32>,
+    },
+    /// Custom user event type
+    Other(T),
+}
 
-pub trait NativeSendFuture<O>: Future<Output = O> + NativeSend {}
-impl<T, O> NativeSendFuture<O> for T where T: Future<Output = O> + NativeSend {}
-
-pub type AsyncMutex<T> = futures_intrusive::sync::Mutex<T>;
-pub type Event = winit::event::Event<'static, ControlFlow>;
-
-pub trait App {
+pub trait App<T: 'static = ()> {
     fn register_logger(&mut self) {
         #[cfg(target_arch = "wasm32")]
         console_log::init().unwrap();
@@ -45,7 +46,7 @@ pub trait App {
         std::panic::set_hook(Box::new(console_error_panic_hook::hook));
     }
 
-    fn create_window(&mut self, builder: WindowBuilder) -> (EventLoop<ControlFlow>, Window) {
+    fn create_window(&mut self, builder: WindowBuilder) -> (EventLoop<UserResizeEvent<T>>, Window) {
         profiling::scope!("creating window");
 
         let event_loop = EventLoop::with_user_event();
@@ -74,71 +75,61 @@ pub trait App {
         Box::pin(async move { Ok(rend3::create_iad(None, None, None).await?) })
     }
 
-    fn setup<'a>(
-        &'a mut self,
-        window: &'a Window,
-        renderer: &'a Arc<Renderer>,
-        routines: &'a Arc<DefaultRoutines>,
-        surface: &'a Arc<Surface>,
+    fn setup(
+        &mut self,
+        window: &Window,
+        renderer: &Arc<Renderer>,
+        routines: &Arc<DefaultRoutines>,
+        surface: &Arc<Surface>,
         surface_format: rend3::types::TextureFormat,
-    ) -> Pin<Box<dyn NativeSendFuture<()> + 'a>> {
+    ) {
         let _ = (window, renderer, routines, surface, surface_format);
-        Box::pin(async move {})
     }
 
-    /// RedrawRequested/RedrawEventsCleared will only be fired if the window size is nonz-ero. As such you should always render in RedrawRequested and use MainEventsCleared for things that need to keep running when minimized.
-    fn handle_event<'a>(
-        &'a mut self,
-        window: &'a Window,
-        renderer: &'a Arc<rend3::Renderer>,
-        routines: &'a Arc<DefaultRoutines>,
-        surface: &'a Arc<Surface>,
-        event: Event,
-        control_flow: impl FnOnce(winit::event_loop::ControlFlow) + NativeSend + 'a,
-    ) -> Pin<Box<dyn NativeSendFuture<()> + 'a>> {
+    /// RedrawRequested/RedrawEventsCleared will only be fired if the window size is non-zero. As such you should always render
+    /// in RedrawRequested and use MainEventsCleared for things that need to keep running when minimized.
+    fn handle_event(
+        &mut self,
+        window: &Window,
+        renderer: &Arc<rend3::Renderer>,
+        routines: &Arc<DefaultRoutines>,
+        surface: &Arc<Surface>,
+        event: Event<'_, T>,
+        control_flow: impl FnOnce(winit::event_loop::ControlFlow),
+    ) {
         let _ = (window, renderer, routines, surface, event, control_flow);
-        Box::pin(async move {})
     }
+}
+
+pub fn lock<T>(lock: &parking_lot::Mutex<T>) -> parking_lot::MutexGuard<'_, T> {
+    #[cfg(target_arch = "wasm32")]
+    let guard = lock.try_lock().expect("Could not lock mutex on single-threaded wasm. Do not hold locks open while an .await causes you to yield execution.");
+    #[cfg(not(target_arch = "wasm32"))]
+    let guard = lock.lock();
+
+    guard
 }
 
 pub struct DefaultRoutines {
-    pub pbr: AsyncMutex<rend3_routine::PbrRenderRoutine>,
-    pub skybox: AsyncMutex<rend3_routine::SkyboxRoutine>,
-    pub tonemapping: AsyncMutex<rend3_routine::TonemappingRoutine>,
+    pub pbr: Mutex<rend3_routine::PbrRenderRoutine>,
+    pub skybox: Mutex<rend3_routine::SkyboxRoutine>,
+    pub tonemapping: Mutex<rend3_routine::TonemappingRoutine>,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-pub fn spawn<Fut>(fut: Fut)
+fn winit_run<F, T>(event_loop: winit::event_loop::EventLoop<T>, event_handler: F) -> !
 where
-    Fut: Future + Send + 'static,
-    Fut::Output: Send + 'static,
-{
-    tokio::spawn(fut);
-}
-
-#[cfg(target_arch = "wasm32")]
-pub fn spawn<Fut>(fut: Fut)
-where
-    Fut: Future + 'static,
-    Fut::Output: 'static,
-{
-    wasm_bindgen_futures::spawn_local(async move {
-        fut.await;
-    });
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-fn winit_run<F>(event_loop: winit::event_loop::EventLoop<ControlFlow>, event_handler: F) -> !
-where
-    F: FnMut(winit::event::Event<'_, ControlFlow>, &EventLoopWindowTarget<ControlFlow>, &mut ControlFlow) + 'static,
+    F: FnMut(winit::event::Event<'_, T>, &EventLoopWindowTarget<T>, &mut ControlFlow) + 'static,
+    T: 'static,
 {
     event_loop.run(event_handler)
 }
 
 #[cfg(target_arch = "wasm32")]
-fn winit_run<F>(event_loop: EventLoop<ControlFlow>, event_handler: F)
+fn winit_run<F, T>(event_loop: EventLoop<T>, event_handler: F)
 where
-    F: FnMut(winit::event::Event<'_, ControlFlow>, &EventLoopWindowTarget<ControlFlow>, &mut ControlFlow) + 'static,
+    F: FnMut(winit::event::Event<'_, T>, &EventLoopWindowTarget<T>, &mut ControlFlow) + 'static,
+    T: 'static,
 {
     use wasm_bindgen::{prelude::*, JsCast};
 
@@ -164,7 +155,7 @@ where
     }
 }
 
-pub async fn async_start<A: App + NativeSend + 'static>(mut app: A, window_builder: WindowBuilder) {
+pub async fn async_start<A: App + 'static>(mut app: A, window_builder: WindowBuilder) {
     app.register_logger();
     app.register_panic_hook();
 
@@ -198,158 +189,52 @@ pub async fn async_start<A: App + NativeSend + 'static>(mut app: A, window_build
         samples: rend3_routine::SampleCount::One,
     };
     let routines = Arc::new(DefaultRoutines {
-        pbr: AsyncMutex::new(
-            rend3_routine::PbrRenderRoutine::new(&renderer, render_texture_options),
-            true,
-        ),
-        skybox: AsyncMutex::new(
-            rend3_routine::SkyboxRoutine::new(&renderer, render_texture_options),
-            true,
-        ),
-        tonemapping: AsyncMutex::new(
-            rend3_routine::TonemappingRoutine::new(&renderer, render_texture_options.resolution, format),
-            true,
-        ),
+        pbr: Mutex::new(rend3_routine::PbrRenderRoutine::new(&renderer, render_texture_options)),
+        skybox: Mutex::new(rend3_routine::SkyboxRoutine::new(&renderer, render_texture_options)),
+        tonemapping: Mutex::new(rend3_routine::TonemappingRoutine::new(
+            &renderer,
+            render_texture_options.resolution,
+            format,
+        )),
     });
 
-    app.setup(&window, &renderer, &routines, &surface, format).await;
-
-    let (sender, reciever) = flume::unbounded();
+    app.setup(&window, &renderer, &routines, &surface, format);
 
     #[cfg(target_arch = "wasm32")]
-    let observer = resize_observer::ResizeObserver::new(&window, sender.clone());
-
-    let proxy = event_loop.create_proxy();
+    let _observer = resize_observer::ResizeObserver::new(&window, event_loop.create_proxy());
 
     // We're ready, so lets make things visible
     window.set_visible(true);
 
-    spawn(async move {
-        #[cfg(target_arch = "wasm32")]
-        let _observer = observer;
-        let mut redraw = Vec::with_capacity(16);
-        let mut allow_redraw = true;
+    let mut allow_redraw = true;
 
-        while let Ok(e) = reciever.recv_async().await {
-            let mut event_opt = Some(e);
-            let mut main_events_cleared = false;
-            let mut redraw_events_cleared = false;
-            while let Some(event) = event_opt.take() {
-                if let Some(allow) = handle_resize(&event, &surface, &renderer, format, &routines).await {
-                    allow_redraw = allow;
-                }
+    winit_run(event_loop, move |event, _event_loop, control_flow| {
+        let event = match event {
+            Event::UserEvent(UserResizeEvent::Resize { size, window_id }) => Event::WindowEvent {
+                window_id,
+                event: WindowEvent::Resized(size),
+            },
+            e => e,
+        };
 
-                match event {
-                    Event::MainEventsCleared => {
-                        main_events_cleared = true;
-                    }
-                    Event::RedrawEventsCleared => {
-                        redraw_events_cleared = true;
-                    }
-                    Event::RedrawRequested(w) => {
-                        redraw.push(w);
-                    }
-                    e => {
-                        let mut flow = None;
-                        app.handle_event(&window, &renderer, &routines, &surface, e, |c: ControlFlow| {
-                            flow = Some(c);
-                        })
-                        .await;
-                        if let Some(flow) = flow {
-                            let _ = proxy.send_event(flow);
-                        }
-                    }
-                }
+        if let Some(allow) = handle_resize(&event, &surface, &renderer, format, &routines) {
+            allow_redraw = allow;
+        }
 
-                event_opt = match reciever.try_recv() {
-                    Ok(e) => Some(e),
-                    Err(flume::TryRecvError::Empty) => None,
-                    Err(flume::TryRecvError::Disconnected) => break,
-                };
-            }
-
-            if main_events_cleared {
-                let mut flow = None;
-                app.handle_event(
-                    &window,
-                    &renderer,
-                    &routines,
-                    &surface,
-                    Event::MainEventsCleared,
-                    |c: ControlFlow| {
-                        flow = Some(c);
-                    },
-                )
-                .await;
-                if let Some(flow) = flow {
-                    let _ = proxy.send_event(flow);
-                }
-            }
-
-            if allow_redraw {
-                for w in redraw.drain(..) {
-                    let mut flow = None;
-                    app.handle_event(
-                        &window,
-                        &renderer,
-                        &routines,
-                        &surface,
-                        Event::RedrawRequested(w),
-                        |c: ControlFlow| {
-                            flow = Some(c);
-                        },
-                    )
-                    .await;
-                    if let Some(flow) = flow {
-                        let _ = proxy.send_event(flow);
-                    }
-                }
-
-                if redraw_events_cleared {
-                    let mut flow = None;
-                    app.handle_event(
-                        &window,
-                        &renderer,
-                        &routines,
-                        &surface,
-                        Event::RedrawEventsCleared,
-                        |c: ControlFlow| {
-                            flow = Some(c);
-                        },
-                    )
-                    .await;
-                    if let Some(flow) = flow {
-                        let _ = proxy.send_event(flow);
-                    }
-                }
-            } else {
-                redraw.clear();
+        if let Event::RedrawRequested(_) = event {
+            if !allow_redraw {
+                return;
             }
         }
-    });
 
-    winit_run(
-        event_loop,
-        move |event, _event_loop: &EventLoopWindowTarget<ControlFlow>, control_flow| {
-            if let Some(e) = event.to_static() {
-                match e {
-                    Event::UserEvent(flow) => {
-                        *control_flow = flow;
-                    }
-                    e => match sender.send(e) {
-                        Ok(()) => {}
-                        Err(_) => {
-                            *control_flow = ControlFlow::Exit;
-                        }
-                    },
-                }
-            }
-        },
-    );
+        app.handle_event(&window, &renderer, &routines, &surface, event, |c: ControlFlow| {
+            *control_flow = c;
+        })
+    });
 }
 
-async fn handle_resize(
-    event: &Event,
+fn handle_resize<T: 'static>(
+    event: &Event<T>,
     surface: &Arc<Surface>,
     renderer: &Arc<Renderer>,
     format: rend3::types::TextureFormat,
@@ -378,21 +263,21 @@ async fn handle_resize(
         // Tell the renderer about the new aspect ratio.
         renderer.set_aspect_ratio(size.x as f32 / size.y as f32);
         // Resize the internal buffers to the same size as the screen.
-        routines.pbr.lock().await.resize(
+        lock(&routines.pbr).resize(
             renderer,
             rend3_routine::RenderTextureOptions {
                 resolution: size,
                 samples: rend3_routine::SampleCount::One,
             },
         );
-        routines.tonemapping.lock().await.resize(size);
+        lock(&routines.tonemapping).resize(size);
         Some(true)
     } else {
         None
     }
 }
 
-pub fn start<A: App + NativeSend + 'static>(app: A, window_builder: WindowBuilder) {
+pub fn start<A: App + 'static>(app: A, window_builder: WindowBuilder) {
     #[cfg(target_arch = "wasm32")]
     {
         wasm_bindgen_futures::spawn_local(async_start(app, window_builder));
@@ -400,7 +285,6 @@ pub fn start<A: App + NativeSend + 'static>(app: A, window_builder: WindowBuilde
 
     #[cfg(not(target_arch = "wasm32"))]
     {
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(async_start(app, window_builder));
+        pollster::block_on(async_start(app, window_builder));
     }
 }

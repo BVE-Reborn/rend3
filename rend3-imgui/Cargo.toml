@@ -1,9 +1,9 @@
 [package]
-name = "rend3-egui"
+name = "rend3-imgui"
 version = "0.2.0"
 authors = ["The rend3 Developers"]
 edition = "2021"
-description = "Egui Render Routine for rend3"
+description = "Imgui Render Routine for rend3"
 readme = "../README.md"
 license = "MIT OR Apache-2.0 OR Zlib"
 repository = "https://github.com/BVE-Reborn/rend3"
@@ -11,9 +11,7 @@ keywords = ["3d", "graphics", "gpu", "renderer", "wgpu"]
 categories = ["game-development", "graphics", "rendering", "rendering::engine"]
 
 [dependencies]
-egui = "0.15.0"
-egui_wgpu_backend = "0.14.0"
-epi = "0.15.0"
+imgui = "0.8"
+imgui-wgpu = "0.18"
 glam = "0.20.0"
 rend3 = { version = "^0.2.0", path = "../rend3" }
-wgpu = "0.11"

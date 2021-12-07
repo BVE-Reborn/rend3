@@ -1,12 +1,7 @@
-use flume::Sender;
 use wasm_bindgen::prelude::*;
-use winit::{
-    dpi::PhysicalSize,
-    event::{Event, WindowEvent},
-    event_loop::ControlFlow,
-    platform::web::WindowExtWebSys,
-    window::Window,
-};
+use winit::{dpi::PhysicalSize, event_loop::EventLoopProxy, platform::web::WindowExtWebSys, window::Window};
+
+use crate::UserResizeEvent;
 
 //from https://github.com/seed-rs/seed/pull/534/files
 
@@ -38,14 +33,15 @@ pub struct ResizeObserver {
     _callback: JsValue,
 }
 impl ResizeObserver {
-    pub fn new(window: &Window, sender: Sender<Event<'static, ControlFlow>>) -> Self {
+    pub fn new<T: 'static>(window: &Window, proxy: EventLoopProxy<UserResizeEvent<T>>) -> Self {
         let canvas = window.canvas();
         let id = window.id();
         let callback: Box<dyn FnMut(u32, u32)> = Box::new(move |width, height| {
-            let _ = sender.send(Event::WindowEvent {
-                event: WindowEvent::Resized(PhysicalSize { width, height }),
+            let _res = proxy.send_event(UserResizeEvent::Resize {
                 window_id: id,
+                size: PhysicalSize { width, height },
             });
+
             canvas.set_width(width);
             canvas.set_height(height);
         });

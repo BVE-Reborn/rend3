@@ -156,14 +156,14 @@ pub async fn filesystem_io_func(parent_directory: impl AsRef<Path>, uri: SsoStri
         let (_mime, rest) = base64_data.split_once(";").unwrap();
         let (encoding, data) = rest.split_once(",").unwrap();
         assert_eq!(encoding, "base64");
-        profiling::scope!("decoding base64 uri");
+        // profiling::scope!("decoding base64 uri");
         log::info!("loading {} bytes of base64 data", data.len());
         // TODO: errors
         Ok(base64::decode(data).unwrap())
     } else {
         let path_resolved = parent_directory.as_ref().join(&*uri);
         let display = path_resolved.as_os_str().to_string_lossy();
-        profiling::scope!("loading file", &display);
+        // profiling::scope!("loading file", &display);
         log::info!("loading file '{}' from disk", &display);
         std::fs::read(path_resolved)
     }
@@ -193,10 +193,10 @@ where
     Fut: Future<Output = Result<Vec<u8>, E>>,
     E: std::error::Error + 'static,
 {
-    profiling::scope!("loading gltf");
+    // profiling::scope!("loading gltf");
 
     let mut file = {
-        profiling::scope!("parsing gltf");
+        // profiling::scope!("parsing gltf");
         gltf::Gltf::from_slice_without_validation(data)?
     };
 
@@ -233,7 +233,7 @@ where
     Fut: Future<Output = Result<Vec<u8>, E>>,
     E: std::error::Error + 'static,
 {
-    profiling::scope!("loading gltf data");
+    // profiling::scope!("loading gltf data");
     let blob = file.blob.take();
 
     let buffers = load_buffers(file.buffers(), blob, &mut io_func).await?;
@@ -365,7 +365,7 @@ where
     Fut: Future<Output = Result<Vec<u8>, E>>,
     E: std::error::Error + 'static,
 {
-    profiling::scope!("loading buffers");
+    // profiling::scope!("loading buffers");
     let mut buffers = Vec::with_capacity(file.len());
     let mut blob_index = None;
     for b in file {
@@ -394,6 +394,7 @@ pub fn load_meshes<'a, E: std::error::Error + 'static>(
     meshes: impl Iterator<Item = gltf::Mesh<'a>>,
     buffers: &[Vec<u8>],
 ) -> Result<Vec<Labeled<Mesh>>, GltfLoadError<E>> {
+    profiling::scope!("loading meshes");
     meshes
         .into_iter()
         .map(|mesh| {
@@ -499,12 +500,12 @@ where
     Fut: Future<Output = Result<Vec<u8>, E>>,
     E: std::error::Error + 'static,
 {
-    profiling::scope!("loading materials and textures");
+    // profiling::scope!("loading materials and textures");
 
     let mut images = ImageMap::default();
     let mut result = Vec::with_capacity(materials.len());
     for material in materials {
-        profiling::scope!("load material", material.name().unwrap_or_default());
+        // profiling::scope!("load material", material.name().unwrap_or_default());
 
         let pbr = material.pbr_metallic_roughness();
         let albedo = pbr.base_color_texture();
@@ -680,7 +681,7 @@ where
     Fut: Future<Output = Result<Vec<u8>, E>>,
     E: std::error::Error + 'static,
 {
-    profiling::scope!("load image", image.name().unwrap_or_default());
+    // profiling::scope!("load image", image.name().unwrap_or_default());
     let (data, uri) = match image.source() {
         gltf::image::Source::Uri { uri, .. } => {
             let data = io_func(SsoString::from(uri))
@@ -754,6 +755,7 @@ where
     #[cfg(feature = "ddsfile")]
     if texture.is_none() {
         if let Ok(dds) = ddsfile::Dds::read(&mut std::io::Cursor::new(&data)) {
+            profiling::scope!("parsing dds");
             let format = dds
                 .get_dxgi_format()
                 .map(|f| {
@@ -862,7 +864,7 @@ pub mod util {
     pub fn convert_dynamic_image(image: image::DynamicImage, srgb: bool) -> (Vec<u8>, rend3::types::TextureFormat) {
         use rend3::types::TextureFormat as r3F;
 
-        profiling::scope!("convert dynamic image");
+        // profiling::scope!("convert dynamic image");
         match image {
             image::DynamicImage::ImageLuma8(i) => (i.into_raw(), r3F::R8Unorm),
             image::DynamicImage::ImageLumaA8(i) => (

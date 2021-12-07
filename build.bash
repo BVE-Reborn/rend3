@@ -61,6 +61,12 @@ case $1 in
         shift
         simple-http-server target/generated -c wasm,html,js -i
     ;;
+    ci)
+        cargo fmt
+        cargo clippy
+        RUSTFLAGS=--cfg=web_sys_unstable_apis cargo clippy --target wasm32-unknown-unknown --workspace --exclude rend3-imgui --exclude rend3-imgui-example
+        cargo deny check
+    ;;
     help | *)
         set +x
         echo "rend3 build script"

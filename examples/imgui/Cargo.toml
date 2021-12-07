@@ -1,5 +1,5 @@
 [package]
-name = "rend3-egui-example"
+name = "rend3-imgui-example"
 license = "MIT OR Apache-2.0 OR Zlib"
 version = "0.2.0"
 authors = ["The rend3 Developers"]
@@ -7,18 +7,16 @@ edition = "2021"
 publish = false
 
 [[bin]]
-name = "egui"
+name = "imgui"
 path = "src/main.rs"
 
 [dependencies]
-# The egui immediate mode gui library
-egui = "0.15.0"
-# Backend-agnostic interface for writing apps using egui
-epi = "0.15.0"
-# Winit integration with egui
-egui_winit_platform = "0.11.0"
 # logging
 env_logger = { version = "0.9", default-features = false, features = ["termcolor", "atty"] }
+# The imgui immediate mode gui library
+imgui = "0.8.0"
+# Winit integration with imgui
+imgui-winit-support = "0.8.0"
 # Linear algebra library
 glam = "0.20.0"
 # Portable implementation of Instant.
@@ -26,10 +24,10 @@ instant = { version = "0.1", features = ["wasm-bindgen"] }
 # Renderer core
 rend3 = { version = "^0.2.0",path = "../../rend3" }
 # Egui renderer integration
-rend3-egui = { version = "^0.2.0",path = "../../rend3-egui" }
+rend3-imgui = { version = "^0.2.0", path = "../../rend3-imgui" }
 # Framework that deals with the event loop, setting up the renderer, and platform differences.
 rend3-framework = { version = "^0.2.0", path = "../../rend3-framework" }
 # Programmable render list that dictates how the scene renders
-rend3-routine = { version = "^0.2.0",path = "../../rend3-routine" }
+rend3-routine = { version = "^0.2.0", path = "../../rend3-routine" }
 # Windowing
 winit = { version = "0.25", features = ["web-sys"] }

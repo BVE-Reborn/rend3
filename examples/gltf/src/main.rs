@@ -56,105 +56,95 @@ struct GltfExample {
 }
 
 impl rend3_framework::App for GltfExample {
-    fn setup<'a>(
-        &'a mut self,
-        _window: &'a winit::window::Window,
-        renderer: &'a Arc<rend3::Renderer>,
-        _routines: &'a Arc<rend3_framework::DefaultRoutines>,
-        _surface: &'a Arc<rend3::types::Surface>,
+    fn setup(
+        &mut self,
+        _window: &winit::window::Window,
+        renderer: &Arc<rend3::Renderer>,
+        _routines: &Arc<rend3_framework::DefaultRoutines>,
+        _surface: &Arc<rend3::types::Surface>,
         _surface_format: rend3::types::TextureFormat,
-    ) -> std::pin::Pin<Box<dyn rend3_framework::NativeSendFuture<()> + 'a>> {
-        Box::pin(async move {
-            // Create mesh and calculate smooth normals based on vertices.
-            //
-            // We do not need to keep these handles alive once we make the object
-            let (mesh, material) = load_gltf(renderer, concat!(env!("CARGO_MANIFEST_DIR"), "/data.glb"));
+    ) {
+        // Create mesh and calculate smooth normals based on vertices.
+        //
+        // We do not need to keep these handles alive once we make the object
+        let (mesh, material) = load_gltf(renderer, concat!(env!("CARGO_MANIFEST_DIR"), "/data.glb"));
 
-            // Combine the mesh and the material with a location to give an object.
-            let object = rend3::types::Object {
-                mesh,
-                material,
-                transform: glam::Mat4::from_scale(glam::Vec3::new(1.0, 1.0, -1.0)),
-            };
-            // We need to keep the object alive.
-            self.object_handle = Some(renderer.add_object(object));
+        // Combine the mesh and the material with a location to give an object.
+        let object = rend3::types::Object {
+            mesh,
+            material,
+            transform: glam::Mat4::from_scale(glam::Vec3::new(1.0, 1.0, -1.0)),
+        };
+        // We need to keep the object alive.
+        self.object_handle = Some(renderer.add_object(object));
 
-            let view_location = glam::Vec3::new(3.0, 3.0, -5.0);
-            let view = glam::Mat4::from_euler(glam::EulerRot::XYZ, -0.55, 0.5, 0.0);
-            let view = view * glam::Mat4::from_translation(-view_location);
+        let view_location = glam::Vec3::new(3.0, 3.0, -5.0);
+        let view = glam::Mat4::from_euler(glam::EulerRot::XYZ, -0.55, 0.5, 0.0);
+        let view = view * glam::Mat4::from_translation(-view_location);
 
-            // Set camera's location
-            renderer.set_camera_data(rend3::types::Camera {
-                projection: rend3::types::CameraProjection::Perspective { vfov: 60.0, near: 0.1 },
-                view,
-            });
+        // Set camera's location
+        renderer.set_camera_data(rend3::types::Camera {
+            projection: rend3::types::CameraProjection::Perspective { vfov: 60.0, near: 0.1 },
+            view,
+        });
 
-            // Create a single directional light
-            //
-            // We need to keep the directional light handle alive.
-            self.directional_light_handle = Some(renderer.add_directional_light(rend3::types::DirectionalLight {
-                color: glam::Vec3::ONE,
-                intensity: 10.0,
-                // Direction will be normalized
-                direction: glam::Vec3::new(-1.0, -4.0, 2.0),
-                distance: 400.0,
-            }));
-        })
+        // Create a single directional light
+        //
+        // We need to keep the directional light handle alive.
+        self.directional_light_handle = Some(renderer.add_directional_light(rend3::types::DirectionalLight {
+            color: glam::Vec3::ONE,
+            intensity: 10.0,
+            // Direction will be normalized
+            direction: glam::Vec3::new(-1.0, -4.0, 2.0),
+            distance: 400.0,
+        }));
     }
 
-    fn handle_event<'a>(
+    fn handle_event(
         &mut self,
-        window: &'a winit::window::Window,
-        renderer: &'a Arc<rend3::Renderer>,
-        routines: &'a Arc<rend3_framework::DefaultRoutines>,
-        surface: &'a Arc<rend3::types::Surface>,
-        event: rend3_framework::Event,
-        control_flow: impl FnOnce(winit::event_loop::ControlFlow) + rend3_framework::NativeSend + 'a,
-    ) -> std::pin::Pin<Box<dyn rend3_framework::NativeSendFuture<()> + 'a>> {
-        Box::pin(async move {
-            match event {
-                // Close button was clicked, we should close.
-                rend3_framework::Event::WindowEvent {
-                    event: winit::event::WindowEvent::CloseRequested,
-                    ..
-                } => {
-                    control_flow(winit::event_loop::ControlFlow::Exit);
-                }
-                rend3_framework::Event::MainEventsCleared => {
-                    window.request_redraw();
-                }
-                // Render!
-                rend3_framework::Event::RedrawRequested(..) => {
-                    // Get a frame
-                    let frame = rend3::util::output::OutputFrame::Surface {
-                        surface: Arc::clone(surface),
-                    };
-                    // Ready up the renderer
-                    let (cmd_bufs, ready) = renderer.ready();
-
-                    // Lock the routines
-                    let pbr_routine = routines.pbr.lock().await;
-                    let tonemapping_routine = routines.tonemapping.lock().await;
-
-                    // Build a rendergraph
-                    let mut graph = rend3::RenderGraph::new();
-
-                    // Add the default rendergraph without a skybox
-                    rend3_routine::add_default_rendergraph(
-                        &mut graph,
-                        &ready,
-                        &pbr_routine,
-                        None,
-                        &tonemapping_routine,
-                    );
-
-                    // Dispatch a render using the built up rendergraph!
-                    graph.execute(renderer, frame, cmd_bufs, &ready);
-                }
-                // Other events we don't care about
-                _ => {}
+        window: &winit::window::Window,
+        renderer: &Arc<rend3::Renderer>,
+        routines: &Arc<rend3_framework::DefaultRoutines>,
+        surface: &Arc<rend3::types::Surface>,
+        event: rend3_framework::Event<'_, ()>,
+        control_flow: impl FnOnce(winit::event_loop::ControlFlow),
+    ) {
+        match event {
+            // Close button was clicked, we should close.
+            rend3_framework::Event::WindowEvent {
+                event: winit::event::WindowEvent::CloseRequested,
+                ..
+            } => {
+                control_flow(winit::event_loop::ControlFlow::Exit);
             }
-        })
+            rend3_framework::Event::MainEventsCleared => {
+                window.request_redraw();
+            }
+            // Render!
+            rend3_framework::Event::RedrawRequested(..) => {
+                // Get a frame
+                let frame = rend3::util::output::OutputFrame::Surface {
+                    surface: Arc::clone(surface),
+                };
+                // Ready up the renderer
+                let (cmd_bufs, ready) = renderer.ready();
+
+                // Lock the routines
+                let pbr_routine = rend3_framework::lock(&routines.pbr);
+                let tonemapping_routine = rend3_framework::lock(&routines.tonemapping);
+
+                // Build a rendergraph
+                let mut graph = rend3::RenderGraph::new();
+
+                // Add the default rendergraph without a skybox
+                rend3_routine::add_default_rendergraph(&mut graph, &ready, &pbr_routine, None, &tonemapping_routine);
+
+                // Dispatch a render using the built up rendergraph!
+                graph.execute(renderer, frame, cmd_bufs, &ready);
+            }
+            // Other events we don't care about
+            _ => {}
+        }
     }
 }
 

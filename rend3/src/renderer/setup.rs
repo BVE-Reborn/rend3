@@ -1,7 +1,7 @@
 use crate::{
     instruction::InstructionStreamPair,
     managers::{CameraManager, DirectionalLightManager, MaterialManager, MeshManager, ObjectManager, TextureManager},
-    util::mipmap::MipmapGenerator,
+    util::{graph_texture_store::GraphTextureStore, mipmap::MipmapGenerator},
     InstanceAdapterDevice, Renderer, RendererInitializationError,
 };
 use parking_lot::{Mutex, RwLock};
@@ -68,5 +68,6 @@ pub fn create_renderer(
 
         mipmap_generator,
         profiler: Mutex::new(profiler),
+        graph_texture_store: Mutex::new(GraphTextureStore::new()),
     }))
 }

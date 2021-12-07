@@ -3,16 +3,19 @@ use std::{
     cell::{RefCell, UnsafeCell},
     marker::PhantomData,
     mem,
-    sync::Arc,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
 };
 
 use bumpalo::Bump;
 use glam::UVec2;
 use rend3_types::{BufferUsages, TextureFormat, TextureUsages};
 use wgpu::{
-    Color, CommandBuffer, CommandEncoder, CommandEncoderDescriptor, Extent3d, LoadOp, Operations, RenderPass,
-    RenderPassColorAttachment, RenderPassDepthStencilAttachment, RenderPassDescriptor, Texture, TextureDescriptor,
-    TextureDimension, TextureView, TextureViewDescriptor,
+    Color, CommandBuffer, CommandEncoder, CommandEncoderDescriptor, LoadOp, Operations, RenderPass,
+    RenderPassColorAttachment, RenderPassDepthStencilAttachment, RenderPassDescriptor, TextureView,
+    TextureViewDescriptor,
 };
 use wgpu_profiler::ProfilerCommandRecorder;
 
@@ -41,6 +44,22 @@ pub struct ReadyData {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct RenderTargetDescriptor {
     pub label: Option<SsoString>,
+    pub dim: UVec2,
+    pub format: TextureFormat,
+    pub usage: TextureUsages,
+}
+impl RenderTargetDescriptor {
+    fn to_core(&self) -> RenderTargetCore {
+        RenderTargetCore {
+            dim: self.dim,
+            format: self.format,
+            usage: self.usage,
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub(crate) struct RenderTargetCore {
     pub dim: UVec2,
     pub format: TextureFormat,
     pub usage: TextureUsages,
@@ -79,7 +98,7 @@ impl<'node> RenderGraph<'node> {
             graph: self,
             inputs: Vec::with_capacity(16),
             outputs: Vec::with_capacity(16),
-            passthrough: PassthroughDataContainer::none(),
+            passthrough: PassthroughDataContainer::new(),
             rpass: None,
         }
     }
@@ -139,7 +158,7 @@ impl<'node> RenderGraph<'node> {
             pruned_node_list.reverse();
         }
 
-        let mut resource_spans = FastHashMap::<_, (usize, usize)>::default();
+        let mut resource_spans = FastHashMap::<_, (usize, Option<usize>)>::default();
         {
             profiling::scope!("Resource Span Analysis");
             // Iterate through all the nodes, tracking the index where they are first used, and the index where they are last used.
@@ -148,17 +167,22 @@ impl<'node> RenderGraph<'node> {
                 for &input in &node.inputs {
                     resource_spans
                         .entry(input)
-                        .and_modify(|range| range.1 = idx)
-                        .or_insert((idx, idx));
+                        .and_modify(|range| range.1 = Some(idx))
+                        .or_insert((idx, Some(idx)));
                 }
                 // And the outputs
                 for &output in &node.outputs {
                     resource_spans
                         .entry(output)
-                        .and_modify(|range| range.1 = idx)
-                        .or_insert((idx, idx));
+                        .and_modify(|range| range.1 = Some(idx))
+                        .or_insert((idx, Some(idx)));
                 }
             }
+        }
+
+        // If the surface is used, we need treat it as if it has no end, as it will be "used" after the graph is done.
+        if let Some((_, surface_end)) = resource_spans.get_mut(&GraphResource::OutputTexture) {
+            *surface_end = None;
         }
 
         // For each node, record the list of textures whose spans start and the list of textures whose spans end.
@@ -167,14 +191,19 @@ impl<'node> RenderGraph<'node> {
             profiling::scope!("Compute Resource Span Deltas");
             for (&resource, span) in &resource_spans {
                 resource_changes[span.0].0.push(resource);
-                resource_changes[span.1].1.push(resource);
+                if let Some(end) = span.1 {
+                    resource_changes[end].1.push(resource);
+                }
             }
         }
 
         // Iterate through every node, allocating and deallocating textures as we go.
 
         // Maps a texture description to any available textures. Will try to pull from here instead of making a new texture.
-        let mut textures = FastHashMap::<RenderTargetDescriptor, Vec<Texture>>::default();
+        let mut graph_texture_store = renderer.graph_texture_store.lock();
+        // Mark all textures as unused, so the ones that are unused can be culled after this pass.
+        graph_texture_store.mark_unused();
+
         // Stores the Texture while a texture is using it
         let mut active_textures = FastHashMap::default();
         // Maps a name to its actual texture view.
@@ -188,34 +217,13 @@ impl<'node> RenderGraph<'node> {
                     match start {
                         GraphResource::Texture(idx) => {
                             let desc = &self.targets[idx];
-                            if let Some(tex) = textures.get_mut(desc).and_then(Vec::pop) {
-                                let view = tex.create_view(&TextureViewDescriptor {
-                                    label: desc.label.as_deref(),
-                                    ..TextureViewDescriptor::default()
-                                });
-                                active_views.insert(idx, view);
-                            } else {
-                                let tex = renderer.device.create_texture(&TextureDescriptor {
-                                    label: None,
-                                    size: Extent3d {
-                                        width: desc.dim.x,
-                                        height: desc.dim.y,
-                                        depth_or_array_layers: 1,
-                                    },
-                                    mip_level_count: 1,
-                                    // TODO: multisampling
-                                    sample_count: 1,
-                                    dimension: TextureDimension::D2,
-                                    format: desc.format,
-                                    usage: desc.usage,
-                                });
-                                let view = tex.create_view(&TextureViewDescriptor {
-                                    label: desc.label.as_deref(),
-                                    ..TextureViewDescriptor::default()
-                                });
-                                active_textures.insert(idx, tex);
-                                active_views.insert(idx, view);
-                            }
+                            let tex = graph_texture_store.get_texture(&renderer.device, desc.to_core());
+                            let view = tex.create_view(&TextureViewDescriptor {
+                                label: desc.label.as_deref(),
+                                ..TextureViewDescriptor::default()
+                            });
+                            active_textures.insert(idx, tex);
+                            active_views.insert(idx, view);
                         }
                         GraphResource::Shadow(..) => {}
                         GraphResource::Data(..) => {}
@@ -234,7 +242,7 @@ impl<'node> RenderGraph<'node> {
                                 .expect("internal rendergraph error: texture end with no start");
 
                             let desc = self.targets[idx].clone();
-                            textures.entry(desc).or_insert_with(|| Vec::with_capacity(16)).push(tex);
+                            graph_texture_store.return_texture(desc.to_core(), tex);
                         }
                         GraphResource::Shadow(..) => {}
                         GraphResource::Data(..) => {}
@@ -243,6 +251,11 @@ impl<'node> RenderGraph<'node> {
                 }
             }
         }
+
+        // All textures that were ever returned are marked as used, so anything in here
+        // that wasn't ever returned, was unused throughout the whole graph.
+        graph_texture_store.remove_unused();
+        drop(graph_texture_store);
 
         profiling::scope!("Run Nodes");
 
@@ -269,7 +282,7 @@ impl<'node> RenderGraph<'node> {
         let mut rpass = None;
 
         // Iterate through all the nodes and actually execute them.
-        for (idx, node) in pruned_node_list.into_iter().enumerate() {
+        for (idx, mut node) in pruned_node_list.into_iter().enumerate() {
             if acquire_idx == Some(idx) {
                 // SAFETY: this drops the renderpass, letting us into everything it was borrowing.
                 rpass = None;
@@ -346,7 +359,7 @@ impl<'node> RenderGraph<'node> {
                 profiler.begin_scope(&node.label, &mut encoder_or_rpass, &renderer.device);
 
                 (node.exec)(
-                    node.passthrough,
+                    &mut node.passthrough,
                     renderer,
                     RenderGraphEncoderOrPass(encoder_or_rpass),
                     // SAFETY: This borrow, and all the objects allocated from it, lasts as long as the renderpass, and isn't used mutably until after the rpass dies
@@ -395,7 +408,7 @@ impl<'node> RenderGraph<'node> {
         encoder: &'rpass mut CommandEncoder,
         pass_idx: usize,
         output: &'rpass OutputFrame,
-        resource_spans: &'rpass FastHashMap<GraphResource, (usize, usize)>,
+        resource_spans: &'rpass FastHashMap<GraphResource, (usize, Option<usize>)>,
         active_views: &'rpass FastHashMap<usize, TextureView>,
         shadow_views: &'rpass [TextureView],
     ) -> RenderPass<'rpass> {
@@ -411,7 +424,7 @@ impl<'node> RenderGraph<'node> {
                     LoadOp::Load
                 };
 
-                let store = view_span.1 != pass_idx;
+                let store = view_span.1 != Some(pass_idx);
 
                 RenderPassColorAttachment {
                     view: match &target.color.handle.resource {
@@ -444,7 +457,7 @@ impl<'node> RenderGraph<'node> {
 
             let view_span = resource_spans[&resource];
 
-            let store = view_span.1 != pass_idx;
+            let store = view_span.1 != Some(pass_idx);
 
             let depth_ops = ds_target.depth_clear.map(|clear| {
                 let load = if view_span.0 == pass_idx {
@@ -701,36 +714,81 @@ impl<'a, 'pass> RenderGraphEncoderOrPass<'a, 'pass> {
     }
 }
 
-pub struct PassthroughDataHandle<T> {
+pub struct PassthroughDataRef<T> {
+    node_id: usize,
+    index: usize,
+    _phantom: PhantomData<T>,
+}
+
+pub struct PassthroughDataRefMut<T> {
+    node_id: usize,
+    index: usize,
     _phantom: PhantomData<T>,
 }
 
 pub struct PassthroughDataContainer<'node> {
-    data: Option<*const ()>,
+    node_id: usize,
+    data: Vec<Option<*const ()>>,
     _phantom: PhantomData<&'node ()>,
 }
 
 impl<'node> PassthroughDataContainer<'node> {
-    fn new<T>(data: &'node T) -> Self {
+    fn new() -> Self {
+        static NODE_ID: AtomicUsize = AtomicUsize::new(0);
         Self {
-            data: Some(data as *const T as *const ()),
+            node_id: NODE_ID.fetch_add(1, Ordering::Relaxed),
+            data: Vec::new(),
             _phantom: PhantomData,
         }
     }
 
-    fn none() -> Self {
-        Self {
-            data: None,
+    pub fn add_ref<T: 'node>(&mut self, data: &'node T) -> PassthroughDataRef<T> {
+        let index = self.data.len();
+        self.data.push(Some(data as *const T as *const ()));
+        PassthroughDataRef {
+            node_id: self.node_id,
+            index,
             _phantom: PhantomData,
         }
     }
 
-    pub fn get<T>(self, _handle: PassthroughDataHandle<T>) -> &'node T {
+    pub fn add_ref_mut<T: 'node>(&mut self, data: &'node mut T) -> PassthroughDataRefMut<T> {
+        let index = self.data.len();
+        self.data.push(Some(data as *const T as *const ()));
+        PassthroughDataRefMut {
+            node_id: self.node_id,
+            index,
+            _phantom: PhantomData,
+        }
+    }
+
+    pub fn get<T>(&mut self, handle: PassthroughDataRef<T>) -> &'node T {
+        assert_eq!(
+            handle.node_id, self.node_id,
+            "Trying to use a passthrough data reference from another node"
+        );
         unsafe {
             &*(self
                 .data
+                .get_mut(handle.index)
                 .expect("internal rendergraph error: passthrough data handle corresponds to no passthrough data")
-                as *const T)
+                .take()
+                .expect("tried to retreve passthrough data more than once") as *const T)
+        }
+    }
+
+    pub fn get_mut<T>(&mut self, handle: PassthroughDataRefMut<T>) -> &'node mut T {
+        assert_eq!(
+            handle.node_id, self.node_id,
+            "Trying to use a passthrough data reference from another node"
+        );
+        unsafe {
+            &mut *(self
+                .data
+                .get_mut(handle.index)
+                .expect("internal rendergraph error: passthrough data handle corresponds to no passthrough data")
+                .take()
+                .expect("tried to retreve passthrough data more than once") as *const T as *mut T)
         }
     }
 }
@@ -829,7 +887,7 @@ pub struct RenderGraphNode<'node> {
     passthrough: PassthroughDataContainer<'node>,
     exec: Box<
         dyn for<'b, 'pass> FnOnce(
-                PassthroughDataContainer<'pass>,
+                &mut PassthroughDataContainer<'pass>,
                 &Arc<Renderer>,
                 RenderGraphEncoderOrPass<'b, 'pass>,
                 &'pass RpassTemporaryPool<'pass>,
@@ -923,20 +981,18 @@ impl<'a, 'node> RenderGraphNodeBuilder<'a, 'node> {
         DeclaredDependency { handle }
     }
 
-    pub fn passthrough_data<T>(&mut self, data: &'node T) -> PassthroughDataHandle<T> {
-        assert!(
-            self.passthrough.data.is_none(),
-            "Cannot have more than piece of passthrough data per node."
-        );
-        self.passthrough = PassthroughDataContainer::new(data);
+    pub fn passthrough_ref<T>(&mut self, data: &'node T) -> PassthroughDataRef<T> {
+        self.passthrough.add_ref(data)
+    }
 
-        PassthroughDataHandle { _phantom: PhantomData }
+    pub fn passthrough_ref_mut<T>(&mut self, data: &'node mut T) -> PassthroughDataRefMut<T> {
+        self.passthrough.add_ref_mut(data)
     }
 
     pub fn build<F>(self, exec: F)
     where
         F: for<'b, 'pass> FnOnce(
-                PassthroughDataContainer<'pass>,
+                &mut PassthroughDataContainer<'pass>,
                 &Arc<Renderer>,
                 RenderGraphEncoderOrPass<'b, 'pass>,
                 &'pass RpassTemporaryPool<'pass>,
