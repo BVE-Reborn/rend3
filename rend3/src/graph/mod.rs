@@ -138,6 +138,8 @@ impl<'node> RenderGraph<'node> {
         let mut awaiting_inputs = FastHashSet::default();
         // The surface is used externally
         awaiting_inputs.insert(GraphResource::OutputTexture);
+        // External deps are used externally
+        awaiting_inputs.insert(GraphResource::External);
 
         let mut pruned_node_list = Vec::with_capacity(self.nodes.len());
         {
@@ -231,6 +233,7 @@ impl<'node> RenderGraph<'node> {
                             acquire_idx = Some(idx);
                             continue;
                         }
+                        GraphResource::External => {}
                     };
                 }
 
@@ -246,7 +249,8 @@ impl<'node> RenderGraph<'node> {
                         }
                         GraphResource::Shadow(..) => {}
                         GraphResource::Data(..) => {}
-                        GraphResource::OutputTexture => continue,
+                        GraphResource::OutputTexture => {}
+                        GraphResource::External => {}
                     };
                 }
             }
@@ -527,6 +531,7 @@ pub struct ShadowTarget<'a> {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 enum GraphResource {
     OutputTexture,
+    External,
     Texture(usize),
     Shadow(usize),
     Data(usize),
@@ -744,7 +749,7 @@ impl<'node> PassthroughDataContainer<'node> {
 
     pub fn add_ref<T: 'node>(&mut self, data: &'node T) -> PassthroughDataRef<T> {
         let index = self.data.len();
-        self.data.push(Some(data as *const T as *const ()));
+        self.data.push(Some(<*const _>::cast(data)));
         PassthroughDataRef {
             node_id: self.node_id,
             index,
@@ -754,7 +759,7 @@ impl<'node> PassthroughDataContainer<'node> {
 
     pub fn add_ref_mut<T: 'node>(&mut self, data: &'node mut T) -> PassthroughDataRefMut<T> {
         let index = self.data.len();
-        self.data.push(Some(data as *const T as *const ()));
+        self.data.push(Some(<*const _>::cast(data)));
         PassthroughDataRefMut {
             node_id: self.node_id,
             index,
@@ -843,7 +848,7 @@ impl RenderPassTargets {
                     .depth_stencil
                     .as_ref()
                     .zip(other.depth_stencil.as_ref())
-                    .map_or(false, |(me, you)| me.target == you.target);
+                    .map_or(true, |(me, you)| me.target == you.target);
 
                 targets_compatible && depth_compatible
             }
@@ -981,11 +986,16 @@ impl<'a, 'node> RenderGraphNodeBuilder<'a, 'node> {
         DeclaredDependency { handle }
     }
 
-    pub fn passthrough_ref<T>(&mut self, data: &'node T) -> PassthroughDataRef<T> {
+    pub fn add_external_output(&mut self) {
+        self.inputs.push(GraphResource::External);
+        self.outputs.push(GraphResource::External);
+    }
+
+    pub fn passthrough_ref<T: 'node>(&mut self, data: &'node T) -> PassthroughDataRef<T> {
         self.passthrough.add_ref(data)
     }
 
-    pub fn passthrough_ref_mut<T>(&mut self, data: &'node mut T) -> PassthroughDataRefMut<T> {
+    pub fn passthrough_ref_mut<T: 'node>(&mut self, data: &'node mut T) -> PassthroughDataRefMut<T> {
         self.passthrough.add_ref_mut(data)
     }
 

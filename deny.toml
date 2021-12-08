@@ -9,6 +9,13 @@ allow = [
 ]
 copyleft = "allow"
 
+[[licenses.clarify]]
+name = "encoding_rs"
+expression = "(Apache-2.0 OR MIT) AND BSD-3-Clause"
+license-files = [
+    { path = "COPYRIGHT", hash = 972598577 }
+]
+
 [bans]
 multiple-versions = "deny"
 wildcards = "allow"

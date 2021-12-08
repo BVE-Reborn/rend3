@@ -1,5 +1,5 @@
-use rend3::{RenderGraph, RenderTargetHandle, Renderer};
-use wgpu::TextureFormat;
+use rend3::{RenderGraph, RenderPassTarget, RenderPassTargets, RenderTargetHandle, Renderer};
+use wgpu::{Color, TextureFormat};
 
 pub struct EguiRenderRoutine {
     pub internal: egui_wgpu_backend::RenderPass,
@@ -43,25 +43,35 @@ impl EguiRenderRoutine {
     ) {
         let mut builder = graph.add_node("egui");
 
-        let output_dep = builder.add_render_target_output(output);
+        let output_handle = builder.add_render_target_output(output);
 
-        builder.build(move |_pt, renderer, encoder_or_pass, _temps, _ready, graph_data| {
-            let encoder = encoder_or_pass.get_encoder();
+        let rpass_handle = builder.add_renderpass(RenderPassTargets {
+            targets: vec![RenderPassTarget {
+                color: output_handle,
+                clear: Color::BLACK,
+                resolve: None,
+            }],
+            depth_stencil: None,
+        });
 
-            self.internal
+        let pt_handle = builder.passthrough_ref_mut(self);
+
+        builder.build(move |pt, renderer, encoder_or_pass, _temps, _ready, _graph_data| {
+            let this = pt.get_mut(pt_handle);
+            let rpass = encoder_or_pass.get_rpass(rpass_handle);
+
+            this.internal
                 .update_texture(&renderer.device, &renderer.queue, &input.context.texture());
-            self.internal.update_user_textures(&renderer.device, &renderer.queue);
-            self.internal.update_buffers(
+            this.internal.update_user_textures(&renderer.device, &renderer.queue);
+            this.internal.update_buffers(
                 &renderer.device,
                 &renderer.queue,
                 input.clipped_meshes,
-                &self.screen_descriptor,
+                &this.screen_descriptor,
             );
 
-            let output = graph_data.get_render_target(output_dep);
-
-            self.internal
-                .execute(encoder, output, input.clipped_meshes, &self.screen_descriptor, None)
+            this.internal
+                .execute_with_renderpass(rpass, input.clipped_meshes, &this.screen_descriptor)
                 .unwrap();
         });
     }

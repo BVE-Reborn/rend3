@@ -713,21 +713,32 @@ impl TonemappingRoutine {
         let input_handle = builder.add_render_target_input(src);
         let output_handle = builder.add_render_target_output(dst);
 
+        let rpass_handle = builder.add_renderpass(RenderPassTargets {
+            targets: vec![RenderPassTarget {
+                color: output_handle,
+                clear: Color::BLACK,
+                resolve: None,
+            }],
+            depth_stencil: None,
+        });
+
         let forward_uniform_handle = builder.add_data_input(forward_uniform_bg);
 
-        builder.build(move |_pt, renderer, encoder_or_pass, temps, _ready, graph_data| {
-            let encoder = encoder_or_pass.get_encoder();
+        let pt_handle = builder.passthrough_ref(self);
+
+        builder.build(move |pt, renderer, encoder_or_pass, temps, _ready, graph_data| {
+            let this = pt.get(pt_handle);
+            let rpass = encoder_or_pass.get_rpass(rpass_handle);
             let forward_uniform_bg = graph_data.get_data(temps, forward_uniform_handle).unwrap();
             let hdr_color = graph_data.get_render_target(input_handle);
-            let output = graph_data.get_render_target(output_handle);
 
-            self.tonemapping_pass.blit(tonemapping::TonemappingPassBlitArgs {
+            this.tonemapping_pass.blit(tonemapping::TonemappingPassBlitArgs {
                 device: &renderer.device,
-                encoder,
-                interfaces: &self.interfaces,
+                rpass,
+                interfaces: &this.interfaces,
                 forward_uniform_bg,
                 source: hdr_color,
-                target: output,
+                temps,
             });
         });
     }
