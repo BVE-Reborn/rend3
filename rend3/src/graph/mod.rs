@@ -744,7 +744,7 @@ impl<'node> PassthroughDataContainer<'node> {
 
     pub fn add_ref<T: 'node>(&mut self, data: &'node T) -> PassthroughDataRef<T> {
         let index = self.data.len();
-        self.data.push(Some(data as *const T as *const ()));
+        self.data.push(Some(<*const _>::cast(data)));
         PassthroughDataRef {
             node_id: self.node_id,
             index,
@@ -754,7 +754,7 @@ impl<'node> PassthroughDataContainer<'node> {
 
     pub fn add_ref_mut<T: 'node>(&mut self, data: &'node mut T) -> PassthroughDataRefMut<T> {
         let index = self.data.len();
-        self.data.push(Some(data as *const T as *const ()));
+        self.data.push(Some(<*const _>::cast(data)));
         PassthroughDataRefMut {
             node_id: self.node_id,
             index,
