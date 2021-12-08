@@ -138,6 +138,8 @@ impl<'node> RenderGraph<'node> {
         let mut awaiting_inputs = FastHashSet::default();
         // The surface is used externally
         awaiting_inputs.insert(GraphResource::OutputTexture);
+        // External deps are used externally
+        awaiting_inputs.insert(GraphResource::External);
 
         let mut pruned_node_list = Vec::with_capacity(self.nodes.len());
         {
@@ -231,6 +233,7 @@ impl<'node> RenderGraph<'node> {
                             acquire_idx = Some(idx);
                             continue;
                         }
+                        GraphResource::External => {}
                     };
                 }
 
@@ -246,7 +249,8 @@ impl<'node> RenderGraph<'node> {
                         }
                         GraphResource::Shadow(..) => {}
                         GraphResource::Data(..) => {}
-                        GraphResource::OutputTexture => continue,
+                        GraphResource::OutputTexture => {}
+                        GraphResource::External => {}
                     };
                 }
             }
@@ -527,6 +531,7 @@ pub struct ShadowTarget<'a> {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 enum GraphResource {
     OutputTexture,
+    External,
     Texture(usize),
     Shadow(usize),
     Data(usize),
@@ -981,11 +986,16 @@ impl<'a, 'node> RenderGraphNodeBuilder<'a, 'node> {
         DeclaredDependency { handle }
     }
 
-    pub fn passthrough_ref<T>(&mut self, data: &'node T) -> PassthroughDataRef<T> {
+    pub fn add_external_output(&mut self) {
+        self.inputs.push(GraphResource::External);
+        self.outputs.push(GraphResource::External);
+    }
+
+    pub fn passthrough_ref<T: 'node>(&mut self, data: &'node T) -> PassthroughDataRef<T> {
         self.passthrough.add_ref(data)
     }
 
-    pub fn passthrough_ref_mut<T>(&mut self, data: &'node mut T) -> PassthroughDataRefMut<T> {
+    pub fn passthrough_ref_mut<T: 'node>(&mut self, data: &'node mut T) -> PassthroughDataRefMut<T> {
         self.passthrough.add_ref_mut(data)
     }
 
