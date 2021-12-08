@@ -843,7 +843,7 @@ impl RenderPassTargets {
                     .depth_stencil
                     .as_ref()
                     .zip(other.depth_stencil.as_ref())
-                    .map_or(false, |(me, you)| me.target == you.target);
+                    .map_or(true, |(me, you)| me.target == you.target);
 
                 targets_compatible && depth_compatible
             }

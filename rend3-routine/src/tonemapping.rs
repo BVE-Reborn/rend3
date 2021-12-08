@@ -1,11 +1,10 @@
 use std::borrow::Cow;
 
-use rend3::util::bind_merge::BindGroupBuilder;
+use rend3::{util::bind_merge::BindGroupBuilder, RpassTemporaryPool};
 use wgpu::{
-    BindGroup, Color, ColorTargetState, ColorWrites, CommandEncoder, Device, FragmentState, FrontFace, LoadOp,
-    MultisampleState, Operations, PipelineLayoutDescriptor, PolygonMode, PrimitiveState, PrimitiveTopology,
-    RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptor,
-    ShaderSource, TextureFormat, TextureView, VertexState,
+    BindGroup, ColorTargetState, ColorWrites, Device, FragmentState, FrontFace, MultisampleState,
+    PipelineLayoutDescriptor, PolygonMode, PrimitiveState, PrimitiveTopology, RenderPass, RenderPipeline,
+    RenderPipelineDescriptor, ShaderModuleDescriptor, ShaderSource, TextureFormat, TextureView, VertexState,
 };
 
 use crate::{common::interfaces::ShaderInterfaces, shaders::WGSL_SHADERS};
@@ -18,15 +17,15 @@ pub struct TonemappingPassNewArgs<'a> {
     pub output_format: TextureFormat,
 }
 
-pub struct TonemappingPassBlitArgs<'a> {
+pub struct TonemappingPassBlitArgs<'a, 'rpass> {
     pub device: &'a Device,
-    pub encoder: &'a mut CommandEncoder,
+    pub rpass: &'a mut RenderPass<'rpass>,
 
     pub interfaces: &'a ShaderInterfaces,
-    pub forward_uniform_bg: &'a BindGroup,
+    pub forward_uniform_bg: &'rpass BindGroup,
+    pub temps: &'rpass RpassTemporaryPool<'rpass>,
 
     pub source: &'a TextureView,
-    pub target: &'a TextureView,
 }
 
 pub struct TonemappingPass {
@@ -99,33 +98,20 @@ impl TonemappingPass {
         Self { pipeline }
     }
 
-    pub fn blit(&self, args: TonemappingPassBlitArgs<'_>) {
+    pub fn blit<'rpass>(&'rpass self, args: TonemappingPassBlitArgs<'_, 'rpass>) {
         profiling::scope!("tonemapping");
 
-        let blit_src_bg = BindGroupBuilder::new().append_texture_view(args.source).build(
-            args.device,
-            Some("blit src bg"),
-            &args.interfaces.blit_bgl,
-        );
+        let blit_src_bg = args
+            .temps
+            .add(BindGroupBuilder::new().append_texture_view(args.source).build(
+                args.device,
+                Some("blit src bg"),
+                &args.interfaces.blit_bgl,
+            ));
 
-        let mut rpass = args.encoder.begin_render_pass(&RenderPassDescriptor {
-            label: None, // We use the begin_scope below
-            color_attachments: &[RenderPassColorAttachment {
-                view: args.target,
-                resolve_target: None,
-                ops: Operations {
-                    load: LoadOp::Clear(Color::BLACK),
-                    store: true,
-                },
-            }],
-            depth_stencil_attachment: None,
-        });
-
-        rpass.set_pipeline(&self.pipeline);
-        rpass.set_bind_group(0, args.forward_uniform_bg, &[]);
-        rpass.set_bind_group(1, &blit_src_bg, &[]);
-        rpass.draw(0..3, 0..1);
-
-        drop(rpass);
+        args.rpass.set_pipeline(&self.pipeline);
+        args.rpass.set_bind_group(0, args.forward_uniform_bg, &[]);
+        args.rpass.set_bind_group(1, blit_src_bg, &[]);
+        args.rpass.draw(0..3, 0..1);
     }
 }
