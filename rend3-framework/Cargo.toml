@@ -29,6 +29,9 @@ env_logger = { version = "0.9", default-features = false, features = ["termcolor
 pollster = "0.2"
 winit = "0.25"
 
+# mio-misc broke semver in 1.3.2, so lock us at no larger than 1.2.2, the latest release
+mio-misc = ">=1.0.0, <=1.2.2"
+
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook = "0.1"
 console_log = "0.2"

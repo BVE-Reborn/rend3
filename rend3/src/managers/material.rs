@@ -354,13 +354,11 @@ impl MaterialManager {
             profiling::scope!("Update GPU Material Buffer");
             let mut translate_texture = texture_manager.translation_fn();
 
-            let self_type_info = &self.type_info;
-
             let bytes: usize = self
                 .registry
                 .archetype_lengths()
                 .map(|(ty, len)| {
-                    let type_info = &self_type_info[&ty];
+                    let type_info = &self.type_info[&ty];
 
                     len.max(1)
                         * (round_up_pot(type_info.texture_count * 4, 16) + round_up_pot(type_info.data_size, 16))
@@ -410,14 +408,20 @@ fn write_gpu_materials<M: Material>(
     let data_size = round_up_pot(M::DATA_SIZE, 16) as usize;
 
     for mat in materials {
-        let texture_slice = bytemuck::cast_slice_mut(&mut dest[offset..offset + texture_bytes]);
-        mat.to_textures(texture_slice, translation_fn);
+        // If we have no textures, we should skip this operation as the cast_slice_mut will fail
+        if mat_size != 0 {
+            let texture_slice = bytemuck::cast_slice_mut(&mut dest[offset..offset + texture_bytes]);
+            mat.to_textures(texture_slice, translation_fn);
 
-        offset += mat_size;
+            offset += mat_size;
+        }
 
-        mat.to_data(&mut dest[offset..offset + M::DATA_SIZE as usize]);
+        // If we have no data, skip calling the material for data.
+        if data_size == 0 {
+            mat.to_data(&mut dest[offset..offset + M::DATA_SIZE as usize]);
 
-        offset += data_size;
+            offset += data_size;
+        }
     }
 
     offset.max(mat_size + data_size)
