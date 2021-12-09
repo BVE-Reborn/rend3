@@ -417,7 +417,7 @@ fn write_gpu_materials<M: Material>(
         }
 
         // If we have no data, skip calling the material for data.
-        if data_size == 0 {
+        if data_size != 0 {
             mat.to_data(&mut dest[offset..offset + M::DATA_SIZE as usize]);
 
             offset += data_size;
