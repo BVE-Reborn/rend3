@@ -35,7 +35,6 @@ skip = [
     { name = "dlib", version = "0.4.2" }, # wayland
     { name = "libloading", version = "0.6.7" }, # everything but wayland
     { name = "nix", version = "0.18.0" }, # wayland
-    { name = "mio", version = "0.7.14" },
     # ddsfile
     { name = "num-traits", version = "0.1.43" },
     # wayland grrr
