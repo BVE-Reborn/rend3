@@ -261,6 +261,28 @@ impl<'node> RenderGraph<'node> {
         graph_texture_store.remove_unused();
         drop(graph_texture_store);
 
+        // Iterate through all nodes and describe the node when they _end_
+        let mut renderpass_ends = Vec::with_capacity(16);
+        // If node is compatible with the previous node
+        let mut compatible = Vec::with_capacity(pruned_node_list.len());
+        {
+            profiling::scope!("Renderpass Description");
+            for (idx, node) in pruned_node_list.iter().enumerate() {
+                let previous = idx.checked_sub(1).and_then(|idx| pruned_node_list[idx].rpass.as_ref());
+
+                compatible.push(RenderPassTargets::compatible(previous, node.rpass.as_ref()))
+            }
+
+            for (idx, &compatible) in compatible.iter().enumerate() {
+                dbg!(idx, compatible);
+                if !compatible || renderpass_ends.is_empty() {
+                    renderpass_ends.push(idx)
+                } else {
+                    *renderpass_ends.last_mut().unwrap() = idx;
+                }
+            }
+        }
+
         profiling::scope!("Run Nodes");
 
         let mut profiler = renderer.profiler.lock();
@@ -282,7 +304,7 @@ impl<'node> RenderGraph<'node> {
         );
         let rpass_temps_cell = UnsafeCell::new(RpassTemporaryPool::new());
 
-        let mut current_rpass_desc = None;
+        let mut next_rpass_idx = 0;
         let mut rpass = None;
 
         // Iterate through all the nodes and actually execute them.
@@ -290,7 +312,6 @@ impl<'node> RenderGraph<'node> {
             if acquire_idx == Some(idx) {
                 // SAFETY: this drops the renderpass, letting us into everything it was borrowing.
                 rpass = None;
-                current_rpass_desc = None;
 
                 // SAFETY: the renderpass has died, so there are no outstanding immutible borrows of the structure, and all uses of the temporaries have died.
                 unsafe { (&mut *rpass_temps_cell.get()).clear() };
@@ -314,17 +335,18 @@ impl<'node> RenderGraph<'node> {
                 unsafe { &mut *output_cell.get() }.acquire().unwrap();
             }
 
-            if !RenderPassTargets::compatible(&current_rpass_desc, &node.rpass) {
+            if !compatible[idx] {
                 // SAFETY: this drops the renderpass, letting us into everything it was borrowing when we make the new renderpass.
                 rpass = None;
-                current_rpass_desc = node.rpass;
+                next_rpass_idx += 1;
 
-                if let Some(ref desc) = current_rpass_desc {
+                if let Some(ref desc) = node.rpass {
                     rpass = Some(Self::create_rpass_from_desc(
                         desc,
-                        // SAFETY:  There are two things which borrow this encoder: the renderpass and the node's encoder reference. Both of these have died by this point.
+                        // SAFETY: There are two things which borrow this encoder: the renderpass and the node's encoder reference. Both of these have died by this point.
                         unsafe { &mut *encoder_cell.get() },
                         idx,
+                        renderpass_ends[next_rpass_idx],
                         // SAFETY: Same context as above.
                         unsafe { &mut *output_cell.get() },
                         &resource_spans,
@@ -410,7 +432,8 @@ impl<'node> RenderGraph<'node> {
     fn create_rpass_from_desc<'rpass>(
         desc: &RenderPassTargets,
         encoder: &'rpass mut CommandEncoder,
-        pass_idx: usize,
+        node_idx: usize,
+        pass_end_idx: usize,
         output: &'rpass OutputFrame,
         resource_spans: &'rpass FastHashMap<GraphResource, (usize, Option<usize>)>,
         active_views: &'rpass FastHashMap<usize, TextureView>,
@@ -422,13 +445,13 @@ impl<'node> RenderGraph<'node> {
             .map(|target| {
                 let view_span = resource_spans[&target.color.handle.resource];
 
-                let load = if view_span.0 == pass_idx {
+                let load = if view_span.0 == node_idx {
                     LoadOp::Clear(target.clear)
                 } else {
                     LoadOp::Load
                 };
 
-                let store = view_span.1 != Some(pass_idx);
+                let store = view_span.1 != Some(pass_end_idx);
 
                 RenderPassColorAttachment {
                     view: match &target.color.handle.resource {
@@ -461,10 +484,11 @@ impl<'node> RenderGraph<'node> {
 
             let view_span = resource_spans[&resource];
 
-            let store = view_span.1 != Some(pass_idx);
+            let store = view_span.1 != Some(pass_end_idx);
+            dbg!(view_span.1, pass_end_idx, store);
 
             let depth_ops = ds_target.depth_clear.map(|clear| {
-                let load = if view_span.0 == pass_idx {
+                let load = if view_span.0 == node_idx {
                     LoadOp::Clear(clear)
                 } else {
                     LoadOp::Load
@@ -474,7 +498,7 @@ impl<'node> RenderGraph<'node> {
             });
 
             let stencil_load = ds_target.stencil_clear.map(|clear| {
-                let load = if view_span.0 == pass_idx {
+                let load = if view_span.0 == node_idx {
                     LoadOp::Clear(clear)
                 } else {
                     LoadOp::Load
@@ -835,7 +859,7 @@ pub struct RenderPassTargets {
 }
 
 impl RenderPassTargets {
-    fn compatible(this: &Option<Self>, other: &Option<Self>) -> bool {
+    fn compatible(this: Option<&Self>, other: Option<&Self>) -> bool {
         match (this, other) {
             (Some(this), Some(other)) => {
                 let targets_compatible = this
