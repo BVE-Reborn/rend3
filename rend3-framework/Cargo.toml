@@ -27,7 +27,7 @@ thiserror = { version = "1" }
 # logging
 env_logger = { version = "0.9", default-features = false, features = ["termcolor", "atty"] }
 pollster = "0.2"
-winit = "0.25"
+winit = "0.26"
 
 # mio-misc broke semver in 1.3.2, so lock us at no larger than 1.2.2, the latest release
 mio-misc = ">=1.0.0, <=1.2.2"
