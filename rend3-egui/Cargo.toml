@@ -12,7 +12,7 @@ categories = ["game-development", "graphics", "rendering", "rendering::engine"]
 
 [dependencies]
 egui = "0.15.0"
-egui_wgpu_backend = { version = "0.14.0", git = "https://github.com/cwfitzgerald/egui_wgpu_backend.git", rev = "9dba721b85cedb7b8db1b5061e61519f23473368" }
+egui_wgpu_backend = { version = "0.14.0", git = "https://github.com/hasenbanck/egui_wgpu_backend.git", rev = "925a4564ea7608eba0333bd9a2521567b68b717a" }
 epi = "0.15.0"
 glam = "0.20.0"
 rend3 = { version = "^0.2.0", path = "../rend3" }

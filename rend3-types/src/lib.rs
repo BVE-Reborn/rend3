@@ -9,6 +9,9 @@ use std::{
 };
 use thiserror::Error;
 
+/// Reexport of the glam version rend3 is using.
+pub use glam;
+
 /// Non-owning resource handle. Not part of rend3's external interface, but needed to interface with rend3's internal datastructures if writing your own structures or render routines.
 pub struct RawResourceHandle<T> {
     pub idx: usize,
