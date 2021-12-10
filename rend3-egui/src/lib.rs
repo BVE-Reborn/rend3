@@ -1,4 +1,4 @@
-use rend3::{RenderGraph, RenderPassTarget, RenderPassTargets, RenderTargetHandle, Renderer};
+use rend3::{types::SampleCount, RenderGraph, RenderPassTarget, RenderPassTargets, RenderTargetHandle, Renderer};
 use wgpu::{Color, TextureFormat};
 
 pub struct EguiRenderRoutine {
@@ -10,12 +10,12 @@ impl EguiRenderRoutine {
     pub fn new(
         renderer: &Renderer,
         surface_format: TextureFormat,
-        msaa_samples: u32,
+        samples: SampleCount,
         width: u32,
         height: u32,
         scale_factor: f32,
     ) -> Self {
-        let rpass = egui_wgpu_backend::RenderPass::new(&renderer.device, surface_format, msaa_samples);
+        let rpass = egui_wgpu_backend::RenderPass::new(&renderer.device, surface_format, samples as _);
 
         Self {
             internal: rpass,

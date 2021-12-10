@@ -1,7 +1,7 @@
 use arrayvec::ArrayVec;
 #[allow(unused_imports)]
 use rend3::format_sso;
-use rend3::{managers::MaterialManager, ModeData, RendererMode};
+use rend3::{managers::MaterialManager, types::SampleCount, ModeData, RendererMode};
 use wgpu::{
     BindGroupLayout, BlendState, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState, DepthStencilState,
     Device, Face, FragmentState, FrontFace, MultisampleState, PipelineLayoutDescriptor, PolygonMode, PrimitiveState,
@@ -12,7 +12,6 @@ use crate::{
     common::{interfaces::ShaderInterfaces, shaders::mode_safe_shader},
     material::{PbrMaterial, TransparencyType},
     vertex::{cpu_vertex_buffers, gpu_vertex_buffers},
-    SampleCount,
 };
 
 /// Determines if vertices will be projected, or outputted in uv2 space.

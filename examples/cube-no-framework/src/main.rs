@@ -89,7 +89,7 @@ fn main() {
     // Create the pbr pipeline with the same internal resolution and 4x multisampling
     let render_texture_options = rend3_routine::RenderTextureOptions {
         resolution: glam::UVec2::new(window_size.width, window_size.height),
-        samples: rend3_routine::SampleCount::One,
+        samples: rend3::types::SampleCount::One,
     };
     let mut pbr_routine = rend3_routine::PbrRenderRoutine::new(&renderer, render_texture_options);
     let mut tonemapping_routine =
@@ -172,7 +172,7 @@ fn main() {
                 &renderer,
                 rend3_routine::RenderTextureOptions {
                     resolution: size,
-                    samples: rend3_routine::SampleCount::One,
+                    samples: rend3::types::SampleCount::One,
                 },
             );
             tonemapping_routine.resize(size);
@@ -190,7 +190,14 @@ fn main() {
             let mut graph = rend3::RenderGraph::new();
 
             // Add the default rendergraph without a skybox
-            rend3_routine::add_default_rendergraph(&mut graph, &ready, &pbr_routine, None, &tonemapping_routine);
+            rend3_routine::add_default_rendergraph(
+                &mut graph,
+                &ready,
+                &pbr_routine,
+                None,
+                &tonemapping_routine,
+                rend3::types::SampleCount::One,
+            );
 
             // Dispatch a render using the built up rendergraph!
             graph.execute(&renderer, frame, cmd_bufs, &ready);

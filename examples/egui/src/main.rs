@@ -16,6 +16,8 @@ struct EguiExample {
     data: Option<EguiExampleData>,
 }
 impl rend3_framework::App for EguiExample {
+    const DEFAULT_SAMPLE_COUNT: rend3::types::SampleCount = rend3::types::SampleCount::One;
+
     fn setup(
         &mut self,
         window: &winit::window::Window,
@@ -30,7 +32,7 @@ impl rend3_framework::App for EguiExample {
         let egui_routine = rend3_egui::EguiRenderRoutine::new(
             renderer,
             surface_format,
-            1, // For now this has to be 1, until rendergraphs support multisampling
+            rend3::types::SampleCount::One,
             window_size.width,
             window_size.height,
             window.scale_factor() as f32,
@@ -171,7 +173,14 @@ impl rend3_framework::App for EguiExample {
                 let mut graph = rend3::RenderGraph::new();
 
                 // Add the default rendergraph without a skybox
-                rend3_routine::add_default_rendergraph(&mut graph, &ready, &pbr_routine, None, &tonemapping_routine);
+                rend3_routine::add_default_rendergraph(
+                    &mut graph,
+                    &ready,
+                    &pbr_routine,
+                    None,
+                    &tonemapping_routine,
+                    Self::DEFAULT_SAMPLE_COUNT,
+                );
 
                 // Add egui on top of all the other passes
                 let surface = graph.add_surface_texture();

@@ -39,6 +39,8 @@ struct TexturedQuadExample {
     data: Option<TexturedQuadExampleData>,
 }
 impl rend3_framework::App for TexturedQuadExample {
+    const DEFAULT_SAMPLE_COUNT: rend3::types::SampleCount = rend3::types::SampleCount::One;
+
     fn setup(
         &mut self,
         window: &winit::window::Window,
@@ -163,7 +165,14 @@ impl rend3_framework::App for TexturedQuadExample {
                 let mut graph = rend3::RenderGraph::new();
 
                 // Add the default rendergraph
-                rend3_routine::add_default_rendergraph(&mut graph, &ready, &pbr_routine, None, &tonemapping_routine);
+                rend3_routine::add_default_rendergraph(
+                    &mut graph,
+                    &ready,
+                    &pbr_routine,
+                    None,
+                    &tonemapping_routine,
+                    Self::DEFAULT_SAMPLE_COUNT,
+                );
 
                 // Dispatch a render using the built up rendergraph!
                 graph.execute(renderer, frame, cmd_bufs, &ready);

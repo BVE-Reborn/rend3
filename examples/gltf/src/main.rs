@@ -56,6 +56,8 @@ struct GltfExample {
 }
 
 impl rend3_framework::App for GltfExample {
+    const DEFAULT_SAMPLE_COUNT: rend3::types::SampleCount = rend3::types::SampleCount::One;
+
     fn setup(
         &mut self,
         _window: &winit::window::Window,
@@ -137,7 +139,14 @@ impl rend3_framework::App for GltfExample {
                 let mut graph = rend3::RenderGraph::new();
 
                 // Add the default rendergraph without a skybox
-                rend3_routine::add_default_rendergraph(&mut graph, &ready, &pbr_routine, None, &tonemapping_routine);
+                rend3_routine::add_default_rendergraph(
+                    &mut graph,
+                    &ready,
+                    &pbr_routine,
+                    None,
+                    &tonemapping_routine,
+                    Self::DEFAULT_SAMPLE_COUNT,
+                );
 
                 // Dispatch a render using the built up rendergraph!
                 graph.execute(renderer, frame, cmd_bufs, &ready);

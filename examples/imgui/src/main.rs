@@ -17,6 +17,8 @@ struct ImguiExample {
     data: Option<ImguiExampleData>,
 }
 impl rend3_framework::App for ImguiExample {
+    const DEFAULT_SAMPLE_COUNT: rend3::types::SampleCount = rend3::types::SampleCount::One;
+
     fn setup(
         &mut self,
         window: &winit::window::Window,
@@ -159,7 +161,14 @@ impl rend3_framework::App for ImguiExample {
                 let mut graph = rend3::RenderGraph::new();
 
                 // Add the default rendergraph without a skybox
-                rend3_routine::add_default_rendergraph(&mut graph, &ready, &pbr_routine, None, &tonemapping_routine);
+                rend3_routine::add_default_rendergraph(
+                    &mut graph,
+                    &ready,
+                    &pbr_routine,
+                    None,
+                    &tonemapping_routine,
+                    Self::DEFAULT_SAMPLE_COUNT,
+                );
 
                 // Add imgui on top of all the other passes
                 let surface = graph.add_surface_texture();

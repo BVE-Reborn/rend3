@@ -1,7 +1,10 @@
 use std::{future::Future, pin::Pin, sync::Arc};
 
 use glam::UVec2;
-use rend3::{types::Surface, InstanceAdapterDevice, Renderer};
+use rend3::{
+    types::{SampleCount, Surface},
+    InstanceAdapterDevice, Renderer,
+};
 use winit::{
     dpi::PhysicalSize,
     event::WindowEvent,
@@ -33,6 +36,10 @@ pub enum UserResizeEvent<T: 'static> {
 }
 
 pub trait App<T: 'static = ()> {
+    /// Amount of samples the HDR renderbuffer should have. If you need to change
+    /// this dynamically look at [`App::sample_count`] which defaults to this value.
+    const DEFAULT_SAMPLE_COUNT: SampleCount;
+
     fn register_logger(&mut self) {
         #[cfg(target_arch = "wasm32")]
         console_log::init().unwrap();
@@ -73,6 +80,13 @@ pub trait App<T: 'static = ()> {
 
     fn create_iad<'a>(&'a mut self) -> Pin<Box<dyn Future<Output = anyhow::Result<InstanceAdapterDevice>> + 'a>> {
         Box::pin(async move { Ok(rend3::create_iad(None, None, None).await?) })
+    }
+
+    /// Determines the sample count used at all times, this may change dynamically,
+    /// as opposed to the compile time static [`App::DEFAULT_SAMPLE_COUNT`]. This function
+    /// is what the framework actually calls, so overriding this will always use the right values.
+    fn sample_count(&self) -> SampleCount {
+        Self::DEFAULT_SAMPLE_COUNT
     }
 
     fn setup(
@@ -186,7 +200,7 @@ pub async fn async_start<A: App + 'static>(mut app: A, window_builder: WindowBui
     // Create the pbr pipeline with the same internal resolution and 4x multisampling
     let render_texture_options = rend3_routine::RenderTextureOptions {
         resolution: glam::UVec2::new(window_size.width, window_size.height),
-        samples: rend3_routine::SampleCount::One,
+        samples: app.sample_count(),
     };
     let routines = Arc::new(DefaultRoutines {
         pbr: Mutex::new(rend3_routine::PbrRenderRoutine::new(&renderer, render_texture_options)),
@@ -217,7 +231,7 @@ pub async fn async_start<A: App + 'static>(mut app: A, window_builder: WindowBui
             e => e,
         };
 
-        if let Some(allow) = handle_resize(&event, &surface, &renderer, format, &routines) {
+        if let Some(allow) = handle_resize(&app, &event, &surface, &renderer, format, &routines) {
             allow_redraw = allow;
         }
 
@@ -233,7 +247,8 @@ pub async fn async_start<A: App + 'static>(mut app: A, window_builder: WindowBui
     });
 }
 
-fn handle_resize<T: 'static>(
+fn handle_resize<A: App, T: 'static>(
+    app: &A,
     event: &Event<T>,
     surface: &Arc<Surface>,
     renderer: &Arc<Renderer>,
@@ -267,7 +282,7 @@ fn handle_resize<T: 'static>(
             renderer,
             rend3_routine::RenderTextureOptions {
                 resolution: size,
-                samples: rend3_routine::SampleCount::One,
+                samples: app.sample_count(),
             },
         );
         lock(&routines.tonemapping).resize(size);
