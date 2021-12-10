@@ -34,8 +34,7 @@ impl GraphTextureStore {
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,
-            // TODO: multisampling
-            sample_count: 1,
+            sample_count: desc.samples as _,
             dimension: TextureDimension::D2,
             format: desc.format,
             usage: desc.usage,

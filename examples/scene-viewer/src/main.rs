@@ -191,6 +191,8 @@ impl SceneViewer {
     }
 }
 impl rend3_framework::App for SceneViewer {
+    const DEFAULT_SAMPLE_COUNT: rend3::types::SampleCount = rend3::types::SampleCount::Four;
+
     fn create_iad<'a>(
         &'a mut self,
     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<rend3::InstanceAdapterDevice>> + 'a>> {
@@ -202,6 +204,10 @@ impl rend3_framework::App for SceneViewer {
             )
             .await?)
         })
+    }
+
+    fn sample_count(&self) -> rend3::types::SampleCount {
+        rend3::types::SampleCount::Four
     }
 
     fn setup<'a>(
@@ -360,6 +366,7 @@ impl rend3_framework::App for SceneViewer {
                     &pbr_routine,
                     Some(&skybox_routine),
                     &tonemapping_routine,
+                    Self::DEFAULT_SAMPLE_COUNT,
                 );
 
                 // Dispatch a render using the built up rendergraph!

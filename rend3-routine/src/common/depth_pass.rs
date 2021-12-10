@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use arrayvec::ArrayVec;
-use rend3::{managers::MaterialManager, ModeData, RendererMode};
+use rend3::{managers::MaterialManager, types::SampleCount, ModeData, RendererMode};
 use wgpu::{
     BindGroupLayout, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState, DepthStencilState, Device, Face,
     FragmentState, FrontFace, MultisampleState, PipelineLayoutDescriptor, PolygonMode, PrimitiveState,
@@ -12,7 +12,6 @@ use crate::{
     common::{interfaces::ShaderInterfaces, shaders::mode_safe_shader},
     material::PbrMaterial,
     vertex::{cpu_vertex_buffers, gpu_vertex_buffers},
-    SampleCount,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

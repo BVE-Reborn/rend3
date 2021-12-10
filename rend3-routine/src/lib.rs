@@ -9,7 +9,7 @@ use glam::{UVec2, Vec4};
 use rend3::{
     format_sso,
     managers::{DirectionalLightManager, MaterialManager, TextureManager},
-    types::{TextureFormat, TextureHandle, TextureUsages},
+    types::{SampleCount, TextureFormat, TextureHandle, TextureUsages},
     util::bind_merge::BindGroupBuilder,
     DataHandle, DepthHandle, ModeData, ReadyData, RenderGraph, RenderPassDepthTarget, RenderPassTarget,
     RenderPassTargets, RenderTargetDescriptor, RenderTargetHandle, Renderer, RendererMode,
@@ -353,11 +353,13 @@ impl PbrRenderRoutine {
         });
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn add_prepass_to_graph<'node>(
         &'node self,
         graph: &mut RenderGraph<'node>,
         transparency: TransparencyType,
         color: RenderTargetHandle,
+        resolve: Option<RenderTargetHandle>,
         depth: RenderTargetHandle,
         forward_uniform_bg: DataHandle<BindGroup>,
         culled: DataHandle<CulledPerMaterial>,
@@ -365,7 +367,7 @@ impl PbrRenderRoutine {
         let mut builder = graph.add_node(format_sso!("Primary Prepass {:?}", transparency));
 
         let hdr_color_handle = builder.add_render_target_output(color);
-
+        let hdr_resolve = builder.add_optional_render_target_output(resolve);
         let hdr_depth_handle = builder.add_render_target_output(depth);
 
         let forward_uniform_handle = builder.add_data_input(forward_uniform_bg);
@@ -375,7 +377,7 @@ impl PbrRenderRoutine {
             targets: vec![RenderPassTarget {
                 color: hdr_color_handle,
                 clear: Color::BLACK,
-                resolve: None,
+                resolve: hdr_resolve,
             }],
             depth_stencil: Some(RenderPassDepthTarget {
                 target: DepthHandle::RenderTarget(hdr_depth_handle),
@@ -413,11 +415,13 @@ impl PbrRenderRoutine {
         });
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn add_forward_to_graph<'node>(
         &'node self,
         graph: &mut RenderGraph<'node>,
         transparency: TransparencyType,
         color: RenderTargetHandle,
+        resolve: Option<RenderTargetHandle>,
         depth: RenderTargetHandle,
         forward_uniform_bg: DataHandle<BindGroup>,
         culled: DataHandle<CulledPerMaterial>,
@@ -425,14 +429,14 @@ impl PbrRenderRoutine {
         let mut builder = graph.add_node(format_sso!("Primary Forward {:?}", transparency));
 
         let hdr_color_handle = builder.add_render_target_output(color);
-
+        let hdr_resolve = builder.add_optional_render_target_output(resolve);
         let hdr_depth_handle = builder.add_render_target_output(depth);
 
         let rpass_handle = builder.add_renderpass(RenderPassTargets {
             targets: vec![RenderPassTarget {
                 color: hdr_color_handle,
                 clear: Color::BLACK,
-                resolve: None,
+                resolve: hdr_resolve,
             }],
             depth_stencil: Some(RenderPassDepthTarget {
                 target: DepthHandle::RenderTarget(hdr_depth_handle),
@@ -588,7 +592,7 @@ impl SkyboxRoutine {
             mode: renderer.mode,
             device: &renderer.device,
             interfaces: &interfaces,
-            samples: SampleCount::One,
+            samples: options.samples,
         });
 
         let skybox_pass = skybox::SkyboxPass::new(skybox_pipeline);
@@ -634,20 +638,21 @@ impl SkyboxRoutine {
         &'node self,
         graph: &mut RenderGraph<'node>,
         color: RenderTargetHandle,
+        resolve: Option<RenderTargetHandle>,
         depth: RenderTargetHandle,
         forward_uniform_bg: DataHandle<BindGroup>,
     ) {
         let mut builder = graph.add_node("Skybox");
 
         let hdr_color_handle = builder.add_render_target_output(color);
-
+        let hdr_resolve = builder.add_optional_render_target_output(resolve);
         let hdr_depth_handle = builder.add_render_target_input(depth);
 
         let rpass_handle = builder.add_renderpass(RenderPassTargets {
             targets: vec![RenderPassTarget {
                 color: hdr_color_handle,
                 clear: Color::BLACK,
-                resolve: None,
+                resolve: hdr_resolve,
             }],
             depth_stencil: Some(RenderPassDepthTarget {
                 target: DepthHandle::RenderTarget(hdr_depth_handle),
@@ -757,6 +762,7 @@ pub fn add_default_rendergraph<'node>(
     pbr: &'node PbrRenderRoutine,
     skybox: Option<&'node SkyboxRoutine>,
     tonemapping: &'node TonemappingRoutine,
+    samples: SampleCount,
 ) {
     // We need to know how many shadows we need to render
     let shadow_count = ready.directional_light_cameras.len();
@@ -816,33 +822,44 @@ pub fn add_default_rendergraph<'node>(
     let color = graph.add_render_target(RenderTargetDescriptor {
         label: Some("hdr color".into()),
         dim: pbr.render_texture_options.resolution,
+        samples,
         format: TextureFormat::Rgba16Float,
         usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
+    });
+    let resolve = samples.needs_resolve().then(|| {
+        graph.add_render_target(RenderTargetDescriptor {
+            label: Some("hdr resolve".into()),
+            dim: pbr.render_texture_options.resolution,
+            samples: SampleCount::One,
+            format: TextureFormat::Rgba16Float,
+            usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
+        })
     });
     let depth = graph.add_render_target(RenderTargetDescriptor {
         label: Some("hdr depth".into()),
         dim: pbr.render_texture_options.resolution,
+        samples,
         format: TextureFormat::Depth32Float,
         usage: TextureUsages::RENDER_ATTACHMENT,
     });
 
     // Add depth prepass
     for trans in per_transparency_no_blend {
-        pbr.add_prepass_to_graph(graph, trans.ty, color, depth, forward_uniform_bg, trans.cull);
+        pbr.add_prepass_to_graph(graph, trans.ty, color, resolve, depth, forward_uniform_bg, trans.cull);
     }
 
     // Add skybox
     if let Some(skybox) = skybox {
-        skybox.add_to_graph(graph, color, depth, forward_uniform_bg);
+        skybox.add_to_graph(graph, color, resolve, depth, forward_uniform_bg);
     }
 
     // Add primary rendering
     for trans in &per_transparency {
-        pbr.add_forward_to_graph(graph, trans.ty, color, depth, forward_uniform_bg, trans.cull);
+        pbr.add_forward_to_graph(graph, trans.ty, color, resolve, depth, forward_uniform_bg, trans.cull);
     }
 
     // Make the reference to the surface
     let surface = graph.add_surface_texture();
 
-    tonemapping.add_to_graph(graph, color, surface, forward_uniform_bg);
+    tonemapping.add_to_graph(graph, resolve.unwrap_or(color), surface, forward_uniform_bg);
 }

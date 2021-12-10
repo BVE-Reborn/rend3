@@ -11,7 +11,7 @@ use std::{
 
 use bumpalo::Bump;
 use glam::UVec2;
-use rend3_types::{BufferUsages, TextureFormat, TextureUsages};
+use rend3_types::{BufferUsages, SampleCount, TextureFormat, TextureUsages};
 use wgpu::{
     Color, CommandBuffer, CommandEncoder, CommandEncoderDescriptor, LoadOp, Operations, RenderPass,
     RenderPassColorAttachment, RenderPassDepthStencilAttachment, RenderPassDescriptor, TextureView,
@@ -31,8 +31,6 @@ use crate::{
     Renderer,
 };
 
-mod shadow_alloc;
-
 /// Output of calling ready on various managers.
 #[derive(Clone)]
 pub struct ReadyData {
@@ -41,10 +39,11 @@ pub struct ReadyData {
     pub directional_light_cameras: Vec<CameraManager>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone)]
 pub struct RenderTargetDescriptor {
     pub label: Option<SsoString>,
     pub dim: UVec2,
+    pub samples: SampleCount,
     pub format: TextureFormat,
     pub usage: TextureUsages,
 }
@@ -52,6 +51,7 @@ impl RenderTargetDescriptor {
     fn to_core(&self) -> RenderTargetCore {
         RenderTargetCore {
             dim: self.dim,
+            samples: self.samples,
             format: self.format,
             usage: self.usage,
         }
@@ -61,6 +61,7 @@ impl RenderTargetDescriptor {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub(crate) struct RenderTargetCore {
     pub dim: UVec2,
+    pub samples: SampleCount,
     pub format: TextureFormat,
     pub usage: TextureUsages,
 }
@@ -470,7 +471,7 @@ impl<'node> RenderGraph<'node> {
                             panic!("internal rendergraph error: using a non-texture as a renderpass attachment")
                         }
                     },
-                    resolve_target: target.resolve.as_ref().map(|handle| match &handle.resource {
+                    resolve_target: target.resolve.as_ref().map(|dep| match &dep.handle.resource {
                         GraphResource::OutputTexture => output
                             .as_view()
                             .expect("internal rendergraph error: tried to use output texture before acquire"),
@@ -897,7 +898,7 @@ pub struct DeclaredDependency<Handle> {
 pub struct RenderPassTarget {
     pub color: DeclaredDependency<RenderTargetHandle>,
     pub clear: Color,
-    pub resolve: Option<RenderTargetHandle>,
+    pub resolve: Option<DeclaredDependency<RenderTargetHandle>>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -950,6 +951,13 @@ impl<'a, 'node> RenderGraphNodeBuilder<'a, 'node> {
         self.inputs.push(handle.resource);
         self.outputs.push(handle.resource);
         DeclaredDependency { handle }
+    }
+
+    pub fn add_optional_render_target_output(
+        &mut self,
+        handle: Option<RenderTargetHandle>,
+    ) -> Option<DeclaredDependency<RenderTargetHandle>> {
+        Some(self.add_render_target_output(handle?))
     }
 
     pub fn add_renderpass(&mut self, targets: RenderPassTargets) -> RenderPassHandle {

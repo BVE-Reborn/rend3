@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use rend3::RendererMode;
+use rend3::{types::SampleCount, RendererMode};
 use wgpu::{
     ColorTargetState, ColorWrites, CompareFunction, DepthBiasState, DepthStencilState, Device, Face, FragmentState,
     FrontFace, MultisampleState, PipelineLayoutDescriptor, PolygonMode, PrimitiveState, PrimitiveTopology,
@@ -8,7 +8,7 @@ use wgpu::{
     VertexState,
 };
 
-use crate::{common::interfaces::ShaderInterfaces, shaders::WGSL_SHADERS, SampleCount};
+use crate::{common::interfaces::ShaderInterfaces, shaders::WGSL_SHADERS};
 
 pub struct BuildSkyboxShaderArgs<'a> {
     pub mode: RendererMode,
