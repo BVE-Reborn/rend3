@@ -268,17 +268,23 @@ impl<'node> RenderGraph<'node> {
         {
             profiling::scope!("Renderpass Description");
             for (idx, node) in pruned_node_list.iter().enumerate() {
-                let previous = idx.checked_sub(1).and_then(|idx| pruned_node_list[idx].rpass.as_ref());
+                // We always assume the first node is incompatible so the codepaths below are consistent.
+                let previous = match idx.checked_sub(1) {
+                    Some(prev) => pruned_node_list[prev].rpass.as_ref(),
+                    None => {
+                        compatible.push(false);
+                        continue;
+                    }
+                };
 
                 compatible.push(RenderPassTargets::compatible(previous, node.rpass.as_ref()))
             }
 
             for (idx, &compatible) in compatible.iter().enumerate() {
-                dbg!(idx, compatible);
-                if !compatible || renderpass_ends.is_empty() {
-                    renderpass_ends.push(idx)
-                } else {
+                if compatible {
                     *renderpass_ends.last_mut().unwrap() = idx;
+                } else {
+                    renderpass_ends.push(idx)
                 }
             }
         }
@@ -338,7 +344,6 @@ impl<'node> RenderGraph<'node> {
             if !compatible[idx] {
                 // SAFETY: this drops the renderpass, letting us into everything it was borrowing when we make the new renderpass.
                 rpass = None;
-                next_rpass_idx += 1;
 
                 if let Some(ref desc) = node.rpass {
                     rpass = Some(Self::create_rpass_from_desc(
@@ -354,6 +359,7 @@ impl<'node> RenderGraph<'node> {
                         shadow_views,
                     ));
                 }
+                next_rpass_idx += 1;
             }
 
             {
@@ -429,6 +435,7 @@ impl<'node> RenderGraph<'node> {
         profiler.process_finished_frame()
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn create_rpass_from_desc<'rpass>(
         desc: &RenderPassTargets,
         encoder: &'rpass mut CommandEncoder,
@@ -485,7 +492,6 @@ impl<'node> RenderGraph<'node> {
             let view_span = resource_spans[&resource];
 
             let store = view_span.1 != Some(pass_end_idx);
-            dbg!(view_span.1, pass_end_idx, store);
 
             let depth_ops = ds_target.depth_clear.map(|clear| {
                 let load = if view_span.0 == node_idx {
