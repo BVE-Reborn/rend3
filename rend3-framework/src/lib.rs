@@ -79,7 +79,7 @@ pub trait App<T: 'static = ()> {
     }
 
     fn create_iad<'a>(&'a mut self) -> Pin<Box<dyn Future<Output = anyhow::Result<InstanceAdapterDevice>> + 'a>> {
-        Box::pin(async move { Ok(rend3::create_iad(None, None, None).await?) })
+        Box::pin(async move { Ok(rend3::create_iad(None, None, None, &[]).await?) })
     }
 
     /// Determines the sample count used at all times, this may change dynamically,

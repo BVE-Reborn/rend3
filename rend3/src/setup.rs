@@ -345,9 +345,9 @@ pub struct InstanceAdapterDevice {
     pub info: ExtendedAdapterInfo,
 }
 
-/// Creates an Instance/Adapter/Device/Queue using the given choices. Tries to /// get the best combination. 
-/// 
-/// **NOTE:** Some adapters will not advertise all of its supported features. The `additional_features` 
+/// Creates an Instance/Adapter/Device/Queue using the given choices. Tries to get the best combination.
+///
+/// **NOTE:** Some adapters will not advertise all of its supported features. The `additional_features`
 /// parameter can be used to explicitly request additional features during device creation.
 pub async fn create_iad(
     desired_backend: Option<Backend>,

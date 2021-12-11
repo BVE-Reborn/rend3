@@ -49,6 +49,7 @@ Per Keep a Changelog there are 6 main categories of changes:
 - rend3: Rename `CameraProjection::Projection` to `CameraProjection::Perspective`.
 - rend3: Add `CameraProjection::Raw`.
 - rend3-routine: All transparency now has backface culling enabled. Use `Mesh::double_side` or `MeshBuilder::with_double_side` to re-enable double sided transparency.
+- rend3: Allow requesting device features explicitly in `rend3::create_iad`. @setzer22
 
 ### Fixes
 - rend3: Get vertex/index counts from RangeAllocator. @jamen
