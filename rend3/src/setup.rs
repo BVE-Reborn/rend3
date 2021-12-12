@@ -346,10 +346,14 @@ pub struct InstanceAdapterDevice {
 }
 
 /// Creates an Instance/Adapter/Device/Queue using the given choices. Tries to get the best combination.
+///
+/// **NOTE:** Some adapters will not advertise all of its supported features. The `additional_features`
+/// parameter can be used to explicitly request additional features during device creation.
 pub async fn create_iad(
     desired_backend: Option<Backend>,
     desired_device: Option<String>,
     desired_mode: Option<RendererMode>,
+    additional_features: Option<Features>,
 ) -> Result<InstanceAdapterDevice, RendererInitializationError> {
     profiling::scope!("create_iad");
     #[cfg(not(target_arch = "wasm32"))]
@@ -451,7 +455,9 @@ pub async fn create_iad(
                 .request_device(
                     &DeviceDescriptor {
                         label: None,
-                        features: adapter.features,
+                        features: adapter
+                            .features
+                            .union(additional_features.unwrap_or_else(Features::empty)),
                         limits: adapter.limits,
                     },
                     None,

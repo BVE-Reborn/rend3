@@ -201,6 +201,7 @@ impl rend3_framework::App for SceneViewer {
                 self.desired_backend,
                 self.desired_device_name.clone(),
                 self.desired_mode,
+                None,
             )
             .await?)
         })
