@@ -455,7 +455,7 @@ pub async fn create_iad(
                 .request_device(
                     &DeviceDescriptor {
                         label: None,
-                        features: adapter.features.union(additional_features.unwrap_or(Features::empty())),
+                        features: adapter.features.union(additional_features.unwrap_or_else(Features::empty)),
                         limits: adapter.limits,
                     },
                     None,
