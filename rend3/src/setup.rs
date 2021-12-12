@@ -353,7 +353,7 @@ pub async fn create_iad(
     desired_backend: Option<Backend>,
     desired_device: Option<String>,
     desired_mode: Option<RendererMode>,
-    additional_features: &[Features],
+    additional_features: Option<Features>,
 ) -> Result<InstanceAdapterDevice, RendererInitializationError> {
     profiling::scope!("create_iad");
     #[cfg(not(target_arch = "wasm32"))]
@@ -455,9 +455,7 @@ pub async fn create_iad(
                 .request_device(
                     &DeviceDescriptor {
                         label: None,
-                        features: adapter
-                            .features
-                            .union(Features::from_iter(additional_features.iter().cloned())),
+                        features: adapter.features.union(additional_features.unwrap_or(Features::empty())),
                         limits: adapter.limits,
                     },
                     None,
