@@ -436,7 +436,7 @@ impl TransparencyType {
         match self {
             Self::Opaque => None,
             Self::Cutout => None,
-            Self::Blend => Some(crate::culling::Sorting::FrontToBack),
+            Self::Blend => Some(crate::culling::Sorting::BackToFront),
         }
     }
 }
