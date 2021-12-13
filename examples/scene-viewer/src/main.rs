@@ -244,7 +244,7 @@ impl rend3_framework::App for SceneViewer {
         let routines = Arc::clone(routines);
         spawn(async move {
             let loader = rend3_framework::AssetLoader::new_local(
-                concat!(env!("CARGO_MANIFEST_DIR"), "/../resources/"),
+                concat!(env!("CARGO_MANIFEST_DIR"), "resources/"),
                 "http://localhost:8000/resources/",
             );
             if let Err(e) = load_skybox(&renderer, &loader, &routines.skybox).await {
