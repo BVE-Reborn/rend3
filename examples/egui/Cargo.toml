@@ -5,6 +5,7 @@ version = "0.2.0"
 authors = ["The rend3 Developers"]
 edition = "2021"
 publish = false
+rust-version = "1.57"
 
 [[bin]]
 name = "egui"

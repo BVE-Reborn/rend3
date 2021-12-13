@@ -9,9 +9,11 @@ repository = "https://github.com/BVE-Reborn/rend3"
 license = "MIT OR Apache-2.0 OR Zlib"
 keywords = ["3d", "graphics", "gpu", "renderer", "wgpu"]
 categories = ["game-development", "graphics", "rendering", "rendering::engine"]
+rust-version = "1.57"
 exclude = [
-    "data/*",
-    "*.jpg",
+    "emerald-square.jpg",
+    "scifi-base.jpg",
+    "screenshot.jpg",
 ]
 
 [[bin]]
