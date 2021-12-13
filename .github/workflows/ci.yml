@@ -61,41 +61,41 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: build
-          args: --target ${{ matrix.target }}
+          args: --target ${{ matrix.target }} --profile ci
         if: matrix.target != 'wasm32-unknown-unknown'
 
       - name: build (no imgui)
         uses: actions-rs/cargo@v1
         with:
           command: build
-          args: --target ${{ matrix.target }} --workspace --exclude rend3-imgui --exclude rend3-imgui-example
+          args: --target ${{ matrix.target }} --profile ci --workspace --exclude rend3-imgui --exclude rend3-imgui-example
         if: matrix.target == 'wasm32-unknown-unknown'
 
       - name: test
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --target ${{ matrix.target }}
+          args: --target ${{ matrix.target }} --profile ci
         if: matrix.target != 'wasm32-unknown-unknown'
 
       - name: clippy (rend3-gltf featureless)
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: --target ${{ matrix.target }} -p rend3-gltf --no-default-features
+          args: --target ${{ matrix.target }} --profile ci -p rend3-gltf --no-default-features
 
       - name: clippy
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: --target ${{ matrix.target }}
+          args: --target ${{ matrix.target }} --profile ci
         if: matrix.target != 'wasm32-unknown-unknown'
 
       - name: clippy (no imgui)
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: --target ${{ matrix.target }} --workspace --exclude rend3-imgui --exclude rend3-imgui-example
+          args: --target ${{ matrix.target }} --profile ci --workspace --exclude rend3-imgui --exclude rend3-imgui-example
         if: matrix.target == 'wasm32-unknown-unknown'
 
   cargo-fmt:

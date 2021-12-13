@@ -17,6 +17,10 @@ members = [
     "rend3-types"
 ]
 
+[profile.ci]
+inherits = "dev"
+debug = false
+incremental = false
 
 [profile.dev-release]
 inherits = "dev"
