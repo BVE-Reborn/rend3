@@ -9,8 +9,7 @@ repository = "https://github.com/BVE-Reborn/rend3"
 license = "MIT OR Apache-2.0 OR Zlib"
 keywords = ["3d", "graphics", "gpu", "renderer", "wgpu"]
 categories = ["game-development", "graphics", "rendering", "rendering::engine"]
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+rust-version = "1.57"
 
 [dependencies]
 anyhow = "1"

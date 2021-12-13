@@ -15,25 +15,25 @@ jobs:
     strategy:
       matrix:
         include:
-          # wasm stable
-          - name: 'stable wasm'
+          # wasm 1.57
+          - name: '1.57 wasm'
             os: 'ubuntu-latest'
             target: 'wasm32-unknown-unknown'
-            rust_version: 'stable'
+            rust_version: '1.57'
 
-          # native stable
-          - name: 'stable linux'
+          # native 1.57
+          - name: '1.57 linux'
             os: 'ubuntu-latest'
             target: 'x86_64-unknown-linux-gnu'
-            rust_version: 'stable'
-          - name: 'stable mac'
+            rust_version: '1.57'
+          - name: '1.57 mac'
             os: 'macos-latest'
             target: 'x86_64-apple-darwin'
-            rust_version: 'stable'
-          - name: 'stable windows'
+            rust_version: '1.57'
+          - name: '1.57 windows'
             os: 'windows-latest'
             target: 'x86_64-pc-windows-msvc'
-            rust_version: 'stable'
+            rust_version: '1.57'
       fail-fast: false
     runs-on: ${{ matrix.os }}
     name: ${{ matrix.name }}

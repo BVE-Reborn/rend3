@@ -17,7 +17,11 @@ members = [
     "rend3-types"
 ]
 
-[profile.dev.package."*"]
+
+[profile.dev-release]
+inherits = "dev"
+
+[profile.dev-release.package."*"]
 opt-level = 3
 
 [profile.release]

@@ -8,6 +8,7 @@ repository = "https://github.com/BVE-Reborn/rend3"
 license = "MIT OR Apache-2.0 OR Zlib"
 keywords = ["3d", "graphics", "gltf", "loading", "rend3"]
 categories = ["game-development", "graphics", "parser-implementations", "rendering", "rendering::engine"]
+rust-version = "1.57"
 
 [features]
 default = ["ddsfile", "ktx2"]
