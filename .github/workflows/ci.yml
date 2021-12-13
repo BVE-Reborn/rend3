@@ -15,25 +15,21 @@ jobs:
     strategy:
       matrix:
         include:
-          # wasm 1.57
-          - name: '1.57 wasm'
+          # wasm
+          - name: 'wasm'
             os: 'ubuntu-latest'
             target: 'wasm32-unknown-unknown'
-            rust_version: '1.57'
 
-          # native 1.57
-          - name: '1.57 linux'
+          # native
+          - name: 'linux'
             os: 'ubuntu-latest'
             target: 'x86_64-unknown-linux-gnu'
-            rust_version: '1.57'
-          - name: '1.57 mac'
+          - name: 'mac'
             os: 'macos-latest'
             target: 'x86_64-apple-darwin'
-            rust_version: '1.57'
-          - name: '1.57 windows'
+          - name: 'windows'
             os: 'windows-latest'
             target: 'x86_64-pc-windows-msvc'
-            rust_version: '1.57'
       fail-fast: false
     runs-on: ${{ matrix.os }}
     name: ${{ matrix.name }}
@@ -46,7 +42,7 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: ${{ matrix.rust_version }}
+          toolchain: '1.57'
           target: ${{ matrix.target }}
           components: clippy
           default: true
