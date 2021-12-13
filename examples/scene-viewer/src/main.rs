@@ -6,13 +6,13 @@ use rend3::{
     util::typedefs::FastHashMap,
     Renderer, RendererMode,
 };
-use rend3_framework::{lock, Mutex};
+use rend3_framework::{lock, AssetPath, Mutex};
 use rend3_routine::SkyboxRoutine;
 use std::{collections::HashMap, future::Future, hash::BuildHasher, path::Path, sync::Arc, time::Duration};
 use wgpu_profiler::GpuTimerScopeResult;
 use winit::{
     event::{DeviceEvent, ElementState, Event, KeyboardInput, MouseButton, WindowEvent},
-    window::WindowBuilder,
+    window::{Fullscreen, WindowBuilder},
 };
 
 mod platform;
@@ -20,7 +20,7 @@ mod platform;
 async fn load_skybox_image(loader: &rend3_framework::AssetLoader, data: &mut Vec<u8>, path: &str) {
     let decoded = image::load_from_memory(
         &loader
-            .get_asset(path)
+            .get_asset(AssetPath::Internal(path))
             .await
             .unwrap_or_else(|e| panic!("Error {}: {}", path, e)),
     )
@@ -58,11 +58,12 @@ async fn load_skybox(
 async fn load_gltf(
     renderer: &Renderer,
     loader: &rend3_framework::AssetLoader,
-    location: String,
+    location: AssetPath<'_>,
 ) -> rend3_gltf::LoadedGltfScene {
     // profiling::scope!("loading gltf");
     let gltf_start = Instant::now();
-    let path = Path::new(&location);
+    let path = loader.get_asset_path(location);
+    let path = Path::new(&*path);
     let parent = path.parent().unwrap();
 
     let parent_str = parent.to_string_lossy();
@@ -70,7 +71,7 @@ async fn load_gltf(
     log::info!("Reading gltf file: {}", path_str);
     let gltf_data = {
         // profiling::scope!("reading gltf file", &path_str);
-        loader.get_asset(&path_str).await.unwrap()
+        loader.get_asset(AssetPath::External(&path_str)).await.unwrap()
     };
 
     let gltf_elapsed = gltf_start.elapsed();
@@ -79,7 +80,7 @@ async fn load_gltf(
         log::info!("Loading resource {}", uri);
         let uri = uri;
         let full_uri = parent_str.clone() + "/" + uri.as_str();
-        loader.get_asset(&full_uri).await
+        loader.get_asset(AssetPath::External(&full_uri)).await
     })
     .await
     .unwrap();
@@ -140,6 +141,9 @@ struct SceneViewer {
     desired_device_name: Option<String>,
     desired_mode: Option<RendererMode>,
     file_to_load: Option<String>,
+    walk_speed: f32,
+
+    fullscreen: bool,
 
     directional_light_handle: Option<DirectionalLightHandle>,
 
@@ -166,6 +170,8 @@ impl SceneViewer {
             .map(|s: String| s.to_lowercase());
         let desired_mode = args.value_from_fn(["-m", "--mode"], extract_mode).ok();
         let file_to_load: Option<String> = args.free_from_str().ok();
+        let fullscreen = args.contains("--fullscreen");
+        let walk_speed = args.value_from_str("--walk").unwrap_or(10.0_f32);
 
         Self {
             absolute_mouse,
@@ -173,6 +179,9 @@ impl SceneViewer {
             desired_device_name,
             desired_mode,
             file_to_load,
+            walk_speed,
+
+            fullscreen,
 
             directional_light_handle: None,
 
@@ -245,7 +254,9 @@ impl rend3_framework::App for SceneViewer {
                 load_gltf(
                     &renderer,
                     &loader,
-                    file_to_load.unwrap_or_else(|| "/default-scene/scene.gltf".to_owned()),
+                    file_to_load
+                        .as_deref()
+                        .map_or_else(|| AssetPath::Internal("/default-scene/scene.gltf"), AssetPath::External),
                 )
                 .await,
             ));
@@ -297,7 +308,7 @@ impl rend3_framework::App for SceneViewer {
                 let velocity = if button_pressed(&self.scancode_status, platform::Scancodes::SHIFT) {
                     50.0
                 } else {
-                    10.0
+                    self.walk_speed
                 };
                 if button_pressed(&self.scancode_status, platform::Scancodes::W) {
                     self.camera_location += forward * velocity * delta_time.as_secs_f32();
@@ -470,8 +481,11 @@ fn main() {
     let _guard = _rt.enter();
 
     let app = SceneViewer::new();
-    rend3_framework::start(
-        app,
-        WindowBuilder::new().with_title("scene-viewer").with_maximized(true),
-    );
+
+    let mut builder = WindowBuilder::new().with_title("scene-viewer").with_maximized(true);
+    if app.fullscreen {
+        builder = builder.with_fullscreen(Some(Fullscreen::Borderless(None)));
+    }
+
+    rend3_framework::start(app, builder);
 }

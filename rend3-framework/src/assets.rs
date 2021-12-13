@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use rend3::util::typedefs::SsoString;
 use thiserror::Error;
 
@@ -25,6 +27,19 @@ pub enum AssetError {
     },
 }
 
+pub enum AssetPath<'a> {
+    Internal(&'a str),
+    External(&'a str),
+}
+impl<'a> AssetPath<'a> {
+    fn get_path(self, base: &str) -> Cow<'a, str> {
+        match self {
+            Self::Internal(p) => Cow::Owned(base.to_owned() + p),
+            Self::External(p) => Cow::Borrowed(p),
+        }
+    }
+}
+
 pub struct AssetLoader {
     base: SsoString,
 }
@@ -43,26 +58,33 @@ impl AssetLoader {
         }
     }
 
+    pub fn get_asset_path<'a>(&self, path: AssetPath<'a>) -> Cow<'a, str> {
+        path.get_path(&self.base)
+    }
+
     #[cfg(not(target_arch = "wasm32"))]
-    pub async fn get_asset(&self, path: &str) -> Result<Vec<u8>, AssetError> {
-        let full_path = self.base.clone() + path;
-        Ok(std::fs::read(&*full_path).map_err(|error| AssetError::FileError { path: full_path, error })?)
+    pub async fn get_asset(&self, path: AssetPath<'_>) -> Result<Vec<u8>, AssetError> {
+        let full_path = path.get_path(&self.base);
+        Ok(std::fs::read(&*full_path).map_err(|error| AssetError::FileError {
+            path: SsoString::from(full_path),
+            error,
+        })?)
     }
 
     #[cfg(target_arch = "wasm32")]
-    pub async fn get_asset(&self, path: &str) -> Result<Vec<u8>, AssetError> {
-        let full_path = self.base.clone() + path;
+    pub async fn get_asset(&self, path: AssetPath<'_>) -> Result<Vec<u8>, AssetError> {
+        let full_path = path.get_path(&self.base);
         let response = reqwest::get(&*full_path)
             .await
             .map_err(|error| AssetError::NetworkError {
-                path: full_path.clone(),
+                path: SsoString::from(&*full_path),
                 error,
             })?;
 
         let status = response.status();
         if !status.is_success() {
             return Err(AssetError::NetworkStatusError {
-                path: full_path.clone(),
+                path: SsoString::from(&*full_path),
                 status,
             });
         }
@@ -70,7 +92,10 @@ impl AssetLoader {
         Ok(response
             .bytes()
             .await
-            .map_err(|error| AssetError::NetworkError { path: full_path, error })?
+            .map_err(|error| AssetError::NetworkError {
+                path: SsoString::from(&*full_path),
+                error,
+            })?
             .to_vec())
     }
 }
