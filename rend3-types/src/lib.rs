@@ -406,7 +406,6 @@ impl MeshBuilder {
     /// All others will be filled with defaults.
     pub fn build(self) -> Result<Mesh, MeshValidationError> {
         let length = self.vertex_count;
-        debug_assert_ne!(length, 0, "Length should be guarded by validation");
 
         let has_normals = self.vertex_normals.is_some();
         let has_tangents = self.vertex_tangents.is_some();
@@ -491,10 +490,6 @@ impl Mesh {
         let position_length = self.vertex_positions.len();
         let indices_length = self.indices.len();
 
-        if position_length == 0 {
-            return Err(MeshValidationError::ZeroVertices);
-        }
-
         if position_length > MAX_VERTEX_COUNT {
             return Err(MeshValidationError::ExceededMaxVertexCount { count: position_length });
         }
@@ -516,10 +511,6 @@ impl Mesh {
                 actual: len,
                 expected: position_length,
             });
-        }
-
-        if indices_length == 0 {
-            return Err(MeshValidationError::ZeroIndices);
         }
 
         if indices_length % 3 != 0 {

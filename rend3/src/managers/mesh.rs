@@ -109,6 +109,18 @@ impl MeshManager {
         let vertex_count = mesh.vertex_positions.len();
         let index_count = mesh.indices.len();
 
+        // If vertex_count is 0, index_count _must_ also be 0, as all indices would be out of range.
+        if index_count == 0 {
+            let mesh = InternalMesh {
+                vertex_range: 0..0,
+                index_range: 0..0,
+                bounding_sphere: BoundingSphere::from_mesh(&[]),
+            };
+
+            self.registry.insert(handle, mesh);
+            return;
+        }
+
         let mut vertex_range = self.vertex_alloc.allocate_range(vertex_count).ok();
         let mut index_range = self.index_alloc.allocate_range(index_count).ok();
 
@@ -194,6 +206,9 @@ impl MeshManager {
         let vertex_alloc = &mut self.vertex_alloc;
         let index_alloc = &mut self.index_alloc;
         self.registry.remove_all_dead(|_, _, mesh| {
+            if mesh.vertex_range.is_empty() {
+                return;
+            }
             vertex_alloc.free_range(mesh.vertex_range);
             index_alloc.free_range(mesh.index_range);
         });
@@ -228,6 +243,10 @@ impl MeshManager {
         let mut new_index_alloc = RangeAllocator::new(0..new_index_count);
 
         for mesh in self.registry.values_mut() {
+            if mesh.index_range.is_empty() {
+                continue;
+            }
+
             let new_vert_range = new_vert_alloc.allocate_range(mesh.vertex_range.len()).unwrap();
             let new_index_range = new_index_alloc.allocate_range(mesh.index_range.len()).unwrap();
 
