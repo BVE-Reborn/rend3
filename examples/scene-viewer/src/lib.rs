@@ -200,6 +200,7 @@ impl SceneViewer {
     }
 }
 impl rend3_framework::App for SceneViewer {
+    const HANDEDNESS: rend3::types::Handedness = rend3::types::Handedness::Right;
     const DEFAULT_SAMPLE_COUNT: rend3::types::SampleCount = rend3::types::SampleCount::One;
 
     fn create_iad<'a>(

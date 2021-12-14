@@ -1,6 +1,8 @@
 use std::num::NonZeroU8;
 
-use rend3::util::bind_merge::{BindGroupBuilder, BindGroupLayoutBuilder};
+use rend3::{
+    util::bind_merge::{BindGroupBuilder, BindGroupLayoutBuilder},
+};
 use wgpu::{
     AddressMode, BindingType, CompareFunction, Device, FilterMode, Sampler, SamplerBindingType, SamplerDescriptor,
     ShaderStages,
@@ -18,7 +20,11 @@ impl Samplers {
 
         let linear = create_sampler(device, FilterMode::Linear, None);
         let nearest = create_sampler(device, FilterMode::Nearest, None);
-        let shadow = create_sampler(device, FilterMode::Linear, Some(CompareFunction::LessEqual));
+        let shadow = create_sampler(
+            device,
+            FilterMode::Linear,
+            Some(CompareFunction::GreaterEqual),
+        );
 
         Self {
             linear,

@@ -219,7 +219,7 @@ fn shadow(l: &InternalDirectionalLight, user_camera: &CameraManager) -> ArrayVec
 
     let shadow_texel_size = l.inner.distance / SHADOW_DIMENSIONS as f32;
 
-    let origin_view = Mat4::look_at_lh(Vec3::ZERO, l.inner.direction, Vec3::Y);
+    let origin_view = Mat4::look_at_rh(Vec3::ZERO, l.inner.direction, Vec3::Y);
     let camera_origin_view = origin_view.transform_point3(camera_location);
 
     let offset = camera_origin_view.truncate() % shadow_texel_size;
@@ -233,8 +233,9 @@ fn shadow(l: &InternalDirectionalLight, user_camera: &CameraManager) -> ArrayVec
             projection: CameraProjection::Orthographic {
                 size: Vec3A::splat(l.inner.distance),
             },
-            view: Mat4::look_at_lh(new_shadow_location, new_shadow_location + l.inner.direction, Vec3::Y),
+            view: Mat4::look_at_rh(new_shadow_location, new_shadow_location + l.inner.direction, Vec3::Y),
         },
+        user_camera.handedness(),
         None,
     ));
 

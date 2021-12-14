@@ -14,7 +14,7 @@ use crate::{
 };
 use glam::Mat4;
 use parking_lot::{Mutex, RwLock};
-use rend3_types::{Material, MipmapCount, MipmapSource, TextureFormat, TextureFromTexture, TextureUsages};
+use rend3_types::{Handedness, Material, MipmapCount, MipmapSource, TextureFormat, TextureFromTexture, TextureUsages};
 use std::{num::NonZeroU32, panic::Location, sync::Arc};
 use wgpu::{
     util::DeviceExt, CommandBuffer, CommandEncoderDescriptor, Device, DownlevelCapabilities, Extent3d, Features,
@@ -46,6 +46,8 @@ pub struct Renderer {
     pub limits: Limits,
     /// Downlevel limits of the device
     pub downlevel: DownlevelCapabilities,
+    /// Handedness of all parts of this renderer.
+    pub handedness: Handedness,
 
     /// Position and settings of the camera.
     pub camera_manager: RwLock<CameraManager>,
@@ -79,9 +81,10 @@ impl Renderer {
     /// The aspect ratio is that of the window. This automatically configures the camera. If None is passed, an aspect ratio of 1.0 is assumed.
     pub fn new(
         iad: InstanceAdapterDevice,
+        handedness: Handedness,
         aspect_ratio: Option<f32>,
     ) -> Result<Arc<Self>, RendererInitializationError> {
-        setup::create_renderer(iad, aspect_ratio)
+        setup::create_renderer(iad, handedness, aspect_ratio)
     }
 
     /// Adds a 3D mesh to the renderer. This doesn't instantiate it to world. To show this in the world, you need to create an [`Object`] using this mesh.
