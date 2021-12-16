@@ -31,6 +31,7 @@ pub struct BuildDepthPassShaderArgs<'a> {
 
     pub samples: SampleCount,
     pub ty: DepthPassType,
+    pub unclipped_depth_supported: bool
 }
 
 #[derive(Clone)]
@@ -147,7 +148,7 @@ fn create_depth_inner(
                 DepthPassType::Shadow => Face::Front,
                 DepthPassType::Prepass => Face::Back,
             }),
-            unclipped_depth: matches!(args.ty, DepthPassType::Shadow),
+            unclipped_depth: matches!(args.ty, DepthPassType::Shadow) && args.unclipped_depth_supported,
             polygon_mode: PolygonMode::Fill,
             conservative: false,
         },

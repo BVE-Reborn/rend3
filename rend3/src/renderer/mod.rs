@@ -16,11 +16,7 @@ use glam::Mat4;
 use parking_lot::{Mutex, RwLock};
 use rend3_types::{Material, MipmapCount, MipmapSource, TextureFormat, TextureFromTexture, TextureUsages};
 use std::{num::NonZeroU32, panic::Location, sync::Arc};
-use wgpu::{
-    util::DeviceExt, CommandBuffer, CommandEncoderDescriptor, Device, Extent3d, ImageCopyTexture, ImageDataLayout,
-    Origin3d, Queue, TextureAspect, TextureDescriptor, TextureDimension, TextureSampleType, TextureViewDescriptor,
-    TextureViewDimension,
-};
+use wgpu::{CommandBuffer, CommandEncoderDescriptor, Device, DownlevelCapabilities, Extent3d, Features, ImageCopyTexture, ImageDataLayout, Limits, Origin3d, Queue, TextureAspect, TextureDescriptor, TextureDimension, TextureSampleType, TextureViewDescriptor, TextureViewDimension, util::DeviceExt};
 use wgpu_profiler::GpuProfiler;
 
 pub mod error;
@@ -39,6 +35,13 @@ pub struct Renderer {
     pub queue: Arc<Queue>,
     /// Device all objects will be created with.
     pub device: Arc<Device>,
+
+    /// Features of the device
+    pub features: Features,
+    /// Limits of the device
+    pub limits: Limits,
+    /// Downlevel limits of the device
+    pub downlevel: DownlevelCapabilities,
 
     /// Position and settings of the camera.
     pub camera_manager: RwLock<CameraManager>,

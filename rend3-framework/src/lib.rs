@@ -107,7 +107,7 @@ pub trait App<T: 'static = ()> {
         window: &Window,
         renderer: &Arc<rend3::Renderer>,
         routines: &Arc<DefaultRoutines>,
-        surface: &Arc<Surface>,
+        surface: &Option<Arc<Surface>>,
         event: Event<'_, T>,
         control_flow: impl FnOnce(winit::event_loop::ControlFlow),
     ) {
@@ -233,7 +233,7 @@ pub async fn async_start<A: App + 'static>(mut app: A, window_builder: WindowBui
     // We're ready, so lets make things visible
     window.set_visible(true);
 
-    let mut allow_redraw = true;
+    let mut allow_redraw = !cfg!(target_os = "android");
 
     winit_run(event_loop, move |event, _event_loop, control_flow| {
         let event = match event {
@@ -267,7 +267,7 @@ pub async fn async_start<A: App + 'static>(mut app: A, window_builder: WindowBui
             &window,
             &renderer,
             &routines,
-            surface.as_ref().unwrap(),
+            &surface,
             event,
             |c: ControlFlow| {
                 *control_flow = c;
