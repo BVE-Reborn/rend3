@@ -17,4 +17,4 @@ egui_wgpu_backend = { version = "0.14.0", git = "https://github.com/hasenbanck/e
 epi = "0.15.0"
 glam = "0.20.0"
 rend3 = { version = "^0.2.0", path = "../rend3" }
-wgpu = "0.11"
+wgpu = { version = "0.11", git = "https://github.com/gfx-rs/wgpu.git", rev = "f42342bbbfd9d7ebd61745acccc0669fc0e064d2" }

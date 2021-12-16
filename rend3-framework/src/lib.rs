@@ -2,9 +2,10 @@ use std::{future::Future, pin::Pin, sync::Arc};
 
 use glam::UVec2;
 use rend3::{
-    types::{SampleCount, Surface},
+    types::{SampleCount, Surface, TextureFormat},
     InstanceAdapterDevice, Renderer,
 };
+use wgpu::Instance;
 use winit::{
     dpi::PhysicalSize,
     event::WindowEvent,
@@ -94,10 +95,9 @@ pub trait App<T: 'static = ()> {
         window: &Window,
         renderer: &Arc<Renderer>,
         routines: &Arc<DefaultRoutines>,
-        surface: &Arc<Surface>,
         surface_format: rend3::types::TextureFormat,
     ) {
-        let _ = (window, renderer, routines, surface, surface_format);
+        let _ = (window, renderer, routines, surface_format);
     }
 
     /// RedrawRequested/RedrawEventsCleared will only be fired if the window size is non-zero. As such you should always render
@@ -180,22 +180,35 @@ pub async fn async_start<A: App + 'static>(mut app: A, window_builder: WindowBui
     let iad = app.create_iad().await.unwrap();
 
     // The one line of unsafe needed. We just need to guarentee that the window outlives the use of the surface.
-    let surface = Arc::new(unsafe { iad.instance.create_surface(&window) });
+    //
+    // Android has to defer the surface until `Resumed` is fired. This doesn't fire on other platforms though :|
+    let mut surface = if cfg!(target_os = "android") {
+        None
+    } else {
+        Some(Arc::new(unsafe { iad.instance.create_surface(&window) }))
+    };
 
     // Make us a renderer.
     let renderer =
         rend3::Renderer::new(iad.clone(), Some(window_size.width as f32 / window_size.height as f32)).unwrap();
 
     // Get the preferred format for the surface.
-    let format = surface.get_preferred_format(&iad.adapter).unwrap();
-    // Configure the surface to be ready for rendering.
-    rend3::configure_surface(
-        &surface,
-        &iad.device,
-        format,
-        glam::UVec2::new(window_size.width, window_size.height),
-        rend3::types::PresentMode::Mailbox,
-    );
+    //
+    // Assume android supports Rgba8Srgb, as it has 100% device coverage
+    let format = surface.as_ref().map_or(TextureFormat::Rgba8UnormSrgb, |s| {
+        let format = s.get_preferred_format(&iad.adapter).unwrap();
+
+        // Configure the surface to be ready for rendering.
+        rend3::configure_surface(
+            s,
+            &iad.device,
+            format,
+            glam::UVec2::new(window_size.width, window_size.height),
+            rend3::types::PresentMode::Mailbox,
+        );
+
+        format
+    });
 
     // Create the pbr pipeline with the same internal resolution and 4x multisampling
     let render_texture_options = rend3_routine::RenderTextureOptions {
@@ -212,7 +225,7 @@ pub async fn async_start<A: App + 'static>(mut app: A, window_builder: WindowBui
         )),
     });
 
-    app.setup(&window, &renderer, &routines, &surface, format);
+    app.setup(&window, &renderer, &routines, format);
 
     #[cfg(target_arch = "wasm32")]
     let _observer = resize_observer::ResizeObserver::new(&window, event_loop.create_proxy());
@@ -231,7 +244,16 @@ pub async fn async_start<A: App + 'static>(mut app: A, window_builder: WindowBui
             e => e,
         };
 
-        if let Some(allow) = handle_resize(&app, &event, &surface, &renderer, format, &routines) {
+        if let Some(allow) = handle_surface(
+            &app,
+            &window,
+            &event,
+            &iad.instance,
+            &mut surface,
+            &renderer,
+            format,
+            &routines,
+        ) {
             allow_redraw = allow;
         }
 
@@ -241,54 +263,71 @@ pub async fn async_start<A: App + 'static>(mut app: A, window_builder: WindowBui
             }
         }
 
-        app.handle_event(&window, &renderer, &routines, &surface, event, |c: ControlFlow| {
-            *control_flow = c;
-        })
+        app.handle_event(
+            &window,
+            &renderer,
+            &routines,
+            surface.as_ref().unwrap(),
+            event,
+            |c: ControlFlow| {
+                *control_flow = c;
+            },
+        )
     });
 }
 
-fn handle_resize<A: App, T: 'static>(
+fn handle_surface<A: App, T: 'static>(
     app: &A,
+    window: &Window,
     event: &Event<T>,
-    surface: &Arc<Surface>,
+    instance: &Instance,
+    surface: &mut Option<Arc<Surface>>,
     renderer: &Arc<Renderer>,
     format: rend3::types::TextureFormat,
     routines: &Arc<DefaultRoutines>,
 ) -> Option<bool> {
-    if let Event::WindowEvent {
-        event: winit::event::WindowEvent::Resized(size),
-        ..
-    } = *event
-    {
-        log::debug!("resize {:?}", size);
-        let size = UVec2::new(size.width, size.height);
-
-        if size.x == 0 || size.y == 0 {
-            return Some(false);
+    match *event {
+        Event::Resumed => {
+            *surface = Some(Arc::new(unsafe { instance.create_surface(window) }));
+            Some(true)
         }
+        Event::Suspended => {
+            *surface = None;
+            Some(false)
+        }
+        Event::WindowEvent {
+            event: winit::event::WindowEvent::Resized(size),
+            ..
+        } => {
+            log::debug!("resize {:?}", size);
+            let size = UVec2::new(size.width, size.height);
 
-        // Reconfigure the surface for the new size.
-        rend3::configure_surface(
-            surface,
-            &renderer.device,
-            format,
-            glam::UVec2::new(size.x, size.y),
-            rend3::types::PresentMode::Mailbox,
-        );
-        // Tell the renderer about the new aspect ratio.
-        renderer.set_aspect_ratio(size.x as f32 / size.y as f32);
-        // Resize the internal buffers to the same size as the screen.
-        lock(&routines.pbr).resize(
-            renderer,
-            rend3_routine::RenderTextureOptions {
-                resolution: size,
-                samples: app.sample_count(),
-            },
-        );
-        lock(&routines.tonemapping).resize(size);
-        Some(true)
-    } else {
-        None
+            if size.x == 0 || size.y == 0 {
+                return Some(false);
+            }
+
+            // Reconfigure the surface for the new size.
+            rend3::configure_surface(
+                surface.as_ref().unwrap(),
+                &renderer.device,
+                format,
+                glam::UVec2::new(size.x, size.y),
+                rend3::types::PresentMode::Mailbox,
+            );
+            // Tell the renderer about the new aspect ratio.
+            renderer.set_aspect_ratio(size.x as f32 / size.y as f32);
+            // Resize the internal buffers to the same size as the screen.
+            lock(&routines.pbr).resize(
+                renderer,
+                rend3_routine::RenderTextureOptions {
+                    resolution: size,
+                    samples: app.sample_count(),
+                },
+            );
+            lock(&routines.tonemapping).resize(size);
+            Some(true)
+        }
+        _ => None,
     }
 }
 

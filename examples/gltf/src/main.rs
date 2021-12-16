@@ -63,7 +63,6 @@ impl rend3_framework::App for GltfExample {
         _window: &winit::window::Window,
         renderer: &Arc<rend3::Renderer>,
         _routines: &Arc<rend3_framework::DefaultRoutines>,
-        _surface: &Arc<rend3::types::Surface>,
         _surface_format: rend3::types::TextureFormat,
     ) {
         // Create mesh and calculate smooth normals based on vertices.

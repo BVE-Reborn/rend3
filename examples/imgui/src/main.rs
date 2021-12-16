@@ -24,7 +24,6 @@ impl rend3_framework::App for ImguiExample {
         window: &winit::window::Window,
         renderer: &Arc<rend3::Renderer>,
         _routines: &Arc<rend3_framework::DefaultRoutines>,
-        _surface: &Arc<rend3::types::Surface>,
         surface_format: rend3::types::TextureFormat,
     ) {
         // Set up imgui

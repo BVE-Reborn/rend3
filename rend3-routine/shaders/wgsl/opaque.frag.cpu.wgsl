@@ -19,14 +19,13 @@ struct UniformData {
     ambient: vec4<f32>;
 };
 
-[[block]]
 struct UniformBuffer {
     uniforms: UniformData;
 };
 
 struct CPUMaterialData {
-    uv_transform0: mat3x3<f32>;
-    uv_transform1: mat3x3<f32>;
+    uv_transform0_: mat3x3<f32>;
+    uv_transform1_: mat3x3<f32>;
     albedo: vec4<f32>;
     emissive: vec3<f32>;
     roughness: f32;
@@ -41,7 +40,6 @@ struct CPUMaterialData {
     texture_enable: u32;
 };
 
-[[block]]
 struct TextureData {
     material: CPUMaterialData;
 };
@@ -58,7 +56,6 @@ struct DirectionalLight {
     size: f32;
 };
 
-[[block]]
 struct DirectionalLightBuffer {
     directional_light_header: DirectionalLightBufferHeader;
     directional_lights: [[stride(112)]] array<DirectionalLight>;
@@ -67,11 +64,11 @@ struct DirectionalLightBuffer {
 var<private> i_coords0_1: vec2<f32>;
 [[group(2), binding(0)]]
 var albedo_tex: texture_2d<f32>;
-var<private> i_color1: vec4<f32>;
-var<private> i_normal1: vec3<f32>;
+var<private> i_color_1: vec4<f32>;
+var<private> i_normal_1: vec3<f32>;
 [[group(2), binding(1)]]
 var normal_tex: texture_2d<f32>;
-var<private> i_tangent1: vec3<f32>;
+var<private> i_tangent_1: vec3<f32>;
 [[group(2), binding(2)]]
 var roughness_tex: texture_2d<f32>;
 [[group(2), binding(9)]]
@@ -89,449 +86,449 @@ var emissive_tex: texture_2d<f32>;
 [[group(0), binding(0)]]
 var primary_sampler: sampler;
 [[group(0), binding(3)]]
-var<uniform> global: UniformBuffer;
+var<uniform> unnamed: UniformBuffer;
 [[group(2), binding(10)]]
-var<uniform> global1: TextureData;
+var<uniform> unnamed_1: TextureData;
 var<private> o_color: vec4<f32>;
-var<private> i_view_position1: vec4<f32>;
+var<private> i_view_position_1: vec4<f32>;
 [[group(0), binding(4)]]
-var<storage> global2: DirectionalLightBuffer;
+var<storage> unnamed_2: DirectionalLightBuffer;
 [[group(0), binding(5)]]
 var shadow: texture_depth_2d_array;
 [[group(0), binding(2)]]
 var shadow_sampler: sampler_comparison;
 var<private> i_coords1_1: vec2<f32>;
-var<private> i_material1: u32;
+var<private> i_material_1: u32;
 
-fn main1() {
-    var phi_2380: vec4<f32>;
-    var phi_2378: vec4<f32>;
-    var phi_2382: vec4<f32>;
-    var phi_2381: vec4<f32>;
-    var phi_2383: vec2<f32>;
-    var phi_2384: vec3<f32>;
-    var phi_2385: vec3<f32>;
-    var phi_2512: f32;
-    var phi_2452: f32;
-    var phi_2404: f32;
-    var phi_1574: bool;
-    var phi_2386: vec2<f32>;
-    var phi_2455: f32;
-    var phi_2407: f32;
-    var phi_2514: f32;
-    var phi_2467: f32;
-    var phi_2419: f32;
-    var phi_2520: f32;
-    var phi_2515: f32;
-    var phi_2456: f32;
-    var phi_2408: f32;
-    var phi_2513: f32;
-    var phi_2453: f32;
-    var phi_2405: f32;
-    var phi_2511: f32;
-    var phi_2451: f32;
-    var phi_2403: f32;
-    var phi_2420: f32;
-    var phi_2475: f32;
-    var phi_2422: f32;
-    var phi_2425: f32;
-    var phi_2477: f32;
-    var phi_2447: f32;
-    var phi_2498: f32;
-    var phi_2478: f32;
-    var phi_2426: f32;
-    var phi_2476: f32;
-    var phi_2423: f32;
-    var phi_2474: f32;
-    var phi_2421: f32;
-    var phi_2499: f32;
-    var phi_2595: vec3<f32>;
-    var phi_2658: vec3<f32>;
-    var phi_2651: f32;
-    var phi_2627: vec3<f32>;
-    var phi_2599: vec3<f32>;
-    var phi_2588: vec3<f32>;
-    var phi_2500: f32;
-    var phi_2687: vec3<f32>;
-    var phi_2686: u32;
-    var phi_1222: bool;
-    var phi_1229: bool;
-    var phi_1236: bool;
-    var phi_1244: bool;
-    var phi_1251: bool;
-    var phi_2694: f32;
+fn main_1() {
+    var phi_2380_: vec4<f32>;
+    var phi_2378_: vec4<f32>;
+    var phi_2382_: vec4<f32>;
+    var phi_2381_: vec4<f32>;
+    var phi_2383_: vec2<f32>;
+    var phi_2384_: vec3<f32>;
+    var phi_2385_: vec3<f32>;
+    var phi_2512_: f32;
+    var phi_2452_: f32;
+    var phi_2404_: f32;
+    var phi_1574_: bool;
+    var phi_2386_: vec2<f32>;
+    var phi_2455_: f32;
+    var phi_2407_: f32;
+    var phi_2514_: f32;
+    var phi_2467_: f32;
+    var phi_2419_: f32;
+    var phi_2520_: f32;
+    var phi_2515_: f32;
+    var phi_2456_: f32;
+    var phi_2408_: f32;
+    var phi_2513_: f32;
+    var phi_2453_: f32;
+    var phi_2405_: f32;
+    var phi_2511_: f32;
+    var phi_2451_: f32;
+    var phi_2403_: f32;
+    var phi_2420_: f32;
+    var phi_2475_: f32;
+    var phi_2422_: f32;
+    var phi_2425_: f32;
+    var phi_2477_: f32;
+    var phi_2447_: f32;
+    var phi_2498_: f32;
+    var phi_2478_: f32;
+    var phi_2426_: f32;
+    var phi_2476_: f32;
+    var phi_2423_: f32;
+    var phi_2474_: f32;
+    var phi_2421_: f32;
+    var phi_2499_: f32;
+    var phi_2595_: vec3<f32>;
+    var phi_2658_: vec3<f32>;
+    var phi_2651_: f32;
+    var phi_2627_: vec3<f32>;
+    var phi_2599_: vec3<f32>;
+    var phi_2588_: vec3<f32>;
+    var phi_2500_: f32;
+    var phi_2687_: vec3<f32>;
+    var phi_2686_: u32;
+    var phi_1222_: bool;
+    var phi_1229_: bool;
+    var phi_1236_: bool;
+    var phi_1244_: bool;
+    var phi_1251_: bool;
+    var phi_2694_: f32;
     var local: vec3<f32>;
-    var local1: vec3<f32>;
-    var local2: vec3<f32>;
-    var local3: vec3<f32>;
+    var local_1: vec3<f32>;
+    var local_2: vec3<f32>;
+    var local_3: vec3<f32>;
 
-    let e92: mat3x3<f32> = global1.material.uv_transform0;
-    let e94: vec4<f32> = global1.material.albedo;
-    let e96: vec3<f32> = global1.material.emissive;
-    let e98: f32 = global1.material.roughness;
-    let e100: f32 = global1.material.metallic;
-    let e102: f32 = global1.material.reflectance;
-    let e104: f32 = global1.material.clear_coat;
-    let e106: f32 = global1.material.clear_coat_roughness;
-    let e108: f32 = global1.material.ambient_occlusion;
-    let e110: u32 = global1.material.material_flags;
-    let e112: u32 = global1.material.texture_enable;
-    let e113: vec2<f32> = i_coords0_1;
-    let e117: vec3<f32> = (e92 * vec3<f32>(e113.x, e113.y, 1.0));
-    let e120: vec2<f32> = vec2<f32>(e117.x, e117.y);
-    let e121: vec2<f32> = dpdx(e120);
-    let e122: vec2<f32> = dpdy(e120);
-    if ((bitcast<i32>((e110 & 1u)) != bitcast<i32>(0u))) {
-        if ((bitcast<i32>(((e112 >> bitcast<u32>(0)) & 1u)) != bitcast<i32>(0u))) {
-            let e133: vec4<f32> = textureSampleGrad(albedo_tex, primary_sampler, e120, e121, e122);
-            phi_2380 = e133;
+    let _e92 = unnamed_1.material.uv_transform0_;
+    let _e94 = unnamed_1.material.albedo;
+    let _e96 = unnamed_1.material.emissive;
+    let _e98 = unnamed_1.material.roughness;
+    let _e100 = unnamed_1.material.metallic;
+    let _e102 = unnamed_1.material.reflectance;
+    let _e104 = unnamed_1.material.clear_coat;
+    let _e106 = unnamed_1.material.clear_coat_roughness;
+    let _e108 = unnamed_1.material.ambient_occlusion;
+    let _e110 = unnamed_1.material.material_flags;
+    let _e112 = unnamed_1.material.texture_enable;
+    let _e113 = i_coords0_1;
+    let _e117 = (_e92 * vec3<f32>(_e113.x, _e113.y, 1.0));
+    let _e120 = vec2<f32>(_e117.x, _e117.y);
+    let _e121 = dpdx(_e120);
+    let _e122 = dpdy(_e120);
+    if ((bitcast<bool>((_e110 & 1u)) != bitcast<bool>(0u))) {
+        if ((bitcast<bool>(((_e112 >> bitcast<u32>(0)) & 1u)) != bitcast<bool>(0u))) {
+            let _e133 = textureSampleGrad(albedo_tex, primary_sampler, _e120, _e121, _e122);
+            phi_2380_ = _e133;
         } else {
-            phi_2380 = vec4<f32>(1.0, 1.0, 1.0, 1.0);
+            phi_2380_ = vec4<f32>(1.0, 1.0, 1.0, 1.0);
         }
-        let e135: vec4<f32> = phi_2380;
-        phi_2382 = e135;
-        if ((bitcast<i32>((e110 & 2u)) != bitcast<i32>(0u))) {
-            let e140: vec4<f32> = i_color1;
-            phi_2378 = e140;
-            if ((bitcast<i32>((e110 & 4u)) != bitcast<i32>(0u))) {
-                let e145: vec3<f32> = e140.xyz;
-                let e152: vec3<f32> = mix((e145 * vec3<f32>(0.07739938050508499, 0.07739938050508499, 0.07739938050508499)), pow(((e145 + vec3<f32>(0.054999999701976776, 0.054999999701976776, 0.054999999701976776)) * vec3<f32>(0.9478673338890076, 0.9478673338890076, 0.9478673338890076)), vec3<f32>(2.4000000953674316, 2.4000000953674316, 2.4000000953674316)), ceil((e145 - vec3<f32>(0.040449999272823334, 0.040449999272823334, 0.040449999272823334))));
-                phi_2378 = vec4<f32>(e152.x, e152.y, e152.z, e140.w);
+        let _e135 = phi_2380_;
+        phi_2382_ = _e135;
+        if ((bitcast<bool>((_e110 & 2u)) != bitcast<bool>(0u))) {
+            let _e140 = i_color_1;
+            phi_2378_ = _e140;
+            if ((bitcast<bool>((_e110 & 4u)) != bitcast<bool>(0u))) {
+                let _e145 = _e140.xyz;
+                let _e152 = mix((_e145 * vec3<f32>(0.07739938050508499, 0.07739938050508499, 0.07739938050508499)), pow(((_e145 + vec3<f32>(0.054999999701976776, 0.054999999701976776, 0.054999999701976776)) * vec3<f32>(0.9478673338890076, 0.9478673338890076, 0.9478673338890076)), vec3<f32>(2.4000000953674316, 2.4000000953674316, 2.4000000953674316)), ceil((_e145 - vec3<f32>(0.040449999272823334, 0.040449999272823334, 0.040449999272823334))));
+                phi_2378_ = vec4<f32>(_e152.x, _e152.y, _e152.z, _e140.w);
             }
-            let e159: vec4<f32> = phi_2378;
-            phi_2382 = (e135 * e159);
+            let _e159 = phi_2378_;
+            phi_2382_ = (_e135 * _e159);
         }
-        let e162: vec4<f32> = phi_2382;
-        phi_2381 = e162;
+        let _e162 = phi_2382_;
+        phi_2381_ = _e162;
     } else {
-        phi_2381 = vec4<f32>(0.0, 0.0, 0.0, 1.0);
+        phi_2381_ = vec4<f32>(0.0, 0.0, 0.0, 1.0);
     }
-    let e164: vec4<f32> = phi_2381;
-    let e165: vec4<f32> = (e164 * e94);
-    if ((bitcast<i32>((e110 & 4096u)) != bitcast<i32>(0u))) {
-        let e170: vec3<f32> = i_normal1;
-        phi_2658 = vec3<f32>(0.0, 0.0, 0.0);
-        phi_2651 = 0.0;
-        phi_2627 = normalize(e170);
-        phi_2599 = vec3<f32>(0.0, 0.0, 0.0);
-        phi_2588 = vec3<f32>(0.0, 0.0, 0.0);
-        phi_2500 = 0.0;
+    let _e164 = phi_2381_;
+    let _e165 = (_e164 * _e94);
+    if ((bitcast<bool>((_e110 & 4096u)) != bitcast<bool>(0u))) {
+        let _e170 = i_normal_1;
+        phi_2658_ = vec3<f32>(0.0, 0.0, 0.0);
+        phi_2651_ = 0.0;
+        phi_2627_ = normalize(_e170);
+        phi_2599_ = vec3<f32>(0.0, 0.0, 0.0);
+        phi_2588_ = vec3<f32>(0.0, 0.0, 0.0);
+        phi_2500_ = 0.0;
     } else {
-        if ((bitcast<i32>(((e112 >> bitcast<u32>(1)) & 1u)) != bitcast<i32>(0u))) {
-            let e178: vec4<f32> = textureSampleGrad(normal_tex, primary_sampler, e120, e121, e122);
-            if ((bitcast<i32>((e110 & 8u)) != bitcast<i32>(0u))) {
-                if ((bitcast<i32>((e110 & 16u)) != bitcast<i32>(0u))) {
-                    phi_2383 = e178.wy;
+        if ((bitcast<bool>(((_e112 >> bitcast<u32>(1)) & 1u)) != bitcast<bool>(0u))) {
+            let _e178 = textureSampleGrad(normal_tex, primary_sampler, _e120, _e121, _e122);
+            if ((bitcast<bool>((_e110 & 8u)) != bitcast<bool>(0u))) {
+                if ((bitcast<bool>((_e110 & 16u)) != bitcast<bool>(0u))) {
+                    phi_2383_ = _e178.wy;
                 } else {
-                    phi_2383 = e178.xy;
+                    phi_2383_ = _e178.xy;
                 }
-                let e190: vec2<f32> = phi_2383;
-                let e192: vec2<f32> = ((e190 * 2.0) - vec2<f32>(1.0, 1.0));
-                phi_2384 = vec3<f32>(e192.x, e192.y, sqrt(((1.0 - (e192.x * e192.x)) - (e192.y * e192.y))));
+                let _e190 = phi_2383_;
+                let _e192 = ((_e190 * 2.0) - vec2<f32>(1.0, 1.0));
+                phi_2384_ = vec3<f32>(_e192.x, _e192.y, sqrt(((1.0 - (_e192.x * _e192.x)) - (_e192.y * _e192.y))));
             } else {
-                phi_2384 = normalize(((e178.xyz * 2.0) - vec3<f32>(1.0, 1.0, 1.0)));
+                phi_2384_ = normalize(((_e178.xyz * 2.0) - vec3<f32>(1.0, 1.0, 1.0)));
             }
-            let e206: vec3<f32> = phi_2384;
-            let e207: vec3<f32> = i_normal1;
-            let e209: vec3<f32> = i_tangent1;
-            phi_2385 = (mat3x3<f32>(e209, cross(normalize(e207), normalize(e209)), e207) * e206);
+            let _e206 = phi_2384_;
+            let _e207 = i_normal_1;
+            let _e209 = i_tangent_1;
+            phi_2385_ = (mat3x3<f32>(_e209, cross(normalize(_e207), normalize(_e209)), _e207) * _e206);
         } else {
-            let e214: vec3<f32> = i_normal1;
-            phi_2385 = e214;
+            let _e214 = i_normal_1;
+            phi_2385_ = _e214;
         }
-        let e216: vec3<f32> = phi_2385;
-        if ((bitcast<i32>((e110 & 32u)) != bitcast<i32>(0u))) {
-            if ((bitcast<i32>(((e112 >> bitcast<u32>(2)) & 1u)) != bitcast<i32>(0u))) {
-                let e228: vec4<f32> = textureSampleGrad(roughness_tex, primary_sampler, e120, e121, e122);
-                phi_2512 = (e108 * e228.x);
-                phi_2452 = (e98 * e228.z);
-                phi_2404 = (e100 * e228.y);
+        let _e216 = phi_2385_;
+        if ((bitcast<bool>((_e110 & 32u)) != bitcast<bool>(0u))) {
+            if ((bitcast<bool>(((_e112 >> bitcast<u32>(2)) & 1u)) != bitcast<bool>(0u))) {
+                let _e228 = textureSampleGrad(roughness_tex, primary_sampler, _e120, _e121, _e122);
+                phi_2512_ = (_e108 * _e228.x);
+                phi_2452_ = (_e98 * _e228.z);
+                phi_2404_ = (_e100 * _e228.y);
             } else {
-                phi_2512 = e108;
-                phi_2452 = e98;
-                phi_2404 = e100;
+                phi_2512_ = _e108;
+                phi_2452_ = _e98;
+                phi_2404_ = _e100;
             }
-            let e236: f32 = phi_2512;
-            let e238: f32 = phi_2452;
-            let e240: f32 = phi_2404;
-            phi_2511 = e236;
-            phi_2451 = e238;
-            phi_2403 = e240;
+            let _e236 = phi_2512_;
+            let _e238 = phi_2452_;
+            let _e240 = phi_2404_;
+            phi_2511_ = _e236;
+            phi_2451_ = _e238;
+            phi_2403_ = _e240;
         } else {
-            let e244: bool = (bitcast<i32>((e110 & 64u)) != bitcast<i32>(0u));
-            phi_1574 = e244;
-            if (!(e244)) {
-                phi_1574 = (bitcast<i32>((e110 & 128u)) != bitcast<i32>(0u));
+            let _e244 = (bitcast<bool>((_e110 & 64u)) != bitcast<bool>(0u));
+            phi_1574_ = _e244;
+            if (!(_e244)) {
+                phi_1574_ = (bitcast<bool>((_e110 & 128u)) != bitcast<bool>(0u));
             }
-            let e251: bool = phi_1574;
-            if (e251) {
-                if ((bitcast<i32>(((e112 >> bitcast<u32>(2)) & 1u)) != bitcast<i32>(0u))) {
-                    let e258: vec4<f32> = textureSampleGrad(roughness_tex, primary_sampler, e120, e121, e122);
-                    if (e244) {
-                        phi_2386 = e258.yz;
+            let _e251 = phi_1574_;
+            if (_e251) {
+                if ((bitcast<bool>(((_e112 >> bitcast<u32>(2)) & 1u)) != bitcast<bool>(0u))) {
+                    let _e258 = textureSampleGrad(roughness_tex, primary_sampler, _e120, _e121, _e122);
+                    if (_e244) {
+                        phi_2386_ = _e258.yz;
                     } else {
-                        phi_2386 = e258.xy;
+                        phi_2386_ = _e258.xy;
                     }
-                    let e262: vec2<f32> = phi_2386;
-                    phi_2455 = (e98 * e262.y);
-                    phi_2407 = (e100 * e262.x);
+                    let _e262 = phi_2386_;
+                    phi_2455_ = (_e98 * _e262.y);
+                    phi_2407_ = (_e100 * _e262.x);
                 } else {
-                    phi_2455 = e108;
-                    phi_2407 = e100;
+                    phi_2455_ = _e108;
+                    phi_2407_ = _e100;
                 }
-                let e268: f32 = phi_2455;
-                let e270: f32 = phi_2407;
-                if ((bitcast<i32>(((e112 >> bitcast<u32>(9)) & 1u)) != bitcast<i32>(0u))) {
-                    let e277: vec4<f32> = textureSampleGrad(ambient_occlusion_tex, primary_sampler, e120, e121, e122);
-                    phi_2514 = (e108 * e277.x);
+                let _e268 = phi_2455_;
+                let _e270 = phi_2407_;
+                if ((bitcast<bool>(((_e112 >> bitcast<u32>(9)) & 1u)) != bitcast<bool>(0u))) {
+                    let _e277 = textureSampleGrad(ambient_occlusion_tex, primary_sampler, _e120, _e121, _e122);
+                    phi_2514_ = (_e108 * _e277.x);
                 } else {
-                    phi_2514 = e108;
+                    phi_2514_ = _e108;
                 }
-                let e281: f32 = phi_2514;
-                phi_2513 = e281;
-                phi_2453 = e268;
-                phi_2405 = e270;
+                let _e281 = phi_2514_;
+                phi_2513_ = _e281;
+                phi_2453_ = _e268;
+                phi_2405_ = _e270;
             } else {
-                phi_2515 = 0.0;
-                phi_2456 = 0.0;
-                phi_2408 = 0.0;
-                if ((bitcast<i32>((e110 & 256u)) != bitcast<i32>(0u))) {
-                    if ((bitcast<i32>(((e112 >> bitcast<u32>(2)) & 1u)) != bitcast<i32>(0u))) {
-                        let e292: vec4<f32> = textureSampleGrad(roughness_tex, primary_sampler, e120, e121, e122);
-                        phi_2467 = (e98 * e292.x);
+                phi_2515_ = 0.0;
+                phi_2456_ = 0.0;
+                phi_2408_ = 0.0;
+                if ((bitcast<bool>((_e110 & 256u)) != bitcast<bool>(0u))) {
+                    if ((bitcast<bool>(((_e112 >> bitcast<u32>(2)) & 1u)) != bitcast<bool>(0u))) {
+                        let _e292 = textureSampleGrad(roughness_tex, primary_sampler, _e120, _e121, _e122);
+                        phi_2467_ = (_e98 * _e292.x);
                     } else {
-                        phi_2467 = e98;
+                        phi_2467_ = _e98;
                     }
-                    let e296: f32 = phi_2467;
-                    if ((bitcast<i32>(((e112 >> bitcast<u32>(3)) & 1u)) != bitcast<i32>(0u))) {
-                        let e303: vec4<f32> = textureSampleGrad(metallic_tex, primary_sampler, e120, e121, e122);
-                        phi_2419 = (e100 * e303.x);
+                    let _e296 = phi_2467_;
+                    if ((bitcast<bool>(((_e112 >> bitcast<u32>(3)) & 1u)) != bitcast<bool>(0u))) {
+                        let _e303 = textureSampleGrad(metallic_tex, primary_sampler, _e120, _e121, _e122);
+                        phi_2419_ = (_e100 * _e303.x);
                     } else {
-                        phi_2419 = e100;
+                        phi_2419_ = _e100;
                     }
-                    let e307: f32 = phi_2419;
-                    if ((bitcast<i32>(((e112 >> bitcast<u32>(9)) & 1u)) != bitcast<i32>(0u))) {
-                        let e314: vec4<f32> = textureSampleGrad(ambient_occlusion_tex, primary_sampler, e120, e121, e122);
-                        phi_2520 = (e108 * e314.x);
+                    let _e307 = phi_2419_;
+                    if ((bitcast<bool>(((_e112 >> bitcast<u32>(9)) & 1u)) != bitcast<bool>(0u))) {
+                        let _e314 = textureSampleGrad(ambient_occlusion_tex, primary_sampler, _e120, _e121, _e122);
+                        phi_2520_ = (_e108 * _e314.x);
                     } else {
-                        phi_2520 = e108;
+                        phi_2520_ = _e108;
                     }
-                    let e318: f32 = phi_2520;
-                    phi_2515 = e318;
-                    phi_2456 = e296;
-                    phi_2408 = e307;
+                    let _e318 = phi_2520_;
+                    phi_2515_ = _e318;
+                    phi_2456_ = _e296;
+                    phi_2408_ = _e307;
                 }
-                let e320: f32 = phi_2515;
-                let e322: f32 = phi_2456;
-                let e324: f32 = phi_2408;
-                phi_2513 = e320;
-                phi_2453 = e322;
-                phi_2405 = e324;
+                let _e320 = phi_2515_;
+                let _e322 = phi_2456_;
+                let _e324 = phi_2408_;
+                phi_2513_ = _e320;
+                phi_2453_ = _e322;
+                phi_2405_ = _e324;
             }
-            let e326: f32 = phi_2513;
-            let e328: f32 = phi_2453;
-            let e330: f32 = phi_2405;
-            phi_2511 = e326;
-            phi_2451 = e328;
-            phi_2403 = e330;
+            let _e326 = phi_2513_;
+            let _e328 = phi_2453_;
+            let _e330 = phi_2405_;
+            phi_2511_ = _e326;
+            phi_2451_ = _e328;
+            phi_2403_ = _e330;
         }
-        let e332: f32 = phi_2511;
-        let e334: f32 = phi_2451;
-        let e336: f32 = phi_2403;
-        if ((bitcast<i32>(((e112 >> bitcast<u32>(4)) & 1u)) != bitcast<i32>(0u))) {
-            let e343: vec4<f32> = textureSampleGrad(reflectance_tex, primary_sampler, e120, e121, e122);
-            phi_2420 = (e102 * e343.x);
+        let _e332 = phi_2511_;
+        let _e334 = phi_2451_;
+        let _e336 = phi_2403_;
+        if ((bitcast<bool>(((_e112 >> bitcast<u32>(4)) & 1u)) != bitcast<bool>(0u))) {
+            let _e343 = textureSampleGrad(reflectance_tex, primary_sampler, _e120, _e121, _e122);
+            phi_2420_ = (_e102 * _e343.x);
         } else {
-            phi_2420 = e102;
+            phi_2420_ = _e102;
         }
-        let e347: f32 = phi_2420;
-        let e348: vec3<f32> = e165.xyz;
-        let e349: f32 = (1.0 - e336);
-        if ((bitcast<i32>((e110 & 512u)) != bitcast<i32>(0u))) {
-            if ((bitcast<i32>(((e112 >> bitcast<u32>(5)) & 1u)) != bitcast<i32>(0u))) {
-                let e367: vec4<f32> = textureSampleGrad(clear_coat_tex, primary_sampler, e120, e121, e122);
-                phi_2475 = (e106 * e367.y);
-                phi_2422 = (e104 * e367.x);
+        let _e347 = phi_2420_;
+        let _e348 = _e165.xyz;
+        let _e349 = (1.0 - _e336);
+        if ((bitcast<bool>((_e110 & 512u)) != bitcast<bool>(0u))) {
+            if ((bitcast<bool>(((_e112 >> bitcast<u32>(5)) & 1u)) != bitcast<bool>(0u))) {
+                let _e367 = textureSampleGrad(clear_coat_tex, primary_sampler, _e120, _e121, _e122);
+                phi_2475_ = (_e106 * _e367.y);
+                phi_2422_ = (_e104 * _e367.x);
             } else {
-                phi_2475 = e106;
-                phi_2422 = e104;
+                phi_2475_ = _e106;
+                phi_2422_ = _e104;
             }
-            let e373: f32 = phi_2475;
-            let e375: f32 = phi_2422;
-            phi_2474 = e373;
-            phi_2421 = e375;
+            let _e373 = phi_2475_;
+            let _e375 = phi_2422_;
+            phi_2474_ = _e373;
+            phi_2421_ = _e375;
         } else {
-            if ((bitcast<i32>((e110 & 1024u)) != bitcast<i32>(0u))) {
-                if ((bitcast<i32>(((e112 >> bitcast<u32>(5)) & 1u)) != bitcast<i32>(0u))) {
-                    let e386: vec4<f32> = textureSampleGrad(clear_coat_tex, primary_sampler, e120, e121, e122);
-                    phi_2425 = (e104 * e386.x);
+            if ((bitcast<bool>((_e110 & 1024u)) != bitcast<bool>(0u))) {
+                if ((bitcast<bool>(((_e112 >> bitcast<u32>(5)) & 1u)) != bitcast<bool>(0u))) {
+                    let _e386 = textureSampleGrad(clear_coat_tex, primary_sampler, _e120, _e121, _e122);
+                    phi_2425_ = (_e104 * _e386.x);
                 } else {
-                    phi_2425 = e104;
+                    phi_2425_ = _e104;
                 }
-                let e390: f32 = phi_2425;
-                if ((bitcast<i32>(((e112 >> bitcast<u32>(6)) & 1u)) != bitcast<i32>(0u))) {
-                    let e397: vec4<f32> = textureSampleGrad(clear_coat_roughness_tex, primary_sampler, e120, e121, e122);
-                    phi_2477 = (e106 * e397.y);
+                let _e390 = phi_2425_;
+                if ((bitcast<bool>(((_e112 >> bitcast<u32>(6)) & 1u)) != bitcast<bool>(0u))) {
+                    let _e397 = textureSampleGrad(clear_coat_roughness_tex, primary_sampler, _e120, _e121, _e122);
+                    phi_2477_ = (_e106 * _e397.y);
                 } else {
-                    phi_2477 = e106;
+                    phi_2477_ = _e106;
                 }
-                let e401: f32 = phi_2477;
-                phi_2476 = e401;
-                phi_2423 = e390;
+                let _e401 = phi_2477_;
+                phi_2476_ = _e401;
+                phi_2423_ = _e390;
             } else {
-                phi_2478 = 0.0;
-                phi_2426 = 0.0;
-                if ((bitcast<i32>((e110 & 2048u)) != bitcast<i32>(0u))) {
-                    if ((bitcast<i32>(((e112 >> bitcast<u32>(5)) & 1u)) != bitcast<i32>(0u))) {
-                        let e412: vec4<f32> = textureSampleGrad(clear_coat_tex, primary_sampler, e120, e121, e122);
-                        phi_2447 = (e104 * e412.x);
+                phi_2478_ = 0.0;
+                phi_2426_ = 0.0;
+                if ((bitcast<bool>((_e110 & 2048u)) != bitcast<bool>(0u))) {
+                    if ((bitcast<bool>(((_e112 >> bitcast<u32>(5)) & 1u)) != bitcast<bool>(0u))) {
+                        let _e412 = textureSampleGrad(clear_coat_tex, primary_sampler, _e120, _e121, _e122);
+                        phi_2447_ = (_e104 * _e412.x);
                     } else {
-                        phi_2447 = e104;
+                        phi_2447_ = _e104;
                     }
-                    let e416: f32 = phi_2447;
-                    if ((bitcast<i32>(((e112 >> bitcast<u32>(6)) & 1u)) != bitcast<i32>(0u))) {
-                        let e423: vec4<f32> = textureSampleGrad(clear_coat_roughness_tex, primary_sampler, e120, e121, e122);
-                        phi_2498 = (e106 * e423.x);
+                    let _e416 = phi_2447_;
+                    if ((bitcast<bool>(((_e112 >> bitcast<u32>(6)) & 1u)) != bitcast<bool>(0u))) {
+                        let _e423 = textureSampleGrad(clear_coat_roughness_tex, primary_sampler, _e120, _e121, _e122);
+                        phi_2498_ = (_e106 * _e423.x);
                     } else {
-                        phi_2498 = e106;
+                        phi_2498_ = _e106;
                     }
-                    let e427: f32 = phi_2498;
-                    phi_2478 = e427;
-                    phi_2426 = e416;
+                    let _e427 = phi_2498_;
+                    phi_2478_ = _e427;
+                    phi_2426_ = _e416;
                 }
-                let e429: f32 = phi_2478;
-                let e431: f32 = phi_2426;
-                phi_2476 = e429;
-                phi_2423 = e431;
+                let _e429 = phi_2478_;
+                let _e431 = phi_2426_;
+                phi_2476_ = _e429;
+                phi_2423_ = _e431;
             }
-            let e433: f32 = phi_2476;
-            let e435: f32 = phi_2423;
-            phi_2474 = e433;
-            phi_2421 = e435;
+            let _e433 = phi_2476_;
+            let _e435 = phi_2423_;
+            phi_2474_ = _e433;
+            phi_2421_ = _e435;
         }
-        let e437: f32 = phi_2474;
-        let e439: f32 = phi_2421;
-        phi_2499 = e334;
-        if ((e439 != 0.0)) {
-            phi_2499 = mix(e334, max(e334, e437), e439);
+        let _e437 = phi_2474_;
+        let _e439 = phi_2421_;
+        phi_2499_ = _e334;
+        if ((_e439 != 0.0)) {
+            phi_2499_ = mix(_e334, max(_e334, _e437), _e439);
         }
-        let e444: f32 = phi_2499;
-        if ((bitcast<i32>(((e112 >> bitcast<u32>(7)) & 1u)) != bitcast<i32>(0u))) {
-            let e452: vec4<f32> = textureSampleGrad(emissive_tex, primary_sampler, e120, e121, e122);
-            phi_2595 = (e96 * e452.xyz);
+        let _e444 = phi_2499_;
+        if ((bitcast<bool>(((_e112 >> bitcast<u32>(7)) & 1u)) != bitcast<bool>(0u))) {
+            let _e452 = textureSampleGrad(emissive_tex, primary_sampler, _e120, _e121, _e122);
+            phi_2595_ = (_e96 * _e452.xyz);
         } else {
-            phi_2595 = e96;
+            phi_2595_ = _e96;
         }
-        let e456: vec3<f32> = phi_2595;
-        phi_2658 = (e348 * e349);
-        phi_2651 = (e444 * e444);
-        phi_2627 = normalize(e216);
-        phi_2599 = ((e348 * e336) + vec3<f32>((((0.1599999964237213 * e347) * e347) * e349)));
-        phi_2588 = e456;
-        phi_2500 = e332;
+        let _e456 = phi_2595_;
+        phi_2658_ = (_e348 * _e349);
+        phi_2651_ = (_e444 * _e444);
+        phi_2627_ = normalize(_e216);
+        phi_2599_ = ((_e348 * _e336) + vec3<f32>((((0.1599999964237213 * _e347) * _e347) * _e349)));
+        phi_2588_ = _e456;
+        phi_2500_ = _e332;
     }
-    let e458: vec3<f32> = phi_2658;
-    let e460: f32 = phi_2651;
-    let e462: vec3<f32> = phi_2627;
-    let e464: vec3<f32> = phi_2599;
-    let e466: vec3<f32> = phi_2588;
-    let e468: f32 = phi_2500;
-    let e471: u32 = global1.material.material_flags;
-    if ((bitcast<i32>((e471 & 4096u)) != bitcast<i32>(0u))) {
-        o_color = e165;
+    let _e458 = phi_2658_;
+    let _e460 = phi_2651_;
+    let _e462 = phi_2627_;
+    let _e464 = phi_2599_;
+    let _e466 = phi_2588_;
+    let _e468 = phi_2500_;
+    let _e471 = unnamed_1.material.material_flags;
+    if ((bitcast<bool>((_e471 & 4096u)) != bitcast<bool>(0u))) {
+        o_color = _e165;
     } else {
-        let e476: vec4<f32> = i_view_position1;
-        let e479: vec3<f32> = -(normalize(e476.xyz));
-        phi_2687 = e466;
-        phi_2686 = 0u;
+        let _e476 = i_view_position_1;
+        let _e479 = -(normalize(_e476.xyz));
+        phi_2687_ = _e466;
+        phi_2686_ = 0u;
         loop {
-            let e481: vec3<f32> = phi_2687;
-            let e483: u32 = phi_2686;
-            let e486: u32 = global2.directional_light_header.total_lights;
-            local = e481;
-            local1 = e481;
-            local2 = e481;
-            if ((e483 < e486)) {
-                let e491: mat4x4<f32> = global2.directional_lights[e483].view_proj;
-                let e494: mat4x4<f32> = global.uniforms.inv_view;
-                let e496: vec4<f32> = ((e491 * e494) * e476);
-                let e499: vec2<f32> = ((e496.xy * 0.5) + vec2<f32>(0.5, 0.5));
-                let e502: f32 = (1.0 - e499.y);
-                let e505: vec4<f32> = vec4<f32>(e499.x, e502, f32(e483), e496.z);
-                let e506: bool = (e499.x < 0.0);
-                phi_1222 = e506;
-                if (!(e506)) {
-                    phi_1222 = (e499.x > 1.0);
+            let _e481 = phi_2687_;
+            let _e483 = phi_2686_;
+            let _e486 = unnamed_2.directional_light_header.total_lights;
+            local = _e481;
+            local_1 = _e481;
+            local_2 = _e481;
+            if ((_e483 < _e486)) {
+                let _e491 = unnamed_2.directional_lights[_e483].view_proj;
+                let _e494 = unnamed.uniforms.inv_view;
+                let _e496 = ((_e491 * _e494) * _e476);
+                let _e499 = ((_e496.xy * 0.5) + vec2<f32>(0.5, 0.5));
+                let _e502 = (1.0 - _e499.y);
+                let _e505 = vec4<f32>(_e499.x, _e502, f32(_e483), _e496.z);
+                let _e506 = (_e499.x < 0.0);
+                phi_1222_ = _e506;
+                if (!(_e506)) {
+                    phi_1222_ = (_e499.x > 1.0);
                 }
-                let e510: bool = phi_1222;
-                phi_1229 = e510;
-                if (!(e510)) {
-                    phi_1229 = (e502 < 0.0);
+                let _e510 = phi_1222_;
+                phi_1229_ = _e510;
+                if (!(_e510)) {
+                    phi_1229_ = (_e502 < 0.0);
                 }
-                let e514: bool = phi_1229;
-                phi_1236 = e514;
-                if (!(e514)) {
-                    phi_1236 = (e502 > 1.0);
+                let _e514 = phi_1229_;
+                phi_1236_ = _e514;
+                if (!(_e514)) {
+                    phi_1236_ = (_e502 > 1.0);
                 }
-                let e518: bool = phi_1236;
-                phi_1244 = e518;
-                if (!(e518)) {
-                    phi_1244 = (e496.z < -1.0);
+                let _e518 = phi_1236_;
+                phi_1244_ = _e518;
+                if (!(_e518)) {
+                    phi_1244_ = (_e496.z < -1.0);
                 }
-                let e522: bool = phi_1244;
-                phi_1251 = e522;
-                if (!(e522)) {
-                    phi_1251 = (e496.z > 1.0);
+                let _e522 = phi_1244_;
+                phi_1251_ = _e522;
+                if (!(_e522)) {
+                    phi_1251_ = (_e496.z > 1.0);
                 }
-                let e526: bool = phi_1251;
-                if (e526) {
-                    phi_2694 = 1.0;
+                let _e526 = phi_1251_;
+                if (_e526) {
+                    phi_2694_ = 1.0;
                 } else {
-                    let e532: f32 = textureSampleCompareLevel(shadow, shadow_sampler, vec2<f32>(e505.x, e505.y), i32(e505.z), e496.z);
-                    phi_2694 = e532;
+                    let _e532 = textureSampleCompareLevel(shadow, shadow_sampler, vec2<f32>(_e505.x, _e505.y), i32(_e505.z), _e496.z);
+                    phi_2694_ = _e532;
                 }
-                let e534: f32 = phi_2694;
-                let e539: vec3<f32> = global2.directional_lights[e483].color;
-                let e541: vec3<f32> = global2.directional_lights[e483].direction;
-                let e544: mat4x4<f32> = global.uniforms.view;
-                let e554: vec3<f32> = normalize((mat3x3<f32>(e544[0].xyz, e544[1].xyz, e544[2].xyz) * -(e541)));
-                let e556: vec3<f32> = normalize((e479 + e554));
-                let e558: f32 = abs(dot(e462, e479));
-                let e559: f32 = (e558 + 0.000009999999747378752);
-                let e561: f32 = clamp(dot(e462, e554), 0.0, 1.0);
-                let e563: f32 = clamp(dot(e462, e556), 0.0, 1.0);
-                let e568: f32 = (e460 * e460);
-                let e572: f32 = ((((e563 * e568) - e563) * e563) + 1.0);
-                local3 = (e481 + ((((e458 * 0.31830987334251404) + (((e464 + ((vec3<f32>(clamp(dot(e464, vec3<f32>(16.5, 16.5, 16.5)), 0.0, 1.0)) - e464) * pow((1.0 - clamp(dot(e554, e556), 0.0, 1.0)), 5.0))) * ((e568 / ((3.1415927410125732 * e572) * e572)) * (0.5 / ((e561 * sqrt((((((-0.000009999999747378752 - e558) * e568) + e559) * e559) + e568))) + (e559 * sqrt(((((-(e561) * e568) + e561) * e561) + e568))))))) * 1.0)) * e539) * (e561 * (e534 * e468))));
+                let _e534 = phi_2694_;
+                let _e539 = unnamed_2.directional_lights[_e483].color;
+                let _e541 = unnamed_2.directional_lights[_e483].direction;
+                let _e544 = unnamed.uniforms.view;
+                let _e554 = normalize((mat3x3<f32>(_e544[0].xyz, _e544[1].xyz, _e544[2].xyz) * -(_e541)));
+                let _e556 = normalize((_e479 + _e554));
+                let _e558 = abs(dot(_e462, _e479));
+                let _e559 = (_e558 + 9.999999747378752e-6);
+                let _e561 = clamp(dot(_e462, _e554), 0.0, 1.0);
+                let _e563 = clamp(dot(_e462, _e556), 0.0, 1.0);
+                let _e568 = (_e460 * _e460);
+                let _e572 = ((((_e563 * _e568) - _e563) * _e563) + 1.0);
+                local_3 = (_e481 + ((((_e458 * 0.31830987334251404) + (((_e464 + ((vec3<f32>(clamp(dot(_e464, vec3<f32>(16.5, 16.5, 16.5)), 0.0, 1.0)) - _e464) * pow((1.0 - clamp(dot(_e554, _e556), 0.0, 1.0)), 5.0))) * ((_e568 / ((3.1415927410125732 * _e572) * _e572)) * (0.5 / ((_e561 * sqrt((((((-9.999999747378752e-6 - _e558) * _e568) + _e559) * _e559) + _e568))) + (_e559 * sqrt(((((-(_e561) * _e568) + _e561) * _e561) + _e568))))))) * 1.0)) * _e539) * (_e561 * (_e534 * _e468))));
                 continue;
             } else {
                 break;
             }
             continuing {
-                let e675: vec3<f32> = local3;
-                phi_2687 = e675;
-                phi_2686 = (e483 + bitcast<u32>(1));
+                let _e675 = local_3;
+                phi_2687_ = _e675;
+                phi_2686_ = (_e483 + bitcast<u32>(1));
             }
         }
-        let e611: vec3<f32> = local;
-        let e614: vec3<f32> = local1;
-        let e617: vec3<f32> = local2;
-        let e622: vec4<f32> = global.uniforms.ambient;
-        o_color = max(vec4<f32>(e611.x, e614.y, e617.z, e165.w), (e622 * e165));
+        let _e611 = local;
+        let _e614 = local_1;
+        let _e617 = local_2;
+        let _e622 = unnamed.uniforms.ambient;
+        o_color = max(vec4<f32>(_e611.x, _e614.y, _e617.z, _e165.w), (_e622 * _e165));
     }
     return;
 }
 
 [[stage(fragment)]]
-fn main([[location(3)]] i_coords0: vec2<f32>, [[location(5)]] i_color: vec4<f32>, [[location(1)]] i_normal: vec3<f32>, [[location(2)]] i_tangent: vec3<f32>, [[location(0)]] i_view_position: vec4<f32>, [[location(4)]] i_coords1: vec2<f32>, [[location(6)]] i_material: u32) -> [[location(0)]] vec4<f32> {
-    i_coords0_1 = i_coords0;
-    i_color1 = i_color;
-    i_normal1 = i_normal;
-    i_tangent1 = i_tangent;
-    i_view_position1 = i_view_position;
-    i_coords1_1 = i_coords1;
-    i_material1 = i_material;
-    main1();
-    let e15: vec4<f32> = o_color;
-    return e15;
+fn main([[location(3)]] i_coords0_: vec2<f32>, [[location(5)]] i_color: vec4<f32>, [[location(1)]] i_normal: vec3<f32>, [[location(2)]] i_tangent: vec3<f32>, [[location(0)]] i_view_position: vec4<f32>, [[location(4)]] i_coords1_: vec2<f32>, [[location(6)]] i_material: u32) -> [[location(0)]] vec4<f32> {
+    i_coords0_1 = i_coords0_;
+    i_color_1 = i_color;
+    i_normal_1 = i_normal;
+    i_tangent_1 = i_tangent;
+    i_view_position_1 = i_view_position;
+    i_coords1_1 = i_coords1_;
+    i_material_1 = i_material;
+    main_1();
+    let _e15 = o_color;
+    return _e15;
 }

@@ -24,6 +24,13 @@ pub enum LimitType {
     MaxVertexBuffers,
     MaxVertexAttributes,
     MaxVertexBufferArrayStride,
+    MaxInterStageShaderComponents,
+    MaxComputeWorkgroupStorageSize,
+    MaxComputeInvocationsPerWorkgroup,
+    MaxComputeWorkgroupSizeX,
+    MaxComputeWorkgroupSizeY,
+    MaxComputeWorkgroupSizeZ,
+    MaxComputeWorkgroupsPerDimension,
 }
 
 /// Reason why the renderer failed to initialize.

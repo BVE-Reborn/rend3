@@ -1,7 +1,7 @@
 use std::num::NonZeroU8;
 
 use rend3::util::bind_merge::{BindGroupBuilder, BindGroupLayoutBuilder};
-use wgpu::{AddressMode, BindingType, CompareFunction, Device, FilterMode, Sampler, SamplerDescriptor, ShaderStages};
+use wgpu::{AddressMode, BindingType, CompareFunction, Device, FilterMode, Sampler, SamplerBindingType, SamplerDescriptor, ShaderStages};
 
 pub struct Samplers {
     pub linear: Sampler,
@@ -27,26 +27,17 @@ impl Samplers {
     pub fn add_to_bgl(bglb: &mut BindGroupLayoutBuilder) {
         bglb.append(
             ShaderStages::FRAGMENT,
-            BindingType::Sampler {
-                filtering: true,
-                comparison: false,
-            },
+            BindingType::Sampler(SamplerBindingType::Filtering),
             None,
         )
         .append(
             ShaderStages::FRAGMENT,
-            BindingType::Sampler {
-                filtering: true,
-                comparison: false,
-            },
+            BindingType::Sampler(SamplerBindingType::NonFiltering),
             None,
         )
         .append(
             ShaderStages::FRAGMENT,
-            BindingType::Sampler {
-                filtering: true,
-                comparison: true,
-            },
+            BindingType::Sampler(SamplerBindingType::Comparison),
             None,
         );
     }

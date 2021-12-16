@@ -225,7 +225,6 @@ impl rend3_framework::App for SceneViewer {
         window: &'a winit::window::Window,
         renderer: &'a Arc<Renderer>,
         routines: &'a Arc<rend3_framework::DefaultRoutines>,
-        _surface: &'a Arc<rend3::types::Surface>,
         _surface_format: rend3::types::TextureFormat,
     ) {
         lock(&routines.pbr).set_ambient_color(glam::Vec4::new(0.15, 0.15, 0.15, 1.0));

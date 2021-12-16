@@ -78,7 +78,7 @@ impl TonemappingPass {
                 strip_index_format: None,
                 front_face: FrontFace::Cw,
                 cull_mode: None,
-                clamp_depth: false,
+                unclipped_depth: false,
                 polygon_mode: PolygonMode::Fill,
                 conservative: false,
             },
@@ -93,6 +93,7 @@ impl TonemappingPass {
                     write_mask: ColorWrites::all(),
                 }],
             }),
+            multiview: None,
         });
 
         Self { pipeline }

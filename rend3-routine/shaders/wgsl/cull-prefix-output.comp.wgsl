@@ -17,7 +17,6 @@ struct CullingUniforms {
     object_count: u32;
 };
 
-[[block]]
 struct ObjectInputUniforms {
     uniforms: CullingUniforms;
 };
@@ -29,7 +28,6 @@ struct ObjectOutputData {
     inv_squared_scale: vec3<f32>;
 };
 
-[[block]]
 struct ObjectOutputDataBuffer {
     object_output: [[stride(160)]] array<ObjectOutputData>;
 };
@@ -42,16 +40,14 @@ struct IndirectCall {
     base_instance: u32;
 };
 
-[[block]]
 struct IndirectBuffer {
     draw_call_count: u32;
-    pad0: u32;
-    pad1: u32;
-    pad2: u32;
+    pad0_: u32;
+    pad1_: u32;
+    pad2_: u32;
     indirect_call: [[stride(20)]] array<IndirectCall>;
 };
 
-[[block]]
 struct IntermediateBufferA {
     result_index_a: [[stride(4)]] array<u32>;
 };
@@ -65,60 +61,59 @@ struct ObjectInputData {
     bounding_sphere: vec4<f32>;
 };
 
-[[block]]
 struct ObjectInputDataBuffer {
     object_input: [[stride(96)]] array<ObjectInputData>;
 };
 
 [[group(0), binding(1)]]
-var<uniform> global: ObjectInputUniforms;
+var<uniform> unnamed: ObjectInputUniforms;
 [[group(0), binding(4)]]
-var<storage, read_write> global1: ObjectOutputDataBuffer;
+var<storage, read_write> unnamed_1: ObjectOutputDataBuffer;
 [[group(0), binding(5)]]
-var<storage, read_write> global2: IndirectBuffer;
-var<private> gl_GlobalInvocationID1: vec3<u32>;
+var<storage, read_write> unnamed_2: IndirectBuffer;
+var<private> gl_GlobalInvocationID_1: vec3<u32>;
 [[group(0), binding(2)]]
-var<storage, read_write> global3: IntermediateBufferA;
+var<storage, read_write> unnamed_3: IntermediateBufferA;
 [[group(0), binding(0)]]
-var<storage> global4: ObjectInputDataBuffer;
+var<storage> unnamed_4: ObjectInputDataBuffer;
 
-fn main1() {
+fn main_1() {
     switch(bitcast<i32>(0u)) {
         default: {
-            let e27: u32 = gl_GlobalInvocationID1[0u];
-            let e30: u32 = global.uniforms.object_count;
-            if ((e27 >= e30)) {
+            let _e27 = gl_GlobalInvocationID_1[0u];
+            let _e30 = unnamed.uniforms.object_count;
+            if ((_e27 >= _e30)) {
                 break;
             }
-            let e34: u32 = global3.result_index_a[e27];
-            let e37: u32 = extractBits(e34, bitcast<u32>(0), bitcast<u32>(31));
-            let e38: u32 = (e37 - 1u);
-            if ((bitcast<i32>(e27) == bitcast<i32>((e30 - 1u)))) {
-                global2.draw_call_count = e37;
+            let _e34 = unnamed_3.result_index_a[_e27];
+            let _e37 = extractBits(_e34, bitcast<u32>(0), bitcast<u32>(31));
+            let _e38 = (_e37 - 1u);
+            if ((bitcast<bool>(_e27) == bitcast<bool>((_e30 - 1u)))) {
+                unnamed_2.draw_call_count = _e37;
             }
-            if (!((bitcast<i32>(extractBits(e34, bitcast<u32>(31), bitcast<u32>(1))) != bitcast<i32>(0u)))) {
+            if (!((bitcast<bool>(extractBits(_e34, bitcast<u32>(31), bitcast<u32>(1))) != bitcast<bool>(0u)))) {
                 break;
             }
-            let e54: u32 = global4.object_input[e27].start_idx;
-            let e56: u32 = global4.object_input[e27].count;
-            let e58: i32 = global4.object_input[e27].vertex_offset;
-            let e60: u32 = global4.object_input[e27].material_idx;
-            let e62: mat4x4<f32> = global4.object_input[e27].transform;
-            let e65: mat4x4<f32> = global.uniforms.view;
-            let e66: mat4x4<f32> = (e65 * e62);
-            let e69: mat4x4<f32> = global.uniforms.view_proj;
-            let e72: vec3<f32> = e66[0].xyz;
-            let e74: vec3<f32> = e66[1].xyz;
-            let e76: vec3<f32> = e66[2].xyz;
-            global1.object_output[e38].model_view = e66;
-            global1.object_output[e38].model_view_proj = (e69 * e62);
-            global1.object_output[e38].material_idx = e60;
-            global1.object_output[e38].inv_squared_scale = (vec3<f32>(1.0, 1.0, 1.0) / vec3<f32>(dot(e72, e72), dot(e74, e74), dot(e76, e76)));
-            global2.indirect_call[e38].vertex_count = e56;
-            global2.indirect_call[e38].instance_count = 1u;
-            global2.indirect_call[e38].base_index = e54;
-            global2.indirect_call[e38].vertex_offset = e58;
-            global2.indirect_call[e38].base_instance = e38;
+            let _e54 = unnamed_4.object_input[_e27].start_idx;
+            let _e56 = unnamed_4.object_input[_e27].count;
+            let _e58 = unnamed_4.object_input[_e27].vertex_offset;
+            let _e60 = unnamed_4.object_input[_e27].material_idx;
+            let _e62 = unnamed_4.object_input[_e27].transform;
+            let _e65 = unnamed.uniforms.view;
+            let _e66 = (_e65 * _e62);
+            let _e69 = unnamed.uniforms.view_proj;
+            let _e72 = _e66[0].xyz;
+            let _e74 = _e66[1].xyz;
+            let _e76 = _e66[2].xyz;
+            unnamed_1.object_output[_e38].model_view = _e66;
+            unnamed_1.object_output[_e38].model_view_proj = (_e69 * _e62);
+            unnamed_1.object_output[_e38].material_idx = _e60;
+            unnamed_1.object_output[_e38].inv_squared_scale = (vec3<f32>(1.0, 1.0, 1.0) / vec3<f32>(dot(_e72, _e72), dot(_e74, _e74), dot(_e76, _e76)));
+            unnamed_2.indirect_call[_e38].vertex_count = _e56;
+            unnamed_2.indirect_call[_e38].instance_count = 1u;
+            unnamed_2.indirect_call[_e38].base_index = _e54;
+            unnamed_2.indirect_call[_e38].vertex_offset = _e58;
+            unnamed_2.indirect_call[_e38].base_instance = _e38;
             break;
         }
     }
@@ -127,6 +122,6 @@ fn main1() {
 
 [[stage(compute), workgroup_size(256, 1, 1)]]
 fn main([[builtin(global_invocation_id)]] gl_GlobalInvocationID: vec3<u32>) {
-    gl_GlobalInvocationID1 = gl_GlobalInvocationID;
-    main1();
+    gl_GlobalInvocationID_1 = gl_GlobalInvocationID;
+    main_1();
 }

@@ -8,7 +8,7 @@ use wgpu::{
     ColorTargetState, ColorWrites, CommandEncoder, Device, FilterMode, FragmentState, FrontFace, LoadOp,
     MultisampleState, Operations, PipelineLayout, PipelineLayoutDescriptor, PolygonMode, PrimitiveState,
     PrimitiveTopology, RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor,
-    SamplerDescriptor, ShaderModule, ShaderStages, Texture, TextureDescriptor, TextureSampleType,
+    SamplerBindingType, SamplerDescriptor, ShaderModule, ShaderStages, Texture, TextureDescriptor, TextureSampleType,
     TextureViewDescriptor, TextureViewDimension, VertexState,
 };
 use wgpu_profiler::GpuProfiler;
@@ -49,10 +49,7 @@ impl MipmapGenerator {
             entries: &[BindGroupLayoutEntry {
                 binding: 0,
                 visibility: ShaderStages::FRAGMENT,
-                ty: BindingType::Sampler {
-                    filtering: true,
-                    comparison: false,
-                },
+                ty: BindingType::Sampler(SamplerBindingType::Filtering),
                 count: None,
             }],
         });
@@ -121,7 +118,7 @@ impl MipmapGenerator {
                 strip_index_format: None,
                 front_face: FrontFace::Cw,
                 cull_mode: None,
-                clamp_depth: false,
+                unclipped_depth: false,
                 polygon_mode: PolygonMode::Fill,
                 conservative: false,
             },
@@ -136,6 +133,7 @@ impl MipmapGenerator {
                     write_mask: ColorWrites::all(),
                 }],
             }),
+            multiview: None,
         })
     }
 
