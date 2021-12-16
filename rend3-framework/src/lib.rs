@@ -44,7 +44,7 @@ pub trait App<T: 'static = ()> {
         #[cfg(target_arch = "wasm32")]
         console_log::init().unwrap();
 
-        #[cfg(not(target_arch = "wasm32"))]
+        #[cfg(all(not(target_arch = "wasm32"), not(target_os = "android")))]
         env_logger::init();
     }
 
