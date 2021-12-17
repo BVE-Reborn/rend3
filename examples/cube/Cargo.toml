@@ -28,7 +28,7 @@ rend3-routine = { version = "^0.2.0", path = "../../rend3-routine" }
 # Framework that deals with the event loop, setting up the renderer, and platform differences.
 rend3-framework = { version = "^0.2.0", path = "../../rend3-framework" }
 # windowing
-winit = { version = "0.26" }
+winit = "0.26"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_log = "0.2"

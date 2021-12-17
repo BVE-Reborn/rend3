@@ -267,7 +267,7 @@ impl rend3_framework::App for SceneViewer {
         window: &winit::window::Window,
         renderer: &Arc<rend3::Renderer>,
         routines: &Arc<rend3_framework::DefaultRoutines>,
-        surface: &Arc<rend3::types::Surface>,
+        surface: Option<&Arc<rend3::types::Surface>>,
         event: rend3_framework::Event<'_, ()>,
         control_flow: impl FnOnce(winit::event_loop::ControlFlow),
     ) {
@@ -355,7 +355,7 @@ impl rend3_framework::App for SceneViewer {
 
                 // Get a frame
                 let frame = rend3::util::output::OutputFrame::Surface {
-                    surface: Arc::clone(surface),
+                    surface: Arc::clone(surface.unwrap()),
                 };
                 // Lock all the routines
                 let pbr_routine = lock(&routines.pbr);

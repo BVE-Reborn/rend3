@@ -107,7 +107,7 @@ pub trait App<T: 'static = ()> {
         window: &Window,
         renderer: &Arc<rend3::Renderer>,
         routines: &Arc<DefaultRoutines>,
-        surface: &Option<Arc<Surface>>,
+        surface: Option<&Arc<Surface>>,
         event: Event<'_, T>,
         control_flow: impl FnOnce(winit::event_loop::ControlFlow),
     ) {
@@ -267,7 +267,7 @@ pub async fn async_start<A: App + 'static>(mut app: A, window_builder: WindowBui
             &window,
             &renderer,
             &routines,
-            &surface,
+            surface.as_ref(),
             event,
             |c: ControlFlow| {
                 *control_flow = c;

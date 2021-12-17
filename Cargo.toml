@@ -45,3 +45,6 @@ wgpu-types = { git = "https://github.com/gfx-rs/wgpu.git", rev = "f42342bbbfd9d7
 # wgpu-core = { path = "../wgpu/wgpu-core" }
 # wgpu-hal = { path = "../wgpu/wgpu-hal" }
 # wgpu-types = { path = "../wgpu/wgpu-types" }
+
+imgui = { git = "https://github.com/cwfitzgerald/imgui-rs.git", rev = "88f2a27bcb3b8ea9cfe58b9926bf78f554b7fcc2" }
+imgui-winit-support = { git = "https://github.com/cwfitzgerald/imgui-rs.git", rev = "88f2a27bcb3b8ea9cfe58b9926bf78f554b7fcc2" }

@@ -46,7 +46,6 @@ impl rend3_framework::App for TexturedQuadExample {
         window: &winit::window::Window,
         renderer: &Arc<rend3::Renderer>,
         _routines: &Arc<rend3_framework::DefaultRoutines>,
-        _surface: &Arc<rend3::types::Surface>,
         _surface_format: rend3::types::TextureFormat,
     ) {
         // Create mesh and calculate smooth normals based on vertices
@@ -121,7 +120,7 @@ impl rend3_framework::App for TexturedQuadExample {
         _window: &winit::window::Window,
         renderer: &Arc<rend3::Renderer>,
         routines: &Arc<rend3_framework::DefaultRoutines>,
-        surface: &Arc<rend3::types::Surface>,
+        surface: Option<&Arc<rend3::types::Surface>>,
         event: rend3_framework::Event<'_, ()>,
         control_flow: impl FnOnce(winit::event_loop::ControlFlow),
     ) {
@@ -151,7 +150,7 @@ impl rend3_framework::App for TexturedQuadExample {
             winit::event::Event::MainEventsCleared => {
                 // Get a frame
                 let frame = rend3::util::output::OutputFrame::Surface {
-                    surface: Arc::clone(surface),
+                    surface: Arc::clone(surface.unwrap()),
                 };
 
                 // Ready up the renderer

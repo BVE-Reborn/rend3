@@ -13,7 +13,7 @@ rust-version = "1.57"
 
 [dependencies]
 egui = "0.15.0"
-egui_wgpu_backend = { version = "0.14.0", git = "https://github.com/hasenbanck/egui_wgpu_backend.git", rev = "925a4564ea7608eba0333bd9a2521567b68b717a" }
+egui_wgpu_backend = { version = "0.14.0", git = "https://github.com/cwfitzgerald/egui_wgpu_backend.git", rev = "01eda7a7003be70c2b5abe35eeb2a3c88da2c02f" }
 epi = "0.15.0"
 glam = "0.20.0"
 rend3 = { version = "^0.2.0", path = "../rend3" }

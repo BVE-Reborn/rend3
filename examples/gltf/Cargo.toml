@@ -27,4 +27,4 @@ rend3-framework = { version = "^0.2.0", path = "../../rend3-framework" }
 # Programmable render list that dictates how the scene renders
 rend3-routine = { version = "^0.2.0", path = "../../rend3-routine" }
 # windowing
-winit = { version = "0.25", features = ["web-sys"] }
+winit = "0.26"

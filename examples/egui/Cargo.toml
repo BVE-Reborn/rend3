@@ -17,7 +17,7 @@ egui = "0.15.0"
 # Backend-agnostic interface for writing apps using egui
 epi = "0.15.0"
 # Winit integration with egui
-egui_winit_platform = "0.11.0"
+egui_winit_platform = "0.12.0"
 # logging
 env_logger = { version = "0.9", default-features = false, features = ["termcolor", "atty"] }
 # Linear algebra library
@@ -33,4 +33,4 @@ rend3-framework = { version = "^0.2.0", path = "../../rend3-framework" }
 # Programmable render list that dictates how the scene renders
 rend3-routine = { version = "^0.2.0",path = "../../rend3-routine" }
 # Windowing
-winit = { version = "0.25", features = ["web-sys"] }
+winit = "0.26"

@@ -43,7 +43,7 @@ rustc-hash = "1"
 smallvec = "1"
 tracy-client = { version = "0.12", optional = true }
 wgpu-profiler = "0.7.0"
-winit = { version = "0.25", features = ["web-sys"] }
+winit = "0.26"
 
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
