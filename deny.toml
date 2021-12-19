@@ -41,7 +41,9 @@ skip = [
     { name = "wasi", version = "0.10.2" },
     # egui
     { name = "owned_ttf_parser", version = "0.6.0" },
-    { name = "ttf-parser", version = "0.6.2" }
+    { name = "ttf-parser", version = "0.6.2" },
+    # serde_json
+    { name = "itoa", version = "0.4.8"},
 ]
 
 [advisories]
