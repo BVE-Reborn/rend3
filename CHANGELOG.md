@@ -53,6 +53,7 @@ Per Keep a Changelog there are 6 main categories of changes:
 
 ### Fixes
 - rend3: Get vertex/index counts from RangeAllocator. @jamen
+- rend3: Fix compatibility comparison for RenderPassTargets. @setzer22
 
 ## v0.2.0
 
