@@ -869,17 +869,18 @@ impl RenderPassTargets {
     fn compatible(this: Option<&Self>, other: Option<&Self>) -> bool {
         match (this, other) {
             (Some(this), Some(other)) => {
-                let targets_compatible = this
-                    .targets
-                    .iter()
-                    .zip(other.targets.iter())
-                    .all(|(me, you)| me.color == you.color && me.resolve == you.resolve);
+                let targets_compatible = this.targets.len() == other.targets.len()
+                    && this
+                        .targets
+                        .iter()
+                        .zip(other.targets.iter())
+                        .all(|(me, you)| me.color == you.color && me.resolve == you.resolve);
 
-                let depth_compatible = this
-                    .depth_stencil
-                    .as_ref()
-                    .zip(other.depth_stencil.as_ref())
-                    .map_or(true, |(me, you)| me.target == you.target);
+                let depth_compatible = match (&this.depth_stencil, &other.depth_stencil) {
+                    (Some(this_depth), Some(other_depth)) => this_depth == other_depth,
+                    (None, None) => true,
+                    _ => false,
+                };
 
                 targets_compatible && depth_compatible
             }
