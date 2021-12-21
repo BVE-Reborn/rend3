@@ -209,7 +209,7 @@ where
 
     loaded.nodes = load_gltf_nodes(
         renderer,
-        &mut loaded,
+        &loaded,
         scene.nodes(),
         Mat4::from_scale(Vec3::new(1.0, 1.0, -1.0)),
     )?;
