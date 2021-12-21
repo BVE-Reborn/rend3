@@ -295,7 +295,7 @@ pub fn add_mesh_by_index<E: std::error::Error + 'static>(
 
 pub fn load_gltf_nodes<'a, E: std::error::Error + 'static>(
     renderer: &Renderer,
-    loaded: &mut LoadedGltfScene,
+    loaded: &LoadedGltfScene,
     nodes: impl Iterator<Item = gltf::Node<'a>>,
     parent_transform: Mat4,
 ) -> Result<Vec<Labeled<Node>>, GltfLoadError<E>> {
