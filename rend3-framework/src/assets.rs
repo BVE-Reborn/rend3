@@ -44,12 +44,14 @@ pub struct AssetLoader {
     base: SsoString,
 }
 impl AssetLoader {
-    pub fn new_local(_base_file: &str, _base_url: &str) -> Self {
+    pub fn new_local(_base_file: &str, _base_asset: &str, _base_url: &str) -> Self {
         cfg_if::cfg_if!(
-            if #[cfg(not(target_arch = "wasm32"))] {
-                let base = _base_file;
-            } else {
+            if #[cfg(target_arch = "wasm32")] {
                 let base = _base_url;
+            } else if #[cfg(target_os = "android")] {
+                let base = _base_asset;
+            } else {
+                let base = _base_file;
             }
         );
 
@@ -62,13 +64,36 @@ impl AssetLoader {
         path.get_path(&self.base)
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
+    #[cfg(all(not(target_arch = "wasm32"), not(target_os = "android")))]
     pub async fn get_asset(&self, path: AssetPath<'_>) -> Result<Vec<u8>, AssetError> {
         let full_path = path.get_path(&self.base);
         Ok(std::fs::read(&*full_path).map_err(|error| AssetError::FileError {
             path: SsoString::from(full_path),
             error,
         })?)
+    }
+
+    #[cfg(target_os = "android")]
+    pub async fn get_asset(&self, path: AssetPath<'_>) -> Result<Vec<u8>, AssetError> {
+        use std::ffi::CString;
+
+        let manager = ndk_glue::native_activity().asset_manager();
+
+        let full_path = path.get_path(&self.base);
+        manager
+            .open(&CString::new(&*full_path).unwrap())
+            .ok_or_else(|| AssetError::FileError {
+                path: SsoString::from(&*full_path),
+                error: std::io::Error::new(std::io::ErrorKind::NotFound, "could not find file in asset manager"),
+            })
+            .and_then(|mut file| {
+                file.get_buffer()
+                    .map(|b| b.to_vec())
+                    .map_err(|error| AssetError::FileError {
+                        path: SsoString::from(full_path),
+                        error,
+                    })
+            })
     }
 
     #[cfg(target_arch = "wasm32")]

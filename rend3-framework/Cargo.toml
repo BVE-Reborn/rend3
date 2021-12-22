@@ -21,13 +21,13 @@ profiling = { version = "1", default-features = false }
 rend3 = { version = "0.2.0", path = "../rend3" }
 rend3-routine = { version = "0.2.0", path = "../rend3-routine" }
 thiserror = { version = "1" }
+winit = "0.26"
 wgpu = { version = "0.11", git = "https://github.com/gfx-rs/wgpu.git", rev = "f42342bbbfd9d7ebd61745acccc0669fc0e064d2" }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 # logging
 env_logger = { version = "0.9", default-features = false, features = ["termcolor", "atty"] }
 pollster = "0.2"
-winit = "0.26"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook = "0.1"
@@ -38,4 +38,6 @@ once_cell = "1.8"
 wasm-bindgen = "=0.2.78"
 wasm-bindgen-futures = "0.4"
 web-sys = "0.3"
-winit = { version = "0.25", features = ["web-sys"] }
+
+[target.'cfg(target_os = "android")'.dependencies]
+ndk-glue = "0.5"
