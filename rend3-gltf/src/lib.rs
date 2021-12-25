@@ -727,22 +727,22 @@ where
                 rend3::types::TextureUsages::TEXTURE_BINDING | rend3::types::TextureUsages::RENDER_ATTACHMENT,
             );
 
-        let size: usize = reader.levels().map(|s| s.len()).sum();
+        let size: usize = reader.levels().skip(1).map(|s| s.len()).sum();
 
         let mut data = Vec::with_capacity(size);
-        for level in reader.levels() {
+        for level in reader.levels().skip(1) {
             data.extend_from_slice(level);
         }
 
         texture = Some(types::Texture {
             label: image.name().map(str::to_owned),
             format,
-            size: UVec2::new(header.pixel_width, header.pixel_height),
+            size: UVec2::new(header.pixel_width / 2, header.pixel_height / 2),
             data,
             mip_count: if generate {
                 types::MipmapCount::Maximum
             } else {
-                types::MipmapCount::Specific(std::num::NonZeroU32::new(header.level_count).unwrap())
+                types::MipmapCount::Specific(std::num::NonZeroU32::new(header.level_count - 1).unwrap())
             },
             mip_source: if generate {
                 types::MipmapSource::Generated
