@@ -810,8 +810,9 @@ where
         profiling::scope!("decoding image");
         let parsed =
             image::load_from_memory(&data).map_err(|e| GltfLoadError::TextureDecode(uri.take().unwrap(), e))?;
-        let size = UVec2::new(parsed.width(), parsed.height());
-        let (data, format) = util::convert_dynamic_image(parsed, srgb);
+        let new = parsed.resize(parsed.width(), parsed.height(), image::imageops::Triangle);
+        let size = UVec2::new(new.width(), new.height());
+        let (data, format) = util::convert_dynamic_image(new, srgb);
 
         texture = Some(types::Texture {
             label: image.name().map(str::to_owned),
