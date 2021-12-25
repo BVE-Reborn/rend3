@@ -200,7 +200,7 @@ impl SceneViewer {
     }
 }
 impl rend3_framework::App for SceneViewer {
-    const DEFAULT_SAMPLE_COUNT: rend3::types::SampleCount = rend3::types::SampleCount::Four;
+    const DEFAULT_SAMPLE_COUNT: rend3::types::SampleCount = rend3::types::SampleCount::One;
 
     fn create_iad<'a>(
         &'a mut self,
@@ -217,7 +217,7 @@ impl rend3_framework::App for SceneViewer {
     }
 
     fn sample_count(&self) -> rend3::types::SampleCount {
-        rend3::types::SampleCount::Four
+        rend3::types::SampleCount::One
     }
 
     fn setup<'a>(
@@ -230,12 +230,12 @@ impl rend3_framework::App for SceneViewer {
     ) {
         lock(&routines.pbr).set_ambient_color(glam::Vec4::new(0.15, 0.15, 0.15, 1.0));
 
-        self.directional_light_handle = Some(renderer.add_directional_light(DirectionalLight {
-            color: Vec3::ONE,
-            intensity: 10.0,
-            direction: Vec3::new(-1.0, -1.0, 0.0),
-            distance: 400.0,
-        }));
+        // self.directional_light_handle = Some(renderer.add_directional_light(DirectionalLight {
+        //     color: Vec3::ONE,
+        //     intensity: 10.0,
+        //     direction: Vec3::new(-1.0, -1.0, 0.0),
+        //     distance: 400.0,
+        // }));
 
         self.grabber = Some(rend3_framework::Grabber::new(window));
 
