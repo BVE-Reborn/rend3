@@ -22,7 +22,7 @@ rend3 = { version = "0.2.0", path = "../rend3" }
 rend3-routine = { version = "0.2.0", path = "../rend3-routine" }
 thiserror = { version = "1" }
 winit = "0.26"
-wgpu = { version = "0.11", git = "https://github.com/gfx-rs/wgpu.git", rev = "f42342bbbfd9d7ebd61745acccc0669fc0e064d2" }
+wgpu = "0.12"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 # logging

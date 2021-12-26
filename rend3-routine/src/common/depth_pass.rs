@@ -31,7 +31,7 @@ pub struct BuildDepthPassShaderArgs<'a> {
 
     pub samples: SampleCount,
     pub ty: DepthPassType,
-    pub unclipped_depth_supported: bool
+    pub unclipped_depth_supported: bool,
 }
 
 #[derive(Clone)]

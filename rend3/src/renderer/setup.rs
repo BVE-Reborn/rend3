@@ -58,7 +58,7 @@ pub fn create_renderer(
         adapter_info: iad.info,
         queue: iad.queue,
         device: iad.device,
-        
+
         features,
         limits,
         downlevel,

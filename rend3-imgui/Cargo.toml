@@ -13,6 +13,6 @@ rust-version = "1.57"
 
 [dependencies]
 imgui = "0.8"
-imgui-wgpu = { version = "0.18", git = "https://github.com/Yatekii/imgui-wgpu-rs.git", rev = "5ad9970820bceb2dd9041363fb7f7ba88300ad07" }
+imgui-wgpu = { version = "0.18", git = "https://github.com/Yatekii/imgui-wgpu-rs.git", rev = "3ed936b9f5f9fe5fd972342549f5ed8e0de16ba7" }
 glam = "0.20.0"
 rend3 = { version = "^0.2.0", path = "../rend3" }
