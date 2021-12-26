@@ -83,11 +83,16 @@ pub trait App<T: 'static = ()> {
         Box::pin(async move { Ok(rend3::create_iad(None, None, None, None).await?) })
     }
 
-    /// Determines the sample count used at all times, this may change dynamically,
+    /// Determines the sample count used, this may change dynamically,
     /// as opposed to the compile time static [`App::DEFAULT_SAMPLE_COUNT`]. This function
     /// is what the framework actually calls, so overriding this will always use the right values.
     fn sample_count(&self) -> SampleCount {
         Self::DEFAULT_SAMPLE_COUNT
+    }
+
+    /// Determines the scale factor used
+    fn scale_factor(&self) -> f32 {
+        1.0
     }
 
     fn setup(
@@ -210,9 +215,9 @@ pub async fn async_start<A: App + 'static>(mut app: A, window_builder: WindowBui
         format
     });
 
-    // Create the pbr pipeline with the same internal resolution and 4x multisampling
+    // Create the pbr pipeline with the same internal resolution
     let render_texture_options = rend3_routine::RenderTextureOptions {
-        resolution: glam::UVec2::new(window_size.width, window_size.height),
+        resolution: (glam::UVec2::new(window_size.width, window_size.height).as_vec2() * app.scale_factor()).as_uvec2(),
         samples: app.sample_count(),
     };
     let routines = Arc::new(DefaultRoutines {
@@ -320,7 +325,7 @@ fn handle_surface<A: App, T: 'static>(
             lock(&routines.pbr).resize(
                 renderer,
                 rend3_routine::RenderTextureOptions {
-                    resolution: size,
+                    resolution: (size.as_vec2() * app.scale_factor()).as_uvec2(),
                     samples: app.sample_count(),
                 },
             );

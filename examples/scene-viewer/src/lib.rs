@@ -200,7 +200,7 @@ impl SceneViewer {
     }
 }
 impl rend3_framework::App for SceneViewer {
-    const DEFAULT_SAMPLE_COUNT: rend3::types::SampleCount = rend3::types::SampleCount::Four;
+    const DEFAULT_SAMPLE_COUNT: rend3::types::SampleCount = rend3::types::SampleCount::One;
 
     fn create_iad<'a>(
         &'a mut self,
@@ -216,8 +216,15 @@ impl rend3_framework::App for SceneViewer {
         })
     }
 
-    fn sample_count(&self) -> rend3::types::SampleCount {
-        rend3::types::SampleCount::Four
+    fn scale_factor(&self) -> f32 {
+        // Android has very low memory bandwidth, so lets run internal buffers at half res by default
+        cfg_if::cfg_if! {
+            if #[cfg(target_os = "android")] {
+                0.5
+            } else {
+                1.0
+            }
+        }
     }
 
     fn setup<'a>(
