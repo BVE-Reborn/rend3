@@ -238,7 +238,8 @@ pub async fn async_start<A: App + 'static>(mut app: A, window_builder: WindowBui
     // We're ready, so lets make things visible
     window.set_visible(true);
 
-    let mut allow_redraw = !cfg!(target_os = "android");
+    let mut suspended = cfg!(target_os = "android");
+    let mut last_user_control_mode = ControlFlow::Poll;
 
     winit_run(event_loop, move |event, _event_loop, control_flow| {
         let event = match event {
@@ -249,7 +250,7 @@ pub async fn async_start<A: App + 'static>(mut app: A, window_builder: WindowBui
             e => e,
         };
 
-        if let Some(allow) = handle_surface(
+        if let Some(suspend) = handle_surface(
             &app,
             &window,
             &event,
@@ -259,11 +260,23 @@ pub async fn async_start<A: App + 'static>(mut app: A, window_builder: WindowBui
             format,
             &routines,
         ) {
-            allow_redraw = allow;
+            suspended = suspend;
         }
 
-        if let Event::RedrawRequested(_) = event {
-            if !allow_redraw {
+        // We move to Wait when we get suspended so we don't spin at 50k FPS.
+        match event {
+            Event::Suspended => {
+                *control_flow = ControlFlow::Wait;
+            }
+            Event::Resumed => {
+                *control_flow = last_user_control_mode;
+            }
+            _ => {}
+        }
+
+        // We need to block all updates
+        if let Event::RedrawRequested(_) | Event::RedrawEventsCleared | Event::MainEventsCleared = event {
+            if suspended {
                 return;
             }
         }
@@ -276,11 +289,13 @@ pub async fn async_start<A: App + 'static>(mut app: A, window_builder: WindowBui
             event,
             |c: ControlFlow| {
                 *control_flow = c;
+                last_user_control_mode = c;
             },
         )
     });
 }
 
+#[allow(clippy::too_many_arguments)]
 fn handle_surface<A: App, T: 'static>(
     app: &A,
     window: &Window,
@@ -294,11 +309,11 @@ fn handle_surface<A: App, T: 'static>(
     match *event {
         Event::Resumed => {
             *surface = Some(Arc::new(unsafe { instance.create_surface(window) }));
-            Some(true)
+            Some(false)
         }
         Event::Suspended => {
             *surface = None;
-            Some(false)
+            Some(true)
         }
         Event::WindowEvent {
             event: winit::event::WindowEvent::Resized(size),
@@ -330,7 +345,7 @@ fn handle_surface<A: App, T: 'static>(
                 },
             );
             lock(&routines.tonemapping).resize(size);
-            Some(true)
+            Some(false)
         }
         _ => None,
     }
