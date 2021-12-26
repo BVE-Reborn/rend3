@@ -1,4 +1,4 @@
-# cube
+# gltf
 
 Quite similar to the cube example, but the geometry to render is pulled from `data.glb` using the gltf crate.
 
