@@ -32,16 +32,16 @@ var<private> i_material_1: u32;
 
 fn main_1() {
     let _e19 = unnamed.material.texture_enable;
-    let _e28 = unnamed.material.uv_transform0_;
-    let _e29 = i_coords0_1;
-    let _e33 = (_e28 * vec3<f32>(_e29.x, _e29.y, 1.0));
-    let _e36 = vec2<f32>(_e33.x, _e33.y);
-    let _e37 = dpdx(_e36);
-    let _e38 = dpdy(_e36);
-    if ((bitcast<bool>(((_e19 >> bitcast<u32>(0)) & 1u)) != bitcast<bool>(0u))) {
-        let _e39 = textureSampleGrad(albedo_tex, primary_sampler, _e36, _e37, _e38);
-        let _e43 = unnamed.material.alpha_cutout;
-        if ((_e39.w <= _e43)) {
+    let _e26 = unnamed.material.uv_transform0_;
+    let _e27 = i_coords0_1;
+    let _e31 = (_e26 * vec3<f32>(_e27.x, _e27.y, 1.0));
+    let _e34 = vec2<f32>(_e31.x, _e31.y);
+    let _e35 = dpdx(_e34);
+    let _e36 = dpdy(_e34);
+    if ((((_e19 >> bitcast<u32>(0)) & 1u) != 0u)) {
+        let _e37 = textureSampleGrad(albedo_tex, primary_sampler, _e34, _e35, _e36);
+        let _e41 = unnamed.material.alpha_cutout;
+        if ((_e37.w <= _e41)) {
             discard;
         }
     }
