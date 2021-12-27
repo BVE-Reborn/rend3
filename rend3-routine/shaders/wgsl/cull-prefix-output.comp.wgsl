@@ -88,31 +88,31 @@ fn main_1() {
             let _e34 = unnamed_3.result_index_a[_e27];
             let _e37 = extractBits(_e34, bitcast<u32>(0), bitcast<u32>(31));
             let _e38 = (_e37 - 1u);
-            if ((bitcast<bool>(_e27) == bitcast<bool>((_e30 - 1u)))) {
+            if ((_e27 == (_e30 - 1u))) {
                 unnamed_2.draw_call_count = _e37;
             }
-            if (!((bitcast<bool>(extractBits(_e34, bitcast<u32>(31), bitcast<u32>(1))) != bitcast<bool>(0u)))) {
+            if (!((extractBits(_e34, bitcast<u32>(31), bitcast<u32>(1)) != 0u))) {
                 break;
             }
-            let _e54 = unnamed_4.object_input[_e27].start_idx;
-            let _e56 = unnamed_4.object_input[_e27].count;
-            let _e58 = unnamed_4.object_input[_e27].vertex_offset;
-            let _e60 = unnamed_4.object_input[_e27].material_idx;
-            let _e62 = unnamed_4.object_input[_e27].transform;
-            let _e65 = unnamed.uniforms.view;
-            let _e66 = (_e65 * _e62);
-            let _e69 = unnamed.uniforms.view_proj;
-            let _e72 = _e66[0].xyz;
-            let _e74 = _e66[1].xyz;
-            let _e76 = _e66[2].xyz;
-            unnamed_1.object_output[_e38].model_view = _e66;
-            unnamed_1.object_output[_e38].model_view_proj = (_e69 * _e62);
-            unnamed_1.object_output[_e38].material_idx = _e60;
-            unnamed_1.object_output[_e38].inv_squared_scale = (vec3<f32>(1.0, 1.0, 1.0) / vec3<f32>(dot(_e72, _e72), dot(_e74, _e74), dot(_e76, _e76)));
-            unnamed_2.indirect_call[_e38].vertex_count = _e56;
+            let _e50 = unnamed_4.object_input[_e27].start_idx;
+            let _e52 = unnamed_4.object_input[_e27].count;
+            let _e54 = unnamed_4.object_input[_e27].vertex_offset;
+            let _e56 = unnamed_4.object_input[_e27].material_idx;
+            let _e58 = unnamed_4.object_input[_e27].transform;
+            let _e61 = unnamed.uniforms.view;
+            let _e62 = (_e61 * _e58);
+            let _e65 = unnamed.uniforms.view_proj;
+            let _e68 = _e62[0].xyz;
+            let _e70 = _e62[1].xyz;
+            let _e72 = _e62[2].xyz;
+            unnamed_1.object_output[_e38].model_view = _e62;
+            unnamed_1.object_output[_e38].model_view_proj = (_e65 * _e58);
+            unnamed_1.object_output[_e38].material_idx = _e56;
+            unnamed_1.object_output[_e38].inv_squared_scale = (vec3<f32>(1.0, 1.0, 1.0) / vec3<f32>(dot(_e68, _e68), dot(_e70, _e70), dot(_e72, _e72)));
+            unnamed_2.indirect_call[_e38].vertex_count = _e52;
             unnamed_2.indirect_call[_e38].instance_count = 1u;
-            unnamed_2.indirect_call[_e38].base_index = _e54;
-            unnamed_2.indirect_call[_e38].vertex_offset = _e58;
+            unnamed_2.indirect_call[_e38].base_index = _e50;
+            unnamed_2.indirect_call[_e38].vertex_offset = _e54;
             unnamed_2.indirect_call[_e38].base_instance = _e38;
             break;
         }
