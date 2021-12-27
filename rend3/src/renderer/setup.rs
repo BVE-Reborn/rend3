@@ -17,6 +17,7 @@ pub fn create_renderer(
 
     let features = iad.device.features();
     let limits = iad.device.limits();
+    let downlevel = iad.adapter.get_downlevel_properties();
 
     let camera_manager = RwLock::new(CameraManager::new(Camera::default(), aspect_ratio));
 
@@ -57,6 +58,10 @@ pub fn create_renderer(
         adapter_info: iad.info,
         queue: iad.queue,
         device: iad.device,
+
+        features,
+        limits,
+        downlevel,
 
         camera_manager,
         mesh_manager,

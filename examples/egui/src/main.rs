@@ -23,7 +23,6 @@ impl rend3_framework::App for EguiExample {
         window: &winit::window::Window,
         renderer: &Arc<rend3::Renderer>,
         _routines: &Arc<rend3_framework::DefaultRoutines>,
-        _surface: &Arc<rend3::types::Surface>,
         surface_format: rend3::types::TextureFormat,
     ) {
         let window_size = window.inner_size();
@@ -119,7 +118,7 @@ impl rend3_framework::App for EguiExample {
         window: &winit::window::Window,
         renderer: &Arc<rend3::Renderer>,
         routines: &Arc<rend3_framework::DefaultRoutines>,
-        surface: &Arc<rend3::types::Surface>,
+        surface: Option<&Arc<rend3::types::Surface>>,
         event: rend3_framework::Event<'_, ()>,
         control_flow: impl FnOnce(winit::event_loop::ControlFlow),
     ) {
@@ -159,7 +158,7 @@ impl rend3_framework::App for EguiExample {
 
                 // Get a frame
                 let frame = rend3::util::output::OutputFrame::Surface {
-                    surface: Arc::clone(surface),
+                    surface: Arc::clone(surface.unwrap()),
                 };
 
                 // Ready up the renderer

@@ -15,15 +15,15 @@ path = "src/main.rs"
 # logging
 env_logger = { version = "0.9", default-features = false, features = ["termcolor", "atty"] }
 # The imgui immediate mode gui library
-imgui = "0.8.0"
+imgui = "0.8"
 # Winit integration with imgui
-imgui-winit-support = "0.8.0"
+imgui-winit-support = { version = "0.8.1", default-features = false, features = ["winit-26"] }
 # Linear algebra library
 glam = "0.20.0"
 # Portable implementation of Instant.
 instant = { version = "0.1", features = ["wasm-bindgen"] }
 # Renderer core
-rend3 = { version = "^0.2.0",path = "../../rend3" }
+rend3 = { version = "^0.2.0", path = "../../rend3" }
 # Egui renderer integration
 rend3-imgui = { version = "^0.2.0", path = "../../rend3-imgui" }
 # Framework that deals with the event loop, setting up the renderer, and platform differences.
@@ -31,4 +31,4 @@ rend3-framework = { version = "^0.2.0", path = "../../rend3-framework" }
 # Programmable render list that dictates how the scene renders
 rend3-routine = { version = "^0.2.0", path = "../../rend3-routine" }
 # Windowing
-winit = { version = "0.25", features = ["web-sys"] }
+winit = "0.26"

@@ -33,10 +33,10 @@ debug = true
 lto = "thin"
 
 [patch.crates-io]
-# wgpu = { git = "https://github.com/gfx-rs/wgpu.git", rev = "dfa4948033a33f89b56f71edba0b443dcd60d965" }
-# wgpu-core = { git = "https://github.com/gfx-rs/wgpu.git", rev = "dfa4948033a33f89b56f71edba0b443dcd60d965" }
-# wgpu-hal = { git = "https://github.com/gfx-rs/wgpu.git", rev = "dfa4948033a33f89b56f71edba0b443dcd60d965" }
-# wgpu-types = { git = "https://github.com/gfx-rs/wgpu.git", rev = "dfa4948033a33f89b56f71edba0b443dcd60d965" }
+# wgpu = { git = "https://github.com/gfx-rs/wgpu.git", rev = "f42342bbbfd9d7ebd61745acccc0669fc0e064d2" }
+# wgpu-core = { git = "https://github.com/gfx-rs/wgpu.git", rev = "f42342bbbfd9d7ebd61745acccc0669fc0e064d2" }
+# wgpu-hal = { git = "https://github.com/gfx-rs/wgpu.git", rev = "f42342bbbfd9d7ebd61745acccc0669fc0e064d2" }
+# wgpu-types = { git = "https://github.com/gfx-rs/wgpu.git", rev = "f42342bbbfd9d7ebd61745acccc0669fc0e064d2" }
 # wgpu = { git = "https://github.com/cwfitzgerald/wgpu.git", rev = "bda861f77e0ca0b97697850ad19d19a8b8f1cc9c" }
 # wgpu-core = { git = "https://github.com/cwfitzgerald/wgpu.git", rev = "bda861f77e0ca0b97697850ad19d19a8b8f1cc9c" }
 # wgpu-hal = { git = "https://github.com/cwfitzgerald/wgpu.git", rev = "bda861f77e0ca0b97697850ad19d19a8b8f1cc9c" }

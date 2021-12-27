@@ -27,23 +27,17 @@ skip = [
     { name = "core-foundation", version = "0.7.0" }, # winit uses old version
     { name = "core-foundation-sys", version = "0.7.0" }, # winit uses old version
     { name = "core-graphics", version = "0.19.2" }, # winit uses old version
-    { name = "raw-window-handle", version = "0.3.4" }, # semver trick
     # image
     { name = "miniz_oxide", version = "0.3.7" }, # png uses old version
-    # winit
-    { name = "proc-macro-crate", version = "0.1.5" }, # ndk
-    { name = "dlib", version = "0.4.2" }, # wayland
-    { name = "libloading", version = "0.6.7" }, # everything but wayland
-    { name = "nix", version = "0.18.0" }, # wayland
     # ddsfile
     { name = "num-traits", version = "0.1.43" },
     # wayland grrr
     { name = "wasi", version = "0.10.2" },
-    # egui
-    { name = "owned_ttf_parser", version = "0.6.0" },
-    { name = "ttf-parser", version = "0.6.2" },
-    # web stack
-    { name = "itoa", version = "0.4.8"},
+    # android
+    { name = "env_logger", version = "0.8.4" },
+    # web
+    { name = "itoa", version = "0.4.8" },
+    { name = "mio", version = "0.7.14" },
 ]
 
 [advisories]

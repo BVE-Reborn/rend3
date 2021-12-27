@@ -118,7 +118,7 @@ fn build_forward_pass_inner(
             strip_index_format: None,
             front_face: FrontFace::Cw,
             cull_mode: Some(Face::Back),
-            clamp_depth: false,
+            unclipped_depth: false,
             polygon_mode: PolygonMode::Fill,
             conservative: false,
         },
@@ -151,5 +151,6 @@ fn build_forward_pass_inner(
                 write_mask: ColorWrites::all(),
             }],
         }),
+        multiview: None,
     })
 }

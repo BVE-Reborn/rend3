@@ -1048,23 +1048,23 @@ pub mod util {
             }
             k2F::ETC2_R8G8B8_UNORM_BLOCK | k2F::ETC2_R8G8B8_SRGB_BLOCK => {
                 if srgb {
-                    r3F::Etc2RgbUnormSrgb
+                    r3F::Etc2Rgb8UnormSrgb
                 } else {
-                    r3F::Etc2RgbUnorm
+                    r3F::Etc2Rgb8Unorm
                 }
             }
             k2F::ETC2_R8G8B8A1_UNORM_BLOCK | k2F::ETC2_R8G8B8A1_SRGB_BLOCK => {
                 if srgb {
-                    r3F::Etc2RgbA1UnormSrgb
+                    r3F::Etc2Rgb8A1UnormSrgb
                 } else {
-                    r3F::Etc2RgbA1Unorm
+                    r3F::Etc2Rgb8A1Unorm
                 }
             }
             k2F::ETC2_R8G8B8A8_UNORM_BLOCK | k2F::ETC2_R8G8B8A8_SRGB_BLOCK => return None,
-            k2F::EAC_R11_UNORM_BLOCK => r3F::EacRUnorm,
-            k2F::EAC_R11_SNORM_BLOCK => r3F::EacRSnorm,
-            k2F::EAC_R11G11_UNORM_BLOCK => r3F::EacRgUnorm,
-            k2F::EAC_R11G11_SNORM_BLOCK => r3F::EacRgSnorm,
+            k2F::EAC_R11_UNORM_BLOCK => r3F::EacR11Unorm,
+            k2F::EAC_R11_SNORM_BLOCK => r3F::EacR11Snorm,
+            k2F::EAC_R11G11_UNORM_BLOCK => r3F::EacRg11Unorm,
+            k2F::EAC_R11G11_SNORM_BLOCK => r3F::EacRg11Snorm,
             k2F::ASTC_4x4_UNORM_BLOCK | k2F::ASTC_4x4_SRGB_BLOCK => {
                 if srgb {
                     r3F::Astc4x4RgbaUnormSrgb

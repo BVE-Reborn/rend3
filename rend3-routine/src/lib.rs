@@ -14,7 +14,7 @@ use rend3::{
     DataHandle, DepthHandle, ModeData, ReadyData, RenderGraph, RenderPassDepthTarget, RenderPassTarget,
     RenderPassTargets, RenderTargetDescriptor, RenderTargetHandle, Renderer, RendererMode,
 };
-use wgpu::{BindGroup, Buffer, Color, Device};
+use wgpu::{BindGroup, Buffer, Color, Device, Features};
 
 pub use utils::*;
 
@@ -80,6 +80,7 @@ impl PbrRenderRoutine {
                 materials: &materials,
                 interfaces: &interfaces,
                 samples: render_texture_options.samples,
+                unclipped_depth_supported: renderer.features.contains(Features::DEPTH_CLIP_CONTROL),
             })
         };
 
@@ -115,6 +116,7 @@ impl PbrRenderRoutine {
                 materials: &materials,
                 interfaces: &self.interfaces,
                 samples: options.samples,
+                unclipped_depth_supported: renderer.features.contains(Features::DEPTH_CLIP_CONTROL),
             });
         }
         self.render_texture_options = options;
@@ -492,6 +494,7 @@ pub struct PrimaryPassesNewArgs<'a> {
     pub interfaces: &'a common::interfaces::ShaderInterfaces,
 
     pub samples: SampleCount,
+    pub unclipped_depth_supported: bool,
 }
 
 pub struct PrimaryPasses {
@@ -515,6 +518,7 @@ impl PrimaryPasses {
                 materials: args.materials,
                 samples: SampleCount::One,
                 ty: common::depth_pass::DepthPassType::Shadow,
+                unclipped_depth_supported: args.unclipped_depth_supported,
             });
         let depth_pipelines =
             common::depth_pass::build_depth_pass_pipeline(common::depth_pass::BuildDepthPassShaderArgs {
@@ -525,6 +529,7 @@ impl PrimaryPasses {
                 materials: args.materials,
                 samples: args.samples,
                 ty: common::depth_pass::DepthPassType::Prepass,
+                unclipped_depth_supported: args.unclipped_depth_supported,
             });
         let forward_pass_args = common::forward_pass::BuildForwardPassShaderArgs {
             mode: args.mode,

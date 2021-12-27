@@ -61,7 +61,7 @@ pub fn build_skybox_pipeline(args: BuildSkyboxShaderArgs<'_>) -> RenderPipeline 
             strip_index_format: None,
             front_face: FrontFace::Cw,
             cull_mode: Some(Face::Back),
-            clamp_depth: false,
+            unclipped_depth: false,
             polygon_mode: PolygonMode::Fill,
             conservative: false,
         },
@@ -85,5 +85,6 @@ pub fn build_skybox_pipeline(args: BuildSkyboxShaderArgs<'_>) -> RenderPipeline 
                 write_mask: ColorWrites::all(),
             }],
         }),
+        multiview: None,
     })
 }

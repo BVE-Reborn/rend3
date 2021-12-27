@@ -21,7 +21,7 @@ pub const GPU_REQUIRED_FEATURES: Features = {
     Features::from_bits_truncate(
         Features::PUSH_CONSTANTS.bits()
             | Features::TEXTURE_COMPRESSION_BC.bits()
-            | Features::DEPTH_CLAMPING.bits()
+            | Features::DEPTH_CLIP_CONTROL.bits()
             | Features::TEXTURE_BINDING_ARRAY.bits()
             | Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING.bits()
             | Features::PARTIALLY_BOUND_BINDING_ARRAY.bits()
@@ -37,7 +37,7 @@ pub const CPU_REQUIRED_FEATURES: Features = Features::from_bits_truncate(0);
 
 /// Features that rend3 can use if it they are available, but we don't require.
 pub const OPTIONAL_FEATURES: Features = Features::from_bits_truncate(
-    Features::DEPTH_CLAMPING.bits()
+    Features::DEPTH_CLIP_CONTROL.bits()
         | Features::TEXTURE_COMPRESSION_BC.bits()
         | Features::TEXTURE_COMPRESSION_ETC2.bits()
         | Features::TEXTURE_COMPRESSION_ASTC_LDR.bits()
@@ -81,6 +81,13 @@ pub const GPU_REQUIRED_LIMITS: Limits = Limits {
     max_push_constant_size: 128,
     min_uniform_buffer_offset_alignment: 256,
     min_storage_buffer_offset_alignment: 256,
+    max_inter_stage_shader_components: 60,
+    max_compute_workgroup_storage_size: 16352,
+    max_compute_invocations_per_workgroup: 256,
+    max_compute_workgroup_size_x: 256,
+    max_compute_workgroup_size_y: 256,
+    max_compute_workgroup_size_z: 64,
+    max_compute_workgroups_per_dimension: 65535,
 };
 
 /// Limits required to run in cpu-mode.
@@ -105,6 +112,13 @@ pub const CPU_REQUIRED_LIMITS: Limits = Limits {
     max_push_constant_size: 0,
     min_uniform_buffer_offset_alignment: 256,
     min_storage_buffer_offset_alignment: 256,
+    max_inter_stage_shader_components: 60,
+    max_compute_workgroup_storage_size: 16352,
+    max_compute_invocations_per_workgroup: 256,
+    max_compute_workgroup_size_x: 256,
+    max_compute_workgroup_size_y: 256,
+    max_compute_workgroup_size_z: 64,
+    max_compute_workgroups_per_dimension: 65535,
 };
 
 fn check_limit_unlimited(d: u32, r: u32, ty: LimitType) -> Result<u32, RendererInitializationError> {
@@ -238,6 +252,41 @@ pub fn check_limits(mode: RendererMode, device_limits: &Limits) -> Result<Limits
             device_limits.min_uniform_buffer_offset_alignment,
             required_limits.min_uniform_buffer_offset_alignment,
             LimitType::UniformBufferBindingAlignment,
+        )?,
+        max_inter_stage_shader_components: check_limit_unlimited(
+            device_limits.max_inter_stage_shader_components,
+            required_limits.max_inter_stage_shader_components,
+            LimitType::MaxInterStageShaderComponents,
+        )?,
+        max_compute_workgroup_storage_size: check_limit_unlimited(
+            device_limits.max_compute_workgroup_storage_size,
+            required_limits.max_compute_workgroup_storage_size,
+            LimitType::MaxComputeWorkgroupStorageSize,
+        )?,
+        max_compute_invocations_per_workgroup: check_limit_unlimited(
+            device_limits.max_compute_invocations_per_workgroup,
+            required_limits.max_compute_invocations_per_workgroup,
+            LimitType::MaxComputeInvocationsPerWorkgroup,
+        )?,
+        max_compute_workgroup_size_x: check_limit_unlimited(
+            device_limits.max_compute_workgroup_size_x,
+            required_limits.max_compute_workgroup_size_x,
+            LimitType::MaxComputeWorkgroupSizeX,
+        )?,
+        max_compute_workgroup_size_y: check_limit_unlimited(
+            device_limits.max_compute_workgroup_size_y,
+            required_limits.max_compute_workgroup_size_y,
+            LimitType::MaxComputeWorkgroupSizeY,
+        )?,
+        max_compute_workgroup_size_z: check_limit_unlimited(
+            device_limits.max_compute_workgroup_size_z,
+            required_limits.max_compute_workgroup_size_z,
+            LimitType::MaxComputeWorkgroupSizeZ,
+        )?,
+        max_compute_workgroups_per_dimension: check_limit_unlimited(
+            device_limits.max_compute_workgroups_per_dimension,
+            required_limits.max_compute_workgroups_per_dimension,
+            LimitType::MaxComputeWorkgroupsPerDimension,
         )?,
     })
 }

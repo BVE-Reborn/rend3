@@ -9,14 +9,14 @@ impl Grabber {
     }
 
     pub fn request_grab(&mut self, window: &Window) {
-        window.set_cursor_grab(true).unwrap();
+        let _ = window.set_cursor_grab(true);
         window.set_cursor_visible(false);
 
         self.grabbed = true;
     }
 
     pub fn request_ungrab(&mut self, window: &Window) {
-        window.set_cursor_grab(false).unwrap();
+        let _ = window.set_cursor_grab(false);
         window.set_cursor_visible(true);
 
         self.grabbed = false;
