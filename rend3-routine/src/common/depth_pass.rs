@@ -168,8 +168,8 @@ fn create_depth_inner(
             bias: match args.ty {
                 DepthPassType::Prepass => DepthBiasState::default(),
                 DepthPassType::Shadow => DepthBiasState {
-                    constant: 2,
-                    slope_scale: 2.0,
+                    constant: -2,
+                    slope_scale: -2.0,
                     clamp: 0.0,
                 },
             },
