@@ -27,26 +27,4 @@ vec4 linear_to_srgb(vec4 linear) {
     return vec4(result, linear.a);
 }
 
-#ifdef RIGHT_HANDED
-vec2 left_cross(vec2 l, vec2 r) {
-    return cross(r, l);
-}
-vec3 left_cross(vec3 l, vec3 r) {
-    return cross(r, l);
-}
-vec4 left_cross(vec4 l, vec4 r) {
-    return cross(r, l);
-}
-#else
-vec2 left_cross(vec2 l, vec2 r) {
-    return cross(l, r);
-}
-vec3 left_cross(vec3 l, vec3 r) {
-    return cross(l, r);
-}
-vec4 left_cross(vec4 l, vec4 r) {
-    return cross(l, r);
-}
-#endif
-
 #endif

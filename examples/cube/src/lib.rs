@@ -46,7 +46,7 @@ fn create_mesh() -> rend3::types::Mesh {
         16, 17, 18, 18, 19, 16, // top
         20, 21, 22, 22, 23, 20, // bottom
     ];
-    
+
     rend3::types::MeshBuilder::new(vertex_positions.to_vec(), rend3::types::Handedness::Right)
         .with_indices(index_data.to_vec())
         .with_flip_winding_order()

@@ -233,7 +233,7 @@ fn main_1() {
             let _e194 = normalize(_e193);
             let _e195 = i_tangent_1;
             let _e196 = normalize(_e195);
-            phi_2391_ = (mat3x3<f32>(_e194, cross(_e194, _e196), _e196) * _e192);
+            phi_2391_ = (mat3x3<f32>(_e196, cross(_e194, _e196), _e194) * _e192);
         } else {
             let _e200 = i_normal_1;
             phi_2391_ = _e200;

@@ -196,8 +196,12 @@ pub async fn async_start<A: App + 'static>(mut app: A, window_builder: WindowBui
     };
 
     // Make us a renderer.
-    let renderer =
-        rend3::Renderer::new(iad.clone(), A::HANDEDNESS, Some(window_size.width as f32 / window_size.height as f32)).unwrap();
+    let renderer = rend3::Renderer::new(
+        iad.clone(),
+        A::HANDEDNESS,
+        Some(window_size.width as f32 / window_size.height as f32),
+    )
+    .unwrap();
 
     // Get the preferred format for the surface.
     //
