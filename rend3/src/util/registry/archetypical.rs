@@ -135,6 +135,11 @@ where
         &mut self.archetype_map.get_mut(&handle_info.key).unwrap().data[handle_info.index]
     }
 
+    pub fn get_value(&self, handle: RawResourceHandle<HandleType>) -> &V {
+        let handle_info = &self.handle_info[&handle.idx];
+        &self.archetype_map.get(&handle_info.key).unwrap().data[handle_info.index]
+    }
+
     pub fn get_archetype_vector(&self, key: &K) -> Option<&[V]> {
         Some(&self.archetype_map.get(key)?.data)
     }
