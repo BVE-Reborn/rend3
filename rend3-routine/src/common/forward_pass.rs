@@ -51,8 +51,8 @@ pub fn build_forward_pass_pipeline(args: BuildForwardPassShaderArgs<'_>) -> Rend
             args.mode,
             "forward pass vert",
             match args.baking {
-                Baking::Disabled => "opaque.vert.cpu.wgsl",
-                Baking::Enabled => "opaque-baking.vert.cpu.wgsl",
+                Baking::Disabled => "opaque.vert.cpu.spv",
+                Baking::Enabled => "opaque-baking.vert.cpu.spv",
             },
             match args.baking {
                 Baking::Disabled => "opaque.vert.gpu.spv",
@@ -66,7 +66,7 @@ pub fn build_forward_pass_pipeline(args: BuildForwardPassShaderArgs<'_>) -> Rend
             args.device,
             args.mode,
             "forward pass frag",
-            "opaque.frag.cpu.wgsl",
+            "opaque.frag.cpu.spv",
             "opaque.frag.gpu.spv",
         )
     };

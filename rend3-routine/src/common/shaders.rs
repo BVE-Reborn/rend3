@@ -1,9 +1,7 @@
-use std::borrow::Cow;
-
 use rend3::RendererMode;
-use wgpu::{Device, ShaderModule, ShaderModuleDescriptor, ShaderModuleDescriptorSpirV, ShaderSource};
+use wgpu::{Device, ShaderModule,ShaderModuleDescriptorSpirV};
 
-use crate::shaders::{SPIRV_SHADERS, WGSL_SHADERS};
+use crate::shaders::SPIRV_SHADERS;
 
 /// # Safety
 ///
@@ -16,7 +14,7 @@ pub unsafe fn mode_safe_shader(
     gpu_source: &str,
 ) -> ShaderModule {
     let shader_dir = match mode {
-        RendererMode::CPUPowered => &WGSL_SHADERS,
+        RendererMode::CPUPowered => &SPIRV_SHADERS,
         RendererMode::GPUPowered => &SPIRV_SHADERS,
     };
 
@@ -28,16 +26,8 @@ pub unsafe fn mode_safe_shader(
         .unwrap()
         .contents();
 
-    let use_unsafe = mode == RendererMode::GPUPowered;
-
-    match use_unsafe {
-        false => device.create_shader_module(&ShaderModuleDescriptor {
-            label: Some(label),
-            source: ShaderSource::Wgsl(Cow::Borrowed(std::str::from_utf8(source).unwrap())),
-        }),
-        true => device.create_shader_module_spirv(&ShaderModuleDescriptorSpirV {
-            label: Some(label),
-            source: wgpu::util::make_spirv_raw(source),
-        }),
-    }
+    device.create_shader_module_spirv(&ShaderModuleDescriptorSpirV {
+        label: Some(label),
+        source: wgpu::util::make_spirv_raw(source),
+    })
 }
