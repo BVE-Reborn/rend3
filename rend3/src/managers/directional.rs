@@ -11,7 +11,7 @@ use crate::{
 };
 use arrayvec::ArrayVec;
 use glam::{Mat4, UVec2, Vec2, Vec3, Vec3A};
-use rend3_types::{DirectionalLightChange, RawDirectionalLightHandle};
+use rend3_types::{DirectionalLightChange, Handedness, RawDirectionalLightHandle};
 use std::{
     mem::{self, size_of},
     num::{NonZeroU32, NonZeroU64},
@@ -219,7 +219,12 @@ fn shadow(l: &InternalDirectionalLight, user_camera: &CameraManager) -> ArrayVec
 
     let shadow_texel_size = l.inner.distance / SHADOW_DIMENSIONS as f32;
 
-    let origin_view = Mat4::look_at_rh(Vec3::ZERO, l.inner.direction, Vec3::Y);
+    let look_at = match user_camera.handedness() {
+        Handedness::Left => Mat4::look_at_lh,
+        Handedness::Right => Mat4::look_at_rh,
+    };
+
+    let origin_view = look_at(Vec3::ZERO, l.inner.direction, Vec3::Y);
     let camera_origin_view = origin_view.transform_point3(camera_location);
 
     let offset = camera_origin_view.truncate() % shadow_texel_size;
@@ -233,7 +238,7 @@ fn shadow(l: &InternalDirectionalLight, user_camera: &CameraManager) -> ArrayVec
             projection: CameraProjection::Orthographic {
                 size: Vec3A::splat(l.inner.distance),
             },
-            view: Mat4::look_at_rh(new_shadow_location, new_shadow_location + l.inner.direction, Vec3::Y),
+            view: look_at(new_shadow_location, new_shadow_location + l.inner.direction, Vec3::Y),
         },
         user_camera.handedness(),
         None,

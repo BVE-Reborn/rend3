@@ -15,7 +15,7 @@
 //! - Only the albedo texture's transform from `KHR_texture_transform` will be used.
 //! - Double sided materials are currently unsupported.
 
-use glam::{Mat3, Mat4, UVec2, Vec2, Vec3, Vec4, Vec4Swizzles};
+use glam::{Mat3, Mat4, UVec2, Vec2, Vec3, Vec4};
 use gltf::buffer::Source;
 use image::GenericImageView;
 use rend3::{
