@@ -47,7 +47,7 @@ fn create_mesh() -> rend3::types::Mesh {
         20, 21, 22, 22, 23, 20, // bottom
     ];
 
-    rend3::types::MeshBuilder::new(vertex_positions.to_vec())
+    rend3::types::MeshBuilder::new(vertex_positions.to_vec(), rend3::types::Handedness::Left)
         .with_indices(index_data.to_vec())
         .build()
         .unwrap()
@@ -60,6 +60,7 @@ struct CubeExample {
 }
 
 impl rend3_framework::App for CubeExample {
+    const HANDEDNESS: rend3::types::Handedness = rend3::types::Handedness::Left;
     const DEFAULT_SAMPLE_COUNT: rend3::types::SampleCount = rend3::types::SampleCount::One;
 
     fn setup(

@@ -15,11 +15,11 @@
 //! - Only the albedo texture's transform from `KHR_texture_transform` will be used.
 //! - Double sided materials are currently unsupported.
 
-use glam::{Mat3, Mat4, UVec2, Vec2, Vec3, Vec4, Vec4Swizzles};
+use glam::{Mat3, Mat4, UVec2, Vec2, Vec3, Vec4};
 use gltf::buffer::Source;
 use image::GenericImageView;
 use rend3::{
-    types::{self, MeshValidationError, ObjectHandle},
+    types::{self, Handedness, MeshValidationError, ObjectHandle},
     util::typedefs::{FastHashMap, SsoString},
     Renderer,
 };
@@ -211,7 +211,15 @@ where
         renderer,
         &loaded,
         scene.nodes(),
-        Mat4::from_scale(Vec3::new(1.0, 1.0, -1.0)),
+        Mat4::from_scale(Vec3::new(
+            1.0,
+            1.0,
+            if renderer.handedness == Handedness::Left {
+                -1.0
+            } else {
+                1.0
+            },
+        )),
     )?;
 
     Ok(loaded)
@@ -319,12 +327,12 @@ pub fn load_gltf_nodes<'a, E: std::error::Error + 'static>(
         let light = if let Some(light) = node.light() {
             match light.kind() {
                 gltf::khr_lights_punctual::Kind::Directional => {
-                    let direction = (transform * (-Vec3::Z).extend(1.0)).xyz();
+                    let direction = transform.transform_vector3(-Vec3::Z);
                     Some(renderer.add_directional_light(types::DirectionalLight {
                         color: Vec3::from(light.color()),
                         intensity: light.intensity(),
                         direction,
-                        distance: 400.0,
+                        distance: 20.0,
                     }))
                 }
                 _ => None,
@@ -417,7 +425,10 @@ pub fn load_meshes<'a, E: std::error::Error + 'static>(
                     .collect();
 
                 // glTF models are right handed, so we must flip their winding order
-                let mut builder = types::MeshBuilder::new(vertex_positions).with_right_handed();
+                let mut builder = types::MeshBuilder::new(vertex_positions, renderer.handedness);
+                if renderer.handedness == Handedness::Left {
+                    builder = builder.with_flip_winding_order();
+                }
 
                 if let Some(normals) = reader.read_normals() {
                     builder = builder.with_vertex_normals(normals.map(Vec3::from).collect())

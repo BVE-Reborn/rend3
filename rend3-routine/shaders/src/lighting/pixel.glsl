@@ -88,7 +88,7 @@ PixelData get_per_pixel_data_sampled(MATERIAL_TYPE material, sampler s) {
             vec3 tangent_norm = normalize(i_tangent);
             vec3 bitangent = cross(normal_norm, tangent_norm);
 
-            mat3 tbn = mat3(normal_norm, bitangent, tangent_norm);
+            mat3 tbn = mat3(tangent_norm, bitangent, normal_norm);
 
             pixel.normal = tbn * normal;
         } else {

@@ -76,19 +76,19 @@ fn main_1() {
     o_view_position = (_e37 * vec4<f32>(_e42.x, _e42.y, _e42.z, 1.0));
     let _e54 = mat3x3<f32>(_e37[0].xyz, _e37[1].xyz, _e37[2].xyz);
     let _e55 = i_normal_1;
-    o_normal = (_e54 * (_e41 * _e55));
-    let _e58 = i_tangent_1;
-    o_tangent = (_e54 * (_e41 * _e58));
-    let _e61 = i_color_1;
-    o_color = _e61;
-    let _e62 = i_coords0_1;
-    o_coords0_ = _e62;
-    let _e63 = i_coords1_1;
-    o_coords1_ = _e63;
-    let _e66 = unnamed_1.material.uv_transform1_;
-    let _e70 = (_e66 * vec3<f32>(_e63.x, _e63.y, 1.0));
-    let _e75 = ((vec2<f32>(_e70.x, _e70.y) * 2.0) - vec2<f32>(1.0, 1.0));
-    perVertexStruct.gl_Position = vec4<f32>(_e75.x, _e75.y, 0.0, 1.0);
+    o_normal = normalize((_e54 * (_e41 * _e55)));
+    let _e59 = i_tangent_1;
+    o_tangent = normalize((_e54 * (_e41 * _e59)));
+    let _e63 = i_color_1;
+    o_color = _e63;
+    let _e64 = i_coords0_1;
+    o_coords0_ = _e64;
+    let _e65 = i_coords1_1;
+    o_coords1_ = _e65;
+    let _e68 = unnamed_1.material.uv_transform1_;
+    let _e72 = (_e68 * vec3<f32>(_e65.x, _e65.y, 1.0));
+    let _e77 = ((vec2<f32>(_e72.x, _e72.y) * 2.0) - vec2<f32>(1.0, 1.0));
+    perVertexStruct.gl_Position = vec4<f32>(_e77.x, _e77.y, 0.0, 1.0);
     return;
 }
 

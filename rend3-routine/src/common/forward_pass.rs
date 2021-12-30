@@ -1,7 +1,11 @@
 use arrayvec::ArrayVec;
 #[allow(unused_imports)]
 use rend3::format_sso;
-use rend3::{managers::MaterialManager, types::SampleCount, ModeData, RendererMode};
+use rend3::{
+    managers::MaterialManager,
+    types::{Handedness, SampleCount},
+    ModeData, RendererMode,
+};
 use wgpu::{
     BindGroupLayout, BlendState, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState, DepthStencilState,
     Device, Face, FragmentState, FrontFace, MultisampleState, PipelineLayoutDescriptor, PolygonMode, PrimitiveState,
@@ -34,6 +38,7 @@ pub struct BuildForwardPassShaderArgs<'a> {
 
     pub materials: &'a MaterialManager,
 
+    pub handedness: Handedness,
     pub samples: SampleCount,
     pub transparency: TransparencyType,
 
@@ -116,7 +121,10 @@ fn build_forward_pass_inner(
         primitive: PrimitiveState {
             topology: PrimitiveTopology::TriangleList,
             strip_index_format: None,
-            front_face: FrontFace::Cw,
+            front_face: match args.handedness {
+                Handedness::Left => FrontFace::Cw,
+                Handedness::Right => FrontFace::Ccw,
+            },
             cull_mode: Some(Face::Back),
             unclipped_depth: false,
             polygon_mode: PolygonMode::Fill,

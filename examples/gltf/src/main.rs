@@ -26,12 +26,12 @@ fn load_gltf(
         .collect();
     let indices = reader.read_indices().unwrap().into_u32().collect();
 
-    let mesh = rend3::types::MeshBuilder::new(vertex_positions.to_vec())
+    let mesh = rend3::types::MeshBuilder::new(vertex_positions.to_vec(), rend3::types::Handedness::Right)
         .with_vertex_normals(vertex_normals)
         .with_vertex_tangents(vertex_tangents)
         .with_vertex_uv0(vertex_uvs)
         .with_indices(indices)
-        .with_right_handed()
+        .with_flip_winding_order()
         .build()
         .unwrap();
 
@@ -56,6 +56,7 @@ struct GltfExample {
 }
 
 impl rend3_framework::App for GltfExample {
+    const HANDEDNESS: rend3::types::Handedness = rend3::types::Handedness::Left;
     const DEFAULT_SAMPLE_COUNT: rend3::types::SampleCount = rend3::types::SampleCount::One;
 
     fn setup(

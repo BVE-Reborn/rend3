@@ -9,7 +9,7 @@ use glam::{UVec2, Vec4};
 use rend3::{
     format_sso,
     managers::{DirectionalLightManager, MaterialManager, TextureManager},
-    types::{SampleCount, TextureFormat, TextureHandle, TextureUsages},
+    types::{Handedness, SampleCount, TextureFormat, TextureHandle, TextureUsages},
     util::bind_merge::BindGroupBuilder,
     DataHandle, DepthHandle, ModeData, ReadyData, RenderGraph, RenderPassDepthTarget, RenderPassTarget,
     RenderPassTargets, RenderTargetDescriptor, RenderTargetHandle, Renderer, RendererMode,
@@ -79,6 +79,7 @@ impl PbrRenderRoutine {
                 directional_lights: &directional_light,
                 materials: &materials,
                 interfaces: &interfaces,
+                handedness: renderer.handedness,
                 samples: render_texture_options.samples,
                 unclipped_depth_supported: renderer.features.contains(Features::DEPTH_CLIP_CONTROL),
             })
@@ -115,6 +116,7 @@ impl PbrRenderRoutine {
                 directional_lights: &directional_light,
                 materials: &materials,
                 interfaces: &self.interfaces,
+                handedness: renderer.handedness,
                 samples: options.samples,
                 unclipped_depth_supported: renderer.features.contains(Features::DEPTH_CLIP_CONTROL),
             });
@@ -267,7 +269,7 @@ impl PbrRenderRoutine {
             targets: vec![],
             depth_stencil: Some(RenderPassDepthTarget {
                 target: DepthHandle::Shadow(shadow_output_handle),
-                depth_clear: Some(1.0),
+                depth_clear: Some(0.0),
                 stencil_clear: None,
             }),
         });
@@ -493,6 +495,7 @@ pub struct PrimaryPassesNewArgs<'a> {
 
     pub interfaces: &'a common::interfaces::ShaderInterfaces,
 
+    pub handedness: Handedness,
     pub samples: SampleCount,
     pub unclipped_depth_supported: bool,
 }
@@ -516,6 +519,7 @@ impl PrimaryPasses {
                 interfaces: args.interfaces,
                 texture_bgl: gpu_d2_texture_bgl,
                 materials: args.materials,
+                handedness: args.handedness,
                 samples: SampleCount::One,
                 ty: common::depth_pass::DepthPassType::Shadow,
                 unclipped_depth_supported: args.unclipped_depth_supported,
@@ -527,6 +531,7 @@ impl PrimaryPasses {
                 interfaces: args.interfaces,
                 texture_bgl: gpu_d2_texture_bgl,
                 materials: args.materials,
+                handedness: args.handedness,
                 samples: args.samples,
                 ty: common::depth_pass::DepthPassType::Prepass,
                 unclipped_depth_supported: args.unclipped_depth_supported,
@@ -538,6 +543,7 @@ impl PrimaryPasses {
             texture_bgl: gpu_d2_texture_bgl,
             materials: args.materials,
             samples: args.samples,
+            handedness: args.handedness,
             transparency: TransparencyType::Opaque,
             baking: common::forward_pass::Baking::Disabled,
         };

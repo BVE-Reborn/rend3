@@ -241,8 +241,6 @@ pub enum VertexBufferType {
 
 #[derive(Debug, Error)]
 pub enum MeshValidationError {
-    #[error("Mesh has zero position vertices")]
-    ZeroVertices,
     #[error("Mesh's {ty:?} buffer has {actual} vertices but the position buffer has {expected}")]
     MismatchedVertexCount {
         ty: VertexBufferType,
@@ -251,8 +249,6 @@ pub enum MeshValidationError {
     },
     #[error("Mesh has {count} vertices when the vertex limit is {}", MAX_VERTEX_COUNT)]
     ExceededMaxVertexCount { count: usize },
-    #[error("Mesh has zero indices")]
-    ZeroIndices,
     #[error("Mesh has {count} indices which is not a multiple of three. Meshes are always composed of triangles")]
     IndexCountNotMultipleOfThree { count: usize },
     #[error(
@@ -276,21 +272,19 @@ pub struct MeshBuilder {
     indices: Option<Vec<u32>>,
     without_validation: bool,
 
-    right_handed: bool,
+    handedness: Handedness,
+    flip_winding_order: bool,
     double_sided: bool,
 }
 impl MeshBuilder {
     /// Create a new [`MeshBuilder`] with a given set of positions.
     ///
     /// All vertices must have positions.
-    ///
-    /// # Panic
-    ///
-    /// Will panic if the length is zero.
-    pub fn new(vertex_positions: Vec<Vec3>) -> Self {
+    pub fn new(vertex_positions: Vec<Vec3>, handedness: Handedness) -> Self {
         Self {
             vertex_count: vertex_positions.len(),
             vertex_positions,
+            handedness,
             ..Self::default()
         }
     }
@@ -365,14 +359,11 @@ impl MeshBuilder {
         self
     }
 
-    /// Mark this mesh as using a right handed (Counter Clockwise) winding order. It will be
-    /// converted to rend3 native left handed (Clockwise) winding order on construction. This will
-    /// not change the vertex normals. If this is called, it is advised to not provide a normal
-    /// buffer so a buffer will be calculated for you.
+    /// Flip the winding order
     ///
     /// See [`Mesh::flip_winding_order`] for more information.
-    pub fn with_right_handed(mut self) -> Self {
-        self.right_handed = true;
+    pub fn with_flip_winding_order(mut self) -> Self {
+        self.flip_winding_order = true;
         self
     }
 
@@ -406,7 +397,6 @@ impl MeshBuilder {
     /// All others will be filled with defaults.
     pub fn build(self) -> Result<Mesh, MeshValidationError> {
         let length = self.vertex_count;
-        debug_assert_ne!(length, 0, "Length should be guarded by validation");
 
         let has_normals = self.vertex_normals.is_some();
         let has_tangents = self.vertex_tangents.is_some();
@@ -430,12 +420,12 @@ impl MeshBuilder {
         }
 
         // We need to flip winding order first, so the normals will be facing the right direction.
-        if self.right_handed {
+        if self.flip_winding_order {
             mesh.flip_winding_order();
         }
 
         if !has_normals {
-            mesh.calculate_normals(true);
+            mesh.calculate_normals(self.handedness, true);
         }
 
         // Don't need to bother with tangents if there are no meaningful UVs
@@ -491,10 +481,6 @@ impl Mesh {
         let position_length = self.vertex_positions.len();
         let indices_length = self.indices.len();
 
-        if position_length == 0 {
-            return Err(MeshValidationError::ZeroVertices);
-        }
-
         if position_length > MAX_VERTEX_COUNT {
             return Err(MeshValidationError::ExceededMaxVertexCount { count: position_length });
         }
@@ -516,10 +502,6 @@ impl Mesh {
                 actual: len,
                 expected: position_length,
             });
-        }
-
-        if indices_length == 0 {
-            return Err(MeshValidationError::ZeroIndices);
         }
 
         if indices_length % 3 != 0 {
@@ -547,14 +529,27 @@ impl Mesh {
 
     /// Calculate normals for the given mesh, assuming smooth shading and per-vertex normals.
     ///
-    /// Use left-handed normal calculation. Call [`Mesh::flip_winding_order`] first if you have
-    /// a right handed mesh you want to use with rend3.
+    /// Use handedness given to calculate normals.
     ///
     /// If zeroed is true, the normals will not be zeroed before hand.
-    pub fn calculate_normals(&mut self, zeroed: bool) {
+    pub fn calculate_normals(&mut self, handedness: Handedness, zeroed: bool) {
         // SAFETY: The mesh unconditionally has a validation token, so it must be valid.
         unsafe {
-            Self::calculate_normals_for_buffers(&mut self.vertex_normals, &self.vertex_positions, &self.indices, zeroed)
+            if handedness == Handedness::Left {
+                Self::calculate_normals_for_buffers::<true>(
+                    &mut self.vertex_normals,
+                    &self.vertex_positions,
+                    &self.indices,
+                    zeroed,
+                )
+            } else {
+                Self::calculate_normals_for_buffers::<false>(
+                    &mut self.vertex_normals,
+                    &self.vertex_positions,
+                    &self.indices,
+                    zeroed,
+                )
+            }
         };
     }
 
@@ -567,7 +562,7 @@ impl Mesh {
     /// The following must be true:
     /// - Normals and positions must be the same length.
     /// - All indices must be in-bounds for the buffers.
-    pub unsafe fn calculate_normals_for_buffers(
+    pub unsafe fn calculate_normals_for_buffers<const LEFT_HANDED: bool>(
         normals: &mut [Vec3],
         positions: &[Vec3],
         indices: &[u32],
@@ -596,7 +591,11 @@ impl Mesh {
             let edge1 = pos2 - pos1;
             let edge2 = pos3 - pos1;
 
-            let normal = edge1.cross(edge2);
+            let normal = if LEFT_HANDED {
+                edge1.cross(edge2)
+            } else {
+                edge2.cross(edge1)
+            };
 
             // SAFETY: The conditions of this function assert all thes indices are in-bounds
             *normals.get_unchecked_mut(idx0 as usize) += normal;
@@ -845,17 +844,6 @@ pub struct Camera {
     pub view: Mat4,
 }
 
-impl Camera {
-    pub fn from_orthographic_direction(direction: Vec3A) -> Self {
-        Self {
-            projection: CameraProjection::Orthographic {
-                size: Vec3A::new(100.0, 100.0, 200.0),
-            },
-            view: glam::Mat4::look_at_lh(Vec3::new(0.0, 0.0, 0.0), direction.into(), Vec3::Y),
-        }
-    }
-}
-
 /// Describes how the world should be projected into the camera.
 #[derive(Debug, Copy, Clone)]
 pub enum CameraProjection {
@@ -920,5 +908,17 @@ impl TryFrom<u8> for SampleCount {
 impl SampleCount {
     pub fn needs_resolve(self) -> bool {
         self != Self::One
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub enum Handedness {
+    Left,
+    Right,
+}
+
+impl Default for Handedness {
+    fn default() -> Self {
+        Self::Left
     }
 }

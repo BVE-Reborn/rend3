@@ -47,7 +47,7 @@ fn create_mesh() -> rend3::types::Mesh {
         20, 21, 22, 22, 23, 20, // bottom
     ];
 
-    rend3::types::MeshBuilder::new(vertex_positions.to_vec())
+    rend3::types::MeshBuilder::new(vertex_positions.to_vec(), rend3::types::Handedness::Left)
         .with_indices(index_data.to_vec())
         .build()
         .unwrap()
@@ -84,7 +84,12 @@ fn main() {
     );
 
     // Make us a renderer.
-    let renderer = rend3::Renderer::new(iad, Some(window_size.width as f32 / window_size.height as f32)).unwrap();
+    let renderer = rend3::Renderer::new(
+        iad,
+        rend3::types::Handedness::Left,
+        Some(window_size.width as f32 / window_size.height as f32),
+    )
+    .unwrap();
 
     // Create the pbr pipeline with the same internal resolution and 4x multisampling
     let render_texture_options = rend3_routine::RenderTextureOptions {

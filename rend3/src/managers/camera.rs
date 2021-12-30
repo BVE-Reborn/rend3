@@ -1,9 +1,11 @@
 use crate::types::{Camera, CameraProjection};
 use glam::{Mat4, Vec3};
+use rend3_types::Handedness;
 
 /// Manages the camera's location and projection settings.
 #[derive(Debug, Clone)]
 pub struct CameraManager {
+    handedness: Handedness,
     orig_view: Mat4,
     proj: Mat4,
     inv_view: Mat4,
@@ -13,14 +15,15 @@ pub struct CameraManager {
 impl CameraManager {
     /// Builds a new camera, using the given aspect ratio. If no aspect ratio is given
     /// it is assumed that no aspect ratio scaling should be done.
-    pub fn new(data: Camera, aspect_ratio: Option<f32>) -> Self {
+    pub fn new(data: Camera, handedness: Handedness, aspect_ratio: Option<f32>) -> Self {
         profiling::scope!("CameraManager::new");
 
         let aspect_ratio = aspect_ratio.unwrap_or(1.0);
-        let proj = compute_projection_matrix(data, aspect_ratio);
+        let proj = compute_projection_matrix(data, handedness, aspect_ratio);
         let orig_view = compute_origin_matrix(data);
 
         Self {
+            handedness,
             orig_view,
             proj,
             inv_view: data.view.inverse(),
@@ -40,7 +43,7 @@ impl CameraManager {
     }
 
     pub fn set_aspect_data(&mut self, data: Camera, aspect_ratio: f32) {
-        self.proj = compute_projection_matrix(data, aspect_ratio);
+        self.proj = compute_projection_matrix(data, self.handedness, aspect_ratio);
         self.orig_view = compute_origin_matrix(data);
         self.inv_view = data.view.inverse();
         self.data = data;
@@ -49,6 +52,10 @@ impl CameraManager {
 
     pub fn get_data(&self) -> Camera {
         self.data
+    }
+
+    pub fn handedness(&self) -> Handedness {
+        self.handedness
     }
 
     pub fn view(&self) -> Mat4 {
@@ -72,14 +79,22 @@ impl CameraManager {
     }
 }
 
-fn compute_projection_matrix(data: Camera, aspect_ratio: f32) -> Mat4 {
+fn compute_projection_matrix(data: Camera, handedness: Handedness, aspect_ratio: f32) -> Mat4 {
     match data.projection {
-        CameraProjection::Orthographic { size, .. } => {
+        CameraProjection::Orthographic { size } => {
             let half = size * 0.5;
-            Mat4::orthographic_lh(-half.x, half.x, -half.y, half.y, -half.z, half.z)
+            if handedness == Handedness::Left {
+                Mat4::orthographic_lh(-half.x, half.x, -half.y, half.y, half.z, -half.z)
+            } else {
+                Mat4::orthographic_rh(-half.x, half.x, -half.y, half.y, half.z, -half.z)
+            }
         }
-        CameraProjection::Perspective { vfov, near, .. } => {
-            Mat4::perspective_infinite_reverse_lh(vfov.to_radians(), aspect_ratio, near)
+        CameraProjection::Perspective { vfov, near } => {
+            if handedness == Handedness::Left {
+                Mat4::perspective_infinite_reverse_lh(vfov.to_radians(), aspect_ratio, near)
+            } else {
+                Mat4::perspective_infinite_reverse_rh(vfov.to_radians(), aspect_ratio, near)
+            }
         }
         CameraProjection::Raw(proj) => proj,
     }

@@ -83,6 +83,5 @@ void main() {
         }
 
         o_color = max(vec4(color, pixel.albedo.a), uniforms.ambient * pixel.albedo);
-        // o_normal = vec4(pixel.normal, 0.0);
     }
 }

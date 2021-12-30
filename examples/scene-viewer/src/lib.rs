@@ -1,8 +1,8 @@
-use glam::{DVec2, Mat3A, Mat4, UVec2, Vec3, Vec3A};
+use glam::{DVec2, Mat3A, Mat4, UVec2, Vec3A};
 use instant::Instant;
 use pico_args::Arguments;
 use rend3::{
-    types::{Backend, Camera, CameraProjection, DirectionalLight, DirectionalLightHandle, Texture, TextureFormat},
+    types::{Backend, Camera, CameraProjection, Texture, TextureFormat},
     util::typedefs::FastHashMap,
     Renderer, RendererMode,
 };
@@ -145,8 +145,6 @@ struct SceneViewer {
 
     fullscreen: bool,
 
-    directional_light_handle: Option<DirectionalLightHandle>,
-
     scancode_status: FastHashMap<u32, bool>,
     camera_pitch: f32,
     camera_yaw: f32,
@@ -183,8 +181,6 @@ impl SceneViewer {
 
             fullscreen,
 
-            directional_light_handle: None,
-
             scancode_status: FastHashMap::default(),
             camera_pitch: std::f32::consts::FRAC_PI_4,
             camera_yaw: -std::f32::consts::FRAC_PI_4,
@@ -200,6 +196,7 @@ impl SceneViewer {
     }
 }
 impl rend3_framework::App for SceneViewer {
+    const HANDEDNESS: rend3::types::Handedness = rend3::types::Handedness::Right;
     const DEFAULT_SAMPLE_COUNT: rend3::types::SampleCount = rend3::types::SampleCount::One;
 
     fn create_iad<'a>(
@@ -235,13 +232,6 @@ impl rend3_framework::App for SceneViewer {
         _surface_format: rend3::types::TextureFormat,
     ) {
         lock(&routines.pbr).set_ambient_color(glam::Vec4::new(0.15, 0.15, 0.15, 1.0));
-
-        self.directional_light_handle = Some(renderer.add_directional_light(DirectionalLight {
-            color: Vec3::ONE,
-            intensity: 10.0,
-            direction: Vec3::new(-1.0, -1.0, 0.0),
-            distance: 400.0,
-        }));
 
         self.grabber = Some(rend3_framework::Grabber::new(window));
 

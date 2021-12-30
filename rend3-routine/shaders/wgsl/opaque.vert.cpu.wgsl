@@ -52,15 +52,15 @@ fn main_1() {
     o_view_position = (_e28.model_view * _e37);
     let _e45 = mat3x3<f32>(_e28.model_view[0].xyz, _e28.model_view[1].xyz, _e28.model_view[2].xyz);
     let _e46 = i_normal_1;
-    o_normal = (_e45 * (_e28.inv_squared_scale * _e46));
-    let _e49 = i_tangent_1;
-    o_tangent = (_e45 * (_e28.inv_squared_scale * _e49));
-    let _e52 = i_color_1;
-    o_color = _e52;
-    let _e53 = i_coords0_1;
-    o_coords0_ = _e53;
-    let _e54 = i_coords1_1;
-    o_coords1_ = _e54;
+    o_normal = normalize((_e45 * (_e28.inv_squared_scale * _e46)));
+    let _e50 = i_tangent_1;
+    o_tangent = normalize((_e45 * (_e28.inv_squared_scale * _e50)));
+    let _e54 = i_color_1;
+    o_color = _e54;
+    let _e55 = i_coords0_1;
+    o_coords0_ = _e55;
+    let _e56 = i_coords1_1;
+    o_coords1_ = _e56;
     perVertexStruct.gl_Position = (_e28.model_view_proj * _e37);
     return;
 }
