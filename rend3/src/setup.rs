@@ -33,7 +33,7 @@ pub const GPU_REQUIRED_FEATURES: Features = {
 };
 
 /// Features required to run in cpu-mode.
-pub const CPU_REQUIRED_FEATURES: Features = Features::from_bits_truncate(0);
+pub const CPU_REQUIRED_FEATURES: Features = Features::from_bits_truncate(Features::SPIRV_SHADER_PASSTHROUGH.bits());
 
 /// Features that rend3 can use if it they are available, but we don't require.
 pub const OPTIONAL_FEATURES: Features = Features::from_bits_truncate(
