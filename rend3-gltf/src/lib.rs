@@ -1205,21 +1205,21 @@ pub mod util {
             d3F::L16 => r3F::R16Uint,
             d3F::L8 => r3F::R8Uint,
             d3F::A4L4 => return None,
-            d3F::DXT1 | d3F::DXT2 => {
+            d3F::DXT1 => {
                 if srgb {
                     r3F::Bc1RgbaUnormSrgb
                 } else {
                     r3F::Bc1RgbaUnorm
                 }
             }
-            d3F::DXT3 | d3F::DXT4 => {
+            d3F::DXT2 | d3F::DXT3 => {
                 if srgb {
                     r3F::Bc2RgbaUnormSrgb
                 } else {
                     r3F::Bc2RgbaUnorm
                 }
             }
-            d3F::DXT5 => {
+            d3F::DXT4 | d3F::DXT5 => {
                 if srgb {
                     r3F::Bc3RgbaUnormSrgb
                 } else {
