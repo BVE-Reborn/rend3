@@ -181,7 +181,12 @@ pub async fn filesystem_io_func(parent_directory: impl AsRef<Path>, uri: SsoStri
 /// let path = Path::new("some/path/scene.gltf"); // or glb
 /// let gltf_data = std::fs::read(&path).unwrap();
 /// let parent_directory = path.parent().unwrap();
-/// let _loaded = pollster::block_on(rend3_gltf::load_gltf(&renderer, &gltf_data, |p| rend3_gltf::filesystem_io_func(&parent_directory, p)));
+/// let _loaded = pollster::block_on(rend3_gltf::load_gltf(
+///     &renderer,
+///     &gltf_data,
+///     rend3_routine::material::NormalTextureYDirection::Up,
+///     |p| rend3_gltf::filesystem_io_func(&parent_directory, p)
+/// ));
 /// ```
 pub async fn load_gltf<F, Fut, E>(
     renderer: &Renderer,
