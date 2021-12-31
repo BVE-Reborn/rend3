@@ -37,11 +37,8 @@ pub enum UserResizeEvent<T: 'static> {
 }
 
 pub trait App<T: 'static = ()> {
-    /// Handedness of the renderer.
+    /// The handedness of the coordinate system of the renderer.
     const HANDEDNESS: Handedness;
-    /// Amount of samples the HDR renderbuffer should have. If you need to change
-    /// this dynamically look at [`App::sample_count`] which defaults to this value.
-    const DEFAULT_SAMPLE_COUNT: SampleCount;
 
     fn register_logger(&mut self) {
         #[cfg(target_arch = "wasm32")]
@@ -85,12 +82,11 @@ pub trait App<T: 'static = ()> {
         Box::pin(async move { Ok(rend3::create_iad(None, None, None, None).await?) })
     }
 
-    /// Determines the sample count used, this may change dynamically,
-    /// as opposed to the compile time static [`App::DEFAULT_SAMPLE_COUNT`]. This function
+    /// Determines the sample count used, this may change dynamically. This function
     /// is what the framework actually calls, so overriding this will always use the right values.
-    fn sample_count(&self) -> SampleCount {
-        Self::DEFAULT_SAMPLE_COUNT
-    }
+    ///
+    /// It is called on main events cleared and things are remade if this changes.
+    fn sample_count(&self) -> SampleCount;
 
     /// Determines the scale factor used
     fn scale_factor(&self) -> f32 {
@@ -246,6 +242,11 @@ pub async fn async_start<A: App + 'static>(mut app: A, window_builder: WindowBui
 
     let mut suspended = cfg!(target_os = "android");
     let mut last_user_control_mode = ControlFlow::Poll;
+    let mut stored_surface_info = StoredSurfaceInfo {
+        size: glam::UVec2::new(window_size.width, window_size.height),
+        scale_factor: app.scale_factor(),
+        sample_count: app.sample_count(),
+    };
 
     winit_run(event_loop, move |event, _event_loop, control_flow| {
         let event = match event {
@@ -265,6 +266,7 @@ pub async fn async_start<A: App + 'static>(mut app: A, window_builder: WindowBui
             &renderer,
             format,
             &routines,
+            &mut stored_surface_info,
         ) {
             suspended = suspend;
         }
@@ -301,6 +303,12 @@ pub async fn async_start<A: App + 'static>(mut app: A, window_builder: WindowBui
     });
 }
 
+struct StoredSurfaceInfo {
+    size: UVec2,
+    scale_factor: f32,
+    sample_count: SampleCount,
+}
+
 #[allow(clippy::too_many_arguments)]
 fn handle_surface<A: App, T: 'static>(
     app: &A,
@@ -311,6 +319,7 @@ fn handle_surface<A: App, T: 'static>(
     renderer: &Arc<Renderer>,
     format: rend3::types::TextureFormat,
     routines: &Arc<DefaultRoutines>,
+    surface_info: &mut StoredSurfaceInfo,
 ) -> Option<bool> {
     match *event {
         Event::Resumed => {
@@ -332,6 +341,10 @@ fn handle_surface<A: App, T: 'static>(
                 return Some(false);
             }
 
+            surface_info.size = size;
+            surface_info.scale_factor = app.scale_factor();
+            surface_info.sample_count = app.sample_count();
+
             // Reconfigure the surface for the new size.
             rend3::configure_surface(
                 surface.as_ref().unwrap(),
@@ -346,12 +359,29 @@ fn handle_surface<A: App, T: 'static>(
             lock(&routines.pbr).resize(
                 renderer,
                 rend3_routine::RenderTextureOptions {
-                    resolution: (size.as_vec2() * app.scale_factor()).as_uvec2(),
-                    samples: app.sample_count(),
+                    resolution: (size.as_vec2() * surface_info.scale_factor).as_uvec2(),
+                    samples: surface_info.sample_count,
                 },
             );
             lock(&routines.tonemapping).resize(size);
             Some(false)
+        }
+        Event::MainEventsCleared => {
+            let new_sample_count = app.sample_count();
+            let new_scale_factor = app.scale_factor();
+
+            if new_sample_count != surface_info.sample_count || new_scale_factor != surface_info.scale_factor {
+                lock(&routines.pbr).resize(
+                    renderer,
+                    rend3_routine::RenderTextureOptions {
+                        resolution: (surface_info.size.as_vec2() * new_scale_factor).as_uvec2(),
+                        samples: new_sample_count,
+                    },
+                );
+                surface_info.scale_factor = new_scale_factor;
+                surface_info.sample_count = new_sample_count;
+            }
+            None
         }
         _ => None,
     }

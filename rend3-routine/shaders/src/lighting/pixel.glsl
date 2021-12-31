@@ -84,6 +84,9 @@ PixelData get_per_pixel_data_sampled(MATERIAL_TYPE material, sampler s) {
             } else {
                 normal = normalize(texture_read.rgb * 2.0 - 1.0);
             }
+            if (MATERIAL_FLAG(FLAGS_YDOWN_NORMAL)) {
+                normal.y = -normal.y;
+            }
             vec3 normal_norm = normalize(i_normal);
             vec3 tangent_norm = normalize(i_tangent);
             vec3 bitangent = cross(normal_norm, tangent_norm);

@@ -2,12 +2,12 @@ use glam::{DVec2, Mat3A, Mat4, UVec2, Vec3A};
 use instant::Instant;
 use pico_args::Arguments;
 use rend3::{
-    types::{Backend, Camera, CameraProjection, Texture, TextureFormat},
+    types::{Backend, Camera, CameraProjection, SampleCount, Texture, TextureFormat},
     util::typedefs::FastHashMap,
     Renderer, RendererMode,
 };
 use rend3_framework::{lock, AssetPath, Mutex};
-use rend3_routine::SkyboxRoutine;
+use rend3_routine::{material::NormalTextureYDirection, SkyboxRoutine};
 use std::{collections::HashMap, future::Future, hash::BuildHasher, path::Path, sync::Arc, time::Duration};
 use wgpu_profiler::GpuTimerScopeResult;
 use winit::{
@@ -58,6 +58,7 @@ async fn load_skybox(
 async fn load_gltf(
     renderer: &Renderer,
     loader: &rend3_framework::AssetLoader,
+    normal_direction: NormalTextureYDirection,
     location: AssetPath<'_>,
 ) -> rend3_gltf::LoadedGltfScene {
     // profiling::scope!("loading gltf");
@@ -76,7 +77,7 @@ async fn load_gltf(
 
     let gltf_elapsed = gltf_start.elapsed();
     let resources_start = Instant::now();
-    let scene = rend3_gltf::load_gltf(renderer, &gltf_data, |uri| async {
+    let scene = rend3_gltf::load_gltf(renderer, &gltf_data, normal_direction, |uri| async {
         log::info!("Loading resource {}", uri);
         let uri = uri;
         let full_uri = parent_str.clone() + "/" + uri.as_str();
@@ -103,7 +104,7 @@ fn extract_backend(value: &str) -> Result<Backend, &'static str> {
         "dx11" | "11" => Backend::Dx11,
         "metal" | "mtl" => Backend::Metal,
         "opengl" | "gl" => Backend::Gl,
-        _ => return Err("backend requested but not found"),
+        _ => return Err("unknown backend"),
     })
 }
 
@@ -111,8 +112,34 @@ fn extract_mode(value: &str) -> Result<rend3::RendererMode, &'static str> {
     Ok(match value.to_lowercase().as_str() {
         "legacy" | "c" | "cpu" => rend3::RendererMode::CPUPowered,
         "modern" | "g" | "gpu" => rend3::RendererMode::GPUPowered,
-        _ => return Err("mode requested but not found"),
+        _ => return Err("unknown rendermode"),
     })
+}
+
+fn extract_msaa(value: &str) -> Result<SampleCount, &'static str> {
+    Ok(match value {
+        "1" => SampleCount::One,
+        "4" => SampleCount::Four,
+        _ => return Err("invalid msaa count"),
+    })
+}
+
+fn option_arg<T>(result: Result<Option<T>, pico_args::Error>) -> Option<T> {
+    match result {
+        Ok(o) => o,
+        Err(pico_args::Error::Utf8ArgumentParsingFailed { value, cause }) => {
+            eprintln!("{}: '{}'\n\n{}", cause, value, HELP);
+            std::process::exit(1);
+        }
+        Err(pico_args::Error::OptionWithoutAValue(value)) => {
+            eprintln!("{} flag needs an argument", value);
+            std::process::exit(1);
+        }
+        Err(e) => {
+            eprintln!("{:?}", e);
+            std::process::exit(1);
+        }
+    }
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -135,6 +162,34 @@ where
     });
 }
 
+const HELP: &str = "\
+scene-viewer
+
+gltf and glb scene viewer powered by the rend3 rendering library.
+
+usage: scene-viewer --options ./path/to/gltf/file.gltf
+
+Meta:
+  --help            This menu.
+
+Rendering:
+  -b --backend      Choose backend to run on ('vk', 'dx12', 'dx11', 'metal', 'gl').
+  -d --device       Choose device to run on (case insensitive device substring).
+  -m --mode         Choose rendering mode to run on ('cpu', 'gpu').
+  --msaa            Level of antialiasing (either 1 or 4). Default 1.
+
+Windowing:
+  --absolute-mouse  Interpret the relative mouse coordinates as absolute. Useful when using things like VNC.
+  --fullscreen      Open the window in borderless fullscreen.
+
+Assets:
+  --normal-y-down   Interpret all normals as having the DirectX convention of Y down. Defaults to Y up.
+
+Controls:
+  --walk <speed>    Walk speed (speed without holding shift) in units/second (typically meters). Default 10.
+  --run  <speed>    Run speed (speed while holding shift) in units/second (typically meters). Default 50.
+";
+
 struct SceneViewer {
     absolute_mouse: bool,
     desired_backend: Option<Backend>,
@@ -142,6 +197,9 @@ struct SceneViewer {
     desired_mode: Option<RendererMode>,
     file_to_load: Option<String>,
     walk_speed: f32,
+    run_speed: f32,
+    normal_direction: NormalTextureYDirection,
+    samples: SampleCount,
 
     fullscreen: bool,
 
@@ -160,16 +218,51 @@ struct SceneViewer {
 impl SceneViewer {
     pub fn new() -> Self {
         let mut args = Arguments::from_vec(std::env::args_os().skip(1).collect());
+
+        // Meta
+        let help = args.contains(["-h", "--help"]);
+
+        // Rendering
+        let desired_backend = option_arg(args.opt_value_from_fn(["-b", "--backend"], extract_backend));
+        let desired_device_name: Option<String> =
+            option_arg(args.opt_value_from_str(["-d", "--device"])).map(|s: String| s.to_lowercase());
+        let desired_mode = option_arg(args.opt_value_from_fn(["-m", "--mode"], extract_mode));
+        let samples = option_arg(args.opt_value_from_fn("--msaa", extract_msaa)).unwrap_or(SampleCount::One);
+
+        // Windowing
         let absolute_mouse: bool = args.contains("--absolute-mouse");
-        let desired_backend = args.value_from_fn(["-b", "--backend"], extract_backend).ok();
-        let desired_device_name: Option<String> = args
-            .value_from_str(["-d", "--device"])
-            .ok()
-            .map(|s: String| s.to_lowercase());
-        let desired_mode = args.value_from_fn(["-m", "--mode"], extract_mode).ok();
-        let file_to_load: Option<String> = args.free_from_str().ok();
         let fullscreen = args.contains("--fullscreen");
+
+        // Assets
+        let normal_direction = match args.contains("--normal-y-down") {
+            true => NormalTextureYDirection::Down,
+            false => NormalTextureYDirection::Up,
+        };
+
+        // Controls
         let walk_speed = args.value_from_str("--walk").unwrap_or(10.0_f32);
+        let run_speed = args.value_from_str("--run").unwrap_or(50.0_f32);
+
+        // Free args
+        let file_to_load: Option<String> = args.free_from_str().ok();
+
+        let remaining = args.finish();
+
+        if !remaining.is_empty() {
+            eprint!("Unknown arguments:");
+            for flag in remaining {
+                eprint!(" '{}'", flag.to_string_lossy());
+            }
+            eprintln!("\n");
+
+            eprintln!("{}", HELP);
+            std::process::exit(1);
+        }
+
+        if help {
+            eprintln!("{}", HELP);
+            std::process::exit(1);
+        }
 
         Self {
             absolute_mouse,
@@ -178,6 +271,9 @@ impl SceneViewer {
             desired_mode,
             file_to_load,
             walk_speed,
+            run_speed,
+            normal_direction,
+            samples,
 
             fullscreen,
 
@@ -197,7 +293,6 @@ impl SceneViewer {
 }
 impl rend3_framework::App for SceneViewer {
     const HANDEDNESS: rend3::types::Handedness = rend3::types::Handedness::Right;
-    const DEFAULT_SAMPLE_COUNT: rend3::types::SampleCount = rend3::types::SampleCount::One;
 
     fn create_iad<'a>(
         &'a mut self,
@@ -211,6 +306,10 @@ impl rend3_framework::App for SceneViewer {
             )
             .await?)
         })
+    }
+
+    fn sample_count(&self) -> SampleCount {
+        self.samples
     }
 
     fn scale_factor(&self) -> f32 {
@@ -235,6 +334,7 @@ impl rend3_framework::App for SceneViewer {
 
         self.grabber = Some(rend3_framework::Grabber::new(window));
 
+        let normal_direction = self.normal_direction;
         let file_to_load = self.file_to_load.take();
         let renderer = Arc::clone(renderer);
         let routines = Arc::clone(routines);
@@ -251,6 +351,7 @@ impl rend3_framework::App for SceneViewer {
                 load_gltf(
                     &renderer,
                     &loader,
+                    normal_direction,
                     file_to_load
                         .as_deref()
                         .map_or_else(|| AssetPath::Internal("default-scene/scene.gltf"), AssetPath::External),
@@ -303,7 +404,7 @@ impl rend3_framework::App for SceneViewer {
                 let up = rotation.y_axis;
                 let side = -rotation.x_axis;
                 let velocity = if button_pressed(&self.scancode_status, platform::Scancodes::SHIFT) {
-                    50.0
+                    self.run_speed
                 } else {
                     self.walk_speed
                 };
@@ -375,7 +476,7 @@ impl rend3_framework::App for SceneViewer {
                     &pbr_routine,
                     Some(&skybox_routine),
                     &tonemapping_routine,
-                    Self::DEFAULT_SAMPLE_COUNT,
+                    self.samples,
                 );
 
                 // Dispatch a render using the built up rendergraph!

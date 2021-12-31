@@ -23,7 +23,7 @@ use rend3::{
     util::typedefs::{FastHashMap, SsoString},
     Renderer,
 };
-use rend3_routine::material;
+use rend3_routine::material::{self, NormalTextureYDirection};
 use std::{borrow::Cow, collections::hash_map::Entry, future::Future, path::Path};
 use thiserror::Error;
 
@@ -181,11 +181,17 @@ pub async fn filesystem_io_func(parent_directory: impl AsRef<Path>, uri: SsoStri
 /// let path = Path::new("some/path/scene.gltf"); // or glb
 /// let gltf_data = std::fs::read(&path).unwrap();
 /// let parent_directory = path.parent().unwrap();
-/// let _loaded = pollster::block_on(rend3_gltf::load_gltf(&renderer, &gltf_data, |p| rend3_gltf::filesystem_io_func(&parent_directory, p)));
+/// let _loaded = pollster::block_on(rend3_gltf::load_gltf(
+///     &renderer,
+///     &gltf_data,
+///     rend3_routine::material::NormalTextureYDirection::Up,
+///     |p| rend3_gltf::filesystem_io_func(&parent_directory, p)
+/// ));
 /// ```
 pub async fn load_gltf<F, Fut, E>(
     renderer: &Renderer,
     data: &[u8],
+    normal_direction: NormalTextureYDirection,
     io_func: F,
 ) -> Result<LoadedGltfScene, GltfLoadError<E>>
 where
@@ -200,7 +206,7 @@ where
         gltf::Gltf::from_slice_without_validation(data)?
     };
 
-    let mut loaded = load_gltf_data(renderer, &mut file, io_func).await?;
+    let mut loaded = load_gltf_data(renderer, &mut file, normal_direction, io_func).await?;
 
     let scene = file
         .default_scene()
@@ -234,6 +240,7 @@ where
 pub async fn load_gltf_data<F, Fut, E>(
     renderer: &Renderer,
     file: &mut gltf::Gltf,
+    normal_direction: NormalTextureYDirection,
     mut io_func: F,
 ) -> Result<LoadedGltfScene, GltfLoadError<E>>
 where
@@ -248,7 +255,8 @@ where
 
     let default_material = load_default_material(renderer);
     let meshes = load_meshes(renderer, file.meshes(), &buffers)?;
-    let (materials, images) = load_materials_and_textures(renderer, file.materials(), &buffers, &mut io_func).await?;
+    let (materials, images) =
+        load_materials_and_textures(renderer, file.materials(), &buffers, normal_direction, &mut io_func).await?;
 
     let loaded = LoadedGltfScene {
         meshes,
@@ -504,6 +512,7 @@ pub async fn load_materials_and_textures<F, Fut, E>(
     renderer: &Renderer,
     materials: impl ExactSizeIterator<Item = gltf::Material<'_>>,
     buffers: &[Vec<u8>],
+    normal_direction: NormalTextureYDirection,
     io_func: &mut F,
 ) -> Result<(Vec<Labeled<types::MaterialHandle>>, ImageMap), GltfLoadError<E>>
 where
@@ -592,8 +601,12 @@ where
                 gltf::material::AlphaMode::Blend => material::Transparency::Blend,
             },
             normal: match normals_tex {
-                Some(tex) if tex.format.describe().components == 2 => material::NormalTexture::Bicomponent(tex.handle),
-                Some(tex) if tex.format.describe().components >= 3 => material::NormalTexture::Tricomponent(tex.handle),
+                Some(tex) if tex.format.describe().components == 2 => {
+                    material::NormalTexture::Bicomponent(tex.handle, normal_direction)
+                }
+                Some(tex) if tex.format.describe().components >= 3 => {
+                    material::NormalTexture::Tricomponent(tex.handle, normal_direction)
+                }
                 _ => material::NormalTexture::None,
             },
             aomr_textures: match (metallic_roughness_tex, occlusion_tex) {

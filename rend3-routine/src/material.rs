@@ -13,15 +13,16 @@ bitflags::bitflags! {
         const ALBEDO_VERTEX_SRGB =  0b0000_0000_0000_0100;
         const BICOMPONENT_NORMAL =  0b0000_0000_0000_1000;
         const SWIZZLED_NORMAL =     0b0000_0000_0001_0000;
-        const AOMR_COMBINED =       0b0000_0000_0010_0000;
-        const AOMR_SWIZZLED_SPLIT = 0b0000_0000_0100_0000;
-        const AOMR_SPLIT =          0b0000_0000_1000_0000;
-        const AOMR_BW_SPLIT =       0b0000_0001_0000_0000;
-        const CC_GLTF_COMBINED =    0b0000_0010_0000_0000;
-        const CC_GLTF_SPLIT =       0b0000_0100_0000_0000;
-        const CC_BW_SPLIT =         0b0000_1000_0000_0000;
-        const UNLIT =               0b0001_0000_0000_0000;
-        const NEAREST =             0b0010_0000_0000_0000;
+        const YDOWN_NORMAL =        0b0000_0000_0010_0000;
+        const AOMR_COMBINED =       0b0000_0000_0100_0000;
+        const AOMR_SWIZZLED_SPLIT = 0b0000_0000_1000_0000;
+        const AOMR_SPLIT =          0b0000_0001_0000_0000;
+        const AOMR_BW_SPLIT =       0b0000_0010_0000_0000;
+        const CC_GLTF_COMBINED =    0b0000_0100_0000_0000;
+        const CC_GLTF_SPLIT =       0b0000_1000_0000_0000;
+        const CC_BW_SPLIT =         0b0001_0000_0000_0000;
+        const UNLIT =               0b0010_0000_0000_0000;
+        const NEAREST =             0b0100_0000_0000_0000;
     }
 }
 
@@ -162,18 +163,33 @@ impl<T: Copy> MaterialComponent<T> {
     }
 }
 
+/// The direction of the Y (i.e. green) value in the normal maps
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub enum NormalTextureYDirection {
+    /// Right handed. X right, Y up. OpenGL convention.
+    Up,
+    /// Left handed. X right, Y down. DirectX convention.
+    Down,
+}
+
+impl Default for NormalTextureYDirection {
+    fn default() -> Self {
+        Self::Up
+    }
+}
+
 /// How normals should be derived
 #[derive(Debug, Clone)]
 pub enum NormalTexture {
     /// No normal texture.
     None,
     /// Normal stored in RGB values.
-    Tricomponent(TextureHandle),
+    Tricomponent(TextureHandle, NormalTextureYDirection),
     /// Normal stored in RG values, third value should be reconstructed.
-    Bicomponent(TextureHandle),
+    Bicomponent(TextureHandle, NormalTextureYDirection),
     /// Normal stored in Green and Alpha values, third value should be reconstructed.
     /// This is useful for storing in BC3 or BC7 compressed textures.
-    BicomponentSwizzled(TextureHandle),
+    BicomponentSwizzled(TextureHandle, NormalTextureYDirection),
 }
 impl Default for NormalTexture {
     fn default() -> Self {
@@ -188,18 +204,27 @@ impl NormalTexture {
     {
         match *self {
             Self::None => None,
-            Self::Tricomponent(ref texture)
-            | Self::Bicomponent(ref texture)
-            | Self::BicomponentSwizzled(ref texture) => Some(func(texture)),
+            Self::Tricomponent(ref texture, _)
+            | Self::Bicomponent(ref texture, _)
+            | Self::BicomponentSwizzled(ref texture, _) => Some(func(texture)),
         }
     }
 
     pub fn to_flags(&self) -> MaterialFlags {
-        match self {
+        // Start with the base component flags
+        let base = match self {
             Self::None => MaterialFlags::empty(),
             Self::Tricomponent(..) => MaterialFlags::empty(),
             Self::Bicomponent(..) => MaterialFlags::BICOMPONENT_NORMAL,
             Self::BicomponentSwizzled(..) => MaterialFlags::BICOMPONENT_NORMAL | MaterialFlags::SWIZZLED_NORMAL,
+        };
+
+        // Add the direction flags
+        match self {
+            Self::Tricomponent(_, NormalTextureYDirection::Down)
+            | Self::Bicomponent(_, NormalTextureYDirection::Down)
+            | Self::BicomponentSwizzled(_, NormalTextureYDirection::Down) => base | MaterialFlags::YDOWN_NORMAL,
+            _ => base,
         }
     }
 }

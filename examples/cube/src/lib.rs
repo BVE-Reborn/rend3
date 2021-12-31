@@ -53,6 +53,8 @@ fn create_mesh() -> rend3::types::Mesh {
         .unwrap()
 }
 
+const SAMPLE_COUNT: rend3::types::SampleCount = rend3::types::SampleCount::One;
+
 #[derive(Default)]
 struct CubeExample {
     object_handle: Option<rend3::types::ObjectHandle>,
@@ -61,7 +63,10 @@ struct CubeExample {
 
 impl rend3_framework::App for CubeExample {
     const HANDEDNESS: rend3::types::Handedness = rend3::types::Handedness::Left;
-    const DEFAULT_SAMPLE_COUNT: rend3::types::SampleCount = rend3::types::SampleCount::One;
+
+    fn sample_count(&self) -> rend3::types::SampleCount {
+        SAMPLE_COUNT
+    }
 
     fn setup(
         &mut self,
@@ -162,7 +167,7 @@ impl rend3_framework::App for CubeExample {
                     &pbr_routine,
                     None,
                     &tonemapping_routine,
-                    Self::DEFAULT_SAMPLE_COUNT,
+                    SAMPLE_COUNT,
                 );
 
                 // Dispatch a render using the built up rendergraph!
