@@ -49,6 +49,8 @@ fn load_gltf(
     (mesh_handle, material_handle)
 }
 
+const SAMPLE_COUNT: rend3::types::SampleCount = rend3::types::SampleCount::One;
+
 #[derive(Default)]
 struct GltfExample {
     object_handle: Option<rend3::types::ObjectHandle>,
@@ -57,7 +59,10 @@ struct GltfExample {
 
 impl rend3_framework::App for GltfExample {
     const HANDEDNESS: rend3::types::Handedness = rend3::types::Handedness::Left;
-    const DEFAULT_SAMPLE_COUNT: rend3::types::SampleCount = rend3::types::SampleCount::One;
+
+    fn sample_count(&self) -> rend3::types::SampleCount {
+        SAMPLE_COUNT
+    }
 
     fn setup(
         &mut self,
@@ -145,7 +150,7 @@ impl rend3_framework::App for GltfExample {
                     &pbr_routine,
                     None,
                     &tonemapping_routine,
-                    Self::DEFAULT_SAMPLE_COUNT,
+                    SAMPLE_COUNT,
                 );
 
                 // Dispatch a render using the built up rendergraph!

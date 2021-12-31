@@ -12,13 +12,18 @@ struct ImguiExampleData {
     demo_window_open: bool,
 }
 
+const SAMPLE_COUNT: rend3::types::SampleCount = rend3::types::SampleCount::One;
+
 #[derive(Default)]
 struct ImguiExample {
     data: Option<ImguiExampleData>,
 }
 impl rend3_framework::App for ImguiExample {
     const HANDEDNESS: rend3::types::Handedness = rend3::types::Handedness::Left;
-    const DEFAULT_SAMPLE_COUNT: rend3::types::SampleCount = rend3::types::SampleCount::One;
+
+    fn sample_count(&self) -> rend3::types::SampleCount {
+        SAMPLE_COUNT
+    }
 
     fn setup(
         &mut self,
@@ -167,7 +172,7 @@ impl rend3_framework::App for ImguiExample {
                     &pbr_routine,
                     None,
                     &tonemapping_routine,
-                    Self::DEFAULT_SAMPLE_COUNT,
+                    SAMPLE_COUNT,
                 );
 
                 // Add imgui on top of all the other passes
