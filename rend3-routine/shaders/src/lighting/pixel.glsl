@@ -103,14 +103,14 @@ PixelData get_per_pixel_data_sampled(MATERIAL_TYPE material, sampler s) {
 
         // In roughness texture:
         // Red: AO
-        // Green: Metallic
-        // Blue: Roughness
+        // Green: Roughness
+        // Blue: Metallic
         if (MATERIAL_FLAG(FLAGS_AOMR_COMBINED)) {
             if (HAS_ROUGHNESS_TEXTURE) {
                 vec3 aomr = textureGrad(sampler2D(ROUGHNESS_TEXTURE, s), coords, uvdx, uvdy).rgb;
-                pixel.ambient_occlusion = material.ambient_occlusion * aomr.r;
-                pixel.metallic = material.metallic * aomr.g;
-                pixel.perceptual_roughness = material.roughness * aomr.b;
+                pixel.ambient_occlusion = material.ambient_occlusion * aomr[0];
+                pixel.perceptual_roughness = material.roughness * aomr[1];
+                pixel.metallic = material.metallic * aomr[2];
             } else {
                 pixel.ambient_occlusion = material.ambient_occlusion;
                 pixel.metallic = material.metallic;
@@ -120,17 +120,17 @@ PixelData get_per_pixel_data_sampled(MATERIAL_TYPE material, sampler s) {
         // In ao texture:
         // Red: AO
         // In roughness texture:
-        // Green: Metallic
-        // Blue: Roughness
+        // Green: Roughness
+        // Blue: Metallic
         else if (MATERIAL_FLAG(FLAGS_AOMR_SWIZZLED_SPLIT) || MATERIAL_FLAG(FLAGS_AOMR_SPLIT)) {
             if (HAS_ROUGHNESS_TEXTURE) {
                 vec4 texture_read = textureGrad(sampler2D(ROUGHNESS_TEXTURE, s), coords, uvdx, uvdy);
                 vec2 mr = MATERIAL_FLAG(FLAGS_AOMR_SWIZZLED_SPLIT) ? texture_read.gb : texture_read.rg;
-                pixel.metallic = material.metallic * mr[0];
-                pixel.perceptual_roughness = material.roughness * mr[1];
+                pixel.perceptual_roughness = material.roughness * mr[0];
+                pixel.metallic = material.metallic * mr[1];
             } else {
                 pixel.metallic = material.metallic;
-                pixel.perceptual_roughness = material.ambient_occlusion;
+                pixel.perceptual_roughness = material.roughness;
             }
             if (HAS_AMBIENT_OCCLUSION_TEXTURE) {
                 pixel.ambient_occlusion = material.ambient_occlusion * textureGrad(sampler2D(AMBIENT_OCCLUSION_TEXTURE, s), coords, uvdx, uvdy).r;

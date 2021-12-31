@@ -249,8 +249,8 @@ fn main_1() {
             if ((((_e114 >> bitcast<u32>(2)) & 1u) != 0u)) {
                 let _e221 = textureSampleGrad(roughness_tex, primary_sampler, _e122, _e123, _e124);
                 phi_2548_ = (_e110 * _e221.x);
-                phi_2486_ = (_e100 * _e221.z);
-                phi_2436_ = (_e102 * _e221.y);
+                phi_2486_ = (_e100 * _e221.y);
+                phi_2436_ = (_e102 * _e221.z);
             } else {
                 phi_2548_ = _e110;
                 phi_2486_ = _e100;
@@ -278,10 +278,10 @@ fn main_1() {
                         phi_2417_ = _e245.xy;
                     }
                     let _e249 = phi_2417_;
-                    phi_2489_ = (_e100 * _e249.y);
-                    phi_2439_ = (_e102 * _e249.x);
+                    phi_2489_ = (_e100 * _e249.x);
+                    phi_2439_ = (_e102 * _e249.y);
                 } else {
-                    phi_2489_ = _e110;
+                    phi_2489_ = _e100;
                     phi_2439_ = _e102;
                 }
                 let _e255 = phi_2489_;
