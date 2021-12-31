@@ -101,422 +101,428 @@ var<private> i_coords1_1: vec2<f32>;
 var<private> i_material_1: u32;
 
 fn main_1() {
-    var phi_2386_: vec4<f32>;
-    var phi_2384_: vec4<f32>;
-    var phi_2388_: vec4<f32>;
-    var phi_2387_: vec4<f32>;
-    var phi_2389_: vec2<f32>;
-    var phi_2390_: vec3<f32>;
-    var phi_2391_: vec3<f32>;
-    var phi_2518_: f32;
-    var phi_2458_: f32;
-    var phi_2410_: f32;
-    var phi_1577_: bool;
-    var phi_2392_: vec2<f32>;
-    var phi_2461_: f32;
-    var phi_2413_: f32;
-    var phi_2520_: f32;
-    var phi_2473_: f32;
-    var phi_2425_: f32;
-    var phi_2526_: f32;
-    var phi_2521_: f32;
-    var phi_2462_: f32;
-    var phi_2414_: f32;
-    var phi_2519_: f32;
-    var phi_2459_: f32;
-    var phi_2411_: f32;
-    var phi_2517_: f32;
-    var phi_2457_: f32;
-    var phi_2409_: f32;
-    var phi_2426_: f32;
-    var phi_2481_: f32;
-    var phi_2428_: f32;
-    var phi_2431_: f32;
-    var phi_2483_: f32;
+    var phi_2410_: vec4<f32>;
+    var phi_2408_: vec4<f32>;
+    var phi_2412_: vec4<f32>;
+    var phi_2411_: vec4<f32>;
+    var phi_2413_: vec2<f32>;
+    var phi_2414_: vec3<f32>;
+    var phi_2415_: vec3<f32>;
+    var phi_2416_: vec3<f32>;
+    var phi_2548_: f32;
+    var phi_2486_: f32;
+    var phi_2436_: f32;
+    var phi_1598_: bool;
+    var phi_2417_: vec2<f32>;
+    var phi_2489_: f32;
+    var phi_2439_: f32;
+    var phi_2550_: f32;
+    var phi_2502_: f32;
+    var phi_2452_: f32;
+    var phi_2557_: f32;
+    var phi_2551_: f32;
+    var phi_2490_: f32;
+    var phi_2440_: f32;
+    var phi_2549_: f32;
+    var phi_2487_: f32;
+    var phi_2437_: f32;
+    var phi_2547_: f32;
+    var phi_2485_: f32;
+    var phi_2435_: f32;
     var phi_2453_: f32;
-    var phi_2504_: f32;
-    var phi_2484_: f32;
-    var phi_2432_: f32;
-    var phi_2482_: f32;
-    var phi_2429_: f32;
-    var phi_2480_: f32;
-    var phi_2427_: f32;
-    var phi_2505_: f32;
-    var phi_2601_: vec3<f32>;
-    var phi_2664_: vec3<f32>;
-    var phi_2657_: f32;
+    var phi_2510_: f32;
+    var phi_2455_: f32;
+    var phi_2458_: f32;
+    var phi_2512_: f32;
+    var phi_2481_: f32;
+    var phi_2534_: f32;
+    var phi_2513_: f32;
+    var phi_2459_: f32;
+    var phi_2511_: f32;
+    var phi_2456_: f32;
+    var phi_2509_: f32;
+    var phi_2454_: f32;
+    var phi_2535_: f32;
     var phi_2633_: vec3<f32>;
-    var phi_2605_: vec3<f32>;
-    var phi_2594_: vec3<f32>;
-    var phi_2506_: f32;
-    var phi_2693_: vec3<f32>;
-    var phi_2692_: u32;
-    var phi_1225_: bool;
-    var phi_1232_: bool;
-    var phi_1239_: bool;
-    var phi_1247_: bool;
-    var phi_1254_: bool;
-    var phi_2700_: f32;
+    var phi_2696_: vec3<f32>;
+    var phi_2689_: f32;
+    var phi_2665_: vec3<f32>;
+    var phi_2637_: vec3<f32>;
+    var phi_2626_: vec3<f32>;
+    var phi_2536_: f32;
+    var phi_2725_: vec3<f32>;
+    var phi_2724_: u32;
+    var phi_1236_: bool;
+    var phi_1243_: bool;
+    var phi_1250_: bool;
+    var phi_1258_: bool;
+    var phi_1265_: bool;
+    var phi_2732_: f32;
     var local: vec3<f32>;
     var local_1: vec3<f32>;
     var local_2: vec3<f32>;
     var local_3: vec3<f32>;
 
-    let _e93 = unnamed_1.material.uv_transform0_;
-    let _e95 = unnamed_1.material.albedo;
-    let _e97 = unnamed_1.material.emissive;
-    let _e99 = unnamed_1.material.roughness;
-    let _e101 = unnamed_1.material.metallic;
-    let _e103 = unnamed_1.material.reflectance;
-    let _e105 = unnamed_1.material.clear_coat;
-    let _e107 = unnamed_1.material.clear_coat_roughness;
-    let _e109 = unnamed_1.material.ambient_occlusion;
-    let _e111 = unnamed_1.material.material_flags;
-    let _e113 = unnamed_1.material.texture_enable;
-    let _e114 = i_coords0_1;
-    let _e118 = (_e93 * vec3<f32>(_e114.x, _e114.y, 1.0));
-    let _e121 = vec2<f32>(_e118.x, _e118.y);
-    let _e122 = dpdx(_e121);
-    let _e123 = dpdy(_e121);
-    if (((_e111 & 1u) != 0u)) {
-        if ((((_e113 >> bitcast<u32>(0)) & 1u) != 0u)) {
-            let _e130 = textureSampleGrad(albedo_tex, primary_sampler, _e121, _e122, _e123);
-            phi_2386_ = _e130;
+    let _e94 = unnamed_1.material.uv_transform0_;
+    let _e96 = unnamed_1.material.albedo;
+    let _e98 = unnamed_1.material.emissive;
+    let _e100 = unnamed_1.material.roughness;
+    let _e102 = unnamed_1.material.metallic;
+    let _e104 = unnamed_1.material.reflectance;
+    let _e106 = unnamed_1.material.clear_coat;
+    let _e108 = unnamed_1.material.clear_coat_roughness;
+    let _e110 = unnamed_1.material.ambient_occlusion;
+    let _e112 = unnamed_1.material.material_flags;
+    let _e114 = unnamed_1.material.texture_enable;
+    let _e115 = i_coords0_1;
+    let _e119 = (_e94 * vec3<f32>(_e115.x, _e115.y, 1.0));
+    let _e122 = vec2<f32>(_e119.x, _e119.y);
+    let _e123 = dpdx(_e122);
+    let _e124 = dpdy(_e122);
+    if (((_e112 & 1u) != 0u)) {
+        if ((((_e114 >> bitcast<u32>(0)) & 1u) != 0u)) {
+            let _e131 = textureSampleGrad(albedo_tex, primary_sampler, _e122, _e123, _e124);
+            phi_2410_ = _e131;
         } else {
-            phi_2386_ = vec4<f32>(1.0, 1.0, 1.0, 1.0);
+            phi_2410_ = vec4<f32>(1.0, 1.0, 1.0, 1.0);
         }
-        let _e132 = phi_2386_;
-        phi_2388_ = _e132;
-        if (((_e111 & 2u) != 0u)) {
-            let _e135 = i_color_1;
-            phi_2384_ = _e135;
-            if (((_e111 & 4u) != 0u)) {
-                let _e138 = _e135.xyz;
-                let _e146 = mix((_e138 * vec3<f32>(0.07739938050508499, 0.07739938050508499, 0.07739938050508499)), pow(((_e138 + vec3<f32>(0.054999999701976776, 0.054999999701976776, 0.054999999701976776)) * vec3<f32>(0.9478673338890076, 0.9478673338890076, 0.9478673338890076)), vec3<f32>(2.4000000953674316, 2.4000000953674316, 2.4000000953674316)), clamp(ceil((_e138 - vec3<f32>(0.040449999272823334, 0.040449999272823334, 0.040449999272823334))), vec3<f32>(0.0, 0.0, 0.0), vec3<f32>(1.0, 1.0, 1.0)));
-                phi_2384_ = vec4<f32>(_e146.x, _e146.y, _e146.z, _e135.w);
+        let _e133 = phi_2410_;
+        phi_2412_ = _e133;
+        if (((_e112 & 2u) != 0u)) {
+            let _e136 = i_color_1;
+            phi_2408_ = _e136;
+            if (((_e112 & 4u) != 0u)) {
+                let _e139 = _e136.xyz;
+                let _e147 = mix((_e139 * vec3<f32>(0.07739938050508499, 0.07739938050508499, 0.07739938050508499)), pow(((_e139 + vec3<f32>(0.054999999701976776, 0.054999999701976776, 0.054999999701976776)) * vec3<f32>(0.9478673338890076, 0.9478673338890076, 0.9478673338890076)), vec3<f32>(2.4000000953674316, 2.4000000953674316, 2.4000000953674316)), clamp(ceil((_e139 - vec3<f32>(0.040449999272823334, 0.040449999272823334, 0.040449999272823334))), vec3<f32>(0.0, 0.0, 0.0), vec3<f32>(1.0, 1.0, 1.0)));
+                phi_2408_ = vec4<f32>(_e147.x, _e147.y, _e147.z, _e136.w);
             }
-            let _e153 = phi_2384_;
-            phi_2388_ = (_e132 * _e153);
+            let _e154 = phi_2408_;
+            phi_2412_ = (_e133 * _e154);
         }
-        let _e156 = phi_2388_;
-        phi_2387_ = _e156;
+        let _e157 = phi_2412_;
+        phi_2411_ = _e157;
     } else {
-        phi_2387_ = vec4<f32>(0.0, 0.0, 0.0, 1.0);
+        phi_2411_ = vec4<f32>(0.0, 0.0, 0.0, 1.0);
     }
-    let _e158 = phi_2387_;
-    let _e159 = (_e158 * _e95);
-    if (((_e111 & 4096u) != 0u)) {
-        let _e162 = i_normal_1;
-        phi_2664_ = vec3<f32>(0.0, 0.0, 0.0);
-        phi_2657_ = 0.0;
-        phi_2633_ = normalize(_e162);
-        phi_2605_ = vec3<f32>(0.0, 0.0, 0.0);
-        phi_2594_ = vec3<f32>(0.0, 0.0, 0.0);
-        phi_2506_ = 0.0;
+    let _e159 = phi_2411_;
+    let _e160 = (_e159 * _e96);
+    if (((_e112 & 8192u) != 0u)) {
+        let _e163 = i_normal_1;
+        phi_2696_ = vec3<f32>(0.0, 0.0, 0.0);
+        phi_2689_ = 0.0;
+        phi_2665_ = normalize(_e163);
+        phi_2637_ = vec3<f32>(0.0, 0.0, 0.0);
+        phi_2626_ = vec3<f32>(0.0, 0.0, 0.0);
+        phi_2536_ = 0.0;
     } else {
-        if ((((_e113 >> bitcast<u32>(1)) & 1u) != 0u)) {
-            let _e168 = textureSampleGrad(normal_tex, primary_sampler, _e121, _e122, _e123);
-            if (((_e111 & 8u) != 0u)) {
-                if (((_e111 & 16u) != 0u)) {
-                    phi_2389_ = _e168.wy;
+        if ((((_e114 >> bitcast<u32>(1)) & 1u) != 0u)) {
+            let _e169 = textureSampleGrad(normal_tex, primary_sampler, _e122, _e123, _e124);
+            if (((_e112 & 8u) != 0u)) {
+                if (((_e112 & 16u) != 0u)) {
+                    phi_2413_ = _e169.wy;
                 } else {
-                    phi_2389_ = _e168.xy;
+                    phi_2413_ = _e169.xy;
                 }
-                let _e176 = phi_2389_;
-                let _e178 = ((_e176 * 2.0) - vec2<f32>(1.0, 1.0));
-                phi_2390_ = vec3<f32>(_e178.x, _e178.y, sqrt(((1.0 - (_e178.x * _e178.x)) - (_e178.y * _e178.y))));
+                let _e177 = phi_2413_;
+                let _e179 = ((_e177 * 2.0) - vec2<f32>(1.0, 1.0));
+                phi_2414_ = vec3<f32>(_e179.x, _e179.y, sqrt(((1.0 - (_e179.x * _e179.x)) - (_e179.y * _e179.y))));
             } else {
-                phi_2390_ = normalize(((_e168.xyz * 2.0) - vec3<f32>(1.0, 1.0, 1.0)));
+                phi_2414_ = normalize(((_e169.xyz * 2.0) - vec3<f32>(1.0, 1.0, 1.0)));
             }
-            let _e192 = phi_2390_;
-            let _e193 = i_normal_1;
-            let _e194 = normalize(_e193);
-            let _e195 = i_tangent_1;
-            let _e196 = normalize(_e195);
-            phi_2391_ = (mat3x3<f32>(_e196, cross(_e194, _e196), _e194) * _e192);
+            let _e193 = phi_2414_;
+            phi_2415_ = _e193;
+            if (((_e112 & 32u) != 0u)) {
+                phi_2415_ = vec3<f32>(_e193.x, -(_e193.y), _e193.z);
+            }
+            let _e203 = phi_2415_;
+            let _e204 = i_normal_1;
+            let _e205 = normalize(_e204);
+            let _e206 = i_tangent_1;
+            let _e207 = normalize(_e206);
+            phi_2416_ = (mat3x3<f32>(_e207, cross(_e205, _e207), _e205) * _e203);
         } else {
-            let _e200 = i_normal_1;
-            phi_2391_ = _e200;
+            let _e211 = i_normal_1;
+            phi_2416_ = _e211;
         }
-        let _e202 = phi_2391_;
-        if (((_e111 & 32u) != 0u)) {
-            if ((((_e113 >> bitcast<u32>(2)) & 1u) != 0u)) {
-                let _e210 = textureSampleGrad(roughness_tex, primary_sampler, _e121, _e122, _e123);
-                phi_2518_ = (_e109 * _e210.x);
-                phi_2458_ = (_e99 * _e210.z);
-                phi_2410_ = (_e101 * _e210.y);
+        let _e213 = phi_2416_;
+        if (((_e112 & 64u) != 0u)) {
+            if ((((_e114 >> bitcast<u32>(2)) & 1u) != 0u)) {
+                let _e221 = textureSampleGrad(roughness_tex, primary_sampler, _e122, _e123, _e124);
+                phi_2548_ = (_e110 * _e221.x);
+                phi_2486_ = (_e100 * _e221.z);
+                phi_2436_ = (_e102 * _e221.y);
             } else {
-                phi_2518_ = _e109;
-                phi_2458_ = _e99;
-                phi_2410_ = _e101;
+                phi_2548_ = _e110;
+                phi_2486_ = _e100;
+                phi_2436_ = _e102;
             }
-            let _e218 = phi_2518_;
-            let _e220 = phi_2458_;
-            let _e222 = phi_2410_;
-            phi_2517_ = _e218;
-            phi_2457_ = _e220;
-            phi_2409_ = _e222;
+            let _e229 = phi_2548_;
+            let _e231 = phi_2486_;
+            let _e233 = phi_2436_;
+            phi_2547_ = _e229;
+            phi_2485_ = _e231;
+            phi_2435_ = _e233;
         } else {
-            let _e224 = ((_e111 & 64u) != 0u);
-            phi_1577_ = _e224;
-            if (!(_e224)) {
-                phi_1577_ = ((_e111 & 128u) != 0u);
+            let _e235 = ((_e112 & 128u) != 0u);
+            phi_1598_ = _e235;
+            if (!(_e235)) {
+                phi_1598_ = ((_e112 & 256u) != 0u);
             }
-            let _e229 = phi_1577_;
-            if (_e229) {
-                if ((((_e113 >> bitcast<u32>(2)) & 1u) != 0u)) {
-                    let _e234 = textureSampleGrad(roughness_tex, primary_sampler, _e121, _e122, _e123);
-                    if (_e224) {
-                        phi_2392_ = _e234.yz;
+            let _e240 = phi_1598_;
+            if (_e240) {
+                if ((((_e114 >> bitcast<u32>(2)) & 1u) != 0u)) {
+                    let _e245 = textureSampleGrad(roughness_tex, primary_sampler, _e122, _e123, _e124);
+                    if (_e235) {
+                        phi_2417_ = _e245.yz;
                     } else {
-                        phi_2392_ = _e234.xy;
+                        phi_2417_ = _e245.xy;
                     }
-                    let _e238 = phi_2392_;
-                    phi_2461_ = (_e99 * _e238.y);
-                    phi_2413_ = (_e101 * _e238.x);
+                    let _e249 = phi_2417_;
+                    phi_2489_ = (_e100 * _e249.y);
+                    phi_2439_ = (_e102 * _e249.x);
                 } else {
-                    phi_2461_ = _e109;
-                    phi_2413_ = _e101;
+                    phi_2489_ = _e110;
+                    phi_2439_ = _e102;
                 }
-                let _e244 = phi_2461_;
-                let _e246 = phi_2413_;
-                if ((((_e113 >> bitcast<u32>(9)) & 1u) != 0u)) {
-                    let _e251 = textureSampleGrad(ambient_occlusion_tex, primary_sampler, _e121, _e122, _e123);
-                    phi_2520_ = (_e109 * _e251.x);
+                let _e255 = phi_2489_;
+                let _e257 = phi_2439_;
+                if ((((_e114 >> bitcast<u32>(9)) & 1u) != 0u)) {
+                    let _e262 = textureSampleGrad(ambient_occlusion_tex, primary_sampler, _e122, _e123, _e124);
+                    phi_2550_ = (_e110 * _e262.x);
                 } else {
-                    phi_2520_ = _e109;
+                    phi_2550_ = _e110;
                 }
-                let _e255 = phi_2520_;
-                phi_2519_ = _e255;
-                phi_2459_ = _e244;
-                phi_2411_ = _e246;
+                let _e266 = phi_2550_;
+                phi_2549_ = _e266;
+                phi_2487_ = _e255;
+                phi_2437_ = _e257;
             } else {
-                phi_2521_ = 0.0;
-                phi_2462_ = 0.0;
-                phi_2414_ = 0.0;
-                if (((_e111 & 256u) != 0u)) {
-                    if ((((_e113 >> bitcast<u32>(2)) & 1u) != 0u)) {
-                        let _e262 = textureSampleGrad(roughness_tex, primary_sampler, _e121, _e122, _e123);
-                        phi_2473_ = (_e99 * _e262.x);
+                phi_2551_ = 0.0;
+                phi_2490_ = 0.0;
+                phi_2440_ = 0.0;
+                if (((_e112 & 512u) != 0u)) {
+                    if ((((_e114 >> bitcast<u32>(2)) & 1u) != 0u)) {
+                        let _e273 = textureSampleGrad(roughness_tex, primary_sampler, _e122, _e123, _e124);
+                        phi_2502_ = (_e100 * _e273.x);
                     } else {
-                        phi_2473_ = _e99;
+                        phi_2502_ = _e100;
                     }
-                    let _e266 = phi_2473_;
-                    if ((((_e113 >> bitcast<u32>(3)) & 1u) != 0u)) {
-                        let _e271 = textureSampleGrad(metallic_tex, primary_sampler, _e121, _e122, _e123);
-                        phi_2425_ = (_e101 * _e271.x);
+                    let _e277 = phi_2502_;
+                    if ((((_e114 >> bitcast<u32>(3)) & 1u) != 0u)) {
+                        let _e282 = textureSampleGrad(metallic_tex, primary_sampler, _e122, _e123, _e124);
+                        phi_2452_ = (_e102 * _e282.x);
                     } else {
-                        phi_2425_ = _e101;
+                        phi_2452_ = _e102;
                     }
-                    let _e275 = phi_2425_;
-                    if ((((_e113 >> bitcast<u32>(9)) & 1u) != 0u)) {
-                        let _e280 = textureSampleGrad(ambient_occlusion_tex, primary_sampler, _e121, _e122, _e123);
-                        phi_2526_ = (_e109 * _e280.x);
+                    let _e286 = phi_2452_;
+                    if ((((_e114 >> bitcast<u32>(9)) & 1u) != 0u)) {
+                        let _e291 = textureSampleGrad(ambient_occlusion_tex, primary_sampler, _e122, _e123, _e124);
+                        phi_2557_ = (_e110 * _e291.x);
                     } else {
-                        phi_2526_ = _e109;
+                        phi_2557_ = _e110;
                     }
-                    let _e284 = phi_2526_;
-                    phi_2521_ = _e284;
-                    phi_2462_ = _e266;
-                    phi_2414_ = _e275;
+                    let _e295 = phi_2557_;
+                    phi_2551_ = _e295;
+                    phi_2490_ = _e277;
+                    phi_2440_ = _e286;
                 }
-                let _e286 = phi_2521_;
-                let _e288 = phi_2462_;
-                let _e290 = phi_2414_;
-                phi_2519_ = _e286;
-                phi_2459_ = _e288;
-                phi_2411_ = _e290;
+                let _e297 = phi_2551_;
+                let _e299 = phi_2490_;
+                let _e301 = phi_2440_;
+                phi_2549_ = _e297;
+                phi_2487_ = _e299;
+                phi_2437_ = _e301;
             }
-            let _e292 = phi_2519_;
-            let _e294 = phi_2459_;
-            let _e296 = phi_2411_;
-            phi_2517_ = _e292;
-            phi_2457_ = _e294;
-            phi_2409_ = _e296;
+            let _e303 = phi_2549_;
+            let _e305 = phi_2487_;
+            let _e307 = phi_2437_;
+            phi_2547_ = _e303;
+            phi_2485_ = _e305;
+            phi_2435_ = _e307;
         }
-        let _e298 = phi_2517_;
-        let _e300 = phi_2457_;
-        let _e302 = phi_2409_;
-        if ((((_e113 >> bitcast<u32>(4)) & 1u) != 0u)) {
-            let _e307 = textureSampleGrad(reflectance_tex, primary_sampler, _e121, _e122, _e123);
-            phi_2426_ = (_e103 * _e307.x);
+        let _e309 = phi_2547_;
+        let _e311 = phi_2485_;
+        let _e313 = phi_2435_;
+        if ((((_e114 >> bitcast<u32>(4)) & 1u) != 0u)) {
+            let _e318 = textureSampleGrad(reflectance_tex, primary_sampler, _e122, _e123, _e124);
+            phi_2453_ = (_e104 * _e318.x);
         } else {
-            phi_2426_ = _e103;
+            phi_2453_ = _e104;
         }
-        let _e311 = phi_2426_;
-        let _e312 = _e159.xyz;
-        let _e313 = (1.0 - _e302);
-        if (((_e111 & 512u) != 0u)) {
-            if ((((_e113 >> bitcast<u32>(5)) & 1u) != 0u)) {
-                let _e327 = textureSampleGrad(clear_coat_tex, primary_sampler, _e121, _e122, _e123);
-                phi_2481_ = (_e107 * _e327.y);
-                phi_2428_ = (_e105 * _e327.x);
+        let _e322 = phi_2453_;
+        let _e323 = _e160.xyz;
+        let _e324 = (1.0 - _e313);
+        if (((_e112 & 1024u) != 0u)) {
+            if ((((_e114 >> bitcast<u32>(5)) & 1u) != 0u)) {
+                let _e338 = textureSampleGrad(clear_coat_tex, primary_sampler, _e122, _e123, _e124);
+                phi_2510_ = (_e108 * _e338.y);
+                phi_2455_ = (_e106 * _e338.x);
             } else {
-                phi_2481_ = _e107;
-                phi_2428_ = _e105;
+                phi_2510_ = _e108;
+                phi_2455_ = _e106;
             }
-            let _e333 = phi_2481_;
-            let _e335 = phi_2428_;
-            phi_2480_ = _e333;
-            phi_2427_ = _e335;
+            let _e344 = phi_2510_;
+            let _e346 = phi_2455_;
+            phi_2509_ = _e344;
+            phi_2454_ = _e346;
         } else {
-            if (((_e111 & 1024u) != 0u)) {
-                if ((((_e113 >> bitcast<u32>(5)) & 1u) != 0u)) {
-                    let _e342 = textureSampleGrad(clear_coat_tex, primary_sampler, _e121, _e122, _e123);
-                    phi_2431_ = (_e105 * _e342.x);
+            if (((_e112 & 2048u) != 0u)) {
+                if ((((_e114 >> bitcast<u32>(5)) & 1u) != 0u)) {
+                    let _e353 = textureSampleGrad(clear_coat_tex, primary_sampler, _e122, _e123, _e124);
+                    phi_2458_ = (_e106 * _e353.x);
                 } else {
-                    phi_2431_ = _e105;
+                    phi_2458_ = _e106;
                 }
-                let _e346 = phi_2431_;
-                if ((((_e113 >> bitcast<u32>(6)) & 1u) != 0u)) {
-                    let _e351 = textureSampleGrad(clear_coat_roughness_tex, primary_sampler, _e121, _e122, _e123);
-                    phi_2483_ = (_e107 * _e351.y);
+                let _e357 = phi_2458_;
+                if ((((_e114 >> bitcast<u32>(6)) & 1u) != 0u)) {
+                    let _e362 = textureSampleGrad(clear_coat_roughness_tex, primary_sampler, _e122, _e123, _e124);
+                    phi_2512_ = (_e108 * _e362.y);
                 } else {
-                    phi_2483_ = _e107;
+                    phi_2512_ = _e108;
                 }
-                let _e355 = phi_2483_;
-                phi_2482_ = _e355;
-                phi_2429_ = _e346;
+                let _e366 = phi_2512_;
+                phi_2511_ = _e366;
+                phi_2456_ = _e357;
             } else {
-                phi_2484_ = 0.0;
-                phi_2432_ = 0.0;
-                if (((_e111 & 2048u) != 0u)) {
-                    if ((((_e113 >> bitcast<u32>(5)) & 1u) != 0u)) {
-                        let _e362 = textureSampleGrad(clear_coat_tex, primary_sampler, _e121, _e122, _e123);
-                        phi_2453_ = (_e105 * _e362.x);
+                phi_2513_ = 0.0;
+                phi_2459_ = 0.0;
+                if (((_e112 & 4096u) != 0u)) {
+                    if ((((_e114 >> bitcast<u32>(5)) & 1u) != 0u)) {
+                        let _e373 = textureSampleGrad(clear_coat_tex, primary_sampler, _e122, _e123, _e124);
+                        phi_2481_ = (_e106 * _e373.x);
                     } else {
-                        phi_2453_ = _e105;
+                        phi_2481_ = _e106;
                     }
-                    let _e366 = phi_2453_;
-                    if ((((_e113 >> bitcast<u32>(6)) & 1u) != 0u)) {
-                        let _e371 = textureSampleGrad(clear_coat_roughness_tex, primary_sampler, _e121, _e122, _e123);
-                        phi_2504_ = (_e107 * _e371.x);
+                    let _e377 = phi_2481_;
+                    if ((((_e114 >> bitcast<u32>(6)) & 1u) != 0u)) {
+                        let _e382 = textureSampleGrad(clear_coat_roughness_tex, primary_sampler, _e122, _e123, _e124);
+                        phi_2534_ = (_e108 * _e382.x);
                     } else {
-                        phi_2504_ = _e107;
+                        phi_2534_ = _e108;
                     }
-                    let _e375 = phi_2504_;
-                    phi_2484_ = _e375;
-                    phi_2432_ = _e366;
+                    let _e386 = phi_2534_;
+                    phi_2513_ = _e386;
+                    phi_2459_ = _e377;
                 }
-                let _e377 = phi_2484_;
-                let _e379 = phi_2432_;
-                phi_2482_ = _e377;
-                phi_2429_ = _e379;
+                let _e388 = phi_2513_;
+                let _e390 = phi_2459_;
+                phi_2511_ = _e388;
+                phi_2456_ = _e390;
             }
-            let _e381 = phi_2482_;
-            let _e383 = phi_2429_;
-            phi_2480_ = _e381;
-            phi_2427_ = _e383;
+            let _e392 = phi_2511_;
+            let _e394 = phi_2456_;
+            phi_2509_ = _e392;
+            phi_2454_ = _e394;
         }
-        let _e385 = phi_2480_;
-        let _e387 = phi_2427_;
-        phi_2505_ = _e300;
-        if ((_e387 != 0.0)) {
-            phi_2505_ = mix(_e300, max(_e300, _e385), _e387);
+        let _e396 = phi_2509_;
+        let _e398 = phi_2454_;
+        phi_2535_ = _e311;
+        if ((_e398 != 0.0)) {
+            phi_2535_ = mix(_e311, max(_e311, _e396), _e398);
         }
-        let _e392 = phi_2505_;
-        if ((((_e113 >> bitcast<u32>(7)) & 1u) != 0u)) {
-            let _e398 = textureSampleGrad(emissive_tex, primary_sampler, _e121, _e122, _e123);
-            phi_2601_ = (_e97 * _e398.xyz);
+        let _e403 = phi_2535_;
+        if ((((_e114 >> bitcast<u32>(7)) & 1u) != 0u)) {
+            let _e409 = textureSampleGrad(emissive_tex, primary_sampler, _e122, _e123, _e124);
+            phi_2633_ = (_e98 * _e409.xyz);
         } else {
-            phi_2601_ = _e97;
+            phi_2633_ = _e98;
         }
-        let _e402 = phi_2601_;
-        phi_2664_ = (_e312 * _e313);
-        phi_2657_ = (_e392 * _e392);
-        phi_2633_ = normalize(_e202);
-        phi_2605_ = ((_e312 * _e302) + vec3<f32>((((0.1599999964237213 * _e311) * _e311) * _e313)));
-        phi_2594_ = _e402;
-        phi_2506_ = _e298;
+        let _e413 = phi_2633_;
+        phi_2696_ = (_e323 * _e324);
+        phi_2689_ = (_e403 * _e403);
+        phi_2665_ = normalize(_e213);
+        phi_2637_ = ((_e323 * _e313) + vec3<f32>((((0.1599999964237213 * _e322) * _e322) * _e324)));
+        phi_2626_ = _e413;
+        phi_2536_ = _e309;
     }
-    let _e404 = phi_2664_;
-    let _e406 = phi_2657_;
-    let _e408 = phi_2633_;
-    let _e410 = phi_2605_;
-    let _e412 = phi_2594_;
-    let _e414 = phi_2506_;
-    let _e417 = unnamed_1.material.material_flags;
-    if (((_e417 & 4096u) != 0u)) {
-        o_color = _e159;
+    let _e415 = phi_2696_;
+    let _e417 = phi_2689_;
+    let _e419 = phi_2665_;
+    let _e421 = phi_2637_;
+    let _e423 = phi_2626_;
+    let _e425 = phi_2536_;
+    let _e428 = unnamed_1.material.material_flags;
+    if (((_e428 & 8192u) != 0u)) {
+        o_color = _e160;
     } else {
-        let _e420 = i_view_position_1;
-        let _e423 = -(normalize(_e420.xyz));
-        phi_2693_ = _e412;
-        phi_2692_ = 0u;
+        let _e431 = i_view_position_1;
+        let _e434 = -(normalize(_e431.xyz));
+        phi_2725_ = _e423;
+        phi_2724_ = 0u;
         loop {
-            let _e425 = phi_2693_;
-            let _e427 = phi_2692_;
-            let _e430 = unnamed_2.directional_light_header.total_lights;
-            local = _e425;
-            local_1 = _e425;
-            local_2 = _e425;
-            if ((_e427 < _e430)) {
-                let _e435 = unnamed_2.directional_lights[_e427].view_proj;
-                let _e438 = unnamed.uniforms.inv_view;
-                let _e440 = ((_e435 * _e438) * _e420);
-                let _e443 = ((_e440.xy * 0.5) + vec2<f32>(0.5, 0.5));
-                let _e446 = (1.0 - _e443.y);
-                let _e449 = vec4<f32>(_e443.x, _e446, f32(_e427), _e440.z);
-                let _e450 = (_e443.x < 0.0);
-                phi_1225_ = _e450;
-                if (!(_e450)) {
-                    phi_1225_ = (_e443.x > 1.0);
+            let _e436 = phi_2725_;
+            let _e438 = phi_2724_;
+            let _e441 = unnamed_2.directional_light_header.total_lights;
+            local = _e436;
+            local_1 = _e436;
+            local_2 = _e436;
+            if ((_e438 < _e441)) {
+                let _e446 = unnamed_2.directional_lights[_e438].view_proj;
+                let _e449 = unnamed.uniforms.inv_view;
+                let _e451 = ((_e446 * _e449) * _e431);
+                let _e454 = ((_e451.xy * 0.5) + vec2<f32>(0.5, 0.5));
+                let _e457 = (1.0 - _e454.y);
+                let _e460 = vec4<f32>(_e454.x, _e457, f32(_e438), _e451.z);
+                let _e461 = (_e454.x < 0.0);
+                phi_1236_ = _e461;
+                if (!(_e461)) {
+                    phi_1236_ = (_e454.x > 1.0);
                 }
-                let _e454 = phi_1225_;
-                phi_1232_ = _e454;
-                if (!(_e454)) {
-                    phi_1232_ = (_e446 < 0.0);
+                let _e465 = phi_1236_;
+                phi_1243_ = _e465;
+                if (!(_e465)) {
+                    phi_1243_ = (_e457 < 0.0);
                 }
-                let _e458 = phi_1232_;
-                phi_1239_ = _e458;
-                if (!(_e458)) {
-                    phi_1239_ = (_e446 > 1.0);
+                let _e469 = phi_1243_;
+                phi_1250_ = _e469;
+                if (!(_e469)) {
+                    phi_1250_ = (_e457 > 1.0);
                 }
-                let _e462 = phi_1239_;
-                phi_1247_ = _e462;
-                if (!(_e462)) {
-                    phi_1247_ = (_e440.z < -1.0);
+                let _e473 = phi_1250_;
+                phi_1258_ = _e473;
+                if (!(_e473)) {
+                    phi_1258_ = (_e451.z < -1.0);
                 }
-                let _e466 = phi_1247_;
-                phi_1254_ = _e466;
-                if (!(_e466)) {
-                    phi_1254_ = (_e440.z > 1.0);
+                let _e477 = phi_1258_;
+                phi_1265_ = _e477;
+                if (!(_e477)) {
+                    phi_1265_ = (_e451.z > 1.0);
                 }
-                let _e470 = phi_1254_;
-                if (_e470) {
-                    phi_2700_ = 1.0;
+                let _e481 = phi_1265_;
+                if (_e481) {
+                    phi_2732_ = 1.0;
                 } else {
-                    let _e476 = textureSampleCompareLevel(shadow, shadow_sampler, vec2<f32>(_e449.x, _e449.y), i32(_e449.z), _e440.z);
-                    phi_2700_ = _e476;
+                    let _e487 = textureSampleCompareLevel(shadow, shadow_sampler, vec2<f32>(_e460.x, _e460.y), i32(_e460.z), _e451.z);
+                    phi_2732_ = _e487;
                 }
-                let _e478 = phi_2700_;
-                let _e483 = unnamed_2.directional_lights[_e427].color;
-                let _e485 = unnamed_2.directional_lights[_e427].direction;
-                let _e488 = unnamed.uniforms.view;
-                let _e498 = normalize((mat3x3<f32>(_e488[0].xyz, _e488[1].xyz, _e488[2].xyz) * -(_e485)));
-                let _e500 = normalize((_e423 + _e498));
-                let _e502 = abs(dot(_e408, _e423));
-                let _e503 = (_e502 + 9.999999747378752e-6);
-                let _e505 = clamp(dot(_e408, _e498), 0.0, 1.0);
-                let _e507 = clamp(dot(_e408, _e500), 0.0, 1.0);
-                let _e512 = (_e406 * _e406);
-                let _e516 = ((((_e507 * _e512) - _e507) * _e507) + 1.0);
-                local_3 = (_e425 + ((((_e404 * 0.31830987334251404) + (((_e410 + ((vec3<f32>(clamp(dot(_e410, vec3<f32>(16.5, 16.5, 16.5)), 0.0, 1.0)) - _e410) * pow((1.0 - clamp(dot(_e498, _e500), 0.0, 1.0)), 5.0))) * ((_e512 / ((3.1415927410125732 * _e516) * _e516)) * (0.5 / ((_e505 * sqrt((((((-9.999999747378752e-6 - _e502) * _e512) + _e503) * _e503) + _e512))) + (_e503 * sqrt(((((-(_e505) * _e512) + _e505) * _e505) + _e512))))))) * 1.0)) * _e483) * (_e505 * (_e478 * _e414))));
+                let _e489 = phi_2732_;
+                let _e494 = unnamed_2.directional_lights[_e438].color;
+                let _e496 = unnamed_2.directional_lights[_e438].direction;
+                let _e499 = unnamed.uniforms.view;
+                let _e509 = normalize((mat3x3<f32>(_e499[0].xyz, _e499[1].xyz, _e499[2].xyz) * -(_e496)));
+                let _e511 = normalize((_e434 + _e509));
+                let _e513 = abs(dot(_e419, _e434));
+                let _e514 = (_e513 + 9.999999747378752e-6);
+                let _e516 = clamp(dot(_e419, _e509), 0.0, 1.0);
+                let _e518 = clamp(dot(_e419, _e511), 0.0, 1.0);
+                let _e523 = (_e417 * _e417);
+                let _e527 = ((((_e518 * _e523) - _e518) * _e518) + 1.0);
+                local_3 = (_e436 + ((((_e415 * 0.31830987334251404) + (((_e421 + ((vec3<f32>(clamp(dot(_e421, vec3<f32>(16.5, 16.5, 16.5)), 0.0, 1.0)) - _e421) * pow((1.0 - clamp(dot(_e509, _e511), 0.0, 1.0)), 5.0))) * ((_e523 / ((3.1415927410125732 * _e527) * _e527)) * (0.5 / ((_e516 * sqrt((((((-9.999999747378752e-6 - _e513) * _e523) + _e514) * _e514) + _e523))) + (_e514 * sqrt(((((-(_e516) * _e523) + _e516) * _e516) + _e523))))))) * 1.0)) * _e494) * (_e516 * (_e489 * _e425))));
                 continue;
             } else {
                 break;
             }
             continuing {
-                let _e619 = local_3;
-                phi_2693_ = _e619;
-                phi_2692_ = (_e427 + bitcast<u32>(1));
+                let _e631 = local_3;
+                phi_2725_ = _e631;
+                phi_2724_ = (_e438 + bitcast<u32>(1));
             }
         }
-        let _e555 = local;
-        let _e558 = local_1;
-        let _e561 = local_2;
-        let _e566 = unnamed.uniforms.ambient;
-        o_color = max(vec4<f32>(_e555.x, _e558.y, _e561.z, _e159.w), (_e566 * _e159));
+        let _e566 = local;
+        let _e569 = local_1;
+        let _e572 = local_2;
+        let _e577 = unnamed.uniforms.ambient;
+        o_color = max(vec4<f32>(_e566.x, _e569.y, _e572.z, _e160.w), (_e577 * _e160));
     }
     return;
 }
