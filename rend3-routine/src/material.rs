@@ -234,19 +234,19 @@ impl NormalTexture {
 pub enum AoMRTextures {
     None,
     Combined {
-        /// Texture with Ambient Occlusion in R, Metallic in G, and Roughness in B
+        /// Texture with Ambient Occlusion in R, Roughness in G, and Metallic in B
         texture: Option<TextureHandle>,
     },
     SwizzledSplit {
         /// Texture with Ambient Occlusion in R
         ao_texture: Option<TextureHandle>,
-        /// Texture with Metallic in G, and Roughness in B
+        /// Texture with Roughness in G and Metallic in B
         mr_texture: Option<TextureHandle>,
     },
     Split {
         /// Texture with Ambient Occlusion in R
         ao_texture: Option<TextureHandle>,
-        /// Texture with Metallic in R, and Roughness in G
+        /// Texture with Roughness in R and Metallic in G
         mr_texture: Option<TextureHandle>,
     },
     BWSplit {

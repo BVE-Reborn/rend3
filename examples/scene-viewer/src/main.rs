@@ -1,3 +1,3 @@
 fn main() {
-    scene_viewer::main()
+    rend3_scene_viewer_example::main()
 }

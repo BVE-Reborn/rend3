@@ -1,8 +1,11 @@
-use glam::{DVec2, Mat3A, Mat4, UVec2, Vec3A};
+use glam::{DVec2, Mat3A, Mat4, UVec2, Vec3, Vec3A};
 use instant::Instant;
 use pico_args::Arguments;
 use rend3::{
-    types::{Backend, Camera, CameraProjection, SampleCount, Texture, TextureFormat},
+    types::{
+        Backend, Camera, CameraProjection, DirectionalLight, DirectionalLightHandle, SampleCount, Texture,
+        TextureFormat,
+    },
     util::typedefs::FastHashMap,
     Renderer, RendererMode,
 };
@@ -59,6 +62,7 @@ async fn load_gltf(
     renderer: &Renderer,
     loader: &rend3_framework::AssetLoader,
     normal_direction: NormalTextureYDirection,
+    scale: f32,
     location: AssetPath<'_>,
 ) -> rend3_gltf::LoadedGltfScene {
     // profiling::scope!("loading gltf");
@@ -77,7 +81,7 @@ async fn load_gltf(
 
     let gltf_elapsed = gltf_start.elapsed();
     let resources_start = Instant::now();
-    let scene = rend3_gltf::load_gltf(renderer, &gltf_data, normal_direction, |uri| async {
+    let scene = rend3_gltf::load_gltf(renderer, &gltf_data, scale, normal_direction, |uri| async {
         log::info!("Loading resource {}", uri);
         let uri = uri;
         let full_uri = parent_str.clone() + "/" + uri.as_str();
@@ -122,6 +126,22 @@ fn extract_msaa(value: &str) -> Result<SampleCount, &'static str> {
         "4" => SampleCount::Four,
         _ => return Err("invalid msaa count"),
     })
+}
+
+fn extract_vec3(value: &str) -> Result<Vec3, &'static str> {
+    let mut res = [0.0_f32, 0.0, 0.0];
+    let split: Vec<_> = value.split(',').enumerate().collect();
+
+    if split.len() != 3 {
+        return Err("Directional lights are defined with 3 values");
+    }
+
+    for (idx, inner) in split {
+        let inner = inner.trim();
+
+        res[idx] = inner.parse().map_err(|_| "Cannot parse direction number")?;
+    }
+    Ok(Vec3::from(res))
 }
 
 fn option_arg<T>(result: Result<Option<T>, pico_args::Error>) -> Option<T> {
@@ -173,21 +193,23 @@ Meta:
   --help            This menu.
 
 Rendering:
-  -b --backend      Choose backend to run on ('vk', 'dx12', 'dx11', 'metal', 'gl').
-  -d --device       Choose device to run on (case insensitive device substring).
-  -m --mode         Choose rendering mode to run on ('cpu', 'gpu').
-  --msaa            Level of antialiasing (either 1 or 4). Default 1.
+  -b --backend                 Choose backend to run on ('vk', 'dx12', 'dx11', 'metal', 'gl').
+  -d --device                  Choose device to run on (case insensitive device substring).
+  -m --mode                    Choose rendering mode to run on ('cpu', 'gpu').
+  --msaa                       Level of antialiasing (either 1 or 4). Default 1.
 
 Windowing:
-  --absolute-mouse  Interpret the relative mouse coordinates as absolute. Useful when using things like VNC.
-  --fullscreen      Open the window in borderless fullscreen.
+  --absolute-mouse             Interpret the relative mouse coordinates as absolute. Useful when using things like VNC.
+  --fullscreen                 Open the window in borderless fullscreen.
 
 Assets:
-  --normal-y-down   Interpret all normals as having the DirectX convention of Y down. Defaults to Y up.
+  --normal-y-down              Interpret all normals as having the DirectX convention of Y down. Defaults to Y up.
+  --directional-light <x,y,z>  Create a directional light pointing towards the given coordinates.
+  --scale <scale>              Scale all objects loaded by this factor.
 
 Controls:
-  --walk <speed>    Walk speed (speed without holding shift) in units/second (typically meters). Default 10.
-  --run  <speed>    Run speed (speed while holding shift) in units/second (typically meters). Default 50.
+  --walk <speed>               Walk speed (speed without holding shift) in units/second (typically meters). Default 10.
+  --run  <speed>               Run speed (speed while holding shift) in units/second (typically meters). Default 50.
 ";
 
 struct SceneViewer {
@@ -199,6 +221,9 @@ struct SceneViewer {
     walk_speed: f32,
     run_speed: f32,
     normal_direction: NormalTextureYDirection,
+    scale: Option<f32>,
+    directional_light_direction: Option<Vec3>,
+    directional_light: Option<DirectionalLightHandle>,
     samples: SampleCount,
 
     fullscreen: bool,
@@ -238,6 +263,8 @@ impl SceneViewer {
             true => NormalTextureYDirection::Down,
             false => NormalTextureYDirection::Up,
         };
+        let directional_light_direction = option_arg(args.opt_value_from_fn("--directional-light", extract_vec3));
+        let scale: Option<f32> = option_arg(args.opt_value_from_str("--scale"));
 
         // Controls
         let walk_speed = args.value_from_str("--walk").unwrap_or(10.0_f32);
@@ -273,6 +300,9 @@ impl SceneViewer {
             walk_speed,
             run_speed,
             normal_direction,
+            scale,
+            directional_light_direction,
+            directional_light: None,
             samples,
 
             fullscreen,
@@ -334,6 +364,16 @@ impl rend3_framework::App for SceneViewer {
 
         self.grabber = Some(rend3_framework::Grabber::new(window));
 
+        if let Some(direction) = self.directional_light_direction {
+            self.directional_light = Some(renderer.add_directional_light(DirectionalLight {
+                color: Vec3::splat(1.0),
+                intensity: 4.0,
+                direction,
+                distance: 100.0,
+            }));
+        }
+
+        let scale = self.scale;
         let normal_direction = self.normal_direction;
         let file_to_load = self.file_to_load.take();
         let renderer = Arc::clone(renderer);
@@ -352,6 +392,7 @@ impl rend3_framework::App for SceneViewer {
                     &renderer,
                     &loader,
                     normal_direction,
+                    scale.unwrap_or(1.0),
                     file_to_load
                         .as_deref()
                         .map_or_else(|| AssetPath::Internal("default-scene/scene.gltf"), AssetPath::External),
@@ -382,7 +423,13 @@ impl rend3_framework::App for SceneViewer {
                 if elapsed_since_second > Duration::from_secs(1) {
                     let count = self.frame_times.entries();
                     println!(
-                        "{:0>5} frames over {:0>5.2}s. Min: {:0>5.2}ms; Average: {:0>5.2}ms; 95%: {:0>5.2}ms; 99%: {:0>5.2}ms; Max: {:0>5.2}ms; StdDev: {:0>5.2}ms",
+                        "{:0>5} frames over {:0>5.2}s. \
+                        Min: {:0>5.2}ms; \
+                        Average: {:0>5.2}ms; \
+                        95%: {:0>5.2}ms; \
+                        99%: {:0>5.2}ms; \
+                        Max: {:0>5.2}ms; \
+                        StdDev: {:0>5.2}ms",
                         count,
                         elapsed_since_second.as_secs_f32(),
                         self.frame_times.minimum().unwrap() as f32 / 1_000.0,
