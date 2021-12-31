@@ -191,6 +191,7 @@ pub async fn filesystem_io_func(parent_directory: impl AsRef<Path>, uri: SsoStri
 pub async fn load_gltf<F, Fut, E>(
     renderer: &Renderer,
     data: &[u8],
+    scale: f32,
     normal_direction: NormalTextureYDirection,
     io_func: F,
 ) -> Result<LoadedGltfScene, GltfLoadError<E>>
@@ -218,12 +219,12 @@ where
         &loaded,
         scene.nodes(),
         Mat4::from_scale(Vec3::new(
-            1.0,
-            1.0,
+            scale,
+            scale,
             if renderer.handedness == Handedness::Left {
-                -1.0
+                -scale
             } else {
-                1.0
+                scale
             },
         )),
     )?;
