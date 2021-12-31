@@ -278,9 +278,9 @@ impl SceneViewer {
             fullscreen,
 
             scancode_status: FastHashMap::default(),
-            camera_pitch: std::f32::consts::FRAC_PI_4,
-            camera_yaw: -std::f32::consts::FRAC_PI_4,
-            camera_location: Vec3A::new(20.0, 20.0, -20.0),
+            camera_pitch: -std::f32::consts::FRAC_PI_8,
+            camera_yaw: std::f32::consts::FRAC_PI_4,
+            camera_location: Vec3A::new(3.0, 3.0, 3.0),
             previous_profiling_stats: None,
             timestamp_last_second: Instant::now(),
             timestamp_last_frame: Instant::now(),
