@@ -250,7 +250,8 @@ where
 
     let default_material = load_default_material(renderer);
     let meshes = load_meshes(renderer, file.meshes(), &buffers)?;
-    let (materials, images) = load_materials_and_textures(renderer, file.materials(), &buffers, normal_direction, &mut io_func).await?;
+    let (materials, images) =
+        load_materials_and_textures(renderer, file.materials(), &buffers, normal_direction, &mut io_func).await?;
 
     let loaded = LoadedGltfScene {
         meshes,
@@ -595,8 +596,12 @@ where
                 gltf::material::AlphaMode::Blend => material::Transparency::Blend,
             },
             normal: match normals_tex {
-                Some(tex) if tex.format.describe().components == 2 => material::NormalTexture::Bicomponent(tex.handle, normal_direction),
-                Some(tex) if tex.format.describe().components >= 3 => material::NormalTexture::Tricomponent(tex.handle, normal_direction),
+                Some(tex) if tex.format.describe().components == 2 => {
+                    material::NormalTexture::Bicomponent(tex.handle, normal_direction)
+                }
+                Some(tex) if tex.format.describe().components >= 3 => {
+                    material::NormalTexture::Tricomponent(tex.handle, normal_direction)
+                }
                 _ => material::NormalTexture::None,
             },
             aomr_textures: match (metallic_roughness_tex, occlusion_tex) {

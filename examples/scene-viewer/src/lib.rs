@@ -2,7 +2,7 @@ use glam::{DVec2, Mat3A, Mat4, UVec2, Vec3A};
 use instant::Instant;
 use pico_args::Arguments;
 use rend3::{
-    types::{Backend, Camera, CameraProjection, Texture, TextureFormat},
+    types::{Backend, Camera, CameraProjection, SampleCount, Texture, TextureFormat},
     util::typedefs::FastHashMap,
     Renderer, RendererMode,
 };
@@ -104,7 +104,7 @@ fn extract_backend(value: &str) -> Result<Backend, &'static str> {
         "dx11" | "11" => Backend::Dx11,
         "metal" | "mtl" => Backend::Metal,
         "opengl" | "gl" => Backend::Gl,
-        _ => return Err("backend requested but not found"),
+        _ => return Err("unknown backend"),
     })
 }
 
@@ -112,8 +112,34 @@ fn extract_mode(value: &str) -> Result<rend3::RendererMode, &'static str> {
     Ok(match value.to_lowercase().as_str() {
         "legacy" | "c" | "cpu" => rend3::RendererMode::CPUPowered,
         "modern" | "g" | "gpu" => rend3::RendererMode::GPUPowered,
-        _ => return Err("mode requested but not found"),
+        _ => return Err("unknown rendermode"),
     })
+}
+
+fn extract_msaa(value: &str) -> Result<SampleCount, &'static str> {
+    Ok(match value {
+        "1" => SampleCount::One,
+        "4" => SampleCount::Four,
+        _ => return Err("invalid msaa count"),
+    })
+}
+
+fn option_arg<T>(result: Result<Option<T>, pico_args::Error>) -> Option<T> {
+    match result {
+        Ok(o) => o,
+        Err(pico_args::Error::Utf8ArgumentParsingFailed { value, cause }) => {
+            eprintln!("{}: '{}'\n\n{}", cause, value, HELP);
+            std::process::exit(1);
+        }
+        Err(pico_args::Error::OptionWithoutAValue(value)) => {
+            eprintln!("{} flag needs an argument", value);
+            std::process::exit(1);
+        }
+        Err(e) => {
+            eprintln!("{:?}", e);
+            std::process::exit(1);
+        }
+    }
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -150,6 +176,7 @@ Rendering:
   -b --backend      Choose backend to run on ('vk', 'dx12', 'dx11', 'metal', 'gl').
   -d --device       Choose device to run on (case insensitive device substring).
   -m --mode         Choose rendering mode to run on ('cpu', 'gpu').
+  --msaa            Level of antialiasing (either 1 or 4). Default 1.
 
 Windowing:
   --absolute-mouse  Interpret the relative mouse coordinates as absolute. Useful when using things like VNC.
@@ -172,6 +199,7 @@ struct SceneViewer {
     walk_speed: f32,
     run_speed: f32,
     normal_direction: NormalTextureYDirection,
+    samples: SampleCount,
 
     fullscreen: bool,
 
@@ -195,12 +223,11 @@ impl SceneViewer {
         let help = args.contains(["-h", "--help"]);
 
         // Rendering
-        let desired_backend = args.value_from_fn(["-b", "--backend"], extract_backend).ok();
-        let desired_device_name: Option<String> = args
-            .value_from_str(["-d", "--device"])
-            .ok()
-            .map(|s: String| s.to_lowercase());
-        let desired_mode = args.value_from_fn(["-m", "--mode"], extract_mode).ok();
+        let desired_backend = option_arg(args.opt_value_from_fn(["-b", "--backend"], extract_backend));
+        let desired_device_name: Option<String> =
+            option_arg(args.opt_value_from_str(["-d", "--device"])).map(|s: String| s.to_lowercase());
+        let desired_mode = option_arg(args.opt_value_from_fn(["-m", "--mode"], extract_mode));
+        let samples = option_arg(args.opt_value_from_fn("--msaa", extract_msaa)).unwrap_or(SampleCount::One);
 
         // Windowing
         let absolute_mouse: bool = args.contains("--absolute-mouse");
@@ -246,6 +273,7 @@ impl SceneViewer {
             walk_speed,
             run_speed,
             normal_direction,
+            samples,
 
             fullscreen,
 
@@ -265,7 +293,6 @@ impl SceneViewer {
 }
 impl rend3_framework::App for SceneViewer {
     const HANDEDNESS: rend3::types::Handedness = rend3::types::Handedness::Right;
-    const DEFAULT_SAMPLE_COUNT: rend3::types::SampleCount = rend3::types::SampleCount::One;
 
     fn create_iad<'a>(
         &'a mut self,
@@ -279,6 +306,10 @@ impl rend3_framework::App for SceneViewer {
             )
             .await?)
         })
+    }
+
+    fn sample_count(&self) -> SampleCount {
+        self.samples
     }
 
     fn scale_factor(&self) -> f32 {
@@ -445,7 +476,7 @@ impl rend3_framework::App for SceneViewer {
                     &pbr_routine,
                     Some(&skybox_routine),
                     &tonemapping_routine,
-                    Self::DEFAULT_SAMPLE_COUNT,
+                    self.samples,
                 );
 
                 // Dispatch a render using the built up rendergraph!
