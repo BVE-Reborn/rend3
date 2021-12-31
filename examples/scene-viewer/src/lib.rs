@@ -382,16 +382,16 @@ impl rend3_framework::App for SceneViewer {
                 if elapsed_since_second > Duration::from_secs(1) {
                     let count = self.frame_times.entries();
                     println!(
-                            "{:0>5} frames over {:0>5.2}s. Min: {:0>5.2}ms; Average: {:0>5.2}ms; 95%: {:0>5.2}ms; 99%: {:0>5.2}ms; Max: {:0>5.2}ms; StdDev: {:0>5.2}ms",
-                            count,
-                            elapsed_since_second.as_secs_f32(),
-                            self.frame_times.minimum().unwrap() as f32 / 1_000.0,
-                            self.frame_times.mean().unwrap() as f32 / 1_000.0,
-                            self.frame_times.percentile(95.0).unwrap() as f32 / 1_000.0,
-                            self.frame_times.percentile(99.0).unwrap() as f32 / 1_000.0,
-                            self.frame_times.maximum().unwrap() as f32 / 1_000.0,
-                            self.frame_times.stddev().unwrap() as f32 / 1_000.0,
-                        );
+                        "{:0>5} frames over {:0>5.2}s. Min: {:0>5.2}ms; Average: {:0>5.2}ms; 95%: {:0>5.2}ms; 99%: {:0>5.2}ms; Max: {:0>5.2}ms; StdDev: {:0>5.2}ms",
+                        count,
+                        elapsed_since_second.as_secs_f32(),
+                        self.frame_times.minimum().unwrap() as f32 / 1_000.0,
+                        self.frame_times.mean().unwrap() as f32 / 1_000.0,
+                        self.frame_times.percentile(95.0).unwrap() as f32 / 1_000.0,
+                        self.frame_times.percentile(99.0).unwrap() as f32 / 1_000.0,
+                        self.frame_times.maximum().unwrap() as f32 / 1_000.0,
+                        self.frame_times.stddev().unwrap() as f32 / 1_000.0,
+                    );
                     self.timestamp_last_second = now;
                     self.frame_times.clear();
                 }
@@ -400,7 +400,7 @@ impl rend3_framework::App for SceneViewer {
 
                 let rotation =
                     Mat3A::from_euler(glam::EulerRot::XYZ, -self.camera_pitch, -self.camera_yaw, 0.0).transpose();
-                let forward = rotation.z_axis;
+                let forward = -rotation.z_axis;
                 let up = rotation.y_axis;
                 let side = -rotation.x_axis;
                 let velocity = if button_pressed(&self.scancode_status, platform::Scancodes::SHIFT) {
@@ -549,8 +549,8 @@ impl rend3_framework::App for SceneViewer {
                     DVec2::new(delta_x, delta_y)
                 };
 
-                self.camera_yaw += (mouse_delta.x / 1000.0) as f32;
-                self.camera_pitch += (mouse_delta.y / 1000.0) as f32;
+                self.camera_yaw -= (mouse_delta.x / 1000.0) as f32;
+                self.camera_pitch -= (mouse_delta.y / 1000.0) as f32;
                 if self.camera_yaw < 0.0 {
                     self.camera_yaw += TAU;
                 } else if self.camera_yaw >= TAU {
