@@ -17,11 +17,9 @@ exclude = [
 ]
 
 [lib]
+name = "rend3_scene_viewer_example"
 crate-type = ["lib", "cdylib"]
 
-[[bin]]
-name = "scene-viewer"
-path = "src/main.rs"
 
 [features]
 tracy = ["profiling/profile-with-tracy", "tracy-client"]

@@ -130,7 +130,7 @@ fn extract_msaa(value: &str) -> Result<SampleCount, &'static str> {
 
 fn extract_vec3(value: &str) -> Result<Vec3, &'static str> {
     let mut res = [0.0_f32, 0.0, 0.0];
-    let split: Vec<_> = value.split(",").enumerate().collect();
+    let split: Vec<_> = value.split(',').enumerate().collect();
 
     if split.len() != 3 {
         return Err("Directional lights are defined with 3 values");
