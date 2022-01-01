@@ -124,7 +124,9 @@ struct CPUMaterialData {
 struct UniformData {
     mat4 view;
     mat4 view_proj;
+    mat4 origin_view_proj;
     mat4 inv_view;
+    mat4 inv_view_proj;
     mat4 inv_origin_view_proj;
     Frustum frustum;
     vec4 ambient;

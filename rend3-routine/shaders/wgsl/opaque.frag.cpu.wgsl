@@ -13,7 +13,9 @@ struct Frustum {
 struct UniformData {
     view: mat4x4<f32>;
     view_proj: mat4x4<f32>;
+    origin_view_proj: mat4x4<f32>;
     inv_view: mat4x4<f32>;
+    inv_view_proj: mat4x4<f32>;
     inv_origin_view_proj: mat4x4<f32>;
     frustum: Frustum;
     ambient: vec4<f32>;
