@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use rend3::{util::bind_merge::BindGroupBuilder, RpassTemporaryPool};
+use rend3::RpassTemporaryPool;
 use wgpu::{
     BindGroup, ColorTargetState, ColorWrites, Device, FragmentState, FrontFace, MultisampleState,
     PipelineLayoutDescriptor, PolygonMode, PrimitiveState, PrimitiveTopology, RenderPass, RenderPipeline,
@@ -29,7 +29,7 @@ pub struct TonemappingPassBlitArgs<'a, 'rpass> {
 }
 
 pub struct TonemappingPass {
-    pipeline: RenderPipeline,
+    pub pipeline: RenderPipeline,
 }
 impl TonemappingPass {
     pub fn new(args: TonemappingPassNewArgs<'_>) -> Self {
@@ -97,22 +97,5 @@ impl TonemappingPass {
         });
 
         Self { pipeline }
-    }
-
-    pub fn blit<'rpass>(&'rpass self, args: TonemappingPassBlitArgs<'_, 'rpass>) {
-        profiling::scope!("tonemapping");
-
-        let blit_src_bg = args
-            .temps
-            .add(BindGroupBuilder::new().append_texture_view(args.source).build(
-                args.device,
-                Some("blit src bg"),
-                &args.interfaces.blit_bgl,
-            ));
-
-        args.rpass.set_pipeline(&self.pipeline);
-        args.rpass.set_bind_group(0, args.forward_uniform_bg, &[]);
-        args.rpass.set_bind_group(1, blit_src_bg, &[]);
-        args.rpass.draw(0..3, 0..1);
     }
 }

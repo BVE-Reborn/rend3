@@ -21,6 +21,7 @@ pub use utils::*;
 use crate::{
     culling::{cpu::CpuCullerCullArgs, gpu::GpuCullerCullArgs, CulledObjectSet},
     material::{PbrMaterial, TransparencyType},
+    skybox::StoredSkybox,
 };
 
 pub mod common;
@@ -647,12 +648,20 @@ impl SkyboxRoutine {
 
     pub fn ready(&mut self, renderer: &Renderer) {
         let d2c_texture_manager = renderer.d2c_texture_manager.read();
-        self.skybox_pass.update_skybox(skybox::UpdateSkyboxArgs {
-            device: &renderer.device,
-            interfaces: &self.interfaces,
-            d2c_texture_manager: &d2c_texture_manager,
-            new_skybox_handle: self.skybox_texture.clone(),
-        });
+
+        profiling::scope!("Update Skybox");
+
+        if let Some(handle) = self.skybox_texture {
+            if self.skybox_pass.current_skybox.as_ref().map(|s| &s.handle) == Some(&handle) {
+                return;
+            }
+
+            let bg = BindGroupBuilder::new()
+                .append_texture_view(d2c_texture_manager.get_view(handle.get_raw()))
+                .build(&renderer.device, Some("skybox"), &self.interfaces.skybox_bgl);
+
+            self.skybox_pass.current_skybox = Some(StoredSkybox { bg, handle })
+        }
     }
 
     pub fn add_to_graph<'node>(
@@ -691,10 +700,12 @@ impl SkyboxRoutine {
 
             let forward_uniform_bg = graph_data.get_data(temps, forward_uniform_handle).unwrap();
 
-            this.skybox_pass.draw_skybox(skybox::SkyboxPassDrawArgs {
-                rpass,
-                forward_uniform_bg,
-            });
+            if let Some(ref skybox) = this.skybox_pass.current_skybox {
+                rpass.set_pipeline(&this.skybox_pass.skybox_pipeline);
+                rpass.set_bind_group(0, forward_uniform_bg, &[]);
+                rpass.set_bind_group(1, &skybox.bg, &[]);
+                rpass.draw(0..3, 0..1);
+            }
         });
     }
 }
@@ -758,14 +769,18 @@ impl TonemappingRoutine {
             let forward_uniform_bg = graph_data.get_data(temps, forward_uniform_handle).unwrap();
             let hdr_color = graph_data.get_render_target(input_handle);
 
-            this.tonemapping_pass.blit(tonemapping::TonemappingPassBlitArgs {
-                device: &renderer.device,
-                rpass,
-                interfaces: &this.interfaces,
-                forward_uniform_bg,
-                source: hdr_color,
-                temps,
-            });
+            profiling::scope!("tonemapping");
+
+            let blit_src_bg = temps.add(BindGroupBuilder::new().append_texture_view(hdr_color).build(
+                &renderer.device,
+                Some("blit src bg"),
+                &this.interfaces.blit_bgl,
+            ));
+
+            rpass.set_pipeline(&this.tonemapping_pass.pipeline);
+            rpass.set_bind_group(0, forward_uniform_bg, &[]);
+            rpass.set_bind_group(1, blit_src_bg, &[]);
+            rpass.draw(0..3, 0..1);
         });
     }
 }
