@@ -263,7 +263,6 @@ impl<'node> RenderGraph<'node> {
         // All textures that were ever returned are marked as used, so anything in here
         // that wasn't ever returned, was unused throughout the whole graph.
         graph_texture_store.remove_unused();
-        drop(graph_texture_store);
 
         // Iterate through all nodes and describe the node when they _end_
         let mut renderpass_ends = Vec::with_capacity(16);

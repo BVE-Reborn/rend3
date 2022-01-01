@@ -472,7 +472,7 @@ impl PbrRenderRoutine {
 
             graph_data.mesh_manager.buffers().bind(rpass);
 
-            rpass.set_pipeline(&pipeline);
+            rpass.set_pipeline(pipeline);
             rpass.set_bind_group(0, forward_uniform_bg, &[]);
             rpass.set_bind_group(1, &culled.per_material, &[]);
 
@@ -519,13 +519,14 @@ impl PrimaryPasses {
             renderer: args.renderer,
             data_core: args.data_core,
             interfaces: args.interfaces,
-            samples: args.samples,
+            samples: SampleCount::One,
             ty: common::depth_pass::DepthPassType::Shadow,
             unclipped_depth_supported: args.unclipped_depth_supported,
         };
         let shadow_pipelines = common::depth_pass::build_depth_pass_pipeline(depth_pass_args.clone());
         let depth_pipelines =
             common::depth_pass::build_depth_pass_pipeline(common::depth_pass::BuildDepthPassShaderArgs {
+                samples: args.samples,
                 ty: common::depth_pass::DepthPassType::Prepass,
                 ..depth_pass_args
             });
@@ -537,13 +538,13 @@ impl PrimaryPasses {
             samples: args.samples,
             transparency: TransparencyType::Opaque,
         };
-        let forward_blend = common::forward_pass::build_forward_pass_pipeline(forward_pass_args.clone());
+        let forward_opaque = common::forward_pass::build_forward_pass_pipeline(forward_pass_args.clone());
         let forward_cutout =
             common::forward_pass::build_forward_pass_pipeline(common::forward_pass::BuildForwardPassShaderArgs {
                 transparency: TransparencyType::Cutout,
                 ..forward_pass_args.clone()
             });
-        let forward_opaque =
+        let forward_blend =
             common::forward_pass::build_forward_pass_pipeline(common::forward_pass::BuildForwardPassShaderArgs {
                 transparency: TransparencyType::Blend,
                 ..forward_pass_args.clone()

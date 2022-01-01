@@ -98,7 +98,7 @@ fn main() {
     };
     let mut pbr_routine = rend3_routine::PbrRenderRoutine::new(&renderer, render_texture_options);
     let mut tonemapping_routine =
-        rend3_routine::TonemappingRoutine::new(&renderer, render_texture_options.resolution, format);
+        rend3_routine::tonemapping::TonemappingRoutine::new(&renderer, render_texture_options.resolution, format);
 
     // Create mesh and calculate smooth normals based on vertices
     let mesh = create_mesh();

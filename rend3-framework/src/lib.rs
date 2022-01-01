@@ -129,8 +129,8 @@ pub fn lock<T>(lock: &parking_lot::Mutex<T>) -> parking_lot::MutexGuard<'_, T> {
 
 pub struct DefaultRoutines {
     pub pbr: Mutex<rend3_routine::PbrRenderRoutine>,
-    pub skybox: Mutex<rend3_routine::SkyboxRoutine>,
-    pub tonemapping: Mutex<rend3_routine::TonemappingRoutine>,
+    pub skybox: Mutex<rend3_routine::skybox::SkyboxRoutine>,
+    pub tonemapping: Mutex<rend3_routine::tonemapping::TonemappingRoutine>,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -224,8 +224,11 @@ pub async fn async_start<A: App + 'static>(mut app: A, window_builder: WindowBui
     };
     let routines = Arc::new(DefaultRoutines {
         pbr: Mutex::new(rend3_routine::PbrRenderRoutine::new(&renderer, render_texture_options)),
-        skybox: Mutex::new(rend3_routine::SkyboxRoutine::new(&renderer, render_texture_options)),
-        tonemapping: Mutex::new(rend3_routine::TonemappingRoutine::new(
+        skybox: Mutex::new(rend3_routine::skybox::SkyboxRoutine::new(
+            &renderer,
+            render_texture_options,
+        )),
+        tonemapping: Mutex::new(rend3_routine::tonemapping::TonemappingRoutine::new(
             &renderer,
             render_texture_options.resolution,
             format,

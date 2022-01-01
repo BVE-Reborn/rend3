@@ -65,7 +65,7 @@ fn create_pipeline(device: &Device, interfaces: &ShaderInterfaces, output_format
         push_constant_ranges: &[],
     });
 
-    let pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
+    device.create_render_pipeline(&RenderPipelineDescriptor {
         label: Some("tonemapping pass"),
         layout: Some(&pll),
         vertex: VertexState {
@@ -94,9 +94,7 @@ fn create_pipeline(device: &Device, interfaces: &ShaderInterfaces, output_format
             }],
         }),
         multiview: None,
-    });
-
-    pipeline
+    })
 }
 
 pub struct TonemappingRoutine {

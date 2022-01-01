@@ -4,7 +4,7 @@ use rend3::{
     types::{SampleCount, TextureHandle},
     util::bind_merge::BindGroupBuilder,
     DataHandle, DepthHandle, RenderGraph, RenderPassDepthTarget, RenderPassTarget, RenderPassTargets,
-    RenderTargetHandle, Renderer, RendererDataCore, RendererMode,
+    RenderTargetHandle, Renderer, RendererMode,
 };
 use wgpu::{
     BindGroup, Color, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState, DepthStencilState, Device, Face,
@@ -138,7 +138,8 @@ impl SkyboxRoutine {
         self.options = options;
     }
 
-    pub fn ready(&mut self, renderer: &Renderer, data_core: &RendererDataCore) {
+    pub fn ready(&mut self, renderer: &Renderer) {
+        let data_core = renderer.data_core.lock();
         let d2c_texture_manager = &data_core.d2c_texture_manager;
 
         profiling::scope!("Update Skybox");
@@ -193,7 +194,7 @@ impl SkyboxRoutine {
             if let Some(ref bg) = this.current_skybox.bg {
                 rpass.set_pipeline(&this.skybox_pipeline);
                 rpass.set_bind_group(0, forward_uniform_bg, &[]);
-                rpass.set_bind_group(1, &bg, &[]);
+                rpass.set_bind_group(1, bg, &[]);
                 rpass.draw(0..3, 0..1);
             }
         });
