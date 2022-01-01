@@ -5,7 +5,11 @@ use crate::{
 use glam::{Vec2, Vec3};
 use range_alloc::RangeAllocator;
 use rend3_types::RawMeshHandle;
-use std::{mem::size_of, ops::Range};
+use std::{
+    mem::size_of,
+    ops::Range,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 use wgpu::{
     Buffer, BufferAddress, BufferDescriptor, BufferUsages, CommandEncoder, Device, IndexFormat, Queue, RenderPass,
 };
@@ -92,8 +96,10 @@ impl MeshManager {
         }
     }
 
-    pub fn allocate(&self) -> MeshHandle {
-        self.registry.allocate()
+    pub fn allocate(counter: &AtomicUsize) -> MeshHandle {
+        let idx = counter.fetch_add(1, Ordering::Relaxed);
+
+        MeshHandle::new(idx)
     }
 
     pub fn fill(

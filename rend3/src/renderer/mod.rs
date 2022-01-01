@@ -13,9 +13,13 @@ use crate::{
     ExtendedAdapterInfo, InstanceAdapterDevice, ReadyData, RendererInitializationError, RendererMode,
 };
 use glam::Mat4;
-use parking_lot::{Mutex, RwLock};
+use parking_lot::Mutex;
 use rend3_types::{Handedness, Material, MipmapCount, MipmapSource, TextureFormat, TextureFromTexture, TextureUsages};
-use std::{num::NonZeroU32, panic::Location, sync::Arc};
+use std::{
+    num::NonZeroU32,
+    panic::Location,
+    sync::{atomic::AtomicUsize, Arc},
+};
 use wgpu::{
     util::DeviceExt, CommandBuffer, CommandEncoderDescriptor, Device, DownlevelCapabilities, Extent3d, Features,
     ImageCopyTexture, ImageDataLayout, Limits, Origin3d, Queue, TextureAspect, TextureDescriptor, TextureDimension,
@@ -49,30 +53,39 @@ pub struct Renderer {
     /// Handedness of all parts of this renderer.
     pub handedness: Handedness,
 
-    /// Position and settings of the camera.
-    pub camera_manager: RwLock<CameraManager>,
-    /// Manages all vertex and index data.
-    pub mesh_manager: RwLock<MeshManager>,
-    /// Manages all 2D textures, including bindless bind group.
-    pub d2_texture_manager: RwLock<TextureManager>,
-    /// Manages all Cube textures, including bindless bind groups.
-    pub d2c_texture_manager: RwLock<TextureManager>,
-    /// Manages all materials, including material bind groups in CPU mode.
-    pub material_manager: RwLock<MaterialManager>,
-    /// Manages all objects.
-    pub object_manager: RwLock<ObjectManager>,
-    /// Manages all directional lights, including their shadow maps.
-    pub directional_light_manager: RwLock<DirectionalLightManager>,
+    /// Identifier allocator.
+    current_ident: AtomicUsize,
+    /// All the lockable data
+    pub data_core: Mutex<RendererDataCore>,
 
     /// Tool which generates mipmaps from a texture.
     pub mipmap_generator: MipmapGenerator,
+}
+
+/// All the mutex protected data within the renderer
+pub struct RendererDataCore {
+    /// Position and settings of the camera.
+    pub camera_manager: CameraManager,
+    /// Manages all vertex and index data.
+    pub mesh_manager: MeshManager,
+    /// Manages all 2D textures, including bindless bind group.
+    pub d2_texture_manager: TextureManager,
+    /// Manages all Cube textures, including bindless bind groups.
+    pub d2c_texture_manager: TextureManager,
+    /// Manages all materials, including material bind groups in CPU mode.
+    pub material_manager: MaterialManager,
+    /// Manages all objects.
+    pub object_manager: ObjectManager,
+    /// Manages all directional lights, including their shadow maps.
+    pub directional_light_manager: DirectionalLightManager,
 
     /// Stores gpu timing and debug scopes.
-    pub profiler: Mutex<GpuProfiler>,
+    pub profiler: GpuProfiler,
 
     /// Stores a cache of render targets between graph invocations.
-    pub(crate) graph_texture_store: Mutex<GraphTextureStore>,
+    pub(crate) graph_texture_store: GraphTextureStore,
 }
+
 impl Renderer {
     /// Create a new renderer with the given IAD.
     ///
@@ -92,7 +105,7 @@ impl Renderer {
     /// The handle will keep the mesh alive. All objects created will also keep the mesh alive.
     #[track_caller]
     pub fn add_mesh(&self, mesh: Mesh) -> MeshHandle {
-        let handle = self.mesh_manager.read().allocate();
+        let handle = MeshManager::allocate(&self.current_ident);
 
         self.instructions.push(
             InstructionKind::AddMesh {
@@ -114,7 +127,7 @@ impl Renderer {
 
         Self::validation_texture_format(texture.format);
 
-        let handle = self.d2_texture_manager.read().allocate();
+        let handle = TextureManager::allocate(&self.current_ident);
         let size = Extent3d {
             width: texture.size.x,
             height: texture.size.y,
@@ -173,7 +186,7 @@ impl Renderer {
 
                 // generate mipmaps
                 self.mipmap_generator
-                    .generate_mipmaps(&self.device, &self.profiler, &mut encoder, &tex, &desc);
+                    .generate_mipmaps(&self.device, &mut encoder, &tex, &desc);
 
                 (Some(encoder.finish()), tex)
             }
@@ -203,16 +216,14 @@ impl Renderer {
 
         let mut encoder = self.device.create_command_encoder(&CommandEncoderDescriptor::default());
 
-        let d2_manager = self.d2_texture_manager.read();
-        let handle = d2_manager.allocate();
-        // self.profiler
-        //     .lock()
-        //     .begin_scope("Add Texture 2D From Texture", &mut encoder, &self.device);
+        let handle = TextureManager::allocate(&self.current_ident);
+
+        let data_core = self.data_core.lock();
 
         let InternalTexture {
             texture: old_texture,
             desc: old_texture_desc,
-        } = d2_manager.get_internal(texture.src.get_raw());
+        } = data_core.d2_texture_manager.get_internal(texture.src.get_raw());
 
         let new_size = old_texture_desc.mip_level_size(texture.start_mip).unwrap();
 
@@ -235,7 +246,6 @@ impl Renderer {
 
             let _label = format_sso!("mip {} to {}", old_mip, new_mip);
             profiling::scope!(&_label);
-            // self.profiler.lock().begin_scope(&label, &mut encoder, &self.device);
 
             encoder.copy_texture_to_texture(
                 ImageCopyTexture {
@@ -252,10 +262,7 @@ impl Renderer {
                 },
                 old_texture_desc.mip_level_size(old_mip).unwrap(),
             );
-
-            // self.profiler.lock().end_scope(&mut encoder);
         }
-        // self.profiler.lock().end_scope(&mut encoder);
         self.instructions.push(
             InstructionKind::AddTexture {
                 handle: handle.clone(),
@@ -279,7 +286,7 @@ impl Renderer {
 
         Self::validation_texture_format(texture.format);
 
-        let handle = self.d2c_texture_manager.read().allocate();
+        let handle = TextureManager::allocate(&self.current_ident);
         let size = Extent3d {
             width: texture.size.x,
             height: texture.size.y,
@@ -345,7 +352,7 @@ impl Renderer {
     /// The material will keep the inside textures alive.
     #[track_caller]
     pub fn add_material<M: Material>(&self, material: M) -> MaterialHandle {
-        let handle = self.material_manager.read().allocate();
+        let handle = MaterialManager::allocate(&self.current_ident);
         self.instructions.push(
             InstructionKind::AddMaterial {
                 handle: handle.clone(),
@@ -381,7 +388,7 @@ impl Renderer {
     /// The object will keep all materials, textures, and meshes alive.
     #[track_caller]
     pub fn add_object(&self, object: Object) -> ObjectHandle {
-        let handle = self.object_manager.read().allocate();
+        let handle = ObjectManager::allocate(&self.current_ident);
         self.instructions.push(
             InstructionKind::AddObject {
                 handle: handle.clone(),
@@ -409,7 +416,7 @@ impl Renderer {
     /// The handle will keep the light alive.
     #[track_caller]
     pub fn add_directional_light(&self, light: DirectionalLight) -> DirectionalLightHandle {
-        let handle = self.directional_light_manager.read().allocate();
+        let handle = DirectionalLightManager::allocate(&self.current_ident);
 
         self.instructions.push(
             InstructionKind::AddDirectionalLight {

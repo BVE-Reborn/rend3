@@ -1,6 +1,12 @@
 use crate::{mode::ModeData, types::TextureHandle, util::registry::ResourceRegistry, RendererMode};
 use rend3_types::{RawTextureHandle, TextureFormat, TextureUsages};
-use std::{num::NonZeroU32, sync::Arc};
+use std::{
+    num::NonZeroU32,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
+};
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
     BindingResource, BindingType, Device, Extent3d, ShaderStages, Texture, TextureDescriptor, TextureDimension,
@@ -67,8 +73,10 @@ impl TextureManager {
         }
     }
 
-    pub fn allocate(&self) -> TextureHandle {
-        self.registry.allocate()
+    pub fn allocate(counter: &AtomicUsize) -> TextureHandle {
+        let idx = counter.fetch_add(1, Ordering::Relaxed);
+
+        TextureHandle::new(idx)
     }
 
     pub fn fill(

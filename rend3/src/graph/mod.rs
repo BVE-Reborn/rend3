@@ -200,10 +200,13 @@ impl<'node> RenderGraph<'node> {
             }
         }
 
+        let mut data_core = renderer.data_core.lock();
+        let data_core = &mut *data_core;
+
         // Iterate through every node, allocating and deallocating textures as we go.
 
         // Maps a texture description to any available textures. Will try to pull from here instead of making a new texture.
-        let mut graph_texture_store = renderer.graph_texture_store.lock();
+        let graph_texture_store = &mut data_core.graph_texture_store;
         // Mark all textures as unused, so the ones that are unused can be culled after this pass.
         graph_texture_store.mark_unused();
 
@@ -292,16 +295,7 @@ impl<'node> RenderGraph<'node> {
 
         profiling::scope!("Run Nodes");
 
-        let mut profiler = renderer.profiler.lock();
-        let camera_manager = renderer.camera_manager.read();
-        let directional_light_manager = renderer.directional_light_manager.read();
-        let material_manager = renderer.material_manager.read();
-        let mesh_manager = renderer.mesh_manager.read();
-        let object_manager = renderer.object_manager.read();
-        let d2_texture_manager = renderer.d2_texture_manager.read();
-        let d2c_texture_manager = renderer.d2c_texture_manager.read();
-
-        let shadow_views = directional_light_manager.get_layer_views();
+        let shadow_views = data_core.directional_light_manager.get_layer_views();
 
         let output_cell = UnsafeCell::new(output);
         let encoder_cell = UnsafeCell::new(
@@ -366,19 +360,19 @@ impl<'node> RenderGraph<'node> {
             {
                 let store = RenderGraphDataStore {
                     texture_mapping: &active_views,
-                    shadow_coordinates: directional_light_manager.get_coords(),
-                    shadow_views: directional_light_manager.get_layer_views(),
+                    shadow_coordinates: data_core.directional_light_manager.get_coords(),
+                    shadow_views: data_core.directional_light_manager.get_layer_views(),
                     data: &self.data,
                     // SAFETY: This is only viewed mutably when no renderpass exists
                     output: unsafe { &*output_cell.get() }.as_view(),
 
-                    camera_manager: &camera_manager,
-                    directional_light_manager: &directional_light_manager,
-                    material_manager: &material_manager,
-                    mesh_manager: &mesh_manager,
-                    object_manager: &object_manager,
-                    d2_texture_manager: &d2_texture_manager,
-                    d2c_texture_manager: &d2c_texture_manager,
+                    camera_manager: &data_core.camera_manager,
+                    directional_light_manager: &data_core.directional_light_manager,
+                    material_manager: &data_core.material_manager,
+                    mesh_manager: &data_core.mesh_manager,
+                    object_manager: &data_core.object_manager,
+                    d2_texture_manager: &data_core.d2_texture_manager,
+                    d2c_texture_manager: &data_core.d2c_texture_manager,
                 };
 
                 let mut encoder_or_rpass = match rpass {
@@ -389,7 +383,9 @@ impl<'node> RenderGraph<'node> {
 
                 profiling::scope!(&node.label);
 
-                profiler.begin_scope(&node.label, &mut encoder_or_rpass, &renderer.device);
+                data_core
+                    .profiler
+                    .begin_scope(&node.label, &mut encoder_or_rpass, &renderer.device);
 
                 (node.exec)(
                     &mut node.passthrough,
@@ -407,7 +403,7 @@ impl<'node> RenderGraph<'node> {
                     None => RenderGraphEncoderOrPassInner::Encoder(unsafe { &mut *encoder_cell.get() }),
                 };
 
-                profiler.end_scope(&mut encoder_or_rpass);
+                data_core.profiler.end_scope(&mut encoder_or_rpass);
             }
         }
 
@@ -424,7 +420,7 @@ impl<'node> RenderGraph<'node> {
         let mut resolve_encoder = renderer.device.create_command_encoder(&CommandEncoderDescriptor {
             label: Some("profile resolve encoder"),
         });
-        profiler.resolve_queries(&mut resolve_encoder);
+        data_core.profiler.resolve_queries(&mut resolve_encoder);
         cmd_bufs.push(resolve_encoder.finish());
 
         renderer.queue.submit(cmd_bufs);
@@ -432,8 +428,8 @@ impl<'node> RenderGraph<'node> {
         // SAFETY: this is safe as we've dropped all renderpasses that possibly borrowed it
         output_cell.into_inner().present();
 
-        profiler.end_frame().unwrap();
-        profiler.process_finished_frame()
+        data_core.profiler.end_frame().unwrap();
+        data_core.profiler.process_finished_frame()
     }
 
     #[allow(clippy::too_many_arguments)]

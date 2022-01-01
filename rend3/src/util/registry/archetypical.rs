@@ -1,11 +1,4 @@
-use std::{
-    hash::Hash,
-    marker::PhantomData,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Weak,
-    },
-};
+use std::{hash::Hash, marker::PhantomData, sync::Weak};
 
 use rend3_types::{RawResourceHandle, ResourceHandle};
 
@@ -38,7 +31,6 @@ struct HandleData<K> {
 pub struct ArchetypicalRegistry<K, V, HandleType> {
     archetype_map: FastHashMap<K, ArchetypeStorage<V>>,
     handle_info: FastHashMap<usize, HandleData<K>>,
-    current_idx: AtomicUsize,
     _phantom: PhantomData<HandleType>,
 }
 impl<K, V, HandleType> ArchetypicalRegistry<K, V, HandleType>
@@ -49,15 +41,8 @@ where
         Self {
             archetype_map: FastHashMap::default(),
             handle_info: FastHashMap::default(),
-            current_idx: AtomicUsize::new(0),
             _phantom: PhantomData,
         }
-    }
-
-    pub fn allocate(&self) -> ResourceHandle<HandleType> {
-        let idx = self.current_idx.fetch_add(1, Ordering::Relaxed);
-
-        ResourceHandle::new(idx)
     }
 
     pub fn insert(&mut self, handle: &ResourceHandle<HandleType>, data: V, key: K) {

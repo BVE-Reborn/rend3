@@ -1,12 +1,6 @@
 use indexmap::map::IndexMap;
 use rend3_types::{RawResourceHandle, ResourceHandle};
-use std::{
-    marker::PhantomData,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Weak,
-    },
-};
+use std::{marker::PhantomData, sync::Weak};
 
 use crate::util::typedefs::FastBuildHasher;
 
@@ -19,22 +13,14 @@ struct ResourceStorage<T> {
 #[derive(Debug)]
 pub struct ResourceRegistry<T, HandleType> {
     mapping: IndexMap<usize, ResourceStorage<T>, FastBuildHasher>,
-    current_idx: AtomicUsize,
     _phantom: PhantomData<HandleType>,
 }
 impl<T, HandleType> ResourceRegistry<T, HandleType> {
     pub fn new() -> Self {
         Self {
             mapping: IndexMap::with_hasher(FastBuildHasher::default()),
-            current_idx: AtomicUsize::new(0),
             _phantom: PhantomData,
         }
-    }
-
-    pub fn allocate(&self) -> ResourceHandle<HandleType> {
-        let idx = self.current_idx.fetch_add(1, Ordering::Relaxed);
-
-        ResourceHandle::new(idx)
     }
 
     pub fn insert(&mut self, handle: &ResourceHandle<HandleType>, data: T) {

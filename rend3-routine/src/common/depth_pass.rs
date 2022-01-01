@@ -1,13 +1,10 @@
-use std::sync::Arc;
-
 use arrayvec::ArrayVec;
 use rend3::{
-    managers::MaterialManager,
     types::{Handedness, SampleCount},
-    ModeData, RendererMode,
+    Renderer, RendererDataCore, RendererMode,
 };
 use wgpu::{
-    BindGroupLayout, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState, DepthStencilState, Device, Face,
+    BindGroupLayout, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState, DepthStencilState, Face,
     FragmentState, FrontFace, MultisampleState, PipelineLayoutDescriptor, PolygonMode, PrimitiveState,
     PrimitiveTopology, RenderPipeline, RenderPipelineDescriptor, StencilState, TextureFormat, VertexState,
 };
@@ -24,33 +21,29 @@ pub enum DepthPassType {
     Prepass,
 }
 
+#[derive(Clone)]
 pub struct BuildDepthPassShaderArgs<'a> {
-    pub mode: RendererMode,
-    pub device: &'a Device,
+    pub renderer: &'a Renderer,
+    pub data_core: &'a RendererDataCore,
 
     pub interfaces: &'a ShaderInterfaces,
-    pub texture_bgl: ModeData<(), &'a BindGroupLayout>,
 
-    pub materials: &'a MaterialManager,
-
-    pub handedness: Handedness,
     pub samples: SampleCount,
     pub ty: DepthPassType,
     pub unclipped_depth_supported: bool,
 }
 
-#[derive(Clone)]
 pub struct DepthPassPipelines {
-    pub cutout: Arc<RenderPipeline>,
-    pub opaque: Arc<RenderPipeline>,
+    pub cutout: RenderPipeline,
+    pub opaque: RenderPipeline,
 }
 
 pub fn build_depth_pass_pipeline(args: BuildDepthPassShaderArgs) -> DepthPassPipelines {
     profiling::scope!("build depth pass pipelines");
     let depth_vert = unsafe {
         mode_safe_shader(
-            args.device,
-            args.mode,
+            &args.renderer.device,
+            args.renderer.mode,
             "depth pass vert",
             "depth.vert.cpu.wgsl",
             "depth.vert.gpu.spv",
@@ -59,8 +52,8 @@ pub fn build_depth_pass_pipeline(args: BuildDepthPassShaderArgs) -> DepthPassPip
 
     let depth_opaque_frag = unsafe {
         mode_safe_shader(
-            args.device,
-            args.mode,
+            &args.renderer.device,
+            args.renderer.mode,
             "depth pass opaque frag",
             "depth-opaque.frag.cpu.wgsl",
             "depth-opaque.frag.gpu.spv",
@@ -69,8 +62,8 @@ pub fn build_depth_pass_pipeline(args: BuildDepthPassShaderArgs) -> DepthPassPip
 
     let depth_cutout_frag = unsafe {
         mode_safe_shader(
-            args.device,
-            args.mode,
+            &args.renderer.device,
+            args.renderer.mode,
             "depth pass cutout frag",
             "depth-cutout.frag.cpu.wgsl",
             "depth-cutout.frag.gpu.spv",
@@ -83,20 +76,24 @@ pub fn build_depth_pass_pipeline(args: BuildDepthPassShaderArgs) -> DepthPassPip
         DepthPassType::Prepass => &args.interfaces.forward_uniform_bgl,
     });
     bgls.push(&args.interfaces.per_material_bgl);
-    if args.mode == RendererMode::GPUPowered {
-        bgls.push(args.texture_bgl.as_gpu())
+    if args.renderer.mode == RendererMode::GPUPowered {
+        bgls.push(args.data_core.d2_texture_manager.gpu_bgl())
     } else {
-        bgls.push(args.materials.get_bind_group_layout_cpu::<PbrMaterial>());
+        bgls.push(
+            args.data_core
+                .material_manager
+                .get_bind_group_layout_cpu::<PbrMaterial>(),
+        );
     }
 
-    let pll = args.device.create_pipeline_layout(&PipelineLayoutDescriptor {
+    let pll = args.renderer.device.create_pipeline_layout(&PipelineLayoutDescriptor {
         label: Some("depth prepass"),
         bind_group_layouts: &bgls,
         push_constant_ranges: &[],
     });
 
     DepthPassPipelines {
-        opaque: Arc::new(create_depth_inner(
+        opaque: create_depth_inner(
             &args,
             &pll,
             &depth_vert,
@@ -105,8 +102,8 @@ pub fn build_depth_pass_pipeline(args: BuildDepthPassShaderArgs) -> DepthPassPip
                 DepthPassType::Prepass => "depth opaque prepass",
                 DepthPassType::Shadow => "shadow opaque prepass",
             },
-        )),
-        cutout: Arc::new(create_depth_inner(
+        ),
+        cutout: create_depth_inner(
             &args,
             &pll,
             &depth_vert,
@@ -115,7 +112,7 @@ pub fn build_depth_pass_pipeline(args: BuildDepthPassShaderArgs) -> DepthPassPip
                 DepthPassType::Prepass => "depth cutout prepass",
                 DepthPassType::Shadow => "shadow cutout prepass",
             },
-        )),
+        ),
     }
 }
 
@@ -134,13 +131,13 @@ fn create_depth_inner(
     }];
     let cpu_vertex_buffers = cpu_vertex_buffers();
     let gpu_vertex_buffers = gpu_vertex_buffers();
-    args.device.create_render_pipeline(&RenderPipelineDescriptor {
+    args.renderer.device.create_render_pipeline(&RenderPipelineDescriptor {
         label: Some(name),
         layout: Some(pll),
         vertex: VertexState {
             module: vert,
             entry_point: "main",
-            buffers: match args.mode {
+            buffers: match args.renderer.mode {
                 RendererMode::CPUPowered => &cpu_vertex_buffers,
                 RendererMode::GPUPowered => &gpu_vertex_buffers,
             },
@@ -148,7 +145,7 @@ fn create_depth_inner(
         primitive: PrimitiveState {
             topology: PrimitiveTopology::TriangleList,
             strip_index_format: None,
-            front_face: match args.handedness {
+            front_face: match args.renderer.handedness {
                 Handedness::Left => FrontFace::Cw,
                 Handedness::Right => FrontFace::Ccw,
             },

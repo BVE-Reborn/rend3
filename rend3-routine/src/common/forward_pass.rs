@@ -2,13 +2,12 @@ use arrayvec::ArrayVec;
 #[allow(unused_imports)]
 use rend3::format_sso;
 use rend3::{
-    managers::MaterialManager,
     types::{Handedness, SampleCount},
-    ModeData, RendererMode,
+    Renderer, RendererDataCore, RendererMode,
 };
 use wgpu::{
     BindGroupLayout, BlendState, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState, DepthStencilState,
-    Device, Face, FragmentState, FrontFace, MultisampleState, PipelineLayoutDescriptor, PolygonMode, PrimitiveState,
+    Face, FragmentState, FrontFace, MultisampleState, PipelineLayoutDescriptor, PolygonMode, PrimitiveState,
     PrimitiveTopology, RenderPipeline, RenderPipelineDescriptor, StencilState, TextureFormat, VertexState,
 };
 
@@ -18,31 +17,15 @@ use crate::{
     vertex::{cpu_vertex_buffers, gpu_vertex_buffers},
 };
 
-/// Determines if vertices will be projected, or outputted in uv2 space.
-#[derive(Debug, Clone)]
-pub enum Baking {
-    /// output position is uv2 space.
-    Enabled,
-    /// output position is normal clip space.
-    Disabled,
-}
-
 #[derive(Clone)]
 pub struct BuildForwardPassShaderArgs<'a> {
-    pub mode: RendererMode,
-    pub device: &'a Device,
+    pub renderer: &'a Renderer,
+    pub data_core: &'a RendererDataCore,
 
     pub interfaces: &'a ShaderInterfaces,
 
-    pub texture_bgl: ModeData<(), &'a BindGroupLayout>,
-
-    pub materials: &'a MaterialManager,
-
-    pub handedness: Handedness,
     pub samples: SampleCount,
     pub transparency: TransparencyType,
-
-    pub baking: Baking,
 }
 
 pub fn build_forward_pass_pipeline(args: BuildForwardPassShaderArgs<'_>) -> RenderPipeline {
@@ -52,24 +35,18 @@ pub fn build_forward_pass_pipeline(args: BuildForwardPassShaderArgs<'_>) -> Rend
     );
     let forward_pass_vert = unsafe {
         mode_safe_shader(
-            args.device,
-            args.mode,
+            &args.renderer.device,
+            args.renderer.mode,
             "forward pass vert",
-            match args.baking {
-                Baking::Disabled => "opaque.vert.cpu.wgsl",
-                Baking::Enabled => "opaque-baking.vert.cpu.wgsl",
-            },
-            match args.baking {
-                Baking::Disabled => "opaque.vert.gpu.spv",
-                Baking::Enabled => "opaque-baking.vert.gpu.spv",
-            },
+            "opaque.vert.cpu.wgsl",
+            "opaque.vert.gpu.spv",
         )
     };
 
     let forward_pass_frag = unsafe {
         mode_safe_shader(
-            args.device,
-            args.mode,
+            &args.renderer.device,
+            args.renderer.mode,
             "forward pass frag",
             "opaque.frag.cpu.wgsl",
             "opaque.frag.gpu.spv",
@@ -79,13 +56,17 @@ pub fn build_forward_pass_pipeline(args: BuildForwardPassShaderArgs<'_>) -> Rend
     let mut bgls: ArrayVec<&BindGroupLayout, 6> = ArrayVec::new();
     bgls.push(&args.interfaces.forward_uniform_bgl);
     bgls.push(&args.interfaces.per_material_bgl);
-    if args.mode == RendererMode::GPUPowered {
-        bgls.push(args.texture_bgl.as_gpu())
+    if args.renderer.mode == RendererMode::GPUPowered {
+        bgls.push(args.data_core.d2_texture_manager.gpu_bgl())
     } else {
-        bgls.push(args.materials.get_bind_group_layout_cpu::<PbrMaterial>());
+        bgls.push(
+            args.data_core
+                .material_manager
+                .get_bind_group_layout_cpu::<PbrMaterial>(),
+        );
     }
 
-    let pll = args.device.create_pipeline_layout(&PipelineLayoutDescriptor {
+    let pll = args.renderer.device.create_pipeline_layout(&PipelineLayoutDescriptor {
         label: Some("opaque pass"),
         bind_group_layouts: &bgls,
         push_constant_ranges: &[],
@@ -103,7 +84,7 @@ fn build_forward_pass_inner(
     let cpu_vertex_buffers = cpu_vertex_buffers();
     let gpu_vertex_buffers = gpu_vertex_buffers();
 
-    args.device.create_render_pipeline(&RenderPipelineDescriptor {
+    args.renderer.device.create_render_pipeline(&RenderPipelineDescriptor {
         label: Some(match args.transparency {
             TransparencyType::Opaque => "opaque pass",
             TransparencyType::Cutout => "cutout pass",
@@ -113,7 +94,7 @@ fn build_forward_pass_inner(
         vertex: VertexState {
             module: &forward_pass_vert,
             entry_point: "main",
-            buffers: match args.mode {
+            buffers: match args.renderer.mode {
                 RendererMode::CPUPowered => &cpu_vertex_buffers,
                 RendererMode::GPUPowered => &gpu_vertex_buffers,
             },
@@ -121,7 +102,7 @@ fn build_forward_pass_inner(
         primitive: PrimitiveState {
             topology: PrimitiveTopology::TriangleList,
             strip_index_format: None,
-            front_face: match args.handedness {
+            front_face: match args.renderer.handedness {
                 Handedness::Left => FrontFace::Cw,
                 Handedness::Right => FrontFace::Ccw,
             },
@@ -130,19 +111,16 @@ fn build_forward_pass_inner(
             polygon_mode: PolygonMode::Fill,
             conservative: false,
         },
-        depth_stencil: match args.baking {
-            Baking::Enabled => None,
-            Baking::Disabled => Some(DepthStencilState {
-                format: TextureFormat::Depth32Float,
-                depth_write_enabled: matches!(args.transparency, TransparencyType::Opaque | TransparencyType::Cutout),
-                depth_compare: match args.transparency {
-                    TransparencyType::Opaque | TransparencyType::Cutout => CompareFunction::Equal,
-                    TransparencyType::Blend => CompareFunction::GreaterEqual,
-                },
-                stencil: StencilState::default(),
-                bias: DepthBiasState::default(),
-            }),
-        },
+        depth_stencil: Some(DepthStencilState {
+            format: TextureFormat::Depth32Float,
+            depth_write_enabled: matches!(args.transparency, TransparencyType::Opaque | TransparencyType::Cutout),
+            depth_compare: match args.transparency {
+                TransparencyType::Opaque | TransparencyType::Cutout => CompareFunction::Equal,
+                TransparencyType::Blend => CompareFunction::GreaterEqual,
+            },
+            stencil: StencilState::default(),
+            bias: DepthBiasState::default(),
+        }),
         multisample: MultisampleState {
             count: args.samples as u32,
             ..Default::default()

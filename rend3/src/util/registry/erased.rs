@@ -1,13 +1,6 @@
 use list_any::VecAny;
 use rend3_types::{RawResourceHandle, ResourceHandle};
-use std::{
-    any::TypeId,
-    marker::PhantomData,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Weak,
-    },
-};
+use std::{any::TypeId, marker::PhantomData, sync::Weak};
 
 use crate::util::typedefs::FastHashMap;
 
@@ -45,7 +38,6 @@ pub struct Archetype<Metadata> {
 pub struct ArchitypicalErasedRegistry<HandleType, Metadata> {
     archetype_map: FastHashMap<TypeId, Archetype<Metadata>>,
     handle_map: FastHashMap<usize, PerHandleData>,
-    current_idx: AtomicUsize,
     _phantom: PhantomData<HandleType>,
 }
 
@@ -54,15 +46,8 @@ impl<HandleType, Metadata> ArchitypicalErasedRegistry<HandleType, Metadata> {
         Self {
             archetype_map: FastHashMap::default(),
             handle_map: FastHashMap::default(),
-            current_idx: AtomicUsize::new(0),
             _phantom: PhantomData,
         }
-    }
-
-    pub fn allocate(&self) -> ResourceHandle<HandleType> {
-        let idx = self.current_idx.fetch_add(1, Ordering::Relaxed);
-
-        ResourceHandle::new(idx)
     }
 
     pub fn ensure_archetype<T: Send + Sync + 'static>(&mut self) {

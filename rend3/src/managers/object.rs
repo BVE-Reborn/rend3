@@ -1,4 +1,7 @@
-use std::any::TypeId;
+use std::{
+    any::TypeId,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
 use crate::{
     managers::{MaterialKeyPair, MaterialManager, MeshManager},
@@ -53,8 +56,10 @@ impl ObjectManager {
         Self { registry }
     }
 
-    pub fn allocate(&self) -> ObjectHandle {
-        self.registry.allocate()
+    pub fn allocate(counter: &AtomicUsize) -> ObjectHandle {
+        let idx = counter.fetch_add(1, Ordering::Relaxed);
+
+        ObjectHandle::new(idx)
     }
 
     pub fn fill(

@@ -4,7 +4,7 @@ use rend3::{
     types::{SampleCount, TextureHandle},
     util::bind_merge::BindGroupBuilder,
     DataHandle, DepthHandle, RenderGraph, RenderPassDepthTarget, RenderPassTarget, RenderPassTargets,
-    RenderTargetHandle, Renderer, RendererMode,
+    RenderTargetHandle, Renderer, RendererDataCore, RendererMode,
 };
 use wgpu::{
     BindGroup, Color, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState, DepthStencilState, Device, Face,
@@ -138,12 +138,12 @@ impl SkyboxRoutine {
         self.options = options;
     }
 
-    pub fn ready(&mut self, renderer: &Renderer) {
-        let d2c_texture_manager = renderer.d2c_texture_manager.read();
+    pub fn ready(&mut self, renderer: &Renderer, data_core: &RendererDataCore) {
+        let d2c_texture_manager = &data_core.d2c_texture_manager;
 
         profiling::scope!("Update Skybox");
 
-        if let Some(handle) = self.current_skybox.handle {
+        if let Some(ref handle) = self.current_skybox.handle {
             if self.current_skybox.bg.is_none() {
                 let bg = BindGroupBuilder::new()
                     .append_texture_view(d2c_texture_manager.get_view(handle.get_raw()))

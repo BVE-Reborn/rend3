@@ -117,7 +117,7 @@ mod surface;
 
 pub use graph::*;
 pub use mode::*;
-pub use renderer::{error::*, Renderer};
+pub use renderer::{error::*, Renderer, RendererDataCore};
 pub use setup::*;
 pub use surface::*;
 

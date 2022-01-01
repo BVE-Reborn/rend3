@@ -16,6 +16,7 @@ use rend3_types::{Material, MaterialTag, RawMaterialHandle, RawObjectHandle};
 use std::{
     any::TypeId,
     num::{NonZeroU32, NonZeroU64},
+    sync::atomic::{AtomicUsize, Ordering},
 };
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
@@ -86,8 +87,10 @@ impl MaterialManager {
         }
     }
 
-    pub fn allocate(&self) -> MaterialHandle {
-        self.registry.allocate()
+    pub fn allocate(counter: &AtomicUsize) -> MaterialHandle {
+        let idx = counter.fetch_add(1, Ordering::Relaxed);
+
+        MaterialHandle::new(idx)
     }
 
     pub fn ensure_archetype<M: Material>(&mut self, device: &Device, mode: RendererMode) {

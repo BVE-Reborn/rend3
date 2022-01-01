@@ -1,12 +1,13 @@
 use crate::{
     instruction::InstructionStreamPair,
     managers::{CameraManager, DirectionalLightManager, MaterialManager, MeshManager, ObjectManager, TextureManager},
+    renderer::RendererDataCore,
     util::{graph_texture_store::GraphTextureStore, mipmap::MipmapGenerator},
     InstanceAdapterDevice, Renderer, RendererInitializationError,
 };
-use parking_lot::{Mutex, RwLock};
+use parking_lot::Mutex;
 use rend3_types::{Camera, Handedness, TextureFormat};
-use std::sync::Arc;
+use std::sync::{atomic::AtomicUsize, Arc};
 use wgpu::TextureViewDimension;
 
 pub fn create_renderer(
@@ -20,24 +21,24 @@ pub fn create_renderer(
     let limits = iad.device.limits();
     let downlevel = iad.adapter.get_downlevel_properties();
 
-    let camera_manager = RwLock::new(CameraManager::new(Camera::default(), handedness, aspect_ratio));
+    let camera_manager = CameraManager::new(Camera::default(), handedness, aspect_ratio);
 
-    let texture_manager_2d = RwLock::new(TextureManager::new(
+    let d2_texture_manager = TextureManager::new(
         &iad.device,
         iad.mode,
         limits.max_sampled_textures_per_shader_stage,
         TextureViewDimension::D2,
-    ));
-    let texture_manager_cube = RwLock::new(TextureManager::new(
+    );
+    let d2c_texture_manager = TextureManager::new(
         &iad.device,
         iad.mode,
         limits.max_sampled_textures_per_shader_stage,
         TextureViewDimension::Cube,
-    ));
-    let mesh_manager = RwLock::new(MeshManager::new(&iad.device));
-    let material_manager = RwLock::new(MaterialManager::new(&iad.device, iad.mode));
-    let object_manager = RwLock::new(ObjectManager::new());
-    let directional_light_manager = RwLock::new(DirectionalLightManager::new(&iad.device));
+    );
+    let mesh_manager = MeshManager::new(&iad.device);
+    let material_manager = MaterialManager::new(&iad.device, iad.mode);
+    let object_manager = ObjectManager::new();
+    let directional_light_manager = DirectionalLightManager::new(&iad.device);
 
     let mipmap_generator = MipmapGenerator::new(
         &iad.device,
@@ -65,16 +66,19 @@ pub fn create_renderer(
         downlevel,
         handedness,
 
-        camera_manager,
-        mesh_manager,
-        d2_texture_manager: texture_manager_2d,
-        d2c_texture_manager: texture_manager_cube,
-        material_manager,
-        object_manager,
-        directional_light_manager,
+        current_ident: AtomicUsize::new(0),
+        data_core: Mutex::new(RendererDataCore {
+            camera_manager,
+            mesh_manager,
+            d2_texture_manager,
+            d2c_texture_manager,
+            material_manager,
+            object_manager,
+            directional_light_manager,
+            profiler,
+            graph_texture_store: GraphTextureStore::new(),
+        }),
 
         mipmap_generator,
-        profiler: Mutex::new(profiler),
-        graph_texture_store: Mutex::new(GraphTextureStore::new()),
     }))
 }
