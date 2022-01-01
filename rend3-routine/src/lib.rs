@@ -19,14 +19,12 @@ use wgpu::{BindGroup, Buffer, Color, Device, Features};
 pub use utils::*;
 
 use crate::{
-    culling::CulledObjectSet,
+    culling::{cpu::CpuCullerCullArgs, gpu::GpuCullerCullArgs, CulledObjectSet},
     material::{PbrMaterial, TransparencyType},
 };
 
 pub mod common;
 pub mod culling;
-pub mod directional;
-pub mod forward;
 pub mod material;
 pub mod shaders;
 pub mod skybox;
@@ -326,15 +324,31 @@ impl PbrRenderRoutine {
                 TransparencyType::Blend => &self.primary_passes.transparent_pass,
             };
 
-            let culled_objects = pass.cull(forward::ForwardPassCullArgs {
-                device: &renderer.device,
-                encoder,
-                culler,
-                interfaces: &self.interfaces,
-                camera: graph_data.camera_manager,
-                objects: graph_data.object_manager,
-                culling_input,
-            });
+            let culled_objects = match self.gpu_culler {
+                ModeData::CPU(()) => self.cpu_culler.cull(CpuCullerCullArgs {
+                    device: &renderer.device,
+                    camera: graph_data.camera_manager,
+                    interfaces: &self.interfaces,
+                    objects: graph_data.object_manager,
+                    transparency,
+                }),
+                ModeData::GPU(ref gpu_culler) => {
+                    let object_count = graph_data
+                        .object_manager
+                        .get_objects::<PbrMaterial>(transparency as u64)
+                        .len();
+                    let culled = gpu_culler.cull(GpuCullerCullArgs {
+                        device: &renderer.device,
+                        encoder,
+                        interfaces: &self.interfaces,
+                        camera: graph_data.camera_manager,
+                        input_buffer: culling_input.as_gpu(),
+                        input_count: object_count,
+                        transparency,
+                    });
+                    culled
+                }
+            };
 
             let mut per_material_bgb = BindGroupBuilder::new();
             per_material_bgb.append_buffer(&culled_objects.output_buffer);
@@ -404,18 +418,23 @@ impl PbrRenderRoutine {
                 TransparencyType::Blend => unreachable!(),
             };
 
-            let d2_texture_output_bg_ref = ready.d2_texture.bg.as_ref().map(|_| (), |a| &**a);
+            graph_data.mesh_manager.buffers().bind(rpass);
 
-            pass.prepass(forward::ForwardPassPrepassArgs {
-                device: &renderer.device,
-                rpass,
-                materials: graph_data.material_manager,
-                meshes: graph_data.mesh_manager.buffers(),
-                forward_uniform_bg,
-                per_material_bg: &culled.per_material,
-                texture_bg: d2_texture_output_bg_ref,
-                culled_objects: &culled.inner,
-            });
+            rpass.set_pipeline(
+                pass.depth_pipeline
+                    .as_ref()
+                    .expect("prepass called on a forward pass with no depth pipeline"),
+            );
+            rpass.set_bind_group(0, forward_uniform_bg, &[]);
+            rpass.set_bind_group(1, &culled.per_material, &[]);
+
+            match culled.inner.calls {
+                ModeData::CPU(ref draws) => culling::cpu::run(rpass, draws, graph_data.material_manager, 2),
+                ModeData::GPU(ref data) => {
+                    rpass.set_bind_group(2, ready.d2_texture.bg.as_gpu(), &[]);
+                    culling::gpu::run(rpass, data);
+                }
+            }
         });
     }
 
@@ -468,19 +487,19 @@ impl PbrRenderRoutine {
                 TransparencyType::Blend => &this.primary_passes.transparent_pass,
             };
 
-            let d2_texture_output_bg_ref = ready.d2_texture.bg.as_ref().map(|_| (), |a| &**a);
+            graph_data.mesh_manager.buffers().bind(rpass);
 
-            pass.draw(forward::ForwardPassDrawArgs {
-                device: &renderer.device,
-                rpass,
-                materials: graph_data.material_manager,
-                meshes: graph_data.mesh_manager.buffers(),
-                samplers: &this.samplers,
-                forward_uniform_bg,
-                per_material_bg: &culled.per_material,
-                texture_bg: d2_texture_output_bg_ref,
-                culled_objects: &culled.inner,
-            });
+            rpass.set_pipeline(&pass.forward_pipeline);
+            rpass.set_bind_group(0, forward_uniform_bg, &[]);
+            rpass.set_bind_group(1, &culled.per_material, &[]);
+
+            match culled.inner.calls {
+                ModeData::CPU(ref draws) => culling::cpu::run(rpass, draws, graph_data.material_manager, 2),
+                ModeData::GPU(ref data) => {
+                    rpass.set_bind_group(2, ready.d2_texture.bg.as_gpu(), &[]);
+                    culling::gpu::run(rpass, data);
+                }
+            }
         });
     }
 }
@@ -570,18 +589,9 @@ impl PrimaryPasses {
             transparent_pass: forward::ForwardPass::new(
                 Some(Arc::clone(&depth_pipelines.opaque)),
                 transparent_pipeline,
-                TransparencyType::Blend,
             ),
-            cutout_pass: forward::ForwardPass::new(
-                Some(Arc::clone(&depth_pipelines.cutout)),
-                cutout_pipeline,
-                TransparencyType::Cutout,
-            ),
-            opaque_pass: forward::ForwardPass::new(
-                Some(Arc::clone(&depth_pipelines.opaque)),
-                opaque_pipeline,
-                TransparencyType::Opaque,
-            ),
+            cutout_pass: forward::ForwardPass::new(Some(Arc::clone(&depth_pipelines.cutout)), cutout_pipeline),
+            opaque_pass: forward::ForwardPass::new(Some(Arc::clone(&depth_pipelines.opaque)), opaque_pipeline),
         }
     }
 }
