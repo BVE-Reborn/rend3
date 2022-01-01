@@ -64,9 +64,10 @@ async fn load_gltf(
     normal_direction: NormalTextureYDirection,
     scale: f32,
     location: AssetPath<'_>,
-) -> rend3_gltf::LoadedGltfScene {
+) -> Option<rend3_gltf::LoadedGltfScene> {
     // profiling::scope!("loading gltf");
     let gltf_start = Instant::now();
+    let is_default_scene = matches!(location, AssetPath::Internal(_));
     let path = loader.get_asset_path(location);
     let path = Path::new(&*path);
     let parent = path.parent().unwrap();
@@ -74,9 +75,31 @@ async fn load_gltf(
     let parent_str = parent.to_string_lossy();
     let path_str = path.as_os_str().to_string_lossy();
     log::info!("Reading gltf file: {}", path_str);
-    let gltf_data = {
-        // profiling::scope!("reading gltf file", &path_str);
-        loader.get_asset(AssetPath::External(&path_str)).await.unwrap()
+    let gltf_data_result = loader.get_asset(AssetPath::External(&path_str)).await;
+
+    let gltf_data = match gltf_data_result {
+        Ok(d) => d,
+        Err(_) if is_default_scene => {
+            let suffix = if cfg!(target_os = "windows") { ".exe" } else { "" };
+
+            indoc::eprintdoc!("
+                *** WARNING ***
+
+                It appears you are running scene-viewer with no file to display.
+                
+                The default scene is no longer bundled into the repository. If you are running on git, use the following commands
+                to download and unzip it into the right place. If you're running it through not-git, pass a custom folder to the -C argument
+                to tar, then run scene-viewer path/to/scene.gltf.
+                
+                curl{0} https://cdn.cwfitz.com/scenes/rend3-default-scene.tar -o ./examples/scene-viewer/resources/rend3-default-scene.tar
+                tar{0} xf ./examples/scene-viewer/resources/rend3-default-scene.tar -C ./examples/scene-viewer/resources
+
+                ***************
+            ", suffix);
+
+            return None;
+        }
+        e => e.unwrap(),
     };
 
     let gltf_elapsed = gltf_start.elapsed();
@@ -89,12 +112,13 @@ async fn load_gltf(
     })
     .await
     .unwrap();
+
     log::info!(
         "Loaded gltf in {:.3?}, resources loaded in {:.3?}",
         gltf_elapsed,
         resources_start.elapsed()
     );
-    scene
+    Some(scene)
 }
 
 fn button_pressed<Hash: BuildHasher>(map: &HashMap<u32, bool, Hash>, key: u32) -> bool {
