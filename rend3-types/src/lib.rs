@@ -411,8 +411,6 @@ impl MeshBuilder {
             vertex_colors: self.vertex_colors.unwrap_or_else(|| vec![[255; 4]; length]),
             vertex_material_indices: self.vertex_material_indices.unwrap_or_else(|| vec![0; length]),
             indices: self.indices.unwrap_or_else(|| (0..length as u32).collect()),
-            // SAFETY: Before we do _anything_ with this mesh, we will validate it. If validation is off, the user has unsafely validated that this is safe to construct.
-            validation: unsafe { MeshValidationToken::new() },
         };
 
         if !self.without_validation {
@@ -425,12 +423,14 @@ impl MeshBuilder {
         }
 
         if !has_normals {
-            mesh.calculate_normals(self.handedness, true);
+            // SAFETY: We've validated this mesh.
+            unsafe { mesh.calculate_normals(self.handedness, true) };
         }
 
         // Don't need to bother with tangents if there are no meaningful UVs
         if !has_tangents && has_uvs {
-            mesh.calculate_tangents(true);
+            // SAFETY: We've validated this mesh.
+            unsafe { mesh.calculate_tangents(true) };
         }
 
         Ok(mesh)
@@ -454,8 +454,6 @@ pub struct Mesh {
     pub vertex_material_indices: Vec<u32>,
 
     pub indices: Vec<u32>,
-
-    pub validation: MeshValidationToken,
 }
 
 impl Clone for Mesh {
@@ -469,8 +467,6 @@ impl Clone for Mesh {
             vertex_colors: self.vertex_colors.clone(),
             vertex_material_indices: self.vertex_material_indices.clone(),
             indices: self.indices.clone(),
-            // SAFETY: The old mesh had a validation token, so this one must as well.
-            validation: unsafe { MeshValidationToken::new() },
         }
     }
 }
@@ -529,31 +525,38 @@ impl Mesh {
 
     /// Calculate normals for the given mesh, assuming smooth shading and per-vertex normals.
     ///
-    /// Use handedness given to calculate normals.
+    /// It is sound to call this function with the wrong handedness, it will just result in flipped normals.
     ///
-    /// If zeroed is true, the normals will not be zeroed before hand.
-    pub fn calculate_normals(&mut self, handedness: Handedness, zeroed: bool) {
-        // SAFETY: The mesh unconditionally has a validation token, so it must be valid.
-        unsafe {
-            if handedness == Handedness::Left {
-                Self::calculate_normals_for_buffers::<true>(
-                    &mut self.vertex_normals,
-                    &self.vertex_positions,
-                    &self.indices,
-                    zeroed,
-                )
-            } else {
-                Self::calculate_normals_for_buffers::<false>(
-                    &mut self.vertex_normals,
-                    &self.vertex_positions,
-                    &self.indices,
-                    zeroed,
-                )
-            }
-        };
+    /// If zeroed is true, the normals will not be zeroed before hand. If this is falsely set, it is sound, just returns incorrect results.
+    ///
+    /// # Safety
+    ///
+    /// The following must be true:
+    /// - Normals and positions must be the same length.
+    /// - All indices must be in-bounds for the buffers.
+    ///
+    /// If a mesh has passed a call to validate, it is sound to call this function.
+    pub unsafe fn calculate_normals(&mut self, handedness: Handedness, zeroed: bool) {
+        if handedness == Handedness::Left {
+            Self::calculate_normals_for_buffers::<true>(
+                &mut self.vertex_normals,
+                &self.vertex_positions,
+                &self.indices,
+                zeroed,
+            )
+        } else {
+            Self::calculate_normals_for_buffers::<false>(
+                &mut self.vertex_normals,
+                &self.vertex_positions,
+                &self.indices,
+                zeroed,
+            )
+        }
     }
 
     /// Calculate normals for the given buffers representing a mesh, assuming smooth shading and per-vertex normals.
+    ///
+    /// It is sound to call this function with the wrong handedness, it will just result in flipped normals.
     ///
     /// If zeroed is true, the normals will not be zeroed before hand. If this is falsely set, it is safe, just returns incorrect results.
     ///
@@ -562,6 +565,8 @@ impl Mesh {
     /// The following must be true:
     /// - Normals and positions must be the same length.
     /// - All indices must be in-bounds for the buffers.
+    ///
+    /// If a mesh has passed a call to validate, it is sound to call this function.
     pub unsafe fn calculate_normals_for_buffers<const LEFT_HANDED: bool>(
         normals: &mut [Vec3],
         positions: &[Vec3],
@@ -604,25 +609,31 @@ impl Mesh {
         }
 
         for normal in normals.iter_mut() {
-            *normal = normal.normalize();
+            *normal = normal.normalize_or_zero();
         }
     }
 
     /// Calculate tangents for the given mesh, based on normals and texture coordinates.
     ///
-    /// If zeroed is true, the normals will not be zeroed before hand.
-    pub fn calculate_tangents(&mut self, zeroed: bool) {
+    /// If zeroed is true, the normals will not be zeroed before hand. If this is falsely set, it is safe, just returns incorrect results.
+    ///
+    /// # Safety
+    ///
+    /// The following must be true:
+    /// - Tangents, positions, normals, and uvs must be the same length.
+    /// - All indices must be in-bounds for the buffers.
+    ///
+    /// If a mesh has passed a call to validate, it is sound to call this function.
+    pub unsafe fn calculate_tangents(&mut self, zeroed: bool) {
         // SAFETY: The mesh unconditionally has a validation token, so it must be valid.
-        unsafe {
-            Self::calculate_tangents_for_buffers(
-                &mut self.vertex_tangents,
-                &self.vertex_positions,
-                &self.vertex_normals,
-                &self.vertex_uv0,
-                &self.indices,
-                zeroed,
-            )
-        };
+        Self::calculate_tangents_for_buffers(
+            &mut self.vertex_tangents,
+            &self.vertex_positions,
+            &self.vertex_normals,
+            &self.vertex_uv0,
+            &self.indices,
+            zeroed,
+        )
     }
 
     /// Calculate tangents for the given set of buffers, based on normals and texture coordinates.
@@ -689,7 +700,7 @@ impl Mesh {
 
         for (tan, norm) in tangents.iter_mut().zip(normals) {
             let t = *tan - (*norm * norm.dot(*tan));
-            *tan = t.normalize();
+            *tan = t.normalize_or_zero();
         }
     }
 
@@ -732,8 +743,6 @@ impl Mesh {
     /// This does not change vertex location, so does not change coordinate system. This will
     /// also not change the vertex normals. Calling [`Mesh::calculate_normals`] is advised after
     /// calling this function.
-    ///
-    /// rend3 uses a left-handed (Clockwise) winding order.
     pub fn flip_winding_order(&mut self) {
         for indices in self.indices.chunks_exact_mut(3) {
             if let [left, _, right] = indices {
