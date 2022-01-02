@@ -55,7 +55,8 @@ pub struct GpuCullerCullArgs<'a> {
     pub input_buffer: &'a Buffer,
     pub input_count: usize,
 
-    pub transparency: TransparencyType,
+    pub sorting: Option<Sorting>,
+    pub key: u64,
 }
 
 pub struct GpuCuller {
@@ -320,7 +321,7 @@ impl GpuCuller {
         if count != 0 {
             let dispatch_count = ((count + 255) / 256) as u32;
 
-            if args.transparency.to_sorting().is_some() {
+            if args.sorting.is_some() {
                 let buffer_a = args.device.create_buffer(&BufferDescriptor {
                     label: Some("cull result index buffer A"),
                     size: (count * 4) as _,

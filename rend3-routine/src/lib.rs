@@ -6,9 +6,8 @@ use glam::Vec4;
 use rend3::{
     format_sso,
     types::{Handedness, SampleCount, TextureFormat, TextureUsages},
-    util::bind_merge::BindGroupBuilder,
     DataHandle, DepthHandle, ModeData, ReadyData, RenderGraph, RenderPassDepthTarget, RenderPassTarget,
-    RenderPassTargets, RenderTargetDescriptor, RenderTargetHandle, Renderer, RendererDataCore, RendererMode,
+    RenderPassTargets, RenderTargetDescriptor, RenderTargetHandle, Renderer, RendererDataCore,
 };
 use wgpu::{BindGroup, Buffer, Color, Features, RenderPipeline};
 
@@ -16,7 +15,7 @@ pub use utils::*;
 
 use crate::{
     common::{interfaces::ShaderInterfaces, samplers::Samplers},
-    culling::{cpu::CpuCullerCullArgs, gpu::GpuCullerCullArgs, CulledObjectSet},
+    culling::{gpu::GpuCuller, CulledObjectSet},
     material::{PbrMaterial, TransparencyType},
 };
 
@@ -41,7 +40,6 @@ pub struct CulledPerMaterial {
 pub struct PbrRenderRoutine {
     pub interfaces: common::interfaces::ShaderInterfaces,
     pub samplers: common::samplers::Samplers,
-    pub cpu_culler: culling::cpu::CpuCuller,
     pub gpu_culler: ModeData<(), culling::gpu::GpuCuller>,
     pub primary_passes: PrimaryPasses,
 
@@ -58,7 +56,6 @@ impl PbrRenderRoutine {
 
         let samplers = common::samplers::Samplers::new(&renderer.device);
 
-        let cpu_culler = culling::cpu::CpuCuller::new();
         let gpu_culler = renderer
             .mode
             .into_data(|| (), || culling::gpu::GpuCuller::new(&renderer.device));
@@ -77,7 +74,6 @@ impl PbrRenderRoutine {
         Self {
             interfaces,
             samplers,
-            cpu_culler,
             gpu_culler,
             primary_passes,
 
@@ -107,72 +103,6 @@ impl PbrRenderRoutine {
             });
         }
         self.render_texture_options = options;
-    }
-
-    pub fn add_shadow_culling_to_graph<'node>(
-        &'node self,
-        graph: &mut RenderGraph<'node>,
-        transparency: TransparencyType,
-        shadow_index: usize,
-        pre_cull_data: DataHandle<Buffer>,
-        culled: DataHandle<CulledPerMaterial>,
-    ) {
-        let mut builder = graph.add_node(format_sso!("Shadow Culling C{} {:?}", shadow_index, transparency));
-
-        let pre_cull_handle = self
-            .gpu_culler
-            .mode()
-            .into_data(|| (), || builder.add_data_input(pre_cull_data));
-        let cull_handle = builder.add_data_output(culled);
-
-        builder.build(move |_pt, renderer, encoder_or_rpass, temps, ready, graph_data| {
-            let encoder = encoder_or_rpass.get_encoder();
-
-            let culling_input = pre_cull_handle.map_gpu(|handle| graph_data.get_data::<Buffer>(temps, handle).unwrap());
-
-            let count = graph_data
-                .object_manager
-                .get_objects::<PbrMaterial>(transparency as u64)
-                .len();
-
-            let culled_objects = match self.gpu_culler {
-                ModeData::CPU(_) => self.cpu_culler.cull(culling::cpu::CpuCullerCullArgs {
-                    device: &renderer.device,
-                    camera: &ready.directional_light_cameras[shadow_index],
-                    interfaces: &self.interfaces,
-                    objects: graph_data.object_manager,
-                    transparency,
-                }),
-                ModeData::GPU(ref gpu_culler) => gpu_culler.cull(culling::gpu::GpuCullerCullArgs {
-                    device: &renderer.device,
-                    encoder,
-                    interfaces: &self.interfaces,
-                    camera: &ready.directional_light_cameras[shadow_index],
-                    input_buffer: culling_input.into_gpu(),
-                    input_count: count,
-                    transparency,
-                }),
-            };
-
-            let mut per_material_bgb = BindGroupBuilder::new();
-            per_material_bgb.append_buffer(&culled_objects.output_buffer);
-
-            if renderer.mode == RendererMode::GPUPowered {
-                graph_data
-                    .material_manager
-                    .add_to_bg_gpu::<PbrMaterial>(&mut per_material_bgb);
-            }
-
-            let per_material_bg = per_material_bgb.build(&renderer.device, None, &self.interfaces.per_material_bgl);
-
-            graph_data.set_data(
-                cull_handle,
-                Some(CulledPerMaterial {
-                    inner: culled_objects,
-                    per_material: per_material_bg,
-                }),
-            );
-        });
     }
 
     pub fn add_shadow_rendering_to_graph<'node>(
@@ -224,74 +154,6 @@ impl PbrRenderRoutine {
                     culling::gpu::run(rpass, data);
                 }
             }
-        });
-    }
-
-    pub fn add_culling_to_graph<'node>(
-        &'node self,
-        graph: &mut RenderGraph<'node>,
-        transparency: TransparencyType,
-        pre_cull_data: DataHandle<Buffer>,
-        culled: DataHandle<CulledPerMaterial>,
-    ) {
-        let mut builder = graph.add_node(format_sso!("Primary Culling {:?}", transparency));
-
-        let pre_cull_handle = self
-            .gpu_culler
-            .mode()
-            .into_data(|| (), || builder.add_data_input(pre_cull_data));
-
-        let cull_handle = builder.add_data_output(culled);
-
-        builder.build(move |_pt, renderer, encoder_or_pass, temps, _ready, graph_data| {
-            let encoder = encoder_or_pass.get_encoder();
-
-            let culling_input = pre_cull_handle.map_gpu(|handle| graph_data.get_data(temps, handle).unwrap());
-
-            let culled_objects = match self.gpu_culler {
-                ModeData::CPU(()) => self.cpu_culler.cull(CpuCullerCullArgs {
-                    device: &renderer.device,
-                    camera: graph_data.camera_manager,
-                    interfaces: &self.interfaces,
-                    objects: graph_data.object_manager,
-                    transparency,
-                }),
-                ModeData::GPU(ref gpu_culler) => {
-                    let object_count = graph_data
-                        .object_manager
-                        .get_objects::<PbrMaterial>(transparency as u64)
-                        .len();
-                    let culled = gpu_culler.cull(GpuCullerCullArgs {
-                        device: &renderer.device,
-                        encoder,
-                        interfaces: &self.interfaces,
-                        camera: graph_data.camera_manager,
-                        input_buffer: culling_input.as_gpu(),
-                        input_count: object_count,
-                        transparency,
-                    });
-                    culled
-                }
-            };
-
-            let mut per_material_bgb = BindGroupBuilder::new();
-            per_material_bgb.append_buffer(&culled_objects.output_buffer);
-
-            if renderer.mode == RendererMode::GPUPowered {
-                graph_data
-                    .material_manager
-                    .add_to_bg_gpu::<PbrMaterial>(&mut per_material_bgb);
-            }
-
-            let per_material_bg = per_material_bgb.build(&renderer.device, None, &self.interfaces.per_material_bgl);
-
-            graph_data.set_data(
-                cull_handle,
-                Some(CulledPerMaterial {
-                    inner: culled_objects,
-                    per_material: per_material_bg,
-                }),
-            );
         });
     }
 
@@ -508,6 +370,7 @@ struct PerTransparencyInfo {
 pub struct DefaultRenderGraphData {
     pub interfaces: ShaderInterfaces,
     pub samplers: Samplers,
+    pub gpu_culler: ModeData<(), GpuCuller>,
 }
 impl DefaultRenderGraphData {
     pub fn new(renderer: &Renderer) -> Self {
@@ -517,7 +380,15 @@ impl DefaultRenderGraphData {
 
         let samplers = common::samplers::Samplers::new(&renderer.device);
 
-        Self { interfaces, samplers }
+        let gpu_culler = renderer
+            .mode
+            .into_data(|| (), || culling::gpu::GpuCuller::new(&renderer.device));
+
+        Self {
+            interfaces,
+            samplers,
+            gpu_culler,
+        }
     }
 }
 
@@ -582,13 +453,33 @@ pub fn add_default_rendergraph<'node>(
     // Add shadow culling
     for trans in per_transparency_no_blend {
         for (shadow_index, &shadow_culled) in trans.shadow_cull.iter().enumerate() {
-            pbr.add_shadow_culling_to_graph(graph, trans.ty, shadow_index, trans.pre_cull, shadow_culled);
+            culling::add_culling_to_graph::<PbrMaterial>(
+                graph,
+                trans.pre_cull,
+                shadow_culled,
+                &data.interfaces,
+                &data.gpu_culler,
+                Some(shadow_index),
+                trans.ty as u64,
+                trans.ty.to_sorting(),
+                &format_sso!("Shadow Culling S{} {:?}", shadow_index, trans.ty),
+            );
         }
     }
 
     // Add primary culling
     for trans in &per_transparency {
-        pbr.add_culling_to_graph(graph, trans.ty, trans.pre_cull, trans.cull);
+        culling::add_culling_to_graph::<PbrMaterial>(
+            graph,
+            trans.pre_cull,
+            trans.cull,
+            &data.interfaces,
+            &data.gpu_culler,
+            None,
+            trans.ty as u64,
+            trans.ty.to_sorting(),
+            &format_sso!("Primary Culling {:?}", trans.ty),
+        );
     }
 
     // Add shadow rendering

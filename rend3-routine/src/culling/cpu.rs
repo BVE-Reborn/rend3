@@ -1,6 +1,7 @@
 use glam::{Mat4, Vec3};
 use rend3::{
     managers::{CameraManager, InternalObject, MaterialManager, ObjectManager},
+    types::Material,
     util::frustum::ShaderFrustum,
     ModeData,
 };
@@ -10,70 +11,51 @@ use wgpu::{
 };
 
 use crate::{
-    common::interfaces::{PerObjectData, ShaderInterfaces},
-    culling::{CPUDrawCall, CulledObjectSet},
-    material::{PbrMaterial, TransparencyType},
+    common::interfaces::PerObjectData,
+    culling::{CPUDrawCall, CulledObjectSet, Sorting},
+    material::PbrMaterial,
 };
 
-pub struct CpuCullerCullArgs<'a> {
-    pub device: &'a Device,
-    pub camera: &'a CameraManager,
+pub fn cull<M: Material>(
+    device: &Device,
+    camera: &CameraManager,
+    objects: &ObjectManager,
+    sorting: Option<Sorting>,
+    key: u64,
+) -> CulledObjectSet {
+    profiling::scope!("CPU Culling");
+    let frustum = ShaderFrustum::from_matrix(camera.proj());
+    let view = camera.view();
+    let view_proj = camera.view_proj();
 
-    pub interfaces: &'a ShaderInterfaces,
+    let objects = objects.get_objects::<M>(key);
 
-    pub objects: &'a ObjectManager,
+    let objects = crate::common::sorting::sort_objects(objects, camera, sorting);
 
-    pub transparency: TransparencyType,
-}
+    let (mut outputs, calls) = cull_internal(&objects, frustum, view, view_proj);
 
-pub struct CpuCuller {}
+    assert_eq!(calls.len(), outputs.len());
 
-impl CpuCuller {
-    pub fn new() -> Self {
-        Self {}
-    }
-
-    pub fn cull(&self, args: CpuCullerCullArgs<'_>) -> CulledObjectSet {
-        profiling::scope!("CPU Culling");
-        let frustum = ShaderFrustum::from_matrix(args.camera.proj());
-        let view = args.camera.view();
-        let view_proj = args.camera.view_proj();
-
-        let objects = args.objects.get_objects::<PbrMaterial>(args.transparency as u64);
-
-        let objects = crate::common::sorting::sort_objects(objects, args.camera, args.transparency.to_sorting());
-
-        let (mut outputs, calls) = cull_internal(&objects, frustum, view, view_proj);
-
-        assert_eq!(calls.len(), outputs.len());
-
-        if outputs.is_empty() {
-            // Dummy data
-            outputs.push(PerObjectData {
-                model_view: Mat4::ZERO,
-                model_view_proj: Mat4::ZERO,
-                pad0: [0; 12],
-                material_idx: 0,
-                inv_squared_scale: Vec3::ZERO,
-            });
-        }
-
-        let output_buffer = args.device.create_buffer_init(&BufferInitDescriptor {
-            label: Some("culling output"),
-            contents: bytemuck::cast_slice(&outputs),
-            usage: BufferUsages::STORAGE,
+    if outputs.is_empty() {
+        // Dummy data
+        outputs.push(PerObjectData {
+            model_view: Mat4::ZERO,
+            model_view_proj: Mat4::ZERO,
+            pad0: [0; 12],
+            material_idx: 0,
+            inv_squared_scale: Vec3::ZERO,
         });
-
-        CulledObjectSet {
-            calls: ModeData::CPU(calls),
-            output_buffer,
-        }
     }
-}
 
-impl Default for CpuCuller {
-    fn default() -> Self {
-        Self::new()
+    let output_buffer = device.create_buffer_init(&BufferInitDescriptor {
+        label: Some("culling output"),
+        contents: bytemuck::cast_slice(&outputs),
+        usage: BufferUsages::STORAGE,
+    });
+
+    CulledObjectSet {
+        calls: ModeData::CPU(calls),
+        output_buffer,
     }
 }
 
