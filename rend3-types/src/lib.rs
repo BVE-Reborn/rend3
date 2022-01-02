@@ -205,27 +205,6 @@ macro_rules! changeable_struct {
 #[doc(inline)]
 pub use wgt::{Backend, Backends, BufferUsages, Color, DeviceType, PresentMode, TextureFormat, TextureUsages};
 
-/// Token that validates a mesh has passed mesh validation.
-#[derive(Debug)]
-pub struct MeshValidationToken(());
-
-impl MeshValidationToken {
-    /// Creates a new validation token.
-    ///
-    /// # Safety
-    ///
-    /// This asserts the following are true about the mesh when any method is called on it or it is passed to add_mesh:
-    /// - All vertex arrays are the same length.
-    /// - There is a non-zero count of vertices.
-    /// - The count of vertices is less than [`MAX_VERTEX_COUNT`].
-    /// - All indexes are in bounds for the given vertex arrays.
-    /// - There is a non-zero count of indices.
-    /// - There is a multiple-of-three count of indices.
-    pub unsafe fn new() -> Self {
-        Self(())
-    }
-}
-
 pub const MAX_VERTEX_COUNT: usize = 1 << 24;
 
 #[derive(Debug, Copy, Clone)]
@@ -377,7 +356,7 @@ impl MeshBuilder {
     ///
     /// # Safety
     ///
-    /// This asserts the following are true about the mesh when any method is called on it or it is passed to add_mesh:
+    /// This asserts the following are true about the mesh:
     /// - All vertex arrays are the same length.
     /// - There is a non-zero count of vertices.
     /// - The count of vertices is less than [`MAX_VERTEX_COUNT`].
@@ -423,13 +402,13 @@ impl MeshBuilder {
         }
 
         if !has_normals {
-            // SAFETY: We've validated this mesh.
+            // SAFETY: We've validated this mesh or had its validity unsafely asserted.
             unsafe { mesh.calculate_normals(self.handedness, true) };
         }
 
         // Don't need to bother with tangents if there are no meaningful UVs
         if !has_tangents && has_uvs {
-            // SAFETY: We've validated this mesh.
+            // SAFETY: We've validated this mesh or had its validity unsafely asserted.
             unsafe { mesh.calculate_tangents(true) };
         }
 
