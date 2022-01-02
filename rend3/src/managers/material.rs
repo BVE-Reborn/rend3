@@ -157,13 +157,13 @@ impl MaterialManager {
     ) -> InternalMaterial {
         let null_tex = texture_manager_2d.get_null_view();
 
-        let mut translation_fn = texture_manager_2d.translation_fn();
+        let translation_fn = texture_manager_2d.translation_fn();
 
         let type_info = self.ensure_archetype_inner::<M>(device, mode);
 
         let (bind_group, material_buffer) = if mode == RendererMode::CPUPowered {
-            let mut textures = vec![NonZeroU32::new(u32::MAX); M::TEXTURE_COUNT as usize];
-            material.to_textures(&mut textures, &mut translation_fn);
+            let mut textures = vec![None; M::TEXTURE_COUNT as usize];
+            material.to_textures(&mut textures);
 
             // TODO(material): stack allocation
             let material_uprounded = round_up_pot(M::DATA_SIZE, 16) as usize;
@@ -174,11 +174,9 @@ impl MaterialManager {
             let mut builder = BindGroupBuilder::new();
             let mut texture_mask = 0_u32;
             for (idx, texture) in textures.into_iter().enumerate() {
-                builder.append(BindingResource::TextureView(
-                    texture
-                        .map(|tex| texture_manager_2d.get_view_from_index(tex))
-                        .unwrap_or(null_tex),
-                ));
+                let view = texture.map(|tex| texture_manager_2d.get_view_from_index(translation_fn(tex)));
+                builder.append(BindingResource::TextureView(view.unwrap_or(null_tex)));
+
                 let enabled = texture.is_some();
                 texture_mask |= (enabled as u32) << idx as u32;
             }
@@ -410,11 +408,20 @@ fn write_gpu_materials<M: Material>(
     let mat_size = round_up_pot(texture_bytes, 16);
     let data_size = round_up_pot(M::DATA_SIZE, 16) as usize;
 
+    // Temporary buffer to store the texture handle references in.
+    let mut texture_ref_tmp = vec![None; M::TEXTURE_COUNT as usize];
+
     for mat in materials {
         // If we have no textures, we should skip this operation as the cast_slice_mut will fail
         if mat_size != 0 {
+            // Get the texture handles from the material
+            mat.to_textures(&mut texture_ref_tmp);
+
+            // Translate them and write them into the slice.
             let texture_slice = bytemuck::cast_slice_mut(&mut dest[offset..offset + texture_bytes]);
-            mat.to_textures(texture_slice, translation_fn);
+            for (idx, tex) in texture_ref_tmp.iter_mut().enumerate() {
+                texture_slice[idx] = tex.take().map(|tex| translation_fn(tex));
+            }
 
             offset += mat_size;
         }

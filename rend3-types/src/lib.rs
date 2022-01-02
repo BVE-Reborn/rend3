@@ -805,13 +805,8 @@ pub trait Material: Send + Sync + 'static {
     fn object_key(&self) -> u64;
 
     /// Fill up the given slice with textures.
-    ///
-    /// To determine what to fill in, call `translation_fn` on the wanted texture handle, then write Some(result) to the given slot in the slice.
-    fn to_textures(
-        &self,
-        slice: &mut [Option<NonZeroU32>],
-        translation_fn: &mut (dyn FnMut(&TextureHandle) -> NonZeroU32 + '_),
-    );
+    fn to_textures<'a>(&'a self, slice: &mut [Option<&'a TextureHandle>]);
+
     /// Fill up the given slice with binary material data. This can be whatever data a shader expects.
     fn to_data(&self, slice: &mut [u8]);
 }

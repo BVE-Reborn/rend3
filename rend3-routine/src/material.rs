@@ -111,16 +111,13 @@ impl AlbedoComponent {
         )
     }
 
-    pub fn to_texture<Func, Out>(&self, func: Func) -> Option<Out>
-    where
-        Func: FnOnce(&TextureHandle) -> Out,
-    {
+    pub fn to_texture(&self) -> Option<&TextureHandle> {
         match *self {
             Self::None | Self::Vertex { .. } | Self::Value(_) | Self::ValueVertex { .. } => None,
             Self::Texture(ref texture)
             | Self::TextureVertex { ref texture, .. }
             | Self::TextureValue { ref texture, .. }
-            | Self::TextureVertexValue { ref texture, .. } => Some(func(texture)),
+            | Self::TextureVertexValue { ref texture, .. } => Some(texture),
         }
     }
 }
@@ -152,13 +149,10 @@ impl<T: Copy> MaterialComponent<T> {
         matches!(*self, Self::Texture(..) | Self::TextureValue { .. })
     }
 
-    pub fn to_texture<Func, Out>(&self, func: Func) -> Option<Out>
-    where
-        Func: FnOnce(&TextureHandle) -> Out,
-    {
+    pub fn to_texture(&self) -> Option<&TextureHandle> {
         match *self {
             Self::None | Self::Value(_) => None,
-            Self::Texture(ref texture) | Self::TextureValue { ref texture, .. } => Some(func(texture)),
+            Self::Texture(ref texture) | Self::TextureValue { ref texture, .. } => Some(texture),
         }
     }
 }
@@ -198,15 +192,12 @@ impl Default for NormalTexture {
 }
 
 impl NormalTexture {
-    pub fn to_texture<Func, Out>(&self, func: Func) -> Option<Out>
-    where
-        Func: FnOnce(&TextureHandle) -> Out,
-    {
+    pub fn to_texture(&self) -> Option<&TextureHandle> {
         match *self {
             Self::None => None,
             Self::Tricomponent(ref texture, _)
             | Self::Bicomponent(ref texture, _)
-            | Self::BicomponentSwizzled(ref texture, _) => Some(func(texture)),
+            | Self::BicomponentSwizzled(ref texture, _) => Some(texture),
         }
     }
 
@@ -260,34 +251,28 @@ pub enum AoMRTextures {
 }
 
 impl AoMRTextures {
-    pub fn to_roughness_texture<Func, Out>(&self, func: Func) -> Option<Out>
-    where
-        Func: FnOnce(&TextureHandle) -> Out,
-    {
+    pub fn to_roughness_texture(&self) -> Option<&TextureHandle> {
         match *self {
             Self::Combined {
                 texture: Some(ref texture),
-            } => Some(func(texture)),
+            } => Some(texture),
             Self::SwizzledSplit {
                 mr_texture: Some(ref texture),
                 ..
-            } => Some(func(texture)),
+            } => Some(texture),
             Self::Split {
                 mr_texture: Some(ref texture),
                 ..
-            } => Some(func(texture)),
+            } => Some(texture),
             Self::BWSplit {
                 r_texture: Some(ref texture),
                 ..
-            } => Some(func(texture)),
+            } => Some(texture),
             _ => None,
         }
     }
 
-    pub fn to_metallic_texture<Func, Out>(&self, func: Func) -> Option<Out>
-    where
-        Func: FnOnce(&TextureHandle) -> Out,
-    {
+    pub fn to_metallic_texture(&self) -> Option<&TextureHandle> {
         match *self {
             Self::Combined { .. } => None,
             Self::SwizzledSplit { .. } => None,
@@ -295,29 +280,26 @@ impl AoMRTextures {
             Self::BWSplit {
                 m_texture: Some(ref texture),
                 ..
-            } => Some(func(texture)),
+            } => Some(texture),
             _ => None,
         }
     }
 
-    pub fn to_ao_texture<Func, Out>(&self, func: Func) -> Option<Out>
-    where
-        Func: FnOnce(&TextureHandle) -> Out,
-    {
+    pub fn to_ao_texture(&self) -> Option<&TextureHandle> {
         match *self {
             Self::Combined { .. } => None,
             Self::SwizzledSplit {
                 ao_texture: Some(ref texture),
                 ..
-            } => Some(func(texture)),
+            } => Some(texture),
             Self::Split {
                 ao_texture: Some(ref texture),
                 ..
-            } => Some(func(texture)),
+            } => Some(texture),
             Self::BWSplit {
                 ao_texture: Some(ref texture),
                 ..
-            } => Some(func(texture)),
+            } => Some(texture),
             _ => None,
         }
     }
@@ -362,40 +344,34 @@ pub enum ClearcoatTextures {
 }
 
 impl ClearcoatTextures {
-    pub fn to_clearcoat_texture<Func, Out>(&self, func: Func) -> Option<Out>
-    where
-        Func: FnOnce(&TextureHandle) -> Out,
-    {
+    pub fn to_clearcoat_texture(&self) -> Option<&TextureHandle> {
         match *self {
             Self::GltfCombined {
                 texture: Some(ref texture),
-            } => Some(func(texture)),
+            } => Some(texture),
             Self::GltfSplit {
                 clearcoat_texture: Some(ref texture),
                 ..
-            } => Some(func(texture)),
+            } => Some(texture),
             Self::BWSplit {
                 clearcoat_texture: Some(ref texture),
                 ..
-            } => Some(func(texture)),
+            } => Some(texture),
             _ => None,
         }
     }
 
-    pub fn to_clearcoat_roughness_texture<Func, Out>(&self, func: Func) -> Option<Out>
-    where
-        Func: FnOnce(&TextureHandle) -> Out,
-    {
+    pub fn to_clearcoat_roughness_texture(&self) -> Option<&TextureHandle> {
         match *self {
             Self::GltfCombined { .. } => None,
             Self::GltfSplit {
                 clearcoat_roughness_texture: Some(ref texture),
                 ..
-            } => Some(func(texture)),
+            } => Some(texture),
             Self::BWSplit {
                 clearcoat_roughness_texture: Some(ref texture),
                 ..
-            } => Some(func(texture)),
+            } => Some(texture),
             _ => None,
         }
     }
@@ -530,23 +506,17 @@ impl Material for PbrMaterial {
         TransparencyType::from(self.transparency) as u64
     }
 
-    fn to_textures(
-        &self,
-        slice: &mut [Option<std::num::NonZeroU32>],
-        translation_fn: &mut (dyn FnMut(&TextureHandle) -> std::num::NonZeroU32 + '_),
-    ) {
-        slice[0] = self.albedo.to_texture(&mut *translation_fn);
-        slice[1] = self.normal.to_texture(&mut *translation_fn);
-        slice[2] = self.aomr_textures.to_roughness_texture(&mut *translation_fn);
-        slice[3] = self.aomr_textures.to_metallic_texture(&mut *translation_fn);
-        slice[4] = self.reflectance.to_texture(&mut *translation_fn);
-        slice[5] = self.clearcoat_textures.to_clearcoat_texture(&mut *translation_fn);
-        slice[6] = self
-            .clearcoat_textures
-            .to_clearcoat_roughness_texture(&mut *translation_fn);
-        slice[7] = self.emissive.to_texture(&mut *translation_fn);
-        slice[8] = self.anisotropy.to_texture(&mut *translation_fn);
-        slice[9] = self.aomr_textures.to_ao_texture(&mut *translation_fn);
+    fn to_textures<'a>(&'a self, slice: &mut [Option<&'a TextureHandle>]) {
+        slice[0] = self.albedo.to_texture();
+        slice[1] = self.normal.to_texture();
+        slice[2] = self.aomr_textures.to_roughness_texture();
+        slice[3] = self.aomr_textures.to_metallic_texture();
+        slice[4] = self.reflectance.to_texture();
+        slice[5] = self.clearcoat_textures.to_clearcoat_texture();
+        slice[6] = self.clearcoat_textures.to_clearcoat_roughness_texture();
+        slice[7] = self.emissive.to_texture();
+        slice[8] = self.anisotropy.to_texture();
+        slice[9] = self.aomr_textures.to_ao_texture();
     }
 
     fn to_data(&self, slice: &mut [u8]) {
