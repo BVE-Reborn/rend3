@@ -21,19 +21,19 @@ layout(set = 1, binding = 1, std430) readonly buffer MaterialBuffer {
 layout(set = 2, binding = 0) uniform texture2D textures[];
 #endif
 #ifdef CPU_MODE
-layout(set = 2, binding = 0) uniform texture2D albedo_tex;
-layout(set = 2, binding = 1) uniform texture2D normal_tex;
-layout(set = 2, binding = 2) uniform texture2D roughness_tex;
-layout(set = 2, binding = 3) uniform texture2D metallic_tex;
-layout(set = 2, binding = 4) uniform texture2D reflectance_tex;
-layout(set = 2, binding = 5) uniform texture2D clear_coat_tex;
-layout(set = 2, binding = 6) uniform texture2D clear_coat_roughness_tex;
-layout(set = 2, binding = 7) uniform texture2D emissive_tex;
-layout(set = 2, binding = 8) uniform texture2D anisotropy_tex;
-layout(set = 2, binding = 9) uniform texture2D ambient_occlusion_tex;
-layout(set = 2, binding = 10) uniform TextureData {
+layout(set = 2, binding = 0) uniform TextureData {
     CPUMaterialData material;
 };
+layout(set = 2, binding = 1) uniform texture2D albedo_tex;
+layout(set = 2, binding = 2) uniform texture2D normal_tex;
+layout(set = 2, binding = 3) uniform texture2D roughness_tex;
+layout(set = 2, binding = 4) uniform texture2D metallic_tex;
+layout(set = 2, binding = 5) uniform texture2D reflectance_tex;
+layout(set = 2, binding = 6) uniform texture2D clear_coat_tex;
+layout(set = 2, binding = 7) uniform texture2D clear_coat_roughness_tex;
+layout(set = 2, binding = 8) uniform texture2D emissive_tex;
+layout(set = 2, binding = 9) uniform texture2D anisotropy_tex;
+layout(set = 2, binding = 10) uniform texture2D ambient_occlusion_tex;
 #endif
 
 #include "lighting/texture_access.glsl"

@@ -19,9 +19,8 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 use wgpu::{
-    util::{BufferInitDescriptor, DeviceExt},
     BindGroup, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType, Buffer,
-    BufferBinding, BufferBindingType, BufferUsages, Device, Queue, ShaderStages, TextureSampleType,
+    BufferBinding, BufferBindingType, BufferDescriptor, BufferUsages, Device, Queue, ShaderStages, TextureSampleType,
     TextureViewDimension,
 };
 
@@ -171,7 +170,17 @@ impl MaterialManager {
             let mut data = vec![0u8; actual_size as usize];
             material.to_data(&mut data[..M::DATA_SIZE as usize]);
 
+            let material_buffer = device.create_buffer(&BufferDescriptor {
+                label: None,
+                usage: BufferUsages::COPY_DST | BufferUsages::UNIFORM,
+                size: data.len() as _,
+                mapped_at_creation: true,
+            });
+            let mut material_buffer_mapping = material_buffer.slice(..).get_mapped_range_mut();
+
             let mut builder = BindGroupBuilder::new();
+            builder.append_buffer(&material_buffer);
+
             let mut texture_mask = 0_u32;
             for (idx, texture) in textures.into_iter().enumerate() {
                 let view = texture.map(|tex| texture_manager_2d.get_view_from_index(translation_fn(tex)));
@@ -183,16 +192,10 @@ impl MaterialManager {
 
             *bytemuck::from_bytes_mut(&mut data[material_uprounded..material_uprounded + 4]) = texture_mask;
 
-            let material_buffer = device.create_buffer_init(&BufferInitDescriptor {
-                label: None,
-                contents: &data,
-                usage: BufferUsages::COPY_DST | BufferUsages::UNIFORM,
-            });
+            material_buffer_mapping.copy_from_slice(&data);
+            drop(material_buffer_mapping);
 
-            let bind_group =
-                builder
-                    .append_buffer(&material_buffer)
-                    .build(device, None, type_info.bgl.as_ref().as_cpu());
+            let bind_group = builder.build(device, None, type_info.bgl.as_ref().as_cpu());
 
             (ModeData::CPU(bind_group), ModeData::CPU(material_buffer))
         } else {

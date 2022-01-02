@@ -785,10 +785,10 @@ pub struct MaterialTag;
 ///
 /// ### CPU Mode
 ///
-/// - One Texture2D binding per texture, provided in the order given. If given a `None`, will bind a null texture (1x1 texture with a (0, 0, 0, 255) pixel).
 /// - A uniform binding with:
 ///   - The data provided, with padding up to 16 byte alignment.
 ///   - A u32 bitflag telling which textures are null. To check if texture N is enabled, do `(texture_bitflag >> N) & 0x1 == 1`.
+/// - One Texture2D binding per texture, provided in the order given. If given a `None`, will bind a null texture (1x1 texture with a (0, 0, 0, 255) pixel).
 ///
 /// ### GPU Mode
 /// - A material array indexed by the material index. Each material has:
