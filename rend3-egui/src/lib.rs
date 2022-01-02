@@ -61,7 +61,7 @@ impl EguiRenderRoutine {
             let rpass = encoder_or_pass.get_rpass(rpass_handle);
 
             this.internal
-                .update_texture(&renderer.device, &renderer.queue, &input.context.texture());
+                .update_texture(&renderer.device, &renderer.queue, &input.context.font_image());
             this.internal.update_user_textures(&renderer.device, &renderer.queue);
             this.internal.update_buffers(
                 &renderer.device,
