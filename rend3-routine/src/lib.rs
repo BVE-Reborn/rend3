@@ -1,5 +1,4 @@
 /// PBR Render Routine for rend3.
-/// target: todo!(), clear: todo!(), resolve: todo!()  target: todo!(), clear: todo!(), resolve: todo!()  target: todo!(), clear: todo!(), resolve: todo!()  target: todo!(), clear: todo!(), resolve: todo!()
 /// Contains [`PbrMaterial`] and the [`PbrRenderRoutine`] which serve as the default render routines.
 ///
 /// Tries to strike a balance between photorealism and performance.
@@ -16,6 +15,7 @@ use wgpu::{BindGroup, Buffer, Color, Features, RenderPipeline};
 pub use utils::*;
 
 use crate::{
+    common::{interfaces::ShaderInterfaces, samplers::Samplers},
     culling::{cpu::CpuCullerCullArgs, gpu::GpuCullerCullArgs, CulledObjectSet},
     material::{PbrMaterial, TransparencyType},
 };
@@ -23,6 +23,7 @@ use crate::{
 pub mod common;
 pub mod culling;
 pub mod material;
+pub mod pre_cull;
 pub mod shaders;
 pub mod skybox;
 pub mod tonemapping;
@@ -85,10 +86,6 @@ impl PbrRenderRoutine {
         }
     }
 
-    pub fn set_ambient_color(&mut self, color: Vec4) {
-        self.ambient = color;
-    }
-
     pub fn resize(&mut self, renderer: &Renderer, options: RenderTextureOptions) {
         profiling::scope!("PbrRenderRoutine::resize");
         let different_sample_count = self.render_texture_options.samples != options.samples;
@@ -109,67 +106,6 @@ impl PbrRenderRoutine {
             });
         }
         self.render_texture_options = options;
-    }
-
-    pub fn add_pre_cull_to_graph<'node>(
-        &'node self,
-        graph: &mut RenderGraph<'node>,
-        transparency: TransparencyType,
-        pre_cull_data: DataHandle<Buffer>,
-    ) {
-        let mut builder = graph.add_node(format_sso!("pre-cull {:?}", transparency));
-        let data_handle = builder.add_data_output(pre_cull_data);
-
-        builder.build(move |_pt, renderer, _encoder_or_pass, _temps, _ready, graph_data| {
-            let objects = graph_data
-                .object_manager
-                .get_objects::<PbrMaterial>(transparency as u64);
-            let objects = common::sorting::sort_objects(objects, graph_data.camera_manager, transparency.to_sorting());
-            let buffer = culling::gpu::build_cull_data(&renderer.device, &objects);
-            graph_data.set_data::<Buffer>(data_handle, Some(buffer));
-        });
-    }
-
-    pub fn add_uniform_bg_creation_to_graph<'node>(
-        &'node self,
-        graph: &mut RenderGraph<'node>,
-        shadow_uniform_bg: DataHandle<BindGroup>,
-        forward_uniform_bg: DataHandle<BindGroup>,
-    ) {
-        let mut builder = graph.add_node("build uniform data");
-        let shadow_handle = builder.add_data_output(shadow_uniform_bg);
-        let forward_handle = builder.add_data_output(forward_uniform_bg);
-        builder.build(move |_pt, renderer, _encoder_or_pass, _temps, _ready, graph_data| {
-            let mut bgb = BindGroupBuilder::new();
-
-            self.samplers.add_to_bg(&mut bgb);
-
-            let uniform_buffer = uniforms::create_shader_uniform(uniforms::CreateShaderUniformArgs {
-                device: &renderer.device,
-                camera: graph_data.camera_manager,
-                interfaces: &self.interfaces,
-                ambient: self.ambient,
-            });
-
-            bgb.append_buffer(&uniform_buffer);
-
-            let shadow_uniform_bg = bgb.build(
-                &renderer.device,
-                Some("shadow uniform bg"),
-                &self.interfaces.shadow_uniform_bgl,
-            );
-
-            graph_data.directional_light_manager.add_to_bg(&mut bgb);
-
-            let forward_uniform_bg = bgb.build(
-                &renderer.device,
-                Some("forward uniform bg"),
-                &self.interfaces.forward_uniform_bgl,
-            );
-
-            graph_data.set_data(shadow_handle, Some(shadow_uniform_bg));
-            graph_data.set_data(forward_handle, Some(forward_uniform_bg));
-        })
     }
 
     pub fn add_shadow_culling_to_graph<'node>(
@@ -568,13 +504,31 @@ struct PerTransparencyInfo {
     cull: DataHandle<CulledPerMaterial>,
 }
 
+pub struct DefaultRenderGraphData {
+    pub interfaces: ShaderInterfaces,
+    pub samplers: Samplers,
+}
+impl DefaultRenderGraphData {
+    pub fn new(renderer: &Renderer) -> Self {
+        profiling::scope!("DefaultRenderGraphData::new");
+
+        let interfaces = common::interfaces::ShaderInterfaces::new(&renderer.device, renderer.mode);
+
+        let samplers = common::samplers::Samplers::new(&renderer.device);
+
+        Self { interfaces, samplers }
+    }
+}
+
 pub fn add_default_rendergraph<'node>(
     graph: &mut RenderGraph<'node>,
     ready: &ReadyData,
     pbr: &'node PbrRenderRoutine,
     skybox: Option<&'node skybox::SkyboxRoutine>,
     tonemapping: &'node tonemapping::TonemappingRoutine,
+    data: &'node DefaultRenderGraphData,
     samples: SampleCount,
+    ambient: Vec4,
 ) {
     // We need to know how many shadows we need to render
     let shadow_count = ready.directional_light_cameras.len();
@@ -603,13 +557,26 @@ pub fn add_default_rendergraph<'node>(
 
     // Add pre-culling
     for trans in &per_transparency {
-        pbr.add_pre_cull_to_graph(graph, trans.ty, trans.pre_cull);
+        pre_cull::add_to_graph::<PbrMaterial>(
+            graph,
+            trans.ty as u64,
+            trans.ty.to_sorting(),
+            &format_sso!("{:?}", trans.ty),
+            trans.pre_cull,
+        );
     }
 
     // Create global bind group information
     let shadow_uniform_bg = graph.add_data::<BindGroup>();
     let forward_uniform_bg = graph.add_data::<BindGroup>();
-    pbr.add_uniform_bg_creation_to_graph(graph, shadow_uniform_bg, forward_uniform_bg);
+    uniforms::add_to_graph(
+        graph,
+        shadow_uniform_bg,
+        forward_uniform_bg,
+        &data.interfaces,
+        &data.samplers,
+        ambient,
+    );
 
     // Add shadow culling
     for trans in per_transparency_no_blend {

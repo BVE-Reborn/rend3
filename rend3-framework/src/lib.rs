@@ -5,6 +5,7 @@ use rend3::{
     types::{Handedness, SampleCount, Surface, TextureFormat},
     InstanceAdapterDevice, Renderer,
 };
+use rend3_routine::DefaultRenderGraphData;
 use wgpu::Instance;
 use winit::{
     dpi::PhysicalSize,
@@ -82,6 +83,10 @@ pub trait App<T: 'static = ()> {
         Box::pin(async move { Ok(rend3::create_iad(None, None, None, None).await?) })
     }
 
+    fn create_default_rendergraph_data(&mut self, renderer: &Renderer) -> DefaultRenderGraphData {
+        DefaultRenderGraphData::new(renderer)
+    }
+
     /// Determines the sample count used, this may change dynamically. This function
     /// is what the framework actually calls, so overriding this will always use the right values.
     ///
@@ -110,11 +115,20 @@ pub trait App<T: 'static = ()> {
         window: &Window,
         renderer: &Arc<rend3::Renderer>,
         routines: &Arc<DefaultRoutines>,
+        default_rendergraph_data: &DefaultRenderGraphData,
         surface: Option<&Arc<Surface>>,
         event: Event<'_, T>,
         control_flow: impl FnOnce(winit::event_loop::ControlFlow),
     ) {
-        let _ = (window, renderer, routines, surface, event, control_flow);
+        let _ = (
+            window,
+            renderer,
+            routines,
+            default_rendergraph_data,
+            surface,
+            event,
+            control_flow,
+        );
     }
 }
 
@@ -222,6 +236,7 @@ pub async fn async_start<A: App + 'static>(mut app: A, window_builder: WindowBui
         resolution: (glam::UVec2::new(window_size.width, window_size.height).as_vec2() * app.scale_factor()).as_uvec2(),
         samples: app.sample_count(),
     };
+    let default_rendergraph_data = app.create_default_rendergraph_data(&renderer);
     let routines = Arc::new(DefaultRoutines {
         pbr: Mutex::new(rend3_routine::PbrRenderRoutine::new(&renderer, render_texture_options)),
         skybox: Mutex::new(rend3_routine::skybox::SkyboxRoutine::new(
@@ -296,6 +311,7 @@ pub async fn async_start<A: App + 'static>(mut app: A, window_builder: WindowBui
             &window,
             &renderer,
             &routines,
+            &default_rendergraph_data,
             surface.as_ref(),
             event,
             |c: ControlFlow| {

@@ -10,7 +10,7 @@ use rend3::{
     Renderer, RendererMode,
 };
 use rend3_framework::{lock, AssetPath, Mutex};
-use rend3_routine::{material::NormalTextureYDirection, skybox::SkyboxRoutine};
+use rend3_routine::{material::NormalTextureYDirection, skybox::SkyboxRoutine, DefaultRenderGraphData};
 use std::{collections::HashMap, future::Future, hash::BuildHasher, path::Path, sync::Arc, time::Duration};
 use wgpu_profiler::GpuTimerScopeResult;
 use winit::{
@@ -229,6 +229,7 @@ Windowing:
 Assets:
   --normal-y-down              Interpret all normals as having the DirectX convention of Y down. Defaults to Y up.
   --directional-light <x,y,z>  Create a directional light pointing towards the given coordinates.
+  --ambient <value>            Set the value of the minimum ambient light. This will be treated as white light of this intensity.
   --scale <scale>              Scale all objects loaded by this factor.
 
 Controls:
@@ -248,6 +249,7 @@ struct SceneViewer {
     scale: Option<f32>,
     directional_light_direction: Option<Vec3>,
     directional_light: Option<DirectionalLightHandle>,
+    ambient_light_level: f32,
     samples: SampleCount,
 
     fullscreen: bool,
@@ -288,6 +290,7 @@ impl SceneViewer {
             false => NormalTextureYDirection::Up,
         };
         let directional_light_direction = option_arg(args.opt_value_from_fn("--directional-light", extract_vec3));
+        let ambient_light_level: f32 = option_arg(args.opt_value_from_str("--ambient")).unwrap_or(0.10);
         let scale: Option<f32> = option_arg(args.opt_value_from_str("--scale"));
 
         // Controls
@@ -327,6 +330,7 @@ impl SceneViewer {
             scale,
             directional_light_direction,
             directional_light: None,
+            ambient_light_level,
             samples,
 
             fullscreen,
@@ -384,8 +388,6 @@ impl rend3_framework::App for SceneViewer {
         routines: &'a Arc<rend3_framework::DefaultRoutines>,
         _surface_format: rend3::types::TextureFormat,
     ) {
-        lock(&routines.pbr).set_ambient_color(glam::Vec4::new(0.15, 0.15, 0.15, 1.0));
-
         self.grabber = Some(rend3_framework::Grabber::new(window));
 
         if let Some(direction) = self.directional_light_direction {
@@ -431,6 +433,7 @@ impl rend3_framework::App for SceneViewer {
         window: &winit::window::Window,
         renderer: &Arc<rend3::Renderer>,
         routines: &Arc<rend3_framework::DefaultRoutines>,
+        default_rendergraph_data: &DefaultRenderGraphData,
         surface: Option<&Arc<rend3::types::Surface>>,
         event: rend3_framework::Event<'_, ()>,
         control_flow: impl FnOnce(winit::event_loop::ControlFlow),
@@ -547,7 +550,9 @@ impl rend3_framework::App for SceneViewer {
                     &pbr_routine,
                     Some(&skybox_routine),
                     &tonemapping_routine,
+                    default_rendergraph_data,
                     self.samples,
+                    Vec3::splat(self.ambient_light_level).extend(1.0),
                 );
 
                 // Dispatch a render using the built up rendergraph!
