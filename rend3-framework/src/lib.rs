@@ -110,6 +110,7 @@ pub trait App<T: 'static = ()> {
 
     /// RedrawRequested/RedrawEventsCleared will only be fired if the window size is non-zero. As such you should always render
     /// in RedrawRequested and use MainEventsCleared for things that need to keep running when minimized.
+    #[allow(clippy::too_many_arguments)]
     fn handle_event(
         &mut self,
         window: &Window,

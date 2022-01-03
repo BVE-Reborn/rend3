@@ -396,6 +396,7 @@ pub fn build_depth_pass_pipeline(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn create_depth_inner(
     renderer: &Renderer,
     samples: SampleCount,

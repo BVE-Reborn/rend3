@@ -91,12 +91,22 @@ fn main() {
     )
     .unwrap();
 
-    // Create the pbr pipeline with the same internal resolution and 4x multisampling
+    // Data that the default rendergraph needs to operate.
+    let default_rendergraph_data = rend3_routine::DefaultRenderGraphData::new(&renderer);
+
+    // Create the pbr pipeline with the same internal resolution and 1x multisampling
     let render_texture_options = rend3_routine::RenderTextureOptions {
         resolution: glam::UVec2::new(window_size.width, window_size.height),
         samples: rend3::types::SampleCount::One,
     };
-    let mut pbr_routine = rend3_routine::PbrRenderRoutine::new(&renderer, render_texture_options);
+    let mut data_core = renderer.data_core.lock();
+    let mut pbr_routine = rend3_routine::PbrRenderRoutine::new(
+        &renderer,
+        &mut data_core,
+        &default_rendergraph_data.interfaces,
+        render_texture_options,
+    );
+    drop(data_core);
     let mut tonemapping_routine =
         rend3_routine::tonemapping::TonemappingRoutine::new(&renderer, render_texture_options.resolution, format);
 
@@ -175,6 +185,7 @@ fn main() {
             // Resize the internal buffers to the same size as the screen.
             pbr_routine.resize(
                 &renderer,
+                &default_rendergraph_data.interfaces,
                 rend3_routine::RenderTextureOptions {
                     resolution: size,
                     samples: rend3::types::SampleCount::One,
@@ -201,7 +212,9 @@ fn main() {
                 &pbr_routine,
                 None,
                 &tonemapping_routine,
+                &default_rendergraph_data,
                 rend3::types::SampleCount::One,
+                glam::Vec4::ZERO,
             );
 
             // Dispatch a render using the built up rendergraph!

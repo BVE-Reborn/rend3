@@ -42,8 +42,6 @@ pub struct PbrRenderRoutine {
     pub primary_passes: PrimaryPasses,
     pub depth_pipelines: DepthPipelines,
 
-    pub ambient: Vec4,
-
     pub render_texture_options: RenderTextureOptions,
 }
 
@@ -69,7 +67,7 @@ impl PbrRenderRoutine {
             PrimaryPasses::new(PrimaryPassesNewArgs {
                 renderer,
                 data_core,
-                interfaces: &interfaces,
+                interfaces,
                 handedness: renderer.handedness,
                 samples: render_texture_options.samples,
                 unclipped_depth_supported,
@@ -79,8 +77,6 @@ impl PbrRenderRoutine {
         Self {
             depth_pipelines,
             primary_passes,
-
-            ambient: Vec4::new(0.0, 0.0, 0.0, 1.0),
 
             render_texture_options,
         }
@@ -256,6 +252,7 @@ impl DefaultRenderGraphData {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn add_default_rendergraph<'node>(
     graph: &mut RenderGraph<'node>,
     ready: &ReadyData,

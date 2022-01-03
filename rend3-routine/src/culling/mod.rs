@@ -32,6 +32,7 @@ pub struct CPUDrawCall {
     pub material_index: u32,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn add_culling_to_graph<'node, M: Material>(
     graph: &mut RenderGraph<'node>,
     pre_cull_data: DataHandle<Buffer>,

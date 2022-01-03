@@ -126,6 +126,7 @@ impl rend3_framework::App for TexturedQuadExample {
         _window: &winit::window::Window,
         renderer: &Arc<rend3::Renderer>,
         routines: &Arc<rend3_framework::DefaultRoutines>,
+        default_rendergraph_data: &rend3_routine::DefaultRenderGraphData,
         surface: Option<&Arc<rend3::types::Surface>>,
         event: rend3_framework::Event<'_, ()>,
         control_flow: impl FnOnce(winit::event_loop::ControlFlow),
@@ -176,7 +177,9 @@ impl rend3_framework::App for TexturedQuadExample {
                     &pbr_routine,
                     None,
                     &tonemapping_routine,
+                    default_rendergraph_data,
                     SAMPLE_COUNT,
+                    glam::Vec4::ZERO,
                 );
 
                 // Dispatch a render using the built up rendergraph!
