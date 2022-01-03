@@ -126,6 +126,7 @@ impl rend3_framework::App for EguiExample {
         routines: &Arc<rend3_framework::DefaultRoutines>,
         default_rendergraph_data: &rend3_routine::DefaultRenderGraphData,
         surface: Option<&Arc<rend3::types::Surface>>,
+        resolution: glam::UVec2,
         event: rend3_framework::Event<'_, ()>,
         control_flow: impl FnOnce(winit::event_loop::ControlFlow),
     ) {
@@ -186,6 +187,7 @@ impl rend3_framework::App for EguiExample {
                     None,
                     &tonemapping_routine,
                     default_rendergraph_data,
+                    resolution,
                     SAMPLE_COUNT,
                     glam::Vec4::ZERO,
                 );

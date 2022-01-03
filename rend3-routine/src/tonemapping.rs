@@ -1,38 +1,24 @@
 use std::borrow::Cow;
 
-use glam::UVec2;
 use rend3::{
-    util::bind_merge::BindGroupBuilder, DataHandle, RenderGraph, RenderPassTarget, RenderPassTargets,
-    RenderTargetHandle, Renderer, RpassTemporaryPool,
+    util::bind_merge::{BindGroupBuilder, BindGroupLayoutBuilder},
+    DataHandle, RenderGraph, RenderPassTarget, RenderPassTargets, RenderTargetHandle, Renderer,
 };
 use wgpu::{
-    BindGroup, Color, ColorTargetState, ColorWrites, Device, FragmentState, FrontFace, MultisampleState,
-    PipelineLayoutDescriptor, PolygonMode, PrimitiveState, PrimitiveTopology, RenderPass, RenderPipeline,
-    RenderPipelineDescriptor, ShaderModuleDescriptor, ShaderSource, TextureFormat, TextureView, VertexState,
+    BindGroup, BindGroupLayout, BindingType, Color, ColorTargetState, ColorWrites, Device, FragmentState, FrontFace,
+    MultisampleState, PipelineLayoutDescriptor, PolygonMode, PrimitiveState, PrimitiveTopology, RenderPipeline,
+    RenderPipelineDescriptor, ShaderModuleDescriptor, ShaderSource, ShaderStages, TextureFormat, TextureSampleType,
+    TextureViewDimension, VertexState,
 };
 
 use crate::{common::interfaces::ShaderInterfaces, shaders::WGSL_SHADERS};
 
-pub struct TonemappingPassNewArgs<'a> {
-    pub device: &'a Device,
-
-    pub interfaces: &'a ShaderInterfaces,
-
-    pub output_format: TextureFormat,
-}
-
-pub struct TonemappingPassBlitArgs<'a, 'rpass> {
-    pub device: &'a Device,
-    pub rpass: &'a mut RenderPass<'rpass>,
-
-    pub interfaces: &'a ShaderInterfaces,
-    pub forward_uniform_bg: &'rpass BindGroup,
-    pub temps: &'rpass RpassTemporaryPool<'rpass>,
-
-    pub source: &'a TextureView,
-}
-
-fn create_pipeline(device: &Device, interfaces: &ShaderInterfaces, output_format: TextureFormat) -> RenderPipeline {
+fn create_pipeline(
+    device: &Device,
+    interfaces: &ShaderInterfaces,
+    bgl: &BindGroupLayout,
+    output_format: TextureFormat,
+) -> RenderPipeline {
     profiling::scope!("TonemappingPass::new");
     let blit_vert = device.create_shader_module(&ShaderModuleDescriptor {
         label: Some("tonemapping vert"),
@@ -61,7 +47,7 @@ fn create_pipeline(device: &Device, interfaces: &ShaderInterfaces, output_format
 
     let pll = device.create_pipeline_layout(&PipelineLayoutDescriptor {
         label: Some("tonemapping pass"),
-        bind_group_layouts: &[&interfaces.forward_uniform_bgl, &interfaces.blit_bgl],
+        bind_group_layouts: &[&interfaces.forward_uniform_bgl, bgl],
         push_constant_ranges: &[],
     });
 
@@ -98,27 +84,27 @@ fn create_pipeline(device: &Device, interfaces: &ShaderInterfaces, output_format
 }
 
 pub struct TonemappingRoutine {
-    interfaces: ShaderInterfaces,
+    bgl: BindGroupLayout,
     pipeline: RenderPipeline,
-    size: UVec2,
 }
 
 impl TonemappingRoutine {
-    pub fn new(renderer: &Renderer, size: UVec2, output_format: TextureFormat) -> Self {
-        // TODO: clean up
-        let interfaces = ShaderInterfaces::new(&renderer.device, renderer.mode);
+    pub fn new(renderer: &Renderer, interfaces: &ShaderInterfaces, output_format: TextureFormat) -> Self {
+        let bgl = BindGroupLayoutBuilder::new()
+            .append(
+                ShaderStages::FRAGMENT,
+                BindingType::Texture {
+                    sample_type: TextureSampleType::Float { filterable: true },
+                    view_dimension: TextureViewDimension::D2,
+                    multisampled: false,
+                },
+                None,
+            )
+            .build(&renderer.device, Some("bind bgl"));
 
-        let pipeline = create_pipeline(&renderer.device, &interfaces, output_format);
+        let pipeline = create_pipeline(&renderer.device, interfaces, &bgl, output_format);
 
-        Self {
-            pipeline,
-            size,
-            interfaces,
-        }
-    }
-
-    pub fn resize(&mut self, size: UVec2) {
-        self.size = size;
+        Self { bgl, pipeline }
     }
 
     pub fn add_to_graph<'node>(
@@ -157,7 +143,7 @@ impl TonemappingRoutine {
             let blit_src_bg = temps.add(BindGroupBuilder::new().append_texture_view(hdr_color).build(
                 &renderer.device,
                 Some("blit src bg"),
-                &this.interfaces.blit_bgl,
+                &this.bgl,
             ));
 
             rpass.set_pipeline(&this.pipeline);

@@ -435,6 +435,7 @@ impl rend3_framework::App for SceneViewer {
         routines: &Arc<rend3_framework::DefaultRoutines>,
         default_rendergraph_data: &DefaultRenderGraphData,
         surface: Option<&Arc<rend3::types::Surface>>,
+        resolution: UVec2,
         event: rend3_framework::Event<'_, ()>,
         control_flow: impl FnOnce(winit::event_loop::ControlFlow),
     ) {
@@ -551,6 +552,7 @@ impl rend3_framework::App for SceneViewer {
                     Some(&skybox_routine),
                     &tonemapping_routine,
                     default_rendergraph_data,
+                    resolution,
                     self.samples,
                     Vec3::splat(self.ambient_light_level).extend(1.0),
                 );

@@ -94,21 +94,12 @@ fn main() {
     // Data that the default rendergraph needs to operate.
     let default_rendergraph_data = rend3_routine::DefaultRenderGraphData::new(&renderer);
 
-    // Create the pbr pipeline with the same internal resolution and 1x multisampling
-    let render_texture_options = rend3_routine::RenderTextureOptions {
-        resolution: glam::UVec2::new(window_size.width, window_size.height),
-        samples: rend3::types::SampleCount::One,
-    };
     let mut data_core = renderer.data_core.lock();
-    let mut pbr_routine = rend3_routine::PbrRenderRoutine::new(
-        &renderer,
-        &mut data_core,
-        &default_rendergraph_data.interfaces,
-        render_texture_options,
-    );
+    let pbr_routine =
+        rend3_routine::pbr::PbrRenderRoutine::new(&renderer, &mut data_core, &default_rendergraph_data.interfaces);
     drop(data_core);
-    let mut tonemapping_routine =
-        rend3_routine::tonemapping::TonemappingRoutine::new(&renderer, render_texture_options.resolution, format);
+    let tonemapping_routine =
+        rend3_routine::tonemapping::TonemappingRoutine::new(&renderer, &default_rendergraph_data.interfaces, format);
 
     // Create mesh and calculate smooth normals based on vertices
     let mesh = create_mesh();
@@ -158,6 +149,8 @@ fn main() {
         distance: 400.0,
     });
 
+    let mut resolution = glam::UVec2::new(window_size.width, window_size.height);
+
     event_loop.run(move |event, _, control| match event {
         // Close button was clicked, we should close.
         winit::event::Event::WindowEvent {
@@ -168,30 +161,20 @@ fn main() {
         }
         // Window was resized, need to resize renderer.
         winit::event::Event::WindowEvent {
-            event: winit::event::WindowEvent::Resized(size),
+            event: winit::event::WindowEvent::Resized(physical_size),
             ..
         } => {
-            let size = glam::UVec2::new(size.width, size.height);
+            resolution = glam::UVec2::new(physical_size.width, physical_size.height);
             // Reconfigure the surface for the new size.
             rend3::configure_surface(
                 &surface,
                 &renderer.device,
                 format,
-                glam::UVec2::new(size.x, size.y),
+                glam::UVec2::new(resolution.x, resolution.y),
                 rend3::types::PresentMode::Mailbox,
             );
             // Tell the renderer about the new aspect ratio.
-            renderer.set_aspect_ratio(size.x as f32 / size.y as f32);
-            // Resize the internal buffers to the same size as the screen.
-            pbr_routine.resize(
-                &renderer,
-                &default_rendergraph_data.interfaces,
-                rend3_routine::RenderTextureOptions {
-                    resolution: size,
-                    samples: rend3::types::SampleCount::One,
-                },
-            );
-            tonemapping_routine.resize(size);
+            renderer.set_aspect_ratio(resolution.x as f32 / resolution.y as f32);
         }
         // Render!
         winit::event::Event::MainEventsCleared => {
@@ -213,6 +196,7 @@ fn main() {
                 None,
                 &tonemapping_routine,
                 &default_rendergraph_data,
+                resolution,
                 rend3::types::SampleCount::One,
                 glam::Vec4::ZERO,
             );

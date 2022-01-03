@@ -6,10 +6,7 @@ use rend3::{
     util::bind_merge::BindGroupLayoutBuilder,
     RendererMode,
 };
-use wgpu::{
-    BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, BufferBindingType, Device,
-    ShaderStages, TextureSampleType, TextureViewDimension,
-};
+use wgpu::{BindGroupLayout, BindingType, BufferBindingType, Device, ShaderStages};
 
 use crate::{common::samplers::Samplers, material::PbrMaterial, uniforms::ShaderCommonUniform};
 
@@ -31,9 +28,6 @@ pub struct ShaderInterfaces {
     pub shadow_uniform_bgl: BindGroupLayout,
     pub forward_uniform_bgl: BindGroupLayout,
     pub per_material_bgl: BindGroupLayout,
-
-    pub blit_bgl: BindGroupLayout,
-    pub skybox_bgl: BindGroupLayout,
 }
 
 impl ShaderInterfaces {
@@ -78,40 +72,10 @@ impl ShaderInterfaces {
 
         let per_material_bgl = per_material_bglb.build(device, Some("per material bgl"));
 
-        let blit_bgl = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-            label: Some("blit bgl"),
-            entries: &[BindGroupLayoutEntry {
-                binding: 0,
-                visibility: ShaderStages::FRAGMENT,
-                ty: BindingType::Texture {
-                    sample_type: TextureSampleType::Float { filterable: true },
-                    view_dimension: TextureViewDimension::D2,
-                    multisampled: false,
-                },
-                count: None,
-            }],
-        });
-
-        let skybox_bgl = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-            label: Some("skybox bgl"),
-            entries: &[BindGroupLayoutEntry {
-                binding: 0,
-                visibility: ShaderStages::FRAGMENT,
-                ty: BindingType::Texture {
-                    sample_type: TextureSampleType::Float { filterable: true },
-                    view_dimension: TextureViewDimension::Cube,
-                    multisampled: false,
-                },
-                count: None,
-            }],
-        });
-
         Self {
             shadow_uniform_bgl,
             forward_uniform_bgl,
             per_material_bgl,
-            blit_bgl,
-            skybox_bgl,
         }
     }
 }
