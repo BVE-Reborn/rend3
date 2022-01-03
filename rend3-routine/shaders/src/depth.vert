@@ -22,22 +22,8 @@ layout(location = 3) flat out uint o_material;
 layout(set = 1, binding = 0, std430) readonly buffer ObjectOutputDataBuffer {
     ObjectOutputData object_output[];
 };
-#ifdef GPU_MODE
-layout(set = 1, binding = 1, std430) readonly buffer MaterialBuffer {
-    GPUMaterialData materials[];
-};
-#endif
-#ifdef CPU_MODE
-layout(set = 2, binding = 0) uniform TextureData {
-    CPUMaterialData material;
-};
-#endif
 
 void main() {
-    #ifdef GPU_MODE
-    GPUMaterialData material = materials[i_material];
-    #endif
-
     #ifdef CPU_MODE
     uint object_idx = gl_InstanceIndex;
     #else

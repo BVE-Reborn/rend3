@@ -5,8 +5,11 @@ use std::mem;
 use glam::{Mat3, Mat3A, Vec3, Vec4};
 use rend3::types::{Material, TextureHandle};
 
+use crate::depth::{AlphaCutoutSpec, DepthRenderableMaterial};
+
 bitflags::bitflags! {
     /// Flags which shaders use to determine properties of a material
+    #[derive(Default)]
     pub struct MaterialFlags : u32 {
         const ALBEDO_ACTIVE =       0b0000_0000_0000_0001;
         const ALBEDO_BLEND =        0b0000_0000_0000_0010;
@@ -524,8 +527,22 @@ impl Material for PbrMaterial {
     }
 }
 
+impl DepthRenderableMaterial for PbrMaterial {
+    const ALPHA_CUTOUT: Option<AlphaCutoutSpec> = Some(AlphaCutoutSpec {
+        index: 0,
+        cutoff_offset: 152,
+        uv_transform_offset: Some(0),
+    });
+}
+
+#[test]
+fn cutout_offset() {
+    assert_eq!(bytemuck::offset_of!(ShaderMaterial, alpha_cutout), 152);
+    assert_eq!(bytemuck::offset_of!(ShaderMaterial, uv_transform0), 0);
+}
+
 #[repr(C)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Default, Copy, Clone)]
 struct ShaderMaterial {
     uv_transform0: Mat3A,
     uv_transform1: Mat3A,

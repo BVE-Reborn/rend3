@@ -90,7 +90,7 @@ var primary_sampler: sampler;
 [[group(0), binding(3)]]
 var<uniform> unnamed: UniformBuffer;
 [[group(2), binding(0)]]
-var<uniform> unnamed_1: TextureData;
+var<storage> unnamed_1: TextureData;
 var<private> o_color: vec4<f32>;
 var<private> i_view_position_1: vec4<f32>;
 [[group(0), binding(4)]]

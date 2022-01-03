@@ -62,7 +62,7 @@ var<private> i_coords0_1: vec2<f32>;
 var<private> o_coords1_: vec2<f32>;
 var<private> i_coords1_1: vec2<f32>;
 [[group(2), binding(0)]]
-var<uniform> unnamed_1: TextureData;
+var<storage> unnamed_1: TextureData;
 var<private> perVertexStruct: gl_PerVertex = gl_PerVertex(vec4<f32>(0.0, 0.0, 0.0, 1.0), );
 var<private> i_material_1: u32;
 

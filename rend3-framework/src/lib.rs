@@ -237,8 +237,14 @@ pub async fn async_start<A: App + 'static>(mut app: A, window_builder: WindowBui
         samples: app.sample_count(),
     };
     let default_rendergraph_data = app.create_default_rendergraph_data(&renderer);
+    let mut data_core = renderer.data_core.lock();
     let routines = Arc::new(DefaultRoutines {
-        pbr: Mutex::new(rend3_routine::PbrRenderRoutine::new(&renderer, render_texture_options)),
+        pbr: Mutex::new(rend3_routine::PbrRenderRoutine::new(
+            &renderer,
+            &mut data_core,
+            &default_rendergraph_data.interfaces,
+            render_texture_options,
+        )),
         skybox: Mutex::new(rend3_routine::skybox::SkyboxRoutine::new(
             &renderer,
             render_texture_options,
@@ -249,6 +255,7 @@ pub async fn async_start<A: App + 'static>(mut app: A, window_builder: WindowBui
             format,
         )),
     });
+    drop(data_core);
 
     app.setup(&window, &renderer, &routines, format);
 
@@ -284,6 +291,7 @@ pub async fn async_start<A: App + 'static>(mut app: A, window_builder: WindowBui
             &renderer,
             format,
             &routines,
+            &default_rendergraph_data,
             &mut stored_surface_info,
         ) {
             suspended = suspend;
@@ -338,6 +346,7 @@ fn handle_surface<A: App, T: 'static>(
     renderer: &Arc<Renderer>,
     format: rend3::types::TextureFormat,
     routines: &Arc<DefaultRoutines>,
+    data: &DefaultRenderGraphData,
     surface_info: &mut StoredSurfaceInfo,
 ) -> Option<bool> {
     match *event {
@@ -377,6 +386,7 @@ fn handle_surface<A: App, T: 'static>(
             // Resize the internal buffers to the same size as the screen.
             lock(&routines.pbr).resize(
                 renderer,
+                &data.interfaces,
                 rend3_routine::RenderTextureOptions {
                     resolution: (size.as_vec2() * surface_info.scale_factor).as_uvec2(),
                     samples: surface_info.sample_count,
@@ -392,6 +402,7 @@ fn handle_surface<A: App, T: 'static>(
             if new_sample_count != surface_info.sample_count || new_scale_factor != surface_info.scale_factor {
                 lock(&routines.pbr).resize(
                     renderer,
+                    &data.interfaces,
                     rend3_routine::RenderTextureOptions {
                         resolution: (surface_info.size.as_vec2() * new_scale_factor).as_uvec2(),
                         samples: new_sample_count,

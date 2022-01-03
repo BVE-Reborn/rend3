@@ -34,7 +34,7 @@ layout(set = 1, binding = 1, std430) restrict readonly buffer MaterialBuffer {
 layout(set = 2, binding = 0) uniform texture2D textures[];
 #endif
 #ifdef CPU_MODE
-layout(set = 2, binding = 0) uniform TextureData {
+layout(set = 2, binding = 0) readonly buffer TextureData {
     CPUMaterialData material;
 };
 layout(set = 2, binding = 1) uniform texture2D albedo_tex;

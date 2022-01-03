@@ -102,7 +102,7 @@ impl MaterialManager {
             mode.into_data(
                 || {
                     let texture_binding = |idx: u32| BindGroupLayoutEntry {
-                        binding: idx as u32,
+                        binding: (idx + 1) as u32,
                         visibility: ShaderStages::FRAGMENT,
                         ty: BindingType::Texture {
                             sample_type: TextureSampleType::Float { filterable: true },
@@ -112,12 +112,12 @@ impl MaterialManager {
                         count: None,
                     };
 
-                    let mut entries: Vec<_> = (0..M::TEXTURE_COUNT).map(texture_binding).collect();
+                    let mut entries: Vec<_> = Vec::with_capacity(M::TEXTURE_COUNT as usize);
                     entries.push(BindGroupLayoutEntry {
-                        binding: M::TEXTURE_COUNT,
+                        binding: 0,
                         visibility: ShaderStages::VERTEX_FRAGMENT,
                         ty: BindingType::Buffer {
-                            ty: BufferBindingType::Uniform,
+                            ty: BufferBindingType::Storage { read_only: true },
                             has_dynamic_offset: false,
                             min_binding_size: NonZeroU64::new(
                                 (round_up_pot(M::DATA_SIZE, 16) + round_up_pot(TEXTURE_MASK_SIZE, 16)) as _,
@@ -125,6 +125,7 @@ impl MaterialManager {
                         },
                         count: None,
                     });
+                    entries.extend((0..M::TEXTURE_COUNT).map(texture_binding));
                     device.create_bind_group_layout(&BindGroupLayoutDescriptor {
                         label: Some("cpu material bgl"),
                         entries: &entries,
@@ -172,7 +173,7 @@ impl MaterialManager {
 
             let material_buffer = device.create_buffer(&BufferDescriptor {
                 label: None,
-                usage: BufferUsages::COPY_DST | BufferUsages::UNIFORM,
+                usage: BufferUsages::COPY_DST | BufferUsages::STORAGE,
                 size: data.len() as _,
                 mapped_at_creation: true,
             });
@@ -194,6 +195,7 @@ impl MaterialManager {
 
             material_buffer_mapping.copy_from_slice(&data);
             drop(material_buffer_mapping);
+            material_buffer.unmap();
 
             let bind_group = builder.build(device, None, type_info.bgl.as_ref().as_cpu());
 

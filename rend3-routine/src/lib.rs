@@ -16,15 +16,16 @@ pub use utils::*;
 use crate::{
     common::{interfaces::ShaderInterfaces, samplers::Samplers},
     culling::{gpu::GpuCuller, CulledObjectSet},
+    depth::DepthPipelines,
     material::{PbrMaterial, TransparencyType},
 };
 
 pub mod common;
 pub mod culling;
+pub mod depth;
 pub mod material;
 pub mod pre_cull;
 pub mod shaders;
-pub mod shadow;
 pub mod skybox;
 pub mod tonemapping;
 pub mod uniforms;
@@ -38,10 +39,8 @@ pub struct CulledPerMaterial {
 
 /// Render routine that renders the using PBR materials and gpu based culling.
 pub struct PbrRenderRoutine {
-    pub interfaces: common::interfaces::ShaderInterfaces,
-    pub samplers: common::samplers::Samplers,
-    pub gpu_culler: ModeData<(), culling::gpu::GpuCuller>,
     pub primary_passes: PrimaryPasses,
+    pub depth_pipelines: DepthPipelines,
 
     pub ambient: Vec4,
 
@@ -49,32 +48,36 @@ pub struct PbrRenderRoutine {
 }
 
 impl PbrRenderRoutine {
-    pub fn new(renderer: &Renderer, render_texture_options: RenderTextureOptions) -> Self {
+    pub fn new(
+        renderer: &Renderer,
+        data_core: &mut RendererDataCore,
+        interfaces: &ShaderInterfaces,
+        render_texture_options: RenderTextureOptions,
+    ) -> Self {
         profiling::scope!("PbrRenderRoutine::new");
 
-        let interfaces = common::interfaces::ShaderInterfaces::new(&renderer.device, renderer.mode);
+        data_core
+            .material_manager
+            .ensure_archetype::<PbrMaterial>(&renderer.device, renderer.mode);
 
-        let samplers = common::samplers::Samplers::new(&renderer.device);
+        let unclipped_depth_supported = renderer.features.contains(Features::DEPTH_CLIP_CONTROL);
 
-        let gpu_culler = renderer
-            .mode
-            .into_data(|| (), || culling::gpu::GpuCuller::new(&renderer.device));
+        let depth_pipelines =
+            DepthPipelines::new::<PbrMaterial>(renderer, data_core, interfaces, unclipped_depth_supported);
 
         let primary_passes = {
             PrimaryPasses::new(PrimaryPassesNewArgs {
                 renderer,
-                data_core: &mut *renderer.data_core.lock(),
+                data_core,
                 interfaces: &interfaces,
                 handedness: renderer.handedness,
                 samples: render_texture_options.samples,
-                unclipped_depth_supported: renderer.features.contains(Features::DEPTH_CLIP_CONTROL),
+                unclipped_depth_supported,
             })
         };
 
         Self {
-            interfaces,
-            samplers,
-            gpu_culler,
+            depth_pipelines,
             primary_passes,
 
             ambient: Vec4::new(0.0, 0.0, 0.0, 1.0),
@@ -83,7 +86,7 @@ impl PbrRenderRoutine {
         }
     }
 
-    pub fn resize(&mut self, renderer: &Renderer, options: RenderTextureOptions) {
+    pub fn resize(&mut self, renderer: &Renderer, interfaces: &ShaderInterfaces, options: RenderTextureOptions) {
         profiling::scope!("PbrRenderRoutine::resize");
         let different_sample_count = self.render_texture_options.samples != options.samples;
         if different_sample_count {
@@ -96,128 +99,13 @@ impl PbrRenderRoutine {
             PrimaryPasses::new(PrimaryPassesNewArgs {
                 renderer,
                 data_core,
-                interfaces: &self.interfaces,
+                interfaces,
                 handedness: renderer.handedness,
                 samples: options.samples,
                 unclipped_depth_supported: renderer.features.contains(Features::DEPTH_CLIP_CONTROL),
             });
         }
         self.render_texture_options = options;
-    }
-
-    pub fn add_shadow_rendering_to_graph<'node>(
-        &'node self,
-        graph: &mut RenderGraph<'node>,
-        transparency: TransparencyType,
-        shadow_index: usize,
-        shadow_uniform_bg: DataHandle<BindGroup>,
-        culled: DataHandle<CulledPerMaterial>,
-    ) {
-        let mut builder = graph.add_node(format_sso!("{} S{} Render", transparency.to_debug_str(), shadow_index));
-
-        let shadow_uniform_handle = builder.add_data_input(shadow_uniform_bg);
-        let culled_handle = builder.add_data_input(culled);
-        let shadow_output_handle = builder.add_shadow_output(shadow_index);
-
-        let rpass_handle = builder.add_renderpass(RenderPassTargets {
-            targets: vec![],
-            depth_stencil: Some(RenderPassDepthTarget {
-                target: DepthHandle::Shadow(shadow_output_handle),
-                depth_clear: Some(0.0),
-                stencil_clear: None,
-            }),
-        });
-
-        let pt_handle = builder.passthrough_ref(self);
-
-        builder.build(move |pt, _renderer, encoder_or_pass, temps, ready, graph_data| {
-            let this = pt.get(pt_handle);
-            let rpass = encoder_or_pass.get_rpass(rpass_handle);
-            let shadow_uniform = graph_data.get_data(temps, shadow_uniform_handle).unwrap();
-            let culled = graph_data.get_data(temps, culled_handle).unwrap();
-
-            let pipeline = match transparency {
-                TransparencyType::Opaque => &this.primary_passes.shadow_opaque,
-                TransparencyType::Cutout => &this.primary_passes.shadow_cutout,
-                TransparencyType::Blend => unreachable!(),
-            };
-
-            graph_data.mesh_manager.buffers().bind(rpass);
-            rpass.set_pipeline(pipeline);
-            rpass.set_bind_group(0, shadow_uniform, &[]);
-            rpass.set_bind_group(1, &culled.per_material, &[]);
-
-            match culled.inner.calls {
-                ModeData::CPU(ref draws) => culling::cpu::run(rpass, draws, graph_data.material_manager, 2),
-                ModeData::GPU(ref data) => {
-                    rpass.set_bind_group(2, ready.d2_texture.bg.as_gpu(), &[]);
-                    culling::gpu::run(rpass, data);
-                }
-            }
-        });
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    pub fn add_prepass_to_graph<'node>(
-        &'node self,
-        graph: &mut RenderGraph<'node>,
-        transparency: TransparencyType,
-        color: RenderTargetHandle,
-        resolve: Option<RenderTargetHandle>,
-        depth: RenderTargetHandle,
-        forward_uniform_bg: DataHandle<BindGroup>,
-        culled: DataHandle<CulledPerMaterial>,
-    ) {
-        let mut builder = graph.add_node(format_sso!("Primary Prepass {:?}", transparency));
-
-        let hdr_color_handle = builder.add_render_target_output(color);
-        let hdr_resolve = builder.add_optional_render_target_output(resolve);
-        let hdr_depth_handle = builder.add_render_target_output(depth);
-
-        let forward_uniform_handle = builder.add_data_input(forward_uniform_bg);
-        let cull_handle = builder.add_data_input(culled);
-
-        let rpass_handle = builder.add_renderpass(RenderPassTargets {
-            targets: vec![RenderPassTarget {
-                color: hdr_color_handle,
-                clear: Color::BLACK,
-                resolve: hdr_resolve,
-            }],
-            depth_stencil: Some(RenderPassDepthTarget {
-                target: DepthHandle::RenderTarget(hdr_depth_handle),
-                depth_clear: Some(0.0),
-                stencil_clear: None,
-            }),
-        });
-
-        let pt_handle = builder.passthrough_ref(self);
-
-        builder.build(move |pt, _renderer, encoder_or_pass, temps, ready, graph_data| {
-            let this = pt.get(pt_handle);
-            let rpass = encoder_or_pass.get_rpass(rpass_handle);
-            let forward_uniform_bg = graph_data.get_data(temps, forward_uniform_handle).unwrap();
-            let culled = graph_data.get_data(temps, cull_handle).unwrap();
-
-            let pipeline = match transparency {
-                TransparencyType::Opaque => &this.primary_passes.depth_opaque,
-                TransparencyType::Cutout => &this.primary_passes.depth_cutout,
-                TransparencyType::Blend => unreachable!(),
-            };
-
-            graph_data.mesh_manager.buffers().bind(rpass);
-
-            rpass.set_pipeline(pipeline);
-            rpass.set_bind_group(0, forward_uniform_bg, &[]);
-            rpass.set_bind_group(1, &culled.per_material, &[]);
-
-            match culled.inner.calls {
-                ModeData::CPU(ref draws) => culling::cpu::run(rpass, draws, graph_data.material_manager, 2),
-                ModeData::GPU(ref data) => {
-                    rpass.set_bind_group(2, ready.d2_texture.bg.as_gpu(), &[]);
-                    culling::gpu::run(rpass, data);
-                }
-            }
-        });
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -298,10 +186,6 @@ pub struct PrimaryPassesNewArgs<'a> {
 }
 
 pub struct PrimaryPasses {
-    shadow_cutout: RenderPipeline,
-    shadow_opaque: RenderPipeline,
-    depth_cutout: RenderPipeline,
-    depth_opaque: RenderPipeline,
     forward_blend: RenderPipeline,
     forward_cutout: RenderPipeline,
     forward_opaque: RenderPipeline,
@@ -313,22 +197,6 @@ impl PrimaryPasses {
         args.data_core
             .material_manager
             .ensure_archetype::<PbrMaterial>(&args.renderer.device, args.renderer.mode);
-
-        let depth_pass_args = common::depth_pass::BuildDepthPassShaderArgs {
-            renderer: args.renderer,
-            data_core: args.data_core,
-            interfaces: args.interfaces,
-            samples: SampleCount::One,
-            ty: common::depth_pass::DepthPassType::Shadow,
-            unclipped_depth_supported: args.unclipped_depth_supported,
-        };
-        let shadow_pipelines = common::depth_pass::build_depth_pass_pipeline(depth_pass_args.clone());
-        let depth_pipelines =
-            common::depth_pass::build_depth_pass_pipeline(common::depth_pass::BuildDepthPassShaderArgs {
-                samples: args.samples,
-                ty: common::depth_pass::DepthPassType::Prepass,
-                ..depth_pass_args
-            });
 
         let forward_pass_args = common::forward_pass::BuildForwardPassShaderArgs {
             renderer: args.renderer,
@@ -349,10 +217,6 @@ impl PrimaryPasses {
                 ..forward_pass_args.clone()
             });
         Self {
-            shadow_cutout: shadow_pipelines.cutout,
-            shadow_opaque: shadow_pipelines.opaque,
-            depth_cutout: depth_pipelines.cutout,
-            depth_opaque: depth_pipelines.opaque,
             forward_blend,
             forward_cutout,
             forward_opaque,
@@ -485,7 +349,13 @@ pub fn add_default_rendergraph<'node>(
     // Add shadow rendering
     for trans in per_transparency_no_blend {
         for (shadow_index, &shadow_culled) in trans.shadow_cull.iter().enumerate() {
-            pbr.add_shadow_rendering_to_graph(graph, trans.ty, shadow_index, shadow_uniform_bg, shadow_culled);
+            pbr.depth_pipelines.add_shadow_rendering_to_graph(
+                graph,
+                matches!(trans.ty, TransparencyType::Cutout),
+                shadow_index,
+                shadow_uniform_bg,
+                shadow_culled,
+            );
         }
     }
 
@@ -516,7 +386,16 @@ pub fn add_default_rendergraph<'node>(
 
     // Add depth prepass
     for trans in per_transparency_no_blend {
-        pbr.add_prepass_to_graph(graph, trans.ty, color, resolve, depth, forward_uniform_bg, trans.cull);
+        pbr.depth_pipelines.add_prepass_to_graph(
+            graph,
+            forward_uniform_bg,
+            trans.cull,
+            samples,
+            matches!(trans.ty, TransparencyType::Cutout),
+            color,
+            resolve,
+            depth,
+        );
     }
 
     // Add skybox
