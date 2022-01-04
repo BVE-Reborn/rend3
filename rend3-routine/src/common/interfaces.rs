@@ -1,37 +1,23 @@
-use std::{mem, num::NonZeroU64};
+use std::{marker::PhantomData, mem, num::NonZeroU64};
 
 use glam::{Mat4, Vec3};
 use rend3::{
     managers::{DirectionalLightManager, MaterialManager},
+    types::Material,
     util::bind_merge::BindGroupLayoutBuilder,
     RendererMode,
 };
 use wgpu::{BindGroupLayout, BindingType, BufferBindingType, Device, ShaderStages};
 
-use crate::{common::samplers::Samplers, material::PbrMaterial, uniforms::ShaderCommonUniform};
+use crate::{common::samplers::Samplers, uniforms::ShaderCommonUniform};
 
-#[repr(C, align(16))]
-#[derive(Debug, Copy, Clone)]
-pub struct PerObjectData {
-    pub model_view: Mat4,
-    pub model_view_proj: Mat4,
-    // Unused in shader
-    pub material_idx: u32,
-    pub pad0: [u8; 12],
-    pub inv_squared_scale: Vec3,
-}
-
-unsafe impl bytemuck::Pod for PerObjectData {}
-unsafe impl bytemuck::Zeroable for PerObjectData {}
-
-pub struct ShaderInterfaces {
-    pub shadow_uniform_bgl: BindGroupLayout,
+pub struct GenericShaderInterfaces {
+    pub depth_uniform_bgl: BindGroupLayout,
     pub forward_uniform_bgl: BindGroupLayout,
-    pub per_material_bgl: BindGroupLayout,
 }
 
-impl ShaderInterfaces {
-    pub fn new(device: &Device, mode: RendererMode) -> Self {
+impl GenericShaderInterfaces {
+    pub fn new(device: &Device) -> Self {
         profiling::scope!("ShaderInterfaces::new");
 
         let mut uniform_bglb = BindGroupLayoutBuilder::new();
@@ -54,6 +40,33 @@ impl ShaderInterfaces {
 
         let forward_uniform_bgl = uniform_bglb.build(device, Some("forward uniform bgl"));
 
+        Self {
+            depth_uniform_bgl: shadow_uniform_bgl,
+            forward_uniform_bgl,
+        }
+    }
+}
+
+#[repr(C, align(16))]
+#[derive(Debug, Copy, Clone)]
+pub struct PerObjectDataAbi {
+    pub model_view: Mat4,
+    pub model_view_proj: Mat4,
+    // Unused in shader
+    pub material_idx: u32,
+    pub pad0: [u8; 12],
+    pub inv_squared_scale: Vec3,
+}
+
+unsafe impl bytemuck::Pod for PerObjectDataAbi {}
+unsafe impl bytemuck::Zeroable for PerObjectDataAbi {}
+
+pub struct PerMaterialInterfaces<M> {
+    pub bgl: BindGroupLayout,
+    _phantom: PhantomData<M>,
+}
+impl<M: Material> PerMaterialInterfaces<M> {
+    pub fn new(device: &Device, mode: RendererMode) -> Self {
         let mut per_material_bglb = BindGroupLayoutBuilder::new();
 
         per_material_bglb.append(
@@ -61,21 +74,20 @@ impl ShaderInterfaces {
             BindingType::Buffer {
                 ty: BufferBindingType::Storage { read_only: true },
                 has_dynamic_offset: false,
-                min_binding_size: NonZeroU64::new(mem::size_of::<PerObjectData>() as _),
+                min_binding_size: NonZeroU64::new(mem::size_of::<PerObjectDataAbi>() as _),
             },
             None,
         );
 
         if mode == RendererMode::GPUPowered {
-            MaterialManager::add_to_bgl_gpu::<PbrMaterial>(&mut per_material_bglb);
+            MaterialManager::add_to_bgl_gpu::<M>(&mut per_material_bglb);
         }
 
-        let per_material_bgl = per_material_bglb.build(device, Some("per material bgl"));
+        let bgl = per_material_bglb.build(device, Some("per material bgl"));
 
         Self {
-            shadow_uniform_bgl,
-            forward_uniform_bgl,
-            per_material_bgl,
+            bgl,
+            _phantom: PhantomData,
         }
     }
 }

@@ -18,7 +18,7 @@ pub fn add_to_graph<'node, M: Material>(
 
     builder.build(move |_pt, renderer, _encoder_or_pass, _temps, _ready, graph_data| {
         let objects = graph_data.object_manager.get_objects::<M>(key);
-        let objects = common::sorting::sort_objects(objects, graph_data.camera_manager, sorting);
+        let objects = common::sort_objects(objects, graph_data.camera_manager, sorting);
         let buffer = culling::gpu::build_cull_data(&renderer.device, &objects);
         graph_data.set_data::<Buffer>(data_handle, Some(buffer));
     });

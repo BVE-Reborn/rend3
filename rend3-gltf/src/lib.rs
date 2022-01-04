@@ -23,7 +23,7 @@ use rend3::{
     util::typedefs::{FastHashMap, SsoString},
     Renderer,
 };
-use rend3_routine::material::{self, NormalTextureYDirection};
+use rend3_routine::pbr;
 use std::{borrow::Cow, collections::hash_map::Entry, future::Future, path::Path};
 use thiserror::Error;
 
@@ -193,7 +193,7 @@ pub async fn load_gltf<F, Fut, E>(
     renderer: &Renderer,
     data: &[u8],
     scale: f32,
-    normal_direction: NormalTextureYDirection,
+    normal_direction: pbr::NormalTextureYDirection,
     io_func: F,
 ) -> Result<LoadedGltfScene, GltfLoadError<E>>
 where
@@ -242,7 +242,7 @@ where
 pub async fn load_gltf_data<F, Fut, E>(
     renderer: &Renderer,
     file: &mut gltf::Gltf,
-    normal_direction: NormalTextureYDirection,
+    normal_direction: pbr::NormalTextureYDirection,
     mut io_func: F,
 ) -> Result<LoadedGltfScene, GltfLoadError<E>>
 where
@@ -342,7 +342,7 @@ pub fn load_gltf_nodes<'a, E: std::error::Error + 'static>(
                         color: Vec3::from(light.color()),
                         intensity: light.intensity(),
                         direction,
-                        distance: 100.0,
+                        distance: 1000.0,
                     }))
                 }
                 _ => None,
@@ -484,24 +484,24 @@ pub fn load_meshes<'a, E: std::error::Error + 'static>(
 /// Creates a gltf default material.
 pub fn load_default_material(renderer: &Renderer) -> types::MaterialHandle {
     profiling::scope!("creating default material");
-    renderer.add_material(material::PbrMaterial {
-        albedo: material::AlbedoComponent::Value(Vec4::splat(1.0)),
-        transparency: material::Transparency::Opaque,
-        normal: material::NormalTexture::None,
-        aomr_textures: material::AoMRTextures::None,
+    renderer.add_material(pbr::PbrMaterial {
+        albedo: pbr::AlbedoComponent::Value(Vec4::splat(1.0)),
+        transparency: pbr::Transparency::Opaque,
+        normal: pbr::NormalTexture::None,
+        aomr_textures: pbr::AoMRTextures::None,
         ao_factor: Some(1.0),
         metallic_factor: Some(1.0),
         roughness_factor: Some(1.0),
-        clearcoat_textures: material::ClearcoatTextures::None,
+        clearcoat_textures: pbr::ClearcoatTextures::None,
         clearcoat_factor: Some(1.0),
         clearcoat_roughness_factor: Some(1.0),
-        emissive: material::MaterialComponent::None,
-        reflectance: material::MaterialComponent::None,
-        anisotropy: material::MaterialComponent::None,
+        emissive: pbr::MaterialComponent::None,
+        reflectance: pbr::MaterialComponent::None,
+        anisotropy: pbr::MaterialComponent::None,
         uv_transform0: Mat3::IDENTITY,
         uv_transform1: Mat3::IDENTITY,
         unlit: false,
-        sample_type: material::SampleType::Linear,
+        sample_type: pbr::SampleType::Linear,
     })
 }
 
@@ -514,7 +514,7 @@ pub async fn load_materials_and_textures<F, Fut, E>(
     renderer: &Renderer,
     materials: impl ExactSizeIterator<Item = gltf::Material<'_>>,
     buffers: &[Vec<u8>],
-    normal_direction: NormalTextureYDirection,
+    normal_direction: pbr::NormalTextureYDirection,
     io_func: &mut F,
 ) -> Result<(Vec<Labeled<types::MaterialHandle>>, ImageMap), GltfLoadError<E>>
 where
@@ -543,9 +543,9 @@ where
         let nearest = albedo
             .as_ref()
             .map(|i| match i.texture().sampler().mag_filter() {
-                Some(gltf::texture::MagFilter::Nearest) => material::SampleType::Nearest,
-                Some(gltf::texture::MagFilter::Linear) => material::SampleType::Linear,
-                None => material::SampleType::Linear,
+                Some(gltf::texture::MagFilter::Nearest) => pbr::SampleType::Nearest,
+                Some(gltf::texture::MagFilter::Linear) => pbr::SampleType::Linear,
+                None => pbr::SampleType::Linear,
             })
             .unwrap_or_default();
 
@@ -583,36 +583,36 @@ where
         )
         .await?;
 
-        let handle = renderer.add_material(material::PbrMaterial {
+        let handle = renderer.add_material(pbr::PbrMaterial {
             albedo: match albedo_tex {
-                Some(tex) => material::AlbedoComponent::TextureVertexValue {
+                Some(tex) => pbr::AlbedoComponent::TextureVertexValue {
                     texture: tex.handle,
                     value: Vec4::from(albedo_factor),
                     srgb: false,
                 },
-                None => material::AlbedoComponent::ValueVertex {
+                None => pbr::AlbedoComponent::ValueVertex {
                     value: Vec4::from(albedo_factor),
                     srgb: false,
                 },
             },
             transparency: match material.alpha_mode() {
-                gltf::material::AlphaMode::Opaque => material::Transparency::Opaque,
-                gltf::material::AlphaMode::Mask => material::Transparency::Cutout {
+                gltf::material::AlphaMode::Opaque => pbr::Transparency::Opaque,
+                gltf::material::AlphaMode::Mask => pbr::Transparency::Cutout {
                     cutout: material.alpha_cutoff().unwrap_or(0.5),
                 },
-                gltf::material::AlphaMode::Blend => material::Transparency::Blend,
+                gltf::material::AlphaMode::Blend => pbr::Transparency::Blend,
             },
             normal: match normals_tex {
                 Some(tex) if tex.format.describe().components == 2 => {
-                    material::NormalTexture::Bicomponent(tex.handle, normal_direction)
+                    pbr::NormalTexture::Bicomponent(tex.handle, normal_direction)
                 }
                 Some(tex) if tex.format.describe().components >= 3 => {
-                    material::NormalTexture::Tricomponent(tex.handle, normal_direction)
+                    pbr::NormalTexture::Tricomponent(tex.handle, normal_direction)
                 }
-                _ => material::NormalTexture::None,
+                _ => pbr::NormalTexture::None,
             },
             aomr_textures: match (metallic_roughness_tex, occlusion_tex) {
-                (Some(mr), Some(ao)) if mr == ao => material::AoMRTextures::Combined {
+                (Some(mr), Some(ao)) if mr == ao => pbr::AoMRTextures::Combined {
                     texture: Some(mr.handle),
                 },
                 (mr, ao)
@@ -621,12 +621,12 @@ where
                         .map(|ao| ao.format.describe().components < 3)
                         .unwrap_or(false) =>
                 {
-                    material::AoMRTextures::Split {
+                    pbr::AoMRTextures::Split {
                         mr_texture: util::extract_handle(mr),
                         ao_texture: util::extract_handle(ao),
                     }
                 }
-                (mr, ao) => material::AoMRTextures::SwizzledSplit {
+                (mr, ao) => pbr::AoMRTextures::SwizzledSplit {
                     mr_texture: util::extract_handle(mr),
                     ao_texture: util::extract_handle(ao),
                 },
@@ -634,17 +634,17 @@ where
             metallic_factor: Some(metallic_factor),
             roughness_factor: Some(roughness_factor),
             emissive: match emissive_tex {
-                Some(tex) => material::MaterialComponent::TextureValue {
+                Some(tex) => pbr::MaterialComponent::TextureValue {
                     texture: tex.handle,
                     value: Vec3::from(emissive_factor),
                 },
-                None => material::MaterialComponent::Value(Vec3::from(emissive_factor)),
+                None => pbr::MaterialComponent::Value(Vec3::from(emissive_factor)),
             },
             uv_transform0: uv_transform,
             uv_transform1: uv_transform,
             unlit: material.unlit(),
             sample_type: nearest,
-            ..material::PbrMaterial::default()
+            ..pbr::PbrMaterial::default()
         });
 
         result.push(Labeled::new(handle, material.name()));

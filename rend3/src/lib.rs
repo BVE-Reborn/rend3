@@ -125,4 +125,4 @@ pub use surface::*;
 pub const INTERNAL_SHADOW_DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 // TODO: This needs to be dynamic
 /// Resolution of all shadow maps.
-pub const SHADOW_DIMENSIONS: u32 = 2048;
+pub const SHADOW_DIMENSIONS: u32 = 8192;

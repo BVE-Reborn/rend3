@@ -9,7 +9,7 @@ use wgpu::{
     BindGroup, Buffer, BufferUsages, Device,
 };
 
-use crate::common::{interfaces::ShaderInterfaces, samplers::Samplers};
+use crate::common::{GenericShaderInterfaces, Samplers};
 
 #[derive(Debug, Copy, Clone)]
 #[repr(C, align(16))]
@@ -56,7 +56,7 @@ pub fn add_to_graph<'node>(
     graph: &mut RenderGraph<'node>,
     shadow_uniform_bg: DataHandle<BindGroup>,
     forward_uniform_bg: DataHandle<BindGroup>,
-    interfaces: &'node ShaderInterfaces,
+    interfaces: &'node GenericShaderInterfaces,
     samplers: &'node Samplers,
     ambient: Vec4,
 ) {
@@ -75,7 +75,7 @@ pub fn add_to_graph<'node>(
         let shadow_uniform_bg = bgb.build(
             &renderer.device,
             Some("shadow uniform bg"),
-            &interfaces.shadow_uniform_bgl,
+            &interfaces.depth_uniform_bgl,
         );
 
         graph_data.directional_light_manager.add_to_bg(&mut bgb);

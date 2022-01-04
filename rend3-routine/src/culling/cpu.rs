@@ -11,9 +11,8 @@ use wgpu::{
 };
 
 use crate::{
-    common::interfaces::PerObjectData,
+    common::PerObjectDataAbi,
     culling::{CPUDrawCall, CulledObjectSet, Sorting},
-    material::PbrMaterial,
 };
 
 pub fn cull<M: Material>(
@@ -30,7 +29,7 @@ pub fn cull<M: Material>(
 
     let objects = objects.get_objects::<M>(key);
 
-    let objects = crate::common::sorting::sort_objects(objects, camera, sorting);
+    let objects = crate::common::sort_objects(objects, camera, sorting);
 
     let (mut outputs, calls) = cull_internal(&objects, frustum, view, view_proj);
 
@@ -38,7 +37,7 @@ pub fn cull<M: Material>(
 
     if outputs.is_empty() {
         // Dummy data
-        outputs.push(PerObjectData {
+        outputs.push(PerObjectDataAbi {
             model_view: Mat4::ZERO,
             model_view_proj: Mat4::ZERO,
             pad0: [0; 12],
@@ -64,7 +63,7 @@ pub fn cull_internal(
     frustum: ShaderFrustum,
     view: Mat4,
     view_proj: Mat4,
-) -> (Vec<PerObjectData>, Vec<CPUDrawCall>) {
+) -> (Vec<PerObjectDataAbi>, Vec<CPUDrawCall>) {
     let mut outputs = Vec::with_capacity(objects.len());
     let mut calls = Vec::with_capacity(objects.len());
 
@@ -94,7 +93,7 @@ pub fn cull_internal(
 
         let inv_squared_scale = squared_scale.recip();
 
-        outputs.push(PerObjectData {
+        outputs.push(PerObjectDataAbi {
             model_view,
             model_view_proj,
             material_idx: 0,
@@ -106,7 +105,7 @@ pub fn cull_internal(
     (outputs, calls)
 }
 
-pub fn run<'rpass>(
+pub fn run<'rpass, M: Material>(
     rpass: &mut RenderPass<'rpass>,
     draws: &'rpass [CPUDrawCall],
     materials: &'rpass MaterialManager,
@@ -117,8 +116,7 @@ pub fn run<'rpass>(
         if previous_mat_handle != Some(draw.material_index) {
             previous_mat_handle = Some(draw.material_index);
             // TODO(material): only resolve the archetype lookup once
-            let (_, internal) =
-                materials.get_internal_material_full_by_index::<PbrMaterial>(draw.material_index as usize);
+            let (_, internal) = materials.get_internal_material_full_by_index::<M>(draw.material_index as usize);
 
             // TODO: GL always gets linear sampling.
 

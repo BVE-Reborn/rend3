@@ -3,7 +3,7 @@ use rend3::{
 };
 use wgpu::Buffer;
 
-use crate::{common::interfaces::ShaderInterfaces, culling::gpu::GpuCuller, CulledPerMaterial};
+use crate::{common::PerMaterialInterfaces, culling::gpu::GpuCuller, CulledPerMaterial};
 
 pub mod cpu;
 pub mod gpu;
@@ -37,7 +37,7 @@ pub fn add_culling_to_graph<'node, M: Material>(
     graph: &mut RenderGraph<'node>,
     pre_cull_data: DataHandle<Buffer>,
     culled: DataHandle<CulledPerMaterial>,
-    interfaces: &'node ShaderInterfaces,
+    per_material: &'node PerMaterialInterfaces<M>,
     gpu_culler: &'node ModeData<(), GpuCuller>,
     shadow_index: Option<usize>,
     key: u64,
@@ -68,7 +68,6 @@ pub fn add_culling_to_graph<'node, M: Material>(
             ModeData::GPU(ref gpu_culler) => gpu_culler.cull(gpu::GpuCullerCullArgs {
                 device: &renderer.device,
                 encoder,
-                interfaces,
                 camera,
                 input_buffer: culling_input.into_gpu(),
                 input_count: count,
@@ -84,7 +83,7 @@ pub fn add_culling_to_graph<'node, M: Material>(
             graph_data.material_manager.add_to_bg_gpu::<M>(&mut per_material_bgb);
         }
 
-        let per_material_bg = per_material_bgb.build(&renderer.device, None, &interfaces.per_material_bgl);
+        let per_material_bg = per_material_bgb.build(&renderer.device, None, &per_material.bgl);
 
         graph_data.set_data(
             cull_handle,

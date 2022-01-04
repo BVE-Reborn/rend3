@@ -13,7 +13,7 @@ use wgpu::{
     ShaderStages, StencilState, TextureFormat, TextureSampleType, TextureViewDimension, VertexState,
 };
 
-use crate::{common::interfaces::ShaderInterfaces, shaders::WGSL_SHADERS};
+use crate::{common::GenericShaderInterfaces, shaders::WGSL_SHADERS};
 
 pub struct StoredSkybox {
     bg: Option<BindGroup>,
@@ -27,7 +27,7 @@ pub struct SkyboxRoutine {
 }
 
 impl SkyboxRoutine {
-    pub fn new(renderer: &Renderer, interfaces: &ShaderInterfaces) -> Self {
+    pub fn new(renderer: &Renderer, interfaces: &GenericShaderInterfaces) -> Self {
         let bgl = BindGroupLayoutBuilder::new()
             .append(
                 ShaderStages::FRAGMENT,
@@ -130,7 +130,7 @@ pub struct SkyboxPipelines {
 
 pub fn build_skybox_pipelines(
     renderer: &Renderer,
-    interfaces: &ShaderInterfaces,
+    interfaces: &GenericShaderInterfaces,
     bgl: &BindGroupLayout,
 ) -> SkyboxPipelines {
     profiling::scope!("build skybox pipeline");

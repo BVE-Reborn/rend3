@@ -1,4 +1,4 @@
-use std::{mem, num::NonZeroU64};
+use std::{marker::PhantomData, mem, num::NonZeroU64};
 
 use arrayvec::ArrayVec;
 use rend3::{
@@ -20,9 +20,9 @@ use wgpu::{
 };
 
 use crate::{
-    common::{interfaces::ShaderInterfaces, shaders::mode_safe_shader},
+    common::{mode_safe_shader, GenericShaderInterfaces, PerMaterialInterfaces},
     culling,
-    material::PbrMaterial,
+    pbr::PbrMaterial,
     vertex::{cpu_vertex_buffers, gpu_vertex_buffers},
     CulledPerMaterial,
 };
@@ -55,16 +55,18 @@ struct AlphaDataAbi {
 unsafe impl bytemuck::Pod for AlphaDataAbi {}
 unsafe impl bytemuck::Zeroable for AlphaDataAbi {}
 
-pub struct DepthPipelines {
+pub struct DepthPipelines<M> {
     pipelines: DepthOnlyPipelines,
     bg: Option<BindGroup>,
+    _phantom: PhantomData<M>,
 }
 
-impl DepthPipelines {
-    pub fn new<M: DepthRenderableMaterial>(
+impl<M: DepthRenderableMaterial> DepthPipelines<M> {
+    pub fn new(
         renderer: &Renderer,
         data_core: &RendererDataCore,
-        interfaces: &ShaderInterfaces,
+        interfaces: &GenericShaderInterfaces,
+        per_material: &PerMaterialInterfaces<M>,
         unclipped_depth_supported: bool,
     ) -> Self {
         let abi_bgl;
@@ -125,11 +127,16 @@ impl DepthPipelines {
             renderer,
             data_core,
             interfaces,
+            &per_material.bgl,
             abi_bgl.as_ref(),
             unclipped_depth_supported,
         );
 
-        Self { pipelines, bg }
+        Self {
+            pipelines,
+            bg,
+            _phantom: PhantomData,
+        }
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -191,7 +198,7 @@ impl DepthPipelines {
             }
 
             match culled.inner.calls {
-                ModeData::CPU(ref draws) => culling::cpu::run(rpass, draws, graph_data.material_manager, 3),
+                ModeData::CPU(ref draws) => culling::cpu::run::<M>(rpass, draws, graph_data.material_manager, 3),
                 ModeData::GPU(ref data) => {
                     rpass.set_bind_group(3, ready.d2_texture.bg.as_gpu(), &[]);
                     culling::gpu::run(rpass, data);
@@ -249,7 +256,7 @@ impl DepthPipelines {
             }
 
             match culled.inner.calls {
-                ModeData::CPU(ref draws) => culling::cpu::run(rpass, draws, graph_data.material_manager, 3),
+                ModeData::CPU(ref draws) => culling::cpu::run::<M>(rpass, draws, graph_data.material_manager, 3),
                 ModeData::GPU(ref data) => {
                     rpass.set_bind_group(3, ready.d2_texture.bg.as_gpu(), &[]);
                     culling::gpu::run(rpass, data);
@@ -277,7 +284,8 @@ pub struct DepthOnlyPipelines {
 pub fn build_depth_pass_pipeline(
     renderer: &Renderer,
     data_core: &RendererDataCore,
-    interfaces: &ShaderInterfaces,
+    interfaces: &GenericShaderInterfaces,
+    per_material_bgl: &BindGroupLayout,
     abi_bgl: Option<&BindGroupLayout>,
     unclipped_depth_supported: bool,
 ) -> DepthOnlyPipelines {
@@ -313,8 +321,8 @@ pub fn build_depth_pass_pipeline(
     };
 
     let mut bgls: ArrayVec<&BindGroupLayout, 4> = ArrayVec::new();
-    bgls.push(&interfaces.shadow_uniform_bgl);
-    bgls.push(&interfaces.per_material_bgl);
+    bgls.push(&interfaces.depth_uniform_bgl);
+    bgls.push(per_material_bgl);
     if let Some(abi_bgl) = abi_bgl {
         bgls.push(abi_bgl);
     }

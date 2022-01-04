@@ -2,7 +2,7 @@ use std::{borrow::Cow, mem, num::NonZeroU64};
 
 use glam::Mat4;
 use rend3::{
-    managers::{CameraManager, GpuCullingInput, InternalObject, ObjectManager},
+    managers::{CameraManager, GpuCullingInput, InternalObject},
     util::{bind_merge::BindGroupBuilder, frustum::ShaderFrustum},
     ModeData,
 };
@@ -15,9 +15,8 @@ use wgpu::{
 };
 
 use crate::{
-    common::interfaces::{PerObjectData, ShaderInterfaces},
+    common::PerObjectDataAbi,
     culling::{CulledObjectSet, GPUIndirectData, Sorting},
-    material::TransparencyType,
     shaders::{SPIRV_SHADERS, WGSL_SHADERS},
 };
 
@@ -33,22 +32,9 @@ struct GPUCullingUniforms {
 unsafe impl bytemuck::Pod for GPUCullingUniforms {}
 unsafe impl bytemuck::Zeroable for GPUCullingUniforms {}
 
-pub struct GpuCullerPreCullArgs<'a> {
-    pub device: &'a Device,
-
-    pub camera: &'a CameraManager,
-
-    pub objects: &'a mut ObjectManager,
-
-    pub transparency: TransparencyType,
-    pub sort: Option<Sorting>,
-}
-
 pub struct GpuCullerCullArgs<'a> {
     pub device: &'a Device,
     pub encoder: &'a mut CommandEncoder,
-
-    pub interfaces: &'a ShaderInterfaces,
 
     pub camera: &'a CameraManager,
 
@@ -101,7 +87,7 @@ impl GpuCuller {
                     ty: BindingType::Buffer {
                         ty: BufferBindingType::Storage { read_only: false },
                         has_dynamic_offset: false,
-                        min_binding_size: NonZeroU64::new(mem::size_of::<PerObjectData>() as _),
+                        min_binding_size: NonZeroU64::new(mem::size_of::<PerObjectDataAbi>() as _),
                     },
                     count: None,
                 },
@@ -167,7 +153,7 @@ impl GpuCuller {
                     ty: BindingType::Buffer {
                         ty: BufferBindingType::Storage { read_only: false },
                         has_dynamic_offset: false,
-                        min_binding_size: NonZeroU64::new(mem::size_of::<PerObjectData>() as _),
+                        min_binding_size: NonZeroU64::new(mem::size_of::<PerObjectDataAbi>() as _),
                     },
                     count: None,
                 },
@@ -305,7 +291,7 @@ impl GpuCuller {
 
         let output_buffer = args.device.create_buffer(&BufferDescriptor {
             label: Some("culling output"),
-            size: (count.max(1) * mem::size_of::<PerObjectData>()) as _,
+            size: (count.max(1) * mem::size_of::<PerObjectDataAbi>()) as _,
             usage: BufferUsages::STORAGE,
             mapped_at_creation: false,
         });

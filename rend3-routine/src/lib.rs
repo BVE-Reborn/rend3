@@ -13,16 +13,21 @@ use wgpu::{BindGroup, Buffer};
 pub use utils::*;
 
 use crate::{
-    common::{interfaces::ShaderInterfaces, samplers::Samplers},
+    common::{GenericShaderInterfaces, Samplers},
     culling::{gpu::GpuCuller, CulledObjectSet},
-    material::{PbrMaterial, TransparencyType},
+    pbr::{PbrMaterial, TransparencyType},
 };
 
 pub mod common;
 pub mod culling;
 pub mod depth;
-pub mod material;
-pub mod pbr;
+pub mod pbr {
+    mod material;
+    mod routine;
+
+    pub use material::*;
+    pub use routine::*;
+}
 pub mod pre_cull;
 pub mod shaders;
 pub mod skybox;
@@ -44,7 +49,7 @@ struct PerTransparencyInfo {
 }
 
 pub struct DefaultRenderGraphData {
-    pub interfaces: ShaderInterfaces,
+    pub interfaces: GenericShaderInterfaces,
     pub samplers: Samplers,
     pub gpu_culler: ModeData<(), GpuCuller>,
 }
@@ -53,9 +58,9 @@ impl DefaultRenderGraphData {
     pub fn new(renderer: &Renderer) -> Self {
         profiling::scope!("DefaultRenderGraphData::new");
 
-        let interfaces = common::interfaces::ShaderInterfaces::new(&renderer.device, renderer.mode);
+        let interfaces = common::GenericShaderInterfaces::new(&renderer.device);
 
-        let samplers = common::samplers::Samplers::new(&renderer.device);
+        let samplers = common::Samplers::new(&renderer.device);
 
         let gpu_culler = renderer
             .mode
@@ -136,7 +141,7 @@ pub fn add_default_rendergraph<'node>(
                 graph,
                 trans.pre_cull,
                 shadow_culled,
-                &data.interfaces,
+                &pbr.per_material,
                 &data.gpu_culler,
                 Some(shadow_index),
                 trans.ty as u64,
@@ -152,7 +157,7 @@ pub fn add_default_rendergraph<'node>(
             graph,
             trans.pre_cull,
             trans.cull,
-            &data.interfaces,
+            &pbr.per_material,
             &data.gpu_culler,
             None,
             trans.ty as u64,

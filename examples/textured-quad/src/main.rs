@@ -77,11 +77,11 @@ impl rend3_framework::App for TexturedQuadExample {
         let texture_checker_handle = renderer.add_texture_2d(texture_checker);
 
         // Add PBR material with all defaults except a single color.
-        let material = rend3_routine::material::PbrMaterial {
-            albedo: rend3_routine::material::AlbedoComponent::Texture(texture_checker_handle),
+        let material = rend3_routine::pbr::PbrMaterial {
+            albedo: rend3_routine::pbr::AlbedoComponent::Texture(texture_checker_handle),
             unlit: true,
-            sample_type: rend3_routine::material::SampleType::Nearest,
-            ..rend3_routine::material::PbrMaterial::default()
+            sample_type: rend3_routine::pbr::SampleType::Nearest,
+            ..rend3_routine::pbr::PbrMaterial::default()
         };
         let material_handle = renderer.add_material(material);
 
