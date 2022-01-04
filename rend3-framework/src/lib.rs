@@ -5,7 +5,7 @@ use rend3::{
     types::{Handedness, SampleCount, Surface, TextureFormat},
     InstanceAdapterDevice, Renderer,
 };
-use rend3_routine::DefaultRenderGraphData;
+use rend3_routine::BaseRenderGraph;
 use wgpu::Instance;
 use winit::{
     dpi::PhysicalSize,
@@ -83,8 +83,8 @@ pub trait App<T: 'static = ()> {
         Box::pin(async move { Ok(rend3::create_iad(None, None, None, None).await?) })
     }
 
-    fn create_default_rendergraph_data(&mut self, renderer: &Renderer) -> DefaultRenderGraphData {
-        DefaultRenderGraphData::new(renderer)
+    fn create_base_rendergraph(&mut self, renderer: &Renderer) -> BaseRenderGraph {
+        BaseRenderGraph::new(renderer)
     }
 
     /// Determines the sample count used, this may change dynamically. This function
@@ -116,7 +116,7 @@ pub trait App<T: 'static = ()> {
         window: &Window,
         renderer: &Arc<rend3::Renderer>,
         routines: &Arc<DefaultRoutines>,
-        default_rendergraph_data: &DefaultRenderGraphData,
+        base_rendergraph: &BaseRenderGraph,
         surface: Option<&Arc<Surface>>,
         resolution: UVec2,
         event: Event<'_, T>,
@@ -126,7 +126,7 @@ pub trait App<T: 'static = ()> {
             window,
             renderer,
             routines,
-            default_rendergraph_data,
+            base_rendergraph,
             resolution,
             surface,
             event,
@@ -234,21 +234,21 @@ pub async fn async_start<A: App + 'static>(mut app: A, window_builder: WindowBui
         format
     });
 
-    let default_rendergraph_data = app.create_default_rendergraph_data(&renderer);
+    let base_rendergraph = app.create_base_rendergraph(&renderer);
     let mut data_core = renderer.data_core.lock();
     let routines = Arc::new(DefaultRoutines {
         pbr: Mutex::new(rend3_routine::pbr::PbrRenderRoutine::new(
             &renderer,
             &mut data_core,
-            &default_rendergraph_data.interfaces,
+            &base_rendergraph.interfaces,
         )),
         skybox: Mutex::new(rend3_routine::skybox::SkyboxRoutine::new(
             &renderer,
-            &default_rendergraph_data.interfaces,
+            &base_rendergraph.interfaces,
         )),
         tonemapping: Mutex::new(rend3_routine::tonemapping::TonemappingRoutine::new(
             &renderer,
-            &default_rendergraph_data.interfaces,
+            &base_rendergraph.interfaces,
             format,
         )),
     });
@@ -314,7 +314,7 @@ pub async fn async_start<A: App + 'static>(mut app: A, window_builder: WindowBui
             &window,
             &renderer,
             &routines,
-            &default_rendergraph_data,
+            &base_rendergraph,
             surface.as_ref(),
             stored_surface_info.size,
             event,

@@ -124,7 +124,7 @@ impl rend3_framework::App for EguiExample {
         window: &winit::window::Window,
         renderer: &Arc<rend3::Renderer>,
         routines: &Arc<rend3_framework::DefaultRoutines>,
-        default_rendergraph_data: &rend3_routine::DefaultRenderGraphData,
+        base_rendergraph: &rend3_routine::BaseRenderGraph,
         surface: Option<&Arc<rend3::types::Surface>>,
         resolution: glam::UVec2,
         event: rend3_framework::Event<'_, ()>,
@@ -180,13 +180,12 @@ impl rend3_framework::App for EguiExample {
                 let mut graph = rend3::RenderGraph::new();
 
                 // Add the default rendergraph without a skybox
-                rend3_routine::add_default_rendergraph(
+                base_rendergraph.add_to_graph(
                     &mut graph,
                     &ready,
                     &pbr_routine,
                     None,
                     &tonemapping_routine,
-                    default_rendergraph_data,
                     resolution,
                     SAMPLE_COUNT,
                     glam::Vec4::ZERO,

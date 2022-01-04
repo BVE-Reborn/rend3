@@ -10,7 +10,7 @@ use rend3::{
     Renderer, RendererMode,
 };
 use rend3_framework::{lock, AssetPath, Mutex};
-use rend3_routine::{pbr::NormalTextureYDirection, skybox::SkyboxRoutine, DefaultRenderGraphData};
+use rend3_routine::{pbr::NormalTextureYDirection, skybox::SkyboxRoutine, BaseRenderGraph};
 use std::{collections::HashMap, future::Future, hash::BuildHasher, path::Path, sync::Arc, time::Duration};
 use wgpu_profiler::GpuTimerScopeResult;
 use winit::{
@@ -433,7 +433,7 @@ impl rend3_framework::App for SceneViewer {
         window: &winit::window::Window,
         renderer: &Arc<rend3::Renderer>,
         routines: &Arc<rend3_framework::DefaultRoutines>,
-        default_rendergraph_data: &DefaultRenderGraphData,
+        base_rendergraph: &BaseRenderGraph,
         surface: Option<&Arc<rend3::types::Surface>>,
         resolution: UVec2,
         event: rend3_framework::Event<'_, ()>,
@@ -545,13 +545,12 @@ impl rend3_framework::App for SceneViewer {
                 let mut graph = rend3::RenderGraph::new();
 
                 // Add the default rendergraph
-                rend3_routine::add_default_rendergraph(
+                base_rendergraph.add_to_graph(
                     &mut graph,
                     &ready,
                     &pbr_routine,
                     Some(&skybox_routine),
                     &tonemapping_routine,
-                    default_rendergraph_data,
                     resolution,
                     self.samples,
                     Vec3::splat(self.ambient_light_level).extend(1.0),

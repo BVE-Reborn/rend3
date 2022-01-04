@@ -91,15 +91,15 @@ fn main() {
     )
     .unwrap();
 
-    // Data that the default rendergraph needs to operate.
-    let default_rendergraph_data = rend3_routine::DefaultRenderGraphData::new(&renderer);
+    // Create the base rendergraph.
+    let base_rendergraph = rend3_routine::BaseRenderGraph::new(&renderer);
 
     let mut data_core = renderer.data_core.lock();
     let pbr_routine =
-        rend3_routine::pbr::PbrRenderRoutine::new(&renderer, &mut data_core, &default_rendergraph_data.interfaces);
+        rend3_routine::pbr::PbrRenderRoutine::new(&renderer, &mut data_core, &base_rendergraph.interfaces);
     drop(data_core);
     let tonemapping_routine =
-        rend3_routine::tonemapping::TonemappingRoutine::new(&renderer, &default_rendergraph_data.interfaces, format);
+        rend3_routine::tonemapping::TonemappingRoutine::new(&renderer, &base_rendergraph.interfaces, format);
 
     // Create mesh and calculate smooth normals based on vertices
     let mesh = create_mesh();
@@ -189,13 +189,12 @@ fn main() {
             let mut graph = rend3::RenderGraph::new();
 
             // Add the default rendergraph without a skybox
-            rend3_routine::add_default_rendergraph(
+            base_rendergraph.add_to_graph(
                 &mut graph,
                 &ready,
                 &pbr_routine,
                 None,
                 &tonemapping_routine,
-                &default_rendergraph_data,
                 resolution,
                 rend3::types::SampleCount::One,
                 glam::Vec4::ZERO,
