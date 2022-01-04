@@ -15,20 +15,20 @@ use wgpu::{
 use crate::{
     common::{mode_safe_shader, GenericShaderInterfaces, PerMaterialInterfaces},
     culling,
-    depth::DepthPipelines,
+    depth::DepthRoutine,
     pbr::{PbrMaterial, TransparencyType},
     vertex::{cpu_vertex_buffers, gpu_vertex_buffers},
     CulledPerMaterial,
 };
 
 /// Render routine that renders the using PBR materials and gpu based culling.
-pub struct PbrRenderRoutine {
+pub struct PbrRoutine {
     pub primary_passes: PrimaryPipelines,
-    pub depth_pipelines: DepthPipelines<PbrMaterial>,
+    pub depth_pipelines: DepthRoutine<PbrMaterial>,
     pub per_material: PerMaterialInterfaces<PbrMaterial>,
 }
 
-impl PbrRenderRoutine {
+impl PbrRoutine {
     pub fn new(renderer: &Renderer, data_core: &mut RendererDataCore, interfaces: &GenericShaderInterfaces) -> Self {
         profiling::scope!("PbrRenderRoutine::new");
 
@@ -40,7 +40,7 @@ impl PbrRenderRoutine {
 
         let per_material = PerMaterialInterfaces::<PbrMaterial>::new(&renderer.device, renderer.mode);
 
-        let depth_pipelines = DepthPipelines::<PbrMaterial>::new(
+        let depth_pipelines = DepthRoutine::<PbrMaterial>::new(
             renderer,
             data_core,
             interfaces,
@@ -118,11 +118,11 @@ impl PbrRenderRoutine {
 
             match culled.inner.calls {
                 ModeData::CPU(ref draws) => {
-                    culling::cpu::run::<PbrMaterial>(rpass, draws, graph_data.material_manager, 2)
+                    culling::draw_cpu_powered::<PbrMaterial>(rpass, draws, graph_data.material_manager, 2)
                 }
                 ModeData::GPU(ref data) => {
                     rpass.set_bind_group(2, ready.d2_texture.bg.as_gpu(), &[]);
-                    culling::gpu::run(rpass, data);
+                    culling::draw_gpu_powered(rpass, data);
                 }
             }
         });

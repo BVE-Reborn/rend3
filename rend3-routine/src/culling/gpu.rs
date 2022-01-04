@@ -15,8 +15,8 @@ use wgpu::{
 };
 
 use crate::{
-    common::PerObjectDataAbi,
-    culling::{CulledObjectSet, GPUIndirectData, Sorting},
+    common::{PerObjectDataAbi, Sorting},
+    culling::CulledObjectSet,
     shaders::{SPIRV_SHADERS, WGSL_SHADERS},
 };
 
@@ -31,6 +31,11 @@ struct GPUCullingUniforms {
 
 unsafe impl bytemuck::Pod for GPUCullingUniforms {}
 unsafe impl bytemuck::Zeroable for GPUCullingUniforms {}
+
+pub struct GpuIndirectData {
+    pub indirect_buffer: Buffer,
+    pub count: usize,
+}
 
 pub struct GpuCullerCullArgs<'a> {
     pub device: &'a Device,
@@ -386,13 +391,13 @@ impl GpuCuller {
         }
 
         CulledObjectSet {
-            calls: ModeData::GPU(GPUIndirectData { indirect_buffer, count }),
+            calls: ModeData::GPU(GpuIndirectData { indirect_buffer, count }),
             output_buffer,
         }
     }
 }
 
-pub fn build_cull_data(device: &Device, objects: &[InternalObject]) -> Buffer {
+pub fn build_gpu_cull_input(device: &Device, objects: &[InternalObject]) -> Buffer {
     profiling::scope!("Building Input Data");
 
     let total_length = objects.len() * mem::size_of::<GpuCullingInput>();
@@ -426,7 +431,7 @@ pub fn build_cull_data(device: &Device, objects: &[InternalObject]) -> Buffer {
     buffer
 }
 
-pub fn run<'rpass>(rpass: &mut RenderPass<'rpass>, indirect_data: &'rpass GPUIndirectData) {
+pub fn draw_gpu_powered<'rpass>(rpass: &mut RenderPass<'rpass>, indirect_data: &'rpass GpuIndirectData) {
     if indirect_data.count != 0 {
         rpass.set_vertex_buffer(7, indirect_data.indirect_buffer.slice(16..));
         rpass.multi_draw_indexed_indirect_count(

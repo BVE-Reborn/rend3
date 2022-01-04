@@ -11,11 +11,19 @@ use wgpu::{
 };
 
 use crate::{
-    common::PerObjectDataAbi,
-    culling::{CPUDrawCall, CulledObjectSet, Sorting},
+    common::{PerObjectDataAbi, Sorting},
+    culling::CulledObjectSet,
 };
 
-pub fn cull<M: Material>(
+#[derive(Debug, Clone)]
+pub struct CpuDrawCall {
+    pub start_idx: u32,
+    pub end_idx: u32,
+    pub vertex_offset: i32,
+    pub material_index: u32,
+}
+
+pub fn cull_cpu<M: Material>(
     device: &Device,
     camera: &CameraManager,
     objects: &ObjectManager,
@@ -58,12 +66,12 @@ pub fn cull<M: Material>(
     }
 }
 
-pub fn cull_internal(
+fn cull_internal(
     objects: &[InternalObject],
     frustum: ShaderFrustum,
     view: Mat4,
     view_proj: Mat4,
-) -> (Vec<PerObjectDataAbi>, Vec<CPUDrawCall>) {
+) -> (Vec<PerObjectDataAbi>, Vec<CpuDrawCall>) {
     let mut outputs = Vec::with_capacity(objects.len());
     let mut calls = Vec::with_capacity(objects.len());
 
@@ -78,7 +86,7 @@ pub fn cull_internal(
 
         let model_view_proj = view_proj * model;
 
-        calls.push(CPUDrawCall {
+        calls.push(CpuDrawCall {
             start_idx: object.input.start_idx,
             end_idx: object.input.start_idx + object.input.count,
             vertex_offset: object.input.vertex_offset,
@@ -105,9 +113,9 @@ pub fn cull_internal(
     (outputs, calls)
 }
 
-pub fn run<'rpass, M: Material>(
+pub fn draw_cpu_powered<'rpass, M: Material>(
     rpass: &mut RenderPass<'rpass>,
-    draws: &'rpass [CPUDrawCall],
+    draws: &'rpass [CpuDrawCall],
     materials: &'rpass MaterialManager,
     material_binding_index: u32,
 ) {

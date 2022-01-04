@@ -6,51 +6,46 @@ use rend3::{
 };
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
-    BindGroup, Buffer, BufferUsages, Device,
+    BindGroup, BufferUsages,
 };
 
 use crate::common::{GenericShaderInterfaces, Samplers};
 
 #[derive(Debug, Copy, Clone)]
 #[repr(C, align(16))]
-pub struct ShaderCommonUniform {
-    view: Mat4,
-    view_proj: Mat4,
-    origin_view_proj: Mat4,
-    inv_view: Mat4,
-    inv_view_proj: Mat4,
-    inv_origin_view_proj: Mat4,
-    frustum: ShaderFrustum,
-    ambient: Vec4,
+pub struct FrameUniforms {
+    pub view: Mat4,
+    pub view_proj: Mat4,
+    pub origin_view_proj: Mat4,
+    pub inv_view: Mat4,
+    pub inv_view_proj: Mat4,
+    pub inv_origin_view_proj: Mat4,
+    pub frustum: ShaderFrustum,
+    pub ambient: Vec4,
+}
+impl FrameUniforms {
+    pub fn new(camera: &CameraManager, ambient: Vec4) -> Self {
+        profiling::scope!("create uniforms");
+
+        let view = camera.view();
+        let view_proj = camera.view_proj();
+        let origin_view_proj = camera.origin_view_proj();
+
+        Self {
+            view,
+            view_proj,
+            origin_view_proj,
+            inv_view: view.inverse(),
+            inv_view_proj: view_proj.inverse(),
+            inv_origin_view_proj: origin_view_proj.inverse(),
+            frustum: ShaderFrustum::from_matrix(camera.proj()),
+            ambient,
+        }
+    }
 }
 
-unsafe impl bytemuck::Zeroable for ShaderCommonUniform {}
-unsafe impl bytemuck::Pod for ShaderCommonUniform {}
-
-pub fn create_shader_uniform(device: &Device, camera: &CameraManager, ambient: Vec4) -> Buffer {
-    profiling::scope!("create uniforms");
-
-    let view = camera.view();
-    let view_proj = camera.view_proj();
-    let origin_view_proj = camera.origin_view_proj();
-
-    let uniforms = ShaderCommonUniform {
-        view,
-        view_proj,
-        origin_view_proj,
-        inv_view: view.inverse(),
-        inv_view_proj: view_proj.inverse(),
-        inv_origin_view_proj: origin_view_proj.inverse(),
-        frustum: ShaderFrustum::from_matrix(camera.proj()),
-        ambient,
-    };
-
-    device.create_buffer_init(&BufferInitDescriptor {
-        label: Some("shader uniform"),
-        contents: bytemuck::bytes_of(&uniforms),
-        usage: BufferUsages::UNIFORM,
-    })
-}
+unsafe impl bytemuck::Zeroable for FrameUniforms {}
+unsafe impl bytemuck::Pod for FrameUniforms {}
 
 pub fn add_to_graph<'node>(
     graph: &mut RenderGraph<'node>,
@@ -68,7 +63,12 @@ pub fn add_to_graph<'node>(
 
         samplers.add_to_bg(&mut bgb);
 
-        let uniform_buffer = create_shader_uniform(&renderer.device, graph_data.camera_manager, ambient);
+        let uniforms = FrameUniforms::new(graph_data.camera_manager, ambient);
+        let uniform_buffer = renderer.device.create_buffer_init(&BufferInitDescriptor {
+            label: Some("frame uniform"),
+            contents: bytemuck::bytes_of(&uniforms),
+            usage: BufferUsages::UNIFORM,
+        });
 
         bgb.append_buffer(&uniform_buffer);
 

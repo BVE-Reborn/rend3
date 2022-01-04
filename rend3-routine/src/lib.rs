@@ -14,7 +14,7 @@ pub use utils::*;
 
 use crate::{
     common::{GenericShaderInterfaces, Samplers},
-    culling::{gpu::GpuCuller, CulledObjectSet},
+    culling::{CulledObjectSet, GpuCuller},
     pbr::{PbrMaterial, TransparencyType},
 };
 
@@ -64,7 +64,7 @@ impl BaseRenderGraph {
 
         let gpu_culler = renderer
             .mode
-            .into_data(|| (), || culling::gpu::GpuCuller::new(&renderer.device));
+            .into_data(|| (), || culling::GpuCuller::new(&renderer.device));
 
         Self {
             interfaces,
@@ -78,7 +78,7 @@ impl BaseRenderGraph {
         &'node self,
         graph: &mut RenderGraph<'node>,
         ready: &ReadyData,
-        pbr: &'node pbr::PbrRenderRoutine,
+        pbr: &'node pbr::PbrRoutine,
         skybox: Option<&'node skybox::SkyboxRoutine>,
         tonemapping: &'node tonemapping::TonemappingRoutine,
         resolution: UVec2,

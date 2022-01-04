@@ -3,7 +3,11 @@ use std::borrow::Cow;
 use ordered_float::OrderedFloat;
 use rend3::managers::{CameraManager, InternalObject};
 
-use crate::culling::Sorting;
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum Sorting {
+    FrontToBack,
+    BackToFront,
+}
 
 pub fn sort_objects<'a>(
     objects: &'a [InternalObject],

@@ -55,13 +55,13 @@ struct AlphaDataAbi {
 unsafe impl bytemuck::Pod for AlphaDataAbi {}
 unsafe impl bytemuck::Zeroable for AlphaDataAbi {}
 
-pub struct DepthPipelines<M> {
-    pipelines: DepthOnlyPipelines,
+pub struct DepthRoutine<M> {
+    pipelines: DepthPipelines,
     bg: Option<BindGroup>,
     _phantom: PhantomData<M>,
 }
 
-impl<M: DepthRenderableMaterial> DepthPipelines<M> {
+impl<M: DepthRenderableMaterial> DepthRoutine<M> {
     pub fn new(
         renderer: &Renderer,
         data_core: &RendererDataCore,
@@ -123,7 +123,7 @@ impl<M: DepthRenderableMaterial> DepthPipelines<M> {
             abi_bgl = None;
         };
 
-        let pipelines = build_depth_pass_pipeline(
+        let pipelines = DepthPipelines::new(
             renderer,
             data_core,
             interfaces,
@@ -198,10 +198,12 @@ impl<M: DepthRenderableMaterial> DepthPipelines<M> {
             }
 
             match culled.inner.calls {
-                ModeData::CPU(ref draws) => culling::cpu::run::<M>(rpass, draws, graph_data.material_manager, 3),
+                ModeData::CPU(ref draws) => {
+                    culling::draw_cpu_powered::<M>(rpass, draws, graph_data.material_manager, 3)
+                }
                 ModeData::GPU(ref data) => {
                     rpass.set_bind_group(3, ready.d2_texture.bg.as_gpu(), &[]);
-                    culling::gpu::run(rpass, data);
+                    culling::draw_gpu_powered(rpass, data);
                 }
             }
         });
@@ -256,10 +258,12 @@ impl<M: DepthRenderableMaterial> DepthPipelines<M> {
             }
 
             match culled.inner.calls {
-                ModeData::CPU(ref draws) => culling::cpu::run::<M>(rpass, draws, graph_data.material_manager, 3),
+                ModeData::CPU(ref draws) => {
+                    culling::draw_cpu_powered::<M>(rpass, draws, graph_data.material_manager, 3)
+                }
                 ModeData::GPU(ref data) => {
                     rpass.set_bind_group(3, ready.d2_texture.bg.as_gpu(), &[]);
-                    culling::gpu::run(rpass, data);
+                    culling::draw_gpu_powered(rpass, data);
                 }
             }
         });
@@ -272,7 +276,7 @@ pub enum DepthPassType {
     Prepass,
 }
 
-pub struct DepthOnlyPipelines {
+pub struct DepthPipelines {
     pub shadow_opaque_s1: RenderPipeline,
     pub shadow_cutout_s1: Option<RenderPipeline>,
     pub prepass_opaque_s1: RenderPipeline,
@@ -280,127 +284,128 @@ pub struct DepthOnlyPipelines {
     pub prepass_opaque_s4: RenderPipeline,
     pub prepass_cutout_s4: Option<RenderPipeline>,
 }
+impl DepthPipelines {
+    pub fn new(
+        renderer: &Renderer,
+        data_core: &RendererDataCore,
+        interfaces: &GenericShaderInterfaces,
+        per_material_bgl: &BindGroupLayout,
+        abi_bgl: Option<&BindGroupLayout>,
+        unclipped_depth_supported: bool,
+    ) -> DepthPipelines {
+        profiling::scope!("build depth pass pipelines");
+        let depth_vert = unsafe {
+            mode_safe_shader(
+                &renderer.device,
+                renderer.mode,
+                "depth pass vert",
+                "depth.vert.cpu.wgsl",
+                "depth.vert.gpu.spv",
+            )
+        };
 
-pub fn build_depth_pass_pipeline(
-    renderer: &Renderer,
-    data_core: &RendererDataCore,
-    interfaces: &GenericShaderInterfaces,
-    per_material_bgl: &BindGroupLayout,
-    abi_bgl: Option<&BindGroupLayout>,
-    unclipped_depth_supported: bool,
-) -> DepthOnlyPipelines {
-    profiling::scope!("build depth pass pipelines");
-    let depth_vert = unsafe {
-        mode_safe_shader(
-            &renderer.device,
-            renderer.mode,
-            "depth pass vert",
-            "depth.vert.cpu.wgsl",
-            "depth.vert.gpu.spv",
-        )
-    };
+        let depth_opaque_frag = unsafe {
+            mode_safe_shader(
+                &renderer.device,
+                renderer.mode,
+                "depth pass opaque frag",
+                "depth-opaque.frag.cpu.wgsl",
+                "depth-opaque.frag.gpu.spv",
+            )
+        };
 
-    let depth_opaque_frag = unsafe {
-        mode_safe_shader(
-            &renderer.device,
-            renderer.mode,
-            "depth pass opaque frag",
-            "depth-opaque.frag.cpu.wgsl",
-            "depth-opaque.frag.gpu.spv",
-        )
-    };
+        let depth_cutout_frag = unsafe {
+            mode_safe_shader(
+                &renderer.device,
+                renderer.mode,
+                "depth pass cutout frag",
+                "depth-cutout.frag.cpu.wgsl",
+                "depth-cutout.frag.gpu.spv",
+            )
+        };
 
-    let depth_cutout_frag = unsafe {
-        mode_safe_shader(
-            &renderer.device,
-            renderer.mode,
-            "depth pass cutout frag",
-            "depth-cutout.frag.cpu.wgsl",
-            "depth-cutout.frag.gpu.spv",
-        )
-    };
+        let mut bgls: ArrayVec<&BindGroupLayout, 4> = ArrayVec::new();
+        bgls.push(&interfaces.depth_uniform_bgl);
+        bgls.push(per_material_bgl);
+        if let Some(abi_bgl) = abi_bgl {
+            bgls.push(abi_bgl);
+        }
+        if renderer.mode == RendererMode::GPUPowered {
+            bgls.push(data_core.d2_texture_manager.gpu_bgl())
+        } else {
+            bgls.push(data_core.material_manager.get_bind_group_layout_cpu::<PbrMaterial>());
+        }
 
-    let mut bgls: ArrayVec<&BindGroupLayout, 4> = ArrayVec::new();
-    bgls.push(&interfaces.depth_uniform_bgl);
-    bgls.push(per_material_bgl);
-    if let Some(abi_bgl) = abi_bgl {
-        bgls.push(abi_bgl);
-    }
-    if renderer.mode == RendererMode::GPUPowered {
-        bgls.push(data_core.d2_texture_manager.gpu_bgl())
-    } else {
-        bgls.push(data_core.material_manager.get_bind_group_layout_cpu::<PbrMaterial>());
-    }
+        let shadow_pll = renderer.device.create_pipeline_layout(&PipelineLayoutDescriptor {
+            label: Some("shadow pll"),
+            bind_group_layouts: &bgls,
+            push_constant_ranges: &[],
+        });
 
-    let shadow_pll = renderer.device.create_pipeline_layout(&PipelineLayoutDescriptor {
-        label: Some("shadow pll"),
-        bind_group_layouts: &bgls,
-        push_constant_ranges: &[],
-    });
+        bgls[0] = &interfaces.forward_uniform_bgl;
+        let prepass_pll = renderer.device.create_pipeline_layout(&PipelineLayoutDescriptor {
+            label: Some("prepass pll"),
+            bind_group_layouts: &bgls,
+            push_constant_ranges: &[],
+        });
 
-    bgls[0] = &interfaces.forward_uniform_bgl;
-    let prepass_pll = renderer.device.create_pipeline_layout(&PipelineLayoutDescriptor {
-        label: Some("prepass pll"),
-        bind_group_layouts: &bgls,
-        push_constant_ranges: &[],
-    });
+        let inner = |name, ty, pll, frag, samples| {
+            create_depth_inner(
+                renderer,
+                samples,
+                ty,
+                unclipped_depth_supported,
+                pll,
+                &depth_vert,
+                frag,
+                name,
+            )
+        };
 
-    let inner = |name, ty, pll, frag, samples| {
-        create_depth_inner(
-            renderer,
-            samples,
-            ty,
-            unclipped_depth_supported,
-            pll,
-            &depth_vert,
-            frag,
-            name,
-        )
-    };
-
-    DepthOnlyPipelines {
-        shadow_opaque_s1: inner(
-            "Shadow Opaque 1x",
-            DepthPassType::Shadow,
-            &shadow_pll,
-            &depth_opaque_frag,
-            SampleCount::One,
-        ),
-        shadow_cutout_s1: Some(inner(
-            "Shadow Cutout 1x",
-            DepthPassType::Shadow,
-            &shadow_pll,
-            &depth_cutout_frag,
-            SampleCount::One,
-        )),
-        prepass_opaque_s1: inner(
-            "Prepass Opaque 1x",
-            DepthPassType::Prepass,
-            &prepass_pll,
-            &depth_opaque_frag,
-            SampleCount::One,
-        ),
-        prepass_cutout_s1: Some(inner(
-            "Prepass Cutout 1x",
-            DepthPassType::Prepass,
-            &prepass_pll,
-            &depth_cutout_frag,
-            SampleCount::One,
-        )),
-        prepass_opaque_s4: inner(
-            "Prepass Opaque 4x",
-            DepthPassType::Prepass,
-            &prepass_pll,
-            &depth_opaque_frag,
-            SampleCount::Four,
-        ),
-        prepass_cutout_s4: Some(inner(
-            "Prepass Cutout 4x",
-            DepthPassType::Prepass,
-            &prepass_pll,
-            &depth_cutout_frag,
-            SampleCount::Four,
-        )),
+        DepthPipelines {
+            shadow_opaque_s1: inner(
+                "Shadow Opaque 1x",
+                DepthPassType::Shadow,
+                &shadow_pll,
+                &depth_opaque_frag,
+                SampleCount::One,
+            ),
+            shadow_cutout_s1: Some(inner(
+                "Shadow Cutout 1x",
+                DepthPassType::Shadow,
+                &shadow_pll,
+                &depth_cutout_frag,
+                SampleCount::One,
+            )),
+            prepass_opaque_s1: inner(
+                "Prepass Opaque 1x",
+                DepthPassType::Prepass,
+                &prepass_pll,
+                &depth_opaque_frag,
+                SampleCount::One,
+            ),
+            prepass_cutout_s1: Some(inner(
+                "Prepass Cutout 1x",
+                DepthPassType::Prepass,
+                &prepass_pll,
+                &depth_cutout_frag,
+                SampleCount::One,
+            )),
+            prepass_opaque_s4: inner(
+                "Prepass Opaque 4x",
+                DepthPassType::Prepass,
+                &prepass_pll,
+                &depth_opaque_frag,
+                SampleCount::Four,
+            ),
+            prepass_cutout_s4: Some(inner(
+                "Prepass Cutout 4x",
+                DepthPassType::Prepass,
+                &prepass_pll,
+                &depth_cutout_frag,
+                SampleCount::Four,
+            )),
+        }
     }
 }
 

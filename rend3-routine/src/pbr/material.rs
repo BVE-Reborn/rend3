@@ -5,7 +5,10 @@ use std::mem;
 use glam::{Mat3, Mat3A, Vec3, Vec4};
 use rend3::types::{Material, TextureHandle};
 
-use crate::depth::{AlphaCutoutSpec, DepthRenderableMaterial};
+use crate::{
+    common::Sorting,
+    depth::{AlphaCutoutSpec, DepthRenderableMaterial},
+};
 
 bitflags::bitflags! {
     /// Flags which shaders use to determine properties of a material
@@ -436,11 +439,11 @@ impl TransparencyType {
         }
     }
 
-    pub fn to_sorting(self) -> Option<crate::culling::Sorting> {
+    pub fn to_sorting(self) -> Option<Sorting> {
         match self {
             Self::Opaque => None,
             Self::Cutout => None,
-            Self::Blend => Some(crate::culling::Sorting::BackToFront),
+            Self::Blend => Some(Sorting::BackToFront),
         }
     }
 }

@@ -40,7 +40,7 @@ impl SkyboxRoutine {
             )
             .build(&renderer.device, Some("skybox bgl"));
 
-        let pipelines = build_skybox_pipelines(renderer, interfaces, &bgl);
+        let pipelines = SkyboxPipelines::new(renderer, interfaces, &bgl);
 
         Self {
             current_skybox: StoredSkybox { bg: None, handle: None },
@@ -127,84 +127,81 @@ pub struct SkyboxPipelines {
     pipeline_s1: RenderPipeline,
     pipeline_s4: RenderPipeline,
 }
+impl SkyboxPipelines {
+    pub fn new(renderer: &Renderer, interfaces: &GenericShaderInterfaces, bgl: &BindGroupLayout) -> Self {
+        profiling::scope!("build skybox pipeline");
+        let skybox_pass_vert = renderer.device.create_shader_module(&ShaderModuleDescriptor {
+            label: Some("skybox vert"),
+            source: ShaderSource::Wgsl(Cow::Borrowed(
+                WGSL_SHADERS
+                    .get_file("skybox.vert.wgsl")
+                    .unwrap()
+                    .contents_utf8()
+                    .unwrap(),
+            )),
+        });
+        let skybox_pass_frag = renderer.device.create_shader_module(&ShaderModuleDescriptor {
+            label: Some("skybox frag"),
+            source: ShaderSource::Wgsl(Cow::Borrowed(
+                WGSL_SHADERS
+                    .get_file("skybox.frag.wgsl")
+                    .unwrap()
+                    .contents_utf8()
+                    .unwrap(),
+            )),
+        });
 
-pub fn build_skybox_pipelines(
-    renderer: &Renderer,
-    interfaces: &GenericShaderInterfaces,
-    bgl: &BindGroupLayout,
-) -> SkyboxPipelines {
-    profiling::scope!("build skybox pipeline");
-    let skybox_pass_vert = renderer.device.create_shader_module(&ShaderModuleDescriptor {
-        label: Some("skybox vert"),
-        source: ShaderSource::Wgsl(Cow::Borrowed(
-            WGSL_SHADERS
-                .get_file("skybox.vert.wgsl")
-                .unwrap()
-                .contents_utf8()
-                .unwrap(),
-        )),
-    });
-    let skybox_pass_frag = renderer.device.create_shader_module(&ShaderModuleDescriptor {
-        label: Some("skybox frag"),
-        source: ShaderSource::Wgsl(Cow::Borrowed(
-            WGSL_SHADERS
-                .get_file("skybox.frag.wgsl")
-                .unwrap()
-                .contents_utf8()
-                .unwrap(),
-        )),
-    });
-
-    let pll = renderer.device.create_pipeline_layout(&PipelineLayoutDescriptor {
-        label: Some("skybox pass"),
-        bind_group_layouts: &[&interfaces.forward_uniform_bgl, bgl],
-        push_constant_ranges: &[],
-    });
-
-    let inner = |samples| {
-        renderer.device.create_render_pipeline(&RenderPipelineDescriptor {
+        let pll = renderer.device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: Some("skybox pass"),
-            layout: Some(&pll),
-            vertex: VertexState {
-                module: &skybox_pass_vert,
-                entry_point: "main",
-                buffers: &[],
-            },
-            primitive: PrimitiveState {
-                topology: PrimitiveTopology::TriangleList,
-                strip_index_format: None,
-                front_face: FrontFace::Cw,
-                cull_mode: Some(Face::Back),
-                unclipped_depth: false,
-                polygon_mode: PolygonMode::Fill,
-                conservative: false,
-            },
-            depth_stencil: Some(DepthStencilState {
-                format: TextureFormat::Depth32Float,
-                depth_write_enabled: true,
-                depth_compare: CompareFunction::GreaterEqual,
-                stencil: StencilState::default(),
-                bias: DepthBiasState::default(),
-            }),
-            multisample: MultisampleState {
-                count: samples as u32,
-                ..Default::default()
-            },
-            fragment: Some(FragmentState {
-                module: &skybox_pass_frag,
-                entry_point: "main",
-                targets: &[ColorTargetState {
-                    format: TextureFormat::Rgba16Float,
-                    blend: None,
-                    write_mask: ColorWrites::all(),
-                }],
-            }),
-            multiview: None,
-        })
-    };
+            bind_group_layouts: &[&interfaces.forward_uniform_bgl, bgl],
+            push_constant_ranges: &[],
+        });
 
-    SkyboxPipelines {
-        pipeline_s1: inner(SampleCount::One),
-        pipeline_s4: inner(SampleCount::Four),
+        let inner = |samples| {
+            renderer.device.create_render_pipeline(&RenderPipelineDescriptor {
+                label: Some("skybox pass"),
+                layout: Some(&pll),
+                vertex: VertexState {
+                    module: &skybox_pass_vert,
+                    entry_point: "main",
+                    buffers: &[],
+                },
+                primitive: PrimitiveState {
+                    topology: PrimitiveTopology::TriangleList,
+                    strip_index_format: None,
+                    front_face: FrontFace::Cw,
+                    cull_mode: Some(Face::Back),
+                    unclipped_depth: false,
+                    polygon_mode: PolygonMode::Fill,
+                    conservative: false,
+                },
+                depth_stencil: Some(DepthStencilState {
+                    format: TextureFormat::Depth32Float,
+                    depth_write_enabled: true,
+                    depth_compare: CompareFunction::GreaterEqual,
+                    stencil: StencilState::default(),
+                    bias: DepthBiasState::default(),
+                }),
+                multisample: MultisampleState {
+                    count: samples as u32,
+                    ..Default::default()
+                },
+                fragment: Some(FragmentState {
+                    module: &skybox_pass_frag,
+                    entry_point: "main",
+                    targets: &[ColorTargetState {
+                        format: TextureFormat::Rgba16Float,
+                        blend: None,
+                        write_mask: ColorWrites::all(),
+                    }],
+                }),
+                multiview: None,
+            })
+        };
+
+        Self {
+            pipeline_s1: inner(SampleCount::One),
+            pipeline_s4: inner(SampleCount::Four),
+        }
     }
 }

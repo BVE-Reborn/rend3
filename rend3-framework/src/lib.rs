@@ -145,7 +145,7 @@ pub fn lock<T>(lock: &parking_lot::Mutex<T>) -> parking_lot::MutexGuard<'_, T> {
 }
 
 pub struct DefaultRoutines {
-    pub pbr: Mutex<rend3_routine::pbr::PbrRenderRoutine>,
+    pub pbr: Mutex<rend3_routine::pbr::PbrRoutine>,
     pub skybox: Mutex<rend3_routine::skybox::SkyboxRoutine>,
     pub tonemapping: Mutex<rend3_routine::tonemapping::TonemappingRoutine>,
 }
@@ -237,7 +237,7 @@ pub async fn async_start<A: App + 'static>(mut app: A, window_builder: WindowBui
     let base_rendergraph = app.create_base_rendergraph(&renderer);
     let mut data_core = renderer.data_core.lock();
     let routines = Arc::new(DefaultRoutines {
-        pbr: Mutex::new(rend3_routine::pbr::PbrRenderRoutine::new(
+        pbr: Mutex::new(rend3_routine::pbr::PbrRoutine::new(
             &renderer,
             &mut data_core,
             &base_rendergraph.interfaces,

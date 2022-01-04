@@ -3,33 +3,20 @@ use rend3::{
 };
 use wgpu::Buffer;
 
-use crate::{common::PerMaterialInterfaces, culling::gpu::GpuCuller, CulledPerMaterial};
+use crate::{
+    common::{PerMaterialInterfaces, Sorting},
+    CulledPerMaterial,
+};
 
-pub mod cpu;
-pub mod gpu;
+mod cpu;
+mod gpu;
+
+pub use cpu::*;
+pub use gpu::*;
 
 pub struct CulledObjectSet {
-    pub calls: ModeData<Vec<CPUDrawCall>, GPUIndirectData>,
+    pub calls: ModeData<Vec<cpu::CpuDrawCall>, gpu::GpuIndirectData>,
     pub output_buffer: Buffer,
-}
-
-pub struct GPUIndirectData {
-    pub indirect_buffer: Buffer,
-    pub count: usize,
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum Sorting {
-    FrontToBack,
-    BackToFront,
-}
-
-#[derive(Debug, Clone)]
-pub struct CPUDrawCall {
-    pub start_idx: u32,
-    pub end_idx: u32,
-    pub vertex_offset: i32,
-    pub material_index: u32,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -38,7 +25,7 @@ pub fn add_culling_to_graph<'node, M: Material>(
     pre_cull_data: DataHandle<Buffer>,
     culled: DataHandle<CulledPerMaterial>,
     per_material: &'node PerMaterialInterfaces<M>,
-    gpu_culler: &'node ModeData<(), GpuCuller>,
+    gpu_culler: &'node ModeData<(), gpu::GpuCuller>,
     shadow_index: Option<usize>,
     key: u64,
     sorting: Option<Sorting>,
@@ -64,7 +51,7 @@ pub fn add_culling_to_graph<'node, M: Material>(
         };
 
         let culled_objects = match gpu_culler {
-            ModeData::CPU(_) => cpu::cull::<M>(&renderer.device, camera, graph_data.object_manager, sorting, key),
+            ModeData::CPU(_) => cpu::cull_cpu::<M>(&renderer.device, camera, graph_data.object_manager, sorting, key),
             ModeData::GPU(ref gpu_culler) => gpu_culler.cull(gpu::GpuCullerCullArgs {
                 device: &renderer.device,
                 encoder,

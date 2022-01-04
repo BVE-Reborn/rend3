@@ -9,7 +9,7 @@ use rend3::{
 };
 use wgpu::{BindGroupLayout, BindingType, BufferBindingType, Device, ShaderStages};
 
-use crate::{common::samplers::Samplers, uniforms::ShaderCommonUniform};
+use crate::{common::samplers::Samplers, uniforms::FrameUniforms};
 
 pub struct GenericShaderInterfaces {
     pub depth_uniform_bgl: BindGroupLayout,
@@ -29,7 +29,7 @@ impl GenericShaderInterfaces {
             BindingType::Buffer {
                 ty: BufferBindingType::Uniform,
                 has_dynamic_offset: false,
-                min_binding_size: NonZeroU64::new(mem::size_of::<ShaderCommonUniform>() as _),
+                min_binding_size: NonZeroU64::new(mem::size_of::<FrameUniforms>() as _),
             },
             None,
         );
