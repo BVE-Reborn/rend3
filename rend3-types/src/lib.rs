@@ -12,7 +12,9 @@ use thiserror::Error;
 /// Reexport of the glam version rend3 is using.
 pub use glam;
 
-/// Non-owning resource handle. Not part of rend3's external interface, but needed to interface with rend3's internal datastructures if writing your own structures or render routines.
+/// Non-owning resource handle. Not part of rend3's external interface, but
+/// needed to interface with rend3's internal datastructures if writing your own
+/// structures or render routines.
 pub struct RawResourceHandle<T> {
     pub idx: usize,
     _phantom: PhantomData<T>,
@@ -236,7 +238,8 @@ pub enum MeshValidationError {
     IndexOutOfBounds { index: usize, value: u32, max: usize },
 }
 
-/// Easy to use builder for a [`Mesh`] that deals with common operations for you.
+/// Easy to use builder for a [`Mesh`] that deals with common operations for
+/// you.
 #[derive(Debug, Default)]
 pub struct MeshBuilder {
     vertex_positions: Vec<Vec3>,
@@ -346,7 +349,9 @@ impl MeshBuilder {
         self
     }
 
-    /// Mark this mesh as needing to be double sided. This will duplicate all faces with the opposite winding order. This acts as if backface culling was disabled.
+    /// Mark this mesh as needing to be double sided. This will duplicate all
+    /// faces with the opposite winding order. This acts as if backface culling
+    /// was disabled.
     pub fn with_double_sided(mut self) -> Self {
         self.double_sided = true;
         self
@@ -396,7 +401,8 @@ impl MeshBuilder {
             mesh.validate()?;
         }
 
-        // We need to flip winding order first, so the normals will be facing the right direction.
+        // We need to flip winding order first, so the normals will be facing the right
+        // direction.
         if self.flip_winding_order {
             mesh.flip_winding_order();
         }
@@ -418,10 +424,12 @@ impl MeshBuilder {
 
 /// A mesh that may be used by many objects.
 ///
-/// Meshes are in Structure of Array format and must have all the vertex_* arrays be the same length.
-/// This condition can be checked with the [`Mesh::validate`] function.
+/// Meshes are in Structure of Array format and must have all the vertex_*
+/// arrays be the same length. This condition can be checked with the
+/// [`Mesh::validate`] function.
 ///
-/// These can be annoying to construct, so use the [`MeshBuilder`] to make it easier.
+/// These can be annoying to construct, so use the [`MeshBuilder`] to make it
+/// easier.
 #[derive(Debug)]
 pub struct Mesh {
     pub vertex_positions: Vec<Vec3>,
@@ -502,11 +510,14 @@ impl Mesh {
         Ok(())
     }
 
-    /// Calculate normals for the given mesh, assuming smooth shading and per-vertex normals.
+    /// Calculate normals for the given mesh, assuming smooth shading and
+    /// per-vertex normals.
     ///
-    /// It is sound to call this function with the wrong handedness, it will just result in flipped normals.
+    /// It is sound to call this function with the wrong handedness, it will
+    /// just result in flipped normals.
     ///
-    /// If zeroed is true, the normals will not be zeroed before hand. If this is falsely set, it is sound, just returns incorrect results.
+    /// If zeroed is true, the normals will not be zeroed before hand. If this
+    /// is falsely set, it is sound, just returns incorrect results.
     ///
     /// # Safety
     ///
@@ -514,7 +525,8 @@ impl Mesh {
     /// - Normals and positions must be the same length.
     /// - All indices must be in-bounds for the buffers.
     ///
-    /// If a mesh has passed a call to validate, it is sound to call this function.
+    /// If a mesh has passed a call to validate, it is sound to call this
+    /// function.
     pub unsafe fn calculate_normals(&mut self, handedness: Handedness, zeroed: bool) {
         if handedness == Handedness::Left {
             Self::calculate_normals_for_buffers::<true>(
@@ -533,11 +545,14 @@ impl Mesh {
         }
     }
 
-    /// Calculate normals for the given buffers representing a mesh, assuming smooth shading and per-vertex normals.
+    /// Calculate normals for the given buffers representing a mesh, assuming
+    /// smooth shading and per-vertex normals.
     ///
-    /// It is sound to call this function with the wrong handedness, it will just result in flipped normals.
+    /// It is sound to call this function with the wrong handedness, it will
+    /// just result in flipped normals.
     ///
-    /// If zeroed is true, the normals will not be zeroed before hand. If this is falsely set, it is safe, just returns incorrect results.
+    /// If zeroed is true, the normals will not be zeroed before hand. If this
+    /// is falsely set, it is safe, just returns incorrect results.
     ///
     /// # Safety
     ///
@@ -545,7 +560,8 @@ impl Mesh {
     /// - Normals and positions must be the same length.
     /// - All indices must be in-bounds for the buffers.
     ///
-    /// If a mesh has passed a call to validate, it is sound to call this function.
+    /// If a mesh has passed a call to validate, it is sound to call this
+    /// function.
     pub unsafe fn calculate_normals_for_buffers<const LEFT_HANDED: bool>(
         normals: &mut [Vec3],
         positions: &[Vec3],
@@ -592,9 +608,11 @@ impl Mesh {
         }
     }
 
-    /// Calculate tangents for the given mesh, based on normals and texture coordinates.
+    /// Calculate tangents for the given mesh, based on normals and texture
+    /// coordinates.
     ///
-    /// If zeroed is true, the normals will not be zeroed before hand. If this is falsely set, it is safe, just returns incorrect results.
+    /// If zeroed is true, the normals will not be zeroed before hand. If this
+    /// is falsely set, it is safe, just returns incorrect results.
     ///
     /// # Safety
     ///
@@ -602,7 +620,8 @@ impl Mesh {
     /// - Tangents, positions, normals, and uvs must be the same length.
     /// - All indices must be in-bounds for the buffers.
     ///
-    /// If a mesh has passed a call to validate, it is sound to call this function.
+    /// If a mesh has passed a call to validate, it is sound to call this
+    /// function.
     pub unsafe fn calculate_tangents(&mut self, zeroed: bool) {
         // SAFETY: The mesh unconditionally has a validation token, so it must be valid.
         Self::calculate_tangents_for_buffers(
@@ -615,9 +634,11 @@ impl Mesh {
         )
     }
 
-    /// Calculate tangents for the given set of buffers, based on normals and texture coordinates.
+    /// Calculate tangents for the given set of buffers, based on normals and
+    /// texture coordinates.
     ///
-    /// If zeroed is true, the normals will not be zeroed before hand. If this is falsely set, it is safe, just returns incorrect results.
+    /// If zeroed is true, the normals will not be zeroed before hand. If this
+    /// is falsely set, it is safe, just returns incorrect results.
     ///
     /// # Safety
     ///
@@ -716,12 +737,13 @@ impl Mesh {
         }
     }
 
-    /// Inverts the winding order of a mesh. This is useful if you have meshes which
-    /// are designed for right-handed (Counter-Clockwise) winding order for use in OpenGL or VK.
+    /// Inverts the winding order of a mesh. This is useful if you have meshes
+    /// which are designed for right-handed (Counter-Clockwise) winding
+    /// order for use in OpenGL or VK.
     ///
-    /// This does not change vertex location, so does not change coordinate system. This will
-    /// also not change the vertex normals. Calling [`Mesh::calculate_normals`] is advised after
-    /// calling this function.
+    /// This does not change vertex location, so does not change coordinate
+    /// system. This will also not change the vertex normals. Calling
+    /// [`Mesh::calculate_normals`] is advised after calling this function.
     pub fn flip_winding_order(&mut self) {
         for indices in self.indices.chunks_exact_mut(3) {
             if let [left, _, right] = indices {
@@ -737,7 +759,8 @@ impl Mesh {
 /// The count of mipmap levels a texture should have.
 #[derive(Debug, Clone)]
 pub enum MipmapCount {
-    /// Specifies a texture with the tiven mipmap count. Must not be greater than the maximum.
+    /// Specifies a texture with the tiven mipmap count. Must not be greater
+    /// than the maximum.
     Specific(NonZeroU32),
     /// Specifies a texture with the maximum mipmap count.
     Maximum,
@@ -750,7 +773,8 @@ impl MipmapCount {
 /// How texture mipmaps get generated.
 #[derive(Debug, Clone)]
 pub enum MipmapSource {
-    /// The user will provide all of the mipmaps in the data texture. Upload all mip levels.
+    /// The user will provide all of the mipmaps in the data texture. Upload all
+    /// mip levels.
     Uploaded,
     /// rend3 will generate the mipmaps for you. Upload only mip level 0.
     Generated,
@@ -781,18 +805,24 @@ pub struct MaterialTag;
 
 /// Interface that all materials must use.
 ///
-/// The material will provide a set of textures, and a pile of bytes. It will then, as part of the material bind group, present the following abi:
+/// The material will provide a set of textures, and a pile of bytes. It will
+/// then, as part of the material bind group, present the following abi:
 ///
 /// ### CPU Mode
 ///
 /// - A uniform binding with:
 ///   - The data provided, with padding up to 16 byte alignment.
-///   - A u32 bitflag telling which textures are null. To check if texture N is enabled, do `(texture_bitflag >> N) & 0x1 == 1`.
-/// - One Texture2D binding per texture, provided in the order given. If given a `None`, will bind a null texture (1x1 texture with a (0, 0, 0, 255) pixel).
+///   - A u32 bitflag telling which textures are null. To check if texture N is
+///     enabled, do `(texture_bitflag >> N) & 0x1 == 1`.
+/// - One Texture2D binding per texture, provided in the order given. If given a
+///   `None`, will bind a null texture (1x1 texture with a (0, 0, 0, 255)
+///   pixel).
 ///
 /// ### GPU Mode
 /// - A material array indexed by the material index. Each material has:
-///   - One u32 per texture. If this value is 0, the texture doesn't exist. If this value is non-zero, subtract one and index into the texture array to ge thte texture.
+///   - One u32 per texture. If this value is 0, the texture doesn't exist. If
+///     this value is non-zero, subtract one and index into the texture array to
+///     ge thte texture.
 ///   - Padding to 16 byte alignemnet.
 ///   - The data provided by the material.
 pub trait Material: Send + Sync + 'static {
@@ -801,13 +831,16 @@ pub trait Material: Send + Sync + 'static {
     /// The amount of data that will be provided to `to_data`.
     const DATA_SIZE: u32;
 
-    /// u64 key that determine's an object's archetype. When you query for objects from the object manager, you must provide this key to get all objects with this key.
+    /// u64 key that determine's an object's archetype. When you query for
+    /// objects from the object manager, you must provide this key to get all
+    /// objects with this key.
     fn object_key(&self) -> u64;
 
     /// Fill up the given slice with textures.
     fn to_textures<'a>(&'a self, slice: &mut [Option<&'a TextureHandle>]);
 
-    /// Fill up the given slice with binary material data. This can be whatever data a shader expects.
+    /// Fill up the given slice with binary material data. This can be whatever
+    /// data a shader expects.
     fn to_data(&self, slice: &mut [u8]);
 }
 

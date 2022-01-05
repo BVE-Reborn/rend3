@@ -371,7 +371,8 @@ impl rend3_framework::App for SceneViewer {
     }
 
     fn scale_factor(&self) -> f32 {
-        // Android has very low memory bandwidth, so lets run internal buffers at half res by default
+        // Android has very low memory bandwidth, so lets run internal buffers at half
+        // res by default
         cfg_if::cfg_if! {
             if #[cfg(target_os = "android")] {
                 0.5

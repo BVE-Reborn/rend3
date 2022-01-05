@@ -1,4 +1,5 @@
-/// Determines if a more-compatible CPU driven rendering, or faster GPU driven rendering.
+/// Determines if a more-compatible CPU driven rendering, or faster GPU driven
+/// rendering.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum RendererMode {
     CPUPowered,
@@ -6,7 +7,8 @@ pub enum RendererMode {
 }
 
 impl RendererMode {
-    /// Turns a RendererMode into a [`ModeData`] calling the appropriate initalization function.
+    /// Turns a RendererMode into a [`ModeData`] calling the appropriate
+    /// initalization function.
     pub fn into_data<C, G>(self, cpu: impl FnOnce() -> C, gpu: impl FnOnce() -> G) -> ModeData<C, G> {
         match self {
             Self::CPUPowered => ModeData::CPU(cpu()),

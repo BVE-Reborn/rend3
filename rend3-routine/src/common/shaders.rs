@@ -5,9 +5,13 @@ use wgpu::{Device, ShaderModule, ShaderModuleDescriptor, ShaderModuleDescriptorS
 
 use crate::shaders::{SPIRV_SHADERS, WGSL_SHADERS};
 
+/// In cpu-mode, creates a checked wgsl shader, in gpu-mode creates a
+/// passthrough SPIRV shader.
+///
 /// # Safety
 ///
-/// The shader must be valid, match all the respective definitions, and otherwise meet wgpu's validation requirements
+/// The shader must be valid, match all the respective definitions, and
+/// otherwise meet wgpu's validation requirements
 pub unsafe fn mode_safe_shader(
     device: &Device,
     mode: RendererMode,

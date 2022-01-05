@@ -113,7 +113,8 @@ impl<HandleType, Metadata> ArchitypicalErasedRegistry<HandleType, Metadata> {
 
             false
         } else {
-            // We need to change archetype, so we clean up, then insert with the old handle. We must clean up first, so the value in the index map is still accurate.
+            // We need to change archetype, so we clean up, then insert with the old handle.
+            // We must clean up first, so the value in the index map is still accurate.
             let metadata = (archetype.remove_single)(
                 &mut archetype.vec,
                 &mut archetype.non_erased,
@@ -215,8 +216,9 @@ fn remove_single<T: Send + Sync + 'static, Metadata>(
 
     vec.swap_remove(idx);
     let deleted_metadata = non_erased.swap_remove(idx);
-    // We don't need to remove our value from the index map or the archetype map because
-    // this is only called in the context of an update, where going to update these values anyway.
+    // We don't need to remove our value from the index map or the archetype map
+    // because this is only called in the context of an update, where going to
+    // update these values anyway.
 
     // If we swapped an element, update its value in the index map
     if let Some(metadata) = non_erased.get(idx) {
@@ -242,7 +244,8 @@ fn remove_all_dead<T: Send + Sync + 'static, Metadata>(
 
     assert_eq!(vec.len(), non_erased.len());
     for idx in (0..vec.len()).rev() {
-        // SAFETY: We're iterating back to front, removing no more than once per time, so this is always valid.
+        // SAFETY: We're iterating back to front, removing no more than once per time,
+        // so this is always valid.
         let _ = unsafe { vec.get_unchecked(idx) };
         let metadata = unsafe { non_erased.get_unchecked(idx) };
         if metadata.refcount.strong_count() == 0 {

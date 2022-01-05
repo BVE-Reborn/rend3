@@ -39,7 +39,8 @@ pub enum AlbedoComponent {
     None,
     /// Albedo color is the vertex value.
     Vertex {
-        /// Vertex should be converted from srgb -> linear before multiplication.
+        /// Vertex should be converted from srgb -> linear before
+        /// multiplication.
         srgb: bool,
     },
     /// Albedo color is the given value.
@@ -47,7 +48,8 @@ pub enum AlbedoComponent {
     /// Albedo color is the given value multiplied by the vertex color.
     ValueVertex {
         value: Vec4,
-        /// Vertex should be converted from srgb -> linear before multiplication.
+        /// Vertex should be converted from srgb -> linear before
+        /// multiplication.
         srgb: bool,
     },
     /// Albedo color is loaded from the given texture.
@@ -56,7 +58,8 @@ pub enum AlbedoComponent {
     /// by the vertex color.
     TextureVertex {
         texture: TextureHandle,
-        /// Vertex should be converted from srgb -> linear before multiplication.
+        /// Vertex should be converted from srgb -> linear before
+        /// multiplication.
         srgb: bool,
     },
     /// Albedo color is loaded from given texture, then multiplied
@@ -66,7 +69,8 @@ pub enum AlbedoComponent {
     /// by the vertex color and the given value.
     TextureVertexValue {
         texture: TextureHandle,
-        /// Vertex should be converted from srgb -> linear before multiplication.
+        /// Vertex should be converted from srgb -> linear before
+        /// multiplication.
         srgb: bool,
         value: Vec4,
     },
@@ -128,7 +132,8 @@ impl AlbedoComponent {
     }
 }
 
-/// Generic container for a component of a material that could either be from a texture or a fixed value.
+/// Generic container for a component of a material that could either be from a
+/// texture or a fixed value.
 #[derive(Debug, Clone)]
 pub enum MaterialComponent<T> {
     None,
@@ -187,8 +192,9 @@ pub enum NormalTexture {
     Tricomponent(TextureHandle, NormalTextureYDirection),
     /// Normal stored in RG values, third value should be reconstructed.
     Bicomponent(TextureHandle, NormalTextureYDirection),
-    /// Normal stored in Green and Alpha values, third value should be reconstructed.
-    /// This is useful for storing in BC3 or BC7 compressed textures.
+    /// Normal stored in Green and Alpha values, third value should be
+    /// reconstructed. This is useful for storing in BC3 or BC7 compressed
+    /// textures.
     BicomponentSwizzled(TextureHandle, NormalTextureYDirection),
 }
 impl Default for NormalTexture {
@@ -226,12 +232,14 @@ impl NormalTexture {
     }
 }
 
-/// How the Ambient Occlusion, Metalic, and Roughness values should be determined.
+/// How the Ambient Occlusion, Metalic, and Roughness values should be
+/// determined.
 #[derive(Debug, Clone)]
 pub enum AoMRTextures {
     None,
     Combined {
-        /// Texture with Ambient Occlusion in R, Roughness in G, and Metallic in B
+        /// Texture with Ambient Occlusion in R, Roughness in G, and Metallic in
+        /// B
         texture: Option<TextureHandle>,
     },
     SwizzledSplit {
@@ -481,7 +489,8 @@ impl Default for Transparency {
 // Consider:
 //
 // - Green screen value
-/// A set of textures and values that determine the how an object interacts with light.
+/// A set of textures and values that determine the how an object interacts with
+/// light.
 #[derive(Default)]
 pub struct PbrMaterial {
     pub albedo: AlbedoComponent,

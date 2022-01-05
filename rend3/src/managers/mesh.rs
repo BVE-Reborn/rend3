@@ -67,7 +67,8 @@ impl MeshBuffers {
     }
 }
 
-/// Manages vertex and instance buffers. All buffers are sub-allocated from megabuffers.
+/// Manages vertex and instance buffers. All buffers are sub-allocated from
+/// megabuffers.
 pub struct MeshManager {
     buffers: MeshBuffers,
 
@@ -115,7 +116,8 @@ impl MeshManager {
         let vertex_count = mesh.vertex_positions.len();
         let index_count = mesh.indices.len();
 
-        // If vertex_count is 0, index_count _must_ also be 0, as all indices would be out of range.
+        // If vertex_count is 0, index_count _must_ also be 0, as all indices would be
+        // out of range.
         if index_count == 0 {
             let mesh = InternalMesh {
                 vertex_range: 0..0,

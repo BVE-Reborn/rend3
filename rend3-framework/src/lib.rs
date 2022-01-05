@@ -87,10 +87,12 @@ pub trait App<T: 'static = ()> {
         BaseRenderGraph::new(renderer)
     }
 
-    /// Determines the sample count used, this may change dynamically. This function
-    /// is what the framework actually calls, so overriding this will always use the right values.
+    /// Determines the sample count used, this may change dynamically. This
+    /// function is what the framework actually calls, so overriding this
+    /// will always use the right values.
     ///
-    /// It is called on main events cleared and things are remade if this changes.
+    /// It is called on main events cleared and things are remade if this
+    /// changes.
     fn sample_count(&self) -> SampleCount;
 
     /// Determines the scale factor used
@@ -108,8 +110,10 @@ pub trait App<T: 'static = ()> {
         let _ = (window, renderer, routines, surface_format);
     }
 
-    /// RedrawRequested/RedrawEventsCleared will only be fired if the window size is non-zero. As such you should always render
-    /// in RedrawRequested and use MainEventsCleared for things that need to keep running when minimized.
+    /// RedrawRequested/RedrawEventsCleared will only be fired if the window
+    /// size is non-zero. As such you should always render
+    /// in RedrawRequested and use MainEventsCleared for things that need to
+    /// keep running when minimized.
     #[allow(clippy::too_many_arguments)]
     fn handle_event(
         &mut self,
@@ -170,8 +174,9 @@ where
     let winit_closure = Closure::once_into_js(move || event_loop.run(event_handler));
 
     // make sure to handle JS exceptions thrown inside start.
-    // Otherwise wasm_bindgen_futures Queue would break and never handle any tasks again.
-    // This is required, because winit uses JS exception for control flow to escape from `run`.
+    // Otherwise wasm_bindgen_futures Queue would break and never handle any tasks
+    // again. This is required, because winit uses JS exception for control flow
+    // to escape from `run`.
     if let Err(error) = call_catch(&winit_closure) {
         let is_control_flow_exception = error
             .dyn_ref::<js_sys::Error>()
@@ -199,9 +204,11 @@ pub async fn async_start<A: App + 'static>(mut app: A, window_builder: WindowBui
 
     let iad = app.create_iad().await.unwrap();
 
-    // The one line of unsafe needed. We just need to guarentee that the window outlives the use of the surface.
+    // The one line of unsafe needed. We just need to guarentee that the window
+    // outlives the use of the surface.
     //
-    // Android has to defer the surface until `Resumed` is fired. This doesn't fire on other platforms though :|
+    // Android has to defer the surface until `Resumed` is fired. This doesn't fire
+    // on other platforms though :|
     let mut surface = if cfg!(target_os = "android") {
         None
     } else {

@@ -139,8 +139,8 @@ impl ShaderFrustum {
 
         // no far plane as we have infinite depth
 
-        // this is the far plane in the algorithm, but we're using inverse Z, so near and far
-        // get flipped.
+        // this is the far plane in the algorithm, but we're using inverse Z, so near
+        // and far get flipped.
         let near = ShaderPlane::new(
             mat_arr[0][3] - mat_arr[0][2],
             mat_arr[1][3] - mat_arr[1][2],

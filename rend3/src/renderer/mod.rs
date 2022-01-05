@@ -31,7 +31,8 @@ pub mod error;
 mod ready;
 mod setup;
 
-/// Core struct which contains the renderer world. Primary way to interact with the world.
+/// Core struct which contains the renderer world. Primary way to interact with
+/// the world.
 pub struct Renderer {
     instructions: InstructionStreamPair,
 
@@ -91,7 +92,8 @@ impl Renderer {
     ///
     /// You can create your own IAD or call [`create_iad`](crate::create_iad).
     ///
-    /// The aspect ratio is that of the window. This automatically configures the camera. If None is passed, an aspect ratio of 1.0 is assumed.
+    /// The aspect ratio is that of the window. This automatically configures
+    /// the camera. If None is passed, an aspect ratio of 1.0 is assumed.
     pub fn new(
         iad: InstanceAdapterDevice,
         handedness: Handedness,
@@ -100,9 +102,12 @@ impl Renderer {
         setup::create_renderer(iad, handedness, aspect_ratio)
     }
 
-    /// Adds a 3D mesh to the renderer. This doesn't instantiate it to world. To show this in the world, you need to create an [`Object`] using this mesh.
+    /// Adds a 3D mesh to the renderer. This doesn't instantiate it to world. To
+    /// show this in the world, you need to create an [`Object`] using this
+    /// mesh.
     ///
-    /// The handle will keep the mesh alive. All objects created will also keep the mesh alive.
+    /// The handle will keep the mesh alive. All objects created will also keep
+    /// the mesh alive.
     #[track_caller]
     pub fn add_mesh(&self, mesh: Mesh) -> MeshHandle {
         let handle = MeshManager::allocate(&self.current_ident);
@@ -120,7 +125,8 @@ impl Renderer {
 
     /// Add a 2D texture to the renderer. This can be used in a [`Material`].
     ///
-    /// The handle will keep the texture alive. All materials created with this texture will also keep the texture alive.
+    /// The handle will keep the texture alive. All materials created with this
+    /// texture will also keep the texture alive.
     #[track_caller]
     pub fn add_texture_2d(&self, texture: Texture) -> TextureHandle {
         profiling::scope!("Add Texture 2D");
@@ -207,9 +213,11 @@ impl Renderer {
         handle
     }
 
-    /// Add a 2D texture to the renderer by copying a set of mipmaps from an existing texture. This new can be used in a [`Material`].
+    /// Add a 2D texture to the renderer by copying a set of mipmaps from an
+    /// existing texture. This new can be used in a [`Material`].
     ///
-    /// The handle will keep the texture alive. All materials created with this texture will also keep the texture alive.
+    /// The handle will keep the texture alive. All materials created with this
+    /// texture will also keep the texture alive.
     #[track_caller]
     pub fn add_texture_2d_from_texture(&self, texture: TextureFromTexture) -> TextureHandle {
         profiling::scope!("Add Texture 2D From Texture");
@@ -277,7 +285,8 @@ impl Renderer {
         handle
     }
 
-    /// Adds a Cube texture to the renderer. This can be used as a cube environment map by a render routine.
+    /// Adds a Cube texture to the renderer. This can be used as a cube
+    /// environment map by a render routine.
     ///
     /// The handle will keep the texture alive.
     #[track_caller]
@@ -347,7 +356,8 @@ impl Renderer {
 
     /// Adds a material to the renderer. This can be used in an [`Object`].
     ///
-    /// The handle will keep the material alive. All objects created with this material will also keep this material alive.
+    /// The handle will keep the material alive. All objects created with this
+    /// material will also keep this material alive.
     ///
     /// The material will keep the inside textures alive.
     #[track_caller]
@@ -381,7 +391,8 @@ impl Renderer {
         )
     }
 
-    /// Adds an object to the renderer. This will create a visible object using the given mesh and materal.
+    /// Adds an object to the renderer. This will create a visible object using
+    /// the given mesh and materal.
     ///
     /// The handle will keep the material alive.
     ///
@@ -441,7 +452,8 @@ impl Renderer {
         )
     }
 
-    /// Sets the aspect ratio of the camera. This should correspond with the aspect ratio of the user.
+    /// Sets the aspect ratio of the camera. This should correspond with the
+    /// aspect ratio of the user.
     #[track_caller]
     pub fn set_aspect_ratio(&self, ratio: f32) {
         self.instructions
@@ -455,9 +467,11 @@ impl Renderer {
             .push(InstructionKind::SetCameraData { data }, *Location::caller())
     }
 
-    /// Render a frame of the scene onto the given output, using the given RenderRoutine.
+    /// Render a frame of the scene onto the given output, using the given
+    /// RenderRoutine.
     ///
-    /// The RendererStatistics may not be the results from this frame, but might be the results from multiple frames ago.
+    /// The RendererStatistics may not be the results from this frame, but might
+    /// be the results from multiple frames ago.
     pub fn ready(&self) -> (Vec<CommandBuffer>, ReadyData) {
         ready::ready(self)
     }

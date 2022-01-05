@@ -234,7 +234,8 @@ impl MaterialManager {
         handle: &MaterialHandle,
         material: M,
     ) {
-        // TODO(material): if this doesn't change archetype, this should do a buffer write cpu side.
+        // TODO(material): if this doesn't change archetype, this should do a buffer
+        // write cpu side.
         let internal = self.fill_inner(device, mode, texture_manager_2d, &material);
 
         let archetype_changed = self.registry.update(handle, material, |internal, idx| {
@@ -394,7 +395,8 @@ impl MaterialManager {
                 offset += size;
             }
 
-            // TODO(material): I know the size before hand, we could elide this cpu side copy
+            // TODO(material): I know the size before hand, we could elide this cpu side
+            // copy
             buffer.write_to_buffer(device, queue, bytemuck::cast_slice(&data));
         }
     }
@@ -417,7 +419,8 @@ fn write_gpu_materials<M: Material>(
     let mut texture_ref_tmp = vec![None; M::TEXTURE_COUNT as usize];
 
     for mat in materials {
-        // If we have no textures, we should skip this operation as the cast_slice_mut will fail
+        // If we have no textures, we should skip this operation as the cast_slice_mut
+        // will fail
         if mat_size != 0 {
             // Get the texture handles from the material
             mat.to_textures(&mut texture_ref_tmp);

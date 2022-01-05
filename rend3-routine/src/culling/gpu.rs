@@ -411,7 +411,8 @@ pub fn build_gpu_cull_input(device: &Device, objects: &[InternalObject]) -> Buff
 
     let mut data = buffer.slice(..).get_mapped_range_mut();
 
-    // This unsafe block measured a bit faster in my tests, and as this is basically _the_ hot path, so this is worthwhile.
+    // This unsafe block measured a bit faster in my tests, and as this is basically
+    // _the_ hot path, so this is worthwhile.
     unsafe {
         let data_ptr = data.as_mut_ptr() as *mut GpuCullingInput;
 
@@ -420,7 +421,8 @@ pub fn build_gpu_cull_input(device: &Device, objects: &[InternalObject]) -> Buff
             // We're iterating over 0..len so this is never going to be out of bounds
             let object = objects.get_unchecked(idx);
 
-            // This is aligned, and we know the vector has enough bytes to hold this, so this is safe
+            // This is aligned, and we know the vector has enough bytes to hold this, so
+            // this is safe
             data_ptr.add(idx).write_unaligned(object.input);
         }
     }

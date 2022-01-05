@@ -1,10 +1,14 @@
 //! gltf scene and model loader for rend3.
 //!
-//! This crate attempts to map the concepts into gltf as best it can into rend3, but there is quite a variety of things that would be insane to properly represent.
+//! This crate attempts to map the concepts into gltf as best it can into rend3,
+//! but there is quite a variety of things that would be insane to properly
+//! represent.
 //!
-//! To "just load a gltf/glb", look at the documentation for [`load_gltf`] and use the default [`filesystem_io_func`].
+//! To "just load a gltf/glb", look at the documentation for [`load_gltf`] and
+//! use the default [`filesystem_io_func`].
 //!
-//! Individual components of a gltf can be loaded with the other functions in this crate.
+//! Individual components of a gltf can be loaded with the other functions in
+//! this crate.
 //!
 //! # Supported Extensions
 //! - `KHR_punctual_lights`
@@ -12,7 +16,8 @@
 //! - `KHR_material_unlit`
 //!
 //! # Known Limitations
-//! - Only the albedo texture's transform from `KHR_texture_transform` will be used.
+//! - Only the albedo texture's transform from `KHR_texture_transform` will be
+//!   used.
 //! - Double sided materials are currently unsupported.
 
 use glam::{Mat3, Mat4, UVec2, Vec2, Vec3, Vec4};
@@ -49,7 +54,8 @@ impl<T> Labeled<T> {
 #[derive(Debug)]
 pub struct MeshPrimitive {
     pub handle: types::MeshHandle,
-    /// Index into the material vector given by [`load_materials_and_textures`] or [`LoadedGltfScene::materials`].
+    /// Index into the material vector given by [`load_materials_and_textures`]
+    /// or [`LoadedGltfScene::materials`].
     pub material: Option<usize>,
 }
 
@@ -59,7 +65,8 @@ pub struct Mesh {
     pub primitives: Vec<MeshPrimitive>,
 }
 
-/// Set of [`ObjectHandle`]s that correspond to a logical object in the node tree.
+/// Set of [`ObjectHandle`]s that correspond to a logical object in the node
+/// tree.
 ///
 /// This is to a [`ObjectHandle`], as a [`Mesh`] is to a [`MeshPrimitive`].
 #[derive(Debug)]
@@ -146,10 +153,11 @@ pub enum GltfLoadError<E: std::error::Error + 'static> {
     MeshValidationError(usize, #[source] MeshValidationError),
 }
 
-/// Default implementation of [`load_gltf`]'s `io_func` that loads from the filesystem relative to the gltf.
+/// Default implementation of [`load_gltf`]'s `io_func` that loads from the
+/// filesystem relative to the gltf.
 ///
-/// The first argumnet is the directory all relative paths should be considered against. This is more than likely
-/// the directory the gltf/glb is in.
+/// The first argumnet is the directory all relative paths should be considered
+/// against. This is more than likely the directory the gltf/glb is in.
 pub async fn filesystem_io_func(parent_directory: impl AsRef<Path>, uri: SsoString) -> Result<Vec<u8>, std::io::Error> {
     let octet_stream_header = "data:";
     if let Some(base64_data) = uri.strip_prefix(octet_stream_header) {
@@ -171,7 +179,8 @@ pub async fn filesystem_io_func(parent_directory: impl AsRef<Path>, uri: SsoStri
 
 /// Load a given gltf into the renderer's world.
 ///
-/// Allows the user to specify how URIs are resolved into their underlying data. Supports most gltfs and glbs.
+/// Allows the user to specify how URIs are resolved into their underlying data.
+/// Supports most gltfs and glbs.
 ///
 /// **Must** keep the [`LoadedGltfScene`] alive for the scene to remain.
 ///
@@ -236,7 +245,8 @@ where
 /// Load a given gltf's data, like meshes and materials, without yet adding
 /// any of the nodes to the scene.
 ///
-/// Allows the user to specify how URIs are resolved into their underlying data. Supports most gltfs and glbs.
+/// Allows the user to specify how URIs are resolved into their underlying data.
+/// Supports most gltfs and glbs.
 ///
 /// **Must** keep the [`LoadedGltfScene`] alive for the meshes and materials
 pub async fn load_gltf_data<F, Fut, E>(
@@ -366,7 +376,8 @@ pub fn load_gltf_nodes<'a, E: std::error::Error + 'static>(
     Ok(final_nodes)
 }
 
-/// Loads buffers from a [`gltf::Buffer`] iterator, calling io_func to resolve them from URI.
+/// Loads buffers from a [`gltf::Buffer`] iterator, calling io_func to resolve
+/// them from URI.
 ///
 /// If the gltf came from a .glb, the glb's blob should be provided.
 ///
@@ -406,7 +417,8 @@ where
 
 /// Loads meshes from a [`gltf::Mesh`] iterator.
 ///
-/// All binary data buffers must be provided. Call this with [`gltf::Document::meshes`] as the mesh argument.
+/// All binary data buffers must be provided. Call this with
+/// [`gltf::Document::meshes`] as the mesh argument.
 pub fn load_meshes<'a, E: std::error::Error + 'static>(
     renderer: &Renderer,
     meshes: impl Iterator<Item = gltf::Mesh<'a>>,
@@ -507,7 +519,8 @@ pub fn load_default_material(renderer: &Renderer) -> types::MaterialHandle {
 
 /// Loads materials and textures from a [`gltf::Material`] iterator.
 ///
-/// All binary data buffers must be provided. Call this with [`gltf::Document::materials`] as the materials argument.
+/// All binary data buffers must be provided. Call this with
+/// [`gltf::Document::materials`] as the materials argument.
 ///
 /// io_func determines how URIs are resolved into their underlying data.
 pub async fn load_materials_and_textures<F, Fut, E>(
@@ -657,7 +670,8 @@ where
 ///
 /// Uses the given ImageMap as a cache.
 ///
-/// All binary data buffers must be provided. You can get the image from a texture by calling [`gltf::Texture::source`].
+/// All binary data buffers must be provided. You can get the image from a
+/// texture by calling [`gltf::Texture::source`].
 ///
 /// io_func determines how URIs are resolved into their underlying data.
 pub async fn load_image_cached<F, Fut, E>(
@@ -692,7 +706,8 @@ where
 
 /// Loads a single image from a [`gltf::Image`].
 ///
-/// All binary data buffers must be provided. Call this with [`gltf::Document::materials`] as the materials argument.
+/// All binary data buffers must be provided. Call this with
+/// [`gltf::Document::materials`] as the materials argument.
 ///
 /// io_func determines how URIs are resolved into their underlying data.
 pub async fn load_image<F, Fut, E>(
@@ -870,9 +885,11 @@ pub mod util {
         texture.map(|t| t.handle)
     }
 
-    /// Turns a `Option<Future<Output = Result<Labeled<T>, E>>>>` into a `Future<Output = Result<Option<T>, E>>`
+    /// Turns a `Option<Future<Output = Result<Labeled<T>, E>>>>` into a
+    /// `Future<Output = Result<Option<T>, E>>`
     ///
-    /// This is a very specific transformation that shows up a lot when using [`load_image_cached`](super::load_image_cached).
+    /// This is a very specific transformation that shows up a lot when using
+    /// [`load_image_cached`](super::load_image_cached).
     pub async fn texture_option_resolve<F: Future, T, E>(fut: Option<F>) -> Result<Option<T>, E>
     where
         F: Future<Output = Result<Labeled<T>, E>>,

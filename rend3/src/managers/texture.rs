@@ -13,9 +13,11 @@ use wgpu::{
     TextureSampleType, TextureView, TextureViewDescriptor, TextureViewDimension,
 };
 
-/// When using GPU mode, we start the 2D texture manager with a bind group with this many textures.
+/// When using GPU mode, we start the 2D texture manager with a bind group with
+/// this many textures.
 pub const STARTING_2D_TEXTURES: usize = 1 << 8;
-/// When using GPU mode, we start the Cubemap texture manager with a bind group with this many textures.
+/// When using GPU mode, we start the Cubemap texture manager with a bind group
+/// with this many textures.
 pub const STARTING_CUBE_TEXTURES: usize = 1 << 3;
 /// Largest amount of supported textures per type
 pub const MAX_TEXTURE_COUNT: u32 = 1 << 17;

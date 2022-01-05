@@ -13,8 +13,8 @@ pub struct CameraManager {
     aspect_ratio: f32,
 }
 impl CameraManager {
-    /// Builds a new camera, using the given aspect ratio. If no aspect ratio is given
-    /// it is assumed that no aspect ratio scaling should be done.
+    /// Builds a new camera, using the given aspect ratio. If no aspect ratio is
+    /// given it is assumed that no aspect ratio scaling should be done.
     pub fn new(data: Camera, handedness: Handedness, aspect_ratio: Option<f32>) -> Self {
         profiling::scope!("CameraManager::new");
 
@@ -32,8 +32,9 @@ impl CameraManager {
         }
     }
 
-    /// Sets the camera data, rebuilding the using the given aspect ratio. If no aspect ratio is given
-    /// it is assumed that no aspect ratio scaling should be done.
+    /// Sets the camera data, rebuilding the using the given aspect ratio. If no
+    /// aspect ratio is given it is assumed that no aspect ratio scaling
+    /// should be done.
     pub fn set_data(&mut self, data: Camera) {
         self.set_aspect_data(data, self.aspect_ratio)
     }

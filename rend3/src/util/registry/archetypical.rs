@@ -63,7 +63,8 @@ where
             let length = archetype.data.len();
             debug_assert_eq!(length, archetype.metadata.len());
             for idx in (0..length).rev() {
-                // SAFETY: We're iterating back to front, removing no more than once per time, so this is always valid.
+                // SAFETY: We're iterating back to front, removing no more than once per time,
+                // so this is always valid.
                 let metadata = unsafe { archetype.metadata.get_unchecked(idx) };
                 if metadata.refcount.strong_count() == 0 {
                     let data = archetype.data.swap_remove(idx);
@@ -89,7 +90,8 @@ where
         let data = old_archetype.data.swap_remove(old_index);
         let metadata = old_archetype.metadata.swap_remove(old_index);
 
-        // If we swapped an element get its handle to update later. We can't update now as handle_info_ref is holding a &mut on self.handle_info
+        // If we swapped an element get its handle to update later. We can't update now
+        // as handle_info_ref is holding a &mut on self.handle_info
         let update_handle = old_archetype
             .metadata
             .get_mut(old_index)

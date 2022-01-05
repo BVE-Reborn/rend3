@@ -80,7 +80,8 @@ impl rend3_framework::App for CubeExample {
 
         // Add mesh to renderer's world.
         //
-        // All handles are refcounted, so we only need to hang onto the handle until we make an object.
+        // All handles are refcounted, so we only need to hang onto the handle until we
+        // make an object.
         let mesh_handle = renderer.add_mesh(mesh);
 
         // Add PBR material with all defaults except a single color.

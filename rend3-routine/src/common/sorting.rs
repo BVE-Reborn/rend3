@@ -3,12 +3,16 @@ use std::borrow::Cow;
 use ordered_float::OrderedFloat;
 use rend3::managers::{CameraManager, InternalObject};
 
+/// An object sorting order.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Sorting {
+    /// Sort with the nearest objects first.
     FrontToBack,
+    /// Sort with the furthest objects first.
     BackToFront,
 }
 
+/// Takes a set of objects and possibly sorts them if a sorting is provided.
 pub fn sort_objects<'a>(
     objects: &'a [InternalObject],
     camera_manager: &CameraManager,

@@ -34,11 +34,14 @@ pub trait DepthRenderableMaterial: Material {
 
 /// How the material should be read for alpha cutouting.
 pub struct AlphaCutoutSpec {
-    /// Index into the texture array to read the alpha from. Currently _must_ be 0. This will be lifted.
+    /// Index into the texture array to read the alpha from. Currently _must_ be
+    /// 0. This will be lifted.
     pub index: u32,
-    /// Byte index into the data array that represents a single f32 to use as the alpha cutout value.
+    /// Byte index into the data array that represents a single f32 to use as
+    /// the alpha cutout value.
     pub cutoff_offset: u32,
-    /// Byte index into the data array that represents a single mat3 to use as uv transform.
+    /// Byte index into the data array that represents a single mat3 to use as
+    /// uv transform.
     pub uv_transform_offset: Option<u32>,
 }
 
@@ -46,9 +49,11 @@ pub struct AlphaCutoutSpec {
 #[repr(C)]
 struct AlphaDataAbi {
     stride: u32,              // Stride in offset into a float array (i.e. byte index / 4). Unused in CPU mode.
-    texture_offset: u32, // Must be zero in gpu mode. In cpu mode, it's the index into the material data with the texture enable bitflag.
-    cutoff_offset: u32,  // Stride in offset into a float array  (i.e. byte index / 4)
-    uv_transform_offset: u32, // Stride in offset into a float array pointing to a mat3 with the uv transform (i.e. byte index / 4). 0xFFFFFFFF represents "no transform"
+    texture_offset: u32,      /* Must be zero in gpu mode. In cpu mode, it's the index into the material data with
+                               * the texture enable bitflag. */
+    cutoff_offset: u32,       // Stride in offset into a float array  (i.e. byte index / 4)
+    uv_transform_offset: u32, /* Stride in offset into a float array pointing to a mat3 with the uv transform (i.e.
+                               * byte index / 4). 0xFFFFFFFF represents "no transform" */
 }
 
 unsafe impl bytemuck::Pod for AlphaDataAbi {}

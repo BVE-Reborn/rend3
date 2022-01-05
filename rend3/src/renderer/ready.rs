@@ -107,7 +107,8 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
     let d2_texture = data_core.d2_texture_manager.ready(&renderer.device);
 
     // Level 1
-    // The material manager needs to be able to pull correct internal indices from the d2 texture manager, so it has to go first.
+    // The material manager needs to be able to pull correct internal indices from
+    // the d2 texture manager, so it has to go first.
     data_core.material_manager.ready(
         &renderer.device,
         &renderer.queue,

@@ -47,6 +47,8 @@ impl GenericShaderInterfaces {
     }
 }
 
+/// The input structure that the culling shaders/functions output and drawing
+/// shaders read.
 #[repr(C, align(16))]
 #[derive(Debug, Copy, Clone)]
 pub struct PerObjectDataAbi {
@@ -61,6 +63,8 @@ pub struct PerObjectDataAbi {
 unsafe impl bytemuck::Pod for PerObjectDataAbi {}
 unsafe impl bytemuck::Zeroable for PerObjectDataAbi {}
 
+/// Interface which has the object output buffer and the gpu material buffer --
+/// both specific to a material and hence an indirect draw
 pub struct PerMaterialInterfaces<M> {
     pub bgl: BindGroupLayout,
     _phantom: PhantomData<M>,

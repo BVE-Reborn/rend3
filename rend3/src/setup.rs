@@ -44,7 +44,8 @@ pub const OPTIONAL_FEATURES: Features = Features::from_bits_truncate(
         | Features::TIMESTAMP_QUERY.bits(),
 );
 
-/// Check that all required features for a given mode are present in the feature set given.
+/// Check that all required features for a given mode are present in the feature
+/// set given.
 pub fn check_features(mode: RendererMode, device: Features) -> Result<Features, RendererInitializationError> {
     let required = match mode {
         RendererMode::GPUPowered => GPU_REQUIRED_FEATURES,
@@ -145,7 +146,8 @@ fn check_limit_low(d: u32, r: u32, ty: LimitType) -> Result<u32, RendererInitial
     }
 }
 
-/// Check that all required limits for a given mode are present in the given limit set.
+/// Check that all required limits for a given mode are present in the given
+/// limit set.
 pub fn check_limits(mode: RendererMode, device_limits: &Limits) -> Result<Limits, RendererInitializationError> {
     let required_limits = match mode {
         RendererMode::GPUPowered => GPU_REQUIRED_LIMITS,
@@ -394,10 +396,12 @@ pub struct InstanceAdapterDevice {
     pub info: ExtendedAdapterInfo,
 }
 
-/// Creates an Instance/Adapter/Device/Queue using the given choices. Tries to get the best combination.
+/// Creates an Instance/Adapter/Device/Queue using the given choices. Tries to
+/// get the best combination.
 ///
-/// **NOTE:** Some adapters will not advertise all of its supported features. The `additional_features`
-/// parameter can be used to explicitly request additional features during device creation.
+/// **NOTE:** Some adapters will not advertise all of its supported features.
+/// The `additional_features` parameter can be used to explicitly request
+/// additional features during device creation.
 pub async fn create_iad(
     desired_backend: Option<Backend>,
     desired_device: Option<String>,
