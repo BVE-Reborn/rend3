@@ -1,18 +1,20 @@
 use rend3::{
     format_sso, types::Material, util::bind_merge::BindGroupBuilder, DataHandle, ModeData, RenderGraph, RendererMode,
 };
-use wgpu::Buffer;
+use wgpu::{BindGroup, Buffer};
 
-use crate::{
-    common::{PerMaterialInterfaces, Sorting},
-    CulledPerMaterial,
-};
+use crate::common::{PerMaterialInterfaces, Sorting};
 
 mod cpu;
 mod gpu;
 
 pub use cpu::*;
 pub use gpu::*;
+
+pub struct PerMaterialData {
+    pub inner: CulledObjectSet,
+    pub per_material: BindGroup,
+}
 
 pub struct CulledObjectSet {
     pub calls: ModeData<Vec<cpu::CpuDrawCall>, gpu::GpuIndirectData>,
@@ -23,7 +25,7 @@ pub struct CulledObjectSet {
 pub fn add_culling_to_graph<'node, M: Material>(
     graph: &mut RenderGraph<'node>,
     pre_cull_data: DataHandle<Buffer>,
-    culled: DataHandle<CulledPerMaterial>,
+    culled: DataHandle<PerMaterialData>,
     per_material: &'node PerMaterialInterfaces<M>,
     gpu_culler: &'node ModeData<(), gpu::GpuCuller>,
     shadow_index: Option<usize>,
@@ -74,7 +76,7 @@ pub fn add_culling_to_graph<'node, M: Material>(
 
         graph_data.set_data(
             cull_handle,
-            Some(CulledPerMaterial {
+            Some(PerMaterialData {
                 inner: culled_objects,
                 per_material: per_material_bg,
             }),

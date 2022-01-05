@@ -21,10 +21,9 @@ use wgpu::{
 
 use crate::{
     common::{mode_safe_shader, GenericShaderInterfaces, PerMaterialInterfaces},
-    culling,
+    culling::{self, PerMaterialData},
     pbr::PbrMaterial,
     vertex::{cpu_vertex_buffers, gpu_vertex_buffers},
-    CulledPerMaterial,
 };
 
 /// Trait for all materials that can use the built-in shadow/prepass rendering.
@@ -144,7 +143,7 @@ impl<M: DepthRenderableMaterial> DepthRoutine<M> {
         &'node self,
         graph: &mut RenderGraph<'node>,
         forward_uniform_bg: DataHandle<BindGroup>,
-        culled: DataHandle<CulledPerMaterial>,
+        culled: DataHandle<PerMaterialData>,
         samples: SampleCount,
         cutout: bool,
         color: RenderTargetHandle,
@@ -215,7 +214,7 @@ impl<M: DepthRenderableMaterial> DepthRoutine<M> {
         cutout: bool,
         shadow_index: usize,
         shadow_uniform_bg: DataHandle<BindGroup>,
-        culled: DataHandle<CulledPerMaterial>,
+        culled: DataHandle<PerMaterialData>,
     ) {
         let mut builder = graph.add_node(&*if cutout {
             format_sso!("Shadow Cutout S{}", shadow_index)

@@ -18,7 +18,6 @@ use crate::{
     depth::DepthRoutine,
     pbr::{PbrMaterial, TransparencyType},
     vertex::{cpu_vertex_buffers, gpu_vertex_buffers},
-    CulledPerMaterial,
 };
 
 /// Render routine that renders the using PBR materials and gpu based culling.
@@ -62,7 +61,7 @@ impl PbrRoutine {
         &'node self,
         graph: &mut RenderGraph<'node>,
         forward_uniform_bg: DataHandle<BindGroup>,
-        culled: DataHandle<CulledPerMaterial>,
+        culled: DataHandle<culling::PerMaterialData>,
         samples: SampleCount,
         transparency: TransparencyType,
         color: RenderTargetHandle,
