@@ -1,5 +1,5 @@
 use rend3::RendererMode;
-use wgpu::{Device, ShaderModule,ShaderModuleDescriptorSpirV};
+use wgpu::{Device, ShaderModule, ShaderModuleDescriptor};
 
 use crate::shaders::SPIRV_SHADERS;
 
@@ -26,8 +26,8 @@ pub unsafe fn mode_safe_shader(
         .unwrap()
         .contents();
 
-    device.create_shader_module_spirv(&ShaderModuleDescriptorSpirV {
+    device.create_shader_module(&ShaderModuleDescriptor {
         label: Some(label),
-        source: wgpu::util::make_spirv_raw(source),
+        source: wgpu::util::make_spirv(source),
     })
 }

@@ -23,5 +23,5 @@ ordered-float = "2"
 parking_lot = "0.11.2"
 profiling = {version = "1", default-features = false }
 rend3 = { version = "^0.2.0", path = "../rend3" }
-wgpu = "0.12"
+wgpu = { version = "0.12", features = ["spirv"] }
 wgpu-profiler = "0.8.0"
