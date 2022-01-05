@@ -5,7 +5,7 @@ use rend3::{
     types::{Handedness, SampleCount, Surface, TextureFormat},
     InstanceAdapterDevice, Renderer,
 };
-use rend3_routine::BaseRenderGraph;
+use rend3_routine::base::BaseRenderGraph;
 use wgpu::Instance;
 use winit::{
     dpi::PhysicalSize,

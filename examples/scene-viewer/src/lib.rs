@@ -10,7 +10,7 @@ use rend3::{
     Renderer, RendererMode,
 };
 use rend3_framework::{lock, AssetPath, Mutex};
-use rend3_routine::{pbr::NormalTextureYDirection, skybox::SkyboxRoutine, BaseRenderGraph};
+use rend3_routine::{base::BaseRenderGraph, pbr::NormalTextureYDirection, skybox::SkyboxRoutine};
 use std::{collections::HashMap, future::Future, hash::BuildHasher, path::Path, sync::Arc, time::Duration};
 use wgpu_profiler::GpuTimerScopeResult;
 use winit::{

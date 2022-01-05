@@ -42,7 +42,7 @@ pub struct ReadyData {
 #[derive(Debug, Clone)]
 pub struct RenderTargetDescriptor {
     pub label: Option<SsoString>,
-    pub dim: UVec2,
+    pub resolution: UVec2,
     pub samples: SampleCount,
     pub format: TextureFormat,
     pub usage: TextureUsages,
@@ -50,7 +50,7 @@ pub struct RenderTargetDescriptor {
 impl RenderTargetDescriptor {
     fn to_core(&self) -> RenderTargetCore {
         RenderTargetCore {
-            dim: self.dim,
+            resolution: self.resolution,
             samples: self.samples,
             format: self.format,
             usage: self.usage,
@@ -60,7 +60,7 @@ impl RenderTargetDescriptor {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub(crate) struct RenderTargetCore {
-    pub dim: UVec2,
+    pub resolution: UVec2,
     pub samples: SampleCount,
     pub format: TextureFormat,
     pub usage: TextureUsages,

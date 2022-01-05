@@ -29,8 +29,8 @@ impl GraphTextureStore {
         device.create_texture(&TextureDescriptor {
             label: None,
             size: Extent3d {
-                width: desc.dim.x,
-                height: desc.dim.y,
+                width: desc.resolution.x,
+                height: desc.resolution.y,
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,
