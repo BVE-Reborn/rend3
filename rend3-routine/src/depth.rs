@@ -95,7 +95,7 @@ impl<M: DepthRenderableMaterial> DepthRoutine<M> {
         let abi_bgl;
         let bg;
         if let Some(alpha) = M::ALPHA_CUTOUT {
-            let abi = if renderer.mode == RendererMode::GPUPowered {
+            let abi = if renderer.mode == RendererMode::GpuPowered {
                 let data_base_offset = round_up_pot(M::TEXTURE_COUNT * 4, 16);
                 let stride = data_base_offset + round_up_pot(M::DATA_SIZE, 16);
 
@@ -221,10 +221,10 @@ impl<M: DepthRenderableMaterial> DepthRoutine<M> {
             }
 
             match culled.inner.calls {
-                ModeData::CPU(ref draws) => {
+                ModeData::Cpu(ref draws) => {
                     culling::draw_cpu_powered::<M>(rpass, draws, graph_data.material_manager, 3)
                 }
-                ModeData::GPU(ref data) => {
+                ModeData::Gpu(ref data) => {
                     rpass.set_bind_group(3, ready.d2_texture.bg.as_gpu(), &[]);
                     culling::draw_gpu_powered(rpass, data);
                 }
@@ -281,10 +281,10 @@ impl<M: DepthRenderableMaterial> DepthRoutine<M> {
             }
 
             match culled.inner.calls {
-                ModeData::CPU(ref draws) => {
+                ModeData::Cpu(ref draws) => {
                     culling::draw_cpu_powered::<M>(rpass, draws, graph_data.material_manager, 3)
                 }
-                ModeData::GPU(ref data) => {
+                ModeData::Gpu(ref data) => {
                     rpass.set_bind_group(3, ready.d2_texture.bg.as_gpu(), &[]);
                     culling::draw_gpu_powered(rpass, data);
                 }
@@ -358,7 +358,7 @@ impl DepthPipelines {
         if let Some(abi_bgl) = abi_bgl {
             bgls.push(abi_bgl);
         }
-        if renderer.mode == RendererMode::GPUPowered {
+        if renderer.mode == RendererMode::GpuPowered {
             bgls.push(data_core.d2_texture_manager.gpu_bgl())
         } else {
             bgls.push(data_core.material_manager.get_bind_group_layout_cpu::<PbrMaterial>());
@@ -461,8 +461,8 @@ fn create_depth_inner(
             module: vert,
             entry_point: "main",
             buffers: match renderer.mode {
-                RendererMode::CPUPowered => &CPU_VERTEX_BUFFERS,
-                RendererMode::GPUPowered => &GPU_VERTEX_BUFFERS,
+                RendererMode::CpuPowered => &CPU_VERTEX_BUFFERS,
+                RendererMode::GpuPowered => &GPU_VERTEX_BUFFERS,
             },
         },
         primitive: PrimitiveState {

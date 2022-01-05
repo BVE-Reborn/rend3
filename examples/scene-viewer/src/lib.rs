@@ -138,8 +138,8 @@ fn extract_backend(value: &str) -> Result<Backend, &'static str> {
 
 fn extract_mode(value: &str) -> Result<rend3::RendererMode, &'static str> {
     Ok(match value.to_lowercase().as_str() {
-        "legacy" | "c" | "cpu" => rend3::RendererMode::CPUPowered,
-        "modern" | "g" | "gpu" => rend3::RendererMode::GPUPowered,
+        "legacy" | "c" | "cpu" => rend3::RendererMode::CpuPowered,
+        "modern" | "g" | "gpu" => rend3::RendererMode::GpuPowered,
         _ => return Err("unknown rendermode"),
     })
 }

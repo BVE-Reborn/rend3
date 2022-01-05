@@ -161,7 +161,7 @@ impl MaterialManager {
 
         let type_info = self.ensure_archetype_inner::<M>(device, mode);
 
-        let (bind_group, material_buffer) = if mode == RendererMode::CPUPowered {
+        let (bind_group, material_buffer) = if mode == RendererMode::CpuPowered {
             let mut textures = vec![None; M::TEXTURE_COUNT as usize];
             material.to_textures(&mut textures);
 
@@ -199,9 +199,9 @@ impl MaterialManager {
 
             let bind_group = builder.build(device, None, type_info.bgl.as_ref().as_cpu());
 
-            (ModeData::CPU(bind_group), ModeData::CPU(material_buffer))
+            (ModeData::Cpu(bind_group), ModeData::Cpu(material_buffer))
         } else {
-            (ModeData::GPU(()), ModeData::GPU(()))
+            (ModeData::Gpu(()), ModeData::Gpu(()))
         };
 
         InternalMaterial {
@@ -357,7 +357,7 @@ impl MaterialManager {
             }
         });
 
-        if let ModeData::GPU(ref mut buffer) = self.buffer {
+        if let ModeData::Gpu(ref mut buffer) = self.buffer {
             profiling::scope!("Update GPU Material Buffer");
             let mut translate_texture = texture_manager.translation_fn();
 
@@ -386,7 +386,7 @@ impl MaterialManager {
 
                 self.bg.insert(
                     ty,
-                    ModeData::GPU(BufferRange {
+                    ModeData::Gpu(BufferRange {
                         offset: offset as u64,
                         size: NonZeroU64::new(size as u64).unwrap(),
                     }),

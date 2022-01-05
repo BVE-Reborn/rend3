@@ -13,11 +13,12 @@ use wgpu::{
 };
 
 use crate::{
-    common::{mode_safe_shader, PerMaterialArchetypeInterface, WholeFrameInterfaces},
+    common::{
+        mode_safe_shader, PerMaterialArchetypeInterface, WholeFrameInterfaces, CPU_VERTEX_BUFFERS, GPU_VERTEX_BUFFERS,
+    },
     culling,
     depth::DepthRoutine,
     pbr::{PbrMaterial, TransparencyType},
-    common::{CPU_VERTEX_BUFFERS, GPU_VERTEX_BUFFERS},
 };
 
 /// Render routine that renders the using PBR materials and gpu based culling.
@@ -116,10 +117,10 @@ impl PbrRoutine {
             rpass.set_bind_group(1, &culled.per_material, &[]);
 
             match culled.inner.calls {
-                ModeData::CPU(ref draws) => {
+                ModeData::Cpu(ref draws) => {
                     culling::draw_cpu_powered::<PbrMaterial>(rpass, draws, graph_data.material_manager, 2)
                 }
-                ModeData::GPU(ref data) => {
+                ModeData::Gpu(ref data) => {
                     rpass.set_bind_group(2, ready.d2_texture.bg.as_gpu(), &[]);
                     culling::draw_gpu_powered(rpass, data);
                 }
@@ -169,7 +170,7 @@ impl PrimaryPipelines {
         let mut bgls: ArrayVec<&BindGroupLayout, 6> = ArrayVec::new();
         bgls.push(&interfaces.forward_uniform_bgl);
         bgls.push(&per_material.bgl);
-        if renderer.mode == RendererMode::GPUPowered {
+        if renderer.mode == RendererMode::GpuPowered {
             bgls.push(data_core.d2_texture_manager.gpu_bgl())
         } else {
             bgls.push(data_core.material_manager.get_bind_group_layout_cpu::<PbrMaterial>());
@@ -211,7 +212,6 @@ fn build_forward_pass_inner(
     forward_pass_vert: &wgpu::ShaderModule,
     forward_pass_frag: &wgpu::ShaderModule,
 ) -> RenderPipeline {
-
     renderer.device.create_render_pipeline(&RenderPipelineDescriptor {
         label: Some(match transparency {
             TransparencyType::Opaque => "opaque pass",
@@ -223,8 +223,8 @@ fn build_forward_pass_inner(
             module: forward_pass_vert,
             entry_point: "main",
             buffers: match renderer.mode {
-                RendererMode::CPUPowered => &CPU_VERTEX_BUFFERS,
-                RendererMode::GPUPowered => &GPU_VERTEX_BUFFERS,
+                RendererMode::CpuPowered => &CPU_VERTEX_BUFFERS,
+                RendererMode::GpuPowered => &GPU_VERTEX_BUFFERS,
             },
         },
         primitive: PrimitiveState {

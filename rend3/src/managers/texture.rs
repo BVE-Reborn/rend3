@@ -108,7 +108,7 @@ impl TextureManager {
             views.swap_remove(index);
         });
 
-        if let ModeData::GPU(group_dirty) = self.group_dirty {
+        if let ModeData::Gpu(group_dirty) = self.group_dirty {
             profiling::scope!("Update GPU Texture Arrays");
 
             if group_dirty {
@@ -126,7 +126,7 @@ impl TextureManager {
                 bg: self.group.as_ref().map(|_| (), Arc::clone),
             }
         } else {
-            TextureManagerReadyOutput { bg: ModeData::CPU(()) }
+            TextureManagerReadyOutput { bg: ModeData::Cpu(()) }
         }
     }
 

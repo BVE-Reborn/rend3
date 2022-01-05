@@ -90,7 +90,7 @@ impl<M: Material> PerMaterialArchetypeInterface<M> {
             None,
         );
 
-        if mode == RendererMode::GPUPowered {
+        if mode == RendererMode::GpuPowered {
             MaterialManager::add_to_bgl_gpu::<M>(&mut per_material_bglb);
         }
 

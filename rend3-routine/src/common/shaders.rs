@@ -20,19 +20,19 @@ pub unsafe fn mode_safe_shader(
     gpu_source: &str,
 ) -> ShaderModule {
     let shader_dir = match mode {
-        RendererMode::CPUPowered => &WGSL_SHADERS,
-        RendererMode::GPUPowered => &SPIRV_SHADERS,
+        RendererMode::CpuPowered => &WGSL_SHADERS,
+        RendererMode::GpuPowered => &SPIRV_SHADERS,
     };
 
     let source = shader_dir
         .get_file(match mode {
-            RendererMode::CPUPowered => cpu_source,
-            RendererMode::GPUPowered => gpu_source,
+            RendererMode::CpuPowered => cpu_source,
+            RendererMode::GpuPowered => gpu_source,
         })
         .unwrap()
         .contents();
 
-    let use_unsafe = mode == RendererMode::GPUPowered;
+    let use_unsafe = mode == RendererMode::GpuPowered;
 
     match use_unsafe {
         false => device.create_shader_module(&ShaderModuleDescriptor {

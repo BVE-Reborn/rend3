@@ -63,7 +63,7 @@ pub fn cull_cpu<M: Material>(
     });
 
     CulledObjectSet {
-        calls: ModeData::CPU(calls),
+        calls: ModeData::Cpu(calls),
         output_buffer,
     }
 }

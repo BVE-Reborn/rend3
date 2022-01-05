@@ -390,7 +390,7 @@ impl GpuCuller {
         }
 
         CulledObjectSet {
-            calls: ModeData::GPU(GpuIndirectData { indirect_buffer, count }),
+            calls: ModeData::Gpu(GpuIndirectData { indirect_buffer, count }),
             output_buffer,
         }
     }

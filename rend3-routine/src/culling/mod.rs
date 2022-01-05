@@ -60,8 +60,8 @@ pub fn add_culling_to_graph<'node, M: Material>(
         };
 
         let culled_objects = match gpu_culler {
-            ModeData::CPU(_) => cpu::cull_cpu::<M>(&renderer.device, camera, graph_data.object_manager, sorting, key),
-            ModeData::GPU(ref gpu_culler) => gpu_culler.cull(
+            ModeData::Cpu(_) => cpu::cull_cpu::<M>(&renderer.device, camera, graph_data.object_manager, sorting, key),
+            ModeData::Gpu(ref gpu_culler) => gpu_culler.cull(
                 &renderer.device,
                 encoder,
                 camera,
@@ -74,7 +74,7 @@ pub fn add_culling_to_graph<'node, M: Material>(
         let mut per_material_bgb = BindGroupBuilder::new();
         per_material_bgb.append_buffer(&culled_objects.output_buffer);
 
-        if renderer.mode == RendererMode::GPUPowered {
+        if renderer.mode == RendererMode::GpuPowered {
             graph_data.material_manager.add_to_bg_gpu::<M>(&mut per_material_bgb);
         }
 
