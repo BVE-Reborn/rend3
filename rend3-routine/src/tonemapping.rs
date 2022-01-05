@@ -1,3 +1,14 @@
+//! Tonemapper which blits an image while applying a tonemapping operator.
+//!
+//! As of right now there is no tonemapping applied as we don't have
+//! auto-exposure yet. Once we have auto-exposure, we can do proper tonemapping,
+//! and will offer a variety of tonemapping operators.
+//!
+//! When creating the tonemapping, ensure you use the correct format for the
+//! output. Each TonemappingRoutine instance only has a single pipeline, so if
+//! you need to render to two different formats potentially, use two different
+//! routines.
+
 use std::borrow::Cow;
 
 use rend3::{
@@ -83,6 +94,9 @@ fn create_pipeline(
     })
 }
 
+/// HDR tonemapping routine.
+///
+/// See module for documentation.
 pub struct TonemappingRoutine {
     bgl: BindGroupLayout,
     pipeline: RenderPipeline,

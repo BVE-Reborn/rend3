@@ -1,3 +1,5 @@
+//! Builds and uploads the input to gpu culling.
+
 use rend3::{format_sso, types::Material, DataHandle, RenderGraph};
 use wgpu::Buffer;
 
@@ -6,6 +8,7 @@ use crate::{
     culling,
 };
 
+/// Uploads the input to gpu culling for the given material archetype.
 pub fn add_to_graph<'node, M: Material>(
     graph: &mut RenderGraph<'node>,
     key: u64,

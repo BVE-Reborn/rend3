@@ -94,7 +94,7 @@ fn main() {
     .unwrap();
 
     // Create the base rendergraph.
-    let base_rendergraph = rend3_routine::BaseRenderGraph::new(&renderer);
+    let base_rendergraph = rend3_routine::base::BaseRenderGraph::new(&renderer);
 
     let mut data_core = renderer.data_core.lock();
     let pbr_routine = rend3_routine::pbr::PbrRoutine::new(&renderer, &mut data_core, &base_rendergraph.interfaces);

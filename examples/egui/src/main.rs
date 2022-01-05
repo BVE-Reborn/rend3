@@ -126,7 +126,7 @@ impl rend3_framework::App for EguiExample {
         window: &winit::window::Window,
         renderer: &Arc<rend3::Renderer>,
         routines: &Arc<rend3_framework::DefaultRoutines>,
-        base_rendergraph: &rend3_routine::BaseRenderGraph,
+        base_rendergraph: &rend3_routine::base::BaseRenderGraph,
         surface: Option<&Arc<rend3::types::Surface>>,
         resolution: glam::UVec2,
         event: rend3_framework::Event<'_, ()>,

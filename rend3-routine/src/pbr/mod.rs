@@ -1,3 +1,4 @@
+//! Realism-focused PBR rendering routines and material.
 
 mod material;
 mod routine;

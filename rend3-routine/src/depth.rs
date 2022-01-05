@@ -25,10 +25,11 @@ use wgpu::{
 };
 
 use crate::{
-    common::{mode_safe_shader, PerMaterialArchetypeInterface, WholeFrameInterfaces},
+    common::{
+        mode_safe_shader, PerMaterialArchetypeInterface, WholeFrameInterfaces, CPU_VERTEX_BUFFERS, GPU_VERTEX_BUFFERS,
+    },
     culling::{self, PerMaterialArchetypeData},
     pbr::PbrMaterial,
-    vertex::{cpu_vertex_buffers, gpu_vertex_buffers},
 };
 
 /// Trait for all materials that can use the built-in shadow/prepass rendering.
@@ -453,8 +454,6 @@ fn create_depth_inner(
         blend: None,
         write_mask: ColorWrites::empty(),
     }];
-    let cpu_vertex_buffers = cpu_vertex_buffers();
-    let gpu_vertex_buffers = gpu_vertex_buffers();
     renderer.device.create_render_pipeline(&RenderPipelineDescriptor {
         label: Some(name),
         layout: Some(pll),
@@ -462,8 +461,8 @@ fn create_depth_inner(
             module: vert,
             entry_point: "main",
             buffers: match renderer.mode {
-                RendererMode::CPUPowered => &cpu_vertex_buffers,
-                RendererMode::GPUPowered => &gpu_vertex_buffers,
+                RendererMode::CPUPowered => &CPU_VERTEX_BUFFERS,
+                RendererMode::GPUPowered => &GPU_VERTEX_BUFFERS,
             },
         },
         primitive: PrimitiveState {

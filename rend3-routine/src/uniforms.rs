@@ -1,3 +1,6 @@
+//! Helpers for building the per-camera uniform data used for cameras and
+//! shadows.
+
 use glam::{Mat4, Vec4};
 use rend3::{
     managers::CameraManager,
@@ -9,8 +12,9 @@ use wgpu::{
     BindGroup, BufferUsages,
 };
 
-use crate::common::{WholeFrameInterfaces, Samplers};
+use crate::common::{Samplers, WholeFrameInterfaces};
 
+/// The actual structure passed to the shader.
 #[derive(Debug, Copy, Clone)]
 #[repr(C, align(16))]
 pub struct FrameUniforms {
@@ -24,6 +28,7 @@ pub struct FrameUniforms {
     pub ambient: Vec4,
 }
 impl FrameUniforms {
+    /// Use the given camera to generate these uniforms.
     pub fn new(camera: &CameraManager, ambient: Vec4) -> Self {
         profiling::scope!("create uniforms");
 
@@ -47,6 +52,7 @@ impl FrameUniforms {
 unsafe impl bytemuck::Zeroable for FrameUniforms {}
 unsafe impl bytemuck::Pod for FrameUniforms {}
 
+/// Add the creation of these uniforms to the graph.
 pub fn add_to_graph<'node>(
     graph: &mut RenderGraph<'node>,
     shadow_uniform_bg: DataHandle<BindGroup>,

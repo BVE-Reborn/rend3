@@ -13,11 +13,11 @@ use wgpu::{
 };
 
 use crate::{
-    common::{mode_safe_shader, WholeFrameInterfaces, PerMaterialArchetypeInterface},
+    common::{mode_safe_shader, PerMaterialArchetypeInterface, WholeFrameInterfaces},
     culling,
     depth::DepthRoutine,
     pbr::{PbrMaterial, TransparencyType},
-    vertex::{cpu_vertex_buffers, gpu_vertex_buffers},
+    common::{CPU_VERTEX_BUFFERS, GPU_VERTEX_BUFFERS},
 };
 
 /// Render routine that renders the using PBR materials and gpu based culling.
@@ -128,13 +128,14 @@ impl PbrRoutine {
     }
 }
 
+/// Set of all possible needed pipelines for the various materials.
 pub struct PrimaryPipelines {
-    forward_blend_s1: RenderPipeline,
-    forward_cutout_s1: RenderPipeline,
-    forward_opaque_s1: RenderPipeline,
-    forward_blend_s4: RenderPipeline,
-    forward_cutout_s4: RenderPipeline,
-    forward_opaque_s4: RenderPipeline,
+    pub forward_blend_s1: RenderPipeline,
+    pub forward_cutout_s1: RenderPipeline,
+    pub forward_opaque_s1: RenderPipeline,
+    pub forward_blend_s4: RenderPipeline,
+    pub forward_cutout_s4: RenderPipeline,
+    pub forward_opaque_s4: RenderPipeline,
 }
 impl PrimaryPipelines {
     pub fn new(
@@ -210,8 +211,6 @@ fn build_forward_pass_inner(
     forward_pass_vert: &wgpu::ShaderModule,
     forward_pass_frag: &wgpu::ShaderModule,
 ) -> RenderPipeline {
-    let cpu_vertex_buffers = cpu_vertex_buffers();
-    let gpu_vertex_buffers = gpu_vertex_buffers();
 
     renderer.device.create_render_pipeline(&RenderPipelineDescriptor {
         label: Some(match transparency {
@@ -224,8 +223,8 @@ fn build_forward_pass_inner(
             module: forward_pass_vert,
             entry_point: "main",
             buffers: match renderer.mode {
-                RendererMode::CPUPowered => &cpu_vertex_buffers,
-                RendererMode::GPUPowered => &gpu_vertex_buffers,
+                RendererMode::CPUPowered => &CPU_VERTEX_BUFFERS,
+                RendererMode::GPUPowered => &GPU_VERTEX_BUFFERS,
             },
         },
         primitive: PrimitiveState {

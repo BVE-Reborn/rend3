@@ -188,7 +188,7 @@ impl BaseRenderGraphIntermediateState {
         }
     }
 
-    /// Create all the uniforms the PBR shaders need.
+    /// Create all the uniforms all the shaders in this graph need.
     pub fn create_frame_uniforms<'node>(
         &self,
         graph: &mut RenderGraph<'node>,

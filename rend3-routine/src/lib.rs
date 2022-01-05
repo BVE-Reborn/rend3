@@ -26,4 +26,3 @@ pub mod shaders;
 pub mod skybox;
 pub mod tonemapping;
 pub mod uniforms;
-pub mod vertex;

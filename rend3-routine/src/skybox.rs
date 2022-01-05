@@ -1,3 +1,5 @@
+//! Routine that renders a cubemap as a skybox.
+
 use std::borrow::Cow;
 
 use rend3::{
@@ -15,11 +17,14 @@ use wgpu::{
 
 use crate::{common::WholeFrameInterfaces, shaders::WGSL_SHADERS};
 
-pub struct StoredSkybox {
+struct StoredSkybox {
     bg: Option<BindGroup>,
     handle: Option<TextureHandle>,
 }
 
+/// Skybox rendering routine.
+///
+/// See module for documentation.
 pub struct SkyboxRoutine {
     pipelines: SkyboxPipelines,
     bgl: BindGroupLayout,
@@ -27,6 +32,7 @@ pub struct SkyboxRoutine {
 }
 
 impl SkyboxRoutine {
+    /// Create the routine.
     pub fn new(renderer: &Renderer, interfaces: &WholeFrameInterfaces) -> Self {
         let bgl = BindGroupLayoutBuilder::new()
             .append(
@@ -49,11 +55,13 @@ impl SkyboxRoutine {
         }
     }
 
+    /// Set the current background texture. Bad things will happen if this isn't a cube texture.
     pub fn set_background_texture(&mut self, texture: Option<TextureHandle>) {
         self.current_skybox.handle = texture;
         self.current_skybox.bg = None;
     }
 
+    /// Update data if the background has changed since last frame.
     pub fn ready(&mut self, renderer: &Renderer) {
         let data_core = renderer.data_core.lock();
         let d2c_texture_manager = &data_core.d2c_texture_manager;
@@ -71,6 +79,7 @@ impl SkyboxRoutine {
         }
     }
 
+    /// Add rendering the skybox to the given rendergraph.
     pub fn add_to_graph<'node>(
         &'node self,
         graph: &mut RenderGraph<'node>,
@@ -123,9 +132,10 @@ impl SkyboxRoutine {
     }
 }
 
+/// Container for all needed skybox pipelines
 pub struct SkyboxPipelines {
-    pipeline_s1: RenderPipeline,
-    pipeline_s4: RenderPipeline,
+    pub pipeline_s1: RenderPipeline,
+    pub pipeline_s4: RenderPipeline,
 }
 impl SkyboxPipelines {
     pub fn new(renderer: &Renderer, interfaces: &WholeFrameInterfaces, bgl: &BindGroupLayout) -> Self {
