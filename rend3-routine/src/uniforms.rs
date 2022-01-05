@@ -9,7 +9,7 @@ use wgpu::{
     BindGroup, BufferUsages,
 };
 
-use crate::common::{GenericShaderInterfaces, Samplers};
+use crate::common::{WholeFrameInterfaces, Samplers};
 
 #[derive(Debug, Copy, Clone)]
 #[repr(C, align(16))]
@@ -51,7 +51,7 @@ pub fn add_to_graph<'node>(
     graph: &mut RenderGraph<'node>,
     shadow_uniform_bg: DataHandle<BindGroup>,
     forward_uniform_bg: DataHandle<BindGroup>,
-    interfaces: &'node GenericShaderInterfaces,
+    interfaces: &'node WholeFrameInterfaces,
     samplers: &'node Samplers,
     ambient: Vec4,
 ) {

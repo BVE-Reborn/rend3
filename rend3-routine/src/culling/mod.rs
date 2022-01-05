@@ -1,9 +1,11 @@
+//! Material agnostic culling on either the CPU or GPU.
+
 use rend3::{
     format_sso, types::Material, util::bind_merge::BindGroupBuilder, DataHandle, ModeData, RenderGraph, RendererMode,
 };
 use wgpu::{BindGroup, Buffer};
 
-use crate::common::{PerMaterialInterfaces, Sorting};
+use crate::common::{PerMaterialArchetypeInterface, Sorting};
 
 mod cpu;
 mod gpu;
@@ -11,22 +13,27 @@ mod gpu;
 pub use cpu::*;
 pub use gpu::*;
 
-pub struct PerMaterialData {
+/// Handles to the data that corresponds with a single material archetype.
+pub struct PerMaterialArchetypeData {
     pub inner: CulledObjectSet,
     pub per_material: BindGroup,
 }
 
+/// A set of objects that have been called. Contains the information needed to
+/// dispatch a render.
 pub struct CulledObjectSet {
     pub calls: ModeData<Vec<cpu::CpuDrawCall>, gpu::GpuIndirectData>,
     pub output_buffer: Buffer,
 }
 
+/// Add the mode-approprate culling for the given material archetype to the
+/// graph.
 #[allow(clippy::too_many_arguments)]
 pub fn add_culling_to_graph<'node, M: Material>(
     graph: &mut RenderGraph<'node>,
     pre_cull_data: DataHandle<Buffer>,
-    culled: DataHandle<PerMaterialData>,
-    per_material: &'node PerMaterialInterfaces<M>,
+    culled: DataHandle<PerMaterialArchetypeData>,
+    per_material: &'node PerMaterialArchetypeInterface<M>,
     gpu_culler: &'node ModeData<(), gpu::GpuCuller>,
     shadow_index: Option<usize>,
     key: u64,
@@ -54,15 +61,14 @@ pub fn add_culling_to_graph<'node, M: Material>(
 
         let culled_objects = match gpu_culler {
             ModeData::CPU(_) => cpu::cull_cpu::<M>(&renderer.device, camera, graph_data.object_manager, sorting, key),
-            ModeData::GPU(ref gpu_culler) => gpu_culler.cull(gpu::GpuCullerCullArgs {
-                device: &renderer.device,
+            ModeData::GPU(ref gpu_culler) => gpu_culler.cull(
+                &renderer.device,
                 encoder,
                 camera,
-                input_buffer: culling_input.into_gpu(),
-                input_count: count,
+                culling_input.into_gpu(),
+                count,
                 sorting,
-                key,
-            }),
+            ),
         };
 
         let mut per_material_bgb = BindGroupBuilder::new();
@@ -76,7 +82,7 @@ pub fn add_culling_to_graph<'node, M: Material>(
 
         graph_data.set_data(
             cull_handle,
-            Some(PerMaterialData {
+            Some(PerMaterialArchetypeData {
                 inner: culled_objects,
                 per_material: per_material_bg,
             }),

@@ -20,13 +20,7 @@ pub mod base;
 pub mod common;
 pub mod culling;
 pub mod depth;
-pub mod pbr {
-    mod material;
-    mod routine;
-
-    pub use material::*;
-    pub use routine::*;
-}
+pub mod pbr;
 pub mod pre_cull;
 pub mod shaders;
 pub mod skybox;

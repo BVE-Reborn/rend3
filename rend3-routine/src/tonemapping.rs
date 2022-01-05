@@ -11,11 +11,11 @@ use wgpu::{
     TextureViewDimension, VertexState,
 };
 
-use crate::{common::GenericShaderInterfaces, shaders::WGSL_SHADERS};
+use crate::{common::WholeFrameInterfaces, shaders::WGSL_SHADERS};
 
 fn create_pipeline(
     device: &Device,
-    interfaces: &GenericShaderInterfaces,
+    interfaces: &WholeFrameInterfaces,
     bgl: &BindGroupLayout,
     output_format: TextureFormat,
 ) -> RenderPipeline {
@@ -89,7 +89,7 @@ pub struct TonemappingRoutine {
 }
 
 impl TonemappingRoutine {
-    pub fn new(renderer: &Renderer, interfaces: &GenericShaderInterfaces, output_format: TextureFormat) -> Self {
+    pub fn new(renderer: &Renderer, interfaces: &WholeFrameInterfaces, output_format: TextureFormat) -> Self {
         let bgl = BindGroupLayoutBuilder::new()
             .append(
                 ShaderStages::FRAGMENT,

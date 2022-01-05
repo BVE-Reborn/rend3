@@ -11,12 +11,19 @@ use wgpu::{BindGroupLayout, BindingType, BufferBindingType, Device, ShaderStages
 
 use crate::{common::samplers::Samplers, uniforms::FrameUniforms};
 
-pub struct GenericShaderInterfaces {
+/// Interfaces which are used throughout the whole frame.
+///
+/// Contains the samplers, per frame uniforms, and directional light
+/// information.
+pub struct WholeFrameInterfaces {
+    /// Includes everything excluding the directional light information to
+    /// prevent cycles when rendering to shadow maps.
     pub depth_uniform_bgl: BindGroupLayout,
+    /// Includes everything.
     pub forward_uniform_bgl: BindGroupLayout,
 }
 
-impl GenericShaderInterfaces {
+impl WholeFrameInterfaces {
     pub fn new(device: &Device) -> Self {
         profiling::scope!("ShaderInterfaces::new");
 
@@ -63,13 +70,13 @@ pub struct PerObjectDataAbi {
 unsafe impl bytemuck::Pod for PerObjectDataAbi {}
 unsafe impl bytemuck::Zeroable for PerObjectDataAbi {}
 
-/// Interface which has the object output buffer and the gpu material buffer --
-/// both specific to a material and hence an indirect draw
-pub struct PerMaterialInterfaces<M> {
+/// Interface which has all per-material-archetype data: the object output
+/// buffer and the gpu material buffer.
+pub struct PerMaterialArchetypeInterface<M> {
     pub bgl: BindGroupLayout,
     _phantom: PhantomData<M>,
 }
-impl<M: Material> PerMaterialInterfaces<M> {
+impl<M: Material> PerMaterialArchetypeInterface<M> {
     pub fn new(device: &Device, mode: RendererMode) -> Self {
         let mut per_material_bglb = BindGroupLayoutBuilder::new();
 

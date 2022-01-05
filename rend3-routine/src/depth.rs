@@ -1,3 +1,8 @@
+//! Material agnostic depth rendering. Shadows or a prepass.
+//!
+//! Any material that implements [`DepthRenderableMaterial`] will be able to use
+//! this routine to render their shadows or a depth prepass.
+
 use std::{marker::PhantomData, mem, num::NonZeroU64};
 
 use arrayvec::ArrayVec;
@@ -20,13 +25,16 @@ use wgpu::{
 };
 
 use crate::{
-    common::{mode_safe_shader, GenericShaderInterfaces, PerMaterialInterfaces},
-    culling::{self, PerMaterialData},
+    common::{mode_safe_shader, PerMaterialArchetypeInterface, WholeFrameInterfaces},
+    culling::{self, PerMaterialArchetypeData},
     pbr::PbrMaterial,
     vertex::{cpu_vertex_buffers, gpu_vertex_buffers},
 };
 
 /// Trait for all materials that can use the built-in shadow/prepass rendering.
+///
+/// When implementing this trait it is recommended to write a test using
+/// [`bytemuck::offset_of`] to validate your offsets are correct.
 pub trait DepthRenderableMaterial: Material {
     /// If Some it is possible to do alpha cutouts
     const ALPHA_CUTOUT: Option<AlphaCutoutSpec>;
@@ -48,17 +56,27 @@ pub struct AlphaCutoutSpec {
 #[derive(Debug, Copy, Clone)]
 #[repr(C)]
 struct AlphaDataAbi {
-    stride: u32,              // Stride in offset into a float array (i.e. byte index / 4). Unused in CPU mode.
-    texture_offset: u32,      /* Must be zero in gpu mode. In cpu mode, it's the index into the material data with
-                               * the texture enable bitflag. */
-    cutoff_offset: u32,       // Stride in offset into a float array  (i.e. byte index / 4)
-    uv_transform_offset: u32, /* Stride in offset into a float array pointing to a mat3 with the uv transform (i.e.
-                               * byte index / 4). 0xFFFFFFFF represents "no transform" */
+    // Stride in offset into a float array (i.e. byte index / 4). Unused in CPU mode.
+    stride: u32,
+    // Must be zero in gpu mode. In cpu mode, it's the index into the material data with the texture enable bitflag.
+    texture_offset: u32,
+    // Stride in offset into a float array  (i.e. byte index / 4)
+    cutoff_offset: u32,
+    // Stride in offset into a float array pointing to a mat3 with the uv transform (i.e. byte index / 4). 0xFFFFFFFF
+    // represents "no transform"
+    uv_transform_offset: u32,
 }
 
 unsafe impl bytemuck::Pod for AlphaDataAbi {}
 unsafe impl bytemuck::Zeroable for AlphaDataAbi {}
 
+/// Depth rendering routine.
+///
+/// To use this with your material, call [`DepthRoutine::new`] for every
+/// Material.
+///
+/// Call the appropriate add-to-graph function for each archetype with the
+/// proper settings set for that archetype.
 pub struct DepthRoutine<M> {
     pipelines: DepthPipelines,
     bg: Option<BindGroup>,
@@ -69,8 +87,8 @@ impl<M: DepthRenderableMaterial> DepthRoutine<M> {
     pub fn new(
         renderer: &Renderer,
         data_core: &RendererDataCore,
-        interfaces: &GenericShaderInterfaces,
-        per_material: &PerMaterialInterfaces<M>,
+        interfaces: &WholeFrameInterfaces,
+        per_material: &PerMaterialArchetypeInterface<M>,
         unclipped_depth_supported: bool,
     ) -> Self {
         let abi_bgl;
@@ -148,7 +166,7 @@ impl<M: DepthRenderableMaterial> DepthRoutine<M> {
         &'node self,
         graph: &mut RenderGraph<'node>,
         forward_uniform_bg: DataHandle<BindGroup>,
-        culled: DataHandle<PerMaterialData>,
+        culled: DataHandle<PerMaterialArchetypeData>,
         samples: SampleCount,
         cutout: bool,
         color: RenderTargetHandle,
@@ -219,7 +237,7 @@ impl<M: DepthRenderableMaterial> DepthRoutine<M> {
         cutout: bool,
         shadow_index: usize,
         shadow_uniform_bg: DataHandle<BindGroup>,
-        culled: DataHandle<PerMaterialData>,
+        culled: DataHandle<PerMaterialArchetypeData>,
     ) {
         let mut builder = graph.add_node(&*if cutout {
             format_sso!("Shadow Cutout S{}", shadow_index)
@@ -274,12 +292,17 @@ impl<M: DepthRenderableMaterial> DepthRoutine<M> {
     }
 }
 
+/// Type of depth pass being done. Determines pipeline settings
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DepthPassType {
+    /// Should have shadow acne compensation, front-face culling, and no color
+    /// state.
     Shadow,
+    /// Should have unused color state and back-face culling.
     Prepass,
 }
 
+/// Set of all possible needed pipelines for a material.
 pub struct DepthPipelines {
     pub shadow_opaque_s1: RenderPipeline,
     pub shadow_cutout_s1: Option<RenderPipeline>,
@@ -292,7 +315,7 @@ impl DepthPipelines {
     pub fn new(
         renderer: &Renderer,
         data_core: &RendererDataCore,
-        interfaces: &GenericShaderInterfaces,
+        interfaces: &WholeFrameInterfaces,
         per_material_bgl: &BindGroupLayout,
         abi_bgl: Option<&BindGroupLayout>,
         unclipped_depth_supported: bool,

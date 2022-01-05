@@ -13,7 +13,7 @@ use wgpu::{
 };
 
 use crate::{
-    common::{mode_safe_shader, GenericShaderInterfaces, PerMaterialInterfaces},
+    common::{mode_safe_shader, WholeFrameInterfaces, PerMaterialArchetypeInterface},
     culling,
     depth::DepthRoutine,
     pbr::{PbrMaterial, TransparencyType},
@@ -24,11 +24,11 @@ use crate::{
 pub struct PbrRoutine {
     pub primary_passes: PrimaryPipelines,
     pub depth_pipelines: DepthRoutine<PbrMaterial>,
-    pub per_material: PerMaterialInterfaces<PbrMaterial>,
+    pub per_material: PerMaterialArchetypeInterface<PbrMaterial>,
 }
 
 impl PbrRoutine {
-    pub fn new(renderer: &Renderer, data_core: &mut RendererDataCore, interfaces: &GenericShaderInterfaces) -> Self {
+    pub fn new(renderer: &Renderer, data_core: &mut RendererDataCore, interfaces: &WholeFrameInterfaces) -> Self {
         profiling::scope!("PbrRenderRoutine::new");
 
         data_core
@@ -37,7 +37,7 @@ impl PbrRoutine {
 
         let unclipped_depth_supported = renderer.features.contains(Features::DEPTH_CLIP_CONTROL);
 
-        let per_material = PerMaterialInterfaces::<PbrMaterial>::new(&renderer.device, renderer.mode);
+        let per_material = PerMaterialArchetypeInterface::<PbrMaterial>::new(&renderer.device, renderer.mode);
 
         let depth_pipelines = DepthRoutine::<PbrMaterial>::new(
             renderer,
@@ -61,7 +61,7 @@ impl PbrRoutine {
         &'node self,
         graph: &mut RenderGraph<'node>,
         forward_uniform_bg: DataHandle<BindGroup>,
-        culled: DataHandle<culling::PerMaterialData>,
+        culled: DataHandle<culling::PerMaterialArchetypeData>,
         samples: SampleCount,
         transparency: TransparencyType,
         color: RenderTargetHandle,
@@ -140,8 +140,8 @@ impl PrimaryPipelines {
     pub fn new(
         renderer: &Renderer,
         data_core: &mut RendererDataCore,
-        interfaces: &GenericShaderInterfaces,
-        per_material: &PerMaterialInterfaces<PbrMaterial>,
+        interfaces: &WholeFrameInterfaces,
+        per_material: &PerMaterialArchetypeInterface<PbrMaterial>,
     ) -> Self {
         profiling::scope!("PrimaryPasses::new");
 

@@ -13,7 +13,7 @@ use wgpu::{
     ShaderStages, StencilState, TextureFormat, TextureSampleType, TextureViewDimension, VertexState,
 };
 
-use crate::{common::GenericShaderInterfaces, shaders::WGSL_SHADERS};
+use crate::{common::WholeFrameInterfaces, shaders::WGSL_SHADERS};
 
 pub struct StoredSkybox {
     bg: Option<BindGroup>,
@@ -27,7 +27,7 @@ pub struct SkyboxRoutine {
 }
 
 impl SkyboxRoutine {
-    pub fn new(renderer: &Renderer, interfaces: &GenericShaderInterfaces) -> Self {
+    pub fn new(renderer: &Renderer, interfaces: &WholeFrameInterfaces) -> Self {
         let bgl = BindGroupLayoutBuilder::new()
             .append(
                 ShaderStages::FRAGMENT,
@@ -128,7 +128,7 @@ pub struct SkyboxPipelines {
     pipeline_s4: RenderPipeline,
 }
 impl SkyboxPipelines {
-    pub fn new(renderer: &Renderer, interfaces: &GenericShaderInterfaces, bgl: &BindGroupLayout) -> Self {
+    pub fn new(renderer: &Renderer, interfaces: &WholeFrameInterfaces, bgl: &BindGroupLayout) -> Self {
         profiling::scope!("build skybox pipeline");
         let skybox_pass_vert = renderer.device.create_shader_module(&ShaderModuleDescriptor {
             label: Some("skybox vert"),

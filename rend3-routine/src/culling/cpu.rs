@@ -15,6 +15,7 @@ use crate::{
     culling::CulledObjectSet,
 };
 
+/// All the information needed to dispatch a CPU draw call.
 #[derive(Debug, Clone)]
 pub struct CpuDrawCall {
     pub start_idx: u32,
@@ -23,6 +24,7 @@ pub struct CpuDrawCall {
     pub material_index: u32,
 }
 
+/// Do all object culling on the CPU and upload the per-object data to the GPU.
 pub fn cull_cpu<M: Material>(
     device: &Device,
     camera: &CameraManager,
@@ -113,6 +115,9 @@ fn cull_internal(
     (outputs, calls)
 }
 
+/// Draw the given cpu draw calls.
+///
+/// No-op if there are 0 objects.
 pub fn draw_cpu_powered<'rpass, M: Material>(
     rpass: &mut RenderPass<'rpass>,
     draws: &'rpass [CpuDrawCall],
