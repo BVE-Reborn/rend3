@@ -88,10 +88,13 @@ impl BaseRenderGraph {
 
         // Depth-only rendering
         state.pbr_shadow_rendering(graph, pbr);
-        state.pbr_forward_rendering(graph, pbr, samples);
+        state.pbr_prepass_rendering(graph, pbr, samples);
 
         // Skybox
         state.skybox(graph, skybox, samples);
+
+        // Forward rendering
+        state.pbr_forward_rendering(graph, pbr, samples);
 
         // Make the reference to the surface
         let surface = graph.add_surface_texture();
