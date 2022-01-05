@@ -67,10 +67,12 @@ fn main() {
 
     let window_size = window.inner_size();
 
-    // Create the Instance, Adapter, and Device. We can specify preferred backend, device name, or rendering mode. In this case we let rend3 choose for us.
+    // Create the Instance, Adapter, and Device. We can specify preferred backend,
+    // device name, or rendering mode. In this case we let rend3 choose for us.
     let iad = pollster::block_on(rend3::create_iad(None, None, None, None)).unwrap();
 
-    // The one line of unsafe needed. We just need to guarentee that the window outlives the use of the surface.
+    // The one line of unsafe needed. We just need to guarentee that the window
+    // outlives the use of the surface.
     let surface = Arc::new(unsafe { iad.instance.create_surface(&window) });
     // Get the preferred format for the surface.
     let format = surface.get_preferred_format(&iad.adapter).unwrap();
@@ -91,27 +93,28 @@ fn main() {
     )
     .unwrap();
 
-    // Create the pbr pipeline with the same internal resolution and 4x multisampling
-    let render_texture_options = rend3_routine::RenderTextureOptions {
-        resolution: glam::UVec2::new(window_size.width, window_size.height),
-        samples: rend3::types::SampleCount::One,
-    };
-    let mut pbr_routine = rend3_routine::PbrRenderRoutine::new(&renderer, render_texture_options);
-    let mut tonemapping_routine =
-        rend3_routine::TonemappingRoutine::new(&renderer, render_texture_options.resolution, format);
+    // Create the base rendergraph.
+    let base_rendergraph = rend3_routine::base::BaseRenderGraph::new(&renderer);
+
+    let mut data_core = renderer.data_core.lock();
+    let pbr_routine = rend3_routine::pbr::PbrRoutine::new(&renderer, &mut data_core, &base_rendergraph.interfaces);
+    drop(data_core);
+    let tonemapping_routine =
+        rend3_routine::tonemapping::TonemappingRoutine::new(&renderer, &base_rendergraph.interfaces, format);
 
     // Create mesh and calculate smooth normals based on vertices
     let mesh = create_mesh();
 
     // Add mesh to renderer's world.
     //
-    // All handles are refcounted, so we only need to hang onto the handle until we make an object.
+    // All handles are refcounted, so we only need to hang onto the handle until we
+    // make an object.
     let mesh_handle = renderer.add_mesh(mesh);
 
     // Add PBR material with all defaults except a single color.
-    let material = rend3_routine::material::PbrMaterial {
-        albedo: rend3_routine::material::AlbedoComponent::Value(glam::Vec4::new(0.0, 0.5, 0.5, 1.0)),
-        ..rend3_routine::material::PbrMaterial::default()
+    let material = rend3_routine::pbr::PbrMaterial {
+        albedo: rend3_routine::pbr::AlbedoComponent::Value(glam::Vec4::new(0.0, 0.5, 0.5, 1.0)),
+        ..rend3_routine::pbr::PbrMaterial::default()
     };
     let material_handle = renderer.add_material(material);
 
@@ -148,6 +151,8 @@ fn main() {
         distance: 400.0,
     });
 
+    let mut resolution = glam::UVec2::new(window_size.width, window_size.height);
+
     event_loop.run(move |event, _, control| match event {
         // Close button was clicked, we should close.
         winit::event::Event::WindowEvent {
@@ -158,29 +163,20 @@ fn main() {
         }
         // Window was resized, need to resize renderer.
         winit::event::Event::WindowEvent {
-            event: winit::event::WindowEvent::Resized(size),
+            event: winit::event::WindowEvent::Resized(physical_size),
             ..
         } => {
-            let size = glam::UVec2::new(size.width, size.height);
+            resolution = glam::UVec2::new(physical_size.width, physical_size.height);
             // Reconfigure the surface for the new size.
             rend3::configure_surface(
                 &surface,
                 &renderer.device,
                 format,
-                glam::UVec2::new(size.x, size.y),
+                glam::UVec2::new(resolution.x, resolution.y),
                 rend3::types::PresentMode::Mailbox,
             );
             // Tell the renderer about the new aspect ratio.
-            renderer.set_aspect_ratio(size.x as f32 / size.y as f32);
-            // Resize the internal buffers to the same size as the screen.
-            pbr_routine.resize(
-                &renderer,
-                rend3_routine::RenderTextureOptions {
-                    resolution: size,
-                    samples: rend3::types::SampleCount::One,
-                },
-            );
-            tonemapping_routine.resize(size);
+            renderer.set_aspect_ratio(resolution.x as f32 / resolution.y as f32);
         }
         // Render!
         winit::event::Event::MainEventsCleared => {
@@ -195,13 +191,15 @@ fn main() {
             let mut graph = rend3::RenderGraph::new();
 
             // Add the default rendergraph without a skybox
-            rend3_routine::add_default_rendergraph(
+            base_rendergraph.add_to_graph(
                 &mut graph,
                 &ready,
                 &pbr_routine,
                 None,
                 &tonemapping_routine,
+                resolution,
                 rend3::types::SampleCount::One,
+                glam::Vec4::ZERO,
             );
 
             // Dispatch a render using the built up rendergraph!

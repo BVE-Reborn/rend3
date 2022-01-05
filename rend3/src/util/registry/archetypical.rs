@@ -1,11 +1,4 @@
-use std::{
-    hash::Hash,
-    marker::PhantomData,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Weak,
-    },
-};
+use std::{hash::Hash, marker::PhantomData, sync::Weak};
 
 use rend3_types::{RawResourceHandle, ResourceHandle};
 
@@ -38,7 +31,6 @@ struct HandleData<K> {
 pub struct ArchetypicalRegistry<K, V, HandleType> {
     archetype_map: FastHashMap<K, ArchetypeStorage<V>>,
     handle_info: FastHashMap<usize, HandleData<K>>,
-    current_idx: AtomicUsize,
     _phantom: PhantomData<HandleType>,
 }
 impl<K, V, HandleType> ArchetypicalRegistry<K, V, HandleType>
@@ -49,15 +41,8 @@ where
         Self {
             archetype_map: FastHashMap::default(),
             handle_info: FastHashMap::default(),
-            current_idx: AtomicUsize::new(0),
             _phantom: PhantomData,
         }
-    }
-
-    pub fn allocate(&self) -> ResourceHandle<HandleType> {
-        let idx = self.current_idx.fetch_add(1, Ordering::Relaxed);
-
-        ResourceHandle::new(idx)
     }
 
     pub fn insert(&mut self, handle: &ResourceHandle<HandleType>, data: V, key: K) {
@@ -78,7 +63,8 @@ where
             let length = archetype.data.len();
             debug_assert_eq!(length, archetype.metadata.len());
             for idx in (0..length).rev() {
-                // SAFETY: We're iterating back to front, removing no more than once per time, so this is always valid.
+                // SAFETY: We're iterating back to front, removing no more than once per time,
+                // so this is always valid.
                 let metadata = unsafe { archetype.metadata.get_unchecked(idx) };
                 if metadata.refcount.strong_count() == 0 {
                     let data = archetype.data.swap_remove(idx);
@@ -104,7 +90,8 @@ where
         let data = old_archetype.data.swap_remove(old_index);
         let metadata = old_archetype.metadata.swap_remove(old_index);
 
-        // If we swapped an element get its handle to update later. We can't update now as handle_info_ref is holding a &mut on self.handle_info
+        // If we swapped an element get its handle to update later. We can't update now
+        // as handle_info_ref is holding a &mut on self.handle_info
         let update_handle = old_archetype
             .metadata
             .get_mut(old_index)

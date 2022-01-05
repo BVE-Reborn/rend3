@@ -42,7 +42,7 @@ pub struct ReadyData {
 #[derive(Debug, Clone)]
 pub struct RenderTargetDescriptor {
     pub label: Option<SsoString>,
-    pub dim: UVec2,
+    pub resolution: UVec2,
     pub samples: SampleCount,
     pub format: TextureFormat,
     pub usage: TextureUsages,
@@ -50,7 +50,7 @@ pub struct RenderTargetDescriptor {
 impl RenderTargetDescriptor {
     fn to_core(&self) -> RenderTargetCore {
         RenderTargetCore {
-            dim: self.dim,
+            resolution: self.resolution,
             samples: self.samples,
             format: self.format,
             usage: self.usage,
@@ -60,7 +60,7 @@ impl RenderTargetDescriptor {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub(crate) struct RenderTargetCore {
-    pub dim: UVec2,
+    pub resolution: UVec2,
     pub samples: SampleCount,
     pub format: TextureFormat,
     pub usage: TextureUsages,
@@ -164,7 +164,8 @@ impl<'node> RenderGraph<'node> {
         let mut resource_spans = FastHashMap::<_, (usize, Option<usize>)>::default();
         {
             profiling::scope!("Resource Span Analysis");
-            // Iterate through all the nodes, tracking the index where they are first used, and the index where they are last used.
+            // Iterate through all the nodes, tracking the index where they are first used,
+            // and the index where they are last used.
             for (idx, node) in pruned_node_list.iter().enumerate() {
                 // Add or update the range for all inputs
                 for &input in &node.inputs {
@@ -183,12 +184,14 @@ impl<'node> RenderGraph<'node> {
             }
         }
 
-        // If the surface is used, we need treat it as if it has no end, as it will be "used" after the graph is done.
+        // If the surface is used, we need treat it as if it has no end, as it will be
+        // "used" after the graph is done.
         if let Some((_, surface_end)) = resource_spans.get_mut(&GraphResource::OutputTexture) {
             *surface_end = None;
         }
 
-        // For each node, record the list of textures whose spans start and the list of textures whose spans end.
+        // For each node, record the list of textures whose spans start and the list of
+        // textures whose spans end.
         let mut resource_changes = vec![(Vec::new(), Vec::new()); pruned_node_list.len()];
         {
             profiling::scope!("Compute Resource Span Deltas");
@@ -200,11 +203,16 @@ impl<'node> RenderGraph<'node> {
             }
         }
 
+        let mut data_core = renderer.data_core.lock();
+        let data_core = &mut *data_core;
+
         // Iterate through every node, allocating and deallocating textures as we go.
 
-        // Maps a texture description to any available textures. Will try to pull from here instead of making a new texture.
-        let mut graph_texture_store = renderer.graph_texture_store.lock();
-        // Mark all textures as unused, so the ones that are unused can be culled after this pass.
+        // Maps a texture description to any available textures. Will try to pull from
+        // here instead of making a new texture.
+        let graph_texture_store = &mut data_core.graph_texture_store;
+        // Mark all textures as unused, so the ones that are unused can be culled after
+        // this pass.
         graph_texture_store.mark_unused();
 
         // Stores the Texture while a texture is using it
@@ -260,7 +268,6 @@ impl<'node> RenderGraph<'node> {
         // All textures that were ever returned are marked as used, so anything in here
         // that wasn't ever returned, was unused throughout the whole graph.
         graph_texture_store.remove_unused();
-        drop(graph_texture_store);
 
         // Iterate through all nodes and describe the node when they _end_
         let mut renderpass_ends = Vec::with_capacity(16);
@@ -269,7 +276,8 @@ impl<'node> RenderGraph<'node> {
         {
             profiling::scope!("Renderpass Description");
             for (idx, node) in pruned_node_list.iter().enumerate() {
-                // We always assume the first node is incompatible so the codepaths below are consistent.
+                // We always assume the first node is incompatible so the codepaths below are
+                // consistent.
                 let previous = match idx.checked_sub(1) {
                     Some(prev) => pruned_node_list[prev].rpass.as_ref(),
                     None => {
@@ -292,16 +300,7 @@ impl<'node> RenderGraph<'node> {
 
         profiling::scope!("Run Nodes");
 
-        let mut profiler = renderer.profiler.lock();
-        let camera_manager = renderer.camera_manager.read();
-        let directional_light_manager = renderer.directional_light_manager.read();
-        let material_manager = renderer.material_manager.read();
-        let mesh_manager = renderer.mesh_manager.read();
-        let object_manager = renderer.object_manager.read();
-        let d2_texture_manager = renderer.d2_texture_manager.read();
-        let d2c_texture_manager = renderer.d2c_texture_manager.read();
-
-        let shadow_views = directional_light_manager.get_layer_views();
+        let shadow_views = data_core.directional_light_manager.get_layer_views();
 
         let output_cell = UnsafeCell::new(output);
         let encoder_cell = UnsafeCell::new(
@@ -317,15 +316,18 @@ impl<'node> RenderGraph<'node> {
         // Iterate through all the nodes and actually execute them.
         for (idx, mut node) in pruned_node_list.into_iter().enumerate() {
             if acquire_idx == Some(idx) {
-                // SAFETY: this drops the renderpass, letting us into everything it was borrowing.
+                // SAFETY: this drops the renderpass, letting us into everything it was
+                // borrowing.
                 rpass = None;
 
-                // SAFETY: the renderpass has died, so there are no outstanding immutible borrows of the structure, and all uses of the temporaries have died.
+                // SAFETY: the renderpass has died, so there are no outstanding immutible
+                // borrows of the structure, and all uses of the temporaries have died.
                 unsafe { (&mut *rpass_temps_cell.get()).clear() };
 
                 cmd_bufs.push(
                     mem::replace(
-                        // SAFETY: There are two things which borrow this encoder: the renderpass and the node's encoder reference. Both of these have died by this point.
+                        // SAFETY: There are two things which borrow this encoder: the renderpass and the node's
+                        // encoder reference. Both of these have died by this point.
                         unsafe { &mut *encoder_cell.get() },
                         renderer
                             .device
@@ -343,13 +345,15 @@ impl<'node> RenderGraph<'node> {
             }
 
             if !compatible[idx] {
-                // SAFETY: this drops the renderpass, letting us into everything it was borrowing when we make the new renderpass.
+                // SAFETY: this drops the renderpass, letting us into everything it was
+                // borrowing when we make the new renderpass.
                 rpass = None;
 
                 if let Some(ref desc) = node.rpass {
                     rpass = Some(Self::create_rpass_from_desc(
                         desc,
-                        // SAFETY: There are two things which borrow this encoder: the renderpass and the node's encoder reference. Both of these have died by this point.
+                        // SAFETY: There are two things which borrow this encoder: the renderpass and the node's
+                        // encoder reference. Both of these have died by this point.
                         unsafe { &mut *encoder_cell.get() },
                         idx,
                         renderpass_ends[next_rpass_idx],
@@ -366,36 +370,40 @@ impl<'node> RenderGraph<'node> {
             {
                 let store = RenderGraphDataStore {
                     texture_mapping: &active_views,
-                    shadow_coordinates: directional_light_manager.get_coords(),
-                    shadow_views: directional_light_manager.get_layer_views(),
+                    shadow_coordinates: data_core.directional_light_manager.get_coords(),
+                    shadow_views: data_core.directional_light_manager.get_layer_views(),
                     data: &self.data,
                     // SAFETY: This is only viewed mutably when no renderpass exists
                     output: unsafe { &*output_cell.get() }.as_view(),
 
-                    camera_manager: &camera_manager,
-                    directional_light_manager: &directional_light_manager,
-                    material_manager: &material_manager,
-                    mesh_manager: &mesh_manager,
-                    object_manager: &object_manager,
-                    d2_texture_manager: &d2_texture_manager,
-                    d2c_texture_manager: &d2c_texture_manager,
+                    camera_manager: &data_core.camera_manager,
+                    directional_light_manager: &data_core.directional_light_manager,
+                    material_manager: &data_core.material_manager,
+                    mesh_manager: &data_core.mesh_manager,
+                    object_manager: &data_core.object_manager,
+                    d2_texture_manager: &data_core.d2_texture_manager,
+                    d2c_texture_manager: &data_core.d2c_texture_manager,
                 };
 
                 let mut encoder_or_rpass = match rpass {
                     Some(ref mut rpass) => RenderGraphEncoderOrPassInner::RenderPass(rpass),
-                    // SAFETY: There is no active renderpass to borrow this. This reference lasts for the duration of the call to exec.
+                    // SAFETY: There is no active renderpass to borrow this. This reference lasts for the duration of
+                    // the call to exec.
                     None => RenderGraphEncoderOrPassInner::Encoder(unsafe { &mut *encoder_cell.get() }),
                 };
 
                 profiling::scope!(&node.label);
 
-                profiler.begin_scope(&node.label, &mut encoder_or_rpass, &renderer.device);
+                data_core
+                    .profiler
+                    .begin_scope(&node.label, &mut encoder_or_rpass, &renderer.device);
 
                 (node.exec)(
                     &mut node.passthrough,
                     renderer,
                     RenderGraphEncoderOrPass(encoder_or_rpass),
-                    // SAFETY: This borrow, and all the objects allocated from it, lasts as long as the renderpass, and isn't used mutably until after the rpass dies
+                    // SAFETY: This borrow, and all the objects allocated from it, lasts as long as the renderpass, and
+                    // isn't used mutably until after the rpass dies
                     unsafe { &*rpass_temps_cell.get() },
                     ready_output,
                     store,
@@ -403,37 +411,42 @@ impl<'node> RenderGraph<'node> {
 
                 let mut encoder_or_rpass = match rpass {
                     Some(ref mut rpass) => RenderGraphEncoderOrPassInner::RenderPass(rpass),
-                    // SAFETY: There is no active renderpass to borrow this. This reference lasts for the duration of the call to exec.
+                    // SAFETY: There is no active renderpass to borrow this. This reference lasts for the duration of
+                    // the call to exec.
                     None => RenderGraphEncoderOrPassInner::Encoder(unsafe { &mut *encoder_cell.get() }),
                 };
 
-                profiler.end_scope(&mut encoder_or_rpass);
+                data_core.profiler.end_scope(&mut encoder_or_rpass);
             }
         }
 
-        // SAFETY: We drop the renderpass to make sure we can access both encoder_cell and output_cell safely
+        // SAFETY: We drop the renderpass to make sure we can access both encoder_cell
+        // and output_cell safely
         drop(rpass);
 
-        // SAFETY: the renderpass has dropped, and so has all the uses of the data, and the immutable borrows of the allocator.
+        // SAFETY: the renderpass has dropped, and so has all the uses of the data, and
+        // the immutable borrows of the allocator.
         unsafe { (&mut *rpass_temps_cell.get()).clear() }
         drop(rpass_temps_cell);
 
-        // SAFETY: this is safe as we've dropped all renderpasses that possibly borrowed it
+        // SAFETY: this is safe as we've dropped all renderpasses that possibly borrowed
+        // it
         cmd_bufs.push(encoder_cell.into_inner().finish());
 
         let mut resolve_encoder = renderer.device.create_command_encoder(&CommandEncoderDescriptor {
             label: Some("profile resolve encoder"),
         });
-        profiler.resolve_queries(&mut resolve_encoder);
+        data_core.profiler.resolve_queries(&mut resolve_encoder);
         cmd_bufs.push(resolve_encoder.finish());
 
         renderer.queue.submit(cmd_bufs);
 
-        // SAFETY: this is safe as we've dropped all renderpasses that possibly borrowed it
+        // SAFETY: this is safe as we've dropped all renderpasses that possibly borrowed
+        // it
         output_cell.into_inner().present();
 
-        profiler.end_frame().unwrap();
-        profiler.process_finished_frame()
+        data_core.profiler.end_frame().unwrap();
+        data_core.profiler.process_finished_frame()
     }
 
     #[allow(clippy::too_many_arguments)]

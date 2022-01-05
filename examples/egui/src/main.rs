@@ -48,13 +48,14 @@ impl rend3_framework::App for EguiExample {
 
         // Add mesh to renderer's world.
         //
-        // All handles are refcounted, so we only need to hang onto the handle until we make an object.
+        // All handles are refcounted, so we only need to hang onto the handle until we
+        // make an object.
         let mesh_handle = renderer.add_mesh(mesh);
 
         // Add PBR material with all defaults except a single color.
-        let material = rend3_routine::material::PbrMaterial {
-            albedo: rend3_routine::material::AlbedoComponent::Value(glam::Vec4::new(0.0, 0.5, 0.5, 1.0)),
-            ..rend3_routine::material::PbrMaterial::default()
+        let material = rend3_routine::pbr::PbrMaterial {
+            albedo: rend3_routine::pbr::AlbedoComponent::Value(glam::Vec4::new(0.0, 0.5, 0.5, 1.0)),
+            ..rend3_routine::pbr::PbrMaterial::default()
         };
         let material_handle = renderer.add_material(material);
 
@@ -73,7 +74,8 @@ impl rend3_framework::App for EguiExample {
 
         let camera_pitch = std::f32::consts::FRAC_PI_4;
         let camera_yaw = -std::f32::consts::FRAC_PI_4;
-        // These values may seem arbitrary, but they center the camera on the cube in the scene
+        // These values may seem arbitrary, but they center the camera on the cube in
+        // the scene
         let camera_location = glam::Vec3A::new(5.0, 7.5, -5.0);
         let view = glam::Mat4::from_euler(glam::EulerRot::XYZ, -camera_pitch, -camera_yaw, 0.0);
         let view = view * glam::Mat4::from_translation((-camera_location).into());
@@ -124,7 +126,9 @@ impl rend3_framework::App for EguiExample {
         window: &winit::window::Window,
         renderer: &Arc<rend3::Renderer>,
         routines: &Arc<rend3_framework::DefaultRoutines>,
+        base_rendergraph: &rend3_routine::base::BaseRenderGraph,
         surface: Option<&Arc<rend3::types::Surface>>,
+        resolution: glam::UVec2,
         event: rend3_framework::Event<'_, ()>,
         control_flow: impl FnOnce(winit::event_loop::ControlFlow),
     ) {
@@ -145,15 +149,16 @@ impl rend3_framework::App for EguiExample {
                     if ui.color_edit_button_rgba_unmultiplied(&mut data.color).changed() {
                         renderer.update_material(
                             &data.material_handle.clone(),
-                            rend3_routine::material::PbrMaterial {
-                                albedo: rend3_routine::material::AlbedoComponent::Value(glam::Vec4::from(data.color)),
-                                ..rend3_routine::material::PbrMaterial::default()
+                            rend3_routine::pbr::PbrMaterial {
+                                albedo: rend3_routine::pbr::AlbedoComponent::Value(glam::Vec4::from(data.color)),
+                                ..rend3_routine::pbr::PbrMaterial::default()
                             },
                         );
                     }
                 });
 
-                // End the UI frame. Now let's draw the UI with our Backend, we could also handle the output here
+                // End the UI frame. Now let's draw the UI with our Backend, we could also
+                // handle the output here
                 let (_output, paint_commands) = data.platform.end_frame(Some(window));
                 let paint_jobs = data.platform.context().tessellate(paint_commands);
 
@@ -178,13 +183,15 @@ impl rend3_framework::App for EguiExample {
                 let mut graph = rend3::RenderGraph::new();
 
                 // Add the default rendergraph without a skybox
-                rend3_routine::add_default_rendergraph(
+                base_rendergraph.add_to_graph(
                     &mut graph,
                     &ready,
                     &pbr_routine,
                     None,
                     &tonemapping_routine,
+                    resolution,
                     SAMPLE_COUNT,
+                    glam::Vec4::ZERO,
                 );
 
                 // Add egui on top of all the other passes

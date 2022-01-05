@@ -44,11 +44,12 @@ pub const OPTIONAL_FEATURES: Features = Features::from_bits_truncate(
         | Features::TIMESTAMP_QUERY.bits(),
 );
 
-/// Check that all required features for a given mode are present in the feature set given.
+/// Check that all required features for a given mode are present in the feature
+/// set given.
 pub fn check_features(mode: RendererMode, device: Features) -> Result<Features, RendererInitializationError> {
     let required = match mode {
-        RendererMode::GPUPowered => GPU_REQUIRED_FEATURES,
-        RendererMode::CPUPowered => CPU_REQUIRED_FEATURES,
+        RendererMode::GpuPowered => GPU_REQUIRED_FEATURES,
+        RendererMode::CpuPowered => CPU_REQUIRED_FEATURES,
     };
     let optional = OPTIONAL_FEATURES & device;
     let missing = required - device;
@@ -145,11 +146,12 @@ fn check_limit_low(d: u32, r: u32, ty: LimitType) -> Result<u32, RendererInitial
     }
 }
 
-/// Check that all required limits for a given mode are present in the given limit set.
+/// Check that all required limits for a given mode are present in the given
+/// limit set.
 pub fn check_limits(mode: RendererMode, device_limits: &Limits) -> Result<Limits, RendererInitializationError> {
     let required_limits = match mode {
-        RendererMode::GPUPowered => GPU_REQUIRED_LIMITS,
-        RendererMode::CPUPowered => CPU_REQUIRED_LIMITS,
+        RendererMode::GpuPowered => GPU_REQUIRED_LIMITS,
+        RendererMode::CpuPowered => CPU_REQUIRED_LIMITS,
     };
 
     Ok(Limits {
@@ -309,16 +311,16 @@ impl<T> PotentialAdapter<T> {
     ) -> Result<Self, RendererInitializationError> {
         let info = ExtendedAdapterInfo::from(inner_info);
 
-        let mut features = check_features(RendererMode::GPUPowered, inner_features);
-        let mut limits = check_limits(RendererMode::GPUPowered, &inner_limits);
-        let mut mode = RendererMode::GPUPowered;
+        let mut features = check_features(RendererMode::GpuPowered, inner_features);
+        let mut limits = check_limits(RendererMode::GpuPowered, &inner_limits);
+        let mut mode = RendererMode::GpuPowered;
 
-        if (features.is_err() || limits.is_err() || desired_mode == Some(RendererMode::CPUPowered))
-            && desired_mode != Some(RendererMode::GPUPowered)
+        if (features.is_err() || limits.is_err() || desired_mode == Some(RendererMode::CpuPowered))
+            && desired_mode != Some(RendererMode::GpuPowered)
         {
-            features = check_features(RendererMode::CPUPowered, inner_features);
-            limits = check_limits(RendererMode::CPUPowered, &inner_limits);
-            mode = RendererMode::CPUPowered;
+            features = check_features(RendererMode::CpuPowered, inner_features);
+            limits = check_limits(RendererMode::CpuPowered, &inner_limits);
+            mode = RendererMode::CpuPowered;
         }
 
         Ok(PotentialAdapter {
@@ -394,10 +396,12 @@ pub struct InstanceAdapterDevice {
     pub info: ExtendedAdapterInfo,
 }
 
-/// Creates an Instance/Adapter/Device/Queue using the given choices. Tries to get the best combination.
+/// Creates an Instance/Adapter/Device/Queue using the given choices. Tries to
+/// get the best combination.
 ///
-/// **NOTE:** Some adapters will not advertise all of its supported features. The `additional_features`
-/// parameter can be used to explicitly request additional features during device creation.
+/// **NOTE:** Some adapters will not advertise all of its supported features.
+/// The `additional_features` parameter can be used to explicitly request
+/// additional features during device creation.
 pub async fn create_iad(
     desired_backend: Option<Backend>,
     desired_device: Option<String>,

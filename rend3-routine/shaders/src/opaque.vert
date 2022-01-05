@@ -35,7 +35,7 @@ layout(set = 1, binding = 1, std430) readonly buffer MaterialBuffer {
 };
 #endif
 #ifdef CPU_MODE
-layout(set = 2, binding = 10) uniform TextureData {
+layout(set = 2, binding = 0) readonly buffer TextureData {
     CPUMaterialData material;
 };
 #endif

@@ -5,8 +5,14 @@ use std::mem;
 use glam::{Mat3, Mat3A, Vec3, Vec4};
 use rend3::types::{Material, TextureHandle};
 
+use crate::{
+    common::Sorting,
+    depth::{AlphaCutoutSpec, DepthRenderableMaterial},
+};
+
 bitflags::bitflags! {
     /// Flags which shaders use to determine properties of a material
+    #[derive(Default)]
     pub struct MaterialFlags : u32 {
         const ALBEDO_ACTIVE =       0b0000_0000_0000_0001;
         const ALBEDO_BLEND =        0b0000_0000_0000_0010;
@@ -33,7 +39,8 @@ pub enum AlbedoComponent {
     None,
     /// Albedo color is the vertex value.
     Vertex {
-        /// Vertex should be converted from srgb -> linear before multiplication.
+        /// Vertex should be converted from srgb -> linear before
+        /// multiplication.
         srgb: bool,
     },
     /// Albedo color is the given value.
@@ -41,7 +48,8 @@ pub enum AlbedoComponent {
     /// Albedo color is the given value multiplied by the vertex color.
     ValueVertex {
         value: Vec4,
-        /// Vertex should be converted from srgb -> linear before multiplication.
+        /// Vertex should be converted from srgb -> linear before
+        /// multiplication.
         srgb: bool,
     },
     /// Albedo color is loaded from the given texture.
@@ -50,7 +58,8 @@ pub enum AlbedoComponent {
     /// by the vertex color.
     TextureVertex {
         texture: TextureHandle,
-        /// Vertex should be converted from srgb -> linear before multiplication.
+        /// Vertex should be converted from srgb -> linear before
+        /// multiplication.
         srgb: bool,
     },
     /// Albedo color is loaded from given texture, then multiplied
@@ -60,7 +69,8 @@ pub enum AlbedoComponent {
     /// by the vertex color and the given value.
     TextureVertexValue {
         texture: TextureHandle,
-        /// Vertex should be converted from srgb -> linear before multiplication.
+        /// Vertex should be converted from srgb -> linear before
+        /// multiplication.
         srgb: bool,
         value: Vec4,
     },
@@ -111,21 +121,19 @@ impl AlbedoComponent {
         )
     }
 
-    pub fn to_texture<Func, Out>(&self, func: Func) -> Option<Out>
-    where
-        Func: FnOnce(&TextureHandle) -> Out,
-    {
+    pub fn to_texture(&self) -> Option<&TextureHandle> {
         match *self {
             Self::None | Self::Vertex { .. } | Self::Value(_) | Self::ValueVertex { .. } => None,
             Self::Texture(ref texture)
             | Self::TextureVertex { ref texture, .. }
             | Self::TextureValue { ref texture, .. }
-            | Self::TextureVertexValue { ref texture, .. } => Some(func(texture)),
+            | Self::TextureVertexValue { ref texture, .. } => Some(texture),
         }
     }
 }
 
-/// Generic container for a component of a material that could either be from a texture or a fixed value.
+/// Generic container for a component of a material that could either be from a
+/// texture or a fixed value.
 #[derive(Debug, Clone)]
 pub enum MaterialComponent<T> {
     None,
@@ -152,13 +160,10 @@ impl<T: Copy> MaterialComponent<T> {
         matches!(*self, Self::Texture(..) | Self::TextureValue { .. })
     }
 
-    pub fn to_texture<Func, Out>(&self, func: Func) -> Option<Out>
-    where
-        Func: FnOnce(&TextureHandle) -> Out,
-    {
+    pub fn to_texture(&self) -> Option<&TextureHandle> {
         match *self {
             Self::None | Self::Value(_) => None,
-            Self::Texture(ref texture) | Self::TextureValue { ref texture, .. } => Some(func(texture)),
+            Self::Texture(ref texture) | Self::TextureValue { ref texture, .. } => Some(texture),
         }
     }
 }
@@ -187,8 +192,9 @@ pub enum NormalTexture {
     Tricomponent(TextureHandle, NormalTextureYDirection),
     /// Normal stored in RG values, third value should be reconstructed.
     Bicomponent(TextureHandle, NormalTextureYDirection),
-    /// Normal stored in Green and Alpha values, third value should be reconstructed.
-    /// This is useful for storing in BC3 or BC7 compressed textures.
+    /// Normal stored in Green and Alpha values, third value should be
+    /// reconstructed. This is useful for storing in BC3 or BC7 compressed
+    /// textures.
     BicomponentSwizzled(TextureHandle, NormalTextureYDirection),
 }
 impl Default for NormalTexture {
@@ -198,15 +204,12 @@ impl Default for NormalTexture {
 }
 
 impl NormalTexture {
-    pub fn to_texture<Func, Out>(&self, func: Func) -> Option<Out>
-    where
-        Func: FnOnce(&TextureHandle) -> Out,
-    {
+    pub fn to_texture(&self) -> Option<&TextureHandle> {
         match *self {
             Self::None => None,
             Self::Tricomponent(ref texture, _)
             | Self::Bicomponent(ref texture, _)
-            | Self::BicomponentSwizzled(ref texture, _) => Some(func(texture)),
+            | Self::BicomponentSwizzled(ref texture, _) => Some(texture),
         }
     }
 
@@ -229,12 +232,14 @@ impl NormalTexture {
     }
 }
 
-/// How the Ambient Occlusion, Metalic, and Roughness values should be determined.
+/// How the Ambient Occlusion, Metalic, and Roughness values should be
+/// determined.
 #[derive(Debug, Clone)]
 pub enum AoMRTextures {
     None,
     Combined {
-        /// Texture with Ambient Occlusion in R, Roughness in G, and Metallic in B
+        /// Texture with Ambient Occlusion in R, Roughness in G, and Metallic in
+        /// B
         texture: Option<TextureHandle>,
     },
     SwizzledSplit {
@@ -260,34 +265,28 @@ pub enum AoMRTextures {
 }
 
 impl AoMRTextures {
-    pub fn to_roughness_texture<Func, Out>(&self, func: Func) -> Option<Out>
-    where
-        Func: FnOnce(&TextureHandle) -> Out,
-    {
+    pub fn to_roughness_texture(&self) -> Option<&TextureHandle> {
         match *self {
             Self::Combined {
                 texture: Some(ref texture),
-            } => Some(func(texture)),
+            } => Some(texture),
             Self::SwizzledSplit {
                 mr_texture: Some(ref texture),
                 ..
-            } => Some(func(texture)),
+            } => Some(texture),
             Self::Split {
                 mr_texture: Some(ref texture),
                 ..
-            } => Some(func(texture)),
+            } => Some(texture),
             Self::BWSplit {
                 r_texture: Some(ref texture),
                 ..
-            } => Some(func(texture)),
+            } => Some(texture),
             _ => None,
         }
     }
 
-    pub fn to_metallic_texture<Func, Out>(&self, func: Func) -> Option<Out>
-    where
-        Func: FnOnce(&TextureHandle) -> Out,
-    {
+    pub fn to_metallic_texture(&self) -> Option<&TextureHandle> {
         match *self {
             Self::Combined { .. } => None,
             Self::SwizzledSplit { .. } => None,
@@ -295,29 +294,26 @@ impl AoMRTextures {
             Self::BWSplit {
                 m_texture: Some(ref texture),
                 ..
-            } => Some(func(texture)),
+            } => Some(texture),
             _ => None,
         }
     }
 
-    pub fn to_ao_texture<Func, Out>(&self, func: Func) -> Option<Out>
-    where
-        Func: FnOnce(&TextureHandle) -> Out,
-    {
+    pub fn to_ao_texture(&self) -> Option<&TextureHandle> {
         match *self {
             Self::Combined { .. } => None,
             Self::SwizzledSplit {
                 ao_texture: Some(ref texture),
                 ..
-            } => Some(func(texture)),
+            } => Some(texture),
             Self::Split {
                 ao_texture: Some(ref texture),
                 ..
-            } => Some(func(texture)),
+            } => Some(texture),
             Self::BWSplit {
                 ao_texture: Some(ref texture),
                 ..
-            } => Some(func(texture)),
+            } => Some(texture),
             _ => None,
         }
     }
@@ -362,40 +358,34 @@ pub enum ClearcoatTextures {
 }
 
 impl ClearcoatTextures {
-    pub fn to_clearcoat_texture<Func, Out>(&self, func: Func) -> Option<Out>
-    where
-        Func: FnOnce(&TextureHandle) -> Out,
-    {
+    pub fn to_clearcoat_texture(&self) -> Option<&TextureHandle> {
         match *self {
             Self::GltfCombined {
                 texture: Some(ref texture),
-            } => Some(func(texture)),
+            } => Some(texture),
             Self::GltfSplit {
                 clearcoat_texture: Some(ref texture),
                 ..
-            } => Some(func(texture)),
+            } => Some(texture),
             Self::BWSplit {
                 clearcoat_texture: Some(ref texture),
                 ..
-            } => Some(func(texture)),
+            } => Some(texture),
             _ => None,
         }
     }
 
-    pub fn to_clearcoat_roughness_texture<Func, Out>(&self, func: Func) -> Option<Out>
-    where
-        Func: FnOnce(&TextureHandle) -> Out,
-    {
+    pub fn to_clearcoat_roughness_texture(&self) -> Option<&TextureHandle> {
         match *self {
             Self::GltfCombined { .. } => None,
             Self::GltfSplit {
                 clearcoat_roughness_texture: Some(ref texture),
                 ..
-            } => Some(func(texture)),
+            } => Some(texture),
             Self::BWSplit {
                 clearcoat_roughness_texture: Some(ref texture),
                 ..
-            } => Some(func(texture)),
+            } => Some(texture),
             _ => None,
         }
     }
@@ -457,11 +447,11 @@ impl TransparencyType {
         }
     }
 
-    pub fn to_sorting(self) -> Option<crate::culling::Sorting> {
+    pub fn to_sorting(self) -> Option<Sorting> {
         match self {
             Self::Opaque => None,
             Self::Cutout => None,
-            Self::Blend => Some(crate::culling::Sorting::BackToFront),
+            Self::Blend => Some(Sorting::BackToFront),
         }
     }
 }
@@ -499,7 +489,8 @@ impl Default for Transparency {
 // Consider:
 //
 // - Green screen value
-/// A set of textures and values that determine the how an object interacts with light.
+/// A set of textures and values that determine the how an object interacts with
+/// light.
 #[derive(Default)]
 pub struct PbrMaterial {
     pub albedo: AlbedoComponent,
@@ -530,23 +521,17 @@ impl Material for PbrMaterial {
         TransparencyType::from(self.transparency) as u64
     }
 
-    fn to_textures(
-        &self,
-        slice: &mut [Option<std::num::NonZeroU32>],
-        translation_fn: &mut (dyn FnMut(&TextureHandle) -> std::num::NonZeroU32 + '_),
-    ) {
-        slice[0] = self.albedo.to_texture(&mut *translation_fn);
-        slice[1] = self.normal.to_texture(&mut *translation_fn);
-        slice[2] = self.aomr_textures.to_roughness_texture(&mut *translation_fn);
-        slice[3] = self.aomr_textures.to_metallic_texture(&mut *translation_fn);
-        slice[4] = self.reflectance.to_texture(&mut *translation_fn);
-        slice[5] = self.clearcoat_textures.to_clearcoat_texture(&mut *translation_fn);
-        slice[6] = self
-            .clearcoat_textures
-            .to_clearcoat_roughness_texture(&mut *translation_fn);
-        slice[7] = self.emissive.to_texture(&mut *translation_fn);
-        slice[8] = self.anisotropy.to_texture(&mut *translation_fn);
-        slice[9] = self.aomr_textures.to_ao_texture(&mut *translation_fn);
+    fn to_textures<'a>(&'a self, slice: &mut [Option<&'a TextureHandle>]) {
+        slice[0] = self.albedo.to_texture();
+        slice[1] = self.normal.to_texture();
+        slice[2] = self.aomr_textures.to_roughness_texture();
+        slice[3] = self.aomr_textures.to_metallic_texture();
+        slice[4] = self.reflectance.to_texture();
+        slice[5] = self.clearcoat_textures.to_clearcoat_texture();
+        slice[6] = self.clearcoat_textures.to_clearcoat_roughness_texture();
+        slice[7] = self.emissive.to_texture();
+        slice[8] = self.anisotropy.to_texture();
+        slice[9] = self.aomr_textures.to_ao_texture();
     }
 
     fn to_data(&self, slice: &mut [u8]) {
@@ -554,8 +539,22 @@ impl Material for PbrMaterial {
     }
 }
 
+impl DepthRenderableMaterial for PbrMaterial {
+    const ALPHA_CUTOUT: Option<AlphaCutoutSpec> = Some(AlphaCutoutSpec {
+        index: 0,
+        cutoff_offset: 152,
+        uv_transform_offset: Some(0),
+    });
+}
+
+#[test]
+fn cutout_offset() {
+    assert_eq!(bytemuck::offset_of!(ShaderMaterial, alpha_cutout), 152);
+    assert_eq!(bytemuck::offset_of!(ShaderMaterial, uv_transform0), 0);
+}
+
 #[repr(C)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Default, Copy, Clone)]
 struct ShaderMaterial {
     uv_transform0: Mat3A,
     uv_transform1: Mat3A,

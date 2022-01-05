@@ -5,7 +5,11 @@ use crate::{
 use glam::{Vec2, Vec3};
 use range_alloc::RangeAllocator;
 use rend3_types::RawMeshHandle;
-use std::{mem::size_of, ops::Range};
+use std::{
+    mem::size_of,
+    ops::Range,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 use wgpu::{
     Buffer, BufferAddress, BufferDescriptor, BufferUsages, CommandEncoder, Device, IndexFormat, Queue, RenderPass,
 };
@@ -63,7 +67,8 @@ impl MeshBuffers {
     }
 }
 
-/// Manages vertex and instance buffers. All buffers are sub-allocated from megabuffers.
+/// Manages vertex and instance buffers. All buffers are sub-allocated from
+/// megabuffers.
 pub struct MeshManager {
     buffers: MeshBuffers,
 
@@ -92,8 +97,10 @@ impl MeshManager {
         }
     }
 
-    pub fn allocate(&self) -> MeshHandle {
-        self.registry.allocate()
+    pub fn allocate(counter: &AtomicUsize) -> MeshHandle {
+        let idx = counter.fetch_add(1, Ordering::Relaxed);
+
+        MeshHandle::new(idx)
     }
 
     pub fn fill(
@@ -109,7 +116,8 @@ impl MeshManager {
         let vertex_count = mesh.vertex_positions.len();
         let index_count = mesh.indices.len();
 
-        // If vertex_count is 0, index_count _must_ also be 0, as all indices would be out of range.
+        // If vertex_count is 0, index_count _must_ also be 0, as all indices would be
+        // out of range.
         if index_count == 0 {
             let mesh = InternalMesh {
                 vertex_range: 0..0,

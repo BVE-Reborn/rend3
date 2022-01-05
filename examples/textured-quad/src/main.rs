@@ -59,7 +59,8 @@ impl rend3_framework::App for TexturedQuadExample {
 
         // Add mesh to renderer's world.
         //
-        // All handles are refcounted, so we only need to hang onto the handle until we make an object.
+        // All handles are refcounted, so we only need to hang onto the handle until we
+        // make an object.
         let mesh_handle = renderer.add_mesh(mesh);
 
         // Add texture to renderer's world.
@@ -77,11 +78,11 @@ impl rend3_framework::App for TexturedQuadExample {
         let texture_checker_handle = renderer.add_texture_2d(texture_checker);
 
         // Add PBR material with all defaults except a single color.
-        let material = rend3_routine::material::PbrMaterial {
-            albedo: rend3_routine::material::AlbedoComponent::Texture(texture_checker_handle),
+        let material = rend3_routine::pbr::PbrMaterial {
+            albedo: rend3_routine::pbr::AlbedoComponent::Texture(texture_checker_handle),
             unlit: true,
-            sample_type: rend3_routine::material::SampleType::Nearest,
-            ..rend3_routine::material::PbrMaterial::default()
+            sample_type: rend3_routine::pbr::SampleType::Nearest,
+            ..rend3_routine::pbr::PbrMaterial::default()
         };
         let material_handle = renderer.add_material(material);
 
@@ -126,7 +127,9 @@ impl rend3_framework::App for TexturedQuadExample {
         _window: &winit::window::Window,
         renderer: &Arc<rend3::Renderer>,
         routines: &Arc<rend3_framework::DefaultRoutines>,
+        base_rendergraph: &rend3_routine::base::BaseRenderGraph,
         surface: Option<&Arc<rend3::types::Surface>>,
+        resolution: glam::UVec2,
         event: rend3_framework::Event<'_, ()>,
         control_flow: impl FnOnce(winit::event_loop::ControlFlow),
     ) {
@@ -170,13 +173,15 @@ impl rend3_framework::App for TexturedQuadExample {
                 let mut graph = rend3::RenderGraph::new();
 
                 // Add the default rendergraph
-                rend3_routine::add_default_rendergraph(
+                base_rendergraph.add_to_graph(
                     &mut graph,
                     &ready,
                     &pbr_routine,
                     None,
                     &tonemapping_routine,
+                    resolution,
                     SAMPLE_COUNT,
+                    glam::Vec4::ZERO,
                 );
 
                 // Dispatch a render using the built up rendergraph!

@@ -1,43 +1,30 @@
-use std::{mem, num::NonZeroU64};
+use std::{marker::PhantomData, mem, num::NonZeroU64};
 
 use glam::{Mat4, Vec3};
 use rend3::{
     managers::{DirectionalLightManager, MaterialManager},
+    types::Material,
     util::bind_merge::BindGroupLayoutBuilder,
     RendererMode,
 };
-use wgpu::{
-    BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, BufferBindingType, Device,
-    ShaderStages, TextureSampleType, TextureViewDimension,
-};
+use wgpu::{BindGroupLayout, BindingType, BufferBindingType, Device, ShaderStages};
 
-use crate::{common::samplers::Samplers, material::PbrMaterial, uniforms::ShaderCommonUniform};
+use crate::{common::samplers::Samplers, uniforms::FrameUniforms};
 
-#[repr(C, align(16))]
-#[derive(Debug, Copy, Clone)]
-pub struct PerObjectData {
-    pub model_view: Mat4,
-    pub model_view_proj: Mat4,
-    // Unused in shader
-    pub material_idx: u32,
-    pub pad0: [u8; 12],
-    pub inv_squared_scale: Vec3,
-}
-
-unsafe impl bytemuck::Pod for PerObjectData {}
-unsafe impl bytemuck::Zeroable for PerObjectData {}
-
-pub struct ShaderInterfaces {
-    pub shadow_uniform_bgl: BindGroupLayout,
+/// Interfaces which are used throughout the whole frame.
+///
+/// Contains the samplers, per frame uniforms, and directional light
+/// information.
+pub struct WholeFrameInterfaces {
+    /// Includes everything excluding the directional light information to
+    /// prevent cycles when rendering to shadow maps.
+    pub depth_uniform_bgl: BindGroupLayout,
+    /// Includes everything.
     pub forward_uniform_bgl: BindGroupLayout,
-    pub per_material_bgl: BindGroupLayout,
-
-    pub blit_bgl: BindGroupLayout,
-    pub skybox_bgl: BindGroupLayout,
 }
 
-impl ShaderInterfaces {
-    pub fn new(device: &Device, mode: RendererMode) -> Self {
+impl WholeFrameInterfaces {
+    pub fn new(device: &Device) -> Self {
         profiling::scope!("ShaderInterfaces::new");
 
         let mut uniform_bglb = BindGroupLayoutBuilder::new();
@@ -49,7 +36,7 @@ impl ShaderInterfaces {
             BindingType::Buffer {
                 ty: BufferBindingType::Uniform,
                 has_dynamic_offset: false,
-                min_binding_size: NonZeroU64::new(mem::size_of::<ShaderCommonUniform>() as _),
+                min_binding_size: NonZeroU64::new(mem::size_of::<FrameUniforms>() as _),
             },
             None,
         );
@@ -60,6 +47,37 @@ impl ShaderInterfaces {
 
         let forward_uniform_bgl = uniform_bglb.build(device, Some("forward uniform bgl"));
 
+        Self {
+            depth_uniform_bgl: shadow_uniform_bgl,
+            forward_uniform_bgl,
+        }
+    }
+}
+
+/// The input structure that the culling shaders/functions output and drawing
+/// shaders read.
+#[repr(C, align(16))]
+#[derive(Debug, Copy, Clone)]
+pub struct PerObjectDataAbi {
+    pub model_view: Mat4,
+    pub model_view_proj: Mat4,
+    // Unused in shader
+    pub material_idx: u32,
+    pub pad0: [u8; 12],
+    pub inv_squared_scale: Vec3,
+}
+
+unsafe impl bytemuck::Pod for PerObjectDataAbi {}
+unsafe impl bytemuck::Zeroable for PerObjectDataAbi {}
+
+/// Interface which has all per-material-archetype data: the object output
+/// buffer and the gpu material buffer.
+pub struct PerMaterialArchetypeInterface<M> {
+    pub bgl: BindGroupLayout,
+    _phantom: PhantomData<M>,
+}
+impl<M: Material> PerMaterialArchetypeInterface<M> {
+    pub fn new(device: &Device, mode: RendererMode) -> Self {
         let mut per_material_bglb = BindGroupLayoutBuilder::new();
 
         per_material_bglb.append(
@@ -67,51 +85,20 @@ impl ShaderInterfaces {
             BindingType::Buffer {
                 ty: BufferBindingType::Storage { read_only: true },
                 has_dynamic_offset: false,
-                min_binding_size: NonZeroU64::new(mem::size_of::<PerObjectData>() as _),
+                min_binding_size: NonZeroU64::new(mem::size_of::<PerObjectDataAbi>() as _),
             },
             None,
         );
 
-        if mode == RendererMode::GPUPowered {
-            MaterialManager::add_to_bgl_gpu::<PbrMaterial>(&mut per_material_bglb);
+        if mode == RendererMode::GpuPowered {
+            MaterialManager::add_to_bgl_gpu::<M>(&mut per_material_bglb);
         }
 
-        let per_material_bgl = per_material_bglb.build(device, Some("per material bgl"));
-
-        let blit_bgl = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-            label: Some("blit bgl"),
-            entries: &[BindGroupLayoutEntry {
-                binding: 0,
-                visibility: ShaderStages::FRAGMENT,
-                ty: BindingType::Texture {
-                    sample_type: TextureSampleType::Float { filterable: true },
-                    view_dimension: TextureViewDimension::D2,
-                    multisampled: false,
-                },
-                count: None,
-            }],
-        });
-
-        let skybox_bgl = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-            label: Some("skybox bgl"),
-            entries: &[BindGroupLayoutEntry {
-                binding: 0,
-                visibility: ShaderStages::FRAGMENT,
-                ty: BindingType::Texture {
-                    sample_type: TextureSampleType::Float { filterable: true },
-                    view_dimension: TextureViewDimension::Cube,
-                    multisampled: false,
-                },
-                count: None,
-            }],
-        });
+        let bgl = per_material_bglb.build(device, Some("per material bgl"));
 
         Self {
-            shadow_uniform_bgl,
-            forward_uniform_bgl,
-            per_material_bgl,
-            blit_bgl,
-            skybox_bgl,
+            bgl,
+            _phantom: PhantomData,
         }
     }
 }

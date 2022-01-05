@@ -4,8 +4,6 @@
 #extension GL_EXT_nonuniform_qualifier : require
 #endif
 
-#include "structures.glsl"
-
 layout(location = 0) in vec4 i_position;
 layout(location = 1) in vec2 i_coords0;
 layout(location = 2) in vec4 i_color;
@@ -16,46 +14,68 @@ layout(location = 3) flat in uint i_material;
 layout(set = 0, binding = 0) uniform sampler primary_sampler;
 #ifdef GPU_MODE
 layout(set = 1, binding = 1, std430) readonly buffer MaterialBuffer {
-    GPUMaterialData materials[];
+    float material_data[];
 };
-layout(set = 2, binding = 0) uniform texture2D textures[];
+layout(set = 3, binding = 0) uniform texture2D textures[];
 #endif
 #ifdef CPU_MODE
-layout(set = 2, binding = 0) uniform texture2D albedo_tex;
-layout(set = 2, binding = 1) uniform texture2D normal_tex;
-layout(set = 2, binding = 2) uniform texture2D roughness_tex;
-layout(set = 2, binding = 3) uniform texture2D metallic_tex;
-layout(set = 2, binding = 4) uniform texture2D reflectance_tex;
-layout(set = 2, binding = 5) uniform texture2D clear_coat_tex;
-layout(set = 2, binding = 6) uniform texture2D clear_coat_roughness_tex;
-layout(set = 2, binding = 7) uniform texture2D emissive_tex;
-layout(set = 2, binding = 8) uniform texture2D anisotropy_tex;
-layout(set = 2, binding = 9) uniform texture2D ambient_occlusion_tex;
-layout(set = 2, binding = 10) uniform TextureData {
-    CPUMaterialData material;
+layout(set = 3, binding = 0, std430) readonly buffer TextureData {
+    float material_data[];
 };
+layout(set = 3, binding = 1) uniform texture2D texture;
 #endif
-
-#include "lighting/texture_access.glsl"
+layout(set = 2, binding = 0) uniform DataAbi {
+    uint stride; // Stride in offset into a float array (i.e. byte index / 4). Unused in CPU mode.
+    uint texture_offset; // Must be zero in gpu mode. In cpu mode, it's the index into the material data with the texture enable bitflag.
+    uint cutoff_offset; // Stride in offset into a float array  (i.e. byte index / 4)
+    uint uv_transform_offset; // Stride in offset into a float array pointing to a mat3 with the uv transform (i.e. byte index / 4). 0xFFFFFFFF represents "no transform"
+};
 
 void main() {
-    #ifdef GPU_MODE
-    GPUMaterialData material = materials[i_material];
-    #endif
+    uint base_material_offset = stride * i_material;
+    float cutoff = material_data[base_material_offset + cutoff_offset];
 
-    bool has_albedo = HAS_ALBEDO_TEXTURE;
-
-    vec2 coords = vec2(material.uv_transform0 * vec3(i_coords0, 1.0));
+    vec2 coords;
+    if (uv_transform_offset != 0xFFFFFFFF) {
+        uint base_transform_offset = base_material_offset + uv_transform_offset;
+        mat3 transform = mat3(
+            material_data[base_transform_offset + 0],
+            material_data[base_transform_offset + 1],
+            material_data[base_transform_offset + 2],
+            material_data[base_transform_offset + 4],
+            material_data[base_transform_offset + 5],
+            material_data[base_transform_offset + 6],
+            material_data[base_transform_offset + 8],
+            material_data[base_transform_offset + 9],
+            material_data[base_transform_offset + 10]
+        );
+        coords = vec2(transform * vec3(i_coords0, 1.0));
+    } else {
+        coords = i_coords0;
+    }
     vec2 uvdx = dFdx(coords);
     vec2 uvdy = dFdy(coords);
 
-    if (has_albedo) {
-        vec4 albedo = textureGrad(sampler2D(ALBEDO_TEXTURE, primary_sampler), coords, uvdx, uvdy);
+    #ifdef GPU_MODE
+    uint texture_index = floatBitsToUint(material_data[base_material_offset + texture_offset]);
+    if (texture_index != 0) {
+        float alpha = textureGrad(sampler2D(textures[nonuniformEXT(texture_index - 1)], primary_sampler), coords, uvdx, uvdy).a;
 
-        if (albedo.a <= material.alpha_cutout) {
+        if (alpha <= cutoff) {
             discard;
         }
     }
+    #endif
+    #ifdef CPU_MODE
+    uint texture_enable_bitflags = floatBitsToUint(material_data[base_material_offset + texture_offset]);
+    if (bool(texture_enable_bitflags & 0x1)) {
+        float alpha = textureGrad(sampler2D(texture, primary_sampler), coords, uvdx, uvdy).a;
+
+        if (alpha <= cutoff) {
+            discard;
+        }
+    }
+    #endif
 }
 #else // ALPHA_CUTOUT
 void main() {}

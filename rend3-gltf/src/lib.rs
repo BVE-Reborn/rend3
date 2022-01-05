@@ -1,10 +1,14 @@
 //! gltf scene and model loader for rend3.
 //!
-//! This crate attempts to map the concepts into gltf as best it can into rend3, but there is quite a variety of things that would be insane to properly represent.
+//! This crate attempts to map the concepts into gltf as best it can into rend3,
+//! but there is quite a variety of things that would be insane to properly
+//! represent.
 //!
-//! To "just load a gltf/glb", look at the documentation for [`load_gltf`] and use the default [`filesystem_io_func`].
+//! To "just load a gltf/glb", look at the documentation for [`load_gltf`] and
+//! use the default [`filesystem_io_func`].
 //!
-//! Individual components of a gltf can be loaded with the other functions in this crate.
+//! Individual components of a gltf can be loaded with the other functions in
+//! this crate.
 //!
 //! # Supported Extensions
 //! - `KHR_punctual_lights`
@@ -12,7 +16,8 @@
 //! - `KHR_material_unlit`
 //!
 //! # Known Limitations
-//! - Only the albedo texture's transform from `KHR_texture_transform` will be used.
+//! - Only the albedo texture's transform from `KHR_texture_transform` will be
+//!   used.
 //! - Double sided materials are currently unsupported.
 
 use glam::{Mat3, Mat4, UVec2, Vec2, Vec3, Vec4};
@@ -23,7 +28,7 @@ use rend3::{
     util::typedefs::{FastHashMap, SsoString},
     Renderer,
 };
-use rend3_routine::material::{self, NormalTextureYDirection};
+use rend3_routine::pbr;
 use std::{borrow::Cow, collections::hash_map::Entry, future::Future, path::Path};
 use thiserror::Error;
 
@@ -49,7 +54,8 @@ impl<T> Labeled<T> {
 #[derive(Debug)]
 pub struct MeshPrimitive {
     pub handle: types::MeshHandle,
-    /// Index into the material vector given by [`load_materials_and_textures`] or [`LoadedGltfScene::materials`].
+    /// Index into the material vector given by [`load_materials_and_textures`]
+    /// or [`LoadedGltfScene::materials`].
     pub material: Option<usize>,
 }
 
@@ -59,7 +65,8 @@ pub struct Mesh {
     pub primitives: Vec<MeshPrimitive>,
 }
 
-/// Set of [`ObjectHandle`]s that correspond to a logical object in the node tree.
+/// Set of [`ObjectHandle`]s that correspond to a logical object in the node
+/// tree.
 ///
 /// This is to a [`ObjectHandle`], as a [`Mesh`] is to a [`MeshPrimitive`].
 #[derive(Debug)]
@@ -146,10 +153,11 @@ pub enum GltfLoadError<E: std::error::Error + 'static> {
     MeshValidationError(usize, #[source] MeshValidationError),
 }
 
-/// Default implementation of [`load_gltf`]'s `io_func` that loads from the filesystem relative to the gltf.
+/// Default implementation of [`load_gltf`]'s `io_func` that loads from the
+/// filesystem relative to the gltf.
 ///
-/// The first argumnet is the directory all relative paths should be considered against. This is more than likely
-/// the directory the gltf/glb is in.
+/// The first argumnet is the directory all relative paths should be considered
+/// against. This is more than likely the directory the gltf/glb is in.
 pub async fn filesystem_io_func(parent_directory: impl AsRef<Path>, uri: SsoString) -> Result<Vec<u8>, std::io::Error> {
     let octet_stream_header = "data:";
     if let Some(base64_data) = uri.strip_prefix(octet_stream_header) {
@@ -171,7 +179,8 @@ pub async fn filesystem_io_func(parent_directory: impl AsRef<Path>, uri: SsoStri
 
 /// Load a given gltf into the renderer's world.
 ///
-/// Allows the user to specify how URIs are resolved into their underlying data. Supports most gltfs and glbs.
+/// Allows the user to specify how URIs are resolved into their underlying data.
+/// Supports most gltfs and glbs.
 ///
 /// **Must** keep the [`LoadedGltfScene`] alive for the scene to remain.
 ///
@@ -185,7 +194,7 @@ pub async fn filesystem_io_func(parent_directory: impl AsRef<Path>, uri: SsoStri
 ///     &renderer,
 ///     &gltf_data,
 ///     1.0,
-///     rend3_routine::material::NormalTextureYDirection::Up,
+///     rend3_routine::pbr::NormalTextureYDirection::Up,
 ///     |p| rend3_gltf::filesystem_io_func(&parent_directory, p)
 /// ));
 /// ```
@@ -193,7 +202,7 @@ pub async fn load_gltf<F, Fut, E>(
     renderer: &Renderer,
     data: &[u8],
     scale: f32,
-    normal_direction: NormalTextureYDirection,
+    normal_direction: pbr::NormalTextureYDirection,
     io_func: F,
 ) -> Result<LoadedGltfScene, GltfLoadError<E>>
 where
@@ -236,13 +245,14 @@ where
 /// Load a given gltf's data, like meshes and materials, without yet adding
 /// any of the nodes to the scene.
 ///
-/// Allows the user to specify how URIs are resolved into their underlying data. Supports most gltfs and glbs.
+/// Allows the user to specify how URIs are resolved into their underlying data.
+/// Supports most gltfs and glbs.
 ///
 /// **Must** keep the [`LoadedGltfScene`] alive for the meshes and materials
 pub async fn load_gltf_data<F, Fut, E>(
     renderer: &Renderer,
     file: &mut gltf::Gltf,
-    normal_direction: NormalTextureYDirection,
+    normal_direction: pbr::NormalTextureYDirection,
     mut io_func: F,
 ) -> Result<LoadedGltfScene, GltfLoadError<E>>
 where
@@ -342,7 +352,7 @@ pub fn load_gltf_nodes<'a, E: std::error::Error + 'static>(
                         color: Vec3::from(light.color()),
                         intensity: light.intensity(),
                         direction,
-                        distance: 100.0,
+                        distance: 1000.0,
                     }))
                 }
                 _ => None,
@@ -366,7 +376,8 @@ pub fn load_gltf_nodes<'a, E: std::error::Error + 'static>(
     Ok(final_nodes)
 }
 
-/// Loads buffers from a [`gltf::Buffer`] iterator, calling io_func to resolve them from URI.
+/// Loads buffers from a [`gltf::Buffer`] iterator, calling io_func to resolve
+/// them from URI.
 ///
 /// If the gltf came from a .glb, the glb's blob should be provided.
 ///
@@ -406,7 +417,8 @@ where
 
 /// Loads meshes from a [`gltf::Mesh`] iterator.
 ///
-/// All binary data buffers must be provided. Call this with [`gltf::Document::meshes`] as the mesh argument.
+/// All binary data buffers must be provided. Call this with
+/// [`gltf::Document::meshes`] as the mesh argument.
 pub fn load_meshes<'a, E: std::error::Error + 'static>(
     renderer: &Renderer,
     meshes: impl Iterator<Item = gltf::Mesh<'a>>,
@@ -484,37 +496,38 @@ pub fn load_meshes<'a, E: std::error::Error + 'static>(
 /// Creates a gltf default material.
 pub fn load_default_material(renderer: &Renderer) -> types::MaterialHandle {
     profiling::scope!("creating default material");
-    renderer.add_material(material::PbrMaterial {
-        albedo: material::AlbedoComponent::Value(Vec4::splat(1.0)),
-        transparency: material::Transparency::Opaque,
-        normal: material::NormalTexture::None,
-        aomr_textures: material::AoMRTextures::None,
+    renderer.add_material(pbr::PbrMaterial {
+        albedo: pbr::AlbedoComponent::Value(Vec4::splat(1.0)),
+        transparency: pbr::Transparency::Opaque,
+        normal: pbr::NormalTexture::None,
+        aomr_textures: pbr::AoMRTextures::None,
         ao_factor: Some(1.0),
         metallic_factor: Some(1.0),
         roughness_factor: Some(1.0),
-        clearcoat_textures: material::ClearcoatTextures::None,
+        clearcoat_textures: pbr::ClearcoatTextures::None,
         clearcoat_factor: Some(1.0),
         clearcoat_roughness_factor: Some(1.0),
-        emissive: material::MaterialComponent::None,
-        reflectance: material::MaterialComponent::None,
-        anisotropy: material::MaterialComponent::None,
+        emissive: pbr::MaterialComponent::None,
+        reflectance: pbr::MaterialComponent::None,
+        anisotropy: pbr::MaterialComponent::None,
         uv_transform0: Mat3::IDENTITY,
         uv_transform1: Mat3::IDENTITY,
         unlit: false,
-        sample_type: material::SampleType::Linear,
+        sample_type: pbr::SampleType::Linear,
     })
 }
 
 /// Loads materials and textures from a [`gltf::Material`] iterator.
 ///
-/// All binary data buffers must be provided. Call this with [`gltf::Document::materials`] as the materials argument.
+/// All binary data buffers must be provided. Call this with
+/// [`gltf::Document::materials`] as the materials argument.
 ///
 /// io_func determines how URIs are resolved into their underlying data.
 pub async fn load_materials_and_textures<F, Fut, E>(
     renderer: &Renderer,
     materials: impl ExactSizeIterator<Item = gltf::Material<'_>>,
     buffers: &[Vec<u8>],
-    normal_direction: NormalTextureYDirection,
+    normal_direction: pbr::NormalTextureYDirection,
     io_func: &mut F,
 ) -> Result<(Vec<Labeled<types::MaterialHandle>>, ImageMap), GltfLoadError<E>>
 where
@@ -543,9 +556,9 @@ where
         let nearest = albedo
             .as_ref()
             .map(|i| match i.texture().sampler().mag_filter() {
-                Some(gltf::texture::MagFilter::Nearest) => material::SampleType::Nearest,
-                Some(gltf::texture::MagFilter::Linear) => material::SampleType::Linear,
-                None => material::SampleType::Linear,
+                Some(gltf::texture::MagFilter::Nearest) => pbr::SampleType::Nearest,
+                Some(gltf::texture::MagFilter::Linear) => pbr::SampleType::Linear,
+                None => pbr::SampleType::Linear,
             })
             .unwrap_or_default();
 
@@ -583,36 +596,36 @@ where
         )
         .await?;
 
-        let handle = renderer.add_material(material::PbrMaterial {
+        let handle = renderer.add_material(pbr::PbrMaterial {
             albedo: match albedo_tex {
-                Some(tex) => material::AlbedoComponent::TextureVertexValue {
+                Some(tex) => pbr::AlbedoComponent::TextureVertexValue {
                     texture: tex.handle,
                     value: Vec4::from(albedo_factor),
                     srgb: false,
                 },
-                None => material::AlbedoComponent::ValueVertex {
+                None => pbr::AlbedoComponent::ValueVertex {
                     value: Vec4::from(albedo_factor),
                     srgb: false,
                 },
             },
             transparency: match material.alpha_mode() {
-                gltf::material::AlphaMode::Opaque => material::Transparency::Opaque,
-                gltf::material::AlphaMode::Mask => material::Transparency::Cutout {
+                gltf::material::AlphaMode::Opaque => pbr::Transparency::Opaque,
+                gltf::material::AlphaMode::Mask => pbr::Transparency::Cutout {
                     cutout: material.alpha_cutoff().unwrap_or(0.5),
                 },
-                gltf::material::AlphaMode::Blend => material::Transparency::Blend,
+                gltf::material::AlphaMode::Blend => pbr::Transparency::Blend,
             },
             normal: match normals_tex {
                 Some(tex) if tex.format.describe().components == 2 => {
-                    material::NormalTexture::Bicomponent(tex.handle, normal_direction)
+                    pbr::NormalTexture::Bicomponent(tex.handle, normal_direction)
                 }
                 Some(tex) if tex.format.describe().components >= 3 => {
-                    material::NormalTexture::Tricomponent(tex.handle, normal_direction)
+                    pbr::NormalTexture::Tricomponent(tex.handle, normal_direction)
                 }
-                _ => material::NormalTexture::None,
+                _ => pbr::NormalTexture::None,
             },
             aomr_textures: match (metallic_roughness_tex, occlusion_tex) {
-                (Some(mr), Some(ao)) if mr == ao => material::AoMRTextures::Combined {
+                (Some(mr), Some(ao)) if mr == ao => pbr::AoMRTextures::Combined {
                     texture: Some(mr.handle),
                 },
                 (mr, ao)
@@ -621,12 +634,12 @@ where
                         .map(|ao| ao.format.describe().components < 3)
                         .unwrap_or(false) =>
                 {
-                    material::AoMRTextures::Split {
+                    pbr::AoMRTextures::Split {
                         mr_texture: util::extract_handle(mr),
                         ao_texture: util::extract_handle(ao),
                     }
                 }
-                (mr, ao) => material::AoMRTextures::SwizzledSplit {
+                (mr, ao) => pbr::AoMRTextures::SwizzledSplit {
                     mr_texture: util::extract_handle(mr),
                     ao_texture: util::extract_handle(ao),
                 },
@@ -634,17 +647,17 @@ where
             metallic_factor: Some(metallic_factor),
             roughness_factor: Some(roughness_factor),
             emissive: match emissive_tex {
-                Some(tex) => material::MaterialComponent::TextureValue {
+                Some(tex) => pbr::MaterialComponent::TextureValue {
                     texture: tex.handle,
                     value: Vec3::from(emissive_factor),
                 },
-                None => material::MaterialComponent::Value(Vec3::from(emissive_factor)),
+                None => pbr::MaterialComponent::Value(Vec3::from(emissive_factor)),
             },
             uv_transform0: uv_transform,
             uv_transform1: uv_transform,
             unlit: material.unlit(),
             sample_type: nearest,
-            ..material::PbrMaterial::default()
+            ..pbr::PbrMaterial::default()
         });
 
         result.push(Labeled::new(handle, material.name()));
@@ -657,7 +670,8 @@ where
 ///
 /// Uses the given ImageMap as a cache.
 ///
-/// All binary data buffers must be provided. You can get the image from a texture by calling [`gltf::Texture::source`].
+/// All binary data buffers must be provided. You can get the image from a
+/// texture by calling [`gltf::Texture::source`].
 ///
 /// io_func determines how URIs are resolved into their underlying data.
 pub async fn load_image_cached<F, Fut, E>(
@@ -692,7 +706,8 @@ where
 
 /// Loads a single image from a [`gltf::Image`].
 ///
-/// All binary data buffers must be provided. Call this with [`gltf::Document::materials`] as the materials argument.
+/// All binary data buffers must be provided. Call this with
+/// [`gltf::Document::materials`] as the materials argument.
 ///
 /// io_func determines how URIs are resolved into their underlying data.
 pub async fn load_image<F, Fut, E>(
@@ -870,9 +885,11 @@ pub mod util {
         texture.map(|t| t.handle)
     }
 
-    /// Turns a `Option<Future<Output = Result<Labeled<T>, E>>>>` into a `Future<Output = Result<Option<T>, E>>`
+    /// Turns a `Option<Future<Output = Result<Labeled<T>, E>>>>` into a
+    /// `Future<Output = Result<Option<T>, E>>`
     ///
-    /// This is a very specific transformation that shows up a lot when using [`load_image_cached`](super::load_image_cached).
+    /// This is a very specific transformation that shows up a lot when using
+    /// [`load_image_cached`](super::load_image_cached).
     pub async fn texture_option_resolve<F: Future, T, E>(fut: Option<F>) -> Result<Option<T>, E>
     where
         F: Future<Output = Result<Labeled<T>, E>>,

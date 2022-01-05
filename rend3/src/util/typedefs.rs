@@ -1,4 +1,5 @@
-/// A string which uses SmallString optimization for strings shorter than 23 characters.
+/// A string which uses SmallString optimization for strings shorter than 23
+/// characters.
 pub type SsoString = smartstring::SmartString<smartstring::LazyCompact>;
 /// Hash map designed for small keys
 pub type FastHashMap<K, V> = rustc_hash::FxHashMap<K, V>;

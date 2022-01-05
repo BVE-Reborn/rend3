@@ -1,15 +1,23 @@
 use crate::{mode::ModeData, types::TextureHandle, util::registry::ResourceRegistry, RendererMode};
 use rend3_types::{RawTextureHandle, TextureFormat, TextureUsages};
-use std::{num::NonZeroU32, sync::Arc};
+use std::{
+    num::NonZeroU32,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
+};
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
     BindingResource, BindingType, Device, Extent3d, ShaderStages, Texture, TextureDescriptor, TextureDimension,
     TextureSampleType, TextureView, TextureViewDescriptor, TextureViewDimension,
 };
 
-/// When using GPU mode, we start the 2D texture manager with a bind group with this many textures.
+/// When using GPU mode, we start the 2D texture manager with a bind group with
+/// this many textures.
 pub const STARTING_2D_TEXTURES: usize = 1 << 8;
-/// When using GPU mode, we start the Cubemap texture manager with a bind group with this many textures.
+/// When using GPU mode, we start the Cubemap texture manager with a bind group
+/// with this many textures.
 pub const STARTING_CUBE_TEXTURES: usize = 1 << 3;
 /// Largest amount of supported textures per type
 pub const MAX_TEXTURE_COUNT: u32 = 1 << 17;
@@ -67,8 +75,10 @@ impl TextureManager {
         }
     }
 
-    pub fn allocate(&self) -> TextureHandle {
-        self.registry.allocate()
+    pub fn allocate(counter: &AtomicUsize) -> TextureHandle {
+        let idx = counter.fetch_add(1, Ordering::Relaxed);
+
+        TextureHandle::new(idx)
     }
 
     pub fn fill(
@@ -98,7 +108,7 @@ impl TextureManager {
             views.swap_remove(index);
         });
 
-        if let ModeData::GPU(group_dirty) = self.group_dirty {
+        if let ModeData::Gpu(group_dirty) = self.group_dirty {
             profiling::scope!("Update GPU Texture Arrays");
 
             if group_dirty {
@@ -116,7 +126,7 @@ impl TextureManager {
                 bg: self.group.as_ref().map(|_| (), Arc::clone),
             }
         } else {
-            TextureManagerReadyOutput { bg: ModeData::CPU(()) }
+            TextureManagerReadyOutput { bg: ModeData::Cpu(()) }
         }
     }
 

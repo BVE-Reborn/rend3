@@ -6,13 +6,18 @@ use wgpu::{
     ShaderStages,
 };
 
+/// Container holding a variety of samplers.
 pub struct Samplers {
+    /// Aniso 16 sampler
     pub linear: Sampler,
+    /// Nearest neighbor sampler
     pub nearest: Sampler,
+    /// Bilinear greater-or-equal comparison sampler
     pub shadow: Sampler,
 }
 
 impl Samplers {
+    /// Create a new set of samplers with this device.
     pub fn new(device: &Device) -> Self {
         profiling::scope!("Samplers::new");
 
@@ -27,6 +32,7 @@ impl Samplers {
         }
     }
 
+    /// Add the samplers to the given bind group layout builder.
     pub fn add_to_bgl(bglb: &mut BindGroupLayoutBuilder) {
         bglb.append(
             ShaderStages::FRAGMENT,
@@ -45,6 +51,7 @@ impl Samplers {
         );
     }
 
+    /// Add the samplers to the given bind group builder.
     pub fn add_to_bg<'a>(&'a self, bgb: &mut BindGroupBuilder<'a>) {
         bgb.append_sampler(&self.linear)
             .append_sampler(&self.nearest)

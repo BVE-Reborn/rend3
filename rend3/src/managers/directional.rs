@@ -15,6 +15,7 @@ use rend3_types::{DirectionalLightChange, Handedness, RawDirectionalLightHandle}
 use std::{
     mem::{self, size_of},
     num::{NonZeroU32, NonZeroU64},
+    sync::atomic::{AtomicUsize, Ordering},
 };
 use wgpu::{
     BindGroup, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, Buffer,
@@ -96,8 +97,10 @@ impl DirectionalLightManager {
         }
     }
 
-    pub fn allocate(&self) -> DirectionalLightHandle {
-        self.registry.allocate()
+    pub fn allocate(counter: &AtomicUsize) -> DirectionalLightHandle {
+        let idx = counter.fetch_add(1, Ordering::Relaxed);
+
+        DirectionalLightHandle::new(idx)
     }
 
     pub fn fill(&mut self, handle: &DirectionalLightHandle, light: DirectionalLight) {

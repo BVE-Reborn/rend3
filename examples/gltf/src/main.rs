@@ -41,8 +41,8 @@ fn load_gltf(
     // Add basic material with all defaults except a single color.
     let material = primitive.material();
     let metallic_roughness = material.pbr_metallic_roughness();
-    let material_handle = renderer.add_material(rend3_routine::material::PbrMaterial {
-        albedo: rend3_routine::material::AlbedoComponent::Value(metallic_roughness.base_color_factor().into()),
+    let material_handle = renderer.add_material(rend3_routine::pbr::PbrMaterial {
+        albedo: rend3_routine::pbr::AlbedoComponent::Value(metallic_roughness.base_color_factor().into()),
         ..Default::default()
     });
 
@@ -112,7 +112,9 @@ impl rend3_framework::App for GltfExample {
         window: &winit::window::Window,
         renderer: &Arc<rend3::Renderer>,
         routines: &Arc<rend3_framework::DefaultRoutines>,
+        base_rendergraph: &rend3_routine::base::BaseRenderGraph,
         surface: Option<&Arc<rend3::types::Surface>>,
+        resolution: glam::UVec2,
         event: rend3_framework::Event<'_, ()>,
         control_flow: impl FnOnce(winit::event_loop::ControlFlow),
     ) {
@@ -144,15 +146,16 @@ impl rend3_framework::App for GltfExample {
                 let mut graph = rend3::RenderGraph::new();
 
                 // Add the default rendergraph without a skybox
-                rend3_routine::add_default_rendergraph(
+                base_rendergraph.add_to_graph(
                     &mut graph,
                     &ready,
                     &pbr_routine,
                     None,
                     &tonemapping_routine,
+                    resolution,
                     SAMPLE_COUNT,
+                    glam::Vec4::ZERO,
                 );
-
                 // Dispatch a render using the built up rendergraph!
                 graph.execute(renderer, frame, cmd_bufs, &ready);
             }

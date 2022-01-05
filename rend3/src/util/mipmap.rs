@@ -1,7 +1,7 @@
 use std::num::NonZeroU32;
 
 use arrayvec::ArrayVec;
-use parking_lot::{Mutex, RwLock};
+use parking_lot::RwLock;
 use rend3_types::TextureFormat;
 use wgpu::{
     AddressMode, BindGroup, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, Color,
@@ -11,7 +11,6 @@ use wgpu::{
     SamplerBindingType, SamplerDescriptor, ShaderModule, ShaderStages, Texture, TextureDescriptor, TextureSampleType,
     TextureViewDescriptor, TextureViewDimension, VertexState,
 };
-use wgpu_profiler::GpuProfiler;
 
 use crate::{
     format_sso,
@@ -140,8 +139,6 @@ impl MipmapGenerator {
     pub fn generate_mipmaps(
         &self,
         device: &Device,
-        // TODO: allow profiler to run asynchronously
-        _profiler: &Mutex<GpuProfiler>,
         encoder: &mut CommandEncoder,
         texture: &Texture,
         desc: &TextureDescriptor,

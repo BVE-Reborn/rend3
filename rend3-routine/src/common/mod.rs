@@ -1,7 +1,13 @@
-pub mod depth_pass;
-pub mod forward_pass;
-pub mod interfaces;
-pub mod samplers;
-pub mod shaders;
-pub mod skybox_pass;
-pub mod sorting;
+//! Common utilities used throughout the crate.
+
+mod interfaces;
+mod samplers;
+mod shaders;
+mod sorting;
+mod vertex;
+
+pub use interfaces::*;
+pub use samplers::*;
+pub use shaders::*;
+pub use sorting::*;
+pub use vertex::*;

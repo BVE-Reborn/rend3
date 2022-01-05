@@ -5,6 +5,7 @@ use rend3::{
     types::{Handedness, SampleCount, Surface, TextureFormat},
     InstanceAdapterDevice, Renderer,
 };
+use rend3_routine::base::BaseRenderGraph;
 use wgpu::Instance;
 use winit::{
     dpi::PhysicalSize,
@@ -82,10 +83,16 @@ pub trait App<T: 'static = ()> {
         Box::pin(async move { Ok(rend3::create_iad(None, None, None, None).await?) })
     }
 
-    /// Determines the sample count used, this may change dynamically. This function
-    /// is what the framework actually calls, so overriding this will always use the right values.
+    fn create_base_rendergraph(&mut self, renderer: &Renderer) -> BaseRenderGraph {
+        BaseRenderGraph::new(renderer)
+    }
+
+    /// Determines the sample count used, this may change dynamically. This
+    /// function is what the framework actually calls, so overriding this
+    /// will always use the right values.
     ///
-    /// It is called on main events cleared and things are remade if this changes.
+    /// It is called on main events cleared and things are remade if this
+    /// changes.
     fn sample_count(&self) -> SampleCount;
 
     /// Determines the scale factor used
@@ -103,18 +110,32 @@ pub trait App<T: 'static = ()> {
         let _ = (window, renderer, routines, surface_format);
     }
 
-    /// RedrawRequested/RedrawEventsCleared will only be fired if the window size is non-zero. As such you should always render
-    /// in RedrawRequested and use MainEventsCleared for things that need to keep running when minimized.
+    /// RedrawRequested/RedrawEventsCleared will only be fired if the window
+    /// size is non-zero. As such you should always render
+    /// in RedrawRequested and use MainEventsCleared for things that need to
+    /// keep running when minimized.
+    #[allow(clippy::too_many_arguments)]
     fn handle_event(
         &mut self,
         window: &Window,
         renderer: &Arc<rend3::Renderer>,
         routines: &Arc<DefaultRoutines>,
+        base_rendergraph: &BaseRenderGraph,
         surface: Option<&Arc<Surface>>,
+        resolution: UVec2,
         event: Event<'_, T>,
         control_flow: impl FnOnce(winit::event_loop::ControlFlow),
     ) {
-        let _ = (window, renderer, routines, surface, event, control_flow);
+        let _ = (
+            window,
+            renderer,
+            routines,
+            base_rendergraph,
+            resolution,
+            surface,
+            event,
+            control_flow,
+        );
     }
 }
 
@@ -128,9 +149,9 @@ pub fn lock<T>(lock: &parking_lot::Mutex<T>) -> parking_lot::MutexGuard<'_, T> {
 }
 
 pub struct DefaultRoutines {
-    pub pbr: Mutex<rend3_routine::PbrRenderRoutine>,
-    pub skybox: Mutex<rend3_routine::SkyboxRoutine>,
-    pub tonemapping: Mutex<rend3_routine::TonemappingRoutine>,
+    pub pbr: Mutex<rend3_routine::pbr::PbrRoutine>,
+    pub skybox: Mutex<rend3_routine::skybox::SkyboxRoutine>,
+    pub tonemapping: Mutex<rend3_routine::tonemapping::TonemappingRoutine>,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -153,8 +174,9 @@ where
     let winit_closure = Closure::once_into_js(move || event_loop.run(event_handler));
 
     // make sure to handle JS exceptions thrown inside start.
-    // Otherwise wasm_bindgen_futures Queue would break and never handle any tasks again.
-    // This is required, because winit uses JS exception for control flow to escape from `run`.
+    // Otherwise wasm_bindgen_futures Queue would break and never handle any tasks
+    // again. This is required, because winit uses JS exception for control flow
+    // to escape from `run`.
     if let Err(error) = call_catch(&winit_closure) {
         let is_control_flow_exception = error
             .dyn_ref::<js_sys::Error>()
@@ -182,9 +204,11 @@ pub async fn async_start<A: App + 'static>(mut app: A, window_builder: WindowBui
 
     let iad = app.create_iad().await.unwrap();
 
-    // The one line of unsafe needed. We just need to guarentee that the window outlives the use of the surface.
+    // The one line of unsafe needed. We just need to guarentee that the window
+    // outlives the use of the surface.
     //
-    // Android has to defer the surface until `Resumed` is fired. This doesn't fire on other platforms though :|
+    // Android has to defer the surface until `Resumed` is fired. This doesn't fire
+    // on other platforms though :|
     let mut surface = if cfg!(target_os = "android") {
         None
     } else {
@@ -217,20 +241,25 @@ pub async fn async_start<A: App + 'static>(mut app: A, window_builder: WindowBui
         format
     });
 
-    // Create the pbr pipeline with the same internal resolution
-    let render_texture_options = rend3_routine::RenderTextureOptions {
-        resolution: (glam::UVec2::new(window_size.width, window_size.height).as_vec2() * app.scale_factor()).as_uvec2(),
-        samples: app.sample_count(),
-    };
+    let base_rendergraph = app.create_base_rendergraph(&renderer);
+    let mut data_core = renderer.data_core.lock();
     let routines = Arc::new(DefaultRoutines {
-        pbr: Mutex::new(rend3_routine::PbrRenderRoutine::new(&renderer, render_texture_options)),
-        skybox: Mutex::new(rend3_routine::SkyboxRoutine::new(&renderer, render_texture_options)),
-        tonemapping: Mutex::new(rend3_routine::TonemappingRoutine::new(
+        pbr: Mutex::new(rend3_routine::pbr::PbrRoutine::new(
             &renderer,
-            render_texture_options.resolution,
+            &mut data_core,
+            &base_rendergraph.interfaces,
+        )),
+        skybox: Mutex::new(rend3_routine::skybox::SkyboxRoutine::new(
+            &renderer,
+            &base_rendergraph.interfaces,
+        )),
+        tonemapping: Mutex::new(rend3_routine::tonemapping::TonemappingRoutine::new(
+            &renderer,
+            &base_rendergraph.interfaces,
             format,
         )),
     });
+    drop(data_core);
 
     app.setup(&window, &renderer, &routines, format);
 
@@ -265,7 +294,6 @@ pub async fn async_start<A: App + 'static>(mut app: A, window_builder: WindowBui
             &mut surface,
             &renderer,
             format,
-            &routines,
             &mut stored_surface_info,
         ) {
             suspended = suspend;
@@ -293,7 +321,9 @@ pub async fn async_start<A: App + 'static>(mut app: A, window_builder: WindowBui
             &window,
             &renderer,
             &routines,
+            &base_rendergraph,
             surface.as_ref(),
+            stored_surface_info.size,
             event,
             |c: ControlFlow| {
                 *control_flow = c;
@@ -318,7 +348,6 @@ fn handle_surface<A: App, T: 'static>(
     surface: &mut Option<Arc<Surface>>,
     renderer: &Arc<Renderer>,
     format: rend3::types::TextureFormat,
-    routines: &Arc<DefaultRoutines>,
     surface_info: &mut StoredSurfaceInfo,
 ) -> Option<bool> {
     match *event {
@@ -355,33 +384,7 @@ fn handle_surface<A: App, T: 'static>(
             );
             // Tell the renderer about the new aspect ratio.
             renderer.set_aspect_ratio(size.x as f32 / size.y as f32);
-            // Resize the internal buffers to the same size as the screen.
-            lock(&routines.pbr).resize(
-                renderer,
-                rend3_routine::RenderTextureOptions {
-                    resolution: (size.as_vec2() * surface_info.scale_factor).as_uvec2(),
-                    samples: surface_info.sample_count,
-                },
-            );
-            lock(&routines.tonemapping).resize(size);
             Some(false)
-        }
-        Event::MainEventsCleared => {
-            let new_sample_count = app.sample_count();
-            let new_scale_factor = app.scale_factor();
-
-            if new_sample_count != surface_info.sample_count || new_scale_factor != surface_info.scale_factor {
-                lock(&routines.pbr).resize(
-                    renderer,
-                    rend3_routine::RenderTextureOptions {
-                        resolution: (surface_info.size.as_vec2() * new_scale_factor).as_uvec2(),
-                        samples: new_sample_count,
-                    },
-                );
-                surface_info.scale_factor = new_scale_factor;
-                surface_info.sample_count = new_sample_count;
-            }
-            None
         }
         _ => None,
     }
