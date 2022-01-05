@@ -194,7 +194,7 @@ pub async fn filesystem_io_func(parent_directory: impl AsRef<Path>, uri: SsoStri
 ///     &renderer,
 ///     &gltf_data,
 ///     1.0,
-///     rend3_routine::material::NormalTextureYDirection::Up,
+///     rend3_routine::pbr::NormalTextureYDirection::Up,
 ///     |p| rend3_gltf::filesystem_io_func(&parent_directory, p)
 /// ));
 /// ```
