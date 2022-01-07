@@ -36,19 +36,17 @@ indoc = "1"
 instant = { version = "0.1", features = ["wasm-bindgen"] }
 log = "0.4"
 pico-args = "0.4"
+pollster = "0.2"
 profiling = { version = "1", default-features = false }
 rend3 = { version = "^0.2.0", path = "../../rend3" }
-rend3-gltf = { version = "^0.2.0", default-features = false, path = "../../rend3-gltf", features = ["ddsfile", "ktx2"] }
 rend3-framework = { version = "^0.2.0", path = "../../rend3-framework" }
+rend3-gltf = { version = "^0.2.0", default-features = false, path = "../../rend3-gltf", features = ["ddsfile", "ktx2"] }
 rend3-routine = { version = "^0.2.0", path = "../../rend3-routine" }
 rustc-hash = "1"
 smallvec = "1"
 tracy-client = { version = "0.12", optional = true }
 wgpu-profiler = "0.8.0"
 winit = "0.26"
-
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-tokio = { version = "1", features = ["rt", "rt-multi-thread"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen-futures = "0.4"

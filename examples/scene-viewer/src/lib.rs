@@ -192,7 +192,7 @@ where
     Fut: Future + Send + 'static,
     Fut::Output: Send + 'static,
 {
-    tokio::spawn(fut);
+    std::thread::spawn(|| pollster::block_on(fut));
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -652,11 +652,6 @@ impl rend3_framework::App for SceneViewer {
 
 #[cfg_attr(target_os = "android", ndk_glue::main(backtrace = "on", logger(level = "debug")))]
 pub fn main() {
-    #[cfg(not(target_arch = "wasm32"))]
-    let _rt = tokio::runtime::Runtime::new().unwrap();
-    #[cfg(not(target_arch = "wasm32"))]
-    let _guard = _rt.enter();
-
     let app = SceneViewer::new();
 
     let mut builder = WindowBuilder::new().with_title("scene-viewer").with_maximized(true);
