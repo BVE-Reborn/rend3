@@ -352,7 +352,7 @@ pub fn load_gltf_nodes<'a, E: std::error::Error + 'static>(
                         color: Vec3::from(light.color()),
                         intensity: light.intensity(),
                         direction,
-                        distance: 1000.0,
+                        distance: 100.0,
                     }))
                 }
                 _ => None,
