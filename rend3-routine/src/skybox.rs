@@ -55,7 +55,8 @@ impl SkyboxRoutine {
         }
     }
 
-    /// Set the current background texture. Bad things will happen if this isn't a cube texture.
+    /// Set the current background texture. Bad things will happen if this isn't
+    /// a cube texture.
     pub fn set_background_texture(&mut self, texture: Option<TextureHandle>) {
         self.current_skybox.handle = texture;
         self.current_skybox.bg = None;
