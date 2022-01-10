@@ -20,6 +20,7 @@ pub mod base;
 pub mod common;
 pub mod culling;
 pub mod depth;
+pub mod forward;
 pub mod pbr;
 pub mod pre_cull;
 pub mod shaders;

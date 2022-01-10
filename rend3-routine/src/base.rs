@@ -317,12 +317,19 @@ impl BaseRenderGraphIntermediateState {
         samples: SampleCount,
     ) {
         for trans in &self.per_transparency {
-            pbr.add_forward_to_graph(
+            let inner = match trans.ty {
+                pbr::TransparencyType::Opaque => &pbr.opaque_routine,
+                pbr::TransparencyType::Cutout => &pbr.cutout_routine,
+                pbr::TransparencyType::Blend => &pbr.blend_routine,
+            };
+
+            inner.add_forward_to_graph(
                 graph,
                 self.forward_uniform_bg,
                 trans.cull,
+                None,
+                &format_sso!("PBR Forward {:?}", trans.ty),
                 samples,
-                trans.ty,
                 self.color,
                 self.resolve,
                 self.depth,
