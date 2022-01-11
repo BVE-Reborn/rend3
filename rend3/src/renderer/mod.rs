@@ -14,7 +14,7 @@ use crate::{
 };
 use glam::Mat4;
 use parking_lot::Mutex;
-use rend3_types::{Handedness, Material, MipmapCount, MipmapSource, TextureFormat, TextureFromTexture, TextureUsages};
+use rend3_types::{Handedness, Material, MipmapCount, MipmapSource, TextureFormat, TextureFromTexture, TextureUsages, ObjectChange};
 use std::{
     num::NonZeroU32,
     panic::Location,
@@ -417,18 +417,14 @@ impl Renderer {
     pub fn duplicate_object(
         &self,
         object_handle: &ObjectHandle,
-        material_override: Option<MaterialHandle>,
-        transform_override: Option<Mat4>,
-        mesh_override: Option<MeshHandle>,
+        change: ObjectChange,
     ) -> ObjectHandle {
         let dst_handle = ObjectManager::allocate(&self.current_ident);
         self.instructions.push(
             InstructionKind::DuplicateObject {
                 src_handle: object_handle.clone(),
                 dst_handle: dst_handle.clone(),
-                material_override,
-                transform_override,
-                mesh_override,
+                change,
             },
             *Location::caller(),
         );

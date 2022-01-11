@@ -844,12 +844,13 @@ pub trait Material: Send + Sync + 'static {
     fn to_data(&self, slice: &mut [u8]);
 }
 
-/// An object in the world that is composed of a [`Mesh`] and [`Material`].
-#[derive(Debug, Clone)]
-pub struct Object {
-    pub mesh: MeshHandle,
-    pub material: MaterialHandle,
-    pub transform: Mat4,
+changeable_struct! {
+    /// An object in the world that is composed of a [`Mesh`] and [`Material`].
+    pub struct Object <- ObjectChange {
+        pub mesh: MeshHandle,
+        pub material: MaterialHandle,
+        pub transform: Mat4,
+    }
 }
 
 /// Describes how the camera should look at the scene.

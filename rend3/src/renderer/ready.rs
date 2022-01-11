@@ -98,16 +98,12 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
                 InstructionKind::DuplicateObject {
                     src_handle,
                     dst_handle,
-                    material_override,
-                    transform_override,
-                    mesh_override,
+                    change,
                 } => {
                     data_core.object_manager.duplicate_object(
                         src_handle,
                         dst_handle,
-                        material_override,
-                        transform_override,
-                        mesh_override,
+                        change,
                         &data_core.mesh_manager,
                         &mut data_core.material_manager,
                     );

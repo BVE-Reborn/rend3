@@ -5,7 +5,7 @@ use crate::{
 };
 use glam::Mat4;
 use parking_lot::Mutex;
-use rend3_types::{MaterialHandle, MeshHandle, ObjectHandle, RawDirectionalLightHandle, TextureHandle};
+use rend3_types::{MaterialHandle, MeshHandle, ObjectHandle, RawDirectionalLightHandle, TextureHandle, ObjectChange};
 use std::{mem, panic::Location};
 use wgpu::{CommandBuffer, Device, Texture, TextureDescriptor, TextureView};
 
@@ -73,9 +73,7 @@ pub enum InstructionKind {
     DuplicateObject {
         src_handle: ObjectHandle,
         dst_handle: ObjectHandle,
-        material_override: Option<MaterialHandle>,
-        transform_override: Option<Mat4>,
-        mesh_override: Option<MeshHandle>,
+        change: ObjectChange,
     },
 }
 
