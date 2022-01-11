@@ -5,7 +5,7 @@ use crate::{
 };
 use glam::Mat4;
 use parking_lot::Mutex;
-use rend3_types::{MaterialHandle, MeshHandle, ObjectHandle, RawDirectionalLightHandle, TextureHandle, ObjectChange};
+use rend3_types::{MaterialHandle, MeshHandle, ObjectChange, ObjectHandle, RawDirectionalLightHandle, TextureHandle};
 use std::{mem, panic::Location};
 use wgpu::{CommandBuffer, Device, Texture, TextureDescriptor, TextureView};
 

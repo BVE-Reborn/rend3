@@ -9,7 +9,7 @@ use crate::{
     util::{frustum::BoundingSphere, registry::ArchetypicalRegistry},
 };
 use glam::{Mat4, Vec3A};
-use rend3_types::{Material, MaterialHandle, MeshHandle, RawObjectHandle, ObjectChange};
+use rend3_types::{Material, MaterialHandle, MeshHandle, ObjectChange, RawObjectHandle};
 
 #[repr(C, align(16))]
 #[derive(Debug, Copy, Clone)]

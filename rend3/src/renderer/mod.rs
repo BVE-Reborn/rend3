@@ -14,7 +14,9 @@ use crate::{
 };
 use glam::Mat4;
 use parking_lot::Mutex;
-use rend3_types::{Handedness, Material, MipmapCount, MipmapSource, TextureFormat, TextureFromTexture, TextureUsages, ObjectChange};
+use rend3_types::{
+    Handedness, Material, MipmapCount, MipmapSource, ObjectChange, TextureFormat, TextureFromTexture, TextureUsages,
+};
 use std::{
     num::NonZeroU32,
     panic::Location,
@@ -414,11 +416,7 @@ impl Renderer {
     /// object's handle. The duplicated object will reference the same mesh,
     /// material and transform as the original object.
     #[track_caller]
-    pub fn duplicate_object(
-        &self,
-        object_handle: &ObjectHandle,
-        change: ObjectChange,
-    ) -> ObjectHandle {
+    pub fn duplicate_object(&self, object_handle: &ObjectHandle, change: ObjectChange) -> ObjectHandle {
         let dst_handle = ObjectManager::allocate(&self.current_ident);
         self.instructions.push(
             InstructionKind::DuplicateObject {
