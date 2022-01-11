@@ -134,6 +134,7 @@ impl ObjectManager {
             .unwrap_or(&mut [])
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn duplicate_object(
         &mut self,
         src_handle: ObjectHandle,
