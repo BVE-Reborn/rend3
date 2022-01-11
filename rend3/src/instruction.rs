@@ -5,7 +5,7 @@ use crate::{
 };
 use glam::Mat4;
 use parking_lot::Mutex;
-use rend3_types::{MaterialHandle, MeshHandle, ObjectHandle, RawDirectionalLightHandle, TextureHandle};
+use rend3_types::{MaterialHandle, MeshHandle, ObjectChange, ObjectHandle, RawDirectionalLightHandle, TextureHandle};
 use std::{mem, panic::Location};
 use wgpu::{CommandBuffer, Device, Texture, TextureDescriptor, TextureView};
 
@@ -69,6 +69,11 @@ pub enum InstructionKind {
     },
     SetCameraData {
         data: Camera,
+    },
+    DuplicateObject {
+        src_handle: ObjectHandle,
+        dst_handle: ObjectHandle,
+        change: ObjectChange,
     },
 }
 
