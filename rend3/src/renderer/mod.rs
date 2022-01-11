@@ -413,8 +413,9 @@ impl Renderer {
     }
 
     /// Duplicates an existing object in the renderer, returning the new
-    /// object's handle. The duplicated object will reference the same mesh,
-    /// material and transform as the original object.
+    /// object's handle. Any changes specified in the `change` struct will be
+    /// applied to the duplicated object, and the same mesh, material and
+    /// transform as the original object will be used otherwise.
     #[track_caller]
     pub fn duplicate_object(&self, object_handle: &ObjectHandle, change: ObjectChange) -> ObjectHandle {
         let dst_handle = ObjectManager::allocate(&self.current_ident);
