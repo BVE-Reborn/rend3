@@ -53,8 +53,8 @@ impl<M: Material> ForwardRoutine<M> {
         interfaces: &WholeFrameInterfaces,
         per_material: &PerMaterialArchetypeInterface<M>,
 
-        vertex: Option<&ShaderModule>,
-        fragment: Option<&ShaderModule>,
+        vertex: Option<(&str, &ShaderModule)>,
+        fragment: Option<(&str, &ShaderModule)>,
         extra_bgls: &[BindGroupLayout],
 
         blend: Option<BlendState>,
@@ -65,10 +65,12 @@ impl<M: Material> ForwardRoutine<M> {
 
         let _forward_pass_vert_owned;
         let forward_pass_vert;
+        let vert_entry_point;
         match vertex {
-            Some(inner) => {
+            Some((inner_name, inner)) => {
                 _forward_pass_vert_owned = None;
                 forward_pass_vert = inner;
+                vert_entry_point = inner_name;
             }
             None => {
                 _forward_pass_vert_owned = Some(unsafe {
@@ -80,16 +82,19 @@ impl<M: Material> ForwardRoutine<M> {
                         "opaque.vert.gpu.spv",
                     )
                 });
-                forward_pass_vert = _forward_pass_vert_owned.as_ref().unwrap()
+                vert_entry_point = "main";
+                forward_pass_vert = _forward_pass_vert_owned.as_ref().unwrap();
             }
         };
 
         let _forward_pass_frag_owned;
         let forward_pass_frag;
+        let frag_entry_point;
         match fragment {
-            Some(inner) => {
+            Some((inner_name, inner)) => {
                 _forward_pass_frag_owned = None;
                 forward_pass_frag = inner;
+                frag_entry_point = inner_name;
             }
             None => {
                 _forward_pass_frag_owned = Some(unsafe {
@@ -101,6 +106,7 @@ impl<M: Material> ForwardRoutine<M> {
                         "opaque.frag.gpu.spv",
                     )
                 });
+                frag_entry_point = "main";
                 forward_pass_frag = _forward_pass_frag_owned.as_ref().unwrap()
             }
         };
@@ -125,7 +131,9 @@ impl<M: Material> ForwardRoutine<M> {
             build_forward_pipeline_inner(
                 renderer,
                 &pll,
+                vert_entry_point,
                 forward_pass_vert,
+                frag_entry_point,
                 forward_pass_frag,
                 blend,
                 use_prepass,
@@ -226,7 +234,9 @@ impl<M: Material> ForwardRoutine<M> {
 fn build_forward_pipeline_inner(
     renderer: &Renderer,
     pll: &wgpu::PipelineLayout,
+    vert_entry_point: &str,
     forward_pass_vert: &wgpu::ShaderModule,
+    frag_entry_point: &str,
     forward_pass_frag: &wgpu::ShaderModule,
     blend: Option<BlendState>,
     use_prepass: bool,
@@ -238,7 +248,7 @@ fn build_forward_pipeline_inner(
         layout: Some(pll),
         vertex: VertexState {
             module: forward_pass_vert,
-            entry_point: "main",
+            entry_point: vert_entry_point,
             buffers: match renderer.mode {
                 RendererMode::CpuPowered => &CPU_VERTEX_BUFFERS,
                 RendererMode::GpuPowered => &GPU_VERTEX_BUFFERS,
@@ -272,7 +282,7 @@ fn build_forward_pipeline_inner(
         },
         fragment: Some(FragmentState {
             module: forward_pass_frag,
-            entry_point: "main",
+            entry_point: frag_entry_point,
             targets: &[ColorTargetState {
                 format: TextureFormat::Rgba16Float,
                 blend,
