@@ -95,6 +95,23 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
                 InstructionKind::SetCameraData { data } => {
                     data_core.camera_manager.set_data(data);
                 }
+                InstructionKind::DuplicateObject {
+                    src_handle,
+                    dst_handle,
+                    material_override,
+                    transform_override,
+                    mesh_override,
+                } => {
+                    data_core.object_manager.duplicate_object(
+                        src_handle,
+                        dst_handle,
+                        material_override,
+                        transform_override,
+                        mesh_override,
+                        &data_core.mesh_manager,
+                        &mut data_core.material_manager,
+                    );
+                }
             }
         }
     }

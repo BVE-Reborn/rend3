@@ -70,6 +70,13 @@ pub enum InstructionKind {
     SetCameraData {
         data: Camera,
     },
+    DuplicateObject {
+        src_handle: ObjectHandle,
+        dst_handle: ObjectHandle,
+        material_override: Option<MaterialHandle>,
+        transform_override: Option<Mat4>,
+        mesh_override: Option<MeshHandle>,
+    },
 }
 
 pub struct InstructionStreamPair {

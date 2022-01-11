@@ -133,6 +133,25 @@ impl ObjectManager {
             })
             .unwrap_or(&mut [])
     }
+
+    pub fn duplicate_object(
+        &mut self,
+        src_handle: ObjectHandle,
+        dst_handle: ObjectHandle,
+        material_override: Option<MaterialHandle>,
+        transform_override: Option<Mat4>,
+        mesh_override: Option<MeshHandle>,
+        mesh_manager: &MeshManager,
+        material_manager: &mut MaterialManager,
+    ) {
+        let src_obj = self.registry.get_value_mut(src_handle.get_raw());
+        let dst_obj = Object {
+            mesh: mesh_override.unwrap_or_else(|| src_obj.mesh_handle.clone()),
+            material: material_override.unwrap_or_else(|| src_obj.material_handle.clone()),
+            transform: transform_override.unwrap_or(src_obj.input.transform),
+        };
+        self.fill(&dst_handle, dst_obj, mesh_manager, material_manager);
+    }
 }
 
 impl Default for ObjectManager {

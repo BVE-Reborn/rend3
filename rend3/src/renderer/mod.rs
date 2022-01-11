@@ -410,6 +410,31 @@ impl Renderer {
         handle
     }
 
+    /// Duplicates an existing object in the renderer, returning the new
+    /// object's handle. The duplicated object will reference the same mesh,
+    /// material and transform as the original object.
+    #[track_caller]
+    pub fn duplicate_object(
+        &self,
+        object_handle: &ObjectHandle,
+        material_override: Option<MaterialHandle>,
+        transform_override: Option<Mat4>,
+        mesh_override: Option<MeshHandle>,
+    ) -> ObjectHandle {
+        let dst_handle = ObjectManager::allocate(&self.current_ident);
+        self.instructions.push(
+            InstructionKind::DuplicateObject {
+                src_handle: object_handle.clone(),
+                dst_handle: dst_handle.clone(),
+                material_override,
+                transform_override,
+                mesh_override,
+            },
+            *Location::caller(),
+        );
+        dst_handle
+    }
+
     /// Move the given object to a new transform location.
     #[track_caller]
     pub fn set_object_transform(&self, handle: &ObjectHandle, transform: Mat4) {

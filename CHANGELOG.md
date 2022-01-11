@@ -36,6 +36,7 @@ Per Keep a Changelog there are 6 main categories of changes:
 ### Added
 - rend3-egui: An integration with the immediate mode GUI [egui](https://github.com/emilk/egui) @MindSwipe
 - rend3-textured-quad: Add example of simple 2D rendering.
+- rend3: Allow duplicating objects overriding some of their properties. @setzer22
 
 ### Changes
 - rend3: Instead of passing a render routine to the render function, you now add them to a rendergraph, then pass that rendergraph into the renderer.
