@@ -24,8 +24,6 @@ pub const VERTEX_TANGENT_SIZE: usize = size_of::<Vec3>();
 pub const VERTEX_UV_SIZE: usize = size_of::<Vec2>();
 /// Size of a single vertex color.
 pub const VERTEX_COLOR_SIZE: usize = size_of::<[u8; 4]>();
-/// Size of a single vertex material index.
-pub const VERTEX_MATERIAL_INDEX_SIZE: usize = size_of::<u32>();
 /// Size of a single index.
 pub const INDEX_SIZE: usize = size_of::<u32>();
 
@@ -49,7 +47,6 @@ pub struct MeshBuffers {
     pub vertex_uv0: Buffer,
     pub vertex_uv1: Buffer,
     pub vertex_color: Buffer,
-    pub vertex_mat_index: Buffer,
 
     pub index: Buffer,
 }
@@ -62,7 +59,6 @@ impl MeshBuffers {
         rpass.set_vertex_buffer(3, self.vertex_uv0.slice(..));
         rpass.set_vertex_buffer(4, self.vertex_uv1.slice(..));
         rpass.set_vertex_buffer(5, self.vertex_color.slice(..));
-        rpass.set_vertex_buffer(6, self.vertex_mat_index.slice(..));
         rpass.set_index_buffer(self.index.slice(..), IndexFormat::Uint32);
     }
 }
@@ -177,11 +173,6 @@ impl MeshManager {
             &self.buffers.vertex_color,
             (vertex_range.start * VERTEX_COLOR_SIZE) as BufferAddress,
             bytemuck::cast_slice(&mesh.vertex_colors),
-        );
-        queue.write_buffer(
-            &self.buffers.vertex_mat_index,
-            (vertex_range.start * VERTEX_MATERIAL_INDEX_SIZE) as BufferAddress,
-            bytemuck::cast_slice(&mesh.vertex_material_indices),
         );
         queue.write_buffer(
             &self.buffers.index,
@@ -306,14 +297,6 @@ impl MeshManager {
                 &new_vert_range,
                 VERTEX_COLOR_SIZE,
             );
-            copy_vert(
-                encoder,
-                &self.buffers.vertex_mat_index,
-                &new_buffers.vertex_mat_index,
-                mesh,
-                &new_vert_range,
-                VERTEX_MATERIAL_INDEX_SIZE,
-            );
 
             // Copy indices over to new buffer, adjusting their value by the difference
             let index_copy_start = mesh.index_range.start * INDEX_SIZE;
@@ -373,7 +356,6 @@ fn create_buffers(device: &Device, vertex_count: usize, index_count: usize) -> M
     let tangent_bytes = vertex_count * VERTEX_TANGENT_SIZE;
     let uv_bytes = vertex_count * VERTEX_UV_SIZE;
     let color_bytes = vertex_count * VERTEX_COLOR_SIZE;
-    let mat_index_bytes = vertex_count * VERTEX_MATERIAL_INDEX_SIZE;
     let index_bytes = index_count * INDEX_SIZE;
 
     let vertex_position = device.create_buffer(&BufferDescriptor {
@@ -418,13 +400,6 @@ fn create_buffers(device: &Device, vertex_count: usize, index_count: usize) -> M
         mapped_at_creation: false,
     });
 
-    let vertex_mat_index = device.create_buffer(&BufferDescriptor {
-        label: Some("material index vertex buffer"),
-        size: mat_index_bytes as BufferAddress,
-        usage: BufferUsages::COPY_SRC | BufferUsages::COPY_DST | BufferUsages::VERTEX | BufferUsages::STORAGE,
-        mapped_at_creation: false,
-    });
-
     let index = device.create_buffer(&BufferDescriptor {
         label: Some("index buffer"),
         size: index_bytes as BufferAddress,
@@ -439,7 +414,6 @@ fn create_buffers(device: &Device, vertex_count: usize, index_count: usize) -> M
         vertex_uv0,
         vertex_uv1,
         vertex_color,
-        vertex_mat_index,
         index,
     }
 }

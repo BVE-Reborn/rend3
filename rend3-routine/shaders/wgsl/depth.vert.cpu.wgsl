@@ -35,26 +35,25 @@ var<private> i_coords0_1: vec2<f32>;
 var<private> i_normal_1: vec3<f32>;
 var<private> i_tangent_1: vec3<f32>;
 var<private> i_coords1_1: vec2<f32>;
-var<private> i_material_1: u32;
 
 fn main_1() {
-    let _e22 = gl_InstanceIndex_1;
-    let _e27 = unnamed.object_output[bitcast<u32>(_e22)].model_view_proj;
-    let _e29 = unnamed.object_output[bitcast<u32>(_e22)].material_idx;
-    let _e30 = i_position_1;
-    let _e35 = (_e27 * vec4<f32>(_e30.x, _e30.y, _e30.z, 1.0));
-    o_position = _e35;
-    perVertexStruct.gl_Position = _e35;
-    o_material = _e29;
-    let _e37 = i_color_1;
-    o_color = _e37;
-    let _e38 = i_coords0_1;
-    o_coords0_ = _e38;
+    let _e21 = gl_InstanceIndex_1;
+    let _e26 = unnamed.object_output[bitcast<u32>(_e21)].model_view_proj;
+    let _e28 = unnamed.object_output[bitcast<u32>(_e21)].material_idx;
+    let _e29 = i_position_1;
+    let _e34 = (_e26 * vec4<f32>(_e29.x, _e29.y, _e29.z, 1.0));
+    o_position = _e34;
+    perVertexStruct.gl_Position = _e34;
+    o_material = _e28;
+    let _e36 = i_color_1;
+    o_color = _e36;
+    let _e37 = i_coords0_1;
+    o_coords0_ = _e37;
     return;
 }
 
 [[stage(vertex)]]
-fn main([[builtin(instance_index)]] gl_InstanceIndex: u32, [[location(0)]] i_position: vec3<f32>, [[location(5)]] i_color: vec4<f32>, [[location(3)]] i_coords0_: vec2<f32>, [[location(1)]] i_normal: vec3<f32>, [[location(2)]] i_tangent: vec3<f32>, [[location(4)]] i_coords1_: vec2<f32>, [[location(6)]] i_material: u32) -> VertexOutput {
+fn main([[builtin(instance_index)]] gl_InstanceIndex: u32, [[location(0)]] i_position: vec3<f32>, [[location(5)]] i_color: vec4<f32>, [[location(3)]] i_coords0_: vec2<f32>, [[location(1)]] i_normal: vec3<f32>, [[location(2)]] i_tangent: vec3<f32>, [[location(4)]] i_coords1_: vec2<f32>) -> VertexOutput {
     gl_InstanceIndex_1 = i32(gl_InstanceIndex);
     i_position_1 = i_position;
     i_color_1 = i_color;
@@ -62,12 +61,11 @@ fn main([[builtin(instance_index)]] gl_InstanceIndex: u32, [[location(0)]] i_pos
     i_normal_1 = i_normal;
     i_tangent_1 = i_tangent;
     i_coords1_1 = i_coords1_;
-    i_material_1 = i_material;
     main_1();
-    let _e23 = o_position;
-    let _e24 = perVertexStruct.gl_Position;
-    let _e25 = o_material;
-    let _e26 = o_color;
-    let _e27 = o_coords0_;
-    return VertexOutput(_e23, _e24, _e25, _e26, _e27);
+    let _e21 = o_position;
+    let _e22 = perVertexStruct.gl_Position;
+    let _e23 = o_material;
+    let _e24 = o_color;
+    let _e25 = o_coords0_;
+    return VertexOutput(_e21, _e22, _e23, _e24, _e25);
 }

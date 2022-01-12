@@ -1,7 +1,7 @@
 use wgpu::{VertexAttribute, VertexBufferLayout, VertexFormat, VertexStepMode};
 
 /// Vertex buffer layouts used in CpuPowered Mode.
-pub static CPU_VERTEX_BUFFERS: [VertexBufferLayout<'static>; 7] = [
+pub static CPU_VERTEX_BUFFERS: [VertexBufferLayout<'static>; 6] = [
     VertexBufferLayout {
         array_stride: rend3::managers::VERTEX_POSITION_SIZE as u64,
         step_mode: VertexStepMode::Vertex,
@@ -54,21 +54,12 @@ pub static CPU_VERTEX_BUFFERS: [VertexBufferLayout<'static>; 7] = [
             format: VertexFormat::Unorm8x4,
             offset: 0,
             shader_location: 5,
-        }],
-    },
-    VertexBufferLayout {
-        array_stride: rend3::managers::VERTEX_MATERIAL_INDEX_SIZE as u64,
-        step_mode: VertexStepMode::Vertex,
-        attributes: &[VertexAttribute {
-            format: VertexFormat::Uint32,
-            offset: 0,
-            shader_location: 6,
         }],
     },
 ];
 
 /// Vertex buffer layouts used in GpuPowered Mode.
-pub static GPU_VERTEX_BUFFERS: [VertexBufferLayout<'static>; 8] = [
+pub static GPU_VERTEX_BUFFERS: [VertexBufferLayout<'static>; 7] = [
     VertexBufferLayout {
         array_stride: rend3::managers::VERTEX_POSITION_SIZE as u64,
         step_mode: VertexStepMode::Vertex,
@@ -121,15 +112,6 @@ pub static GPU_VERTEX_BUFFERS: [VertexBufferLayout<'static>; 8] = [
             format: VertexFormat::Unorm8x4,
             offset: 0,
             shader_location: 5,
-        }],
-    },
-    VertexBufferLayout {
-        array_stride: rend3::managers::VERTEX_MATERIAL_INDEX_SIZE as u64,
-        step_mode: VertexStepMode::Vertex,
-        attributes: &[VertexAttribute {
-            format: VertexFormat::Uint32,
-            offset: 0,
-            shader_location: 6,
         }],
     },
     VertexBufferLayout {
@@ -138,7 +120,7 @@ pub static GPU_VERTEX_BUFFERS: [VertexBufferLayout<'static>; 8] = [
         attributes: &[VertexAttribute {
             format: VertexFormat::Uint32,
             offset: 16,
-            shader_location: 7,
+            shader_location: 6,
         }],
     },
 ];

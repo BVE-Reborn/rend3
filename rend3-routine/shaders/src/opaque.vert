@@ -10,9 +10,8 @@ layout(location = 2) in vec3 i_tangent;
 layout(location = 3) in vec2 i_coords0;
 layout(location = 4) in vec2 i_coords1;
 layout(location = 5) in vec4 i_color;
-layout(location = 6) in uint i_material;
 #ifdef GPU_MODE
-layout(location = 7) in uint i_object_idx;
+layout(location = 6) in uint i_object_idx;
 #endif
 
 layout(location = 0) out vec4 o_view_position;
@@ -41,10 +40,6 @@ layout(set = 2, binding = 0) readonly buffer TextureData {
 #endif
 
 void main() {
-    #ifdef GPU_MODE
-    GPUMaterialData material = materials[i_material];
-    #endif
-
     #ifdef CPU_MODE
     uint object_idx = gl_InstanceIndex;
     #else
@@ -66,10 +61,5 @@ void main() {
     o_coords0 = i_coords0;
     o_coords1 = i_coords1;
 
-    #ifdef BAKING
-    vec2 coord1_adj = vec2(material.uv_transform1 * vec3(i_coords1, 1.0));
-    gl_Position = vec4(coord1_adj * 2.0 - 1.0, 0.0, 1.0);
-    #else
     gl_Position = data.model_view_proj * vec4(i_position, 1.0);
-    #endif
 }
