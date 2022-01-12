@@ -151,31 +151,6 @@ declare_raw_handle!(
 );
 
 macro_rules! changeable_struct {
-    ($(#[$outer:meta])* pub struct $name:ident <- nodefault $name_change:ident { $($(#[$inner:meta])* $field_vis:vis $field_name:ident : $field_type:ty),* $(,)? } ) => {
-        $(#[$outer])*
-        #[derive(Debug, Default, Clone)]
-        pub struct $name {
-            $(
-                $(#[$inner])* $field_vis $field_name : $field_type
-            ),*
-        }
-        impl $name {
-            pub fn update_from_changes(&mut self, change: $name_change) {
-                $(
-                    if let Some(inner) = change.$field_name {
-                        self.$field_name = inner;
-                    }
-                );*
-            }
-        }
-        #[doc = concat!("Describes a modification to a ", stringify!($name), ".")]
-        #[derive(Debug, Default, Clone)]
-        pub struct $name_change {
-            $(
-                $field_vis $field_name : Option<$field_type>
-            ),*
-        }
-    };
     ($(#[$outer:meta])* pub struct $name:ident <- $name_change:ident { $($(#[$inner:meta])* $field_vis:vis $field_name:ident : $field_type:ty),* $(,)? } ) => {
         $(#[$outer])*
         #[derive(Debug, Clone)]
