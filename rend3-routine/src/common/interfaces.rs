@@ -61,7 +61,7 @@ impl WholeFrameInterfaces {
 pub struct PerObjectDataAbi {
     pub model_view: Mat4,
     pub model_view_proj: Mat4,
-    // Unused in shader
+    // Only read in GpuPowered mode. Materials are directly bound in CpuPowered mode.
     pub material_idx: u32,
     pub pad0: [u8; 12],
     pub inv_squared_scale: Vec3,
