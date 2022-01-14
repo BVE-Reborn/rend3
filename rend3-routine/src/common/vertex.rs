@@ -81,7 +81,7 @@ pub static CPU_VERTEX_BUFFERS: [VertexBufferLayout<'static>; 8] = [
 ];
 
 /// Vertex buffer layouts used in GpuPowered Mode.
-pub static GPU_VERTEX_BUFFERS: [VertexBufferLayout<'static>; 7] = [
+pub static GPU_VERTEX_BUFFERS: [VertexBufferLayout<'static>; 9] = [
     VertexBufferLayout {
         array_stride: rend3::managers::VERTEX_POSITION_SIZE as u64,
         step_mode: VertexStepMode::Vertex,
