@@ -130,7 +130,8 @@ declare_handle!(
     TextureHandle<Texture>,
     MaterialHandle<MaterialTag>,
     ObjectHandle<Object>,
-    DirectionalLightHandle<DirectionalLight>
+    DirectionalLightHandle<DirectionalLight>,
+    SkeletonHandle<Skeleton>
 );
 
 #[macro_export]
@@ -147,7 +148,8 @@ declare_raw_handle!(
     RawTextureHandle<Texture>,
     RawMaterialHandle<MaterialTag>,
     RawObjectHandle<Object>,
-    RawDirectionalLightHandle<DirectionalLight>
+    RawDirectionalLightHandle<DirectionalLight>,
+    RawSkeletonHandle<Skeleton>
 );
 
 macro_rules! changeable_struct {
@@ -925,4 +927,17 @@ impl Default for Handedness {
     fn default() -> Self {
         Self::Left
     }
+}
+
+/// A Skeleton stores the necessary data to do vertex skinning for an [Object]
+#[derive(Debug, Clone)]
+pub struct Skeleton {
+    /// Stores one transformation matrix for each joint. These are the
+    /// transformations that will be applied to the vertices affected by the
+    /// corresponding joint. Not to be confused with the transform matrix of the
+    /// joint itself.
+    ///
+    /// TODO: Add note about utility function that takes inverseBindMatrices and
+    /// how to use it.
+    pub joint_deltas: Vec<Mat4>,
 }

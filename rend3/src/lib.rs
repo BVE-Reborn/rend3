@@ -81,6 +81,7 @@ pub mod managers {
     mod material;
     mod mesh;
     mod object;
+    mod skeleton;
     mod texture;
 
     pub use camera::*;
@@ -88,6 +89,7 @@ pub mod managers {
     pub use material::*;
     pub use mesh::*;
     pub use object::*;
+    pub use skeleton::*;
     pub use texture::*;
 }
 
