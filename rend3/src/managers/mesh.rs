@@ -441,7 +441,6 @@ fn create_buffers(device: &Device, vertex_count: usize, index_count: usize) -> M
         mapped_at_creation: false,
     });
 
-
     MeshBuffers {
         vertex_position,
         vertex_normal,
