@@ -27,7 +27,7 @@ pub const VERTEX_COLOR_SIZE: usize = size_of::<[u8; 4]>();
 /// Size of a single index.
 pub const INDEX_SIZE: usize = size_of::<u32>();
 /// Size of a joint index vector
-pub const VERTEX_JOINT_INDEX_SIZE: usize = size_of::<[u32; 4]>();
+pub const VERTEX_JOINT_INDEX_SIZE: usize = size_of::<[u16; 4]>();
 /// Size of a joint weight vector
 pub const VERTEX_JOINT_WEIGHT_SIZE: usize = size_of::<[f32; 4]>();
 
