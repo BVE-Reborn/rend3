@@ -477,6 +477,14 @@ pub fn load_meshes<'a, E: std::error::Error + 'static>(
                     builder = builder.with_indices(indices.into_u32().collect())
                 }
 
+                if let Some(joint_indices) = reader.read_joints(0) {
+                    builder = builder.with_vertex_joint_indices(joint_indices.into_u16().collect())
+                }
+
+                if let Some(joint_weights) = reader.read_weights(0) {
+                    builder = builder.with_vertex_joint_weights(joint_weights.into_f32().map(Vec4::from).collect())
+                }
+
                 let mesh = builder
                     .build()
                     .map_err(|valid| GltfLoadError::MeshValidationError(mesh.index(), valid))?;
