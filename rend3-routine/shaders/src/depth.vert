@@ -10,7 +10,7 @@ layout(location = 3) in vec2 i_coords0;
 layout(location = 4) in vec2 i_coords1;
 layout(location = 5) in vec4 i_color;
 #ifdef GPU_MODE
-layout(location = 6) in uint i_object_idx;
+layout(location = 8) in uint i_object_idx;
 #endif
 
 layout(location = 0) out vec4 o_position;
