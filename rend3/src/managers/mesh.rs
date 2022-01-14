@@ -32,24 +32,24 @@ pub const VERTEX_JOINT_INDEX_SIZE: usize = size_of::<[u16; 4]>();
 pub const VERTEX_JOINT_WEIGHT_SIZE: usize = size_of::<[f32; 4]>();
 
 /// Vertex buffer slot for positions
-pub const VERTEX_POSITION_SLOT:  u32 = 0;
+pub const VERTEX_POSITION_SLOT: u32 = 0;
 /// Vertex buffer slot for normals
-pub const VERTEX_NORMAL_SLOT:  u32 = 1;
+pub const VERTEX_NORMAL_SLOT: u32 = 1;
 /// Vertex buffer slot for tangents
-pub const VERTEX_TANGENT_SLOT:  u32 = 2;
+pub const VERTEX_TANGENT_SLOT: u32 = 2;
 /// Vertex buffer slot for uv0
-pub const VERTEX_UV0_SLOT:  u32 = 3;
+pub const VERTEX_UV0_SLOT: u32 = 3;
 /// Vertex buffer slot for uv1
-pub const VERTEX_UV1_SLOT:  u32 = 4;
+pub const VERTEX_UV1_SLOT: u32 = 4;
 /// Vertex buffer slot for colors
-pub const VERTEX_COLOR_SLOT:  u32 = 5;
+pub const VERTEX_COLOR_SLOT: u32 = 5;
 /// Vertex buffer slot for joint indices
-pub const VERTEX_JOINT_INDEX_SLOT:  u32 = 6;
+pub const VERTEX_JOINT_INDEX_SLOT: u32 = 6;
 /// Vertex buffer slot for joint weights
-pub const VERTEX_JOINT_WEIGHT_SLOT:  u32 = 7;
+pub const VERTEX_JOINT_WEIGHT_SLOT: u32 = 7;
 /// Vertex buffer slot for object indices
 /// Note that this slot is only used in GPU mode.
-pub const VERTEX_OBJECT_INDEX_SLOT:  u32 = 8;
+pub const VERTEX_OBJECT_INDEX_SLOT: u32 = 8;
 
 /// Pre-allocated vertex count in the vertex megabuffers.
 pub const STARTING_VERTICES: usize = 1 << 16;
