@@ -31,6 +31,26 @@ pub const VERTEX_JOINT_INDEX_SIZE: usize = size_of::<[u16; 4]>();
 /// Size of a joint weight vector
 pub const VERTEX_JOINT_WEIGHT_SIZE: usize = size_of::<[f32; 4]>();
 
+/// Vertex buffer slot for positions
+pub const VERTEX_POSITION_SLOT:  u32 = 0;
+/// Vertex buffer slot for normals
+pub const VERTEX_NORMAL_SLOT:  u32 = 1;
+/// Vertex buffer slot for tangents
+pub const VERTEX_TANGENT_SLOT:  u32 = 2;
+/// Vertex buffer slot for uv0
+pub const VERTEX_UV0_SLOT:  u32 = 3;
+/// Vertex buffer slot for uv1
+pub const VERTEX_UV1_SLOT:  u32 = 4;
+/// Vertex buffer slot for colors
+pub const VERTEX_COLOR_SLOT:  u32 = 5;
+/// Vertex buffer slot for joint indices
+pub const VERTEX_JOINT_INDEX_SLOT:  u32 = 6;
+/// Vertex buffer slot for joint weights
+pub const VERTEX_JOINT_WEIGHT_SLOT:  u32 = 7;
+/// Vertex buffer slot for object indices
+/// Note that this slot is only used in GPU mode.
+pub const VERTEX_OBJECT_INDEX_SLOT:  u32 = 8;
+
 /// Pre-allocated vertex count in the vertex megabuffers.
 pub const STARTING_VERTICES: usize = 1 << 16;
 /// Pre-allocated index count in the index megabuffer.
@@ -59,14 +79,14 @@ pub struct MeshBuffers {
 
 impl MeshBuffers {
     pub fn bind<'rpass>(&'rpass self, rpass: &mut RenderPass<'rpass>) {
-        rpass.set_vertex_buffer(0, self.vertex_position.slice(..));
-        rpass.set_vertex_buffer(1, self.vertex_normal.slice(..));
-        rpass.set_vertex_buffer(2, self.vertex_tangent.slice(..));
-        rpass.set_vertex_buffer(3, self.vertex_uv0.slice(..));
-        rpass.set_vertex_buffer(4, self.vertex_uv1.slice(..));
-        rpass.set_vertex_buffer(5, self.vertex_color.slice(..));
-        rpass.set_vertex_buffer(6, self.vertex_joint_index.slice(..));
-        rpass.set_vertex_buffer(7, self.vertex_joint_weight.slice(..));
+        rpass.set_vertex_buffer(VERTEX_POSITION_SLOT, self.vertex_position.slice(..));
+        rpass.set_vertex_buffer(VERTEX_NORMAL_SLOT, self.vertex_normal.slice(..));
+        rpass.set_vertex_buffer(VERTEX_TANGENT_SLOT, self.vertex_tangent.slice(..));
+        rpass.set_vertex_buffer(VERTEX_UV0_SLOT, self.vertex_uv0.slice(..));
+        rpass.set_vertex_buffer(VERTEX_UV1_SLOT, self.vertex_uv1.slice(..));
+        rpass.set_vertex_buffer(VERTEX_COLOR_SLOT, self.vertex_color.slice(..));
+        rpass.set_vertex_buffer(VERTEX_JOINT_INDEX_SLOT, self.vertex_joint_index.slice(..));
+        rpass.set_vertex_buffer(VERTEX_JOINT_WEIGHT_SLOT, self.vertex_joint_weight.slice(..));
         rpass.set_index_buffer(self.index.slice(..), IndexFormat::Uint32);
     }
 }
