@@ -77,6 +77,7 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
                         &handle,
                         object,
                         &data_core.mesh_manager,
+                        &mut data_core.skeleton_manager,
                         &mut data_core.material_manager,
                     );
                 }
@@ -105,6 +106,7 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
                         dst_handle,
                         change,
                         &data_core.mesh_manager,
+                        &mut data_core.skeleton_manager,
                         &mut data_core.material_manager,
                     );
                 }

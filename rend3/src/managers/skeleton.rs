@@ -1,20 +1,23 @@
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::{
+    ops::Range,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
 use crate::util::registry::ResourceRegistry;
 
 use glam::Mat4;
-use rend3_types::{RawSkeletonHandle, Skeleton, SkeletonHandle};
+use rend3_types::{MeshHandle, RawSkeletonHandle, Skeleton, SkeletonHandle};
+use wgpu::{CommandEncoder, Device, Queue};
+
+use super::MeshManager;
 
 /// Internal representation of a Skeleton
 #[repr(C, align(16))]
 #[derive(Debug, Clone)]
 pub struct InternalSkeleton {
-    /// Stores one transformation matrix for each joint. These are the
-    /// transformations that will be applied to the vertices affected by the
-    /// corresponding joint. Not to be confused with the transform matrix of the
-    /// joint itself.
-    /// TODO: Add note about utility function that takes inverseBindMatrices
+    pub mesh_handle: MeshHandle,
     pub joint_deltas: Vec<Mat4>,
+    pub vertex_range: Range<usize>,
 }
 
 /// Manages skeletons. Skeletons only contain the relevant data for vertex
@@ -37,9 +40,21 @@ impl SkeletonManager {
         SkeletonHandle::new(idx)
     }
 
-    pub fn fill(&mut self, handle: &SkeletonHandle, skeleton: Skeleton) {
+    pub fn fill(
+        &mut self,
+        device: &Device,
+        queue: &Queue,
+        encoder: &mut CommandEncoder,
+        mesh_manager: &mut MeshManager,
+        handle: &SkeletonHandle,
+        skeleton: Skeleton,
+    ) {
+        let vertex_range = mesh_manager.allocate_skeleton_mesh(device, queue, encoder, &skeleton.mesh);
+
         let internal = InternalSkeleton {
             joint_deltas: skeleton.joint_deltas,
+            mesh_handle: skeleton.mesh,
+            vertex_range,
         };
         self.registry.insert(handle, internal);
     }
@@ -52,6 +67,10 @@ impl SkeletonManager {
     pub fn set_joint_deltas(&mut self, handle: RawSkeletonHandle, joint_deltas: Vec<Mat4>) {
         let skeleton = self.registry.get_mut(handle);
         skeleton.joint_deltas = joint_deltas;
+    }
+
+    pub fn internal_data(&self, handle: RawSkeletonHandle) -> &InternalSkeleton {
+        self.registry.get(handle)
     }
 }
 

@@ -24,7 +24,7 @@ use glam::{Mat3, Mat4, UVec2, Vec2, Vec3, Vec4};
 use gltf::buffer::Source;
 use image::GenericImageView;
 use rend3::{
-    types::{self, Handedness, MeshValidationError, ObjectHandle},
+    types::{self, Handedness, MeshValidationError, ObjectHandle, ObjectMeshKind},
     util::typedefs::{FastHashMap, SsoString},
     Renderer,
 };
@@ -307,7 +307,8 @@ pub fn add_mesh_by_index<E: std::error::Error + 'static>(
                 )
                 .ok_or_else(|| GltfLoadError::MissingMaterial(mat_idx.expect("Could not find default material")))?;
             Ok(renderer.add_object(types::Object {
-                mesh: prim.handle.clone(),
+                // TODO: Autodetect animation and spawn skeleton instead.
+                mesh_kind: ObjectMeshKind::Static(prim.handle.clone()),
                 material: mat.clone(),
                 transform,
             }))

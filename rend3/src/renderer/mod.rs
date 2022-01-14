@@ -3,7 +3,7 @@ use crate::{
     instruction::{InstructionKind, InstructionStreamPair},
     managers::{
         CameraManager, DirectionalLightManager, InternalTexture, MaterialManager, MeshManager, ObjectManager,
-        TextureManager,
+        TextureManager, SkeletonManager,
     },
     types::{
         Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, MaterialHandle, Mesh, MeshHandle,
@@ -81,6 +81,8 @@ pub struct RendererDataCore {
     pub object_manager: ObjectManager,
     /// Manages all directional lights, including their shadow maps.
     pub directional_light_manager: DirectionalLightManager,
+    /// Manages skeletons, and their owned portion of the MeshManager's buffers
+    pub skeleton_manager: SkeletonManager,
 
     /// Stores gpu timing and debug scopes.
     pub profiler: GpuProfiler,

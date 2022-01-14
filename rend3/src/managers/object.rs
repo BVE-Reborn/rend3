@@ -9,7 +9,9 @@ use crate::{
     util::{frustum::BoundingSphere, registry::ArchetypicalRegistry},
 };
 use glam::{Mat4, Vec3A};
-use rend3_types::{Material, MaterialHandle, MeshHandle, ObjectChange, RawObjectHandle};
+use rend3_types::{Material, MaterialHandle, MeshHandle, ObjectChange, RawObjectHandle, SkeletonHandle, ObjectMeshKind};
+
+use super::SkeletonManager;
 
 #[repr(C, align(16))]
 #[derive(Debug, Copy, Clone)]
@@ -30,7 +32,7 @@ unsafe impl bytemuck::Zeroable for GpuCullingInput {}
 #[repr(C, align(16))]
 #[derive(Debug, Clone)]
 pub struct InternalObject {
-    pub mesh_handle: MeshHandle,
+    pub mesh_kind: ObjectMeshKind,
     pub material_handle: MaterialHandle,
     // Index into the material archetype array
     pub location: Vec3A,
@@ -67,9 +69,21 @@ impl ObjectManager {
         handle: &ObjectHandle,
         object: Object,
         mesh_manager: &MeshManager,
+        skeleton_manager: &SkeletonManager,
         material_manager: &mut MaterialManager,
     ) {
-        let mesh = mesh_manager.internal_data(object.mesh.get_raw());
+        let (bounding_sphere, index_range, vertex_range) = match &object.mesh_kind {
+            ObjectMeshKind::Animated(skeleton) => {
+                let skeleton = skeleton_manager.internal_data(skeleton.get_raw());
+                let mesh = mesh_manager.internal_data(skeleton.mesh_handle.get_raw());
+                (mesh.bounding_sphere, mesh.index_range.clone(), skeleton.vertex_range.clone())
+            },
+            ObjectMeshKind::Static(mesh) => {
+                let mesh = mesh_manager.internal_data(mesh.get_raw());
+                (mesh.bounding_sphere, mesh.index_range.clone(), mesh.vertex_range.clone())
+            },
+        };
+
         let (material_key, object_list) = material_manager.get_material_key_and_objects(object.material.get_raw());
         object_list.push(handle.get_raw());
 
@@ -78,13 +92,13 @@ impl ObjectManager {
             input: GpuCullingInput {
                 material_index: material_manager.get_internal_index(object.material.get_raw()) as u32,
                 transform: object.transform,
-                bounding_sphere: mesh.bounding_sphere,
-                start_idx: mesh.index_range.start as u32,
-                count: (mesh.index_range.end - mesh.index_range.start) as u32,
-                vertex_offset: mesh.vertex_range.start as i32,
+                bounding_sphere,
+                start_idx: index_range.start as u32,
+                count: (index_range.end - index_range.start) as u32,
+                vertex_offset: vertex_range.start as i32,
             },
             material_handle: object.material,
-            mesh_handle: object.mesh,
+            mesh_kind: object.mesh_kind,
         };
 
         self.registry.insert(handle, shader_object, material_key);
@@ -140,15 +154,16 @@ impl ObjectManager {
         dst_handle: ObjectHandle,
         change: ObjectChange,
         mesh_manager: &MeshManager,
+        skeleton_manager: &SkeletonManager,
         material_manager: &mut MaterialManager,
     ) {
         let src_obj = self.registry.get_value_mut(src_handle.get_raw());
         let dst_obj = Object {
-            mesh: change.mesh.unwrap_or_else(|| src_obj.mesh_handle.clone()),
+            mesh_kind: change.mesh_kind.unwrap_or_else(|| src_obj.mesh_kind.clone()),
             material: change.material.unwrap_or_else(|| src_obj.material_handle.clone()),
             transform: change.transform.unwrap_or(src_obj.input.transform),
         };
-        self.fill(&dst_handle, dst_obj, mesh_manager, material_manager);
+        self.fill(&dst_handle, dst_obj, mesh_manager, skeleton_manager, material_manager);
     }
 }
 
