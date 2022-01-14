@@ -1,4 +1,4 @@
-use glam::{Mat4, UVec2, Vec2, Vec3, Vec3A};
+use glam::{Mat4, UVec2, Vec2, Vec3, Vec3A, Vec4};
 use std::{
     fmt::Debug,
     hash::Hash,
@@ -222,6 +222,8 @@ pub struct MeshBuilder {
     vertex_uv0: Option<Vec<Vec2>>,
     vertex_uv1: Option<Vec<Vec2>>,
     vertex_colors: Option<Vec<[u8; 4]>>,
+    vertex_joint_indices: Option<Vec<[u16; 4]>>,
+    vertex_joint_weights: Option<Vec<Vec4>>,
     vertex_count: usize,
 
     indices: Option<Vec<u32>>,
@@ -294,6 +296,26 @@ impl MeshBuilder {
         self
     }
 
+    /// Add vertex joint indices to the given mesh.
+    ///
+    /// # Panic
+    ///
+    /// Will panic if the length is different from the position buffer length.
+    pub fn with_vertex_joint_indices(mut self, joint_indices: Vec<[u16; 4]>) -> Self {
+        self.vertex_joint_indices = Some(joint_indices);
+        self
+    }
+
+    /// Add vertex joint weights to the given mesh.
+    ///
+    /// # Panic
+    ///
+    /// Will panic if the length is different from the position buffer length.
+    pub fn with_vertex_joint_weights(mut self, joint_weights: Vec<Vec4>) -> Self {
+        self.vertex_joint_weights = Some(joint_weights);
+        self
+    }
+
     /// Add indices to the given mesh.
     ///
     /// # Panic
@@ -356,6 +378,8 @@ impl MeshBuilder {
             vertex_uv0: self.vertex_uv0.unwrap_or_else(|| vec![Vec2::ZERO; length]),
             vertex_uv1: self.vertex_uv1.unwrap_or_else(|| vec![Vec2::ZERO; length]),
             vertex_colors: self.vertex_colors.unwrap_or_else(|| vec![[255; 4]; length]),
+            vertex_joint_indices: self.vertex_joint_indices.unwrap_or_else(|| vec![[0; 4]; length]),
+            vertex_joint_weights: self.vertex_joint_weights.unwrap_or_else(|| vec![Vec4::ZERO; length]),
             indices: self.indices.unwrap_or_else(|| (0..length as u32).collect()),
         };
 
@@ -400,6 +424,8 @@ pub struct Mesh {
     pub vertex_uv0: Vec<Vec2>,
     pub vertex_uv1: Vec<Vec2>,
     pub vertex_colors: Vec<[u8; 4]>,
+    pub vertex_joint_indices: Vec<[u16; 4]>,
+    pub vertex_joint_weights: Vec<Vec4>,
 
     pub indices: Vec<u32>,
 }
@@ -413,6 +439,8 @@ impl Clone for Mesh {
             vertex_uv0: self.vertex_uv0.clone(),
             vertex_uv1: self.vertex_uv1.clone(),
             vertex_colors: self.vertex_colors.clone(),
+            vertex_joint_indices: self.vertex_joint_indices.clone(),
+            vertex_joint_weights: self.vertex_joint_weights.clone(),
             indices: self.indices.clone(),
         }
     }

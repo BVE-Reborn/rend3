@@ -1,14 +1,18 @@
+use rend3::managers::{
+    VERTEX_COLOR_SLOT, VERTEX_JOINT_INDEX_SLOT, VERTEX_JOINT_WEIGHT_SLOT, VERTEX_NORMAL_SLOT, VERTEX_OBJECT_INDEX_SLOT,
+    VERTEX_POSITION_SLOT, VERTEX_TANGENT_SLOT, VERTEX_UV0_SLOT, VERTEX_UV1_SLOT,
+};
 use wgpu::{VertexAttribute, VertexBufferLayout, VertexFormat, VertexStepMode};
 
 /// Vertex buffer layouts used in CpuPowered Mode.
-pub static CPU_VERTEX_BUFFERS: [VertexBufferLayout<'static>; 6] = [
+pub static CPU_VERTEX_BUFFERS: [VertexBufferLayout<'static>; 8] = [
     VertexBufferLayout {
         array_stride: rend3::managers::VERTEX_POSITION_SIZE as u64,
         step_mode: VertexStepMode::Vertex,
         attributes: &[VertexAttribute {
             format: VertexFormat::Float32x3,
             offset: 0,
-            shader_location: 0,
+            shader_location: VERTEX_POSITION_SLOT,
         }],
     },
     VertexBufferLayout {
@@ -17,7 +21,7 @@ pub static CPU_VERTEX_BUFFERS: [VertexBufferLayout<'static>; 6] = [
         attributes: &[VertexAttribute {
             format: VertexFormat::Float32x3,
             offset: 0,
-            shader_location: 1,
+            shader_location: VERTEX_NORMAL_SLOT,
         }],
     },
     VertexBufferLayout {
@@ -26,7 +30,7 @@ pub static CPU_VERTEX_BUFFERS: [VertexBufferLayout<'static>; 6] = [
         attributes: &[VertexAttribute {
             format: VertexFormat::Float32x3,
             offset: 0,
-            shader_location: 2,
+            shader_location: VERTEX_TANGENT_SLOT,
         }],
     },
     VertexBufferLayout {
@@ -35,7 +39,7 @@ pub static CPU_VERTEX_BUFFERS: [VertexBufferLayout<'static>; 6] = [
         attributes: &[VertexAttribute {
             format: VertexFormat::Float32x2,
             offset: 0,
-            shader_location: 3,
+            shader_location: VERTEX_UV0_SLOT,
         }],
     },
     VertexBufferLayout {
@@ -44,7 +48,7 @@ pub static CPU_VERTEX_BUFFERS: [VertexBufferLayout<'static>; 6] = [
         attributes: &[VertexAttribute {
             format: VertexFormat::Float32x2,
             offset: 0,
-            shader_location: 4,
+            shader_location: VERTEX_UV1_SLOT,
         }],
     },
     VertexBufferLayout {
@@ -53,20 +57,38 @@ pub static CPU_VERTEX_BUFFERS: [VertexBufferLayout<'static>; 6] = [
         attributes: &[VertexAttribute {
             format: VertexFormat::Unorm8x4,
             offset: 0,
-            shader_location: 5,
+            shader_location: VERTEX_COLOR_SLOT,
+        }],
+    },
+    VertexBufferLayout {
+        array_stride: rend3::managers::VERTEX_JOINT_INDEX_SIZE as u64,
+        step_mode: VertexStepMode::Vertex,
+        attributes: &[VertexAttribute {
+            format: VertexFormat::Uint16x4,
+            offset: 0,
+            shader_location: VERTEX_JOINT_INDEX_SLOT,
+        }],
+    },
+    VertexBufferLayout {
+        array_stride: rend3::managers::VERTEX_JOINT_WEIGHT_SIZE as u64,
+        step_mode: VertexStepMode::Vertex,
+        attributes: &[VertexAttribute {
+            format: VertexFormat::Float32x4,
+            offset: 0,
+            shader_location: VERTEX_JOINT_WEIGHT_SLOT,
         }],
     },
 ];
 
 /// Vertex buffer layouts used in GpuPowered Mode.
-pub static GPU_VERTEX_BUFFERS: [VertexBufferLayout<'static>; 7] = [
+pub static GPU_VERTEX_BUFFERS: [VertexBufferLayout<'static>; 9] = [
     VertexBufferLayout {
         array_stride: rend3::managers::VERTEX_POSITION_SIZE as u64,
         step_mode: VertexStepMode::Vertex,
         attributes: &[VertexAttribute {
             format: VertexFormat::Float32x3,
             offset: 0,
-            shader_location: 0,
+            shader_location: VERTEX_POSITION_SLOT,
         }],
     },
     VertexBufferLayout {
@@ -75,7 +97,7 @@ pub static GPU_VERTEX_BUFFERS: [VertexBufferLayout<'static>; 7] = [
         attributes: &[VertexAttribute {
             format: VertexFormat::Float32x3,
             offset: 0,
-            shader_location: 1,
+            shader_location: VERTEX_NORMAL_SLOT,
         }],
     },
     VertexBufferLayout {
@@ -84,7 +106,7 @@ pub static GPU_VERTEX_BUFFERS: [VertexBufferLayout<'static>; 7] = [
         attributes: &[VertexAttribute {
             format: VertexFormat::Float32x3,
             offset: 0,
-            shader_location: 2,
+            shader_location: VERTEX_TANGENT_SLOT,
         }],
     },
     VertexBufferLayout {
@@ -93,7 +115,7 @@ pub static GPU_VERTEX_BUFFERS: [VertexBufferLayout<'static>; 7] = [
         attributes: &[VertexAttribute {
             format: VertexFormat::Float32x2,
             offset: 0,
-            shader_location: 3,
+            shader_location: VERTEX_UV0_SLOT,
         }],
     },
     VertexBufferLayout {
@@ -102,7 +124,7 @@ pub static GPU_VERTEX_BUFFERS: [VertexBufferLayout<'static>; 7] = [
         attributes: &[VertexAttribute {
             format: VertexFormat::Float32x2,
             offset: 0,
-            shader_location: 4,
+            shader_location: VERTEX_UV1_SLOT,
         }],
     },
     VertexBufferLayout {
@@ -111,7 +133,25 @@ pub static GPU_VERTEX_BUFFERS: [VertexBufferLayout<'static>; 7] = [
         attributes: &[VertexAttribute {
             format: VertexFormat::Unorm8x4,
             offset: 0,
-            shader_location: 5,
+            shader_location: VERTEX_COLOR_SLOT,
+        }],
+    },
+    VertexBufferLayout {
+        array_stride: rend3::managers::VERTEX_COLOR_SIZE as u64,
+        step_mode: VertexStepMode::Vertex,
+        attributes: &[VertexAttribute {
+            format: VertexFormat::Unorm8x4,
+            offset: 0,
+            shader_location: VERTEX_COLOR_SLOT,
+        }],
+    },
+    VertexBufferLayout {
+        array_stride: rend3::managers::VERTEX_JOINT_INDEX_SIZE as u64,
+        step_mode: VertexStepMode::Vertex,
+        attributes: &[VertexAttribute {
+            format: VertexFormat::Uint16x4,
+            offset: 0,
+            shader_location: VERTEX_JOINT_INDEX_SLOT,
         }],
     },
     VertexBufferLayout {
@@ -120,7 +160,7 @@ pub static GPU_VERTEX_BUFFERS: [VertexBufferLayout<'static>; 7] = [
         attributes: &[VertexAttribute {
             format: VertexFormat::Uint32,
             offset: 16,
-            shader_location: 6,
+            shader_location: VERTEX_OBJECT_INDEX_SLOT,
         }],
     },
 ];

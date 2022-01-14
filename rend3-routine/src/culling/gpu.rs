@@ -2,7 +2,7 @@ use std::{borrow::Cow, mem, num::NonZeroU64};
 
 use glam::Mat4;
 use rend3::{
-    managers::{CameraManager, GpuCullingInput, InternalObject},
+    managers::{CameraManager, GpuCullingInput, InternalObject, VERTEX_OBJECT_INDEX_SLOT},
     util::{bind_merge::BindGroupBuilder, frustum::ShaderFrustum},
     ModeData,
 };
@@ -439,7 +439,7 @@ pub fn build_gpu_cull_input(device: &Device, objects: &[InternalObject]) -> Buff
 /// No-op if there are 0 objects.
 pub fn draw_gpu_powered<'rpass>(rpass: &mut RenderPass<'rpass>, indirect_data: &'rpass GpuIndirectData) {
     if indirect_data.count != 0 {
-        rpass.set_vertex_buffer(6, indirect_data.indirect_buffer.slice(16..));
+        rpass.set_vertex_buffer(VERTEX_OBJECT_INDEX_SLOT, indirect_data.indirect_buffer.slice(16..));
         rpass.multi_draw_indexed_indirect_count(
             &indirect_data.indirect_buffer,
             16,
