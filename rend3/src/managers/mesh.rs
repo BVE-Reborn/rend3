@@ -26,6 +26,10 @@ pub const VERTEX_UV_SIZE: usize = size_of::<Vec2>();
 pub const VERTEX_COLOR_SIZE: usize = size_of::<[u8; 4]>();
 /// Size of a single index.
 pub const INDEX_SIZE: usize = size_of::<u32>();
+/// Size of a joint index vector
+pub const VERTEX_JOINT_INDEX_SIZE: usize = size_of::<[u32; 4]>();
+/// Size of a joint weight vector
+pub const VERTEX_JOINT_WEIGHT_SIZE: usize = size_of::<[f32; 4]>();
 
 /// Pre-allocated vertex count in the vertex megabuffers.
 pub const STARTING_VERTICES: usize = 1 << 16;
@@ -47,6 +51,8 @@ pub struct MeshBuffers {
     pub vertex_uv0: Buffer,
     pub vertex_uv1: Buffer,
     pub vertex_color: Buffer,
+    pub vertex_joint_index: Buffer,
+    pub vertex_joint_weight: Buffer,
 
     pub index: Buffer,
 }
@@ -59,6 +65,8 @@ impl MeshBuffers {
         rpass.set_vertex_buffer(3, self.vertex_uv0.slice(..));
         rpass.set_vertex_buffer(4, self.vertex_uv1.slice(..));
         rpass.set_vertex_buffer(5, self.vertex_color.slice(..));
+        rpass.set_vertex_buffer(6, self.vertex_joint_index.slice(..));
+        rpass.set_vertex_buffer(7, self.vertex_joint_weight.slice(..));
         rpass.set_index_buffer(self.index.slice(..), IndexFormat::Uint32);
     }
 }
@@ -173,6 +181,16 @@ impl MeshManager {
             &self.buffers.vertex_color,
             (vertex_range.start * VERTEX_COLOR_SIZE) as BufferAddress,
             bytemuck::cast_slice(&mesh.vertex_colors),
+        );
+        queue.write_buffer(
+            &self.buffers.vertex_joint_index,
+            (vertex_range.start * VERTEX_JOINT_INDEX_SIZE) as BufferAddress,
+            bytemuck::cast_slice(&mesh.vertex_joint_indices),
+        );
+        queue.write_buffer(
+            &self.buffers.vertex_joint_weight,
+            (vertex_range.start * VERTEX_JOINT_WEIGHT_SIZE) as BufferAddress,
+            bytemuck::cast_slice(&mesh.vertex_joint_weights),
         );
         queue.write_buffer(
             &self.buffers.index,
@@ -356,6 +374,8 @@ fn create_buffers(device: &Device, vertex_count: usize, index_count: usize) -> M
     let tangent_bytes = vertex_count * VERTEX_TANGENT_SIZE;
     let uv_bytes = vertex_count * VERTEX_UV_SIZE;
     let color_bytes = vertex_count * VERTEX_COLOR_SIZE;
+    let joint_index_bytes = vertex_count * VERTEX_JOINT_INDEX_SIZE;
+    let joint_weight_bytes = vertex_count * VERTEX_JOINT_WEIGHT_SIZE;
     let index_bytes = index_count * INDEX_SIZE;
 
     let vertex_position = device.create_buffer(&BufferDescriptor {
@@ -400,12 +420,27 @@ fn create_buffers(device: &Device, vertex_count: usize, index_count: usize) -> M
         mapped_at_creation: false,
     });
 
+    let vertex_joint_index = device.create_buffer(&BufferDescriptor {
+        label: Some("joint index vertex buffer"),
+        size: joint_index_bytes as BufferAddress,
+        usage: BufferUsages::COPY_SRC | BufferUsages::COPY_DST | BufferUsages::VERTEX | BufferUsages::STORAGE,
+        mapped_at_creation: false,
+    });
+
+    let vertex_joint_weight = device.create_buffer(&BufferDescriptor {
+        label: Some("joint weight vertex buffer"),
+        size: joint_weight_bytes as BufferAddress,
+        usage: BufferUsages::COPY_SRC | BufferUsages::COPY_DST | BufferUsages::VERTEX | BufferUsages::STORAGE,
+        mapped_at_creation: false,
+    });
+
     let index = device.create_buffer(&BufferDescriptor {
         label: Some("index buffer"),
         size: index_bytes as BufferAddress,
         usage: BufferUsages::COPY_SRC | BufferUsages::COPY_DST | BufferUsages::INDEX | BufferUsages::STORAGE,
         mapped_at_creation: false,
     });
+
 
     MeshBuffers {
         vertex_position,
@@ -414,6 +449,8 @@ fn create_buffers(device: &Device, vertex_count: usize, index_count: usize) -> M
         vertex_uv0,
         vertex_uv1,
         vertex_color,
+        vertex_joint_index,
+        vertex_joint_weight,
         index,
     }
 }
