@@ -943,8 +943,25 @@ pub struct Skeleton {
     /// corresponding joint. Not to be confused with the transform matrix of the
     /// joint itself.
     ///
-    /// TODO: Add note about utility function that takes inverseBindMatrices and
-    /// how to use it.
+    /// The `Skeleton::form_joint_transforms` constructor can be used to create
+    /// a Skeleton with the joint transform matrices instead.
     pub joint_deltas: Vec<Mat4>,
     pub mesh: MeshHandle,
+}
+
+impl Skeleton {
+    /// Creates a skeleton with the list of global transforms and inverse bind
+    /// transforms for each joint
+    pub fn from_joint_transforms(
+        mesh: MeshHandle,
+        joint_global_transforms: &[Mat4],
+        inverse_bind_transforms: &[Mat4],
+    ) -> Skeleton {
+        let joint_deltas: Vec<Mat4> = joint_global_transforms
+            .iter()
+            .zip(inverse_bind_transforms.iter())
+            .map(|(global_pos, inv_bind_pos)| (*global_pos) * (*inv_bind_pos))
+            .collect();
+        Skeleton { joint_deltas, mesh }
+    }
 }
