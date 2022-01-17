@@ -161,8 +161,8 @@ pub enum GltfLoadError<E: std::error::Error + 'static> {
 pub async fn filesystem_io_func(parent_directory: impl AsRef<Path>, uri: SsoString) -> Result<Vec<u8>, std::io::Error> {
     let octet_stream_header = "data:";
     if let Some(base64_data) = uri.strip_prefix(octet_stream_header) {
-        let (_mime, rest) = base64_data.split_once(";").unwrap();
-        let (encoding, data) = rest.split_once(",").unwrap();
+        let (_mime, rest) = base64_data.split_once(';').unwrap();
+        let (encoding, data) = rest.split_once(',').unwrap();
         assert_eq!(encoding, "base64");
         // profiling::scope!("decoding base64 uri");
         log::info!("loading {} bytes of base64 data", data.len());
