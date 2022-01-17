@@ -6,8 +6,8 @@ use crate::{
 use glam::Mat4;
 use parking_lot::Mutex;
 use rend3_types::{
-    MaterialHandle, MeshHandle, ObjectChange, ObjectHandle, RawDirectionalLightHandle, Skeleton, SkeletonHandle,
-    TextureHandle, RawSkeletonHandle,
+    MaterialHandle, MeshHandle, ObjectChange, ObjectHandle, RawDirectionalLightHandle, RawSkeletonHandle, Skeleton,
+    SkeletonHandle, TextureHandle,
 };
 use std::{mem, panic::Location};
 use wgpu::{CommandBuffer, Device, Texture, TextureDescriptor, TextureView};

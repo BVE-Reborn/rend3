@@ -9,7 +9,7 @@ use crate::{
     util::{frustum::BoundingSphere, registry::ArchetypicalRegistry},
 };
 use glam::{Mat4, Vec3A};
-use rend3_types::{Material, MaterialHandle, ObjectChange, RawObjectHandle, ObjectMeshKind};
+use rend3_types::{Material, MaterialHandle, ObjectChange, ObjectMeshKind, RawObjectHandle};
 
 use super::SkeletonManager;
 
@@ -76,12 +76,20 @@ impl ObjectManager {
             ObjectMeshKind::Animated(skeleton) => {
                 let skeleton = skeleton_manager.internal_data(skeleton.get_raw());
                 let mesh = mesh_manager.internal_data(skeleton.mesh_handle.get_raw());
-                (mesh.bounding_sphere, mesh.index_range.clone(), skeleton.vertex_range.clone())
-            },
+                (
+                    mesh.bounding_sphere,
+                    mesh.index_range.clone(),
+                    skeleton.vertex_range.clone(),
+                )
+            }
             ObjectMeshKind::Static(mesh) => {
                 let mesh = mesh_manager.internal_data(mesh.get_raw());
-                (mesh.bounding_sphere, mesh.index_range.clone(), mesh.vertex_range.clone())
-            },
+                (
+                    mesh.bounding_sphere,
+                    mesh.index_range.clone(),
+                    mesh.vertex_range.clone(),
+                )
+            }
         };
 
         let (material_key, object_list) = material_manager.get_material_key_and_objects(object.material.get_raw());

@@ -1,6 +1,9 @@
 use crate::{
     instruction::InstructionStreamPair,
-    managers::{CameraManager, DirectionalLightManager, MaterialManager, MeshManager, ObjectManager, TextureManager, SkeletonManager},
+    managers::{
+        CameraManager, DirectionalLightManager, MaterialManager, MeshManager, ObjectManager, SkeletonManager,
+        TextureManager,
+    },
     renderer::RendererDataCore,
     util::{graph_texture_store::GraphTextureStore, mipmap::MipmapGenerator},
     InstanceAdapterDevice, Renderer, RendererInitializationError,
