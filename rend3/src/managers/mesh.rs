@@ -426,6 +426,22 @@ impl MeshManager {
                 &new_vert_range,
                 VERTEX_COLOR_SIZE,
             );
+            copy_vert(
+                encoder,
+                &self.buffers.vertex_joint_index,
+                &new_buffers.vertex_joint_index,
+                mesh,
+                &new_vert_range,
+                VERTEX_JOINT_WEIGHT_SIZE,
+            );
+            copy_vert(
+                encoder,
+                &self.buffers.vertex_joint_weight,
+                &new_buffers.vertex_joint_weight,
+                mesh,
+                &new_vert_range,
+                VERTEX_JOINT_INDEX_SIZE,
+            );
 
             // Copy indices over to new buffer, adjusting their value by the difference
             let index_copy_start = mesh.index_range.start * INDEX_SIZE;
