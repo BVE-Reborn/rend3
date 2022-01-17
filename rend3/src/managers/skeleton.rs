@@ -59,6 +59,15 @@ impl SkeletonManager {
         self.registry.insert(handle, internal);
     }
 
+    pub fn set_skeleton_joint_deltas(
+        &mut self,
+        handle: RawSkeletonHandle,
+        joint_deltas: Vec<Mat4>,
+    ) {
+        let skeleton = self.registry.get_mut(handle);
+        skeleton.joint_deltas = joint_deltas;
+    }
+
     pub fn ready(&mut self) {
         profiling::scope!("Skeleton Manager Ready");
         self.registry.remove_all_dead(|_, _, _| {});

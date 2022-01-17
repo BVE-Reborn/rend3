@@ -5,7 +5,10 @@ use crate::{
 };
 use glam::Mat4;
 use parking_lot::Mutex;
-use rend3_types::{MaterialHandle, MeshHandle, ObjectChange, ObjectHandle, RawDirectionalLightHandle, TextureHandle};
+use rend3_types::{
+    MaterialHandle, MeshHandle, ObjectChange, ObjectHandle, RawDirectionalLightHandle, Skeleton, SkeletonHandle,
+    TextureHandle, RawSkeletonHandle,
+};
 use std::{mem, panic::Location};
 use wgpu::{CommandBuffer, Device, Texture, TextureDescriptor, TextureView};
 
@@ -19,6 +22,10 @@ pub enum InstructionKind {
     AddMesh {
         handle: MeshHandle,
         mesh: Mesh,
+    },
+    AddSkeleton {
+        handle: SkeletonHandle,
+        skeleton: Skeleton,
     },
     AddTexture {
         handle: TextureHandle,
@@ -55,6 +62,10 @@ pub enum InstructionKind {
     SetObjectTransform {
         handle: RawObjectHandle,
         transform: Mat4,
+    },
+    SetSkeletonJointDeltas {
+        handle: RawSkeletonHandle,
+        joint_deltas: Vec<Mat4>,
     },
     AddDirectionalLight {
         handle: DirectionalLightHandle,

@@ -3,7 +3,7 @@ use crate::{
     instruction::{InstructionKind, InstructionStreamPair},
     managers::{
         CameraManager, DirectionalLightManager, InternalTexture, MaterialManager, MeshManager, ObjectManager,
-        TextureManager, SkeletonManager,
+        SkeletonManager, TextureManager,
     },
     types::{
         Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, MaterialHandle, Mesh, MeshHandle,
@@ -15,7 +15,8 @@ use crate::{
 use glam::Mat4;
 use parking_lot::Mutex;
 use rend3_types::{
-    Handedness, Material, MipmapCount, MipmapSource, ObjectChange, TextureFormat, TextureFromTexture, TextureUsages,
+    Handedness, Material, MipmapCount, MipmapSource, ObjectChange, Skeleton, SkeletonHandle, TextureFormat,
+    TextureFromTexture, TextureUsages,
 };
 use std::{
     num::NonZeroU32,
@@ -124,6 +125,18 @@ impl Renderer {
             *Location::caller(),
         );
 
+        handle
+    }
+
+    pub fn add_skeleton(&self, skeleton: Skeleton) -> SkeletonHandle {
+        let handle = SkeletonManager::allocate(&self.current_ident);
+        self.instructions.push(
+            InstructionKind::AddSkeleton {
+                handle: handle.clone(),
+                skeleton,
+            },
+            *Location::caller(),
+        );
         handle
     }
 
@@ -442,6 +455,46 @@ impl Renderer {
             },
             *Location::caller(),
         );
+    }
+
+    /// Sets the joint positions for a skeleton. See
+    /// [Renderer::set_skeleton_joint_deltas] to set the vertex transformations
+    /// directly, without having to supply two separate matrix vectors.
+    ///
+    /// ## Inputs
+    /// - `joint_global_positions`: Contains one transform matrix per bone,
+    ///   containing that bone's current clobal transform
+    /// - `inverse_bind_poses`: Contains one inverse bind transform matrix per
+    ///   bone, that is, the inverse of the bone's transformation at its rest
+    ///   position.
+    #[track_caller]
+    pub fn set_skeleton_joint_transforms(
+        &self,
+        handle: &SkeletonHandle,
+        joint_global_positions: &[Mat4],
+        inverse_bind_poses: &[Mat4],
+    ) {
+        let joint_deltas: Vec<Mat4> = joint_global_positions
+            .iter()
+            .zip(inverse_bind_poses.iter())
+            .map(|(global_pos, inv_bind_pos)| (*global_pos) * (*inv_bind_pos))
+            .collect();
+        self.set_skeleton_joint_deltas(handle, joint_deltas);
+    }
+
+    /// Sets the joint deltas for a skeleton. The joint delta is the
+    /// transformation that will be applied to a vertex affected by a joint.
+    /// Note that this is not the same as the joint's transformation. See
+    /// [Renderer::set_skeleton_joint_positions] for an alternative method that
+    /// allows setting the joint transformation instead.
+    pub fn set_skeleton_joint_deltas(&self, handle: &SkeletonHandle, joint_deltas: Vec<Mat4>) {
+        self.instructions.push(
+            InstructionKind::SetSkeletonJointDeltas {
+                handle: handle.get_raw(),
+                joint_deltas,
+            },
+            *Location::caller(),
+        )
     }
 
     /// Add a sun-like light into the world.

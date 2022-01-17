@@ -9,7 +9,7 @@ use crate::{
     util::{frustum::BoundingSphere, registry::ArchetypicalRegistry},
 };
 use glam::{Mat4, Vec3A};
-use rend3_types::{Material, MaterialHandle, MeshHandle, ObjectChange, RawObjectHandle, SkeletonHandle, ObjectMeshKind};
+use rend3_types::{Material, MaterialHandle, ObjectChange, RawObjectHandle, ObjectMeshKind};
 
 use super::SkeletonManager;
 
