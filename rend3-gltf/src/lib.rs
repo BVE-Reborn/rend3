@@ -187,6 +187,8 @@ pub struct GltfLoadSettings {
     pub directional_light_shadow_distance: f32,
     /// Coordinate space normal maps should use (default Up)
     pub normal_direction: pbr::NormalTextureYDirection,
+    /// Enable built-in directional lights (default true)
+    pub enable_directional: bool,
 }
 
 impl Default for GltfLoadSettings {
@@ -195,6 +197,7 @@ impl Default for GltfLoadSettings {
             scale: 1.0,
             directional_light_shadow_distance: 100.0,
             normal_direction: pbr::NormalTextureYDirection::Up,
+            enable_directional: true,
         }
     }
 }
@@ -370,7 +373,7 @@ pub fn load_gltf_nodes<'a, E: std::error::Error + 'static>(
 
         let light = if let Some(light) = node.light() {
             match light.kind() {
-                gltf::khr_lights_punctual::Kind::Directional => {
+                gltf::khr_lights_punctual::Kind::Directional if settings.enable_directional => {
                     let direction = transform.transform_vector3(-Vec3::Z);
                     Some(renderer.add_directional_light(types::DirectionalLight {
                         color: Vec3::from(light.color()),
