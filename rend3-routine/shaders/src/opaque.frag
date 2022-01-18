@@ -50,6 +50,7 @@ layout(set = 2, binding = 10) uniform texture2D ambient_occlusion_tex;
 #endif
 
 #include "lighting/surface.glsl"
+#include "lighting/pcf.glsl"
 
 void main() {
     #ifdef GPU_MODE
@@ -76,7 +77,7 @@ void main() {
             if (shadow_shadow_coords.x < 0 || shadow_shadow_coords.x > 1 || shadow_shadow_coords.y < 0 || shadow_shadow_coords.y > 1 || shadow_ndc.z < -1 || shadow_ndc.z > 1) {
                 shadow_value = 1.0;
             } else {
-                shadow_value = textureGrad(sampler2DArrayShadow(shadow, shadow_sampler), shadow_shadow_coords, vec2(0), vec2(0));
+                shadow_value = sample_shadow_pcf5(shadow, shadow_sampler, shadow_shadow_coords);
             }
 
             color += surface_shading(directional_lights[i], pixel, v, shadow_value * pixel.ambient_occlusion);
