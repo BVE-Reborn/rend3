@@ -255,7 +255,7 @@ impl MeshManager {
             &self.buffers.vertex_position,
             (original.vertex_range.start * VERTEX_POSITION_SIZE) as u64,
             &self.buffers.vertex_position,
-            vertex_range.start as u64,
+            (vertex_range.start * VERTEX_POSITION_SIZE) as u64,
             (vertex_range.len() * VERTEX_POSITION_SIZE) as u64,
         );
 
@@ -263,7 +263,7 @@ impl MeshManager {
             &self.buffers.vertex_normal,
             (original.vertex_range.start * VERTEX_NORMAL_SIZE) as u64,
             &self.buffers.vertex_normal,
-            vertex_range.start as u64,
+            (vertex_range.start * VERTEX_NORMAL_SIZE) as u64,
             (vertex_range.len() * VERTEX_NORMAL_SIZE) as u64,
         );
 
@@ -271,7 +271,7 @@ impl MeshManager {
             &self.buffers.vertex_tangent,
             (original.vertex_range.start * VERTEX_TANGENT_SIZE) as u64,
             &self.buffers.vertex_tangent,
-            vertex_range.start as u64,
+            (vertex_range.start * VERTEX_TANGENT_SIZE) as u64,
             (vertex_range.len() * VERTEX_TANGENT_SIZE) as u64,
         );
 
@@ -279,7 +279,7 @@ impl MeshManager {
             &self.buffers.vertex_uv0,
             (original.vertex_range.start * VERTEX_UV_SIZE) as u64,
             &self.buffers.vertex_uv0,
-            vertex_range.start as u64,
+            (vertex_range.start * VERTEX_UV_SIZE) as u64,
             (vertex_range.len() * VERTEX_UV_SIZE) as u64,
         );
 
@@ -287,7 +287,7 @@ impl MeshManager {
             &self.buffers.vertex_uv1,
             (original.vertex_range.start * VERTEX_UV_SIZE) as u64,
             &self.buffers.vertex_uv1,
-            vertex_range.start as u64,
+            (vertex_range.start * VERTEX_UV_SIZE) as u64,
             (vertex_range.len() * VERTEX_UV_SIZE) as u64,
         );
 
@@ -295,7 +295,7 @@ impl MeshManager {
             &self.buffers.vertex_color,
             (original.vertex_range.start * VERTEX_COLOR_SIZE) as u64,
             &self.buffers.vertex_color,
-            vertex_range.start as u64,
+            (vertex_range.start * VERTEX_COLOR_SIZE) as u64,
             (vertex_range.len() * VERTEX_COLOR_SIZE) as u64,
         );
 
@@ -303,7 +303,7 @@ impl MeshManager {
             &self.buffers.vertex_joint_index,
             (original.vertex_range.start * VERTEX_JOINT_INDEX_SIZE) as u64,
             &self.buffers.vertex_joint_index,
-            vertex_range.start as u64,
+            (vertex_range.start * VERTEX_JOINT_INDEX_SIZE) as u64,
             (vertex_range.len() * VERTEX_JOINT_INDEX_SIZE) as u64,
         );
 
@@ -311,7 +311,7 @@ impl MeshManager {
             &self.buffers.vertex_joint_weight,
             (original.vertex_range.start * VERTEX_JOINT_WEIGHT_SIZE) as u64,
             &self.buffers.vertex_joint_weight,
-            vertex_range.start as u64,
+            (vertex_range.start * VERTEX_JOINT_WEIGHT_SIZE) as u64,
             (vertex_range.len() * VERTEX_JOINT_WEIGHT_SIZE) as u64,
         );
 

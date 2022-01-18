@@ -471,15 +471,13 @@ impl Renderer {
     pub fn set_skeleton_joint_transforms(
         &self,
         handle: &SkeletonHandle,
-        joint_global_positions: &[Mat4],
-        inverse_bind_poses: &[Mat4],
+        joint_global_transforms: &[Mat4],
+        inverse_bind_transforms: &[Mat4],
     ) {
-        let joint_deltas: Vec<Mat4> = joint_global_positions
-            .iter()
-            .zip(inverse_bind_poses.iter())
-            .map(|(global_pos, inv_bind_pos)| (*global_pos) * (*inv_bind_pos))
-            .collect();
-        self.set_skeleton_joint_deltas(handle, joint_deltas);
+        self.set_skeleton_joint_deltas(
+            handle,
+            Skeleton::compute_joint_matrices(joint_global_transforms, inverse_bind_transforms),
+        );
     }
 
     /// Sets the joint deltas for a skeleton. The joint delta is the
@@ -487,6 +485,7 @@ impl Renderer {
     /// Note that this is not the same as the joint's transformation. See
     /// [Renderer::set_skeleton_joint_positions] for an alternative method that
     /// allows setting the joint transformation instead.
+    #[track_caller]
     pub fn set_skeleton_joint_deltas(&self, handle: &SkeletonHandle, joint_deltas: Vec<Mat4>) {
         self.instructions.push(
             InstructionKind::SetSkeletonJointDeltas {

@@ -957,11 +957,17 @@ impl Skeleton {
         joint_global_transforms: &[Mat4],
         inverse_bind_transforms: &[Mat4],
     ) -> Skeleton {
-        let joint_deltas: Vec<Mat4> = joint_global_transforms
+        let joint_deltas = Self::compute_joint_matrices(joint_global_transforms, inverse_bind_transforms);
+        Skeleton { joint_deltas, mesh }
+    }
+
+    /// Given a list of joint global positions and another one with inverse bind
+    /// matrices, multiplies them together to return the list of joint matrices.
+    pub fn compute_joint_matrices(joint_global_transforms: &[Mat4], inverse_bind_transforms: &[Mat4]) -> Vec<Mat4> {
+        joint_global_transforms
             .iter()
             .zip(inverse_bind_transforms.iter())
             .map(|(global_pos, inv_bind_pos)| (*global_pos) * (*inv_bind_pos))
-            .collect();
-        Skeleton { joint_deltas, mesh }
+            .collect()
     }
 }
