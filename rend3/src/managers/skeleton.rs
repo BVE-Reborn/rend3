@@ -10,8 +10,7 @@ use rend3_types::{MeshHandle, RawSkeletonHandle, Skeleton, SkeletonHandle};
 use wgpu::{CommandEncoder, Device, Queue};
 
 /// Internal representation of a Skeleton
-#[repr(C, align(16))]
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct InternalSkeleton {
     pub mesh_handle: MeshHandle,
     pub joint_deltas: Vec<Mat4>,
