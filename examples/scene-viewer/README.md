@@ -19,12 +19,12 @@ https://cdn.cwfitz.com/scenes/rend3-default-scene.blend
 
 Default scene, exposed through glTF:
 
-![](https://raw.githubusercontent.com/BVE-Reborn/rend3/trunk/examples/scene-viewer/screenshot.jpg)
+![](screenshot.jpg)
 
 Exported Unity Scene through glTF:
 
-![](https://raw.githubusercontent.com/BVE-Reborn/rend3/trunk/examples/scene-viewer/scifi-base.jpg)
+![](scifi-base.jpg)
 
 Emerald-Square from [Nvidia ORCA](https://developer.nvidia.com/orca) exported to GLTF with blender:
 
-![](https://raw.githubusercontent.com/BVE-Reborn/rend3/trunk/examples/scene-viewer/emerald-square.jpg)
+![](emerald-square.jpg)
