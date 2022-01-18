@@ -35,6 +35,21 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
                         .fill(&renderer.device, &renderer.queue, &mut encoder, &handle, mesh);
                     data_core.profiler.end_scope(&mut encoder);
                 }
+                InstructionKind::AddSkeleton { handle, skeleton } => {
+                    profiling::scope!("Add Skeleton");
+                    data_core
+                        .profiler
+                        .begin_scope("Add Skeleton", &mut encoder, &renderer.device);
+                    data_core.skeleton_manager.fill(
+                        &renderer.device,
+                        &renderer.queue,
+                        &mut encoder,
+                        &mut data_core.mesh_manager,
+                        &handle,
+                        skeleton,
+                    );
+                    data_core.profiler.end_scope(&mut encoder);
+                }
                 InstructionKind::AddTexture {
                     handle,
                     desc,
@@ -77,11 +92,15 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
                         &handle,
                         object,
                         &data_core.mesh_manager,
+                        &data_core.skeleton_manager,
                         &mut data_core.material_manager,
                     );
                 }
                 InstructionKind::SetObjectTransform { handle, transform } => {
                     data_core.object_manager.set_object_transform(handle, transform);
+                }
+                InstructionKind::SetSkeletonJointDeltas { handle, joint_deltas } => {
+                    data_core.skeleton_manager.set_joint_deltas(handle, joint_deltas);
                 }
                 InstructionKind::AddDirectionalLight { handle, light } => {
                     data_core.directional_light_manager.fill(&handle, light);
@@ -105,6 +124,7 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
                         dst_handle,
                         change,
                         &data_core.mesh_manager,
+                        &data_core.skeleton_manager,
                         &mut data_core.material_manager,
                     );
                 }

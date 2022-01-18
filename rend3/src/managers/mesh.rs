@@ -229,6 +229,95 @@ impl MeshManager {
         self.registry.insert(handle, mesh);
     }
 
+    /// Duplicates a mesh's vertex data so that it can be skinned on the GPU.
+    pub fn allocate_skeleton_mesh(
+        &mut self,
+        device: &Device,
+        _queue: &Queue,
+        encoder: &mut CommandEncoder,
+        mesh_handle: &MeshHandle,
+    ) -> Range<usize> {
+        // Need to fetch internal data twice, because the returned mesh borrows &self
+        let needed_verts = self.internal_data(mesh_handle.get_raw()).vertex_range.len();
+        let vertex_range = match self.vertex_alloc.allocate_range(needed_verts) {
+            Ok(range) => range,
+            Err(_) => {
+                self.reallocate_buffers(device, encoder, needed_verts as u32, 0);
+                self.vertex_alloc
+                    .allocate_range(needed_verts)
+                    .expect("We just reallocated")
+            }
+        };
+
+        let original = self.internal_data(mesh_handle.get_raw());
+
+        encoder.copy_buffer_to_buffer(
+            &self.buffers.vertex_position,
+            (original.vertex_range.start * VERTEX_POSITION_SIZE) as u64,
+            &self.buffers.vertex_position,
+            (vertex_range.start * VERTEX_POSITION_SIZE) as u64,
+            (vertex_range.len() * VERTEX_POSITION_SIZE) as u64,
+        );
+
+        encoder.copy_buffer_to_buffer(
+            &self.buffers.vertex_normal,
+            (original.vertex_range.start * VERTEX_NORMAL_SIZE) as u64,
+            &self.buffers.vertex_normal,
+            (vertex_range.start * VERTEX_NORMAL_SIZE) as u64,
+            (vertex_range.len() * VERTEX_NORMAL_SIZE) as u64,
+        );
+
+        encoder.copy_buffer_to_buffer(
+            &self.buffers.vertex_tangent,
+            (original.vertex_range.start * VERTEX_TANGENT_SIZE) as u64,
+            &self.buffers.vertex_tangent,
+            (vertex_range.start * VERTEX_TANGENT_SIZE) as u64,
+            (vertex_range.len() * VERTEX_TANGENT_SIZE) as u64,
+        );
+
+        encoder.copy_buffer_to_buffer(
+            &self.buffers.vertex_uv0,
+            (original.vertex_range.start * VERTEX_UV_SIZE) as u64,
+            &self.buffers.vertex_uv0,
+            (vertex_range.start * VERTEX_UV_SIZE) as u64,
+            (vertex_range.len() * VERTEX_UV_SIZE) as u64,
+        );
+
+        encoder.copy_buffer_to_buffer(
+            &self.buffers.vertex_uv1,
+            (original.vertex_range.start * VERTEX_UV_SIZE) as u64,
+            &self.buffers.vertex_uv1,
+            (vertex_range.start * VERTEX_UV_SIZE) as u64,
+            (vertex_range.len() * VERTEX_UV_SIZE) as u64,
+        );
+
+        encoder.copy_buffer_to_buffer(
+            &self.buffers.vertex_color,
+            (original.vertex_range.start * VERTEX_COLOR_SIZE) as u64,
+            &self.buffers.vertex_color,
+            (vertex_range.start * VERTEX_COLOR_SIZE) as u64,
+            (vertex_range.len() * VERTEX_COLOR_SIZE) as u64,
+        );
+
+        encoder.copy_buffer_to_buffer(
+            &self.buffers.vertex_joint_index,
+            (original.vertex_range.start * VERTEX_JOINT_INDEX_SIZE) as u64,
+            &self.buffers.vertex_joint_index,
+            (vertex_range.start * VERTEX_JOINT_INDEX_SIZE) as u64,
+            (vertex_range.len() * VERTEX_JOINT_INDEX_SIZE) as u64,
+        );
+
+        encoder.copy_buffer_to_buffer(
+            &self.buffers.vertex_joint_weight,
+            (original.vertex_range.start * VERTEX_JOINT_WEIGHT_SIZE) as u64,
+            &self.buffers.vertex_joint_weight,
+            (vertex_range.start * VERTEX_JOINT_WEIGHT_SIZE) as u64,
+            (vertex_range.len() * VERTEX_JOINT_WEIGHT_SIZE) as u64,
+        );
+
+        vertex_range
+    }
+
     pub fn buffers(&self) -> &MeshBuffers {
         &self.buffers
     }
@@ -334,6 +423,22 @@ impl MeshManager {
                 mesh,
                 &new_vert_range,
                 VERTEX_COLOR_SIZE,
+            );
+            copy_vert(
+                encoder,
+                &self.buffers.vertex_joint_index,
+                &new_buffers.vertex_joint_index,
+                mesh,
+                &new_vert_range,
+                VERTEX_JOINT_WEIGHT_SIZE,
+            );
+            copy_vert(
+                encoder,
+                &self.buffers.vertex_joint_weight,
+                &new_buffers.vertex_joint_weight,
+                mesh,
+                &new_vert_range,
+                VERTEX_JOINT_INDEX_SIZE,
             );
 
             // Copy indices over to new buffer, adjusting their value by the difference

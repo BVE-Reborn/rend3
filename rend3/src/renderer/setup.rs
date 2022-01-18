@@ -1,6 +1,9 @@
 use crate::{
     instruction::InstructionStreamPair,
-    managers::{CameraManager, DirectionalLightManager, MaterialManager, MeshManager, ObjectManager, TextureManager},
+    managers::{
+        CameraManager, DirectionalLightManager, MaterialManager, MeshManager, ObjectManager, SkeletonManager,
+        TextureManager,
+    },
     renderer::RendererDataCore,
     util::{graph_texture_store::GraphTextureStore, mipmap::MipmapGenerator},
     InstanceAdapterDevice, Renderer, RendererInitializationError,
@@ -39,6 +42,7 @@ pub fn create_renderer(
     let material_manager = MaterialManager::new(&iad.device, iad.mode);
     let object_manager = ObjectManager::new();
     let directional_light_manager = DirectionalLightManager::new(&iad.device);
+    let skeleton_manager = SkeletonManager::new();
 
     let mipmap_generator = MipmapGenerator::new(
         &iad.device,
@@ -75,6 +79,7 @@ pub fn create_renderer(
             material_manager,
             object_manager,
             directional_light_manager,
+            skeleton_manager,
             profiler,
             graph_texture_store: GraphTextureStore::new(),
         }),

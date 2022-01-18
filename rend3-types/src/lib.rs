@@ -130,7 +130,8 @@ declare_handle!(
     TextureHandle<Texture>,
     MaterialHandle<MaterialTag>,
     ObjectHandle<Object>,
-    DirectionalLightHandle<DirectionalLight>
+    DirectionalLightHandle<DirectionalLight>,
+    SkeletonHandle<Skeleton>
 );
 
 #[macro_export]
@@ -147,7 +148,8 @@ declare_raw_handle!(
     RawTextureHandle<Texture>,
     RawMaterialHandle<MaterialTag>,
     RawObjectHandle<Object>,
-    RawDirectionalLightHandle<DirectionalLight>
+    RawDirectionalLightHandle<DirectionalLight>,
+    RawSkeletonHandle<Skeleton>
 );
 
 macro_rules! changeable_struct {
@@ -831,10 +833,16 @@ pub trait Material: Send + Sync + 'static {
     fn to_data(&self, slice: &mut [u8]);
 }
 
+#[derive(Clone, Debug)]
+pub enum ObjectMeshKind {
+    Animated(SkeletonHandle),
+    Static(MeshHandle),
+}
+
 changeable_struct! {
     /// An object in the world that is composed of a [`Mesh`] and [`Material`].
     pub struct Object <- ObjectChange {
-        pub mesh: MeshHandle,
+        pub mesh_kind: ObjectMeshKind,
         pub material: MaterialHandle,
         pub transform: Mat4,
     }
@@ -924,5 +932,42 @@ pub enum Handedness {
 impl Default for Handedness {
     fn default() -> Self {
         Self::Left
+    }
+}
+
+/// A Skeleton stores the necessary data to do vertex skinning for an [Object]
+#[derive(Debug, Clone)]
+pub struct Skeleton {
+    /// Stores one transformation matrix for each joint. These are the
+    /// transformations that will be applied to the vertices affected by the
+    /// corresponding joint. Not to be confused with the transform matrix of the
+    /// joint itself.
+    ///
+    /// The `Skeleton::form_joint_transforms` constructor can be used to create
+    /// a Skeleton with the joint transform matrices instead.
+    pub joint_deltas: Vec<Mat4>,
+    pub mesh: MeshHandle,
+}
+
+impl Skeleton {
+    /// Creates a skeleton with the list of global transforms and inverse bind
+    /// transforms for each joint
+    pub fn from_joint_transforms(
+        mesh: MeshHandle,
+        joint_global_transforms: &[Mat4],
+        inverse_bind_transforms: &[Mat4],
+    ) -> Skeleton {
+        let joint_deltas = Self::compute_joint_matrices(joint_global_transforms, inverse_bind_transforms);
+        Skeleton { joint_deltas, mesh }
+    }
+
+    /// Given a list of joint global positions and another one with inverse bind
+    /// matrices, multiplies them together to return the list of joint matrices.
+    pub fn compute_joint_matrices(joint_global_transforms: &[Mat4], inverse_bind_transforms: &[Mat4]) -> Vec<Mat4> {
+        joint_global_transforms
+            .iter()
+            .zip(inverse_bind_transforms.iter())
+            .map(|(global_pos, inv_bind_pos)| (*global_pos) * (*inv_bind_pos))
+            .collect()
     }
 }

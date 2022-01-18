@@ -24,7 +24,7 @@ use glam::{Mat3, Mat4, UVec2, Vec2, Vec3, Vec4};
 use gltf::buffer::Source;
 use image::GenericImageView;
 use rend3::{
-    types::{self, Handedness, MeshValidationError, ObjectHandle},
+    types::{self, Handedness, MeshValidationError, ObjectHandle, ObjectMeshKind},
     util::typedefs::{FastHashMap, SsoString},
     Renderer,
 };
@@ -161,8 +161,8 @@ pub enum GltfLoadError<E: std::error::Error + 'static> {
 pub async fn filesystem_io_func(parent_directory: impl AsRef<Path>, uri: SsoString) -> Result<Vec<u8>, std::io::Error> {
     let octet_stream_header = "data:";
     if let Some(base64_data) = uri.strip_prefix(octet_stream_header) {
-        let (_mime, rest) = base64_data.split_once(";").unwrap();
-        let (encoding, data) = rest.split_once(",").unwrap();
+        let (_mime, rest) = base64_data.split_once(';').unwrap();
+        let (encoding, data) = rest.split_once(',').unwrap();
         assert_eq!(encoding, "base64");
         // profiling::scope!("decoding base64 uri");
         log::info!("loading {} bytes of base64 data", data.len());
@@ -307,7 +307,8 @@ pub fn add_mesh_by_index<E: std::error::Error + 'static>(
                 )
                 .ok_or_else(|| GltfLoadError::MissingMaterial(mat_idx.expect("Could not find default material")))?;
             Ok(renderer.add_object(types::Object {
-                mesh: prim.handle.clone(),
+                // TODO: Autodetect animation and spawn skeleton instead.
+                mesh_kind: ObjectMeshKind::Static(prim.handle.clone()),
                 material: mat.clone(),
                 transform,
             }))

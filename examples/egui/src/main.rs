@@ -61,7 +61,7 @@ impl rend3_framework::App for EguiExample {
 
         // Combine the mesh and the material with a location to give an object.
         let object = rend3::types::Object {
-            mesh: mesh_handle,
+            mesh_kind: rend3::types::ObjectMeshKind::Static(mesh_handle),
             material: material_handle.clone(),
             transform: glam::Mat4::IDENTITY,
         };

@@ -88,7 +88,7 @@ impl rend3_framework::App for TexturedQuadExample {
 
         // Combine the mesh and the material with a location to give an object.
         let object = rend3::types::Object {
-            mesh: mesh_handle,
+            mesh_kind: rend3::types::ObjectMeshKind::Static(mesh_handle),
             material: material_handle,
             transform: glam::Mat4::from_scale_rotation_translation(
                 glam::Vec3::new(1.0, 1.0, 1.0),
