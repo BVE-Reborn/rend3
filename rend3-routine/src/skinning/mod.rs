@@ -17,27 +17,24 @@ pub struct GpuSkinningInput {
 pub fn add_pre_skin_to_graph<'node>(
     graph: &mut RenderGraph<'node>,
     name: &str,
-    skin_input_data: DataHandle<Buffer>,
-    joint_matrices: DataHandle<Buffer>,
+    pre_skin_data: DataHandle<PreSkinningBuffers>,
 ) {
     let mut builder = graph.add_node(format_sso!("pre-skin {:?}", name));
-    let skin_input_handle = builder.add_data_output(skin_input_data);
-    let joint_matrices_handle = builder.add_data_output(joint_matrices);
+    let pre_skin_handle = builder.add_data_output(pre_skin_data);
 
     builder.build(move |_pt, renderer, _encoder_or_pass, _temps, _ready, graph_data| {
         let buffers = build_gpu_skinning_input_buffers(&renderer.device, &graph_data.skeleton_manager);
-        graph_data.set_data::<Buffer>(skin_input_handle, Some(buffers.gpu_skinning_inputs));
-        graph_data.set_data::<Buffer>(joint_matrices_handle, Some(buffers.joint_matrices));
+        graph_data.set_data::<PreSkinningBuffers>(pre_skin_handle, Some(buffers));
     });
 }
 
 /// The two buffers uploaded to the GPU during pre-skinning.
-pub struct BuiltBuffers {
+pub struct PreSkinningBuffers {
     gpu_skinning_inputs: Buffer,
     joint_matrices: Buffer,
 }
 
-fn build_gpu_skinning_input_buffers<'node>(device: &Device, skeleton_manager: &SkeletonManager) -> BuiltBuffers {
+fn build_gpu_skinning_input_buffers<'node>(device: &Device, skeleton_manager: &SkeletonManager) -> PreSkinningBuffers {
     profiling::scope!("Building GPU Skinning Input Data");
 
     let skinning_inputs_length = skeleton_manager.skeletons().len() * std::mem::size_of::<GpuSkinningInput>();
@@ -102,7 +99,7 @@ fn build_gpu_skinning_input_buffers<'node>(device: &Device, skeleton_manager: &S
     gpu_skinning_inputs.unmap();
     joint_matrices.unmap();
 
-    BuiltBuffers {
+    PreSkinningBuffers {
         gpu_skinning_inputs,
         joint_matrices,
     }

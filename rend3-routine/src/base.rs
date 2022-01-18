@@ -22,7 +22,7 @@ use rend3::{
 };
 use wgpu::{BindGroup, Buffer};
 
-use crate::{common, culling, pbr, skybox, tonemapping};
+use crate::{common, culling, pbr, skinning, skybox, tonemapping};
 
 /// Handles and information for a single type of transparency in the PBR
 /// pipeline.
@@ -79,6 +79,7 @@ impl BaseRenderGraph {
         let state = BaseRenderGraphIntermediateState::new(graph, ready, resolution, samples);
 
         // Preparing and uploading data
+        state.pbr_pre_skinning(graph);
         state.pbr_pre_culling(graph);
         state.create_frame_uniforms(graph, self, ambient);
 
@@ -113,6 +114,7 @@ pub struct BaseRenderGraphIntermediateState {
     pub color: RenderTargetHandle,
     pub resolve: Option<RenderTargetHandle>,
     pub depth: RenderTargetHandle,
+    pub pre_skinning_buffers: DataHandle<skinning::PreSkinningBuffers>,
 }
 impl BaseRenderGraphIntermediateState {
     /// Create the default setting for all state.
@@ -168,6 +170,8 @@ impl BaseRenderGraphIntermediateState {
             usage: TextureUsages::RENDER_ATTACHMENT,
         });
 
+        let pre_skinning_buffers = graph.add_data::<skinning::PreSkinningBuffers>();
+
         Self {
             per_transparency,
             shadow_uniform_bg,
@@ -175,6 +179,7 @@ impl BaseRenderGraphIntermediateState {
             color,
             resolve,
             depth,
+            pre_skinning_buffers,
         }
     }
 
@@ -189,6 +194,11 @@ impl BaseRenderGraphIntermediateState {
                 trans.pre_cull,
             );
         }
+    }
+
+    /// Upload skinning input data to the GPU.
+    pub fn pbr_pre_skinning(&self, graph: &mut RenderGraph<'_>) {
+        crate::skinning::add_pre_skin_to_graph(graph, "pbr", self.pre_skinning_buffers);
     }
 
     /// Create all the uniforms all the shaders in this graph need.
