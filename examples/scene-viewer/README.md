@@ -25,6 +25,10 @@ Exported Unity Scene through glTF:
 
 ![](scifi-base.jpg)
 
-Emerald-Square from [Nvidia ORCA](https://developer.nvidia.com/orca) exported to GLTF with blender:
+Bistro scene from [NVIDIA ORCA](https://developer.nvidia.com/orca) touched up by https://github.com/aclysma/rendering-demo-scenes
+
+![](bistro.jpg)
+
+Emerald-Square from [NVIDIA ORCA](https://developer.nvidia.com/orca) exported to GLTF with blender:
 
 ![](emerald-square.jpg)

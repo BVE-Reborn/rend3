@@ -13,8 +13,9 @@
 //! # Screenshots
 //!
 //! ![scifi-base](https://raw.githubusercontent.com/BVE-Reborn/rend3/trunk/examples/scene-viewer/scifi-base.jpg)
-//! ![emerald-square](https://raw.githubusercontent.com/BVE-Reborn/rend3/trunk/examples/scene-viewer/emerald-square.jpg)
 //! ![example](https://raw.githubusercontent.com/BVE-Reborn/rend3/trunk/examples/scene-viewer/screenshot.jpg)
+//! ![bistro](https://raw.githubusercontent.com/BVE-Reborn/rend3/trunk/examples/scene-viewer/bistro.jpg)
+//! ![emerald-square](https://raw.githubusercontent.com/BVE-Reborn/rend3/trunk/examples/scene-viewer/emerald-square.jpg)
 //!
 //! # Examples
 //!
