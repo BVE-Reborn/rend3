@@ -99,8 +99,8 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
                 InstructionKind::SetObjectTransform { handle, transform } => {
                     data_core.object_manager.set_object_transform(handle, transform);
                 }
-                InstructionKind::SetSkeletonJointDeltas { handle, joint_deltas } => {
-                    data_core.skeleton_manager.set_joint_deltas(handle, joint_deltas);
+                InstructionKind::SetSkeletonJointDeltas { handle, joint_matrices } => {
+                    data_core.skeleton_manager.set_joint_matrices(handle, joint_matrices);
                 }
                 InstructionKind::AddDirectionalLight { handle, light } => {
                     data_core.directional_light_manager.fill(&handle, light);

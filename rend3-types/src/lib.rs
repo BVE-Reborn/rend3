@@ -945,7 +945,7 @@ pub struct Skeleton {
     ///
     /// The `Skeleton::form_joint_transforms` constructor can be used to create
     /// a Skeleton with the joint transform matrices instead.
-    pub joint_deltas: Vec<Mat4>,
+    pub joint_matrices: Vec<Mat4>,
     pub mesh: MeshHandle,
 }
 
@@ -957,8 +957,8 @@ impl Skeleton {
         joint_global_transforms: &[Mat4],
         inverse_bind_transforms: &[Mat4],
     ) -> Skeleton {
-        let joint_deltas = Self::compute_joint_matrices(joint_global_transforms, inverse_bind_transforms);
-        Skeleton { joint_deltas, mesh }
+        let joint_matrices = Self::compute_joint_matrices(joint_global_transforms, inverse_bind_transforms);
+        Skeleton { joint_matrices, mesh }
     }
 
     /// Given a list of joint global positions and another one with inverse bind

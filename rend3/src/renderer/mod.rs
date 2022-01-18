@@ -458,7 +458,7 @@ impl Renderer {
     }
 
     /// Sets the joint positions for a skeleton. See
-    /// [Renderer::set_skeleton_joint_deltas] to set the vertex transformations
+    /// [Renderer::set_skeleton_joint_matrices] to set the vertex transformations
     /// directly, without having to supply two separate matrix vectors.
     ///
     /// ## Inputs
@@ -474,23 +474,23 @@ impl Renderer {
         joint_global_transforms: &[Mat4],
         inverse_bind_transforms: &[Mat4],
     ) {
-        self.set_skeleton_joint_deltas(
+        self.set_skeleton_joint_matrices(
             handle,
             Skeleton::compute_joint_matrices(joint_global_transforms, inverse_bind_transforms),
         );
     }
 
-    /// Sets the joint deltas for a skeleton. The joint delta is the
+    /// Sets the joint matrices for a skeleton. The joint matrix is the
     /// transformation that will be applied to a vertex affected by a joint.
     /// Note that this is not the same as the joint's transformation. See
     /// [Renderer::set_skeleton_joint_positions] for an alternative method that
     /// allows setting the joint transformation instead.
     #[track_caller]
-    pub fn set_skeleton_joint_deltas(&self, handle: &SkeletonHandle, joint_deltas: Vec<Mat4>) {
+    pub fn set_skeleton_joint_matrices(&self, handle: &SkeletonHandle, joint_matrices: Vec<Mat4>) {
         self.instructions.push(
             InstructionKind::SetSkeletonJointDeltas {
                 handle: handle.get_raw(),
-                joint_deltas,
+                joint_matrices,
             },
             *Location::caller(),
         )

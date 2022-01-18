@@ -19,6 +19,7 @@
 pub mod base;
 pub mod common;
 pub mod culling;
+pub mod skinning;
 pub mod depth;
 pub mod forward;
 pub mod pbr;

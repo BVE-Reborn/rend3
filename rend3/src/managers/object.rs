@@ -79,7 +79,7 @@ impl ObjectManager {
                 (
                     mesh.bounding_sphere,
                     mesh.index_range.clone(),
-                    skeleton.vertex_range.clone(),
+                    skeleton.skeleton_vertex_range.clone(),
                 )
             }
             ObjectMeshKind::Static(mesh) => {

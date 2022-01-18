@@ -22,7 +22,7 @@ use wgpu_profiler::ProfilerCommandRecorder;
 use crate::{
     managers::{
         CameraManager, DirectionalLightManager, MaterialManager, MeshManager, ObjectManager, ShadowCoordinates,
-        TextureManager, TextureManagerReadyOutput,
+        TextureManager, TextureManagerReadyOutput, SkeletonManager,
     },
     util::{
         output::OutputFrame,
@@ -380,6 +380,7 @@ impl<'node> RenderGraph<'node> {
                     directional_light_manager: &data_core.directional_light_manager,
                     material_manager: &data_core.material_manager,
                     mesh_manager: &data_core.mesh_manager,
+                    skeleton_manager: &data_core.skeleton_manager,
                     object_manager: &data_core.object_manager,
                     d2_texture_manager: &data_core.d2_texture_manager,
                     d2c_texture_manager: &data_core.d2c_texture_manager,
@@ -634,6 +635,7 @@ pub struct RenderGraphDataStore<'a> {
     pub material_manager: &'a MaterialManager,
     pub mesh_manager: &'a MeshManager,
     pub object_manager: &'a ObjectManager,
+    pub skeleton_manager: &'a SkeletonManager,
     pub d2_texture_manager: &'a TextureManager,
     pub d2c_texture_manager: &'a TextureManager,
 }

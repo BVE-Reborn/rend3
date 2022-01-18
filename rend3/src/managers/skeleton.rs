@@ -12,9 +12,30 @@ use wgpu::{CommandEncoder, Device, Queue};
 /// Internal representation of a Skeleton
 #[derive(Debug)]
 pub struct InternalSkeleton {
+    /// A handle to the mesh this skeleton deforms.
     pub mesh_handle: MeshHandle,
-    pub joint_deltas: Vec<Mat4>,
-    pub vertex_range: Range<usize>,
+    /// The list of per-joint transformation matrices that will be applied to
+    /// vertices.
+    pub joint_matrices: Vec<Mat4>,
+    /// The portion of the vertex buffer data owned by this skeleton
+    pub skeleton_vertex_range: Range<usize>,
+    /// The vertex ranges that is sent to the GPU Skinning compute shader,
+    /// cached here for improved performance.
+    pub ranges: GpuVertexRanges,
+}
+
+/// The skeleton and mes vertex ranges, in a format that's suitable to be sent
+/// to the GPU. 
+/// 
+/// Note that there's no need for this struct to be `#[repr(C)]`
+/// because this is not the actual data that gets uploaded for GPU skinning.
+#[derive(Debug, Copy, Clone)]
+pub struct GpuVertexRanges {
+    /// The range of the vertex buffer that holds the original mesh.
+    pub mesh_range: [u32; 2],
+    /// The range of the vertex buffer that holds the duplicate mesh data, owned
+    /// by the Skeleton
+    pub skeleton_range: [u32; 2],
 }
 
 /// Manages skeletons. Skeletons only contain the relevant data for vertex
@@ -46,19 +67,21 @@ impl SkeletonManager {
         handle: &SkeletonHandle,
         skeleton: Skeleton,
     ) {
-        let vertex_range = mesh_manager.allocate_skeleton_mesh(device, queue, encoder, &skeleton.mesh);
+        let mesh_range = mesh_manager.internal_data(skeleton.mesh.get_raw()).vertex_range.clone();
+        let skeleton_range = mesh_manager.allocate_skeleton_mesh(device, queue, encoder, &skeleton.mesh);
+
+        let input = GpuVertexRanges {
+            skeleton_range: [skeleton_range.start as u32, skeleton_range.end as u32],
+            mesh_range: [mesh_range.start as u32, mesh_range.end as u32],
+        };
 
         let internal = InternalSkeleton {
-            joint_deltas: skeleton.joint_deltas,
+            joint_matrices: skeleton.joint_matrices,
             mesh_handle: skeleton.mesh,
-            vertex_range,
+            skeleton_vertex_range: skeleton_range,
+            ranges: input,
         };
         self.registry.insert(handle, internal);
-    }
-
-    pub fn set_skeleton_joint_deltas(&mut self, handle: RawSkeletonHandle, joint_deltas: Vec<Mat4>) {
-        let skeleton = self.registry.get_mut(handle);
-        skeleton.joint_deltas = joint_deltas;
     }
 
     pub fn ready(&mut self) {
@@ -66,13 +89,17 @@ impl SkeletonManager {
         self.registry.remove_all_dead(|_, _, _| {});
     }
 
-    pub fn set_joint_deltas(&mut self, handle: RawSkeletonHandle, joint_deltas: Vec<Mat4>) {
+    pub fn set_joint_matrices(&mut self, handle: RawSkeletonHandle, joint_matrices: Vec<Mat4>) {
         let skeleton = self.registry.get_mut(handle);
-        skeleton.joint_deltas = joint_deltas;
+        skeleton.joint_matrices = joint_matrices;
     }
 
     pub fn internal_data(&self, handle: RawSkeletonHandle) -> &InternalSkeleton {
         self.registry.get(handle)
+    }
+
+    pub fn skeletons(&self) -> impl ExactSizeIterator<Item = &InternalSkeleton> {
+        self.registry.values()
     }
 }
 
