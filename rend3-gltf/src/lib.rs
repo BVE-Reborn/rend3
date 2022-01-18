@@ -1005,11 +1005,11 @@ pub mod util {
                 }
             }
             k2F::B8G8R8A8_SNORM | k2F::B8G8R8A8_UINT | k2F::B8G8R8A8_SINT => return None,
+            k2F::A2B10G10R10_UNORM_PACK32 => r3F::Rgb10a2Unorm,
             k2F::A2R10G10B10_UNORM_PACK32
             | k2F::A2R10G10B10_SNORM_PACK32
             | k2F::A2R10G10B10_UINT_PACK32
             | k2F::A2R10G10B10_SINT_PACK32
-            | k2F::A2B10G10R10_UNORM_PACK32
             | k2F::A2B10G10R10_SNORM_PACK32
             | k2F::A2B10G10R10_UINT_PACK32
             | k2F::A2B10G10R10_SINT_PACK32 => return None,
@@ -1026,7 +1026,8 @@ pub mod util {
             | k2F::R16G16B16_UINT
             | k2F::R16G16B16_SINT
             | k2F::R16G16B16_SFLOAT => return None,
-            k2F::R16G16B16A16_UNORM | k2F::R16G16B16A16_SNORM => return None,
+            k2F::R16G16B16A16_UNORM => r3F::Rgba16Unorm,
+            k2F::R16G16B16A16_SNORM => r3F::Rgba16Snorm,
             k2F::R16G16B16A16_UINT => r3F::Rgba16Uint,
             k2F::R16G16B16A16_SINT => r3F::Rgba16Sint,
             k2F::R16G16B16A16_SFLOAT => r3F::Rgba16Float,
