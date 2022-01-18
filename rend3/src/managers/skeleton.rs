@@ -3,13 +3,11 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 
-use crate::util::registry::ResourceRegistry;
+use crate::{managers::MeshManager, util::registry::ResourceRegistry};
 
 use glam::Mat4;
 use rend3_types::{MeshHandle, RawSkeletonHandle, Skeleton, SkeletonHandle};
 use wgpu::{CommandEncoder, Device, Queue};
-
-use super::MeshManager;
 
 /// Internal representation of a Skeleton
 #[repr(C, align(16))]
