@@ -33,6 +33,7 @@ pub struct ReadyData {
     pub directional_light_cameras: Vec<CameraManager>,
 }
 
+/// Implementation of a rendergraph. See module docs for details.
 pub struct RenderGraph<'node> {
     pub(super) targets: Vec<RenderTargetDescriptor>,
     pub(super) shadows: FastHashSet<usize>,
