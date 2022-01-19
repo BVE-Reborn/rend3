@@ -1,6 +1,14 @@
 use std::{cell::RefCell, sync::Arc};
 
-use crate::{Renderer, graph::{DataHandle, GraphResource, PassthroughDataContainer, PassthroughDataRef, PassthroughDataRefMut, ReadyData, RenderGraph, RenderGraphDataStore, RenderGraphEncoderOrPass, RenderPassHandle, RenderPassTargets, RenderTargetHandle, RpassTemporaryPool, ShadowArrayHandle, ShadowTargetHandle}, util::typedefs::SsoString};
+use crate::{
+    graph::{
+        DataHandle, GraphResource, PassthroughDataContainer, PassthroughDataRef, PassthroughDataRefMut, ReadyData,
+        RenderGraph, RenderGraphDataStore, RenderGraphEncoderOrPass, RenderPassHandle, RenderPassTargets,
+        RenderTargetHandle, RpassTemporaryPool, ShadowArrayHandle, ShadowTargetHandle,
+    },
+    util::typedefs::SsoString,
+    Renderer,
+};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct DeclaredDependency<Handle> {

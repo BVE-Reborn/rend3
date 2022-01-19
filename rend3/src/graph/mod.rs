@@ -7,6 +7,7 @@ use wgpu::{Color, TextureView};
 use crate::util::typedefs::SsoString;
 
 mod encpass;
+#[allow(clippy::module_inception)] // lmao
 mod graph;
 mod node;
 mod passthrough;

@@ -2,10 +2,16 @@ use std::{any::Any, cell::RefCell, marker::PhantomData};
 
 use wgpu::TextureView;
 
-use crate::{graph::{DeclaredDependency, GraphResource, RenderTargetHandle, RpassTemporaryPool, ShadowTarget, ShadowTargetHandle}, managers::{
+use crate::{
+    graph::{
+        DeclaredDependency, GraphResource, RenderTargetHandle, RpassTemporaryPool, ShadowTarget, ShadowTargetHandle,
+    },
+    managers::{
         CameraManager, DirectionalLightManager, MaterialManager, MeshManager, ObjectManager, ShadowCoordinates,
         TextureManager,
-    }, util::typedefs::FastHashMap};
+    },
+    util::typedefs::FastHashMap,
+};
 
 pub struct DataHandle<T> {
     pub(super) resource: GraphResource,

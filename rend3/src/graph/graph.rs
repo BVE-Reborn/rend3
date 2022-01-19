@@ -11,10 +11,19 @@ use wgpu::{
     RenderPassDepthStencilAttachment, RenderPassDescriptor, TextureView, TextureViewDescriptor,
 };
 
-use crate::{Renderer, graph::{DataHandle, DepthHandle, GraphResource, PassthroughDataContainer, RenderGraphDataStore, RenderGraphEncoderOrPass, RenderGraphEncoderOrPassInner, RenderGraphNode, RenderGraphNodeBuilder, RenderPassTargets, RenderTargetDescriptor, RenderTargetHandle, RpassTemporaryPool}, managers::{CameraManager, TextureManagerReadyOutput}, util::{
+use crate::{
+    graph::{
+        DataHandle, DepthHandle, GraphResource, PassthroughDataContainer, RenderGraphDataStore,
+        RenderGraphEncoderOrPass, RenderGraphEncoderOrPassInner, RenderGraphNode, RenderGraphNodeBuilder,
+        RenderPassTargets, RenderTargetDescriptor, RenderTargetHandle, RpassTemporaryPool,
+    },
+    managers::{CameraManager, TextureManagerReadyOutput},
+    util::{
         output::OutputFrame,
         typedefs::{FastHashMap, FastHashSet, RendererStatistics, SsoString},
-    }};
+    },
+    Renderer,
+};
 
 /// Output of calling ready on various managers.
 #[derive(Clone)]

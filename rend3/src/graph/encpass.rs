@@ -1,6 +1,4 @@
-use wgpu::{
-    CommandEncoder, RenderPass,
-};
+use wgpu::{CommandEncoder, RenderPass};
 use wgpu_profiler::ProfilerCommandRecorder;
 
 pub struct RenderPassHandle;
