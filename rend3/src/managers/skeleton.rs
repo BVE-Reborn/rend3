@@ -17,8 +17,10 @@ pub struct InternalSkeleton {
     pub vertex_range: Range<usize>,
 }
 
-/// Manages skeletons. Skeletons only contain the relevant data for vertex
-/// skinning. No bone hierarchy is stored.
+/// Manages skeletons.
+///
+/// Skeletons only contain the relevant data for vertex skinning. No bone
+/// hierarchy is stored.
 pub struct SkeletonManager {
     registry: ResourceRegistry<InternalSkeleton, Skeleton>,
 }

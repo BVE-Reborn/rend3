@@ -13,6 +13,7 @@ use rend3_types::{Material, MaterialHandle, ObjectChange, ObjectMeshKind, RawObj
 
 use super::SkeletonManager;
 
+/// cpu side input to gpu-based culling
 #[repr(C, align(16))]
 #[derive(Debug, Copy, Clone)]
 pub struct GpuCullingInput {

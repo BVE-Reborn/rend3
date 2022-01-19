@@ -207,6 +207,7 @@ impl DirectionalLightManager {
     }
 }
 
+/// The location of a shadow map in the shadow atlas.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct ShadowCoordinates {
     pub layer: usize,

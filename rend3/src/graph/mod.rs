@@ -1,3 +1,5 @@
+//! Rendergraph implementation that rend3 uses for all render work scheduling.
+
 use std::{
     any::Any,
     cell::{RefCell, UnsafeCell},

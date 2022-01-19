@@ -128,6 +128,13 @@ impl Renderer {
         handle
     }
 
+    /// Adds a skeleton into the renderer. This combines a [`Mesh`] with a set
+    /// of joints that can be used to animate that mesh.
+    ///
+    /// The handle will keep the skeleton alive. All objects created will also
+    /// keep the skeleton alive. The skeleton will also keep the mesh it
+    /// references alive.
+    #[track_caller]
     pub fn add_skeleton(&self, skeleton: Skeleton) -> SkeletonHandle {
         let handle = SkeletonManager::allocate(&self.current_ident);
         self.instructions.push(
@@ -483,7 +490,7 @@ impl Renderer {
     /// Sets the joint deltas for a skeleton. The joint delta is the
     /// transformation that will be applied to a vertex affected by a joint.
     /// Note that this is not the same as the joint's transformation. See
-    /// [Renderer::set_skeleton_joint_positions] for an alternative method that
+    /// [Renderer::set_skeleton_joint_transforms] for an alternative method that
     /// allows setting the joint transformation instead.
     #[track_caller]
     pub fn set_skeleton_joint_deltas(&self, handle: &SkeletonHandle, joint_deltas: Vec<Mat4>) {
