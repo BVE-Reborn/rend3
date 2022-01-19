@@ -218,8 +218,7 @@ impl Default for GltfLoadSettings {
 /// let _loaded = pollster::block_on(rend3_gltf::load_gltf(
 ///     &renderer,
 ///     &gltf_data,
-///     1.0,
-///     rend3_routine::pbr::NormalTextureYDirection::Up,
+///     &rend3_gltf::GltfLoadSettings::default(),
 ///     |p| rend3_gltf::filesystem_io_func(&parent_directory, p)
 /// ));
 /// ```
