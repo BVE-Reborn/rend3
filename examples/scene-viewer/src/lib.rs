@@ -61,8 +61,7 @@ async fn load_skybox(
 async fn load_gltf(
     renderer: &Renderer,
     loader: &rend3_framework::AssetLoader,
-    normal_direction: NormalTextureYDirection,
-    scale: f32,
+    settings: &rend3_gltf::GltfLoadSettings,
     location: AssetPath<'_>,
 ) -> Option<rend3_gltf::LoadedGltfScene> {
     // profiling::scope!("loading gltf");
@@ -104,7 +103,7 @@ async fn load_gltf(
 
     let gltf_elapsed = gltf_start.elapsed();
     let resources_start = Instant::now();
-    let scene = rend3_gltf::load_gltf(renderer, &gltf_data, scale, normal_direction, |uri| async {
+    let scene = rend3_gltf::load_gltf(renderer, &gltf_data, settings, |uri| async {
         log::info!("Loading resource {}", uri);
         let uri = uri;
         let full_uri = parent_str.clone() + "/" + uri.as_str();
@@ -227,10 +226,13 @@ Windowing:
   --fullscreen                 Open the window in borderless fullscreen.
 
 Assets:
-  --normal-y-down              Interpret all normals as having the DirectX convention of Y down. Defaults to Y up.
-  --directional-light <x,y,z>  Create a directional light pointing towards the given coordinates.
-  --ambient <value>            Set the value of the minimum ambient light. This will be treated as white light of this intensity.
-  --scale <scale>              Scale all objects loaded by this factor.
+  --normal-y-down                        Interpret all normals as having the DirectX convention of Y down. Defaults to Y up.
+  --directional-light <x,y,z>            Create a directional light pointing towards the given coordinates.
+  --directional-light-intensity <value>  All lights created by the above flag have this intensity.
+  --gltf-disable-directional-lights      Disable all directional lights in the gltf
+  --ambient <value>                      Set the value of the minimum ambient light. This will be treated as white light of this intensity.
+  --scale <scale>                        Scale all objects loaded by this factor.
+  --shadow-distance <value>              Distance from the camera there will be directional shadows.
 
 Controls:
   --walk <speed>               Walk speed (speed without holding shift) in units/second (typically meters). Default 10.
@@ -245,9 +247,9 @@ struct SceneViewer {
     file_to_load: Option<String>,
     walk_speed: f32,
     run_speed: f32,
-    normal_direction: NormalTextureYDirection,
-    scale: Option<f32>,
+    gltf_settings: rend3_gltf::GltfLoadSettings,
     directional_light_direction: Option<Vec3>,
+    directional_light_intensity: f32,
     directional_light: Option<DirectionalLightHandle>,
     ambient_light_level: f32,
     samples: SampleCount,
@@ -290,8 +292,12 @@ impl SceneViewer {
             false => NormalTextureYDirection::Up,
         };
         let directional_light_direction = option_arg(args.opt_value_from_fn("--directional-light", extract_vec3));
+        let directional_light_intensity: f32 =
+            option_arg(args.opt_value_from_str("--directional-light-intensity")).unwrap_or(4.0);
         let ambient_light_level: f32 = option_arg(args.opt_value_from_str("--ambient")).unwrap_or(0.10);
         let scale: Option<f32> = option_arg(args.opt_value_from_str("--scale"));
+        let shadow_distance: Option<f32> = option_arg(args.opt_value_from_str("--shadow-distance"));
+        let gltf_disable_directional_light: bool = args.contains("--gltf-disable-directional-lights");
 
         // Controls
         let walk_speed = args.value_from_str("--walk").unwrap_or(10.0_f32);
@@ -318,6 +324,18 @@ impl SceneViewer {
             std::process::exit(1);
         }
 
+        let mut gltf_settings = rend3_gltf::GltfLoadSettings {
+            normal_direction,
+            enable_directional: !gltf_disable_directional_light,
+            ..Default::default()
+        };
+        if let Some(scale) = scale {
+            gltf_settings.scale = scale
+        }
+        if let Some(shadow_distance) = shadow_distance {
+            gltf_settings.directional_light_shadow_distance = shadow_distance;
+        }
+
         Self {
             absolute_mouse,
             desired_backend,
@@ -326,9 +344,9 @@ impl SceneViewer {
             file_to_load,
             walk_speed,
             run_speed,
-            normal_direction,
-            scale,
+            gltf_settings,
             directional_light_direction,
+            directional_light_intensity,
             directional_light: None,
             ambient_light_level,
             samples,
@@ -394,14 +412,13 @@ impl rend3_framework::App for SceneViewer {
         if let Some(direction) = self.directional_light_direction {
             self.directional_light = Some(renderer.add_directional_light(DirectionalLight {
                 color: Vec3::splat(1.0),
-                intensity: 4.0,
+                intensity: self.directional_light_intensity,
                 direction,
-                distance: 100.0,
+                distance: self.gltf_settings.directional_light_shadow_distance,
             }));
         }
 
-        let scale = self.scale;
-        let normal_direction = self.normal_direction;
+        let gltf_settings = self.gltf_settings;
         let file_to_load = self.file_to_load.take();
         let renderer = Arc::clone(renderer);
         let routines = Arc::clone(routines);
@@ -418,8 +435,7 @@ impl rend3_framework::App for SceneViewer {
                 load_gltf(
                     &renderer,
                     &loader,
-                    normal_direction,
-                    scale.unwrap_or(1.0),
+                    &gltf_settings,
                     file_to_load
                         .as_deref()
                         .map_or_else(|| AssetPath::Internal("default-scene/scene.gltf"), AssetPath::External),
