@@ -314,7 +314,7 @@ fn vec_min_max(iter: impl IntoIterator<Item = Vec3A>) -> (Vec3A, Vec3A) {
     (min, max)
 }
 
-pub fn allocate_shadows(shadow_sizes: impl Iterator<Item = usize>) -> (Extent3d, Vec<ShadowCoordinates>) {
+fn allocate_shadows(shadow_sizes: impl Iterator<Item = usize>) -> (Extent3d, Vec<ShadowCoordinates>) {
     let mut sorted = shadow_sizes
         .enumerate()
         .map(|(id, size)| (id, size))
