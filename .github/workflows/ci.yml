@@ -99,6 +99,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: rend3-doc
+          args: --profile ci
 
   cargo-fmt:
     runs-on: ubuntu-latest
