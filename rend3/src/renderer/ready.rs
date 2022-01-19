@@ -1,6 +1,7 @@
 use crate::{
+    graph::ReadyData,
     instruction::{Instruction, InstructionKind},
-    ReadyData, Renderer,
+    Renderer,
 };
 use wgpu::{CommandBuffer, CommandEncoderDescriptor};
 

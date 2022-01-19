@@ -559,7 +559,7 @@ impl rend3_framework::App for SceneViewer {
                 skybox_routine.ready(renderer);
 
                 // Build a rendergraph
-                let mut graph = rend3::RenderGraph::new();
+                let mut graph = rend3::graph::RenderGraph::new();
 
                 // Add the default rendergraph
                 base_rendergraph.add_to_graph(

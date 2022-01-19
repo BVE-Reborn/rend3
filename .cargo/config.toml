@@ -1,0 +1,2 @@
+[alias]
+rend3-doc = ["doc", "--no-deps", "--lib", "--workspace", "--exclude", "scene-viewer", "--exclude", "rend3-cube-example"]

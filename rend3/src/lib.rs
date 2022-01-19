@@ -62,10 +62,11 @@
 //! We have a matrix chatroom that you can come and join if you want to chat
 //! about using rend3 or developing it:
 //!
-//! [![Matrix](https://img.shields.io/static/v1?label=rend3%20matrix&message=%23rend3&color=blueviolet&logo=matrix)](https://matrix.to/#/#rend3:matrix.org)
+//! [![Matrix](https://img.shields.io/static/v1?label=rend3%20dev&message=%23rend3&color=blueviolet&logo=matrix)](https://matrix.to/#/#rend3:matrix.org)
+//! [![Matrix](https://img.shields.io/static/v1?label=rend3%20users&message=%23rend3-users&color=blueviolet&logo=matrix)](https://matrix.to/#/#rend3-users:matrix.org)
 //!
 //! If discord is more your style, our meta project has a channel which mirrors
-//! the matrix:
+//! the matrix rooms:
 //!
 //! [![Discord](https://img.shields.io/discord/451037457475960852?color=7289DA&label=discord)](https://discord.gg/mjxXTVzaDg)
 //!
@@ -121,13 +122,12 @@ pub mod util {
     pub mod typedefs;
 }
 
-mod graph;
+pub mod graph;
 mod instruction;
 mod mode;
 mod setup;
 mod surface;
 
-pub use graph::*;
 pub use mode::*;
 pub use renderer::{error::*, Renderer, RendererDataCore};
 pub use setup::*;

@@ -180,7 +180,7 @@ impl rend3_framework::App for EguiExample {
                 let tonemapping_routine = rend3_framework::lock(&routines.tonemapping);
 
                 // Build a rendergraph
-                let mut graph = rend3::RenderGraph::new();
+                let mut graph = rend3::graph::RenderGraph::new();
 
                 // Add the default rendergraph without a skybox
                 base_rendergraph.add_to_graph(

@@ -188,7 +188,7 @@ fn main() {
             let (cmd_bufs, ready) = renderer.ready();
 
             // Build a rendergraph
-            let mut graph = rend3::RenderGraph::new();
+            let mut graph = rend3::graph::RenderGraph::new();
 
             // Add the default rendergraph without a skybox
             base_rendergraph.add_to_graph(

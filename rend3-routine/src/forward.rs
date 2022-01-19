@@ -6,9 +6,12 @@ use std::marker::PhantomData;
 
 use arrayvec::ArrayVec;
 use rend3::{
+    graph::{
+        DataHandle, DepthHandle, RenderGraph, RenderPassDepthTarget, RenderPassTarget, RenderPassTargets,
+        RenderTargetHandle,
+    },
     types::{Handedness, Material, SampleCount},
-    DataHandle, DepthHandle, ModeData, RenderGraph, RenderPassDepthTarget, RenderPassTarget, RenderPassTargets,
-    RenderTargetHandle, Renderer, RendererDataCore, RendererMode,
+    ModeData, Renderer, RendererDataCore, RendererMode,
 };
 use wgpu::{
     BindGroup, BindGroupLayout, BlendState, Color, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState,
