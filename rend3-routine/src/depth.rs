@@ -13,8 +13,8 @@ use rend3::{
         bind_merge::{BindGroupBuilder, BindGroupLayoutBuilder},
         math::round_up_pot,
     },
-    DataHandle, DepthHandle, ModeData, RenderGraph, RenderPassDepthTarget, RenderPassTarget, RenderPassTargets,
-    RenderTargetHandle, Renderer, RendererDataCore, RendererMode,
+    graph::{DataHandle, DepthHandle,  RenderGraph, RenderPassDepthTarget, RenderPassTarget, RenderPassTargets,
+    RenderTargetHandle}, Renderer, RendererDataCore, RendererMode,ModeData,
 };
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},

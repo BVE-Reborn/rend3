@@ -121,13 +121,12 @@ pub mod util {
     pub mod typedefs;
 }
 
-mod graph;
+pub mod graph;
 mod instruction;
 mod mode;
 mod setup;
 mod surface;
 
-pub use graph::*;
 pub use mode::*;
 pub use renderer::{error::*, Renderer, RendererDataCore};
 pub use setup::*;

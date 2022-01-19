@@ -17,8 +17,9 @@ use arrayvec::ArrayVec;
 use glam::{UVec2, Vec4};
 use rend3::{
     format_sso,
+    graph::{DataHandle, ReadyData, RenderGraph, RenderTargetDescriptor, RenderTargetHandle},
     types::{SampleCount, TextureFormat, TextureUsages},
-    DataHandle, ModeData, ReadyData, RenderGraph, RenderTargetDescriptor, RenderTargetHandle, Renderer,
+    ModeData, Renderer,
 };
 use wgpu::{BindGroup, Buffer};
 

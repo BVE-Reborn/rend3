@@ -2,7 +2,7 @@ use wgpu::{Device, Extent3d, Texture, TextureDescriptor, TextureDimension};
 
 use crate::{
     util::typedefs::{FastBuildHasher, FastHashMap},
-    RenderTargetCore,
+    graph::RenderTargetCore,
 };
 
 struct StoredTexture {

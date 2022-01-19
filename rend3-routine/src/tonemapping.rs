@@ -12,8 +12,9 @@
 use std::borrow::Cow;
 
 use rend3::{
+    graph::{DataHandle, RenderGraph, RenderPassTarget, RenderPassTargets, RenderTargetHandle},
     util::bind_merge::{BindGroupBuilder, BindGroupLayoutBuilder},
-    DataHandle, RenderGraph, RenderPassTarget, RenderPassTargets, RenderTargetHandle, Renderer,
+    Renderer,
 };
 use wgpu::{
     BindGroup, BindGroupLayout, BindingType, Color, ColorTargetState, ColorWrites, Device, FragmentState, FrontFace,

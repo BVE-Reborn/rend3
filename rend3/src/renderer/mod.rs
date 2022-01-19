@@ -1,5 +1,6 @@
 use crate::{
     format_sso,
+    graph::ReadyData,
     instruction::{InstructionKind, InstructionStreamPair},
     managers::{
         CameraManager, DirectionalLightManager, InternalTexture, MaterialManager, MeshManager, ObjectManager,
@@ -10,7 +11,7 @@ use crate::{
         Object, ObjectHandle, Texture, TextureHandle,
     },
     util::{graph_texture_store::GraphTextureStore, mipmap::MipmapGenerator},
-    ExtendedAdapterInfo, InstanceAdapterDevice, ReadyData, RendererInitializationError, RendererMode,
+    ExtendedAdapterInfo, InstanceAdapterDevice, RendererInitializationError, RendererMode,
 };
 use glam::Mat4;
 use parking_lot::Mutex;

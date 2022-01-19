@@ -1,6 +1,10 @@
 //! Builds and uploads the input to gpu culling.
 
-use rend3::{format_sso, types::Material, DataHandle, RenderGraph};
+use rend3::{
+    format_sso,
+    graph::{DataHandle, RenderGraph},
+    types::Material,
+};
 use wgpu::Buffer;
 
 use crate::{

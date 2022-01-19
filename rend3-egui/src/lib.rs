@@ -1,4 +1,8 @@
-use rend3::{types::SampleCount, RenderGraph, RenderPassTarget, RenderPassTargets, RenderTargetHandle, Renderer};
+use rend3::{
+    graph::{RenderGraph, RenderPassTarget, RenderPassTargets, RenderTargetHandle},
+    types::SampleCount,
+    Renderer,
+};
 use wgpu::{Color, TextureFormat};
 
 pub struct EguiRenderRoutine {

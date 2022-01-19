@@ -1,7 +1,8 @@
 //! Material agnostic culling on either the CPU or GPU.
 
 use rend3::{
-    format_sso, types::Material, util::bind_merge::BindGroupBuilder, DataHandle, ModeData, RenderGraph, RendererMode,
+    format_sso, types::Material, util::bind_merge::BindGroupBuilder, ModeData, RendererMode,
+    graph::{DataHandle, RenderGraph}
 };
 use wgpu::{BindGroup, Buffer};
 

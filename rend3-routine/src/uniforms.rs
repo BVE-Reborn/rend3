@@ -3,9 +3,9 @@
 
 use glam::{Mat4, Vec4};
 use rend3::{
+    graph::{DataHandle, RenderGraph},
     managers::CameraManager,
     util::{bind_merge::BindGroupBuilder, frustum::ShaderFrustum},
-    DataHandle, RenderGraph,
 };
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
