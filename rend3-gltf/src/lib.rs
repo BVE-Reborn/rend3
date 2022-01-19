@@ -21,7 +21,7 @@
 //! - Double sided materials are currently unsupported.
 
 use glam::{Mat3, Mat4, UVec2, Vec2, Vec3, Vec4};
-use gltf::buffer::Source;
+use gltf::{buffer::Source, skin::util::ReadInverseBindMatrices};
 use image::GenericImageView;
 use rend3::{
     types::{self, Handedness, MeshValidationError, ObjectHandle, ObjectMeshKind},
@@ -102,6 +102,10 @@ pub struct Texture {
     pub format: types::TextureFormat,
 }
 
+#[derive(Debug)]
+pub struct Skin {
+    iverse_bind_matrices: Vec<Mat4>,
+}
 /// Hashmap which stores a mapping from [`ImageKey`] to a labeled handle.
 pub type ImageMap = FastHashMap<ImageKey, Labeled<Texture>>;
 
@@ -113,6 +117,7 @@ pub struct LoadedGltfScene {
     pub default_material: types::MaterialHandle,
     pub images: ImageMap,
     pub nodes: Vec<Labeled<Node>>,
+    pub skins: Vec<Labeled<Skin>>,
 }
 
 /// Describes how loading gltf failed.
@@ -269,6 +274,7 @@ where
     let meshes = load_meshes(renderer, file.meshes(), &buffers)?;
     let (materials, images) =
         load_materials_and_textures(renderer, file.materials(), &buffers, normal_direction, &mut io_func).await?;
+    let skins = load_skins(file.skins(), &buffers)?;
 
     let loaded = LoadedGltfScene {
         meshes,
@@ -276,6 +282,7 @@ where
         default_material,
         images,
         nodes: Vec::new(),
+        skins,
     };
 
     Ok(loaded)
@@ -500,6 +507,35 @@ pub fn load_meshes<'a, E: std::error::Error + 'static>(
             Ok(Labeled::new(Mesh { primitives: res_prims }, mesh.name()))
         })
         .collect()
+}
+
+fn load_skins<'a, E: std::error::Error + 'static>(
+    skins: gltf::iter::Skins,
+    buffers: &[Vec<u8>],
+) -> Result<Vec<Labeled<Skin>>, GltfLoadError<E>> {
+    let mut res_skins = vec![];
+
+    for skin in skins.into_iter() {
+        let num_joints = skin.joints().count();
+        let reader = skin.reader(|b| Some(&buffers[b.index()][..b.length()]));
+
+        let inv_b_mats = if let Some(inv_b_mats) = reader.read_inverse_bind_matrices() {
+            inv_b_mats.map(|mat| Mat4::from_cols_array_2d(&mat)).collect()
+        } else {
+            // The inverse bind matrices are sometimes not provided. This has to
+            // be interpreted as all of them being the identity transform.
+            vec![Mat4::IDENTITY; num_joints]
+        };
+
+        res_skins.push(Labeled::new(
+            Skin {
+                iverse_bind_matrices: inv_b_mats,
+            },
+            skin.name(),
+        ))
+    }
+
+    Ok(res_skins)
 }
 
 /// Creates a gltf default material.
