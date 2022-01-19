@@ -24,7 +24,7 @@ use glam::{Mat3, Mat4, UVec2, Vec2, Vec3, Vec4};
 use gltf::{buffer::Source, skin::util::ReadInverseBindMatrices};
 use image::GenericImageView;
 use rend3::{
-    types::{self, Handedness, MeshValidationError, ObjectHandle, ObjectMeshKind},
+    types::{self, Handedness, MeshValidationError, ObjectHandle, ObjectMeshKind, Skeleton},
     util::typedefs::{FastHashMap, SsoString},
     Renderer,
 };
@@ -150,6 +150,8 @@ pub enum GltfLoadError<E: std::error::Error + 'static> {
     MissingPositions(usize),
     #[error("Gltf file references mesh {0} but mesh does not exist")]
     MissingMesh(usize),
+    #[error("Gltf file references skin {0} but skin does not exist")]
+    MissingSkin(usize),
     #[error("Gltf file references material {0} but material does not exist")]
     MissingMaterial(usize),
     #[error("Mesh {0} primitive {1} uses unsupported mode {2:?}. Only triangles are supported")]
@@ -295,6 +297,7 @@ pub fn add_mesh_by_index<E: std::error::Error + 'static>(
     loaded: &LoadedGltfScene,
     mesh_index: usize,
     name: Option<&str>,
+    skin_index: Option<usize>,
     transform: Mat4,
 ) -> Result<Labeled<Object>, GltfLoadError<E>> {
     let mesh_handle = loaded
@@ -314,8 +317,18 @@ pub fn add_mesh_by_index<E: std::error::Error + 'static>(
                 )
                 .ok_or_else(|| GltfLoadError::MissingMaterial(mat_idx.expect("Could not find default material")))?;
             Ok(renderer.add_object(types::Object {
-                // TODO: Autodetect animation and spawn skeleton instead.
-                mesh_kind: ObjectMeshKind::Static(prim.handle.clone()),
+                mesh_kind: if let Some(skin_index) = skin_index {
+                    let skin = loaded.skins.get(skin_index).ok_or(GltfLoadError::MissingSkin(skin_index))?;
+                    let num_joints = skin.inner.iverse_bind_matrices.len();
+                    ObjectMeshKind::Animated(renderer.add_skeleton(Skeleton {
+                        // We don't need to use the inverse bind matrices. At rest pose, every 
+                        // joint matrix is inv_bind_pose * bind_pose, thus the identity matrix.
+                        joint_matrices: vec![Mat4::IDENTITY; num_joints],
+                        mesh: prim.handle.clone(),
+                    }))
+                } else {
+                    ObjectMeshKind::Static(prim.handle.clone())
+                },
                 material: mat.clone(),
                 transform,
             }))
@@ -346,6 +359,7 @@ pub fn load_gltf_nodes<'a, E: std::error::Error + 'static>(
                 loaded,
                 mesh.index(),
                 mesh.name(),
+                node.skin().map(|s| s.index()),
                 transform,
             )?)
         } else {
