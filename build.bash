@@ -62,14 +62,11 @@ case $1 in
         shift
         simple-http-server target/generated -c wasm,html,js -i
     ;;
-    doc)
-        shift
-        cargo doc --no-deps --lib --workspace --exclude scene-viewer --exclude rend3-cube-example $@
-    ;;
     ci)
         cargo fmt
         cargo clippy
         cargo test
+        cargo rend3-doc
         RUSTFLAGS=--cfg=web_sys_unstable_apis cargo clippy --target wasm32-unknown-unknown --workspace --exclude rend3-imgui --exclude rend3-imgui-example
         cargo deny check
     ;;

@@ -98,8 +98,7 @@ jobs:
       - name: doc
         uses: actions-rs/cargo@v1
         with:
-          command: doc
-          args: --no-deps --lib --workspace --exclude scene-viewer --exclude rend3-cube-example
+          command: rend3-doc
         
 
   cargo-fmt:
