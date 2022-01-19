@@ -62,6 +62,10 @@ case $1 in
         shift
         simple-http-server target/generated -c wasm,html,js -i
     ;;
+    doc)
+        shift
+        cargo doc --no-deps --lib --workspace --exclude scene-viewer --exclude rend3-cube-example $@
+    ;;
     ci)
         cargo fmt
         cargo clippy
