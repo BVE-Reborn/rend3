@@ -82,7 +82,7 @@ impl<'node> RenderGraph<'node> {
         let idx = self.data.len();
         self.data.push(Box::new(RefCell::new(None::<T>)));
         DataHandle {
-            resource: GraphResource::Data(idx),
+            idx,
             _phantom: PhantomData,
         }
     }
@@ -460,7 +460,7 @@ impl<'node> RenderGraph<'node> {
         let depth_stencil_attachment = desc.depth_stencil.as_ref().map(|ds_target| {
             let resource = match ds_target.target {
                 DepthHandle::RenderTarget(ref dep) => dep.handle.resource,
-                DepthHandle::Shadow(ref s) => GraphResource::Shadow(s.idx),
+                DepthHandle::Shadow(ref s) => GraphResource::Shadow(s.handle.idx),
             };
 
             let view_span = resource_spans[&resource];

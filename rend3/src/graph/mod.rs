@@ -49,7 +49,7 @@
 //! the renderpass is.
 
 use glam::UVec2;
-use rend3_types::{BufferUsages, SampleCount, TextureFormat, TextureUsages};
+use rend3_types::{SampleCount, TextureFormat, TextureUsages};
 use wgpu::{Color, TextureView};
 
 use crate::util::typedefs::SsoString;
@@ -69,6 +69,7 @@ pub use passthrough::*;
 pub use store::*;
 pub use temp::*;
 
+/// Description of a single render target.
 #[derive(Debug, Clone)]
 pub struct RenderTargetDescriptor {
     pub label: Option<SsoString>,
@@ -96,17 +97,15 @@ pub(crate) struct RenderTargetCore {
     pub usage: TextureUsages,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct BufferTargetDescriptor {
-    pub label: Option<SsoString>,
-    pub length: u64,
-    pub usage: BufferUsages,
-    pub mapped: bool,
-}
-
+/// Requirements to render to a particular shadow map.
+///
+/// view + size form the start/end of the viewport to render to.
 pub struct ShadowTarget<'a> {
+    /// View to render to
     pub view: &'a TextureView,
+    /// 2D offset in the image.
     pub offset: UVec2,
+    /// Size in both dimentions of the viewport
     pub size: usize,
 }
 
@@ -119,26 +118,38 @@ enum GraphResource {
     Data(usize),
 }
 
+/// Handle to a graph-stored render target.
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct RenderTargetHandle {
+    // Must only be OutputTexture or Texture
     resource: GraphResource,
 }
 
+/// Handle to a single shadow map.
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct ShadowTargetHandle {
     idx: usize,
 }
 
+/// Handle to the entire shadow atlas.
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct ShadowArrayHandle;
 
+/// Targets that make up a renderpass.
 #[derive(Debug, PartialEq)]
 pub struct RenderPassTargets {
+    /// Color targets
     pub targets: Vec<RenderPassTarget>,
+    /// Depth-stencil target
     pub depth_stencil: Option<RenderPassDepthTarget>,
 }
 
 impl RenderPassTargets {
+    /// Determines if two renderpasses have compatible targets.
+    ///
+    /// `this: Some, other: Some` will check the contents  
+    /// `this: None, other: None` is always true  
+    /// one some and one none is always false.
     pub fn compatible(this: Option<&Self>, other: Option<&Self>) -> bool {
         match (this, other) {
             (Some(this), Some(other)) => {
@@ -163,22 +174,35 @@ impl RenderPassTargets {
     }
 }
 
+/// Color target in a renderpass.
 #[derive(Debug, PartialEq)]
 pub struct RenderPassTarget {
+    /// Color attachment. Must be declared as a dependency of the node before it
+    /// can be used.
     pub color: DeclaredDependency<RenderTargetHandle>,
+    /// Color the attachment will be cleared with if this is the first use.
     pub clear: Color,
+    /// Resolve attachment. Can only be present if color attachment has > 1
+    /// sample.
     pub resolve: Option<DeclaredDependency<RenderTargetHandle>>,
 }
 
+/// Depth target in a renderpass.
 #[derive(Debug, PartialEq)]
 pub struct RenderPassDepthTarget {
+    /// The target to use as depth.
     pub target: DepthHandle,
+    /// Depth value the attachment will be cleared with if this is the first
+    /// use.
     pub depth_clear: Option<f32>,
+    /// Stencil value the attachment will be cleared with if this is the first
+    /// use.
     pub stencil_clear: Option<u32>,
 }
 
+/// Handle to something that can be used as depth.
 #[derive(Debug, PartialEq)]
 pub enum DepthHandle {
     RenderTarget(DeclaredDependency<RenderTargetHandle>),
-    Shadow(ShadowTargetHandle),
+    Shadow(DeclaredDependency<ShadowTargetHandle>),
 }

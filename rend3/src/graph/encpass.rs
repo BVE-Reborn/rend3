@@ -1,6 +1,9 @@
 use wgpu::{CommandEncoder, RenderPass};
 use wgpu_profiler::ProfilerCommandRecorder;
 
+use crate::graph::DeclaredDependency;
+
+/// Handle to a declared renderpass output.
 pub struct RenderPassHandle;
 
 pub(super) enum RenderGraphEncoderOrPassInner<'a, 'pass> {
@@ -31,9 +34,15 @@ impl<'a, 'pass> ProfilerCommandRecorder for RenderGraphEncoderOrPassInner<'a, 'p
     }
 }
 
+/// Holds either a renderpass or an encoder.
 pub struct RenderGraphEncoderOrPass<'a, 'pass>(pub(super) RenderGraphEncoderOrPassInner<'a, 'pass>);
 
 impl<'a, 'pass> RenderGraphEncoderOrPass<'a, 'pass> {
+    /// Get an encoder.
+    ///
+    /// # Panics
+    ///
+    /// If this node requested a renderpass, this will panic.
     pub fn get_encoder(self) -> &'a mut CommandEncoder {
         match self.0 {
             RenderGraphEncoderOrPassInner::Encoder(e) => e,
@@ -43,7 +52,8 @@ impl<'a, 'pass> RenderGraphEncoderOrPass<'a, 'pass> {
         }
     }
 
-    pub fn get_rpass(self, _handle: RenderPassHandle) -> &'a mut RenderPass<'pass> {
+    /// Get an renderpass from the given handle.
+    pub fn get_rpass(self, _handle: DeclaredDependency<RenderPassHandle>) -> &'a mut RenderPass<'pass> {
         match self.0 {
             RenderGraphEncoderOrPassInner::Encoder(_) => {
                 panic!("Internal rendergraph error: trying to get renderpass when one was not asked for")
