@@ -26,8 +26,7 @@ unsafe impl bytemuck::Pod for BufferCopierParams {}
 unsafe impl bytemuck::Zeroable for BufferCopierParams {}
 
 impl BufferCopier {
-
-    const WORKGROUP_SIZE : u32 = 256;
+    const WORKGROUP_SIZE: u32 = 256;
 
     pub fn new(device: &Device) -> Self {
         let buffer_entry = |idx| BindGroupLayoutEntry {
@@ -134,7 +133,8 @@ impl BufferCopier {
 
             cpass.set_pipeline(&self.pipeline);
             cpass.set_bind_group(0, &bind_group, &[]);
-            cpass.dispatch((params.count as f32 / Self::WORKGROUP_SIZE as f32).ceil() as u32, 1, 1);
+            let num_workgroups = (params.count + (Self::WORKGROUP_SIZE - 1)) / Self::WORKGROUP_SIZE; // Divide rounding up
+            cpass.dispatch(num_workgroups, 1, 1);
         }
 
         queue.submit(Some(encoder.finish()));

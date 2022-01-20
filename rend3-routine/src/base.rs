@@ -79,9 +79,12 @@ impl BaseRenderGraph {
         let state = BaseRenderGraphIntermediateState::new(graph, ready, resolution, samples);
 
         // Preparing and uploading data
-        state.pbr_pre_skinning(graph);
+        state.pre_skinning(graph);
         state.pbr_pre_culling(graph);
         state.create_frame_uniforms(graph, self, ambient);
+
+        // Skinning
+        state.skinning(graph);
 
         // Culling
         state.pbr_shadow_culling(graph, self, pbr);
@@ -197,8 +200,8 @@ impl BaseRenderGraphIntermediateState {
     }
 
     /// Upload skinning input data to the GPU.
-    pub fn pbr_pre_skinning(&self, graph: &mut RenderGraph<'_>) {
-        crate::skinning::add_pre_skin_to_graph(graph, "pbr", self.pre_skinning_buffers);
+    pub fn pre_skinning(&self, graph: &mut RenderGraph<'_>) {
+        crate::skinning::add_pre_skin_to_graph(graph, self.pre_skinning_buffers);
     }
 
     /// Create all the uniforms all the shaders in this graph need.
@@ -240,6 +243,12 @@ impl BaseRenderGraphIntermediateState {
                 );
             }
         }
+    }
+
+    pub fn skinning<'node>(
+        &self,
+        graph: &mut RenderGraph<'node>,
+    ) {
     }
 
     /// Does all culling for the forward PBR materials.
