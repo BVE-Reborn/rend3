@@ -1,6 +1,10 @@
 use crate::{
     types::{Mesh, MeshHandle},
-    util::{frustum::BoundingSphere, registry::ResourceRegistry},
+    util::{
+        buffer_copier::{self, BufferCopier, BufferCopierParams},
+        frustum::BoundingSphere,
+        registry::ResourceRegistry,
+    },
 };
 use glam::{Vec2, Vec3};
 use range_alloc::RangeAllocator;
@@ -100,6 +104,8 @@ pub struct MeshManager {
     index_alloc: RangeAllocator<usize>,
 
     registry: ResourceRegistry<InternalMesh, Mesh>,
+
+    buffer_copier: BufferCopier,
 }
 
 impl MeshManager {
@@ -118,6 +124,7 @@ impl MeshManager {
             vertex_alloc,
             index_alloc,
             registry,
+            buffer_copier: BufferCopier::new(device),
         }
     }
 
@@ -233,7 +240,7 @@ impl MeshManager {
     pub fn allocate_skeleton_mesh(
         &mut self,
         device: &Device,
-        _queue: &Queue,
+        queue: &Queue,
         encoder: &mut CommandEncoder,
         mesh_handle: &MeshHandle,
     ) -> Range<usize> {
@@ -251,68 +258,27 @@ impl MeshManager {
 
         let original = self.internal_data(mesh_handle.get_raw());
 
-        encoder.copy_buffer_to_buffer(
-            &self.buffers.vertex_position,
-            (original.vertex_range.start * VERTEX_POSITION_SIZE) as u64,
-            &self.buffers.vertex_position,
-            (vertex_range.start * VERTEX_POSITION_SIZE) as u64,
-            (vertex_range.len() * VERTEX_POSITION_SIZE) as u64,
-        );
-
-        encoder.copy_buffer_to_buffer(
-            &self.buffers.vertex_normal,
-            (original.vertex_range.start * VERTEX_NORMAL_SIZE) as u64,
-            &self.buffers.vertex_normal,
-            (vertex_range.start * VERTEX_NORMAL_SIZE) as u64,
-            (vertex_range.len() * VERTEX_NORMAL_SIZE) as u64,
-        );
-
-        encoder.copy_buffer_to_buffer(
-            &self.buffers.vertex_tangent,
-            (original.vertex_range.start * VERTEX_TANGENT_SIZE) as u64,
-            &self.buffers.vertex_tangent,
-            (vertex_range.start * VERTEX_TANGENT_SIZE) as u64,
-            (vertex_range.len() * VERTEX_TANGENT_SIZE) as u64,
-        );
-
-        encoder.copy_buffer_to_buffer(
-            &self.buffers.vertex_uv0,
-            (original.vertex_range.start * VERTEX_UV_SIZE) as u64,
-            &self.buffers.vertex_uv0,
-            (vertex_range.start * VERTEX_UV_SIZE) as u64,
-            (vertex_range.len() * VERTEX_UV_SIZE) as u64,
-        );
-
-        encoder.copy_buffer_to_buffer(
-            &self.buffers.vertex_uv1,
-            (original.vertex_range.start * VERTEX_UV_SIZE) as u64,
-            &self.buffers.vertex_uv1,
-            (vertex_range.start * VERTEX_UV_SIZE) as u64,
-            (vertex_range.len() * VERTEX_UV_SIZE) as u64,
-        );
-
-        encoder.copy_buffer_to_buffer(
-            &self.buffers.vertex_color,
-            (original.vertex_range.start * VERTEX_COLOR_SIZE) as u64,
-            &self.buffers.vertex_color,
-            (vertex_range.start * VERTEX_COLOR_SIZE) as u64,
-            (vertex_range.len() * VERTEX_COLOR_SIZE) as u64,
-        );
-
-        encoder.copy_buffer_to_buffer(
-            &self.buffers.vertex_joint_index,
-            (original.vertex_range.start * VERTEX_JOINT_INDEX_SIZE) as u64,
-            &self.buffers.vertex_joint_index,
-            (vertex_range.start * VERTEX_JOINT_INDEX_SIZE) as u64,
-            (vertex_range.len() * VERTEX_JOINT_INDEX_SIZE) as u64,
-        );
-
-        encoder.copy_buffer_to_buffer(
-            &self.buffers.vertex_joint_weight,
-            (original.vertex_range.start * VERTEX_JOINT_WEIGHT_SIZE) as u64,
-            &self.buffers.vertex_joint_weight,
-            (vertex_range.start * VERTEX_JOINT_WEIGHT_SIZE) as u64,
-            (vertex_range.len() * VERTEX_JOINT_WEIGHT_SIZE) as u64,
+        // Copies one region of the vertex buffer to another using a compute
+        // shader. This is necessary because wgpu's copy_buffer_to_buffer does
+        // not allow copies whithin the same buffer.
+        self.buffer_copier.execute(
+            device,
+            queue,
+            [
+                &self.buffers.vertex_position,
+                &self.buffers.vertex_normal,
+                &self.buffers.vertex_tangent,
+                &self.buffers.vertex_uv0,
+                &self.buffers.vertex_uv1,
+                &self.buffers.vertex_color,
+                &self.buffers.vertex_joint_index,
+                &self.buffers.vertex_joint_weight,
+            ],
+            BufferCopierParams {
+                src_offset: original.vertex_range.start as u32,
+                dst_offset: vertex_range.start as u32,
+                count: vertex_range.len() as u32,
+            },
         );
 
         vertex_range
@@ -506,63 +472,90 @@ fn create_buffers(device: &Device, vertex_count: usize, index_count: usize) -> M
     let vertex_position = device.create_buffer(&BufferDescriptor {
         label: Some("position vertex buffer"),
         size: position_bytes as BufferAddress,
-        usage: BufferUsages::COPY_SRC | BufferUsages::COPY_DST | BufferUsages::VERTEX | BufferUsages::STORAGE,
+        usage: BufferUsages::COPY_SRC
+            | BufferUsages::COPY_DST
+            | BufferUsages::VERTEX
+            | BufferUsages::STORAGE,
         mapped_at_creation: false,
     });
 
     let vertex_normal = device.create_buffer(&BufferDescriptor {
         label: Some("normal vertex buffer"),
         size: normal_bytes as BufferAddress,
-        usage: BufferUsages::COPY_SRC | BufferUsages::COPY_DST | BufferUsages::VERTEX | BufferUsages::STORAGE,
+        usage: BufferUsages::COPY_SRC
+            | BufferUsages::COPY_DST
+            | BufferUsages::VERTEX
+            | BufferUsages::STORAGE,
         mapped_at_creation: false,
     });
 
     let vertex_tangent = device.create_buffer(&BufferDescriptor {
         label: Some("tangent vertex buffer"),
         size: tangent_bytes as BufferAddress,
-        usage: BufferUsages::COPY_SRC | BufferUsages::COPY_DST | BufferUsages::VERTEX | BufferUsages::STORAGE,
+        usage: BufferUsages::COPY_SRC
+            | BufferUsages::COPY_DST
+            | BufferUsages::VERTEX
+            | BufferUsages::STORAGE,
         mapped_at_creation: false,
     });
 
     let vertex_uv0 = device.create_buffer(&BufferDescriptor {
         label: Some("uv0 vertex buffer"),
         size: uv_bytes as BufferAddress,
-        usage: BufferUsages::COPY_SRC | BufferUsages::COPY_DST | BufferUsages::VERTEX | BufferUsages::STORAGE,
+        usage: BufferUsages::COPY_SRC
+            | BufferUsages::COPY_DST
+            | BufferUsages::VERTEX
+            | BufferUsages::STORAGE,
         mapped_at_creation: false,
     });
 
     let vertex_uv1 = device.create_buffer(&BufferDescriptor {
         label: Some("uv1 vertex buffer"),
         size: uv_bytes as BufferAddress,
-        usage: BufferUsages::COPY_SRC | BufferUsages::COPY_DST | BufferUsages::VERTEX | BufferUsages::STORAGE,
+        usage: BufferUsages::COPY_SRC
+            | BufferUsages::COPY_DST
+            | BufferUsages::VERTEX
+            | BufferUsages::STORAGE,
         mapped_at_creation: false,
     });
 
     let vertex_color = device.create_buffer(&BufferDescriptor {
         label: Some("color vertex buffer"),
         size: color_bytes as BufferAddress,
-        usage: BufferUsages::COPY_SRC | BufferUsages::COPY_DST | BufferUsages::VERTEX | BufferUsages::STORAGE,
+        usage: BufferUsages::COPY_SRC
+            | BufferUsages::COPY_DST
+            | BufferUsages::VERTEX
+            | BufferUsages::STORAGE,
         mapped_at_creation: false,
     });
 
     let vertex_joint_index = device.create_buffer(&BufferDescriptor {
         label: Some("joint index vertex buffer"),
         size: joint_index_bytes as BufferAddress,
-        usage: BufferUsages::COPY_SRC | BufferUsages::COPY_DST | BufferUsages::VERTEX | BufferUsages::STORAGE,
+        usage: BufferUsages::COPY_SRC
+            | BufferUsages::COPY_DST
+            | BufferUsages::VERTEX
+            | BufferUsages::STORAGE,
         mapped_at_creation: false,
     });
 
     let vertex_joint_weight = device.create_buffer(&BufferDescriptor {
         label: Some("joint weight vertex buffer"),
         size: joint_weight_bytes as BufferAddress,
-        usage: BufferUsages::COPY_SRC | BufferUsages::COPY_DST | BufferUsages::VERTEX | BufferUsages::STORAGE,
+        usage: BufferUsages::COPY_SRC
+            | BufferUsages::COPY_DST
+            | BufferUsages::VERTEX
+            | BufferUsages::STORAGE,
         mapped_at_creation: false,
     });
 
     let index = device.create_buffer(&BufferDescriptor {
         label: Some("index buffer"),
         size: index_bytes as BufferAddress,
-        usage: BufferUsages::COPY_SRC | BufferUsages::COPY_DST | BufferUsages::INDEX | BufferUsages::STORAGE,
+        usage: BufferUsages::COPY_SRC
+            | BufferUsages::COPY_DST
+            | BufferUsages::INDEX
+            | BufferUsages::STORAGE,
         mapped_at_creation: false,
     });
 
