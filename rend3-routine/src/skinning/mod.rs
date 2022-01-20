@@ -44,7 +44,7 @@ fn build_gpu_skinning_input_buffers<'node>(device: &Device, skeleton_manager: &S
     let gpu_skinning_inputs = device.create_buffer(&BufferDescriptor {
         label: Some("skinning inputs"),
         size: skinning_inputs_length as u64,
-        usage: BufferUsages::STORAGE,
+        usage: BufferUsages::UNIFORM,
         mapped_at_creation: true,
     });
 
@@ -119,8 +119,8 @@ impl GpuSkinner {
     const WORKGROUP_SIZE: u32 = 64;
 
     pub fn new(device: &wgpu::Device) -> GpuSkinner {
-        let storage_buffer_ty = wgpu::BindingType::Buffer {
-            ty: wgpu::BufferBindingType::Storage { read_only: false },
+        let storage_buffer_ty = |read_only| wgpu::BindingType::Buffer {
+            ty: wgpu::BufferBindingType::Storage { read_only },
             has_dynamic_offset: false,
             min_binding_size: None,
         };
@@ -128,11 +128,11 @@ impl GpuSkinner {
         // Bind group 0 contains some vertex buffers bound as storage buffers
         let vertex_buffers_bgl = {
             let mut bglb = BindGroupLayoutBuilder::new();
-            bglb.append(wgpu::ShaderStages::COMPUTE, storage_buffer_ty, None); // Positions
-            bglb.append(wgpu::ShaderStages::COMPUTE, storage_buffer_ty, None); // Normals
-            bglb.append(wgpu::ShaderStages::COMPUTE, storage_buffer_ty, None); // Tangents
-            bglb.append(wgpu::ShaderStages::COMPUTE, storage_buffer_ty, None); // Joint indices
-            bglb.append(wgpu::ShaderStages::COMPUTE, storage_buffer_ty, None); // Joint weights
+            bglb.append(wgpu::ShaderStages::COMPUTE, storage_buffer_ty(false), None); // Positions
+            bglb.append(wgpu::ShaderStages::COMPUTE, storage_buffer_ty(false), None); // Normals
+            bglb.append(wgpu::ShaderStages::COMPUTE, storage_buffer_ty(false), None); // Tangents
+            bglb.append(wgpu::ShaderStages::COMPUTE, storage_buffer_ty(false), None); // Joint indices
+            bglb.append(wgpu::ShaderStages::COMPUTE, storage_buffer_ty(false), None); // Joint weights
             bglb.build(device, Some("Gpu skinning vertex buffers"))
         };
 
@@ -140,7 +140,7 @@ impl GpuSkinner {
         // skinning input struct contains an offset into this array.
         let joint_matrices_bgl = {
             let mut bglb = BindGroupLayoutBuilder::new();
-            bglb.append(wgpu::ShaderStages::COMPUTE, storage_buffer_ty, None);
+            bglb.append(wgpu::ShaderStages::COMPUTE, storage_buffer_ty(true), None);
             bglb.build(device, Some("Gpu skinning joint matrices"))
         };
 
@@ -155,7 +155,7 @@ impl GpuSkinner {
             bglb.append(
                 wgpu::ShaderStages::COMPUTE,
                 wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Storage { read_only: true },
+                    ty: wgpu::BufferBindingType::Uniform,
                     has_dynamic_offset: true,
                     min_binding_size: None,
                 },
@@ -231,7 +231,7 @@ impl GpuSkinner {
             let offset = (i * std::mem::size_of::<GpuSkinningInput>()) as u32;
             cpass.set_bind_group(2, &skinning_inputs_bgb, &[offset]);
 
-            let num_verts = skel.ranges.mesh_range.len() as u32;
+            let num_verts = (skel.ranges.mesh_range[1] - skel.ranges.mesh_range[0]) as u32;
             let num_workgroups = (num_verts + (Self::WORKGROUP_SIZE - 1)) / Self::WORKGROUP_SIZE; // Divide rounding up
             cpass.dispatch(num_workgroups, 1, 1);
         }
