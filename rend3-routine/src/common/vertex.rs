@@ -137,21 +137,21 @@ pub static GPU_VERTEX_BUFFERS: [VertexBufferLayout<'static>; 9] = [
         }],
     },
     VertexBufferLayout {
-        array_stride: rend3::managers::VERTEX_COLOR_SIZE as u64,
-        step_mode: VertexStepMode::Vertex,
-        attributes: &[VertexAttribute {
-            format: VertexFormat::Unorm8x4,
-            offset: 0,
-            shader_location: VERTEX_COLOR_SLOT,
-        }],
-    },
-    VertexBufferLayout {
         array_stride: rend3::managers::VERTEX_JOINT_INDEX_SIZE as u64,
         step_mode: VertexStepMode::Vertex,
         attributes: &[VertexAttribute {
             format: VertexFormat::Uint16x4,
             offset: 0,
             shader_location: VERTEX_JOINT_INDEX_SLOT,
+        }],
+    },
+    VertexBufferLayout {
+        array_stride: rend3::managers::VERTEX_JOINT_WEIGHT_SIZE as u64,
+        step_mode: VertexStepMode::Vertex,
+        attributes: &[VertexAttribute {
+            format: VertexFormat::Uint16x4,
+            offset: 0,
+            shader_location: VERTEX_JOINT_WEIGHT_SLOT,
         }],
     },
     VertexBufferLayout {

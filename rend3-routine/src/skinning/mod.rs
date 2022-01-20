@@ -1,8 +1,7 @@
 use rend3::{
     format_sso,
     managers::{InternalSkeleton, MeshBuffers, SkeletonManager},
-    util::bind_merge::{BindGroupBuilder, BindGroupLayoutBuilder},
-    DataHandle, RenderGraph,
+    util::bind_merge::{BindGroupBuilder, BindGroupLayoutBuilder}, graph::{RenderGraph, DataHandle},
 };
 use wgpu::{
     BindGroupEntry, BindGroupLayout, Buffer, BufferDescriptor, BufferUsages, ComputePipeline, Device, ShaderStages,

@@ -1,3 +1,8 @@
+//! Type declarations for the rend3 3D rendering crate.
+//!
+//! This is reexported in the rend3 crate proper and includes all the "surface"
+//! api arguments.
+
 use glam::{Mat4, UVec2, Vec2, Vec3, Vec3A, Vec4};
 use std::{
     fmt::Debug,
@@ -12,10 +17,12 @@ use thiserror::Error;
 /// Reexport of the glam version rend3 is using.
 pub use glam;
 
-/// Non-owning resource handle. Not part of rend3's external interface, but
-/// needed to interface with rend3's internal datastructures if writing your own
-/// structures or render routines.
+/// Non-owning resource handle.
+///
+/// Not part of rend3's external interface, but needed to interface with rend3's
+/// internal datastructures if writing your own structures or render routines.
 pub struct RawResourceHandle<T> {
+    /// Underlying value of the handle.
     pub idx: usize,
     _phantom: PhantomData<T>,
 }
@@ -184,8 +191,13 @@ macro_rules! changeable_struct {
 #[doc(inline)]
 pub use wgt::{Backend, Backends, BufferUsages, Color, DeviceType, PresentMode, TextureFormat, TextureUsages};
 
+/// The maximum amount of vertices any one object can have.
+///
+/// The value allows for 8 bits of information packed in the high 8 bits of the
+/// index for object recombination.
 pub const MAX_VERTEX_COUNT: usize = 1 << 24;
 
+/// Identifies the semantic use of a vertex buffer.
 #[derive(Debug, Copy, Clone)]
 pub enum VertexBufferType {
     Position,
@@ -196,6 +208,7 @@ pub enum VertexBufferType {
     Colors,
 }
 
+/// Error returned from mesh validation.
 #[derive(Debug, Error)]
 pub enum MeshValidationError {
     #[error("Mesh's {ty:?} buffer has {actual} vertices but the position buffer has {expected}")]
@@ -833,6 +846,7 @@ pub trait Material: Send + Sync + 'static {
     fn to_data(&self, slice: &mut [u8]);
 }
 
+/// Source of a mesh for an object.
 #[derive(Clone, Debug)]
 pub enum ObjectMeshKind {
     Animated(SkeletonHandle),
@@ -892,6 +906,7 @@ changeable_struct! {
     }
 }
 
+/// The sample count when doing multisampling.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 #[repr(u8)]
 pub enum SampleCount {
@@ -918,11 +933,22 @@ impl TryFrom<u8> for SampleCount {
 }
 
 impl SampleCount {
+    /// Determines if a resolve texture is needed for this texture.
     pub fn needs_resolve(self) -> bool {
         self != Self::One
     }
 }
 
+/// Describes the "Handedness" of a given coordinate system. Affects math done
+/// in the space.
+///
+/// While a weird term, if you make your thumb X, your pointer Y,
+/// and your middle finger Z, the handedness can be determined by which hand can
+/// contort to represent the coordinate system.
+///
+/// For example  
+/// +X right, +Y up, +Z _into_ the screen is left handed.  
+/// +X right, +Y up, +Z _out of_ the screen is right handed.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum Handedness {
     Left,
@@ -935,7 +961,7 @@ impl Default for Handedness {
     }
 }
 
-/// A Skeleton stores the necessary data to do vertex skinning for an [Object]
+/// A Skeleton stores the necessary data to do vertex skinning for an [Object].
 #[derive(Debug, Clone)]
 pub struct Skeleton {
     /// Stores one transformation matrix for each joint. These are the

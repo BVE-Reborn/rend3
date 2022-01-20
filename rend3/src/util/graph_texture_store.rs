@@ -1,8 +1,8 @@
 use wgpu::{Device, Extent3d, Texture, TextureDescriptor, TextureDimension};
 
 use crate::{
+    graph::RenderTargetCore,
     util::typedefs::{FastBuildHasher, FastHashMap},
-    RenderTargetCore,
 };
 
 struct StoredTexture {

@@ -3,10 +3,13 @@
 use std::borrow::Cow;
 
 use rend3::{
+    graph::{
+        DataHandle, DepthHandle, RenderGraph, RenderPassDepthTarget, RenderPassTarget, RenderPassTargets,
+        RenderTargetHandle,
+    },
     types::{SampleCount, TextureHandle},
     util::bind_merge::{BindGroupBuilder, BindGroupLayoutBuilder},
-    DataHandle, DepthHandle, RenderGraph, RenderPassDepthTarget, RenderPassTarget, RenderPassTargets,
-    RenderTargetHandle, Renderer,
+    Renderer,
 };
 use wgpu::{
     BindGroup, BindGroupLayout, BindingType, Color, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState,

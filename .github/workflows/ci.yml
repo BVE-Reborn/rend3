@@ -7,6 +7,7 @@ on:
 
 env:
   RUSTFLAGS: --cfg=web_sys_unstable_apis -D warnings
+  RUSTDOCFLAGS: -D warnings
 
 jobs:
   build:
@@ -93,6 +94,12 @@ jobs:
           command: clippy
           args: --target ${{ matrix.target }} --profile ci --workspace --exclude rend3-imgui --exclude rend3-imgui-example
         if: matrix.target == 'wasm32-unknown-unknown'
+
+      - name: doc
+        uses: actions-rs/cargo@v1
+        with:
+          command: rend3-doc
+          args: --profile ci
 
   cargo-fmt:
     runs-on: ubuntu-latest

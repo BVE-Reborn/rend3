@@ -65,6 +65,8 @@ case $1 in
     ci)
         cargo fmt
         cargo clippy
+        cargo test
+        cargo rend3-doc
         RUSTFLAGS=--cfg=web_sys_unstable_apis cargo clippy --target wasm32-unknown-unknown --workspace --exclude rend3-imgui --exclude rend3-imgui-example
         cargo deny check
     ;;

@@ -396,7 +396,7 @@ impl MeshManager {
                 &new_buffers.vertex_joint_index,
                 mesh,
                 &new_vert_range,
-                VERTEX_JOINT_WEIGHT_SIZE,
+                VERTEX_JOINT_INDEX_SIZE,
             );
             copy_vert(
                 encoder,
@@ -404,7 +404,7 @@ impl MeshManager {
                 &new_buffers.vertex_joint_weight,
                 mesh,
                 &new_vert_range,
-                VERTEX_JOINT_INDEX_SIZE,
+                VERTEX_JOINT_WEIGHT_SIZE,
             );
 
             // Copy indices over to new buffer, adjusting their value by the difference

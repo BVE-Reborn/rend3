@@ -26,6 +26,7 @@ use wgpu::{
 
 const TEXTURE_MASK_SIZE: u32 = 4;
 
+/// Internal representation of a material.
 pub struct InternalMaterial {
     pub bind_group: ModeData<BindGroup, ()>,
     pub material_buffer: ModeData<Buffer, ()>,

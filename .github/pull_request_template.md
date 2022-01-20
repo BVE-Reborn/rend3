@@ -2,12 +2,17 @@
 
 ## Checklist
 
-- [ ] cargo clippy reports no issues
-- [ ] cargo deny issues have been fixed or added to deny.toml
-- [ ] relevant examples/test cases run
-- [ ] changes added to changelog
-  - [ ] Add credit to yourself for each change: `Added new functionality @githubname`.
-
-## Problems PR Solves
+- CI Checked:
+  - [ ] `cargo fmt` has been ran
+  - [ ] `cargo clippy` reports no issues
+  - [ ] `cargo test` succeeds
+  - [ ] `cargo rend3-doc` has no warnings
+  - [ ] `cargo deny check` issues have been fixed or added to deny.toml
+- Manually Checked:
+  - [ ] relevant examples/test cases run
+  - [ ] changes added to changelog
+    - [ ] Add credit to yourself for each change: `Added new functionality @githubname`.
 
 ## Related Issues
+
+## Description

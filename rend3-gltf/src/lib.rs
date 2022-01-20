@@ -184,6 +184,31 @@ pub async fn filesystem_io_func(parent_directory: impl AsRef<Path>, uri: SsoStri
     }
 }
 
+/// Determines parameters that are given to various parts of the gltf world that
+/// cannot be specified by gltf alone.
+#[derive(Copy, Clone)]
+pub struct GltfLoadSettings {
+    /// Global scale applied to all objects (default: 1)
+    pub scale: f32,
+    /// Size of the shadow map in world space (default: 100)
+    pub directional_light_shadow_distance: f32,
+    /// Coordinate space normal maps should use (default Up)
+    pub normal_direction: pbr::NormalTextureYDirection,
+    /// Enable built-in directional lights (default true)
+    pub enable_directional: bool,
+}
+
+impl Default for GltfLoadSettings {
+    fn default() -> Self {
+        Self {
+            scale: 1.0,
+            directional_light_shadow_distance: 100.0,
+            normal_direction: pbr::NormalTextureYDirection::Up,
+            enable_directional: true,
+        }
+    }
+}
+
 /// Load a given gltf into the renderer's world.
 ///
 /// Allows the user to specify how URIs are resolved into their underlying data.
@@ -200,16 +225,14 @@ pub async fn filesystem_io_func(parent_directory: impl AsRef<Path>, uri: SsoStri
 /// let _loaded = pollster::block_on(rend3_gltf::load_gltf(
 ///     &renderer,
 ///     &gltf_data,
-///     1.0,
-///     rend3_routine::pbr::NormalTextureYDirection::Up,
+///     &rend3_gltf::GltfLoadSettings::default(),
 ///     |p| rend3_gltf::filesystem_io_func(&parent_directory, p)
 /// ));
 /// ```
 pub async fn load_gltf<F, Fut, E>(
     renderer: &Renderer,
     data: &[u8],
-    scale: f32,
-    normal_direction: pbr::NormalTextureYDirection,
+    settings: &GltfLoadSettings,
     io_func: F,
 ) -> Result<LoadedGltfScene, GltfLoadError<E>>
 where
@@ -224,7 +247,7 @@ where
         gltf::Gltf::from_slice_without_validation(data)?
     };
 
-    let mut loaded = load_gltf_data(renderer, &mut file, normal_direction, io_func).await?;
+    let mut loaded = load_gltf_data(renderer, &mut file, settings, io_func).await?;
 
     let scene = file
         .default_scene()
@@ -235,13 +258,14 @@ where
         renderer,
         &loaded,
         scene.nodes(),
+        settings,
         Mat4::from_scale(Vec3::new(
-            scale,
-            scale,
+            settings.scale,
+            settings.scale,
             if renderer.handedness == Handedness::Left {
-                -scale
+                -settings.scale
             } else {
-                scale
+                settings.scale
             },
         )),
     )?;
@@ -259,7 +283,7 @@ where
 pub async fn load_gltf_data<F, Fut, E>(
     renderer: &Renderer,
     file: &mut gltf::Gltf,
-    normal_direction: pbr::NormalTextureYDirection,
+    settings: &GltfLoadSettings,
     mut io_func: F,
 ) -> Result<LoadedGltfScene, GltfLoadError<E>>
 where
@@ -275,7 +299,7 @@ where
     let default_material = load_default_material(renderer);
     let meshes = load_meshes(renderer, file.meshes(), &buffers)?;
     let (materials, images) =
-        load_materials_and_textures(renderer, file.materials(), &buffers, normal_direction, &mut io_func).await?;
+        load_materials_and_textures(renderer, file.materials(), &buffers, settings, &mut io_func).await?;
     let skins = load_skins(file.skins(), &buffers)?;
 
     let loaded = LoadedGltfScene {
@@ -346,6 +370,7 @@ pub fn load_gltf_nodes<'a, E: std::error::Error + 'static>(
     renderer: &Renderer,
     loaded: &LoadedGltfScene,
     nodes: impl Iterator<Item = gltf::Node<'a>>,
+    settings: &GltfLoadSettings,
     parent_transform: Mat4,
 ) -> Result<Vec<Labeled<Node>>, GltfLoadError<E>> {
     let mut final_nodes = Vec::with_capacity(nodes.size_hint().0);
@@ -368,13 +393,13 @@ pub fn load_gltf_nodes<'a, E: std::error::Error + 'static>(
 
         let light = if let Some(light) = node.light() {
             match light.kind() {
-                gltf::khr_lights_punctual::Kind::Directional => {
+                gltf::khr_lights_punctual::Kind::Directional if settings.enable_directional => {
                     let direction = transform.transform_vector3(-Vec3::Z);
                     Some(renderer.add_directional_light(types::DirectionalLight {
                         color: Vec3::from(light.color()),
                         intensity: light.intensity(),
                         direction,
-                        distance: 100.0,
+                        distance: settings.directional_light_shadow_distance,
                     }))
                 }
                 _ => None,
@@ -383,7 +408,7 @@ pub fn load_gltf_nodes<'a, E: std::error::Error + 'static>(
             None
         };
 
-        let children = load_gltf_nodes(renderer, loaded, node.children(), transform)?;
+        let children = load_gltf_nodes(renderer, loaded, node.children(), settings, transform)?;
 
         final_nodes.push(Labeled::new(
             Node {
@@ -586,7 +611,7 @@ pub async fn load_materials_and_textures<F, Fut, E>(
     renderer: &Renderer,
     materials: impl ExactSizeIterator<Item = gltf::Material<'_>>,
     buffers: &[Vec<u8>],
-    normal_direction: pbr::NormalTextureYDirection,
+    settings: &GltfLoadSettings,
     io_func: &mut F,
 ) -> Result<(Vec<Labeled<types::MaterialHandle>>, ImageMap), GltfLoadError<E>>
 where
@@ -676,10 +701,10 @@ where
             },
             normal: match normals_tex {
                 Some(tex) if tex.format.describe().components == 2 => {
-                    pbr::NormalTexture::Bicomponent(tex.handle, normal_direction)
+                    pbr::NormalTexture::Bicomponent(tex.handle, settings.normal_direction)
                 }
                 Some(tex) if tex.format.describe().components >= 3 => {
-                    pbr::NormalTexture::Tricomponent(tex.handle, normal_direction)
+                    pbr::NormalTexture::Tricomponent(tex.handle, settings.normal_direction)
                 }
                 _ => pbr::NormalTexture::None,
             },
@@ -1056,11 +1081,11 @@ pub mod util {
                 }
             }
             k2F::B8G8R8A8_SNORM | k2F::B8G8R8A8_UINT | k2F::B8G8R8A8_SINT => return None,
+            k2F::A2B10G10R10_UNORM_PACK32 => r3F::Rgb10a2Unorm,
             k2F::A2R10G10B10_UNORM_PACK32
             | k2F::A2R10G10B10_SNORM_PACK32
             | k2F::A2R10G10B10_UINT_PACK32
             | k2F::A2R10G10B10_SINT_PACK32
-            | k2F::A2B10G10R10_UNORM_PACK32
             | k2F::A2B10G10R10_SNORM_PACK32
             | k2F::A2B10G10R10_UINT_PACK32
             | k2F::A2B10G10R10_SINT_PACK32 => return None,
@@ -1077,7 +1102,8 @@ pub mod util {
             | k2F::R16G16B16_UINT
             | k2F::R16G16B16_SINT
             | k2F::R16G16B16_SFLOAT => return None,
-            k2F::R16G16B16A16_UNORM | k2F::R16G16B16A16_SNORM => return None,
+            k2F::R16G16B16A16_UNORM => r3F::Rgba16Unorm,
+            k2F::R16G16B16A16_SNORM => r3F::Rgba16Snorm,
             k2F::R16G16B16A16_UINT => r3F::Rgba16Uint,
             k2F::R16G16B16A16_SINT => r3F::Rgba16Sint,
             k2F::R16G16B16A16_SFLOAT => r3F::Rgba16Float,

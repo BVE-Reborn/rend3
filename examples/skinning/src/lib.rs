@@ -39,8 +39,7 @@ impl rend3_framework::App for SkinningExample {
             pollster::block_on(rend3_gltf::load_gltf(
                 &renderer,
                 &gltf_data,
-                1.0,
-                rend3_routine::pbr::NormalTextureYDirection::Up,
+                &rend3_gltf::GltfLoadSettings::default(),
                 |p| rend3_gltf::filesystem_io_func(&parent_directory, p),
             ))
             .expect("Loading gltf scene"),
@@ -51,7 +50,7 @@ impl rend3_framework::App for SkinningExample {
         // We need to keep the directional light handle alive.
         self.directional_light_handle = Some(renderer.add_directional_light(rend3::types::DirectionalLight {
             color: glam::Vec3::ONE,
-            intensity: 100.0,
+            intensity: 10.0,
             // Direction will be normalized
             direction: glam::Vec3::new(-1.0, -4.0, 2.0),
             distance: 400.0,
@@ -94,7 +93,7 @@ impl rend3_framework::App for SkinningExample {
                 let tonemapping_routine = rend3_framework::lock(&routines.tonemapping);
 
                 // Build a rendergraph
-                let mut graph = rend3::RenderGraph::new();
+                let mut graph = rend3::graph::RenderGraph::new();
 
                 // Add the default rendergraph without a skybox
                 base_rendergraph.add_to_graph(
