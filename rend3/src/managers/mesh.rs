@@ -472,90 +472,63 @@ fn create_buffers(device: &Device, vertex_count: usize, index_count: usize) -> M
     let vertex_position = device.create_buffer(&BufferDescriptor {
         label: Some("position vertex buffer"),
         size: position_bytes as BufferAddress,
-        usage: BufferUsages::COPY_SRC
-            | BufferUsages::COPY_DST
-            | BufferUsages::VERTEX
-            | BufferUsages::STORAGE,
+        usage: BufferUsages::COPY_SRC | BufferUsages::COPY_DST | BufferUsages::VERTEX | BufferUsages::STORAGE,
         mapped_at_creation: false,
     });
 
     let vertex_normal = device.create_buffer(&BufferDescriptor {
         label: Some("normal vertex buffer"),
         size: normal_bytes as BufferAddress,
-        usage: BufferUsages::COPY_SRC
-            | BufferUsages::COPY_DST
-            | BufferUsages::VERTEX
-            | BufferUsages::STORAGE,
+        usage: BufferUsages::COPY_SRC | BufferUsages::COPY_DST | BufferUsages::VERTEX | BufferUsages::STORAGE,
         mapped_at_creation: false,
     });
 
     let vertex_tangent = device.create_buffer(&BufferDescriptor {
         label: Some("tangent vertex buffer"),
         size: tangent_bytes as BufferAddress,
-        usage: BufferUsages::COPY_SRC
-            | BufferUsages::COPY_DST
-            | BufferUsages::VERTEX
-            | BufferUsages::STORAGE,
+        usage: BufferUsages::COPY_SRC | BufferUsages::COPY_DST | BufferUsages::VERTEX | BufferUsages::STORAGE,
         mapped_at_creation: false,
     });
 
     let vertex_uv0 = device.create_buffer(&BufferDescriptor {
         label: Some("uv0 vertex buffer"),
         size: uv_bytes as BufferAddress,
-        usage: BufferUsages::COPY_SRC
-            | BufferUsages::COPY_DST
-            | BufferUsages::VERTEX
-            | BufferUsages::STORAGE,
+        usage: BufferUsages::COPY_SRC | BufferUsages::COPY_DST | BufferUsages::VERTEX | BufferUsages::STORAGE,
         mapped_at_creation: false,
     });
 
     let vertex_uv1 = device.create_buffer(&BufferDescriptor {
         label: Some("uv1 vertex buffer"),
         size: uv_bytes as BufferAddress,
-        usage: BufferUsages::COPY_SRC
-            | BufferUsages::COPY_DST
-            | BufferUsages::VERTEX
-            | BufferUsages::STORAGE,
+        usage: BufferUsages::COPY_SRC | BufferUsages::COPY_DST | BufferUsages::VERTEX | BufferUsages::STORAGE,
         mapped_at_creation: false,
     });
 
     let vertex_color = device.create_buffer(&BufferDescriptor {
         label: Some("color vertex buffer"),
         size: color_bytes as BufferAddress,
-        usage: BufferUsages::COPY_SRC
-            | BufferUsages::COPY_DST
-            | BufferUsages::VERTEX
-            | BufferUsages::STORAGE,
+        usage: BufferUsages::COPY_SRC | BufferUsages::COPY_DST | BufferUsages::VERTEX | BufferUsages::STORAGE,
         mapped_at_creation: false,
     });
 
     let vertex_joint_index = device.create_buffer(&BufferDescriptor {
         label: Some("joint index vertex buffer"),
         size: joint_index_bytes as BufferAddress,
-        usage: BufferUsages::COPY_SRC
-            | BufferUsages::COPY_DST
-            | BufferUsages::VERTEX
-            | BufferUsages::STORAGE,
+        usage: BufferUsages::COPY_SRC | BufferUsages::COPY_DST | BufferUsages::VERTEX | BufferUsages::STORAGE,
         mapped_at_creation: false,
     });
 
     let vertex_joint_weight = device.create_buffer(&BufferDescriptor {
         label: Some("joint weight vertex buffer"),
         size: joint_weight_bytes as BufferAddress,
-        usage: BufferUsages::COPY_SRC
-            | BufferUsages::COPY_DST
-            | BufferUsages::VERTEX
-            | BufferUsages::STORAGE,
+        usage: BufferUsages::COPY_SRC | BufferUsages::COPY_DST | BufferUsages::VERTEX | BufferUsages::STORAGE,
         mapped_at_creation: false,
     });
 
     let index = device.create_buffer(&BufferDescriptor {
         label: Some("index buffer"),
         size: index_bytes as BufferAddress,
-        usage: BufferUsages::COPY_SRC
-            | BufferUsages::COPY_DST
-            | BufferUsages::INDEX
-            | BufferUsages::STORAGE,
+        usage: BufferUsages::COPY_SRC | BufferUsages::COPY_DST | BufferUsages::INDEX | BufferUsages::STORAGE,
         mapped_at_creation: false,
     });
 
