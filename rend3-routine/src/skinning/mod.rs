@@ -6,13 +6,15 @@ use rend3::{
 };
 use wgpu::{BindGroupLayout, Buffer, BufferDescriptor, BufferUsages, ComputePipeline, Device};
 
+
+
 /// The per-skeleton data, as uploaded to the GPU compute shader.
 #[repr(C, align(16))]
 #[derive(Copy, Clone)]
 pub struct GpuSkinningInput {
-    /// See [GpuVertexRanges::mesh_range].
+    /// See [rend3::managers::GpuVertexRanges].
     pub mesh_range: [u32; 2],
-    /// See [GpuVertexRanges::skeleton_range].
+    /// See [rend3::managers::GpuVertexRanges].
     pub skeleton_range: [u32; 2],
     /// The index of this skeleton's first joint in the global joint matrix
     /// buffer.
