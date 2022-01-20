@@ -6,7 +6,7 @@ use crate::{
         registry::ResourceRegistry,
     },
 };
-use glam::{Vec2, Vec3};
+use glam::{Vec2, Vec3, Vec4};
 use range_alloc::RangeAllocator;
 use rend3_types::RawMeshHandle;
 use std::{
@@ -79,6 +79,18 @@ pub struct MeshBuffers {
     pub vertex_joint_weight: Buffer,
 
     pub index: Buffer,
+}
+
+/// The [MeshBuffers] when brought back to the CPU, for debug purposes
+pub struct DebugBuffers {
+    pub vertex_position: Vec<Vec3>,
+    pub vertex_normal: Vec<Vec3>,
+    pub vertex_tangent: Vec<Vec3>,
+    pub vertex_uv0: Vec<Vec2>,
+    pub vertex_uv1: Vec<Vec2>,
+    pub vertex_color: Vec<[u8; 4]>,
+    pub vertex_joint_index: Vec<[u16; 4]>,
+    pub vertex_joint_weight: Vec<Vec4>,
 }
 
 impl MeshBuffers {
@@ -434,6 +446,36 @@ impl MeshManager {
 
     fn index_count(&self) -> usize {
         self.index_alloc.initial_range().end
+    }
+
+    /// Sometimes it is necessary to explore the context of the [MeshBuffers] on
+    /// the CPU side for debug purposes. This utility function takes care of
+    /// reading and returning a type-safe CPU-side version of that data.
+    /// 
+    /// **NOTE:** Do not use this method in any performance-sensitive context.
+    pub fn debug_buffers(&self) -> DebugBuffers {
+        fn read_buffer<Out: Copy + bytemuck::Pod + bytemuck::Zeroable>(buf: &wgpu::Buffer) -> Vec<Out> {
+            let buf_slice = buf.slice(..);
+            let buf_future = buf_slice.map_async(wgpu::MapMode::Read);
+            if let Ok(()) = pollster::block_on(buf_future) {
+                let data = buf_slice.get_mapped_range();
+                let data_typed: &[Out] = bytemuck::cast_slice(&data);
+                data_typed.iter().cloned().collect()
+            } else {
+                panic!("Could not read buffer")
+            }
+        }
+
+        DebugBuffers {
+            vertex_position: read_buffer(&self.buffers.vertex_position),
+            vertex_normal: read_buffer(&self.buffers.vertex_normal),
+            vertex_tangent: read_buffer(&self.buffers.vertex_tangent),
+            vertex_uv0: read_buffer(&self.buffers.vertex_uv0),
+            vertex_uv1: read_buffer(&self.buffers.vertex_uv1),
+            vertex_color: read_buffer(&self.buffers.vertex_color),
+            vertex_joint_index: read_buffer(&self.buffers.vertex_joint_index),
+            vertex_joint_weight: read_buffer(&self.buffers.vertex_joint_weight),
+        }
     }
 }
 
