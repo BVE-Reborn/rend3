@@ -33,6 +33,7 @@ pub fn add_culling_to_graph<'node, M: Material>(
     graph: &mut RenderGraph<'node>,
     pre_cull_data: DataHandle<Buffer>,
     culled: DataHandle<PerMaterialArchetypeData>,
+    skinned: DataHandle<()>,
     per_material: &'node PerMaterialArchetypeInterface<M>,
     gpu_culler: &'node ModeData<(), gpu::GpuCuller>,
     shadow_index: Option<usize>,
@@ -46,6 +47,9 @@ pub fn add_culling_to_graph<'node, M: Material>(
         .mode()
         .into_data(|| (), || builder.add_data_input(pre_cull_data));
     let cull_handle = builder.add_data_output(culled);
+
+    // Just connect the input, we don't need its value.
+    builder.add_data_input(skinned);
 
     builder.build(move |_pt, renderer, encoder_or_rpass, temps, ready, graph_data| {
         let encoder = encoder_or_rpass.get_encoder();

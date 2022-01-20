@@ -155,7 +155,7 @@ impl GpuSkinner {
             bglb.append(
                 wgpu::ShaderStages::COMPUTE,
                 wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
+                    ty: wgpu::BufferBindingType::Storage { read_only: true },
                     has_dynamic_offset: true,
                     min_binding_size: None,
                 },
@@ -242,9 +242,11 @@ pub fn add_skinning_to_graph<'node>(
     graph: &mut RenderGraph<'node>,
     gpu_skinner: &'node GpuSkinner,
     pre_skin_data: DataHandle<PreSkinningBuffers>,
+    skinned_data: DataHandle<()>,
 ) {
     let mut builder = graph.add_node("skinning");
     let pre_skin_handle = builder.add_data_input(pre_skin_data);
+    let skinned_data_handle = builder.add_data_output(skinned_data);
 
     let skinner_pt = builder.passthrough_ref(gpu_skinner);
 
@@ -261,6 +263,8 @@ pub fn add_skinning_to_graph<'node>(
             skin_input,
             &graph_data.mesh_manager.buffers(),
             &graph_data.skeleton_manager,
-        )
+        );
+
+        graph_data.set_data(skinned_data_handle, Some(()));
     });
 }
