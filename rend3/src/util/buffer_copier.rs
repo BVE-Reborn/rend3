@@ -1,6 +1,6 @@
 use wgpu::{
-    util::DeviceExt, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutEntry, CommandEncoder,
-    ComputePipeline, Device, Queue,
+    util::DeviceExt, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutEntry, ComputePipeline,
+    Device, Queue,
 };
 
 /// When allocating data for a new skeleton, the MeshManager needs to copy some

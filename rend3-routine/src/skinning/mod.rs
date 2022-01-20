@@ -1,11 +1,10 @@
 use rend3::{
     format_sso,
-    managers::{InternalSkeleton, MeshBuffers, SkeletonManager},
-    util::bind_merge::{BindGroupBuilder, BindGroupLayoutBuilder}, graph::{RenderGraph, DataHandle},
+    graph::{DataHandle, RenderGraph},
+    managers::{MeshBuffers, SkeletonManager},
+    util::bind_merge::{BindGroupBuilder, BindGroupLayoutBuilder},
 };
-use wgpu::{
-    BindGroupEntry, BindGroupLayout, Buffer, BufferDescriptor, BufferUsages, ComputePipeline, Device, ShaderStages,
-};
+use wgpu::{BindGroupLayout, Buffer, BufferDescriptor, BufferUsages, ComputePipeline, Device};
 
 /// The per-skeleton data, as uploaded to the GPU compute shader.
 #[repr(C, align(16))]
@@ -20,12 +19,12 @@ pub struct GpuSkinningInput {
     pub joint_idx: u32,
 }
 
-pub fn add_pre_skin_to_graph<'node>(graph: &mut RenderGraph<'node>, pre_skin_data: DataHandle<PreSkinningBuffers>) {
+pub fn add_pre_skin_to_graph(graph: &mut RenderGraph, pre_skin_data: DataHandle<PreSkinningBuffers>) {
     let mut builder = graph.add_node("pre-skinning");
     let pre_skin_handle = builder.add_data_output(pre_skin_data);
 
     builder.build(move |_pt, renderer, _encoder_or_pass, _temps, _ready, graph_data| {
-        let buffers = build_gpu_skinning_input_buffers(&renderer.device, &graph_data.skeleton_manager);
+        let buffers = build_gpu_skinning_input_buffers(&renderer.device, graph_data.skeleton_manager);
         graph_data.set_data::<PreSkinningBuffers>(pre_skin_handle, Some(buffers));
     });
 }
@@ -36,7 +35,7 @@ pub struct PreSkinningBuffers {
     joint_matrices: Buffer,
 }
 
-fn build_gpu_skinning_input_buffers<'node>(device: &Device, skeleton_manager: &SkeletonManager) -> PreSkinningBuffers {
+fn build_gpu_skinning_input_buffers(device: &Device, skeleton_manager: &SkeletonManager) -> PreSkinningBuffers {
     profiling::scope!("Building GPU Skinning Input Data");
 
     let skinning_inputs_length = skeleton_manager.skeletons().len() * std::mem::size_of::<GpuSkinningInput>();
@@ -260,8 +259,8 @@ pub fn add_skinning_to_graph<'node>(
             &renderer.device,
             encoder,
             skin_input,
-            &graph_data.mesh_manager.buffers(),
-            &graph_data.skeleton_manager,
+            graph_data.mesh_manager.buffers(),
+            graph_data.skeleton_manager,
         );
 
         graph_data.set_data(skinned_data_handle, Some(()));

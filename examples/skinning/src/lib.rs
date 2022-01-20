@@ -37,7 +37,7 @@ impl rend3_framework::App for SkinningExample {
         let parent_directory = path.parent().unwrap();
         self.loaded_model = Some(
             pollster::block_on(rend3_gltf::load_gltf(
-                &renderer,
+                renderer,
                 &gltf_data,
                 &rend3_gltf::GltfLoadSettings::default(),
                 |p| rend3_gltf::filesystem_io_func(&parent_directory, p),

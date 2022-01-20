@@ -25,8 +25,8 @@ pub struct InternalSkeleton {
 }
 
 /// The skeleton and mes vertex ranges, in a format that's suitable to be sent
-/// to the GPU. 
-/// 
+/// to the GPU.
+///
 /// Note that there's no need for this struct to be `#[repr(C)]`
 /// because this is not the actual data that gets uploaded for GPU skinning.
 #[derive(Debug, Copy, Clone)]

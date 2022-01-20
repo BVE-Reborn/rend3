@@ -21,7 +21,7 @@
 //! - Double sided materials are currently unsupported.
 
 use glam::{Mat3, Mat4, UVec2, Vec2, Vec3, Vec4};
-use gltf::{buffer::Source, skin::util::ReadInverseBindMatrices};
+use gltf::buffer::Source;
 use image::GenericImageView;
 use rend3::{
     types::{self, Handedness, MeshValidationError, ObjectHandle, ObjectMeshKind, Skeleton},
@@ -342,10 +342,13 @@ pub fn add_mesh_by_index<E: std::error::Error + 'static>(
                 .ok_or_else(|| GltfLoadError::MissingMaterial(mat_idx.expect("Could not find default material")))?;
             Ok(renderer.add_object(types::Object {
                 mesh_kind: if let Some(skin_index) = skin_index {
-                    let skin = loaded.skins.get(skin_index).ok_or(GltfLoadError::MissingSkin(skin_index))?;
+                    let skin = loaded
+                        .skins
+                        .get(skin_index)
+                        .ok_or(GltfLoadError::MissingSkin(skin_index))?;
                     let num_joints = skin.inner.iverse_bind_matrices.len();
                     ObjectMeshKind::Animated(renderer.add_skeleton(Skeleton {
-                        // We don't need to use the inverse bind matrices. At rest pose, every 
+                        // We don't need to use the inverse bind matrices. At rest pose, every
                         // joint matrix is inv_bind_pose * bind_pose, thus the identity matrix.
                         joint_matrices: vec![Mat4::IDENTITY; num_joints],
                         mesh: prim.handle.clone(),
@@ -548,13 +551,13 @@ pub fn load_meshes<'a, E: std::error::Error + 'static>(
         .collect()
 }
 
-fn load_skins<'a, E: std::error::Error + 'static>(
+fn load_skins<E: std::error::Error + 'static>(
     skins: gltf::iter::Skins,
     buffers: &[Vec<u8>],
 ) -> Result<Vec<Labeled<Skin>>, GltfLoadError<E>> {
     let mut res_skins = vec![];
 
-    for skin in skins.into_iter() {
+    for skin in skins {
         let num_joints = skin.joints().count();
         let reader = skin.reader(|b| Some(&buffers[b.index()][..b.length()]));
 

@@ -466,8 +466,9 @@ impl Renderer {
     }
 
     /// Sets the joint positions for a skeleton. See
-    /// [Renderer::set_skeleton_joint_matrices] to set the vertex transformations
-    /// directly, without having to supply two separate matrix vectors.
+    /// [Renderer::set_skeleton_joint_matrices] to set the vertex
+    /// transformations directly, without having to supply two separate
+    /// matrix vectors.
     ///
     /// ## Inputs
     /// - `joint_global_positions`: Contains one transform matrix per bone,

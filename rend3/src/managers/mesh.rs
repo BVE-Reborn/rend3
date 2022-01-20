@@ -1,12 +1,12 @@
 use crate::{
     types::{Mesh, MeshHandle},
     util::{
-        buffer_copier::{self, BufferCopier, BufferCopierParams},
+        buffer_copier::{BufferCopier, BufferCopierParams},
         frustum::BoundingSphere,
         registry::ResourceRegistry,
     },
 };
-use glam::{Vec2, Vec3, Vec4};
+use glam::{Vec2, Vec3};
 use range_alloc::RangeAllocator;
 use rend3_types::RawMeshHandle;
 use std::{

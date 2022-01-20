@@ -8,7 +8,7 @@ use crate::{
     },
     managers::{
         CameraManager, DirectionalLightManager, MaterialManager, MeshManager, ObjectManager, ShadowCoordinates,
-        TextureManager, SkeletonManager,
+        SkeletonManager, TextureManager,
     },
     util::typedefs::FastHashMap,
 };
