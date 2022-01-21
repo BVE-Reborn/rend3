@@ -390,14 +390,7 @@ pub fn add_mesh_by_index<E: std::error::Error + 'static>(
     Ok(Labeled::new(
         Object {
             primitives,
-            armature: if let Some(skin_index) = skin_index {
-                Some(Armature {
-                    skeletons,
-                    skin_index
-                })
-            } else {
-                None
-            },
+            armature: skin_index.map(|skin_index| Armature { skeletons, skin_index }),
         },
         name,
     ))

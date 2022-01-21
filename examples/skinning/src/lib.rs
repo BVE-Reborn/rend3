@@ -24,7 +24,7 @@ pub fn find_armature<'a>(
             return Some(skels);
         }
     }
-    return None;
+    None
 }
 
 impl rend3_framework::App for SkinningExample {

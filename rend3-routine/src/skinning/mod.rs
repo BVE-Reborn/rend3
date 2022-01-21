@@ -6,8 +6,6 @@ use rend3::{
 };
 use wgpu::{BindGroupLayout, Buffer, BufferDescriptor, BufferUsages, ComputePipeline, Device};
 
-
-
 /// The per-skeleton data, as uploaded to the GPU compute shader.
 #[repr(C, align(16))]
 #[derive(Copy, Clone)]
