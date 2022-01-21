@@ -61,9 +61,13 @@ fn get_joint_matrix(joint_idx: u32) -> mat4x4<f32> {
     return joint_matrices.matrices[input.joints_start_idx + joint_idx];
 }
 
-//fn inv_scale_squared(matrix: mat4x4<f32>) -> vec4<f32> {
-    
-//}
+fn get_inv_scale_squared(matrix: mat4x4<f32>) -> vec3<f32> {
+    return vec3<f32>(
+        1.0 / dot(matrix[0].xyz, matrix[0].xyz), 
+        1.0 / dot(matrix[1].xyz, matrix[1].xyz),
+        1.0 / dot(matrix[2].xyz, matrix[2].xyz)
+    );
+}
 
 [[stage(compute), workgroup_size(64)]]
 fn main([[builtin(global_invocation_id)]] global_id: vec3<u32>) {
@@ -89,10 +93,6 @@ fn main([[builtin(global_invocation_id)]] global_id: vec3<u32>) {
     var joint_indices = array<u32,4>(joint_i0, joint_i1, joint_i2, joint_i3);
 
     // Compute the skinned position
-    let pos4 = vec4<f32>(pos, 1.0);
-    let norm4 = vec4<f32>(normal, 0.0);
-    let tang4 = vec4<f32>(tangent, 0.0);
-
     var pos_acc = vec3<f32>(0.0, 0.0, 0.0);
     var norm_acc = vec3<f32>(0.0, 0.0, 0.0);
     var tang_acc = vec3<f32>(0.0, 0.0, 0.0);
@@ -103,14 +103,16 @@ fn main([[builtin(global_invocation_id)]] global_id: vec3<u32>) {
 
         if (weight > 0.0) {
             let joint_matrix = get_joint_matrix(joint_index);
-            pos_acc = pos_acc + ((joint_matrix * pos4) * weight).xyz;
-            norm_acc = norm_acc + ((joint_matrix * norm4) * weight).xyz;
-            tang_acc = tang_acc + ((joint_matrix * tang4) * weight).xyz;
+            let joint_matrix3 = mat3x3<f32>(joint_matrix[0].xyz, joint_matrix[1].xyz, joint_matrix[2].xyz);
+            let inv_scale_sq = get_inv_scale_squared(joint_matrix);
+            pos_acc = pos_acc + ((joint_matrix * vec4<f32>(pos, 1.0)) * weight).xyz;
+            norm_acc = norm_acc + (joint_matrix3 * (inv_scale_sq * normal)) * weight;
+            tang_acc = tang_acc + (joint_matrix3 * (inv_scale_sq * tangent)) * weight;
         }
     }
     
     // Write to output region of buffer
     positions.data[input.skeleton_range.start + idx] = from_v(pos_acc);
-    normals.data[input.skeleton_range.start + idx] = from_v(norm_acc);
-    tangents.data[input.skeleton_range.start + idx] = from_v(tang_acc);
+    normals.data[input.skeleton_range.start + idx] = from_v(normalize(norm_acc));
+    tangents.data[input.skeleton_range.start + idx] = from_v(normalize(tang_acc));
 }

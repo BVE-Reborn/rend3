@@ -112,7 +112,7 @@ impl rend3_framework::App for SkinningExample {
             color: glam::Vec3::ONE,
             intensity: 10.0,
             // Direction will be normalized
-            direction: glam::Vec3::new(-1.0, -4.0, -2.0),
+            direction: glam::Vec3::new(-1.0, -4.0, 2.0),
             distance: 400.0,
         }));
     }
