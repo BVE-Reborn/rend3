@@ -68,6 +68,9 @@ impl rend3_framework::App for SkinningExample {
         // with an armature.
         let armature = find_armature(loaded_model.nodes.iter()).unwrap();
 
+        // Locate the inverse bind matrices for this skeleton
+        let inverse_bind_matrices = &loaded_model.skins[armature.skin_index].inner.inverse_bind_matrices;
+
         // An armature contains multiple skeletons, one per mesh primitive being
         // deformed. We need to set the joint matrices per each skeleton.
         for skeleton in armature.skeletons {
@@ -77,7 +80,7 @@ impl rend3_framework::App for SkinningExample {
                     glam::Mat4::from_rotation_x(30.0f32.to_radians()),
                     glam::Mat4::from_rotation_x(-30.0f32.to_radians()),
                 ],
-                &armature.inverse_bind_matrices,
+                inverse_bind_matrices,
             );
         }
 

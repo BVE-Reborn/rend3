@@ -66,14 +66,17 @@ pub struct Mesh {
 }
 
 /// A set of [`SkeletonHandle`]s, one per mesh in the wrapping object, plus the
-/// list of inverse bind matrices for each joint in the skeletons.
+/// index of the skin data in the `skins` array of [`LoadedGltfScene`].
 ///
 /// All the skeletons are guaranteed to have the same number of joints and
 /// structure, but deform different meshes of the object.
 #[derive(Debug, Clone)]
 pub struct Armature {
+    /// The list of skeletons that are deforming this node's mesh primitives.
     pub skeletons: Vec<SkeletonHandle>,
-    pub inverse_bind_matrices: Vec<glam::Mat4>,
+    /// Index to the skin that contains the inverse bind matrices for the
+    /// skeletons in this armature.
+    pub skin_index: usize,
 }
 
 /// Set of [`ObjectHandle`]s that correspond to a logical object in the node
@@ -117,7 +120,7 @@ pub struct Texture {
 
 #[derive(Debug)]
 pub struct Skin {
-    iverse_bind_matrices: Vec<Mat4>,
+    pub inverse_bind_matrices: Vec<Mat4>,
 }
 /// Hashmap which stores a mapping from [`ImageKey`] to a labeled handle.
 pub type ImageMap = FastHashMap<ImageKey, Labeled<Texture>>;
@@ -368,7 +371,7 @@ pub fn add_mesh_by_index<E: std::error::Error + 'static>(
             let skeleton = renderer.add_skeleton(Skeleton {
                 // We don't need to use the inverse bind matrices. At rest pose, every
                 // joint matrix is inv_bind_pose * bind_pose, thus the identity matrix.
-                joint_matrices: vec![Mat4::IDENTITY; skin.inner.iverse_bind_matrices.len()],
+                joint_matrices: vec![Mat4::IDENTITY; skin.inner.inverse_bind_matrices.len()],
                 mesh: prim.handle.clone(),
             });
             skeletons.push(skeleton.clone());
@@ -387,10 +390,10 @@ pub fn add_mesh_by_index<E: std::error::Error + 'static>(
     Ok(Labeled::new(
         Object {
             primitives,
-            armature: if let Some(skin) = skin {
+            armature: if let Some(skin_index) = skin_index {
                 Some(Armature {
                     skeletons,
-                    inverse_bind_matrices: skin.inner.iverse_bind_matrices.clone(),
+                    skin_index
                 })
             } else {
                 None
@@ -602,7 +605,7 @@ fn load_skins<E: std::error::Error + 'static>(
 
         res_skins.push(Labeled::new(
             Skin {
-                iverse_bind_matrices: inv_b_mats,
+                inverse_bind_matrices: inv_b_mats,
             },
             skin.name(),
         ))
