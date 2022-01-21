@@ -1,4 +1,4 @@
-use std::{path::Path, sync::Arc};
+use std::{path::Path, sync::Arc, time::Instant};
 
 const SAMPLE_COUNT: rend3::types::SampleCount = rend3::types::SampleCount::One;
 
@@ -6,6 +6,8 @@ const SAMPLE_COUNT: rend3::types::SampleCount = rend3::types::SampleCount::One;
 struct SkinningExample {
     loaded_model: Option<rend3_gltf::LoadedGltfScene>,
     directional_light_handle: Option<rend3::types::DirectionalLightHandle>,
+    armature: Option<rend3_gltf::Armature>,
+    start_time: Option<Instant>,
 }
 
 /// Locates an object in the node hierarchy that corresponds to an animated mesh
@@ -27,6 +29,35 @@ pub fn find_armature<'a>(
     None
 }
 
+impl SkinningExample {
+    /// This function gets called every frame. Updates the skeleton's joint
+    /// positions
+    pub fn update_skeleton(&mut self, renderer: &rend3::Renderer) {
+        let armature = &self.armature.as_ref().expect("Data must be loaded by now");
+        let loaded_model = &self.loaded_model.as_ref().expect("Data must be loaded by now");
+        let inverse_bind_matrices = &loaded_model.skins[armature.skin_index].inner.inverse_bind_matrices;
+
+        // Compute a very simple animation for the top bone
+        let elapsed_time = Instant::now().duration_since(self.start_time.unwrap());
+        let t = elapsed_time.as_secs_f32();
+        let rotation_degrees = 30.0 * f32::sin(5.0 * t);
+
+        // An armature contains multiple skeletons, one per mesh primitive being
+        // deformed. We need to set the joint matrices per each skeleton.
+        for skeleton in &armature.skeletons {
+            renderer.set_skeleton_joint_transforms(
+                &skeleton,
+                &[
+                    glam::Mat4::from_translation(glam::Vec3::new(0.0, 0.0, -4.18)),
+                    glam::Mat4::from_translation(glam::Vec3::new(0.0, 0.0, 0.0))
+                        * glam::Mat4::from_rotation_x(rotation_degrees.to_radians()),
+                ],
+                inverse_bind_matrices,
+            );
+        }
+    }
+}
+
 impl rend3_framework::App for SkinningExample {
     const HANDEDNESS: rend3::types::Handedness = rend3::types::Handedness::Left;
 
@@ -41,8 +72,11 @@ impl rend3_framework::App for SkinningExample {
         _routines: &Arc<rend3_framework::DefaultRoutines>,
         _surface_format: rend3::types::TextureFormat,
     ) {
-        let view_location = glam::Vec3::new(3.0, 3.0, -5.0);
-        let view = glam::Mat4::from_euler(glam::EulerRot::XYZ, -0.55, 0.5, 0.0);
+        // Store the startup time. Use later to animate the joint rotation
+        self.start_time = Some(Instant::now());
+
+        let view_location = glam::Vec3::new(0.0, 0.0, -10.0);
+        let view = glam::Mat4::from_euler(glam::EulerRot::XYZ, 0.0, 0.0, 0.0);
         let view = view * glam::Mat4::from_translation(-view_location);
 
         // Set camera's location
@@ -66,23 +100,7 @@ impl rend3_framework::App for SkinningExample {
         // The returned loaded model contains a node hierarchy with a complete
         // scene. We know in our case there will be a single node in the tree
         // with an armature.
-        let armature = find_armature(loaded_model.nodes.iter()).unwrap();
-
-        // Locate the inverse bind matrices for this skeleton
-        let inverse_bind_matrices = &loaded_model.skins[armature.skin_index].inner.inverse_bind_matrices;
-
-        // An armature contains multiple skeletons, one per mesh primitive being
-        // deformed. We need to set the joint matrices per each skeleton.
-        for skeleton in armature.skeletons {
-            renderer.set_skeleton_joint_transforms(
-                &skeleton,
-                &[
-                    glam::Mat4::from_rotation_x(30.0f32.to_radians()),
-                    glam::Mat4::from_rotation_x(-30.0f32.to_radians()),
-                ],
-                inverse_bind_matrices,
-            );
-        }
+        self.armature = Some(find_armature(loaded_model.nodes.iter()).unwrap());
 
         // Store the loaded model somewhere, otherwise all the data gets freed.
         self.loaded_model = Some(loaded_model);
@@ -94,7 +112,7 @@ impl rend3_framework::App for SkinningExample {
             color: glam::Vec3::ONE,
             intensity: 10.0,
             // Direction will be normalized
-            direction: glam::Vec3::new(-1.0, -4.0, 2.0),
+            direction: glam::Vec3::new(-1.0, -4.0, -2.0),
             distance: 400.0,
         }));
     }
@@ -119,6 +137,7 @@ impl rend3_framework::App for SkinningExample {
                 control_flow(winit::event_loop::ControlFlow::Exit);
             }
             rend3_framework::Event::MainEventsCleared => {
+                self.update_skeleton(&renderer);
                 window.request_redraw();
             }
             // Render!
@@ -146,7 +165,7 @@ impl rend3_framework::App for SkinningExample {
                     &tonemapping_routine,
                     resolution,
                     SAMPLE_COUNT,
-                    glam::Vec4::ZERO,
+                    glam::Vec4::ONE * 0.15,
                 );
 
                 // Dispatch a render using the built up rendergraph!
