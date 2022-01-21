@@ -255,13 +255,17 @@ pub fn add_skinning_to_graph<'node>(
             .get_data(temps, pre_skin_handle)
             .expect("Skinning requires pre-skinning to run first");
 
-        skinner.execute_pass(
-            &renderer.device,
-            encoder,
-            skin_input,
-            graph_data.mesh_manager.buffers(),
-            graph_data.skeleton_manager,
-        );
+        // Avoid running the compute pass if there are no skeletons. This
+        // prevents binding an empty buffer
+        if graph_data.skeleton_manager.skeletons().len() > 0 {
+            skinner.execute_pass(
+                &renderer.device,
+                encoder,
+                skin_input,
+                graph_data.mesh_manager.buffers(),
+                graph_data.skeleton_manager,
+            );
+        }
 
         graph_data.set_data(skinned_data_handle, Some(()));
     });
