@@ -24,7 +24,7 @@ use glam::{Mat3, Mat4, UVec2, Vec2, Vec3, Vec4};
 use gltf::buffer::Source;
 use image::GenericImageView;
 use rend3::{
-    types::{self, Handedness, MeshValidationError, ObjectHandle, ObjectMeshKind, Skeleton},
+    types::{self, Handedness, MeshValidationError, ObjectHandle, ObjectMeshKind, Skeleton, SkeletonHandle},
     util::typedefs::{FastHashMap, SsoString},
     Renderer,
 };
@@ -65,13 +65,26 @@ pub struct Mesh {
     pub primitives: Vec<MeshPrimitive>,
 }
 
+/// A set of [`SkeletonHandle`]s, one per mesh in the wrapping object, plus the
+/// list of inverse bind matrices for each joint in the skeletons.
+///
+/// All the skeletons are guaranteed to have the same number of joints and
+/// structure, but deform different meshes of the object.
+#[derive(Debug, Clone)]
+pub struct Armature {
+    pub skeletons: Vec<SkeletonHandle>,
+    pub inverse_bind_matrices: Vec<glam::Mat4>,
+}
+
 /// Set of [`ObjectHandle`]s that correspond to a logical object in the node
-/// tree.
+/// tree. When the node corresponds to an animated mesh, the `armature` will
+/// contain the necessary data to deform the primitives.
 ///
 /// This is to a [`ObjectHandle`], as a [`Mesh`] is to a [`MeshPrimitive`].
 #[derive(Debug)]
 pub struct Object {
     pub primitives: Vec<ObjectHandle>,
+    pub armature: Option<Armature>,
 }
 
 /// Node in the gltf scene tree
@@ -328,42 +341,60 @@ pub fn add_mesh_by_index<E: std::error::Error + 'static>(
         .meshes
         .get(mesh_index)
         .ok_or(GltfLoadError::MissingMesh(mesh_index))?;
-    let primitives: Result<Vec<_>, GltfLoadError<_>> = mesh_handle
-        .inner
-        .primitives
-        .iter()
-        .map(|prim| {
-            let mat_idx = prim.material;
-            let mat = mat_idx
-                .map_or_else(
-                    || Some(&loaded.default_material),
-                    |mat_idx| loaded.materials.get(mat_idx).map(|m| &m.inner),
-                )
-                .ok_or_else(|| GltfLoadError::MissingMaterial(mat_idx.expect("Could not find default material")))?;
-            Ok(renderer.add_object(types::Object {
-                mesh_kind: if let Some(skin_index) = skin_index {
-                    let skin = loaded
-                        .skins
-                        .get(skin_index)
-                        .ok_or(GltfLoadError::MissingSkin(skin_index))?;
-                    let num_joints = skin.inner.iverse_bind_matrices.len();
-                    ObjectMeshKind::Animated(renderer.add_skeleton(Skeleton {
-                        // We don't need to use the inverse bind matrices. At rest pose, every
-                        // joint matrix is inv_bind_pose * bind_pose, thus the identity matrix.
-                        joint_matrices: vec![Mat4::IDENTITY; num_joints],
-                        mesh: prim.handle.clone(),
-                    }))
-                } else {
-                    ObjectMeshKind::Static(prim.handle.clone())
-                },
-                material: mat.clone(),
-                transform,
-            }))
-        })
-        .collect();
+
+    let mut primitives: Vec<ObjectHandle> = vec![];
+    let mut skeletons: Vec<SkeletonHandle> = vec![];
+
+    let skin = if let Some(skin_index) = skin_index {
+        let skin = loaded
+            .skins
+            .get(skin_index)
+            .ok_or(GltfLoadError::MissingSkin(skin_index))?;
+        Some(skin)
+    } else {
+        None
+    };
+
+    for prim in mesh_handle.inner.primitives.iter() {
+        let mat_idx = prim.material;
+        let mat = mat_idx
+            .map_or_else(
+                || Some(&loaded.default_material),
+                |mat_idx| loaded.materials.get(mat_idx).map(|m| &m.inner),
+            )
+            .ok_or_else(|| GltfLoadError::MissingMaterial(mat_idx.expect("Could not find default material")))?;
+
+        let mesh_kind = if let Some(skin) = skin {
+            let skeleton = renderer.add_skeleton(Skeleton {
+                // We don't need to use the inverse bind matrices. At rest pose, every
+                // joint matrix is inv_bind_pose * bind_pose, thus the identity matrix.
+                joint_matrices: vec![Mat4::IDENTITY; skin.inner.iverse_bind_matrices.len()],
+                mesh: prim.handle.clone(),
+            });
+            skeletons.push(skeleton.clone());
+            ObjectMeshKind::Animated(skeleton)
+        } else {
+            ObjectMeshKind::Static(prim.handle.clone())
+        };
+
+        primitives.push(renderer.add_object(types::Object {
+            mesh_kind,
+            material: mat.clone(),
+            transform,
+        }));
+    }
+
     Ok(Labeled::new(
         Object {
-            primitives: primitives?,
+            primitives,
+            armature: if let Some(skin) = skin {
+                Some(Armature {
+                    skeletons,
+                    inverse_bind_matrices: skin.inner.iverse_bind_matrices.clone(),
+                })
+            } else {
+                None
+            },
         },
         name,
     ))

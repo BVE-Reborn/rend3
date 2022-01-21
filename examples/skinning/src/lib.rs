@@ -8,6 +8,25 @@ struct SkinningExample {
     directional_light_handle: Option<rend3::types::DirectionalLightHandle>,
 }
 
+/// Locates an object in the node hierarchy that corresponds to an animated mesh
+/// and returns its list of skeletons. Note that a gltf object may contain
+/// multiple primitives, and there will be one skeleton per primitive.
+pub fn find_armature<'a>(
+    nodes: impl Iterator<Item = &'a rend3_gltf::Labeled<rend3_gltf::Node>>,
+) -> Option<rend3_gltf::Armature> {
+    for node in nodes {
+        if let Some(ref obj) = node.inner.object {
+            if let Some(ref armature) = obj.inner.armature {
+                return Some(armature.clone());
+            }
+        }
+        if let Some(skels) = find_armature(node.inner.children.iter()) {
+            return Some(skels);
+        }
+    }
+    return None;
+}
+
 impl rend3_framework::App for SkinningExample {
     const HANDEDNESS: rend3::types::Handedness = rend3::types::Handedness::Left;
 
@@ -32,18 +51,38 @@ impl rend3_framework::App for SkinningExample {
             view,
         });
 
-        let path = Path::new("/tmp/RiggedSimple.glb");
+        // Load a gltf model with animation data
+        let path = Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/RiggedSimple.glb"));
         let gltf_data = std::fs::read(&path).unwrap();
         let parent_directory = path.parent().unwrap();
-        self.loaded_model = Some(
-            pollster::block_on(rend3_gltf::load_gltf(
-                renderer,
-                &gltf_data,
-                &rend3_gltf::GltfLoadSettings::default(),
-                |p| rend3_gltf::filesystem_io_func(&parent_directory, p),
-            ))
-            .expect("Loading gltf scene"),
-        );
+        let loaded_model = pollster::block_on(rend3_gltf::load_gltf(
+            renderer,
+            &gltf_data,
+            &rend3_gltf::GltfLoadSettings::default(),
+            |p| rend3_gltf::filesystem_io_func(&parent_directory, p),
+        ))
+        .expect("Loading gltf scene");
+
+        // The returned loaded model contains a node hierarchy with a complete
+        // scene. We know in our case there will be a single node in the tree
+        // with an armature.
+        let armature = find_armature(loaded_model.nodes.iter()).unwrap();
+
+        // An armature contains multiple skeletons, one per mesh primitive being
+        // deformed. We need to set the joint matrices per each skeleton.
+        for skeleton in armature.skeletons {
+            renderer.set_skeleton_joint_transforms(
+                &skeleton,
+                &[
+                    glam::Mat4::from_rotation_x(30.0f32.to_radians()),
+                    glam::Mat4::from_rotation_x(-30.0f32.to_radians()),
+                ],
+                &armature.inverse_bind_matrices,
+            );
+        }
+
+        // Store the loaded model somewhere, otherwise all the data gets freed.
+        self.loaded_model = Some(loaded_model);
 
         // Create a single directional light
         //
