@@ -76,6 +76,7 @@ fn main([[builtin(global_invocation_id)]] global_id: vec3<u32>) {
     let joint_ws = joint_weights.data[input.mesh_range.start + idx];
     let joint_is = joint_indices.data[input.mesh_range.start + idx];
 
+    // NOTE: This should use bitfieldExtract once it is available on dx12
     let joint_i0 = joint_is.indices_0_1 & 0x0000ffffu;
     let joint_i1 = (joint_is.indices_0_1 & 0xffff0000u) >> 16u;
     let joint_i2 = joint_is.indices_2_3 & 0x0000ffffu;

@@ -358,7 +358,7 @@ pub fn add_mesh_by_index<E: std::error::Error + 'static>(
         None
     };
 
-    for prim in mesh_handle.inner.primitives.iter() {
+    for prim in &mesh_handle.inner.primitives {
         let mat_idx = prim.material;
         let mat = mat_idx
             .map_or_else(
