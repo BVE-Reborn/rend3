@@ -3,7 +3,7 @@ use std::cell::RefCell;
 use bumpalo::Bump;
 
 /// Pool which extends the lifetime of objects to the length of the renderpass.
-/// 
+///
 /// Essentially just bumpalo + destructors.
 pub struct RpassTemporaryPool<'rpass> {
     bump: Bump,

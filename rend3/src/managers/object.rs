@@ -1,5 +1,6 @@
 use std::{
     any::TypeId,
+    ops::Range,
     sync::atomic::{AtomicUsize, Ordering},
 };
 
@@ -69,29 +70,25 @@ impl ObjectManager {
         &mut self,
         handle: &ObjectHandle,
         object: Object,
-        mesh_manager: &MeshManager,
+        mesh_manager: &mut MeshManager,
         skeleton_manager: &SkeletonManager,
         material_manager: &mut MaterialManager,
     ) {
-        let (bounding_sphere, index_range, vertex_range) = match &object.mesh_kind {
+        let (internal_mesh, vertex_range) = match &object.mesh_kind {
             ObjectMeshKind::Animated(skeleton) => {
                 let skeleton = skeleton_manager.internal_data(skeleton.get_raw());
-                let mesh = mesh_manager.internal_data(skeleton.mesh_handle.get_raw());
-                (
-                    mesh.bounding_sphere,
-                    mesh.index_range.clone(),
-                    skeleton.vertex_range.clone(),
-                )
+                let mesh = mesh_manager.internal_data_mut(skeleton.mesh_handle.get_raw());
+                (mesh, skeleton.vertex_range.clone())
             }
             ObjectMeshKind::Static(mesh) => {
-                let mesh = mesh_manager.internal_data(mesh.get_raw());
-                (
-                    mesh.bounding_sphere,
-                    mesh.index_range.clone(),
-                    mesh.vertex_range.clone(),
-                )
+                let mesh = mesh_manager.internal_data_mut(mesh.get_raw());
+                let vertex_range = mesh.vertex_range.clone();
+                (mesh, vertex_range)
             }
         };
+        internal_mesh.objects.push(handle.get_raw());
+        let bounding_sphere = internal_mesh.bounding_sphere;
+        let index_range = internal_mesh.index_range.clone();
 
         let (material_key, object_list) = material_manager.get_material_key_and_objects(object.material.get_raw());
         object_list.push(handle.get_raw());
@@ -113,18 +110,43 @@ impl ObjectManager {
         self.registry.insert(handle, shader_object, material_key);
     }
 
-    pub fn ready(&mut self, material_manager: &mut MaterialManager) {
+    pub fn ready(
+        &mut self,
+        mesh_manager: &mut MeshManager,
+        material_manager: &mut MaterialManager,
+        skeleton_manager: &SkeletonManager,
+    ) {
         profiling::scope!("Object Manager Ready");
         self.registry.remove_all_dead(|handle, object| {
-            let objects = material_manager.get_objects(object.material_handle.get_raw());
-            let index = objects.iter().position(|v| v.idx == handle).unwrap();
-            objects.swap_remove(index);
+            // Remove from material list
+            {
+                let objects = material_manager.get_objects(object.material_handle.get_raw());
+                let index = objects.iter().position(|v| v.idx == handle).unwrap();
+                objects.swap_remove(index);
+            }
+            // Remove from mesh list
+            {
+                let mesh_handle = match object.mesh_kind {
+                    ObjectMeshKind::Animated(s) => skeleton_manager.internal_data(s.get_raw()).mesh_handle.get_raw(),
+                    ObjectMeshKind::Static(m) => m.get_raw(),
+                };
+                let mesh = mesh_manager.internal_data_mut(mesh_handle);
+                let index = mesh.objects.iter().position(|v| v.idx == handle).unwrap();
+                mesh.objects.swap_remove(index);
+            }
         });
     }
 
     pub fn set_material_index(&mut self, handle: RawObjectHandle, index: usize) {
         let object = self.registry.get_value_mut(handle);
         object.input.material_index = index as u32;
+    }
+
+    pub fn set_mesh_ranges(&mut self, handle: RawObjectHandle, vertex_range: Range<usize>, index_range: Range<usize>) {
+        let object = self.registry.get_value_mut(handle);
+        object.input.start_idx = index_range.start as u32;
+        object.input.count = (index_range.end - index_range.start) as u32;
+        object.input.vertex_offset = vertex_range.start as i32;
     }
 
     pub fn set_key(&mut self, handle: RawObjectHandle, key: MaterialKeyPair) {
@@ -162,7 +184,7 @@ impl ObjectManager {
         src_handle: ObjectHandle,
         dst_handle: ObjectHandle,
         change: ObjectChange,
-        mesh_manager: &MeshManager,
+        mesh_manager: &mut MeshManager,
         skeleton_manager: &SkeletonManager,
         material_manager: &mut MaterialManager,
     ) {

@@ -3,7 +3,10 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 
-use crate::{managers::MeshManager, util::registry::ResourceRegistry};
+use crate::{
+    managers::{MeshManager, ObjectManager},
+    util::registry::ResourceRegistry,
+};
 
 use glam::Mat4;
 use rend3_types::{MeshHandle, RawSkeletonHandle, Skeleton, SkeletonHandle};
@@ -39,16 +42,18 @@ impl SkeletonManager {
         SkeletonHandle::new(idx)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn fill(
         &mut self,
         device: &Device,
         queue: &Queue,
         encoder: &mut CommandEncoder,
         mesh_manager: &mut MeshManager,
+        object_manager: &mut ObjectManager,
         handle: &SkeletonHandle,
         skeleton: Skeleton,
     ) {
-        let vertex_range = mesh_manager.allocate_skeleton_mesh(device, queue, encoder, &skeleton.mesh);
+        let vertex_range = mesh_manager.allocate_skeleton_mesh(device, queue, encoder, object_manager, &skeleton.mesh);
 
         let internal = InternalSkeleton {
             joint_deltas: skeleton.joint_deltas,

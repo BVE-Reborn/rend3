@@ -59,8 +59,9 @@ impl<'node> PassthroughDataContainer<'node> {
 impl<'rpass> PassthroughDataContainer<'rpass> {
     /// Gets a piece of immutable data passed through from outside the node.
     ///
-    /// Use [RenderGraphNodeBuilder::passthrough_ref][pt] to add data on the outside.
-    /// 
+    /// Use [RenderGraphNodeBuilder::passthrough_ref][pt] to add data on the
+    /// outside.
+    ///
     /// [pt]: super::RenderGraphNodeBuilder::passthrough_ref
     pub fn get<T>(&mut self, handle: PassthroughDataRef<T>) -> &'rpass T {
         assert_eq!(
@@ -79,8 +80,9 @@ impl<'rpass> PassthroughDataContainer<'rpass> {
 
     /// Gets a piece of mutable data passed through from outside the node.
     ///
-    /// Use [RenderGraphNodeBuilder::passthrough_ref_mut][pt] to add data on the outside.
-    /// 
+    /// Use [RenderGraphNodeBuilder::passthrough_ref_mut][pt] to add data on the
+    /// outside.
+    ///
     /// [pt]: super::RenderGraphNodeBuilder::passthrough_ref_mut
     pub fn get_mut<T>(&mut self, handle: PassthroughDataRefMut<T>) -> &'rpass mut T {
         assert_eq!(

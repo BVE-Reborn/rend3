@@ -31,9 +31,14 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
                     data_core
                         .profiler
                         .begin_scope("Add Mesh", &mut encoder, &renderer.device);
-                    data_core
-                        .mesh_manager
-                        .fill(&renderer.device, &renderer.queue, &mut encoder, &handle, mesh);
+                    data_core.mesh_manager.fill(
+                        &renderer.device,
+                        &renderer.queue,
+                        &mut encoder,
+                        &mut data_core.object_manager,
+                        &handle,
+                        mesh,
+                    );
                     data_core.profiler.end_scope(&mut encoder);
                 }
                 InstructionKind::AddSkeleton { handle, skeleton } => {
@@ -46,6 +51,7 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
                         &renderer.queue,
                         &mut encoder,
                         &mut data_core.mesh_manager,
+                        &mut data_core.object_manager,
                         &handle,
                         skeleton,
                     );
@@ -92,7 +98,7 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
                     data_core.object_manager.fill(
                         &handle,
                         object,
-                        &data_core.mesh_manager,
+                        &mut data_core.mesh_manager,
                         &data_core.skeleton_manager,
                         &mut data_core.material_manager,
                     );
@@ -124,7 +130,7 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
                         src_handle,
                         dst_handle,
                         change,
-                        &data_core.mesh_manager,
+                        &mut data_core.mesh_manager,
                         &data_core.skeleton_manager,
                         &mut data_core.material_manager,
                     );
@@ -135,7 +141,11 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
 
     // Do these in dependency order
     // Level 3
-    data_core.object_manager.ready(&mut data_core.material_manager);
+    data_core.object_manager.ready(
+        &mut data_core.mesh_manager,
+        &mut data_core.material_manager,
+        &data_core.skeleton_manager,
+    );
 
     // Level 2
     let d2_texture = data_core.d2_texture_manager.ready(&renderer.device);
