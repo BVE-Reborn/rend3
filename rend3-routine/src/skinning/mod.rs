@@ -4,7 +4,7 @@ use glam::UVec2;
 use rend3::{
     format_sso,
     graph::{DataHandle, RenderGraph},
-    managers::{MeshBuffers, SkeletonManager},
+    managers::{MeshBuffers, SkeletonManager, VERTEX_JOINT_WEIGHT_SIZE, VERTEX_POSITION_SIZE, VERTEX_TANGENT_SIZE, VERTEX_NORMAL_SIZE, VERTEX_JOINT_INDEX_SIZE},
     util::{bind_merge::{BindGroupBuilder, BindGroupLayoutBuilder}, math::round_up_div},
 };
 use wgpu::{BindGroupLayout, Buffer, BufferDescriptor, BufferUsages, ComputePipeline, Device};
@@ -115,25 +115,32 @@ impl GpuSkinner {
     const WORKGROUP_SIZE: u32 = 64;
 
     pub fn new(device: &wgpu::Device) -> GpuSkinner {
-        let storage_buffer_ty = |read_only| wgpu::BindingType::Buffer {
+        let storage_buffer_ty = |read_only, size| wgpu::BindingType::Buffer {
             ty: wgpu::BufferBindingType::Storage { read_only },
             has_dynamic_offset: false,
-            min_binding_size: None,
+            min_binding_size: size,
         };
+
+        let pos_size = NonZeroU64::new(VERTEX_POSITION_SIZE as u64);
+        let nrm_size = NonZeroU64::new(VERTEX_NORMAL_SIZE as u64);
+        let tan_size = NonZeroU64::new(VERTEX_TANGENT_SIZE as u64);
+        let j_idx_size = NonZeroU64::new(VERTEX_JOINT_INDEX_SIZE as u64);
+        let j_wt_size = NonZeroU64::new(VERTEX_JOINT_WEIGHT_SIZE  as u64);
+        let mat_size = NonZeroU64::new(std::mem::size_of::<[[f32;4];4]>() as u64);
 
         // Bind group 0 contains some vertex buffers bound as storage buffers
         let vertex_buffers_bgl = BindGroupLayoutBuilder::new()
-            .append(wgpu::ShaderStages::COMPUTE, storage_buffer_ty(false), None) // Positions
-            .append(wgpu::ShaderStages::COMPUTE, storage_buffer_ty(false), None) // Normals
-            .append(wgpu::ShaderStages::COMPUTE, storage_buffer_ty(false), None) // Tangents
-            .append(wgpu::ShaderStages::COMPUTE, storage_buffer_ty(false), None) // Joint indices
-            .append(wgpu::ShaderStages::COMPUTE, storage_buffer_ty(false), None) // Joint weights
+            .append(wgpu::ShaderStages::COMPUTE, storage_buffer_ty(false, pos_size), None) // Positions
+            .append(wgpu::ShaderStages::COMPUTE, storage_buffer_ty(false, nrm_size), None) // Normals
+            .append(wgpu::ShaderStages::COMPUTE, storage_buffer_ty(false, tan_size), None) // Tangents
+            .append(wgpu::ShaderStages::COMPUTE, storage_buffer_ty(false, j_idx_size), None) // Joint indices
+            .append(wgpu::ShaderStages::COMPUTE, storage_buffer_ty(false, j_wt_size), None) // Joint weights
             .build(device, Some("Gpu skinning vertex buffers"));
 
         // Bind group 1 contains the joint matrices global buffer. Each
         // skinning input struct contains an offset into this array.
         let joint_matrices_bgl = BindGroupLayoutBuilder::new()
-            .append(wgpu::ShaderStages::COMPUTE, storage_buffer_ty(true), None)
+            .append(wgpu::ShaderStages::COMPUTE, storage_buffer_ty(true, mat_size), None)
             .build(device, Some("Gpu skinning joint matrices"));
 
         // Bind group 2 contains the pre skinning inputs. This uses dynamic
