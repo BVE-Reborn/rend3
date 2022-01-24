@@ -137,6 +137,7 @@ impl MeshManager {
         MeshHandle::new(idx)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn fill(
         &mut self,
         device: &Device,
