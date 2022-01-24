@@ -224,11 +224,13 @@ impl GpuSkinner {
     }
 }
 
+pub struct SkinningOutput;
+
 pub fn add_skinning_to_graph<'node>(
     graph: &mut RenderGraph<'node>,
     gpu_skinner: &'node GpuSkinner,
     pre_skin_data: DataHandle<PreSkinningBuffers>,
-    skinned_data: DataHandle<()>,
+    skinned_data: DataHandle<SkinningOutput>,
 ) {
     let mut builder = graph.add_node("skinning");
     let pre_skin_handle = builder.add_data_input(pre_skin_data);
@@ -255,6 +257,6 @@ pub fn add_skinning_to_graph<'node>(
             );
         }
 
-        graph_data.set_data(skinned_data_handle, Some(()));
+        graph_data.set_data(skinned_data_handle, Some(SkinningOutput));
     });
 }

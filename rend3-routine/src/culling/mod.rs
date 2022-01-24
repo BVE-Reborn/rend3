@@ -9,7 +9,7 @@ use rend3::{
 };
 use wgpu::{BindGroup, Buffer};
 
-use crate::common::{PerMaterialArchetypeInterface, Sorting};
+use crate::{common::{PerMaterialArchetypeInterface, Sorting}, skinning::SkinningOutput};
 
 mod cpu;
 mod gpu;
@@ -37,7 +37,7 @@ pub fn add_culling_to_graph<'node, M: Material>(
     graph: &mut RenderGraph<'node>,
     pre_cull_data: DataHandle<Buffer>,
     culled: DataHandle<PerMaterialArchetypeData>,
-    skinned: DataHandle<()>,
+    skinned: DataHandle<SkinningOutput>,
     per_material: &'node PerMaterialArchetypeInterface<M>,
     gpu_culler: &'node ModeData<(), gpu::GpuCuller>,
     shadow_index: Option<usize>,

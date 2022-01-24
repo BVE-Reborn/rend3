@@ -25,7 +25,7 @@ use wgpu::{BindGroup, Buffer};
 
 use crate::{
     common, culling, pbr,
-    skinning::{self, GpuSkinner},
+    skinning::{self, GpuSkinner, SkinningOutput},
     skybox, tonemapping,
 };
 
@@ -127,7 +127,7 @@ pub struct BaseRenderGraphIntermediateState {
     pub resolve: Option<RenderTargetHandle>,
     pub depth: RenderTargetHandle,
     pub pre_skinning_buffers: DataHandle<skinning::PreSkinningBuffers>,
-    pub skinned_data: DataHandle<()>,
+    pub skinned_data: DataHandle<skinning::SkinningOutput>,
 }
 impl BaseRenderGraphIntermediateState {
     /// Create the default setting for all state.
@@ -184,7 +184,7 @@ impl BaseRenderGraphIntermediateState {
         });
 
         let pre_skinning_buffers = graph.add_data::<skinning::PreSkinningBuffers>();
-        let skinned_data = graph.add_data::<()>();
+        let skinned_data = graph.add_data::<SkinningOutput>();
 
         Self {
             per_transparency,
