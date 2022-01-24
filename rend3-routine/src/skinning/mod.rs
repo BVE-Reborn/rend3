@@ -4,8 +4,14 @@ use glam::UVec2;
 use rend3::{
     format_sso,
     graph::{DataHandle, RenderGraph},
-    managers::{MeshBuffers, SkeletonManager, VERTEX_JOINT_WEIGHT_SIZE, VERTEX_POSITION_SIZE, VERTEX_TANGENT_SIZE, VERTEX_NORMAL_SIZE, VERTEX_JOINT_INDEX_SIZE},
-    util::{bind_merge::{BindGroupBuilder, BindGroupLayoutBuilder}, math::round_up_div},
+    managers::{
+        MeshBuffers, SkeletonManager, VERTEX_JOINT_INDEX_SIZE, VERTEX_JOINT_WEIGHT_SIZE, VERTEX_NORMAL_SIZE,
+        VERTEX_POSITION_SIZE, VERTEX_TANGENT_SIZE,
+    },
+    util::{
+        bind_merge::{BindGroupBuilder, BindGroupLayoutBuilder},
+        math::round_up_div,
+    },
 };
 use wgpu::{BindGroupLayout, Buffer, BufferDescriptor, BufferUsages, ComputePipeline, Device};
 
@@ -125,8 +131,8 @@ impl GpuSkinner {
         let nrm_size = NonZeroU64::new(VERTEX_NORMAL_SIZE as u64);
         let tan_size = NonZeroU64::new(VERTEX_TANGENT_SIZE as u64);
         let j_idx_size = NonZeroU64::new(VERTEX_JOINT_INDEX_SIZE as u64);
-        let j_wt_size = NonZeroU64::new(VERTEX_JOINT_WEIGHT_SIZE  as u64);
-        let mat_size = NonZeroU64::new(std::mem::size_of::<[[f32;4];4]>() as u64);
+        let j_wt_size = NonZeroU64::new(VERTEX_JOINT_WEIGHT_SIZE as u64);
+        let mat_size = NonZeroU64::new(std::mem::size_of::<[[f32; 4]; 4]>() as u64);
 
         // Bind group 0 contains some vertex buffers bound as storage buffers
         let vertex_buffers_bgl = BindGroupLayoutBuilder::new()
@@ -226,7 +232,7 @@ impl GpuSkinner {
             cpass.set_bind_group(2, &skinning_inputs_bgb, &[offset]);
 
             let num_verts = (skel.ranges.mesh_range[1] - skel.ranges.mesh_range[0]) as u32;
-            let num_workgroups = round_up_div(num_verts, Self::WORKGROUP_SIZE); 
+            let num_workgroups = round_up_div(num_verts, Self::WORKGROUP_SIZE);
             cpass.dispatch(num_workgroups, 1, 1);
         }
     }

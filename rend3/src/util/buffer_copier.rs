@@ -1,6 +1,6 @@
 use wgpu::{
-    util::DeviceExt, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutEntry, ComputePipeline,
-    Device, Queue, CommandEncoder,
+    util::DeviceExt, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutEntry, CommandEncoder,
+    ComputePipeline, Device, Queue,
 };
 
 use super::math::round_up_div;
@@ -87,7 +87,13 @@ impl BufferCopier {
         BufferCopier { pipeline, bgl }
     }
 
-    pub fn execute(&self, device: &Device, encoder: &mut CommandEncoder, buffers: [&wgpu::Buffer; 8], params: BufferCopierParams) {
+    pub fn execute(
+        &self,
+        device: &Device,
+        encoder: &mut CommandEncoder,
+        buffers: [&wgpu::Buffer; 8],
+        params: BufferCopierParams,
+    ) {
         let buffer_binding = |idx, buffer| BindGroupEntry {
             binding: idx,
             resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {

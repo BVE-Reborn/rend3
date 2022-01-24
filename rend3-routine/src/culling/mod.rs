@@ -9,7 +9,10 @@ use rend3::{
 };
 use wgpu::{BindGroup, Buffer};
 
-use crate::{common::{PerMaterialArchetypeInterface, Sorting}, skinning::SkinningOutput};
+use crate::{
+    common::{PerMaterialArchetypeInterface, Sorting},
+    skinning::SkinningOutput,
+};
 
 mod cpu;
 mod gpu;
