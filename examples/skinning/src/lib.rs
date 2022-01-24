@@ -165,7 +165,7 @@ impl rend3_framework::App for SkinningExample {
                     &tonemapping_routine,
                     resolution,
                     SAMPLE_COUNT,
-                    glam::Vec4::ONE * 0.15,
+                    glam::Vec4::splat(0.15),
                 );
 
                 // Dispatch a render using the built up rendergraph!

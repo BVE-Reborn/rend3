@@ -98,10 +98,10 @@ fn main([[builtin(global_invocation_id)]] global_id: vec3<u32>) {
     var tang_acc = vec3<f32>(0.0, 0.0, 0.0);
     
     for (var i = 0; i < 4; i = i + 1) {
-        let joint_index = joint_indices[i];
         let weight = joint_ws.ws[i];
 
         if (weight > 0.0) {
+            let joint_index = joint_indices[i];
             let joint_matrix = get_joint_matrix(joint_index);
             let joint_matrix3 = mat3x3<f32>(joint_matrix[0].xyz, joint_matrix[1].xyz, joint_matrix[2].xyz);
             let inv_scale_sq = get_inv_scale_squared(joint_matrix);

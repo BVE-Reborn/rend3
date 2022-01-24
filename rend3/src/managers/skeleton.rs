@@ -44,6 +44,8 @@ pub struct GpuVertexRanges {
 /// hierarchy is stored.
 pub struct SkeletonManager {
     registry: ResourceRegistry<InternalSkeleton, Skeleton>,
+    /// The number of joints of all the skeletons in this manager
+    global_joint_count: usize,
 }
 impl SkeletonManager {
     pub fn new() -> Self {
@@ -51,7 +53,10 @@ impl SkeletonManager {
 
         let registry = ResourceRegistry::new();
 
-        Self { registry }
+        Self {
+            registry,
+            global_joint_count: 0,
+        }
     }
 
     pub fn allocate(counter: &AtomicUsize) -> SkeletonHandle {
@@ -69,6 +74,7 @@ impl SkeletonManager {
         handle: &SkeletonHandle,
         skeleton: Skeleton,
     ) {
+        self.global_joint_count += skeleton.joint_matrices.len();
         let mesh_range = mesh_manager.internal_data(skeleton.mesh.get_raw()).vertex_range.clone();
         let skeleton_range = mesh_manager.allocate_skeleton_mesh(device, queue, encoder, &skeleton.mesh);
 
@@ -88,11 +94,14 @@ impl SkeletonManager {
 
     pub fn ready(&mut self) {
         profiling::scope!("Skeleton Manager Ready");
-        self.registry.remove_all_dead(|_, _, _| {});
+        self.registry.remove_all_dead(|_, _, skeleton| {
+            self.global_joint_count -= skeleton.joint_matrices.len();
+        });
     }
 
     pub fn set_joint_matrices(&mut self, handle: RawSkeletonHandle, joint_matrices: Vec<Mat4>) {
         let skeleton = self.registry.get_mut(handle);
+        assert_eq!(joint_matrices.len(), skeleton.joint_matrices.len());
         skeleton.joint_matrices = joint_matrices;
     }
 
@@ -102,6 +111,11 @@ impl SkeletonManager {
 
     pub fn skeletons(&self) -> impl ExactSizeIterator<Item = &InternalSkeleton> {
         self.registry.values()
+    }
+
+    /// Get the skeleton manager's global joint count.
+    pub fn global_joint_count(&self) -> usize {
+        self.global_joint_count
     }
 }
 
