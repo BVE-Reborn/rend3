@@ -8,7 +8,7 @@ use crate::{
     },
     managers::{
         CameraManager, DirectionalLightManager, MaterialManager, MeshManager, ObjectManager, ShadowCoordinates,
-        TextureManager,
+        SkeletonManager, TextureManager,
     },
     util::typedefs::FastHashMap,
 };
@@ -56,6 +56,7 @@ pub struct RenderGraphDataStore<'a> {
     pub directional_light_manager: &'a DirectionalLightManager,
     pub material_manager: &'a MaterialManager,
     pub mesh_manager: &'a MeshManager,
+    pub skeleton_manager: &'a SkeletonManager,
     pub object_manager: &'a ObjectManager,
     pub d2_texture_manager: &'a TextureManager,
     pub d2c_texture_manager: &'a TextureManager,

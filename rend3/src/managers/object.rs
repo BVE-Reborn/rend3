@@ -78,7 +78,7 @@ impl ObjectManager {
             ObjectMeshKind::Animated(skeleton) => {
                 let skeleton = skeleton_manager.internal_data(skeleton.get_raw());
                 let mesh = mesh_manager.internal_data_mut(skeleton.mesh_handle.get_raw());
-                (mesh, skeleton.vertex_range.clone())
+                (mesh, skeleton.skeleton_vertex_range.clone())
             }
             ObjectMeshKind::Static(mesh) => {
                 let mesh = mesh_manager.internal_data_mut(mesh.get_raw());

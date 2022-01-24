@@ -340,6 +340,7 @@ impl<'node> RenderGraph<'node> {
                     directional_light_manager: &data_core.directional_light_manager,
                     material_manager: &data_core.material_manager,
                     mesh_manager: &data_core.mesh_manager,
+                    skeleton_manager: &data_core.skeleton_manager,
                     object_manager: &data_core.object_manager,
                     d2_texture_manager: &data_core.d2_texture_manager,
                     d2c_texture_manager: &data_core.d2c_texture_manager,

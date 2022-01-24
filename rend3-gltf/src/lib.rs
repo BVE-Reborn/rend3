@@ -24,7 +24,7 @@ use glam::{Mat3, Mat4, UVec2, Vec2, Vec3, Vec4};
 use gltf::buffer::Source;
 use image::GenericImageView;
 use rend3::{
-    types::{self, Handedness, MeshValidationError, ObjectHandle, ObjectMeshKind},
+    types::{self, Handedness, MeshValidationError, ObjectHandle, ObjectMeshKind, Skeleton, SkeletonHandle},
     util::typedefs::{FastHashMap, SsoString},
     Renderer,
 };
@@ -65,13 +65,29 @@ pub struct Mesh {
     pub primitives: Vec<MeshPrimitive>,
 }
 
+/// A set of [`SkeletonHandle`]s, one per mesh in the wrapping object, plus the
+/// index of the skin data in the `skins` array of [`LoadedGltfScene`].
+///
+/// All the skeletons are guaranteed to have the same number of joints and
+/// structure, but deform different meshes of the object.
+#[derive(Debug, Clone)]
+pub struct Armature {
+    /// The list of skeletons that are deforming this node's mesh primitives.
+    pub skeletons: Vec<SkeletonHandle>,
+    /// Index to the skin that contains the inverse bind matrices for the
+    /// skeletons in this armature.
+    pub skin_index: usize,
+}
+
 /// Set of [`ObjectHandle`]s that correspond to a logical object in the node
-/// tree.
+/// tree. When the node corresponds to an animated mesh, the `armature` will
+/// contain the necessary data to deform the primitives.
 ///
 /// This is to a [`ObjectHandle`], as a [`Mesh`] is to a [`MeshPrimitive`].
 #[derive(Debug)]
 pub struct Object {
     pub primitives: Vec<ObjectHandle>,
+    pub armature: Option<Armature>,
 }
 
 /// Node in the gltf scene tree
@@ -102,6 +118,10 @@ pub struct Texture {
     pub format: types::TextureFormat,
 }
 
+#[derive(Debug)]
+pub struct Skin {
+    pub inverse_bind_matrices: Vec<Mat4>,
+}
 /// Hashmap which stores a mapping from [`ImageKey`] to a labeled handle.
 pub type ImageMap = FastHashMap<ImageKey, Labeled<Texture>>;
 
@@ -113,6 +133,7 @@ pub struct LoadedGltfScene {
     pub default_material: types::MaterialHandle,
     pub images: ImageMap,
     pub nodes: Vec<Labeled<Node>>,
+    pub skins: Vec<Labeled<Skin>>,
 }
 
 /// Describes how loading gltf failed.
@@ -145,6 +166,8 @@ pub enum GltfLoadError<E: std::error::Error + 'static> {
     MissingPositions(usize),
     #[error("Gltf file references mesh {0} but mesh does not exist")]
     MissingMesh(usize),
+    #[error("Gltf file references skin {0} but skin does not exist")]
+    MissingSkin(usize),
     #[error("Gltf file references material {0} but material does not exist")]
     MissingMaterial(usize),
     #[error("Mesh {0} primitive {1} uses unsupported mode {2:?}. Only triangles are supported")]
@@ -293,6 +316,7 @@ where
     let meshes = load_meshes(renderer, file.meshes(), &buffers)?;
     let (materials, images) =
         load_materials_and_textures(renderer, file.materials(), &buffers, settings, &mut io_func).await?;
+    let skins = load_skins(file.skins(), &buffers)?;
 
     let loaded = LoadedGltfScene {
         meshes,
@@ -300,6 +324,7 @@ where
         default_material,
         images,
         nodes: Vec::new(),
+        skins,
     };
 
     Ok(loaded)
@@ -312,35 +337,60 @@ pub fn add_mesh_by_index<E: std::error::Error + 'static>(
     loaded: &LoadedGltfScene,
     mesh_index: usize,
     name: Option<&str>,
+    skin_index: Option<usize>,
     transform: Mat4,
 ) -> Result<Labeled<Object>, GltfLoadError<E>> {
     let mesh_handle = loaded
         .meshes
         .get(mesh_index)
         .ok_or(GltfLoadError::MissingMesh(mesh_index))?;
-    let primitives: Result<Vec<_>, GltfLoadError<_>> = mesh_handle
-        .inner
-        .primitives
-        .iter()
-        .map(|prim| {
-            let mat_idx = prim.material;
-            let mat = mat_idx
-                .map_or_else(
-                    || Some(&loaded.default_material),
-                    |mat_idx| loaded.materials.get(mat_idx).map(|m| &m.inner),
-                )
-                .ok_or_else(|| GltfLoadError::MissingMaterial(mat_idx.expect("Could not find default material")))?;
-            Ok(renderer.add_object(types::Object {
-                // TODO: Autodetect animation and spawn skeleton instead.
-                mesh_kind: ObjectMeshKind::Static(prim.handle.clone()),
-                material: mat.clone(),
-                transform,
-            }))
-        })
-        .collect();
+
+    let mut primitives = Vec::new();
+    let mut skeletons = Vec::new();
+
+    let skin = if let Some(skin_index) = skin_index {
+        let skin = loaded
+            .skins
+            .get(skin_index)
+            .ok_or(GltfLoadError::MissingSkin(skin_index))?;
+        Some(skin)
+    } else {
+        None
+    };
+
+    for prim in &mesh_handle.inner.primitives {
+        let mat_idx = prim.material;
+        let mat = mat_idx
+            .map_or_else(
+                || Some(&loaded.default_material),
+                |mat_idx| loaded.materials.get(mat_idx).map(|m| &m.inner),
+            )
+            .ok_or_else(|| GltfLoadError::MissingMaterial(mat_idx.expect("Could not find default material")))?;
+
+        let mesh_kind = if let Some(skin) = skin {
+            let skeleton = renderer.add_skeleton(Skeleton {
+                // We don't need to use the inverse bind matrices. At rest pose, every
+                // joint matrix is inv_bind_pose * bind_pose, thus the identity matrix.
+                joint_matrices: vec![Mat4::IDENTITY; skin.inner.inverse_bind_matrices.len()],
+                mesh: prim.handle.clone(),
+            });
+            skeletons.push(skeleton.clone());
+            ObjectMeshKind::Animated(skeleton)
+        } else {
+            ObjectMeshKind::Static(prim.handle.clone())
+        };
+
+        primitives.push(renderer.add_object(types::Object {
+            mesh_kind,
+            material: mat.clone(),
+            transform,
+        }));
+    }
+
     Ok(Labeled::new(
         Object {
-            primitives: primitives?,
+            primitives,
+            armature: skin_index.map(|skin_index| Armature { skeletons, skin_index }),
         },
         name,
     ))
@@ -364,6 +414,7 @@ pub fn load_gltf_nodes<'a, E: std::error::Error + 'static>(
                 loaded,
                 mesh.index(),
                 mesh.name(),
+                node.skin().map(|s| s.index()),
                 transform,
             )?)
         } else {
@@ -525,6 +576,35 @@ pub fn load_meshes<'a, E: std::error::Error + 'static>(
             Ok(Labeled::new(Mesh { primitives: res_prims }, mesh.name()))
         })
         .collect()
+}
+
+fn load_skins<E: std::error::Error + 'static>(
+    skins: gltf::iter::Skins,
+    buffers: &[Vec<u8>],
+) -> Result<Vec<Labeled<Skin>>, GltfLoadError<E>> {
+    let mut res_skins = vec![];
+
+    for skin in skins {
+        let num_joints = skin.joints().count();
+        let reader = skin.reader(|b| Some(&buffers[b.index()][..b.length()]));
+
+        let inv_b_mats = if let Some(inv_b_mats) = reader.read_inverse_bind_matrices() {
+            inv_b_mats.map(|mat| Mat4::from_cols_array_2d(&mat)).collect()
+        } else {
+            // The inverse bind matrices are sometimes not provided. This has to
+            // be interpreted as all of them being the identity transform.
+            vec![Mat4::IDENTITY; num_joints]
+        };
+
+        res_skins.push(Labeled::new(
+            Skin {
+                inverse_bind_matrices: inv_b_mats,
+            },
+            skin.name(),
+        ))
+    }
+
+    Ok(res_skins)
 }
 
 /// Creates a gltf default material.

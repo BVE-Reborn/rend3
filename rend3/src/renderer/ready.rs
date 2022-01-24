@@ -36,6 +36,7 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
                         &renderer.queue,
                         &mut encoder,
                         &mut data_core.object_manager,
+                        &mut data_core.skeleton_manager,
                         &handle,
                         mesh,
                     );
@@ -48,7 +49,6 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
                         .begin_scope("Add Skeleton", &mut encoder, &renderer.device);
                     data_core.skeleton_manager.fill(
                         &renderer.device,
-                        &renderer.queue,
                         &mut encoder,
                         &mut data_core.mesh_manager,
                         &mut data_core.object_manager,
@@ -106,8 +106,8 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
                 InstructionKind::SetObjectTransform { handle, transform } => {
                     data_core.object_manager.set_object_transform(handle, transform);
                 }
-                InstructionKind::SetSkeletonJointDeltas { handle, joint_deltas } => {
-                    data_core.skeleton_manager.set_joint_deltas(handle, joint_deltas);
+                InstructionKind::SetSkeletonJointDeltas { handle, joint_matrices } => {
+                    data_core.skeleton_manager.set_joint_matrices(handle, joint_matrices);
                 }
                 InstructionKind::AddDirectionalLight { handle, light } => {
                     data_core.directional_light_manager.fill(&handle, light);
@@ -167,6 +167,7 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
             .directional_light_manager
             .ready(&renderer.device, &renderer.queue, &data_core.camera_manager);
     data_core.mesh_manager.ready();
+    data_core.skeleton_manager.ready(&mut data_core.mesh_manager);
 
     cmd_bufs.push(encoder.finish());
 

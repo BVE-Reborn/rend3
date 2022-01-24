@@ -24,6 +24,7 @@ pub mod forward;
 pub mod pbr;
 pub mod pre_cull;
 pub mod shaders;
+pub mod skinning;
 pub mod skybox;
 pub mod tonemapping;
 pub mod uniforms;

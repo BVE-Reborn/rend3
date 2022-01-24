@@ -65,7 +65,7 @@ pub enum InstructionKind {
     },
     SetSkeletonJointDeltas {
         handle: RawSkeletonHandle,
-        joint_deltas: Vec<Mat4>,
+        joint_matrices: Vec<Mat4>,
     },
     AddDirectionalLight {
         handle: DirectionalLightHandle,
