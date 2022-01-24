@@ -77,7 +77,8 @@ pub struct InternalMesh {
     /// Handles to the objects that point to this mesh. Used for internal
     /// bookkeeping
     pub objects: Vec<RawObjectHandle>,
-    /// For skinned meshes, stores the number of joints present in the joint index buffer
+    /// For skinned meshes, stores the number of joints present in the joint
+    /// index buffer
     pub num_joints: u32,
 }
 
