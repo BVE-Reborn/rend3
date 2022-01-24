@@ -63,11 +63,36 @@ pub const STARTING_INDICES: usize = 1 << 16;
 
 /// Internal representation of a mesh.
 pub struct InternalMesh {
+    /// Range of values from the [`MeshBuffers`] where vertex data for this mesh
+    /// is
     pub vertex_range: Range<usize>,
+    /// Range of values from the [`MeshBuffers`] where index data for this mesh
+    /// is
     pub index_range: Range<usize>,
+    /// The bounding sphere of this mesh. Used for culling.
     pub bounding_sphere: BoundingSphere,
+    /// Handles to the skeletons that point to this mesh. Used for internal
+    /// bookkeeping
     pub skeletons: Vec<RawSkeletonHandle>,
+    /// Handles to the objects that point to this mesh. Used for internal
+    /// bookkeeping
     pub objects: Vec<RawObjectHandle>,
+    /// For skinned meshes, stores the number of joints present in the joint index buffer
+    pub num_joints: u32,
+}
+
+impl InternalMesh {
+    /// Returns an empty InternalMesh
+    fn new_empty() -> Self {
+        InternalMesh {
+            vertex_range: 0..0,
+            index_range: 0..0,
+            bounding_sphere: BoundingSphere::from_mesh(&[]),
+            skeletons: Vec::new(),
+            objects: Vec::new(),
+            num_joints: 0,
+        }
+    }
 }
 
 /// Set of megabuffers used by the mesh manager.
@@ -153,17 +178,14 @@ impl MeshManager {
         let vertex_count = mesh.vertex_positions.len();
         let index_count = mesh.indices.len();
 
+        // This value is used later when setting joints, to make sure all indices are
+        // in-bounds
+        let num_joints = mesh.vertex_joint_indices.iter().flatten().max().map_or(0, |i| i + 1);
+
         // If vertex_count is 0, index_count _must_ also be 0, as all indices would be
         // out of range.
         if index_count == 0 {
-            let mesh = InternalMesh {
-                vertex_range: 0..0,
-                index_range: 0..0,
-                bounding_sphere: BoundingSphere::from_mesh(&[]),
-                skeletons: Vec::new(),
-                objects: Vec::new(),
-            };
-
+            let mesh = InternalMesh::new_empty();
             self.registry.insert(handle, mesh);
             return;
         }
@@ -246,6 +268,7 @@ impl MeshManager {
             vertex_range,
             index_range,
             bounding_sphere,
+            num_joints: num_joints as u32,
             skeletons: Vec::new(),
             objects: Vec::new(),
         };

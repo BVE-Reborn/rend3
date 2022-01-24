@@ -78,9 +78,18 @@ impl SkeletonManager {
         handle: &SkeletonHandle,
         skeleton: Skeleton,
     ) {
-        self.global_joint_count += skeleton.joint_matrices.len();
-
         let internal_mesh = mesh_manager.internal_data_mut(skeleton.mesh.get_raw());
+
+        assert_eq!(
+            internal_mesh.num_joints as usize,
+            skeleton.joint_matrices.len(),
+            "Created a skeleton with an incorrect number of joints. \
+            The mesh has {} joints, but {} joint matrices were provided.",
+            internal_mesh.num_joints as usize,
+            skeleton.joint_matrices.len(),
+        );
+
+        self.global_joint_count += skeleton.joint_matrices.len();
         internal_mesh.skeletons.push(handle.get_raw());
 
         let mesh_range = internal_mesh.vertex_range.clone();
