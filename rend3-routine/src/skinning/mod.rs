@@ -2,7 +2,6 @@ use std::num::NonZeroU64;
 
 use glam::UVec2;
 use rend3::{
-    format_sso,
     graph::{DataHandle, RenderGraph},
     managers::{
         MeshBuffers, SkeletonManager, VERTEX_JOINT_INDEX_SIZE, VERTEX_JOINT_WEIGHT_SIZE, VERTEX_NORMAL_SIZE,

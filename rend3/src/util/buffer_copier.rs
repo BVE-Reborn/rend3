@@ -1,6 +1,6 @@
 use wgpu::{
     util::DeviceExt, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutEntry, CommandEncoder,
-    ComputePipeline, Device, Queue,
+    ComputePipeline, Device,
 };
 
 use super::math::round_up_div;

@@ -46,7 +46,7 @@ impl SkinningExample {
         // deformed. We need to set the joint matrices per each skeleton.
         for skeleton in &armature.skeletons {
             renderer.set_skeleton_joint_transforms(
-                &skeleton,
+                skeleton,
                 &[
                     glam::Mat4::from_translation(glam::Vec3::new(0.0, 0.0, -4.18)),
                     glam::Mat4::from_translation(glam::Vec3::new(0.0, 0.0, 0.0))
@@ -137,7 +137,7 @@ impl rend3_framework::App for SkinningExample {
                 control_flow(winit::event_loop::ControlFlow::Exit);
             }
             rend3_framework::Event::MainEventsCleared => {
-                self.update_skeleton(&renderer);
+                self.update_skeleton(renderer);
                 window.request_redraw();
             }
             // Render!

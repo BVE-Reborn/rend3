@@ -7,7 +7,7 @@ use crate::{managers::MeshManager, util::registry::ResourceRegistry};
 
 use glam::{Mat4, UVec2};
 use rend3_types::{MeshHandle, RawSkeletonHandle, Skeleton, SkeletonHandle};
-use wgpu::{CommandEncoder, Device, Queue};
+use wgpu::{CommandEncoder, Device};
 
 /// Internal representation of a Skeleton
 #[derive(Debug)]
