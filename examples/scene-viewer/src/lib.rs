@@ -219,7 +219,7 @@ Rendering:
   -b --backend                 Choose backend to run on ('vk', 'dx12', 'dx11', 'metal', 'gl').
   -d --device                  Choose device to run on (case insensitive device substring).
   -m --mode                    Choose rendering mode to run on ('cpu', 'gpu').
-  --msaa                       Level of antialiasing (either 1 or 4). Default 1.
+  --msaa <level>               Level of antialiasing (either 1 or 4). Default 1.
 
 Windowing:
   --absolute-mouse             Interpret the relative mouse coordinates as absolute. Useful when using things like VNC.
@@ -228,11 +228,11 @@ Windowing:
 Assets:
   --normal-y-down                        Interpret all normals as having the DirectX convention of Y down. Defaults to Y up.
   --directional-light <x,y,z>            Create a directional light pointing towards the given coordinates.
-  --directional-light-intensity <value>  All lights created by the above flag have this intensity.
+  --directional-light-intensity <value>  All lights created by the above flag have this intensity. Defaults to 4.
   --gltf-disable-directional-lights      Disable all directional lights in the gltf
-  --ambient <value>                      Set the value of the minimum ambient light. This will be treated as white light of this intensity.
-  --scale <scale>                        Scale all objects loaded by this factor.
-  --shadow-distance <value>              Distance from the camera there will be directional shadows.
+  --ambient <value>                      Set the value of the minimum ambient light. This will be treated as white light of this intensity. Defaults to 0.1.
+  --scale <scale>                        Scale all objects loaded by this factor. Defaults to 1.0.
+  --shadow-distance <value>              Distance from the camera there will be directional shadows. Lower values means higher quality shadows. Defaults to 100.
 
 Controls:
   --walk <speed>               Walk speed (speed without holding shift) in units/second (typically meters). Default 10.

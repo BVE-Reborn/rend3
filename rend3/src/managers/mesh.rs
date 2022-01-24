@@ -1,4 +1,5 @@
 use crate::{
+    managers::ObjectManager,
     types::{Mesh, MeshHandle},
     util::{
         buffer_copier::{BufferCopier, BufferCopierParams},
@@ -8,7 +9,7 @@ use crate::{
 };
 use glam::{Vec2, Vec3};
 use range_alloc::RangeAllocator;
-use rend3_types::{RawMeshHandle, RawSkeletonHandle};
+use rend3_types::{RawMeshHandle, RawSkeletonHandle, RawObjectHandle};
 use std::{
     mem::size_of,
     ops::Range,
@@ -66,6 +67,7 @@ pub struct InternalMesh {
     pub index_range: Range<usize>,
     pub bounding_sphere: BoundingSphere,
     pub skeletons: Vec<RawSkeletonHandle>,
+    pub objects: Vec<RawObjectHandle>,
 }
 
 /// Set of megabuffers used by the mesh manager.
@@ -140,6 +142,7 @@ impl MeshManager {
         device: &Device,
         queue: &Queue,
         encoder: &mut CommandEncoder,
+        object_manager: &mut ObjectManager,
         handle: &MeshHandle,
         mesh: Mesh,
     ) {
@@ -156,6 +159,7 @@ impl MeshManager {
                 index_range: 0..0,
                 bounding_sphere: BoundingSphere::from_mesh(&[]),
                 skeletons: Vec::new(),
+                objects: Vec::new(),
             };
 
             self.registry.insert(handle, mesh);
@@ -173,7 +177,13 @@ impl MeshManager {
         };
 
         if let Some((needed_verts, needed_indices)) = needed {
-            self.reallocate_buffers(device, encoder, needed_verts as u32, needed_indices as u32);
+            self.reallocate_buffers(
+                device,
+                encoder,
+                object_manager,
+                needed_verts as u32,
+                needed_indices as u32,
+            );
             vertex_range = self.vertex_alloc.allocate_range(vertex_count).ok();
             index_range = self.index_alloc.allocate_range(index_count).ok();
         }
@@ -234,6 +244,7 @@ impl MeshManager {
             index_range,
             bounding_sphere,
             skeletons: Vec::new(),
+            objects: Vec::new(),
         };
 
         self.registry.insert(handle, mesh);
@@ -244,6 +255,7 @@ impl MeshManager {
         &mut self,
         device: &Device,
         encoder: &mut CommandEncoder,
+        object_manager: &mut ObjectManager,
         mesh_handle: &MeshHandle,
     ) -> Range<usize> {
         // Need to fetch internal data twice, because the returned mesh borrows &self
@@ -251,7 +263,7 @@ impl MeshManager {
         let vertex_range = match self.vertex_alloc.allocate_range(needed_verts) {
             Ok(range) => range,
             Err(_) => {
-                self.reallocate_buffers(device, encoder, needed_verts as u32, 0);
+                self.reallocate_buffers(device, encoder, object_manager, needed_verts as u32, 0);
                 self.vertex_alloc
                     .allocate_range(needed_verts)
                     .expect("We just reallocated")
@@ -316,6 +328,7 @@ impl MeshManager {
         &mut self,
         device: &Device,
         encoder: &mut CommandEncoder,
+        object_manager: &mut ObjectManager,
         needed_verts: u32,
         needed_indices: u32,
     ) {
@@ -427,6 +440,10 @@ impl MeshManager {
 
             mesh.vertex_range = new_vert_range;
             mesh.index_range = new_index_range;
+
+            for &object in &mesh.objects {
+                object_manager.set_mesh_ranges(object, mesh.vertex_range.clone(), mesh.index_range.clone())
+            }
         }
 
         self.buffers = new_buffers;

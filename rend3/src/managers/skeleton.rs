@@ -3,7 +3,10 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 
-use crate::{managers::MeshManager, util::registry::ResourceRegistry};
+use crate::{
+    managers::{MeshManager, ObjectManager},
+    util::registry::ResourceRegistry,
+};
 
 use glam::{Mat4, UVec2};
 use rend3_types::{MeshHandle, RawSkeletonHandle, Skeleton, SkeletonHandle};
@@ -65,11 +68,13 @@ impl SkeletonManager {
         SkeletonHandle::new(idx)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn fill(
         &mut self,
         device: &Device,
         encoder: &mut CommandEncoder,
         mesh_manager: &mut MeshManager,
+        object_manager: &mut ObjectManager,
         handle: &SkeletonHandle,
         skeleton: Skeleton,
     ) {
@@ -79,7 +84,7 @@ impl SkeletonManager {
         internal_mesh.skeletons.push(handle.get_raw());
 
         let mesh_range = internal_mesh.vertex_range.clone();
-        let skeleton_range = mesh_manager.allocate_skeleton_mesh(device, encoder, &skeleton.mesh);
+        let skeleton_range = mesh_manager.allocate_skeleton_mesh(device, encoder, object_manager, &skeleton.mesh);
 
         let input = GpuVertexRanges {
             skeleton_range: UVec2::new(skeleton_range.start as u32, skeleton_range.end as u32),
