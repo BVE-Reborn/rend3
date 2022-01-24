@@ -118,6 +118,9 @@ impl SkeletonManager {
             let mesh = mesh_manager.internal_data_mut(skeleton.mesh_handle.get_raw());
             let index = mesh.skeletons.iter().position(|sk| sk.idx == handle_idx).unwrap();
             mesh.skeletons.swap_remove(index);
+
+            // Free the owned region of the vertex buffer
+            mesh_manager.free_skeleton_mesh(skeleton.skeleton_vertex_range);
         });
     }
 

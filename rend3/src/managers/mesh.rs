@@ -333,6 +333,10 @@ impl MeshManager {
         vertex_range
     }
 
+    pub fn free_skeleton_mesh(&mut self, vertex_range: Range<usize>) {
+        self.vertex_alloc.free_range(vertex_range);
+    }
+
     pub fn buffers(&self) -> &MeshBuffers {
         &self.buffers
     }

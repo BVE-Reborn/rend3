@@ -167,6 +167,7 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
             .directional_light_manager
             .ready(&renderer.device, &renderer.queue, &data_core.camera_manager);
     data_core.mesh_manager.ready();
+    data_core.skeleton_manager.ready(&mut data_core.mesh_manager);
 
     cmd_bufs.push(encoder.finish());
 
