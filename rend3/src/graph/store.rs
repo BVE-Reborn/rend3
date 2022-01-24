@@ -13,14 +13,15 @@ use crate::{
     util::typedefs::FastHashMap,
 };
 
+/// Handle to arbitrary graph-stored data.
 pub struct DataHandle<T> {
-    pub(super) resource: GraphResource,
+    pub(super) idx: usize,
     pub(super) _phantom: PhantomData<T>,
 }
 
 impl<T> std::fmt::Debug for DataHandle<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("DataHandle").field("resource", &self.resource).finish()
+        f.debug_struct("DataHandle").field("idx", &self.idx).finish()
     }
 }
 
@@ -29,7 +30,7 @@ impl<T> Copy for DataHandle<T> {}
 impl<T> Clone for DataHandle<T> {
     fn clone(&self) -> Self {
         Self {
-            resource: self.resource,
+            idx: self.idx,
             _phantom: self._phantom,
         }
     }
@@ -37,10 +38,13 @@ impl<T> Clone for DataHandle<T> {
 
 impl<T> PartialEq for DataHandle<T> {
     fn eq(&self, other: &Self) -> bool {
-        self.resource == other.resource && self._phantom == other._phantom
+        self.idx == other.idx && self._phantom == other._phantom
     }
 }
 
+/// Provides read-only access to the renderer and access to graph resources.
+///
+/// This is how you turn [DeclaredDependency] into actual wgpu resources.
 pub struct RenderGraphDataStore<'a> {
     pub(super) texture_mapping: &'a FastHashMap<usize, TextureView>,
     pub(super) shadow_coordinates: &'a [ShadowCoordinates],
@@ -58,6 +62,7 @@ pub struct RenderGraphDataStore<'a> {
 }
 
 impl<'a> RenderGraphDataStore<'a> {
+    /// Get a rendertarget from the handle to one.
     pub fn get_render_target(&self, dep: DeclaredDependency<RenderTargetHandle>) -> &'a TextureView {
         match dep.handle.resource {
             GraphResource::Texture(name) => self
@@ -73,10 +78,11 @@ impl<'a> RenderGraphDataStore<'a> {
         }
     }
 
-    pub fn get_shadow(&self, handle: ShadowTargetHandle) -> ShadowTarget<'_> {
+    /// Get a shadow description from a handle to one.
+    pub fn get_shadow(&self, handle: DeclaredDependency<ShadowTargetHandle>) -> ShadowTarget<'_> {
         let coords = self
             .shadow_coordinates
-            .get(handle.idx)
+            .get(handle.handle.idx)
             .expect("internal rendergraph error: failed to get shadow mapping");
         ShadowTarget {
             view: self
@@ -88,44 +94,43 @@ impl<'a> RenderGraphDataStore<'a> {
         }
     }
 
+    /// Set the custom data behind a data handle.
+    ///
+    /// # Panics
+    ///
+    /// If get_data was called in the same renderpass, calling this will panic.
     pub fn set_data<T: 'static>(&self, dep: DeclaredDependency<DataHandle<T>>, data: Option<T>) {
-        match dep.handle.resource {
-            GraphResource::Data(idx) => {
-                *self
-                    .data
-                    .get(idx)
-                    .expect("internal rendergraph error: failed to get buffer")
-                    .downcast_ref::<RefCell<Option<T>>>()
-                    .expect("internal rendergraph error: downcasting failed")
-                    .try_borrow_mut()
-                    .expect("tried to call set_data on a handle that has an outstanding borrow through get_data") = data
-            }
-            r => {
-                panic!("internal rendergraph error: tried to get a {:?} as a render target", r)
-            }
-        }
+        *self
+            .data
+            .get(dep.handle.idx)
+            .expect("internal rendergraph error: failed to get buffer")
+            .downcast_ref::<RefCell<Option<T>>>()
+            .expect("internal rendergraph error: downcasting failed")
+            .try_borrow_mut()
+            .expect("tried to call set_data on a handle that has an outstanding borrow through get_data") = data
     }
 
+    /// Gets the custom data behind a data handle. If it has not been set, or
+    /// set to None, this will return None.
     pub fn get_data<T: 'static>(
         &self,
         temps: &'a RpassTemporaryPool<'a>,
         dep: DeclaredDependency<DataHandle<T>>,
     ) -> Option<&'a T> {
-        match dep.handle.resource {
-            GraphResource::Data(idx) => temps
-                .add(
-                    self.data
-                        .get(idx)
-                        .expect("internal rendergraph error: failed to get buffer")
-                        .downcast_ref::<RefCell<Option<T>>>()
-                        .expect("internal rendergraph error: downcasting failed")
-                        .try_borrow()
-                        .expect("internal rendergraph error: read-only borrow failed"),
-                )
-                .as_ref(),
-            r => {
-                panic!("internal rendergraph error: tried to get a {:?} as a render target", r)
+        let borrow = self
+            .data
+            .get(dep.handle.idx)
+            .expect("internal rendergraph error: failed to get buffer")
+            .downcast_ref::<RefCell<Option<T>>>()
+            .expect("internal rendergraph error: downcasting failed")
+            .try_borrow()
+            .expect("internal rendergraph error: read-only borrow failed");
+        match *borrow {
+            Some(_) => {
+                let r = temps.add(borrow);
+                Some(r.as_ref().unwrap())
             }
+            None => None,
         }
     }
 }
