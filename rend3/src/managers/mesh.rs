@@ -8,7 +8,7 @@ use crate::{
 };
 use glam::{Vec2, Vec3};
 use range_alloc::RangeAllocator;
-use rend3_types::RawMeshHandle;
+use rend3_types::{RawMeshHandle, RawSkeletonHandle};
 use std::{
     mem::size_of,
     ops::Range,
@@ -65,6 +65,7 @@ pub struct InternalMesh {
     pub vertex_range: Range<usize>,
     pub index_range: Range<usize>,
     pub bounding_sphere: BoundingSphere,
+    pub skeletons: Vec<RawSkeletonHandle>,
 }
 
 /// Set of megabuffers used by the mesh manager.
@@ -154,6 +155,7 @@ impl MeshManager {
                 vertex_range: 0..0,
                 index_range: 0..0,
                 bounding_sphere: BoundingSphere::from_mesh(&[]),
+                skeletons: Vec::new(),
             };
 
             self.registry.insert(handle, mesh);
@@ -231,6 +233,7 @@ impl MeshManager {
             vertex_range,
             index_range,
             bounding_sphere,
+            skeletons: Vec::new(),
         };
 
         self.registry.insert(handle, mesh);
@@ -289,6 +292,10 @@ impl MeshManager {
 
     pub fn internal_data(&self, handle: RawMeshHandle) -> &InternalMesh {
         self.registry.get(handle)
+    }
+
+    pub fn internal_data_mut(&mut self, handle: RawMeshHandle) -> &mut InternalMesh {
+        self.registry.get_mut(handle)
     }
 
     pub fn ready(&mut self) {

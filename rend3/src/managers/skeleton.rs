@@ -74,7 +74,11 @@ impl SkeletonManager {
         skeleton: Skeleton,
     ) {
         self.global_joint_count += skeleton.joint_matrices.len();
-        let mesh_range = mesh_manager.internal_data(skeleton.mesh.get_raw()).vertex_range.clone();
+
+        let internal_mesh = mesh_manager.internal_data_mut(skeleton.mesh.get_raw());
+        internal_mesh.skeletons.push(handle.get_raw());
+
+        let mesh_range = internal_mesh.vertex_range.clone();
         let skeleton_range = mesh_manager.allocate_skeleton_mesh(device, encoder, &skeleton.mesh);
 
         let input = GpuVertexRanges {
@@ -91,10 +95,15 @@ impl SkeletonManager {
         self.registry.insert(handle, internal);
     }
 
-    pub fn ready(&mut self) {
+    pub fn ready(&mut self, mesh_manager: &mut MeshManager) {
         profiling::scope!("Skeleton Manager Ready");
-        self.registry.remove_all_dead(|_, _, skeleton| {
+        self.registry.remove_all_dead(|_, handle_idx, skeleton| {
             self.global_joint_count -= skeleton.joint_matrices.len();
+
+            // Clean back references in the mesh data
+            let mesh = mesh_manager.internal_data_mut(skeleton.mesh_handle.get_raw());
+            let index = mesh.skeletons.iter().position(|sk| sk.idx == handle_idx).unwrap();
+            mesh.skeletons.swap_remove(index);
         });
     }
 
