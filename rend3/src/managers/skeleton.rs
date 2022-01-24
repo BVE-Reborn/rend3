@@ -114,7 +114,14 @@ impl SkeletonManager {
 
     pub fn set_joint_matrices(&mut self, handle: RawSkeletonHandle, joint_matrices: Vec<Mat4>) {
         let skeleton = self.registry.get_mut(handle);
-        assert_eq!(joint_matrices.len(), skeleton.joint_matrices.len());
+        assert_eq!(
+            joint_matrices.len(),
+            skeleton.joint_matrices.len(),
+            "Call to set_joint_matrices with an incorrect number of bones. \
+            Skeleton has {} bones, input vector has {}.",
+            joint_matrices.len(),
+            skeleton.joint_matrices.len(),
+        );
         skeleton.joint_matrices = joint_matrices;
     }
 

@@ -345,8 +345,8 @@ pub fn add_mesh_by_index<E: std::error::Error + 'static>(
         .get(mesh_index)
         .ok_or(GltfLoadError::MissingMesh(mesh_index))?;
 
-    let mut primitives: Vec<ObjectHandle> = vec![];
-    let mut skeletons: Vec<SkeletonHandle> = vec![];
+    let mut primitives = Vec::new();
+    let mut skeletons = Vec::new();
 
     let skin = if let Some(skin_index) = skin_index {
         let skin = loaded

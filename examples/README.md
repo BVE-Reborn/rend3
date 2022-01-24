@@ -8,3 +8,4 @@ The examples are separate crates, so to run an example run `cargo run --bin <nam
 | gltf                | Similar to cube, but geometry is pulled from a gltf file | ![](gltf/screenshot.jpg) |
 | scene-viewer        | Advanced example used to test rend3. | ![](scene-viewer/scifi-base.jpg) ![](scene-viewer/screenshot.jpg) ![](scene-viewer/bistro.jpg) ![](scene-viewer/emerald-square.jpg) |
 | textured-quad       | Basic 2d rendering with an orthographic camera | ![](textured-quad/screenshot.png) |
+| skinning            | Basic bone deformation of a loaded gltf model | ![](skinning/screenshot.png) |

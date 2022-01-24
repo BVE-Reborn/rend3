@@ -1,6 +1,6 @@
-use std::num::NonZeroU64;
+use std::{mem, num::NonZeroU64};
 
-use glam::UVec2;
+use glam::{Mat4, UVec2};
 use rend3::{
     graph::{DataHandle, RenderGraph},
     managers::{
@@ -27,6 +27,7 @@ pub struct GpuSkinningInput {
     pub joint_idx: u32,
 }
 
+/// Uploads the data for the GPU skinning compute pass to the GPU
 pub fn add_pre_skin_to_graph(graph: &mut RenderGraph, pre_skin_data: DataHandle<PreSkinningBuffers>) {
     let mut builder = graph.add_node("pre-skinning");
     let pre_skin_handle = builder.add_data_output(pre_skin_data);
@@ -46,7 +47,7 @@ pub struct PreSkinningBuffers {
 fn build_gpu_skinning_input_buffers(device: &Device, skeleton_manager: &SkeletonManager) -> PreSkinningBuffers {
     profiling::scope!("Building GPU Skinning Input Data");
 
-    let skinning_inputs_length = skeleton_manager.skeletons().len() * std::mem::size_of::<GpuSkinningInput>();
+    let skinning_inputs_length = skeleton_manager.skeletons().len() * mem::size_of::<GpuSkinningInput>();
     let gpu_skinning_inputs = device.create_buffer(&BufferDescriptor {
         label: Some("skinning inputs"),
         size: skinning_inputs_length as u64,
@@ -56,7 +57,7 @@ fn build_gpu_skinning_input_buffers(device: &Device, skeleton_manager: &Skeleton
 
     let joint_matrices = device.create_buffer(&BufferDescriptor {
         label: Some("joint matrices"),
-        size: (skeleton_manager.global_joint_count() * std::mem::size_of::<[[f32; 4]; 4]>()) as u64,
+        size: (skeleton_manager.global_joint_count() * mem::size_of::<Mat4>()) as u64,
         usage: BufferUsages::STORAGE,
         mapped_at_creation: true,
     });
@@ -109,6 +110,7 @@ fn build_gpu_skinning_input_buffers(device: &Device, skeleton_manager: &Skeleton
     }
 }
 
+/// Holds the necessary wgpu data structures for the GPU skinning compute pass
 pub struct GpuSkinner {
     pub pipeline: ComputePipeline,
     pub vertex_buffers_bgl: BindGroupLayout,
@@ -131,7 +133,7 @@ impl GpuSkinner {
         let tan_size = NonZeroU64::new(VERTEX_TANGENT_SIZE as u64);
         let j_idx_size = NonZeroU64::new(VERTEX_JOINT_INDEX_SIZE as u64);
         let j_wt_size = NonZeroU64::new(VERTEX_JOINT_WEIGHT_SIZE as u64);
-        let mat_size = NonZeroU64::new(std::mem::size_of::<[[f32; 4]; 4]>() as u64);
+        let mat_size = NonZeroU64::new(mem::size_of::<Mat4>() as u64);
 
         // Bind group 0 contains some vertex buffers bound as storage buffers
         let vertex_buffers_bgl = BindGroupLayoutBuilder::new()
@@ -160,7 +162,7 @@ impl GpuSkinner {
                 wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Uniform,
                     has_dynamic_offset: true,
-                    min_binding_size: NonZeroU64::new(std::mem::size_of::<GpuSkinningInput>() as u64),
+                    min_binding_size: NonZeroU64::new(mem::size_of::<GpuSkinningInput>() as u64),
                 },
                 None,
             )
@@ -227,7 +229,7 @@ impl GpuSkinner {
 
         for (i, skel) in skeleton_manager.skeletons().enumerate() {
             cpass.set_pipeline(&self.pipeline);
-            let offset = (i * std::mem::size_of::<GpuSkinningInput>()) as u32;
+            let offset = (i * mem::size_of::<GpuSkinningInput>()) as u32;
             cpass.set_bind_group(2, &skinning_inputs_bgb, &[offset]);
 
             let num_verts = (skel.ranges.mesh_range[1] - skel.ranges.mesh_range[0]) as u32;
@@ -237,8 +239,16 @@ impl GpuSkinner {
     }
 }
 
+/// The GPU skinning node works by producing a side effect: Mutating the
+/// skeleton copies of the vertex buffer in-place. All this happens on GPU
+/// memory, so there is no data to be returned on the CPU side. This type
+/// represents the (virtual) output of GPU skinning.
+///
+/// This is used to ensure skinning will be called at the right time in the
+/// render graph (before any culling happens).
 pub struct SkinningOutput;
 
+/// Performs skinning on the GPU.
 pub fn add_skinning_to_graph<'node>(
     graph: &mut RenderGraph<'node>,
     gpu_skinner: &'node GpuSkinner,
