@@ -84,7 +84,7 @@ impl SkeletonManager {
         internal_mesh.skeletons.push(handle.get_raw());
 
         let mesh_range = internal_mesh.vertex_range.clone();
-        let skeleton_range = mesh_manager.allocate_skeleton_mesh(device, encoder, object_manager, &skeleton.mesh);
+        let skeleton_range = mesh_manager.allocate_skeleton_mesh(device, encoder, object_manager, self, &skeleton.mesh);
 
         let input = GpuVertexRanges {
             skeleton_range: UVec2::new(skeleton_range.start as u32, skeleton_range.end as u32),
@@ -129,6 +129,19 @@ impl SkeletonManager {
     /// Get the skeleton manager's global joint count.
     pub fn global_joint_count(&self) -> usize {
         self.global_joint_count
+    }
+
+    pub fn set_skeleton_range(
+        &mut self,
+        handle: RawSkeletonHandle,
+        new_skeleton_vert_range: &Range<usize>,
+        new_mesh_vert_range: &Range<usize>,
+    ) {
+        let skeleton = self.registry.get_mut(handle);
+        skeleton.skeleton_vertex_range = new_skeleton_vert_range.clone();
+        skeleton.ranges.mesh_range = UVec2::new(new_mesh_vert_range.start as u32, new_mesh_vert_range.end as u32);
+        skeleton.ranges.skeleton_range =
+            UVec2::new(new_skeleton_vert_range.start as u32, new_skeleton_vert_range.end as u32);
     }
 }
 

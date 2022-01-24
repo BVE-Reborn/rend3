@@ -1,5 +1,5 @@
 use crate::{
-    managers::ObjectManager,
+    managers::{ObjectManager, SkeletonManager},
     types::{Mesh, MeshHandle},
     util::{
         buffer_copier::{BufferCopier, BufferCopierParams},
@@ -9,7 +9,7 @@ use crate::{
 };
 use glam::{Vec2, Vec3};
 use range_alloc::RangeAllocator;
-use rend3_types::{RawMeshHandle, RawSkeletonHandle, RawObjectHandle};
+use rend3_types::{RawMeshHandle, RawObjectHandle, RawSkeletonHandle};
 use std::{
     mem::size_of,
     ops::Range,
@@ -143,6 +143,7 @@ impl MeshManager {
         queue: &Queue,
         encoder: &mut CommandEncoder,
         object_manager: &mut ObjectManager,
+        skeleton_manager: &mut SkeletonManager,
         handle: &MeshHandle,
         mesh: Mesh,
     ) {
@@ -181,6 +182,7 @@ impl MeshManager {
                 device,
                 encoder,
                 object_manager,
+                skeleton_manager,
                 needed_verts as u32,
                 needed_indices as u32,
             );
@@ -256,6 +258,7 @@ impl MeshManager {
         device: &Device,
         encoder: &mut CommandEncoder,
         object_manager: &mut ObjectManager,
+        skeleton_manager: &mut SkeletonManager,
         mesh_handle: &MeshHandle,
     ) -> Range<usize> {
         // Need to fetch internal data twice, because the returned mesh borrows &self
@@ -263,7 +266,14 @@ impl MeshManager {
         let vertex_range = match self.vertex_alloc.allocate_range(needed_verts) {
             Ok(range) => range,
             Err(_) => {
-                self.reallocate_buffers(device, encoder, object_manager, needed_verts as u32, 0);
+                self.reallocate_buffers(
+                    device,
+                    encoder,
+                    object_manager,
+                    skeleton_manager,
+                    needed_verts as u32,
+                    0,
+                );
                 self.vertex_alloc
                     .allocate_range(needed_verts)
                     .expect("We just reallocated")
@@ -329,6 +339,7 @@ impl MeshManager {
         device: &Device,
         encoder: &mut CommandEncoder,
         object_manager: &mut ObjectManager,
+        skeleton_manager: &mut SkeletonManager,
         needed_verts: u32,
         needed_indices: u32,
     ) {
@@ -361,70 +372,32 @@ impl MeshManager {
             let new_vert_range = new_vert_alloc.allocate_range(mesh.vertex_range.len()).unwrap();
             let new_index_range = new_index_alloc.allocate_range(mesh.index_range.len()).unwrap();
 
-            copy_vert(
+            // Copy the vertex data to the new buffer range
+            copy_to_new_buffers(
                 encoder,
-                &self.buffers.vertex_position,
-                &new_buffers.vertex_position,
-                mesh,
+                &self.buffers,
+                &new_buffers,
+                &mesh.vertex_range,
                 &new_vert_range,
-                VERTEX_POSITION_SIZE,
             );
-            copy_vert(
-                encoder,
-                &self.buffers.vertex_normal,
-                &new_buffers.vertex_normal,
-                mesh,
-                &new_vert_range,
-                VERTEX_NORMAL_SIZE,
-            );
-            copy_vert(
-                encoder,
-                &self.buffers.vertex_tangent,
-                &new_buffers.vertex_tangent,
-                mesh,
-                &new_vert_range,
-                VERTEX_TANGENT_SIZE,
-            );
-            copy_vert(
-                encoder,
-                &self.buffers.vertex_uv0,
-                &new_buffers.vertex_uv0,
-                mesh,
-                &new_vert_range,
-                VERTEX_UV_SIZE,
-            );
-            copy_vert(
-                encoder,
-                &self.buffers.vertex_uv1,
-                &new_buffers.vertex_uv1,
-                mesh,
-                &new_vert_range,
-                VERTEX_UV_SIZE,
-            );
-            copy_vert(
-                encoder,
-                &self.buffers.vertex_color,
-                &new_buffers.vertex_color,
-                mesh,
-                &new_vert_range,
-                VERTEX_COLOR_SIZE,
-            );
-            copy_vert(
-                encoder,
-                &self.buffers.vertex_joint_index,
-                &new_buffers.vertex_joint_index,
-                mesh,
-                &new_vert_range,
-                VERTEX_JOINT_INDEX_SIZE,
-            );
-            copy_vert(
-                encoder,
-                &self.buffers.vertex_joint_weight,
-                &new_buffers.vertex_joint_weight,
-                mesh,
-                &new_vert_range,
-                VERTEX_JOINT_WEIGHT_SIZE,
-            );
+
+            // Copy the skeleton data that was copied from this mesh
+            for skeleton_handle in mesh.skeletons.iter() {
+                let skeleton = skeleton_manager.internal_data(*skeleton_handle);
+                let new_skeleton_vert_range = new_vert_alloc
+                    .allocate_range(skeleton.skeleton_vertex_range.len())
+                    .unwrap();
+                copy_to_new_buffers(
+                    encoder,
+                    &self.buffers,
+                    &new_buffers,
+                    &skeleton.skeleton_vertex_range,
+                    &new_skeleton_vert_range,
+                );
+
+                // Update the cache range data on the skeleton
+                skeleton_manager.set_skeleton_range(*skeleton_handle, &new_skeleton_vert_range, &new_vert_range);
+            }
 
             // Copy indices over to new buffer, adjusting their value by the difference
             let index_copy_start = mesh.index_range.start * INDEX_SIZE;
@@ -460,16 +433,89 @@ impl MeshManager {
     }
 }
 
+fn copy_to_new_buffers(
+    encoder: &mut CommandEncoder,
+    current_buffers: &MeshBuffers,
+    new_buffers: &MeshBuffers,
+    current_range: &Range<usize>,
+    new_range: &Range<usize>,
+) {
+    copy_vert(
+        encoder,
+        &current_buffers.vertex_position,
+        &new_buffers.vertex_position,
+        current_range,
+        new_range,
+        VERTEX_POSITION_SIZE,
+    );
+    copy_vert(
+        encoder,
+        &current_buffers.vertex_normal,
+        &new_buffers.vertex_normal,
+        current_range,
+        new_range,
+        VERTEX_NORMAL_SIZE,
+    );
+    copy_vert(
+        encoder,
+        &current_buffers.vertex_tangent,
+        &new_buffers.vertex_tangent,
+        current_range,
+        new_range,
+        VERTEX_TANGENT_SIZE,
+    );
+    copy_vert(
+        encoder,
+        &current_buffers.vertex_uv0,
+        &new_buffers.vertex_uv0,
+        current_range,
+        new_range,
+        VERTEX_UV_SIZE,
+    );
+    copy_vert(
+        encoder,
+        &current_buffers.vertex_uv1,
+        &new_buffers.vertex_uv1,
+        current_range,
+        new_range,
+        VERTEX_UV_SIZE,
+    );
+    copy_vert(
+        encoder,
+        &current_buffers.vertex_color,
+        &new_buffers.vertex_color,
+        current_range,
+        new_range,
+        VERTEX_COLOR_SIZE,
+    );
+    copy_vert(
+        encoder,
+        &current_buffers.vertex_joint_index,
+        &new_buffers.vertex_joint_index,
+        current_range,
+        new_range,
+        VERTEX_JOINT_INDEX_SIZE,
+    );
+    copy_vert(
+        encoder,
+        &current_buffers.vertex_joint_weight,
+        &new_buffers.vertex_joint_weight,
+        current_range,
+        new_range,
+        VERTEX_JOINT_WEIGHT_SIZE,
+    );
+}
+
 fn copy_vert(
     encoder: &mut CommandEncoder,
     src: &Buffer,
     dst: &Buffer,
-    mesh: &InternalMesh,
+    orig_vert_range: &Range<usize>,
     new_vert_range: &Range<usize>,
     size: usize,
 ) {
-    let vert_copy_start = mesh.vertex_range.start * size;
-    let vert_copy_size = (mesh.vertex_range.end * size) - vert_copy_start;
+    let vert_copy_start = orig_vert_range.start * size;
+    let vert_copy_size = (orig_vert_range.end * size) - vert_copy_start;
     let vert_output = new_vert_range.start * size;
     encoder.copy_buffer_to_buffer(
         src,
