@@ -5,7 +5,7 @@ use std::{
 
 use crate::{managers::MeshManager, util::registry::ResourceRegistry};
 
-use glam::Mat4;
+use glam::{Mat4, UVec2};
 use rend3_types::{MeshHandle, RawSkeletonHandle, Skeleton, SkeletonHandle};
 use wgpu::{CommandEncoder, Device, Queue};
 
@@ -32,10 +32,10 @@ pub struct InternalSkeleton {
 #[derive(Debug, Copy, Clone)]
 pub struct GpuVertexRanges {
     /// The range of the vertex buffer that holds the original mesh.
-    pub mesh_range: [u32; 2],
+    pub mesh_range: glam::UVec2,
     /// The range of the vertex buffer that holds the duplicate mesh data, owned
     /// by the Skeleton
-    pub skeleton_range: [u32; 2],
+    pub skeleton_range: glam::UVec2,
 }
 
 /// Manages skeletons.
@@ -78,8 +78,8 @@ impl SkeletonManager {
         let skeleton_range = mesh_manager.allocate_skeleton_mesh(device, encoder, &skeleton.mesh);
 
         let input = GpuVertexRanges {
-            skeleton_range: [skeleton_range.start as u32, skeleton_range.end as u32],
-            mesh_range: [mesh_range.start as u32, mesh_range.end as u32],
+            skeleton_range: UVec2::new(skeleton_range.start as u32, skeleton_range.end as u32),
+            mesh_range: UVec2::new(mesh_range.start as u32, mesh_range.end as u32),
         };
 
         let internal = InternalSkeleton {

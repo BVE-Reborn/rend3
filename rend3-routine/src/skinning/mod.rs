@@ -1,5 +1,6 @@
 use std::num::NonZeroU64;
 
+use glam::UVec2;
 use rend3::{
     format_sso,
     graph::{DataHandle, RenderGraph},
@@ -13,9 +14,9 @@ use wgpu::{BindGroupLayout, Buffer, BufferDescriptor, BufferUsages, ComputePipel
 #[derive(Copy, Clone)]
 pub struct GpuSkinningInput {
     /// See [rend3::managers::GpuVertexRanges].
-    pub mesh_range: [u32; 2],
+    pub mesh_range: UVec2,
     /// See [rend3::managers::GpuVertexRanges].
-    pub skeleton_range: [u32; 2],
+    pub skeleton_range: UVec2,
     /// The index of this skeleton's first joint in the global joint matrix
     /// buffer.
     pub joint_idx: u32,
