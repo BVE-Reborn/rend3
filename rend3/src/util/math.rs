@@ -5,3 +5,8 @@ pub fn round_up_pot<T: PrimInt>(src: T, factor: T) -> T {
     let minus1 = factor - T::one();
     (src + minus1) & !minus1
 }
+
+/// Performs integer division betwee a and b rounding up, instead of down
+pub fn round_up_div<T: PrimInt>(a: T, b: T) -> T {
+    (a + (b - T::one())) / b
+}

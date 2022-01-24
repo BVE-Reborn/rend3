@@ -3,6 +3,8 @@ use wgpu::{
     Device, Queue,
 };
 
+use super::math::round_up_div;
+
 /// When allocating data for a new skeleton, the MeshManager needs to copy some
 /// of the allocated vertex data to a different region of the vertex buffer.
 /// This copy operation can't be done by wgpu using the `Encoder` because it is
@@ -133,7 +135,7 @@ impl BufferCopier {
 
             cpass.set_pipeline(&self.pipeline);
             cpass.set_bind_group(0, &bind_group, &[]);
-            let num_workgroups = (params.count + (Self::WORKGROUP_SIZE - 1)) / Self::WORKGROUP_SIZE; // Divide rounding up
+            let num_workgroups = round_up_div(params.count, Self::WORKGROUP_SIZE);
             cpass.dispatch(num_workgroups, 1, 1);
         }
 

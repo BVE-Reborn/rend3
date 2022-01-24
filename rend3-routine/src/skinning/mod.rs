@@ -4,7 +4,7 @@ use rend3::{
     format_sso,
     graph::{DataHandle, RenderGraph},
     managers::{MeshBuffers, SkeletonManager},
-    util::bind_merge::{BindGroupBuilder, BindGroupLayoutBuilder},
+    util::{bind_merge::{BindGroupBuilder, BindGroupLayoutBuilder}, math::round_up_div},
 };
 use wgpu::{BindGroupLayout, Buffer, BufferDescriptor, BufferUsages, ComputePipeline, Device};
 
@@ -206,18 +206,19 @@ impl GpuSkinner {
             .append_buffer(&buffers.gpu_skinning_inputs)
             .build(device, Some("GPU skinning inputs"), &self.skinning_inputs_bgl);
 
+        let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+            label: Some("GPU Skinning"),
+        });
+        cpass.set_bind_group(0, &vertex_buffers_bg, &[]);
+        cpass.set_bind_group(1, &joint_matrices_bg, &[]);
+
         for (i, skel) in skeleton_manager.skeletons().enumerate() {
-            let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-                label: Some(&format_sso!("GPU Skinning {}", i)),
-            });
             cpass.set_pipeline(&self.pipeline);
-            cpass.set_bind_group(0, &vertex_buffers_bg, &[]);
-            cpass.set_bind_group(1, &joint_matrices_bg, &[]);
             let offset = (i * std::mem::size_of::<GpuSkinningInput>()) as u32;
             cpass.set_bind_group(2, &skinning_inputs_bgb, &[offset]);
 
             let num_verts = (skel.ranges.mesh_range[1] - skel.ranges.mesh_range[0]) as u32;
-            let num_workgroups = (num_verts + (Self::WORKGROUP_SIZE - 1)) / Self::WORKGROUP_SIZE; // Divide rounding up
+            let num_workgroups = round_up_div(num_verts, Self::WORKGROUP_SIZE); 
             cpass.dispatch(num_workgroups, 1, 1);
         }
     }
