@@ -240,7 +240,6 @@ impl MeshManager {
     pub fn allocate_skeleton_mesh(
         &mut self,
         device: &Device,
-        queue: &Queue,
         encoder: &mut CommandEncoder,
         mesh_handle: &MeshHandle,
     ) -> Range<usize> {
@@ -263,7 +262,7 @@ impl MeshManager {
         // not allow copies whithin the same buffer.
         self.buffer_copier.execute(
             device,
-            queue,
+            encoder,
             [
                 &self.buffers.vertex_position,
                 &self.buffers.vertex_normal,

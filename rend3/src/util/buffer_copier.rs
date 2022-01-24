@@ -1,6 +1,6 @@
 use wgpu::{
     util::DeviceExt, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutEntry, ComputePipeline,
-    Device, Queue,
+    Device, Queue, CommandEncoder,
 };
 
 use super::math::round_up_div;
@@ -87,9 +87,7 @@ impl BufferCopier {
         BufferCopier { pipeline, bgl }
     }
 
-    pub fn execute(&self, device: &Device, queue: &Queue, buffers: [&wgpu::Buffer; 8], params: BufferCopierParams) {
-        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
-
+    pub fn execute(&self, device: &Device, encoder: &mut CommandEncoder, buffers: [&wgpu::Buffer; 8], params: BufferCopierParams) {
         let buffer_binding = |idx, buffer| BindGroupEntry {
             binding: idx,
             resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
@@ -138,7 +136,5 @@ impl BufferCopier {
             let num_workgroups = round_up_div(params.count, Self::WORKGROUP_SIZE);
             cpass.dispatch(num_workgroups, 1, 1);
         }
-
-        queue.submit(Some(encoder.finish()));
     }
 }

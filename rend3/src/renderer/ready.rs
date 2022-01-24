@@ -43,7 +43,6 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
                         .begin_scope("Add Skeleton", &mut encoder, &renderer.device);
                     data_core.skeleton_manager.fill(
                         &renderer.device,
-                        &renderer.queue,
                         &mut encoder,
                         &mut data_core.mesh_manager,
                         &handle,

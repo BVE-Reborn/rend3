@@ -68,7 +68,6 @@ impl SkeletonManager {
     pub fn fill(
         &mut self,
         device: &Device,
-        queue: &Queue,
         encoder: &mut CommandEncoder,
         mesh_manager: &mut MeshManager,
         handle: &SkeletonHandle,
@@ -76,7 +75,7 @@ impl SkeletonManager {
     ) {
         self.global_joint_count += skeleton.joint_matrices.len();
         let mesh_range = mesh_manager.internal_data(skeleton.mesh.get_raw()).vertex_range.clone();
-        let skeleton_range = mesh_manager.allocate_skeleton_mesh(device, queue, encoder, &skeleton.mesh);
+        let skeleton_range = mesh_manager.allocate_skeleton_mesh(device, encoder, &skeleton.mesh);
 
         let input = GpuVertexRanges {
             skeleton_range: [skeleton_range.start as u32, skeleton_range.end as u32],
