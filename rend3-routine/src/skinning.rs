@@ -51,10 +51,10 @@ pub struct PreSkinningBuffers {
 fn build_gpu_skinning_input_buffers(device: &Device, skeleton_manager: &SkeletonManager) -> PreSkinningBuffers {
     profiling::scope!("Building GPU Skinning Input Data");
 
-    let skinning_inputs_length = skeleton_manager.skeletons().len() * mem::size_of::<GpuSkinningInput>();
+    let skinning_inputs_size = skeleton_manager.skeletons().len() * mem::size_of::<GpuSkinningInput>();
     let gpu_skinning_inputs = device.create_buffer(&BufferDescriptor {
         label: Some("skinning inputs"),
-        size: skinning_inputs_length as u64,
+        size: skinning_inputs_size as u64,
         usage: BufferUsages::STORAGE,
         mapped_at_creation: true,
     });
@@ -209,8 +209,9 @@ impl GpuSkinner {
             .append_buffer(&buffers.joint_matrices)
             .build(device, Some("GPU skinning mesh data"), &self.vertex_buffers_bgl);
 
-        let skinning_inputs_bgb = BindGroupBuilder::new()
-            .append_buffer(&buffers.gpu_skinning_inputs)
+        let skinning_inputs_bg = BindGroupBuilder::new()
+            // NOTE: Need to specify a binding size to avoid getting the full buffer's.
+            .append_buffer_with_size(&buffers.gpu_skinning_inputs, mem::size_of::<GpuSkinningInput>() as u64)
             .build(device, Some("GPU skinning inputs"), &self.skinning_inputs_bgl);
 
         let mut cpass = encoder.begin_compute_pass(&ComputePassDescriptor {
@@ -220,8 +221,9 @@ impl GpuSkinner {
 
         for (i, skel) in skeleton_manager.skeletons().enumerate() {
             cpass.set_pipeline(&self.pipeline);
+
             let offset = (i * mem::size_of::<GpuSkinningInput>()) as u32;
-            cpass.set_bind_group(1, &skinning_inputs_bgb, &[offset]);
+            cpass.set_bind_group(1, &skinning_inputs_bg, &[offset]);
 
             let num_verts = (skel.ranges.mesh_range[1] - skel.ranges.mesh_range[0]) as u32;
             let num_workgroups = round_up_div(num_verts, Self::WORKGROUP_SIZE);

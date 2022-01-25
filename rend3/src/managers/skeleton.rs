@@ -78,30 +78,43 @@ impl SkeletonManager {
         handle: &SkeletonHandle,
         skeleton: Skeleton,
     ) {
-        let internal_mesh = mesh_manager.internal_data_mut(skeleton.mesh.get_raw());
+        let internal_mesh = mesh_manager.internal_data(skeleton.mesh.get_raw());
+        let num_joints = internal_mesh.num_joints as usize;
 
-        assert_eq!(
-            internal_mesh.num_joints as usize,
-            skeleton.joint_matrices.len(),
-            "Created a skeleton with an incorrect number of joints. \
-            The mesh has {} joints, but {} joint matrices were provided.",
-            internal_mesh.num_joints as usize,
+        assert!(
+            internal_mesh.num_joints as usize <= skeleton.joint_matrices.len(),
+            "Not enough joints to create this skeleton. The mesh has {} joints, \
+             but only {} joint matrices were provided.",
+            num_joints,
             skeleton.joint_matrices.len(),
         );
 
-        self.global_joint_count += skeleton.joint_matrices.len();
-        internal_mesh.skeletons.push(handle.get_raw());
+        self.global_joint_count += num_joints;
 
         let mesh_range = internal_mesh.vertex_range.clone();
         let skeleton_range = mesh_manager.allocate_skeleton_mesh(device, encoder, object_manager, self, &skeleton.mesh);
+
+        // It is important that this happens after allocating the skeleton mesh.
+        // Otherwise it will try to reallocate the data for the skeleton it's
+        // trying to allocate.
+        //
+        // NOTE: Need to access internal_mesh again to avoid double borrow.
+        mesh_manager
+            .internal_data_mut(skeleton.mesh.get_raw())
+            .skeletons
+            .push(handle.get_raw());
 
         let input = GpuVertexRanges {
             skeleton_range: UVec2::new(skeleton_range.start as u32, skeleton_range.end as u32),
             mesh_range: UVec2::new(mesh_range.start as u32, mesh_range.end as u32),
         };
 
+        // Ensure there will be exactly `num_joints` matrices.
+        let mut joint_matrices = skeleton.joint_matrices;
+        joint_matrices.truncate(num_joints);
+
         let internal = InternalSkeleton {
-            joint_matrices: skeleton.joint_matrices,
+            joint_matrices,
             mesh_handle: skeleton.mesh,
             skeleton_vertex_range: skeleton_range,
             ranges: input,
@@ -124,16 +137,17 @@ impl SkeletonManager {
         });
     }
 
-    pub fn set_joint_matrices(&mut self, handle: RawSkeletonHandle, joint_matrices: Vec<Mat4>) {
+    pub fn set_joint_matrices(&mut self, handle: RawSkeletonHandle, mut joint_matrices: Vec<Mat4>) {
         let skeleton = self.registry.get_mut(handle);
-        assert_eq!(
-            joint_matrices.len(),
-            skeleton.joint_matrices.len(),
-            "Call to set_joint_matrices with an incorrect number of bones. \
-            Skeleton has {} bones, input vector has {}.",
+        assert!(
+            skeleton.joint_matrices.len() <= joint_matrices.len(),
+            "Not enough joints to update this skeleton. The mesh has {} joints, \
+            but only {} joint matrices were provided.",
             skeleton.joint_matrices.len(),
             joint_matrices.len(),
         );
+        // Truncate to avoid storing any extra joint matrices
+        joint_matrices.truncate(skeleton.joint_matrices.len());
         skeleton.joint_matrices = joint_matrices;
     }
 
