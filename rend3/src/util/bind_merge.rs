@@ -1,8 +1,8 @@
-use std::num::NonZeroU32;
+use std::num::{NonZeroU32, NonZeroU64};
 
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
-    BindingResource, BindingType, Buffer, Device, Sampler, ShaderStages, TextureView,
+    BindingResource, BindingType, Buffer, BufferBinding, Device, Sampler, ShaderStages, TextureView,
 };
 
 pub struct BindGroupLayoutBuilder {
@@ -61,6 +61,15 @@ impl<'a> BindGroupBuilder<'a> {
 
     pub fn append_buffer(&mut self, buffer: &'a Buffer) -> &mut Self {
         self.append(buffer.as_entire_binding());
+        self
+    }
+
+    pub fn append_buffer_with_size(&mut self, buffer: &'a Buffer, size: u64) -> &mut Self {
+        self.append(BindingResource::Buffer(BufferBinding {
+            buffer,
+            offset: 0,
+            size: NonZeroU64::new(size),
+        }));
         self
     }
 
