@@ -28,6 +28,11 @@ struct HandleData<K> {
     index: usize,
 }
 
+/// Registry that stores the values in archetypes, each key representing an
+/// archetype.
+///
+/// This is used by the [ObjectManager](crate::managers::ObjectManager) to store
+/// objects. It uses the material archetype and a custom u64 as the key.
 pub struct ArchetypicalRegistry<K, V, HandleType> {
     archetype_map: FastHashMap<K, ArchetypeStorage<V>>,
     handle_info: FastHashMap<usize, HandleData<K>>,
@@ -124,11 +129,6 @@ where
 
     pub fn get_archetype_vector(&self, key: &K) -> Option<&[V]> {
         Some(&self.archetype_map.get(key)?.data)
-    }
-
-    // TODO(material): runtime borrow checking
-    pub fn get_archetype_vector_mut(&mut self, key: &K) -> Option<&mut [V]> {
-        Some(&mut self.archetype_map.get_mut(key)?.data)
     }
 }
 
