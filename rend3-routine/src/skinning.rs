@@ -12,7 +12,11 @@ use rend3::{
         math::round_up_div,
     },
 };
-use wgpu::{BindGroupLayout, BindingType, Buffer, BufferBindingType, BufferDescriptor, BufferUsages, CommandEncoder, ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor, Device, PipelineLayoutDescriptor, ShaderModuleDescriptor, ShaderStages};
+use wgpu::{
+    BindGroupLayout, BindingType, Buffer, BufferBindingType, BufferDescriptor, BufferUsages, CommandEncoder,
+    ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor, Device, PipelineLayoutDescriptor,
+    ShaderModuleDescriptor, ShaderStages,
+};
 
 /// The per-skeleton data, as uploaded to the GPU compute shader.
 #[repr(C, align(16))]
