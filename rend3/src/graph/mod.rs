@@ -61,6 +61,7 @@ mod node;
 mod passthrough;
 mod store;
 mod temp;
+mod texture_store;
 
 pub use encpass::*;
 pub use graph::*;
@@ -68,6 +69,7 @@ pub use node::*;
 pub use passthrough::*;
 pub use store::*;
 pub use temp::*;
+pub(crate) use texture_store::*;
 
 /// Description of a single render target.
 #[derive(Debug, Clone)]

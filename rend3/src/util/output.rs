@@ -1,8 +1,11 @@
+//! Output frame and surface acquisition.
+
 use std::sync::Arc;
 use wgpu::{SurfaceError, SurfaceTexture, TextureView, TextureViewDescriptor};
 
 use crate::types::Surface;
 
+/// Anything that resembles a surface to render to.
 pub enum OutputFrame {
     // A surface which has not yet been acquired. This lets rend3 acquire as late as possible.
     Surface {
@@ -18,6 +21,8 @@ pub enum OutputFrame {
 }
 
 impl OutputFrame {
+    /// If needed, acquire the surface. If the frame is Surface, after this call
+    /// it will be SurfaceAcquired.
     pub fn acquire(&mut self) -> Result<(), SurfaceError> {
         if let Self::Surface { surface } = self {
             profiling::scope!("OutputFrame::acquire");
@@ -43,6 +48,7 @@ impl OutputFrame {
         Ok(())
     }
 
+    /// Turn the given surface into a texture view, if it has one.
     pub fn as_view(&self) -> Option<&TextureView> {
         match self {
             Self::Surface { .. } => None,
@@ -51,6 +57,7 @@ impl OutputFrame {
         }
     }
 
+    /// Present the surface, if needed.
     pub fn present(self) {
         if let Self::SurfaceAcquired {
             surface_tex: surface, ..

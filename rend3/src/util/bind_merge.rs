@@ -1,3 +1,6 @@
+//! Builders for BindGroup and BindGroupLayouts.
+//!
+//! Automates some boilerplate including index generation.
 use std::num::{NonZeroU32, NonZeroU64};
 
 use wgpu::{
@@ -5,6 +8,7 @@ use wgpu::{
     BindingResource, BindingType, Buffer, BufferBinding, Device, Sampler, ShaderStages, TextureView,
 };
 
+/// Builder for BindGroupLayouts.
 pub struct BindGroupLayoutBuilder {
     bgl_entries: Vec<BindGroupLayoutEntry>,
 }
@@ -40,6 +44,7 @@ impl Default for BindGroupLayoutBuilder {
     }
 }
 
+/// Builder for BindGroups.
 pub struct BindGroupBuilder<'a> {
     bg_entries: Vec<BindGroupEntry<'a>>,
 }

@@ -1,6 +1,6 @@
 use crate::{
     format_sso,
-    graph::ReadyData,
+    graph::{GraphTextureStore, ReadyData},
     instruction::{InstructionKind, InstructionStreamPair},
     managers::{
         CameraManager, DirectionalLightManager, InternalTexture, MaterialManager, MeshManager, ObjectManager,
@@ -10,7 +10,7 @@ use crate::{
         Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, MaterialHandle, Mesh, MeshHandle,
         Object, ObjectHandle, Texture, TextureHandle,
     },
-    util::{graph_texture_store::GraphTextureStore, mipmap::MipmapGenerator},
+    util::mipmap::MipmapGenerator,
     ExtendedAdapterInfo, InstanceAdapterDevice, RendererInitializationError, RendererMode,
 };
 use glam::Mat4;

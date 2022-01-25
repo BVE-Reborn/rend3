@@ -1,3 +1,5 @@
+//! Mipmap generation tools.
+
 use std::num::NonZeroU32;
 
 use arrayvec::ArrayVec;
@@ -17,12 +19,13 @@ use crate::{
     util::{bind_merge::BindGroupBuilder, typedefs::FastHashMap},
 };
 
+/// Generator for mipmaps.
 pub struct MipmapGenerator {
-    pub texture_bgl: BindGroupLayout,
-    pub sampler_bg: BindGroup,
-    pub sm: ShaderModule,
-    pub pll: PipelineLayout,
-    pub pipelines: RwLock<FastHashMap<TextureFormat, RenderPipeline>>,
+    texture_bgl: BindGroupLayout,
+    sampler_bg: BindGroup,
+    sm: ShaderModule,
+    pll: PipelineLayout,
+    pipelines: RwLock<FastHashMap<TextureFormat, RenderPipeline>>,
 }
 
 impl MipmapGenerator {
