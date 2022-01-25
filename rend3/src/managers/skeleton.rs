@@ -79,17 +79,17 @@ impl SkeletonManager {
         skeleton: Skeleton,
     ) {
         let internal_mesh = mesh_manager.internal_data(skeleton.mesh.get_raw());
-        let num_joints = internal_mesh.num_joints;
+        let num_joints = internal_mesh.num_joints as usize;
 
         assert!(
             internal_mesh.num_joints as usize <= skeleton.joint_matrices.len(),
             "Not enough joints to create this skeleton. The mesh has {} joints, \
              but only {} joint matrices were provided.",
-            num_joints as usize,
+            num_joints,
             skeleton.joint_matrices.len(),
         );
 
-        self.global_joint_count += num_joints as usize;
+        self.global_joint_count += num_joints;
 
         let mesh_range = internal_mesh.vertex_range.clone();
         let skeleton_range = mesh_manager.allocate_skeleton_mesh(device, encoder, object_manager, self, &skeleton.mesh);
@@ -111,7 +111,7 @@ impl SkeletonManager {
 
         // Ensure there will be exactly `num_joints` matrices.
         let mut joint_matrices = skeleton.joint_matrices;
-        joint_matrices.truncate(num_joints as usize);
+        joint_matrices.truncate(num_joints);
 
         let internal = InternalSkeleton {
             joint_matrices,
