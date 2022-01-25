@@ -131,8 +131,8 @@ impl SkeletonManager {
             skeleton.joint_matrices.len(),
             "Call to set_joint_matrices with an incorrect number of bones. \
             Skeleton has {} bones, input vector has {}.",
-            joint_matrices.len(),
             skeleton.joint_matrices.len(),
+            joint_matrices.len(),
         );
         skeleton.joint_matrices = joint_matrices;
     }

@@ -38,15 +38,12 @@ skip = [
     # web
     { name = "itoa", version = "0.4.8" },
     { name = "mio", version = "0.7.14" },
-    # indexmap
-    { name = "hashbrown", version = "0.9.1" },
 ]
 
 [advisories]
 vulnerability = "warn"
 unmaintained = "warn"
 ignore = [
-    "RUSTSEC-2021-0119" # nix
 ]
 
 [sources]
