@@ -4,6 +4,7 @@ use std::{any::TypeId, marker::PhantomData, sync::Weak};
 
 use crate::util::typedefs::FastHashMap;
 
+/// Per-value data that isn't type erased in a [ArchitypicalErasedRegistry].
 pub struct NonErasedData<Metadata> {
     pub handle: usize,
     pub refcount: Weak<()>,
@@ -16,9 +17,13 @@ struct PerHandleData {
     ty: TypeId,
 }
 
+/// Represents a single archetype in a [ArchitypicalErasedRegistry].
 #[allow(clippy::type_complexity)]
 pub struct Archetype<Metadata> {
+    /// Archetype of Vec<T> where T is the type of the archetype.
     pub vec: VecAny,
+    /// All data that doesn't need to be type erased. Uses the same indices as
+    /// the vec.
     pub non_erased: Vec<NonErasedData<Metadata>>,
     remove_single: fn(
         &mut VecAny,
@@ -35,6 +40,11 @@ pub struct Archetype<Metadata> {
     ),
 }
 
+/// Registry that stores type-erased values in archetypes, each type
+/// corresponding to an archetype.
+///
+/// This is used by the [MaterialManager](crate::managers::MaterialManager) to
+/// store materials of any type.
 pub struct ArchitypicalErasedRegistry<HandleType, Metadata> {
     archetype_map: FastHashMap<TypeId, Archetype<Metadata>>,
     handle_map: FastHashMap<usize, PerHandleData>,

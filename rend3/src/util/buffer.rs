@@ -1,11 +1,14 @@
+//! Automatic management of Power-of-Two sized buffers.
+
 use crate::util::typedefs::SsoString;
 use std::{ops::Deref, sync::Arc};
 use wgpu::{Buffer, BufferAddress, BufferDescriptor, BufferUsages, Device, Queue};
 
+/// Creates, fills, and automatically resizes a power-of-two sized buffer.
 pub struct WrappedPotBuffer {
     inner: Arc<Buffer>,
     size: BufferAddress,
-    /// This field is assumed to be a power of 2.
+    // This field is assumed to be a power of 2.
     minimum: BufferAddress,
     usage: BufferUsages,
     label: Option<SsoString>,

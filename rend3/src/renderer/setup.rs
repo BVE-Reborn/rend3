@@ -1,11 +1,12 @@
 use crate::{
+    graph::GraphTextureStore,
     instruction::InstructionStreamPair,
     managers::{
         CameraManager, DirectionalLightManager, MaterialManager, MeshManager, ObjectManager, SkeletonManager,
         TextureManager,
     },
     renderer::RendererDataCore,
-    util::{graph_texture_store::GraphTextureStore, mipmap::MipmapGenerator},
+    util::mipmap::MipmapGenerator,
     InstanceAdapterDevice, Renderer, RendererInitializationError,
 };
 use parking_lot::Mutex;

@@ -107,10 +107,11 @@ pub mod util {
     pub mod buffer;
     pub mod buffer_copier;
     pub mod frustum;
-    pub mod graph_texture_store;
     pub mod math;
     pub mod mipmap;
     pub mod output;
+    /// Core datastructures that associate handles with data in a gpu-friendly
+    /// format.
     pub mod registry {
         mod archetypical;
         mod basic;

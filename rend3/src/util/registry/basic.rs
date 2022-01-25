@@ -10,6 +10,9 @@ struct ResourceStorage<T> {
     data: T,
 }
 
+/// Registry that stores values in an IndexMap.
+///
+/// Used by many managers without special requirements.
 #[derive(Debug)]
 pub struct ResourceRegistry<T, HandleType> {
     mapping: IndexMap<usize, ResourceStorage<T>, FastBuildHasher>,

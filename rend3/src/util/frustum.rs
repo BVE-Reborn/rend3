@@ -1,7 +1,10 @@
+//! Frustums and bounding spheres.
+//!
 //! This entire module only exists because of <https://www.gamedevs.org/uploads/fast-extraction-viewing-frustum-planes-from-world-view-projection-matrix.pdf>.
 
 use glam::{Mat4, Vec3, Vec3A, Vec4Swizzles};
 
+/// Represents a point in space and a radius from that point.
 #[derive(Debug, Clone, Copy)]
 #[repr(C, align(16))]
 pub struct BoundingSphere {
@@ -66,6 +69,7 @@ fn find_mesh_bounding_sphere_radius(mesh_center: Vec3A, mesh: &[Vec3]) -> f32 {
     })
 }
 
+/// Represents a plane as a vec4 (or vec3 + f32)
 #[derive(Debug, Copy, Clone)]
 #[repr(C, align(16))]
 pub struct ShaderPlane {
@@ -95,6 +99,8 @@ impl ShaderPlane {
     }
 }
 
+/// A frustum composed of 5 different planes. Has no far plane as it assumes
+/// infinite.
 #[derive(Debug, Copy, Clone)]
 #[repr(C, align(16))]
 pub struct ShaderFrustum {
@@ -157,6 +163,7 @@ impl ShaderFrustum {
         }
     }
 
+    /// Determins if the sphere is at all inside the frustum.
     pub fn contains_sphere(&self, sphere: BoundingSphere) -> bool {
         let neg_radius = -sphere.radius;
 

@@ -1,3 +1,5 @@
+//! Rendergraph
+
 use wgpu::{Device, Extent3d, Texture, TextureDescriptor, TextureDimension};
 
 use crate::{

@@ -2,7 +2,7 @@ use crate::{
     managers::{ObjectManager, SkeletonManager},
     types::{Mesh, MeshHandle},
     util::{
-        buffer_copier::{BufferCopier, BufferCopierParams},
+        buffer_copier::{VertexBufferCopier, VertexBufferCopierParams},
         frustum::BoundingSphere,
         registry::ResourceRegistry,
     },
@@ -134,7 +134,7 @@ pub struct MeshManager {
 
     registry: ResourceRegistry<InternalMesh, Mesh>,
 
-    buffer_copier: BufferCopier,
+    buffer_copier: VertexBufferCopier,
 }
 
 impl MeshManager {
@@ -153,7 +153,7 @@ impl MeshManager {
             vertex_alloc,
             index_alloc,
             registry,
-            buffer_copier: BufferCopier::new(device),
+            buffer_copier: VertexBufferCopier::new(device),
         }
     }
 
@@ -323,7 +323,7 @@ impl MeshManager {
                 &self.buffers.vertex_joint_index,
                 &self.buffers.vertex_joint_weight,
             ],
-            BufferCopierParams {
+            VertexBufferCopierParams {
                 src_offset: original.vertex_range.start as u32,
                 dst_offset: vertex_range.start as u32,
                 count: vertex_range.len() as u32,
