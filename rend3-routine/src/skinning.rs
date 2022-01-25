@@ -12,7 +12,7 @@ use rend3::{
         math::round_up_div,
     },
 };
-use wgpu::{BindGroupLayout, Buffer, BufferDescriptor, BufferUsages, ComputePipeline, Device};
+use wgpu::{BindGroupLayout, BindingType, Buffer, BufferBindingType, BufferDescriptor, BufferUsages, CommandEncoder, ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor, Device, PipelineLayoutDescriptor, ShaderModuleDescriptor, ShaderStages};
 
 /// The per-skeleton data, as uploaded to the GPU compute shader.
 #[repr(C, align(16))]
@@ -51,7 +51,7 @@ fn build_gpu_skinning_input_buffers(device: &Device, skeleton_manager: &Skeleton
     let gpu_skinning_inputs = device.create_buffer(&BufferDescriptor {
         label: Some("skinning inputs"),
         size: skinning_inputs_length as u64,
-        usage: BufferUsages::UNIFORM,
+        usage: BufferUsages::STORAGE,
         mapped_at_creation: true,
     });
 
@@ -114,7 +114,6 @@ fn build_gpu_skinning_input_buffers(device: &Device, skeleton_manager: &Skeleton
 pub struct GpuSkinner {
     pub pipeline: ComputePipeline,
     pub vertex_buffers_bgl: BindGroupLayout,
-    pub joint_matrices_bgl: BindGroupLayout,
     pub skinning_inputs_bgl: BindGroupLayout,
 }
 
@@ -122,8 +121,8 @@ impl GpuSkinner {
     const WORKGROUP_SIZE: u32 = 64;
 
     pub fn new(device: &wgpu::Device) -> GpuSkinner {
-        let storage_buffer_ty = |read_only, size| wgpu::BindingType::Buffer {
-            ty: wgpu::BufferBindingType::Storage { read_only },
+        let storage_buffer_ty = |read_only, size| BindingType::Buffer {
+            ty: BufferBindingType::Storage { read_only },
             has_dynamic_offset: false,
             min_binding_size: size,
         };
@@ -137,20 +136,15 @@ impl GpuSkinner {
 
         // Bind group 0 contains some vertex buffers bound as storage buffers
         let vertex_buffers_bgl = BindGroupLayoutBuilder::new()
-            .append(wgpu::ShaderStages::COMPUTE, storage_buffer_ty(false, pos_size), None) // Positions
-            .append(wgpu::ShaderStages::COMPUTE, storage_buffer_ty(false, nrm_size), None) // Normals
-            .append(wgpu::ShaderStages::COMPUTE, storage_buffer_ty(false, tan_size), None) // Tangents
-            .append(wgpu::ShaderStages::COMPUTE, storage_buffer_ty(false, j_idx_size), None) // Joint indices
-            .append(wgpu::ShaderStages::COMPUTE, storage_buffer_ty(false, j_wt_size), None) // Joint weights
-            .build(device, Some("Gpu skinning vertex buffers"));
+            .append(ShaderStages::COMPUTE, storage_buffer_ty(false, pos_size), None) // Positions
+            .append(ShaderStages::COMPUTE, storage_buffer_ty(false, nrm_size), None) // Normals
+            .append(ShaderStages::COMPUTE, storage_buffer_ty(false, tan_size), None) // Tangents
+            .append(ShaderStages::COMPUTE, storage_buffer_ty(false, j_idx_size), None) // Joint indices
+            .append(ShaderStages::COMPUTE, storage_buffer_ty(false, j_wt_size), None) // Joint weights
+            .append(ShaderStages::COMPUTE, storage_buffer_ty(true, mat_size), None) // Matrices
+            .build(device, Some("Gpu skinning mesh data"));
 
-        // Bind group 1 contains the joint matrices global buffer. Each
-        // skinning input struct contains an offset into this array.
-        let joint_matrices_bgl = BindGroupLayoutBuilder::new()
-            .append(wgpu::ShaderStages::COMPUTE, storage_buffer_ty(true, mat_size), None)
-            .build(device, Some("Gpu skinning joint matrices"));
-
-        // Bind group 2 contains the pre skinning inputs. This uses dynamic
+        // Bind group 1 contains the pre skinning inputs. This uses dynamic
         // offsets because there is one dispatch per input, and the offset is
         // used to indicate which is the current input to the shader.
         //
@@ -158,9 +152,9 @@ impl GpuSkinner {
         // not available on all platforms so we need to use this workaround.
         let skinning_inputs_bgl = BindGroupLayoutBuilder::new()
             .append(
-                wgpu::ShaderStages::COMPUTE,
-                wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
+                ShaderStages::COMPUTE,
+                BindingType::Buffer {
+                    ty: BufferBindingType::Storage { read_only: true },
                     has_dynamic_offset: true,
                     min_binding_size: NonZeroU64::new(mem::size_of::<GpuSkinningInput>() as u64),
                 },
@@ -168,18 +162,18 @@ impl GpuSkinner {
             )
             .build(device, Some("Gpu skinning inputs"));
 
-        let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+        let layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: None,
-            bind_group_layouts: &[&vertex_buffers_bgl, &joint_matrices_bgl, &skinning_inputs_bgl],
+            bind_group_layouts: &[&vertex_buffers_bgl, &skinning_inputs_bgl],
             push_constant_ranges: &[],
         });
 
-        let module = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+        let module = device.create_shader_module(&ShaderModuleDescriptor {
             label: Some("Gpu skinning compute shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("../../shaders/src/skinning.wgsl").into()),
+            source: wgpu::ShaderSource::Wgsl(include_str!("../shaders/src/skinning.wgsl").into()),
         });
 
-        let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+        let pipeline = device.create_compute_pipeline(&ComputePipelineDescriptor {
             label: Some("Gpu skinning pipeline"),
             layout: Some(&layout),
             module: &module,
@@ -188,7 +182,6 @@ impl GpuSkinner {
 
         GpuSkinner {
             vertex_buffers_bgl,
-            joint_matrices_bgl,
             skinning_inputs_bgl,
             pipeline,
         }
@@ -197,7 +190,7 @@ impl GpuSkinner {
     pub fn execute_pass(
         &self,
         device: &Device,
-        encoder: &mut wgpu::CommandEncoder,
+        encoder: &mut CommandEncoder,
         buffers: &PreSkinningBuffers,
         mesh_buffers: &MeshBuffers,
         // The number of inputs in the skinning_inputs buffer
@@ -209,28 +202,22 @@ impl GpuSkinner {
             .append_buffer(&mesh_buffers.vertex_tangent)
             .append_buffer(&mesh_buffers.vertex_joint_index)
             .append_buffer(&mesh_buffers.vertex_joint_weight)
-            .build(device, Some("GPU skinning vertex buffers"), &self.vertex_buffers_bgl);
-
-        let joint_matrices_bg = BindGroupBuilder::new().append_buffer(&buffers.joint_matrices).build(
-            device,
-            Some("GPU skinning joint matrices"),
-            &self.joint_matrices_bgl,
-        );
+            .append_buffer(&buffers.joint_matrices)
+            .build(device, Some("GPU skinning mesh data"), &self.vertex_buffers_bgl);
 
         let skinning_inputs_bgb = BindGroupBuilder::new()
             .append_buffer(&buffers.gpu_skinning_inputs)
             .build(device, Some("GPU skinning inputs"), &self.skinning_inputs_bgl);
 
-        let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+        let mut cpass = encoder.begin_compute_pass(&ComputePassDescriptor {
             label: Some("GPU Skinning"),
         });
         cpass.set_bind_group(0, &vertex_buffers_bg, &[]);
-        cpass.set_bind_group(1, &joint_matrices_bg, &[]);
 
         for (i, skel) in skeleton_manager.skeletons().enumerate() {
             cpass.set_pipeline(&self.pipeline);
             let offset = (i * mem::size_of::<GpuSkinningInput>()) as u32;
-            cpass.set_bind_group(2, &skinning_inputs_bgb, &[offset]);
+            cpass.set_bind_group(1, &skinning_inputs_bgb, &[offset]);
 
             let num_verts = (skel.ranges.mesh_range[1] - skel.ranges.mesh_range[0]) as u32;
             let num_workgroups = round_up_div(num_verts, Self::WORKGROUP_SIZE);
