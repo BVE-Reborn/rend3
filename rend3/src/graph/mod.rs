@@ -1,7 +1,7 @@
 //! Rendergraph implementation that rend3 uses for all render work scheduling.
 //!
-//! Start with [RenderGraph::new] and add nodes and then
-//! [RenderGraph::execute] to run everything.
+//! Start with [`RenderGraph::new`] and add nodes and then
+//! [`RenderGraph::execute`] to run everything.
 //!
 //! # High Level Overview
 //!
@@ -12,19 +12,21 @@
 //! Each node is a pile of arbitrary code that can use various resources within
 //! the renderer to do work.
 //!
-//! All work that doesn't interact with the surface is submitted, then the
-//! surface is acquired, then all the following work is submitted.
+//! Two submits happen during execute. First, all work that doesn't interact
+//! with the surface is submitted, then the surface is acquired, then all the
+//! following work is submitted.
 //!
 //! # Nodes
 //!
-//! Nodes are made with [RenderGraphNodeBuilder]. The builder is used to declare
-//! all the dependencies of the node ("outside" the node), then
-//! [RenderGraphNodeBuilder::build] is called. This takes a callback that
+//! Nodes are made with [`RenderGraphNodeBuilder`]. The builder is used to
+//! declare all the dependencies of the node ("outside" the node), then
+//! [`RenderGraphNodeBuilder::build`] is called. This takes a callback that
 //! contains all the code that will run as part of the node (the "inside").
 //!
 //! The arguments given to this callback give you all the data you need to do
 //! your work, including turning handles-to-dependencies into actual concrete
-//! resources.
+//! resources. See the documentation for [`RenderGraphNodeBuilder::build`] for a
+//! description of the arguments you are provided.
 //!
 //! # Renderpasses/Encoders
 //!
@@ -38,13 +40,13 @@
 //! Because renderpasses carry with them a lifetime that can cause problems, two
 //! facilities are available.
 //!
-//! First is the [PassthroughDataContainer] which
+//! First is the [`PassthroughDataContainer`] which
 //! allows you to take lifetimes of length `'node` and turn them into lifetimes
 //! of length `'rpass`. This is commonly used to bring in any state from the
 //! outside.
 //!
-//! Second is the [RpassTemporaryPool]. If, inside the node, you need to create
-//! a temporary, you can put that temporary on the pool, and it will
+//! Second is the [`RpassTemporaryPool`]. If, inside the node, you need to
+//! create a temporary, you can put that temporary on the pool, and it will
 //! automatically have lifetime `'rpass`. The temporary is destroyed right after
 //! the renderpass is.
 
