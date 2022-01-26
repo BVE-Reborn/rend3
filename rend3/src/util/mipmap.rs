@@ -77,7 +77,7 @@ impl MipmapGenerator {
             &sampler_bgl,
         );
 
-        let sm = device.create_shader_module(&wgpu::include_wgsl!("mipmap.wgsl"));
+        let sm = device.create_shader_module(&wgpu::include_wgsl!("../../shaders/mipmap.wgsl"));
 
         let pll = device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: Some("mipmap generator pipeline layout"),
