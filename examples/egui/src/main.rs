@@ -55,6 +55,7 @@ impl rend3_framework::App for EguiExample {
         // Add PBR material with all defaults except a single color.
         let material = rend3_routine::pbr::PbrMaterial {
             albedo: rend3_routine::pbr::AlbedoComponent::Value(glam::Vec4::new(0.0, 0.5, 0.5, 1.0)),
+            transparency: rend3_routine::pbr::Transparency::Blend,
             ..rend3_routine::pbr::PbrMaterial::default()
         };
         let material_handle = renderer.add_material(material);
@@ -151,6 +152,7 @@ impl rend3_framework::App for EguiExample {
                             &data.material_handle.clone(),
                             rend3_routine::pbr::PbrMaterial {
                                 albedo: rend3_routine::pbr::AlbedoComponent::Value(glam::Vec4::from(data.color)),
+                                transparency: rend3_routine::pbr::Transparency::Blend,
                                 ..rend3_routine::pbr::PbrMaterial::default()
                             },
                         );
