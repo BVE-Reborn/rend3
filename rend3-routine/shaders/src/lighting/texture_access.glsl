@@ -5,7 +5,7 @@ bool has_texture(uint idx) {
     return idx != 0;
 }
 
-#ifdef GPU_MODE
+#ifdef GPU_DRIVEN
 #define MATERIAL_TYPE GPUMaterialData
 
 #define HAS_ALBEDO_TEXTURE has_texture(material.albedo_tex)
@@ -31,7 +31,7 @@ bool has_texture(uint idx) {
 #define AMBIENT_OCCLUSION_TEXTURE textures[nonuniformEXT(material.ambient_occlusion_tex - 1)]
 #endif
 
-#ifdef CPU_MODE
+#ifdef CPU_DRIVEN
 #define MATERIAL_TYPE CPUMaterialData
 
 #define HAS_ALBEDO_TEXTURE bool((material.texture_enable >> 0) & 0x1)

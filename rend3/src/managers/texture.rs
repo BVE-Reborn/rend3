@@ -1,4 +1,4 @@
-use crate::{mode::ModeData, types::TextureHandle, util::registry::ResourceRegistry, RendererMode};
+use crate::{profile::ProfileData, types::TextureHandle, util::registry::ResourceRegistry, RendererProfile};
 use rend3_types::{RawTextureHandle, TextureFormat, TextureUsages};
 use std::{
     num::NonZeroU32,
@@ -13,10 +13,10 @@ use wgpu::{
     TextureSampleType, TextureView, TextureViewDescriptor, TextureViewDimension,
 };
 
-/// When using GPU mode, we start the 2D texture manager with a bind group with
+/// When using the GpuDriven profile, we start the 2D texture manager with a bind group with
 /// this many textures.
 pub const STARTING_2D_TEXTURES: usize = 1 << 8;
-/// When using GPU mode, we start the Cubemap texture manager with a bind group
+/// When using the GpuDriven profile, we start the Cubemap texture manager with a bind group
 /// with this many textures.
 pub const STARTING_CUBE_TEXTURES: usize = 1 << 3;
 /// Largest amount of supported textures per type
@@ -35,9 +35,9 @@ const BGL_DIVISOR: u32 = 4;
 
 /// Manages textures and associated bindless bind groups
 pub struct TextureManager {
-    layout: ModeData<(), Arc<BindGroupLayout>>,
-    group: ModeData<(), Arc<BindGroup>>,
-    group_dirty: ModeData<(), bool>,
+    layout: ProfileData<(), Arc<BindGroupLayout>>,
+    group: ProfileData<(), Arc<BindGroup>>,
+    group_dirty: ProfileData<(), bool>,
 
     null_view: TextureView,
 
@@ -47,7 +47,7 @@ pub struct TextureManager {
     dimension: TextureViewDimension,
 }
 impl TextureManager {
-    pub fn new(device: &Device, mode: RendererMode, texture_limit: u32, dimension: TextureViewDimension) -> Self {
+    pub fn new(device: &Device, profile: RendererProfile, texture_limit: u32, dimension: TextureViewDimension) -> Self {
         profiling::scope!("TextureManager::new");
 
         let views = Vec::with_capacity(TEXTURE_PREALLOCATION);
@@ -56,8 +56,8 @@ impl TextureManager {
 
         let max_textures = (texture_limit / BGL_DIVISOR).min(MAX_TEXTURE_COUNT);
 
-        let layout = mode.into_data(|| (), || create_bind_group_layout(device, max_textures, dimension));
-        let group = mode.into_data(
+        let layout = profile.into_data(|| (), || create_bind_group_layout(device, max_textures, dimension));
+        let group = profile.into_data(
             || (),
             || create_bind_group(device, layout.as_gpu(), &null_view, views.iter(), dimension),
         );
@@ -67,7 +67,7 @@ impl TextureManager {
         Self {
             layout,
             group,
-            group_dirty: mode.into_data(|| (), || false),
+            group_dirty: profile.into_data(|| (), || false),
             null_view,
             views,
             registry,
@@ -108,7 +108,7 @@ impl TextureManager {
             views.swap_remove(index);
         });
 
-        if let ModeData::Gpu(group_dirty) = self.group_dirty {
+        if let ProfileData::Gpu(group_dirty) = self.group_dirty {
             profiling::scope!("Update GPU Texture Arrays");
 
             if group_dirty {
@@ -126,7 +126,9 @@ impl TextureManager {
                 bg: self.group.as_ref().map(|_| (), Arc::clone),
             }
         } else {
-            TextureManagerReadyOutput { bg: ModeData::Cpu(()) }
+            TextureManagerReadyOutput {
+                bg: ProfileData::Cpu(()),
+            }
         }
     }
 
@@ -158,7 +160,7 @@ impl TextureManager {
 /// Output of readying up a [`TextureManager`].
 #[derive(Clone)]
 pub struct TextureManagerReadyOutput {
-    pub bg: ModeData<(), Arc<BindGroup>>,
+    pub bg: ProfileData<(), Arc<BindGroup>>,
 }
 
 fn create_bind_group_layout(device: &Device, count: u32, view_dimension: TextureViewDimension) -> Arc<BindGroupLayout> {

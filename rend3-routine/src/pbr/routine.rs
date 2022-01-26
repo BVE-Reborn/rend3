@@ -24,11 +24,11 @@ impl PbrRoutine {
         // This ensures the BGLs for the material are created
         data_core
             .material_manager
-            .ensure_archetype::<PbrMaterial>(&renderer.device, renderer.mode);
+            .ensure_archetype::<PbrMaterial>(&renderer.device, renderer.profile);
 
         let unclipped_depth_supported = renderer.features.contains(Features::DEPTH_CLIP_CONTROL);
 
-        let per_material = PerMaterialArchetypeInterface::<PbrMaterial>::new(&renderer.device, renderer.mode);
+        let per_material = PerMaterialArchetypeInterface::<PbrMaterial>::new(&renderer.device, renderer.profile);
 
         let depth_pipelines = DepthRoutine::<PbrMaterial>::new(
             renderer,

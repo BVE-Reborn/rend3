@@ -5,7 +5,7 @@ use rend3::{
     managers::{DirectionalLightManager, MaterialManager},
     types::Material,
     util::bind_merge::BindGroupLayoutBuilder,
-    RendererMode,
+    RendererProfile,
 };
 use wgpu::{BindGroupLayout, BindingType, BufferBindingType, Device, ShaderStages};
 
@@ -61,7 +61,7 @@ impl WholeFrameInterfaces {
 pub struct PerObjectDataAbi {
     pub model_view: Mat4,
     pub model_view_proj: Mat4,
-    // Only read in GpuPowered mode. Materials are directly bound in CpuPowered mode.
+    // Only read when GpuDriven. Materials are directly bound when CpuDriven.
     pub material_idx: u32,
     pub pad0: [u8; 12],
     pub inv_squared_scale: Vec3,
@@ -77,7 +77,7 @@ pub struct PerMaterialArchetypeInterface<M> {
     _phantom: PhantomData<M>,
 }
 impl<M: Material> PerMaterialArchetypeInterface<M> {
-    pub fn new(device: &Device, mode: RendererMode) -> Self {
+    pub fn new(device: &Device, profile: RendererProfile) -> Self {
         let mut per_material_bglb = BindGroupLayoutBuilder::new();
 
         per_material_bglb.append(
@@ -90,7 +90,7 @@ impl<M: Material> PerMaterialArchetypeInterface<M> {
             None,
         );
 
-        if mode == RendererMode::GpuPowered {
+        if profile == RendererProfile::GpuDriven {
             MaterialManager::add_to_bgl_gpu::<M>(&mut per_material_bglb);
         }
 

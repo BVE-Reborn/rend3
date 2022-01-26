@@ -810,7 +810,7 @@ pub struct MaterialTag;
 /// The material will provide a set of textures, and a pile of bytes. It will
 /// then, as part of the material bind group, present the following abi:
 ///
-/// ### CPU Mode
+/// ### CpuDriven Profile
 ///
 /// - A uniform binding with:
 ///   - The data provided, with padding up to 16 byte alignment.
@@ -820,7 +820,7 @@ pub struct MaterialTag;
 ///   `None`, will bind a null texture (1x1 texture with a (0, 0, 0, 255)
 ///   pixel).
 ///
-/// ### GPU Mode
+/// ### GpuDriven Profile
 /// - A material array indexed by the material index. Each material has:
 ///   - One u32 per texture. If this value is 0, the texture doesn't exist. If
 ///     this value is non-zero, subtract one and index into the texture array to

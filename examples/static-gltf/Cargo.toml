@@ -1,5 +1,5 @@
 [package]
-name = "rend3-gltf-example"
+name = "rend3-static-gltf-example"
 license = "MIT OR Apache-2.0 OR Zlib"
 version = "0.2.0"
 authors = ["The rend3 Developers"]
@@ -8,7 +8,7 @@ publish = false
 rust-version = "1.57"
 
 [[bin]]
-name = "gltf"
+name = "static-gltf"
 path = "src/main.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

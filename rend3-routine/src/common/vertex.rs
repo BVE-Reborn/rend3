@@ -4,7 +4,7 @@ use rend3::managers::{
 };
 use wgpu::{VertexAttribute, VertexBufferLayout, VertexFormat, VertexStepMode};
 
-/// Vertex buffer layouts used in CpuPowered Mode.
+/// Vertex buffer layouts used when CpuDriven.
 pub static CPU_VERTEX_BUFFERS: [VertexBufferLayout<'static>; 8] = [
     VertexBufferLayout {
         array_stride: rend3::managers::VERTEX_POSITION_SIZE as u64,
@@ -80,7 +80,7 @@ pub static CPU_VERTEX_BUFFERS: [VertexBufferLayout<'static>; 8] = [
     },
 ];
 
-/// Vertex buffer layouts used in GpuPowered Mode.
+/// Vertex buffer layouts used when GpuDriven.
 pub static GPU_VERTEX_BUFFERS: [VertexBufferLayout<'static>; 9] = [
     VertexBufferLayout {
         array_stride: rend3::managers::VERTEX_POSITION_SIZE as u64,

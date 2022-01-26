@@ -1,6 +1,6 @@
 use crate::{
     managers::{ObjectManager, TextureManager},
-    mode::ModeData,
+    profile::ProfileData,
     types::{MaterialHandle, TextureHandle},
     util::{
         bind_merge::{BindGroupBuilder, BindGroupLayoutBuilder},
@@ -9,7 +9,7 @@ use crate::{
         registry::ArchitypicalErasedRegistry,
         typedefs::FastHashMap,
     },
-    RendererMode,
+    RendererProfile,
 };
 use list_any::VecAny;
 use rend3_types::{Material, MaterialTag, RawMaterialHandle, RawObjectHandle};
@@ -28,8 +28,8 @@ const TEXTURE_MASK_SIZE: u32 = 4;
 
 /// Internal representation of a material.
 pub struct InternalMaterial {
-    pub bind_group: ModeData<BindGroup, ()>,
-    pub material_buffer: ModeData<Buffer, ()>,
+    pub bind_group: ProfileData<BindGroup, ()>,
+    pub material_buffer: ProfileData<Buffer, ()>,
     pub key: u64,
     /// Handles of all objects
     pub objects: Vec<RawObjectHandle>,
@@ -37,7 +37,7 @@ pub struct InternalMaterial {
 
 #[allow(clippy::type_complexity)]
 struct PerTypeInfo {
-    bgl: ModeData<BindGroupLayout, ()>,
+    bgl: ProfileData<BindGroupLayout, ()>,
     data_size: u32,
     texture_count: u32,
     write_gpu_materials_fn: fn(&mut [u8], &VecAny, &mut (dyn FnMut(&TextureHandle) -> NonZeroU32 + '_)) -> usize,
@@ -60,19 +60,19 @@ struct BufferRange {
 
 /// Manages materials and their associated BindGroups in CPU modes.
 pub struct MaterialManager {
-    bg: FastHashMap<TypeId, ModeData<(), BufferRange>>,
+    bg: FastHashMap<TypeId, ProfileData<(), BufferRange>>,
     type_info: FastHashMap<TypeId, PerTypeInfo>,
 
-    buffer: ModeData<(), WrappedPotBuffer>,
+    buffer: ProfileData<(), WrappedPotBuffer>,
 
     registry: ArchitypicalErasedRegistry<MaterialTag, InternalMaterial>,
 }
 
 impl MaterialManager {
-    pub fn new(device: &Device, mode: RendererMode) -> Self {
+    pub fn new(device: &Device, profile: RendererProfile) -> Self {
         profiling::scope!("MaterialManager::new");
 
-        let buffer = mode.into_data(
+        let buffer = profile.into_data(
             || (),
             || WrappedPotBuffer::new(device, 0, 16, BufferUsages::STORAGE, Some("material buffer")),
         );
@@ -93,14 +93,14 @@ impl MaterialManager {
         MaterialHandle::new(idx)
     }
 
-    pub fn ensure_archetype<M: Material>(&mut self, device: &Device, mode: RendererMode) {
-        self.ensure_archetype_inner::<M>(device, mode);
+    pub fn ensure_archetype<M: Material>(&mut self, device: &Device, profile: RendererProfile) {
+        self.ensure_archetype_inner::<M>(device, profile);
     }
 
-    fn ensure_archetype_inner<M: Material>(&mut self, device: &Device, mode: RendererMode) -> &mut PerTypeInfo {
+    fn ensure_archetype_inner<M: Material>(&mut self, device: &Device, profile: RendererProfile) -> &mut PerTypeInfo {
         profiling::scope!("MaterialManager::ensure_archetype");
         let create_bgl = || {
-            mode.into_data(
+            profile.into_data(
                 || {
                     let texture_binding = |idx: u32| BindGroupLayoutEntry {
                         binding: (idx + 1) as u32,
@@ -152,7 +152,7 @@ impl MaterialManager {
     fn fill_inner<M: Material>(
         &mut self,
         device: &Device,
-        mode: RendererMode,
+        profile: RendererProfile,
         texture_manager_2d: &mut TextureManager,
         material: &M,
     ) -> InternalMaterial {
@@ -160,9 +160,9 @@ impl MaterialManager {
 
         let translation_fn = texture_manager_2d.translation_fn();
 
-        let type_info = self.ensure_archetype_inner::<M>(device, mode);
+        let type_info = self.ensure_archetype_inner::<M>(device, profile);
 
-        let (bind_group, material_buffer) = if mode == RendererMode::CpuPowered {
+        let (bind_group, material_buffer) = if profile == RendererProfile::CpuDriven {
             let mut textures = vec![None; M::TEXTURE_COUNT as usize];
             material.to_textures(&mut textures);
 
@@ -200,9 +200,9 @@ impl MaterialManager {
 
             let bind_group = builder.build(device, None, type_info.bgl.as_ref().as_cpu());
 
-            (ModeData::Cpu(bind_group), ModeData::Cpu(material_buffer))
+            (ProfileData::Cpu(bind_group), ProfileData::Cpu(material_buffer))
         } else {
-            (ModeData::Gpu(()), ModeData::Gpu(()))
+            (ProfileData::Gpu(()), ProfileData::Gpu(()))
         };
 
         InternalMaterial {
@@ -216,12 +216,12 @@ impl MaterialManager {
     pub fn fill<M: Material>(
         &mut self,
         device: &Device,
-        mode: RendererMode,
+        profile: RendererProfile,
         texture_manager_2d: &mut TextureManager,
         handle: &MaterialHandle,
         material: M,
     ) {
-        let internal = self.fill_inner(device, mode, texture_manager_2d, &material);
+        let internal = self.fill_inner(device, profile, texture_manager_2d, &material);
 
         self.registry.insert(handle, material, internal);
     }
@@ -229,7 +229,7 @@ impl MaterialManager {
     pub fn update<M: Material>(
         &mut self,
         device: &Device,
-        mode: RendererMode,
+        profile: RendererProfile,
         texture_manager_2d: &mut TextureManager,
         object_manager: &mut ObjectManager,
         handle: &MaterialHandle,
@@ -237,7 +237,7 @@ impl MaterialManager {
     ) {
         // TODO(material): if this doesn't change archetype, this should do a buffer
         // write cpu side.
-        let internal = self.fill_inner(device, mode, texture_manager_2d, &material);
+        let internal = self.fill_inner(device, profile, texture_manager_2d, &material);
 
         let archetype_changed = self.registry.update(handle, material, |internal, idx| {
             for object in &internal.objects {
@@ -358,7 +358,7 @@ impl MaterialManager {
             }
         });
 
-        if let ModeData::Gpu(ref mut buffer) = self.buffer {
+        if let ProfileData::Gpu(ref mut buffer) = self.buffer {
             profiling::scope!("Update GPU Material Buffer");
             let mut translate_texture = texture_manager.translation_fn();
 
@@ -387,7 +387,7 @@ impl MaterialManager {
 
                 self.bg.insert(
                     ty,
-                    ModeData::Gpu(BufferRange {
+                    ProfileData::Gpu(BufferRange {
                         offset: offset as u64,
                         size: NonZeroU64::new(size as u64).unwrap(),
                     }),

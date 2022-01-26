@@ -53,7 +53,7 @@ pub const VERTEX_JOINT_INDEX_SLOT: u32 = 6;
 /// Vertex buffer slot for joint weights
 pub const VERTEX_JOINT_WEIGHT_SLOT: u32 = 7;
 /// Vertex buffer slot for object indices
-/// Note that this slot is only used in GPU mode.
+/// Note that this slot is only used in the GpuDriven profile.
 pub const VERTEX_OBJECT_INDEX_SLOT: u32 = 8;
 
 /// Pre-allocated vertex count in the vertex megabuffers.

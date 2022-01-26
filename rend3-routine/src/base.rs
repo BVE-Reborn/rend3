@@ -19,7 +19,7 @@ use rend3::{
     format_sso,
     graph::{DataHandle, ReadyData, RenderGraph, RenderTargetDescriptor, RenderTargetHandle},
     types::{SampleCount, TextureFormat, TextureUsages},
-    ModeData, Renderer,
+    ProfileData, Renderer,
 };
 use wgpu::{BindGroup, Buffer};
 
@@ -44,7 +44,7 @@ pub struct PerTransparencyInfo {
 pub struct BaseRenderGraph {
     pub interfaces: common::WholeFrameInterfaces,
     pub samplers: common::Samplers,
-    pub gpu_culler: ModeData<(), culling::GpuCuller>,
+    pub gpu_culler: ProfileData<(), culling::GpuCuller>,
     pub gpu_skinner: GpuSkinner,
 }
 
@@ -57,7 +57,7 @@ impl BaseRenderGraph {
         let samplers = common::Samplers::new(&renderer.device);
 
         let gpu_culler = renderer
-            .mode
+            .profile
             .into_data(|| (), || culling::GpuCuller::new(&renderer.device));
 
         let gpu_skinner = GpuSkinner::new(&renderer.device);

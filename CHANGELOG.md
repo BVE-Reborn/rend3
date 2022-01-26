@@ -45,6 +45,9 @@ Per Keep a Changelog there are 6 main categories of changes:
     - Split the PbrRoutine into two parts `add_prepass_to_graph` and `add_forward_to_graph`.
     - Split out the skybox renderer into `SkyboxRoutine`.
     - Split out tonemapping into the `TonemappingRoutine`.
+- rend3: Renamed the old `RendererMode` to `RendererProfile` and adjusted verbiage to refer to them as profiles.
+  - "CpuPowered" => "CpuDriven".
+  - "GpuPowered" => "GpuDriven".
 - rend3: All meshes now require validation.
   - `MeshBuilder::build()` now returns a `Result<Mesh, MeshValidationError>`. This validation can be unsafely omitted.
   - The implementation functions `Mesh::calculate_normals_for_buffers` and `Mesh::calculate_tangents_for_buffers` are now unsafe.

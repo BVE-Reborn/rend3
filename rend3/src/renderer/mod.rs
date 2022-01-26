@@ -11,7 +11,7 @@ use crate::{
         Object, ObjectHandle, Texture, TextureHandle,
     },
     util::mipmap::MipmapGenerator,
-    ExtendedAdapterInfo, InstanceAdapterDevice, RendererInitializationError, RendererMode,
+    ExtendedAdapterInfo, InstanceAdapterDevice, RendererInitializationError, RendererProfile,
 };
 use glam::Mat4;
 use parking_lot::Mutex;
@@ -40,8 +40,8 @@ mod setup;
 pub struct Renderer {
     instructions: InstructionStreamPair,
 
-    /// The culling mode used.
-    pub mode: RendererMode,
+    /// The rendering profile used.
+    pub profile: RendererProfile,
     /// Information about the adapter.
     pub adapter_info: ExtendedAdapterInfo,
     /// Queue all command buffers will be submitted to.
@@ -77,7 +77,7 @@ pub struct RendererDataCore {
     pub d2_texture_manager: TextureManager,
     /// Manages all Cube textures, including bindless bind groups.
     pub d2c_texture_manager: TextureManager,
-    /// Manages all materials, including material bind groups in CPU mode.
+    /// Manages all materials, including material bind groups when CpuDriven.
     pub material_manager: MaterialManager,
     /// Manages all objects.
     pub object_manager: ObjectManager,
@@ -391,8 +391,8 @@ impl Renderer {
         self.instructions.push(
             InstructionKind::AddMaterial {
                 handle: handle.clone(),
-                fill_invoke: Box::new(move |material_manager, device, mode, d2_manager, mat_handle| {
-                    material_manager.fill(device, mode, d2_manager, mat_handle, material)
+                fill_invoke: Box::new(move |material_manager, device, profile, d2_manager, mat_handle| {
+                    material_manager.fill(device, profile, d2_manager, mat_handle, material)
                 }),
             },
             *Location::caller(),
@@ -407,8 +407,8 @@ impl Renderer {
             InstructionKind::ChangeMaterial {
                 handle: handle.clone(),
                 change_invoke: Box::new(
-                    move |material_manager, device, mode, d2_manager, object_manager, mat_handle| {
-                        material_manager.update(device, mode, d2_manager, object_manager, mat_handle, material)
+                    move |material_manager, device, profile, d2_manager, object_manager, mat_handle| {
+                        material_manager.update(device, profile, d2_manager, object_manager, mat_handle, material)
                     },
                 ),
             },

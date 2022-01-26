@@ -4,7 +4,7 @@ use glam::Mat4;
 use rend3::{
     managers::{CameraManager, GpuCullingInput, InternalObject, VERTEX_OBJECT_INDEX_SLOT},
     util::{bind_merge::BindGroupBuilder, frustum::ShaderFrustum},
-    ModeData,
+    ProfileData,
 };
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
@@ -390,7 +390,7 @@ impl GpuCuller {
         }
 
         CulledObjectSet {
-            calls: ModeData::Gpu(GpuIndirectData { indirect_buffer, count }),
+            calls: ProfileData::Gpu(GpuIndirectData { indirect_buffer, count }),
             output_buffer,
         }
     }

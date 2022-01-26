@@ -77,7 +77,7 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
                     fill_invoke(
                         &mut data_core.material_manager,
                         &renderer.device,
-                        renderer.mode,
+                        renderer.profile,
                         &mut data_core.d2_texture_manager,
                         &handle,
                     );
@@ -88,7 +88,7 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
                     change_invoke(
                         &mut data_core.material_manager,
                         &renderer.device,
-                        renderer.mode,
+                        renderer.profile,
                         &mut data_core.d2_texture_manager,
                         &mut data_core.object_manager,
                         &handle,

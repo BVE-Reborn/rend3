@@ -7,7 +7,7 @@ use rend3::{
         TextureFormat,
     },
     util::typedefs::FastHashMap,
-    Renderer, RendererMode,
+    Renderer, RendererProfile,
 };
 use rend3_framework::{lock, AssetPath, Mutex};
 use rend3_routine::{base::BaseRenderGraph, pbr::NormalTextureYDirection, skybox::SkyboxRoutine};
@@ -135,10 +135,10 @@ fn extract_backend(value: &str) -> Result<Backend, &'static str> {
     })
 }
 
-fn extract_mode(value: &str) -> Result<rend3::RendererMode, &'static str> {
+fn extract_mode(value: &str) -> Result<rend3::RendererProfile, &'static str> {
     Ok(match value.to_lowercase().as_str() {
-        "legacy" | "c" | "cpu" => rend3::RendererMode::CpuPowered,
-        "modern" | "g" | "gpu" => rend3::RendererMode::GpuPowered,
+        "legacy" | "c" | "cpu" => rend3::RendererProfile::CpuDriven,
+        "modern" | "g" | "gpu" => rend3::RendererProfile::GpuDriven,
         _ => return Err("unknown rendermode"),
     })
 }
@@ -218,7 +218,7 @@ Meta:
 Rendering:
   -b --backend                 Choose backend to run on ('vk', 'dx12', 'dx11', 'metal', 'gl').
   -d --device                  Choose device to run on (case insensitive device substring).
-  -m --mode                    Choose rendering mode to run on ('cpu', 'gpu').
+  -p --profile                 Choose rendering profile to use ('cpu', 'gpu').
   --msaa <level>               Level of antialiasing (either 1 or 4). Default 1.
 
 Windowing:
@@ -243,7 +243,7 @@ struct SceneViewer {
     absolute_mouse: bool,
     desired_backend: Option<Backend>,
     desired_device_name: Option<String>,
-    desired_mode: Option<RendererMode>,
+    desired_profile: Option<RendererProfile>,
     file_to_load: Option<String>,
     walk_speed: f32,
     run_speed: f32,
@@ -279,7 +279,7 @@ impl SceneViewer {
         let desired_backend = option_arg(args.opt_value_from_fn(["-b", "--backend"], extract_backend));
         let desired_device_name: Option<String> =
             option_arg(args.opt_value_from_str(["-d", "--device"])).map(|s: String| s.to_lowercase());
-        let desired_mode = option_arg(args.opt_value_from_fn(["-m", "--mode"], extract_mode));
+        let desired_mode = option_arg(args.opt_value_from_fn(["-p", "--profile"], extract_mode));
         let samples = option_arg(args.opt_value_from_fn("--msaa", extract_msaa)).unwrap_or(SampleCount::One);
 
         // Windowing
@@ -340,7 +340,7 @@ impl SceneViewer {
             absolute_mouse,
             desired_backend,
             desired_device_name,
-            desired_mode,
+            desired_profile: desired_mode,
             file_to_load,
             walk_speed,
             run_speed,
@@ -377,7 +377,7 @@ impl rend3_framework::App for SceneViewer {
             Ok(rend3::create_iad(
                 self.desired_backend,
                 self.desired_device_name.clone(),
-                self.desired_mode,
+                self.desired_profile,
                 None,
             )
             .await?)
