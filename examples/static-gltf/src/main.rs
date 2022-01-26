@@ -100,10 +100,10 @@ impl rend3_framework::App for GltfExample {
         // We need to keep the directional light handle alive.
         self.directional_light_handle = Some(renderer.add_directional_light(rend3::types::DirectionalLight {
             color: glam::Vec3::ONE,
-            intensity: 10.0,
+            intensity: 4.0,
             // Direction will be normalized
             direction: glam::Vec3::new(-1.0, -4.0, 2.0),
-            distance: 400.0,
+            distance: 20.0,
         }));
     }
 
