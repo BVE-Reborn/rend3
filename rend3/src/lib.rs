@@ -11,7 +11,7 @@
 //!
 //! [examples]: https://github.com/BVE-Reborn/rend3/tree/trunk/examples
 //!
-//! #### Screenshots
+//! ### Screenshots
 //!
 //! These screenshots are from the scene-viewer example.
 //!
@@ -26,7 +26,7 @@
 //! of the functionality and exensibility to the library, extension crates, and
 //! integration crates
 //!
-//! #### Core
+//! ### Core
 //!
 //! - `rend3`: The core crate. Performs all handling of world data, provides the
 //!   Renderer and RenderGraph and defines vocabulary types.
@@ -34,7 +34,7 @@
 //!   RenderGraph. Also provides for re-usable graphics work. Provides PBR
 //!   rendering, Skyboxes, Shadow Rendering, and Tonemapping.
 //!
-//! #### Extensions
+//! ### Extensions
 //!
 //! There are extension crates that are not required, but provide pre-made bits
 //! of useful code that I would recommend using.
@@ -43,7 +43,7 @@
 //!   surface across platforms.
 //! - `rend3-gltf`: Modular gltf file and scene loader.
 //!
-//! #### Integration
+//! ### Integration
 //!
 //! Integration with other external libraries are also offered. Due to external
 //! dependencies, the versions of these may increase at a much higher rate than
@@ -59,23 +59,23 @@
 //! rend3 supports two different rendering profiles one for speed and one for
 //! compatibility.
 //!
-//! #### Profile Features
+//! ### Profile Features
 //!
 //! The modern profile not only offloads a lot more work to the gpu, it can do more
-//! aggressive performance optimizations.
+//! aggressive performance optimizations including only drawing exactly the triangles that are needed
 //!
-//! | Profile  | Texture Access | Object Culling | Triangle Culling | Draw Calls          |
-//! |:---------|----------------|----------------|------------------|---------------------|
-//! | Modern   | Bindless       | On GPU         | On GPU           | Merged Indirect     |
-//! | Legacy   | Bound          | On CPU         | ❌                | Instanced Direct    |
+//! | Profile   | Texture Access | Object Culling | Triangle Culling | Draw Calls          |
+//! |:----------|----------------|----------------|------------------|---------------------|
+//! | GpuDriven | Bindless       | On GPU         | On GPU           | Merged Indirect     |
+//! | CpuDriven | Bound          | On CPU         | ❌                | Instanced Direct    |
 //!
-//! #### Profile Support
+//! ### Profile Support
 //!
 //! The following table shows support of various profiles on various apis/platforms. This will
 //! hopefully help you judge what your target demographic supports.
 //!
-//! | OS                   | API    | GPU                                        | Modern | Legacy |
-//! |----------------------|--------|--------------------------------------------|:------:|:------:|
+//! | OS                   | API    | GPU                                        | GpuDriven | CpuDriven |
+//! |----------------------|--------|--------------------------------------------|:---------:|:---------:|
 //! | Windows 7+           | Vulkan | AMD / NVIDIA                               | ✅    | —       |
 //! |                      | Vulkan | Intel 6XXX+                                | ❌      | ✅     |
 //! |                      | Dx11   | Intel 2XXX+                                | ❌      | 🚧     |
@@ -111,12 +111,6 @@
 //! an advanced game or simulation nor care how you structure     your program.
 //! I do have plans for a `rend3-util` (or similar) crate that is a very basic
 //! framework for the second use case listed above.
-//!
-//! # GPU Culling
-//!
-//! On Vulkan and DX12 "gpu mode" is enabled by default, which uses modern
-//! bindless resources and gpu-based culling. This reduces CPU load and allows
-//! significantly more powerful culling.
 //!
 //! # Future Plans
 //!
@@ -194,11 +188,11 @@ pub mod util {
 
 pub mod graph;
 mod instruction;
-mod mode;
+mod profile;
 mod setup;
 mod surface;
 
-pub use mode::*;
+pub use profile::*;
 pub use renderer::{error::*, Renderer, RendererDataCore};
 pub use setup::*;
 pub use surface::*;

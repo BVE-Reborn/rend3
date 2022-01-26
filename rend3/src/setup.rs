@@ -9,14 +9,15 @@ use wgpu::{
 #[allow(unused_imports)]
 use crate::format_sso;
 use crate::{
-    managers::STARTING_2D_TEXTURES, util::typedefs::FastHashMap, LimitType, RendererInitializationError, RendererMode,
+    managers::STARTING_2D_TEXTURES, util::typedefs::FastHashMap, LimitType, RendererInitializationError,
+    RendererProfile,
 };
 
 /// Largest uniform buffer binding needed to run rend3.
 pub const MAX_UNIFORM_BUFFER_BINDING_SIZE: BufferAddress = 1024;
 
-/// Features required to run in gpu-mode.
-pub const GPU_REQUIRED_FEATURES: Features = {
+/// Features required to run in the GpuDriven profile.
+pub const GPU_DRIVEN_REQUIRED_FEATURES: Features = {
     // We need to do this whole bits thing to make this const as OpOr isn't const
     Features::from_bits_truncate(
         Features::PUSH_CONSTANTS.bits()
@@ -32,8 +33,8 @@ pub const GPU_REQUIRED_FEATURES: Features = {
     )
 };
 
-/// Features required to run in cpu-mode.
-pub const CPU_REQUIRED_FEATURES: Features = Features::from_bits_truncate(0);
+/// Features required to run in the GpuDriven profile.
+pub const CPU_DRIVEN_REQUIRED_FEATURES: Features = Features::from_bits_truncate(0);
 
 /// Features that rend3 can use if it they are available, but we don't require.
 pub const OPTIONAL_FEATURES: Features = Features::from_bits_truncate(
@@ -44,12 +45,12 @@ pub const OPTIONAL_FEATURES: Features = Features::from_bits_truncate(
         | Features::TIMESTAMP_QUERY.bits(),
 );
 
-/// Check that all required features for a given mode are present in the feature
+/// Check that all required features for a given profile are present in the feature
 /// set given.
-pub fn check_features(mode: RendererMode, device: Features) -> Result<Features, RendererInitializationError> {
-    let required = match mode {
-        RendererMode::GpuPowered => GPU_REQUIRED_FEATURES,
-        RendererMode::CpuPowered => CPU_REQUIRED_FEATURES,
+pub fn check_features(profile: RendererProfile, device: Features) -> Result<Features, RendererInitializationError> {
+    let required = match profile {
+        RendererProfile::GpuDriven => GPU_DRIVEN_REQUIRED_FEATURES,
+        RendererProfile::CpuDriven => CPU_DRIVEN_REQUIRED_FEATURES,
     };
     let optional = OPTIONAL_FEATURES & device;
     let missing = required - device;
@@ -60,7 +61,7 @@ pub fn check_features(mode: RendererMode, device: Features) -> Result<Features, 
     }
 }
 
-/// Limits required to run in gpu-mode.
+/// Limits required to run in the GpuDriven profile.
 pub const GPU_REQUIRED_LIMITS: Limits = Limits {
     max_texture_dimension_1d: 2048,
     max_texture_dimension_2d: 2048,
@@ -91,7 +92,7 @@ pub const GPU_REQUIRED_LIMITS: Limits = Limits {
     max_compute_workgroups_per_dimension: 65535,
 };
 
-/// Limits required to run in cpu-mode.
+/// Limits required to run in the CpuDriven profile.
 pub const CPU_REQUIRED_LIMITS: Limits = Limits {
     max_texture_dimension_1d: 2048,
     max_texture_dimension_2d: 2048,
@@ -146,12 +147,12 @@ fn check_limit_low(d: u32, r: u32, ty: LimitType) -> Result<u32, RendererInitial
     }
 }
 
-/// Check that all required limits for a given mode are present in the given
+/// Check that all required limits for a given profile are present in the given
 /// limit set.
-pub fn check_limits(mode: RendererMode, device_limits: &Limits) -> Result<Limits, RendererInitializationError> {
-    let required_limits = match mode {
-        RendererMode::GpuPowered => GPU_REQUIRED_LIMITS,
-        RendererMode::CpuPowered => CPU_REQUIRED_LIMITS,
+pub fn check_limits(profile: RendererProfile, device_limits: &Limits) -> Result<Limits, RendererInitializationError> {
+    let required_limits = match profile {
+        RendererProfile::GpuDriven => GPU_REQUIRED_LIMITS,
+        RendererProfile::CpuDriven => CPU_REQUIRED_LIMITS,
     };
 
     Ok(Limits {
@@ -299,7 +300,7 @@ pub struct PotentialAdapter<T> {
     pub info: ExtendedAdapterInfo,
     pub features: Features,
     pub limits: Limits,
-    pub mode: RendererMode,
+    pub profile: RendererProfile,
 }
 impl<T> PotentialAdapter<T> {
     pub fn new(
@@ -307,20 +308,20 @@ impl<T> PotentialAdapter<T> {
         inner_info: AdapterInfo,
         inner_limits: Limits,
         inner_features: Features,
-        desired_mode: Option<RendererMode>,
+        desired_profile: Option<RendererProfile>,
     ) -> Result<Self, RendererInitializationError> {
         let info = ExtendedAdapterInfo::from(inner_info);
 
-        let mut features = check_features(RendererMode::GpuPowered, inner_features);
-        let mut limits = check_limits(RendererMode::GpuPowered, &inner_limits);
-        let mut mode = RendererMode::GpuPowered;
+        let mut features = check_features(RendererProfile::GpuDriven, inner_features);
+        let mut limits = check_limits(RendererProfile::GpuDriven, &inner_limits);
+        let mut profile = RendererProfile::GpuDriven;
 
-        if (features.is_err() || limits.is_err() || desired_mode == Some(RendererMode::CpuPowered))
-            && desired_mode != Some(RendererMode::GpuPowered)
+        if (features.is_err() || limits.is_err() || desired_profile == Some(RendererProfile::CpuDriven))
+            && desired_profile != Some(RendererProfile::GpuDriven)
         {
-            features = check_features(RendererMode::CpuPowered, inner_features);
-            limits = check_limits(RendererMode::CpuPowered, &inner_limits);
-            mode = RendererMode::CpuPowered;
+            features = check_features(RendererProfile::CpuDriven, inner_features);
+            limits = check_limits(RendererProfile::CpuDriven, &inner_limits);
+            profile = RendererProfile::CpuDriven;
         }
 
         Ok(PotentialAdapter {
@@ -328,7 +329,7 @@ impl<T> PotentialAdapter<T> {
             info,
             features: features?,
             limits: limits?,
-            mode,
+            profile,
         })
     }
 }
@@ -392,7 +393,7 @@ pub struct InstanceAdapterDevice {
     pub adapter: Arc<Adapter>,
     pub device: Arc<Device>,
     pub queue: Arc<Queue>,
-    pub mode: RendererMode,
+    pub profile: RendererProfile,
     pub info: ExtendedAdapterInfo,
 }
 
@@ -405,7 +406,7 @@ pub struct InstanceAdapterDevice {
 pub async fn create_iad(
     desired_backend: Option<Backend>,
     desired_device: Option<String>,
-    desired_mode: Option<RendererMode>,
+    desired_profile: Option<RendererProfile>,
     additional_features: Option<Features>,
 ) -> Result<InstanceAdapterDevice, RendererInitializationError> {
     profiling::scope!("create_iad");
@@ -447,7 +448,7 @@ pub async fn create_iad(
             let info = adapter.get_info();
             let limits = adapter.limits();
             let features = adapter.features();
-            let potential = PotentialAdapter::new(adapter, info, limits, features, desired_mode);
+            let potential = PotentialAdapter::new(adapter, info, limits, features, desired_profile);
 
             log::info!(
                 "{:?} Adapter {}: {:#?}",
@@ -466,7 +467,7 @@ pub async fn create_iad(
             };
 
             if let (Ok(potential), true) = (potential, desired) {
-                log::debug!("Adapter usable in {:?} mode", potential.mode);
+                log::debug!("Adapter usable in the {:?} profile", potential.profile);
                 potential_adapters.push(potential)
             } else {
                 log::debug!("Adapter not usable");
@@ -501,7 +502,7 @@ pub async fn create_iad(
             log::debug!("Chosen backend: {:?}", backend);
             log::debug!("Chosen features: {:#?}", adapter.features);
             log::debug!("Chosen limits: {:#?}", adapter.limits);
-            log::debug!("Chosen mode: {:#?}", adapter.mode);
+            log::debug!("Chosen profile: {:#?}", adapter.profile);
 
             let (device, queue) = adapter
                 .inner
@@ -523,7 +524,7 @@ pub async fn create_iad(
                 adapter: Arc::new(adapter.inner),
                 device: Arc::new(device),
                 queue: Arc::new(queue),
-                mode: adapter.mode,
+                profile: adapter.profile,
                 info: adapter.info,
             });
         }

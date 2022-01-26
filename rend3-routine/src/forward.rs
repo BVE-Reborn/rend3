@@ -11,7 +11,7 @@ use rend3::{
         RenderTargetHandle,
     },
     types::{Handedness, Material, SampleCount},
-    ModeData, Renderer, RendererDataCore, RendererMode,
+    ProfileData, Renderer, RendererDataCore, RendererProfile,
 };
 use wgpu::{
     BindGroup, BindGroupLayout, BlendState, Color, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState,
@@ -22,7 +22,8 @@ use wgpu::{
 
 use crate::{
     common::{
-        mode_safe_shader, PerMaterialArchetypeInterface, WholeFrameInterfaces, CPU_VERTEX_BUFFERS, GPU_VERTEX_BUFFERS,
+        profile_safe_shader, PerMaterialArchetypeInterface, WholeFrameInterfaces, CPU_VERTEX_BUFFERS,
+        GPU_VERTEX_BUFFERS,
     },
     culling,
     pbr::PbrMaterial,
@@ -42,7 +43,7 @@ impl<M: Material> ForwardRoutine<M> {
     /// The order of BGLs passed to the shader is:  
     /// 0: Forward uniforms  
     /// 1: Per material data  
-    /// 2: Texture Array (GpuPowered) / Material (CpuPowered)  
+    /// 2: Texture Array (GpuDriven) / Material (CpuDriven)  
     /// 3+: Contents of extra_bgls  
     ///
     /// Blend state is passed through to the pipeline.
@@ -77,9 +78,9 @@ impl<M: Material> ForwardRoutine<M> {
             }
             None => {
                 _forward_pass_vert_owned = Some(unsafe {
-                    mode_safe_shader(
+                    profile_safe_shader(
                         &renderer.device,
-                        renderer.mode,
+                        renderer.profile,
                         "forward pass vert",
                         "opaque.vert.cpu.wgsl",
                         "opaque.vert.gpu.spv",
@@ -101,9 +102,9 @@ impl<M: Material> ForwardRoutine<M> {
             }
             None => {
                 _forward_pass_frag_owned = Some(unsafe {
-                    mode_safe_shader(
+                    profile_safe_shader(
                         &renderer.device,
-                        renderer.mode,
+                        renderer.profile,
                         "forward pass frag",
                         "opaque.frag.cpu.wgsl",
                         "opaque.frag.gpu.spv",
@@ -117,7 +118,7 @@ impl<M: Material> ForwardRoutine<M> {
         let mut bgls: ArrayVec<&BindGroupLayout, 8> = ArrayVec::new();
         bgls.push(&interfaces.forward_uniform_bgl);
         bgls.push(&per_material.bgl);
-        if renderer.mode == RendererMode::GpuPowered {
+        if renderer.profile == RendererProfile::GpuDriven {
             bgls.push(data_core.d2_texture_manager.gpu_bgl())
         } else {
             bgls.push(data_core.material_manager.get_bind_group_layout_cpu::<PbrMaterial>());
@@ -221,10 +222,10 @@ impl<M: Material> ForwardRoutine<M> {
             }
 
             match culled.inner.calls {
-                ModeData::Cpu(ref draws) => {
+                ProfileData::Cpu(ref draws) => {
                     culling::draw_cpu_powered::<PbrMaterial>(rpass, draws, graph_data.material_manager, 2)
                 }
-                ModeData::Gpu(ref data) => {
+                ProfileData::Gpu(ref data) => {
                     rpass.set_bind_group(2, ready.d2_texture.bg.as_gpu(), &[]);
                     culling::draw_gpu_powered(rpass, data);
                 }
@@ -252,9 +253,9 @@ fn build_forward_pipeline_inner(
         vertex: VertexState {
             module: forward_pass_vert,
             entry_point: vert_entry_point,
-            buffers: match renderer.mode {
-                RendererMode::CpuPowered => &CPU_VERTEX_BUFFERS,
-                RendererMode::GpuPowered => &GPU_VERTEX_BUFFERS,
+            buffers: match renderer.profile {
+                RendererProfile::CpuDriven => &CPU_VERTEX_BUFFERS,
+                RendererProfile::GpuDriven => &GPU_VERTEX_BUFFERS,
             },
         },
         primitive: PrimitiveState {

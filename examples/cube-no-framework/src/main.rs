@@ -68,7 +68,7 @@ fn main() {
     let window_size = window.inner_size();
 
     // Create the Instance, Adapter, and Device. We can specify preferred backend,
-    // device name, or rendering mode. In this case we let rend3 choose for us.
+    // device name, or rendering profile. In this case we let rend3 choose for us.
     let iad = pollster::block_on(rend3::create_iad(None, None, None, None)).unwrap();
 
     // The one line of unsafe needed. We just need to guarentee that the window

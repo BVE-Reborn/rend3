@@ -3,7 +3,7 @@ use rend3::{
     managers::{CameraManager, InternalObject, MaterialManager, ObjectManager},
     types::Material,
     util::frustum::ShaderFrustum,
-    ModeData,
+    ProfileData,
 };
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
@@ -63,7 +63,7 @@ pub fn cull_cpu<M: Material>(
     });
 
     CulledObjectSet {
-        calls: ModeData::Cpu(calls),
+        calls: ProfileData::Cpu(calls),
         output_buffer,
     }
 }

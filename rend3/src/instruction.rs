@@ -1,7 +1,7 @@
 use crate::{
     managers::{MaterialManager, ObjectManager, TextureManager},
     types::{Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Mesh, Object, RawObjectHandle},
-    RendererMode,
+    RendererProfile,
 };
 use glam::Mat4;
 use parking_lot::Mutex;
@@ -38,7 +38,9 @@ pub enum InstructionKind {
     AddMaterial {
         handle: MaterialHandle,
         fill_invoke: Box<
-            dyn FnOnce(&mut MaterialManager, &Device, RendererMode, &mut TextureManager, &MaterialHandle) + Send + Sync,
+            dyn FnOnce(&mut MaterialManager, &Device, RendererProfile, &mut TextureManager, &MaterialHandle)
+                + Send
+                + Sync,
         >,
     },
     ChangeMaterial {
@@ -47,7 +49,7 @@ pub enum InstructionKind {
             dyn FnOnce(
                     &mut MaterialManager,
                     &Device,
-                    RendererMode,
+                    RendererProfile,
                     &mut TextureManager,
                     &mut ObjectManager,
                     &MaterialHandle,

@@ -10,7 +10,7 @@ layout(location = 2) in vec3 i_tangent;
 layout(location = 3) in vec2 i_coords0;
 layout(location = 4) in vec2 i_coords1;
 layout(location = 5) in vec4 i_color;
-#ifdef GPU_MODE
+#ifdef GPU_DRIVEN
 layout(location = 8) in uint i_object_idx;
 #endif
 
@@ -28,19 +28,19 @@ layout(set = 0, binding = 3) uniform UniformBuffer {
 layout(set = 1, binding = 0, std430) restrict readonly buffer ObjectOutputDataBuffer {
     ObjectOutputData object_output[];
 };
-#ifdef GPU_MODE
+#ifdef GPU_DRIVEN
 layout(set = 1, binding = 1, std430) readonly buffer MaterialBuffer {
     GPUMaterialData materials[];
 };
 #endif
-#ifdef CPU_MODE
+#ifdef CPU_DRIVEN
 layout(set = 2, binding = 0) readonly buffer TextureData {
     CPUMaterialData material;
 };
 #endif
 
 void main() {
-    #ifdef CPU_MODE
+    #ifdef CPU_DRIVEN
     uint object_idx = gl_InstanceIndex;
     #else
     uint object_idx = i_object_idx;

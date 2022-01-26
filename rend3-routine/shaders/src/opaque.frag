@@ -1,6 +1,6 @@
 #version 440
 
-#ifdef GPU_MODE
+#ifdef GPU_DRIVEN
 #extension GL_EXT_nonuniform_qualifier : require
 #endif
 
@@ -27,13 +27,13 @@ layout(set = 0, binding = 4) restrict readonly buffer DirectionalLightBuffer {
     DirectionalLight directional_lights[];
 };
 layout(set = 0, binding = 5) uniform texture2DArray shadow;
-#ifdef GPU_MODE
+#ifdef GPU_DRIVEN
 layout(set = 1, binding = 1, std430) restrict readonly buffer MaterialBuffer {
     GPUMaterialData materials[];
 };
 layout(set = 2, binding = 0) uniform texture2D textures[];
 #endif
-#ifdef CPU_MODE
+#ifdef CPU_DRIVEN
 layout(set = 2, binding = 0) readonly buffer TextureData {
     CPUMaterialData material;
 };
@@ -53,7 +53,7 @@ layout(set = 2, binding = 10) uniform texture2D ambient_occlusion_tex;
 #include "lighting/pcf.glsl"
 
 void main() {
-    #ifdef GPU_MODE
+    #ifdef GPU_DRIVEN
     GPUMaterialData material = materials[i_material];
     #endif
 

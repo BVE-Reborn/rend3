@@ -5,7 +5,7 @@ use rend3::{
     graph::{DataHandle, RenderGraph},
     types::Material,
     util::bind_merge::BindGroupBuilder,
-    ModeData, RendererMode,
+    ProfileData, RendererProfile,
 };
 use wgpu::{BindGroup, Buffer};
 
@@ -29,11 +29,11 @@ pub struct PerMaterialArchetypeData {
 /// A set of objects that have been called. Contains the information needed to
 /// dispatch a render.
 pub struct CulledObjectSet {
-    pub calls: ModeData<Vec<cpu::CpuDrawCall>, gpu::GpuIndirectData>,
+    pub calls: ProfileData<Vec<cpu::CpuDrawCall>, gpu::GpuIndirectData>,
     pub output_buffer: Buffer,
 }
 
-/// Add the mode-approprate culling for the given material archetype to the
+/// Add the profile-approprate culling for the given material archetype to the
 /// graph.
 #[allow(clippy::too_many_arguments)]
 pub fn add_culling_to_graph<'node, M: Material>(
@@ -42,7 +42,7 @@ pub fn add_culling_to_graph<'node, M: Material>(
     culled: DataHandle<PerMaterialArchetypeData>,
     skinned: DataHandle<SkinningOutput>,
     per_material: &'node PerMaterialArchetypeInterface<M>,
-    gpu_culler: &'node ModeData<(), gpu::GpuCuller>,
+    gpu_culler: &'node ProfileData<(), gpu::GpuCuller>,
     shadow_index: Option<usize>,
     key: u64,
     sorting: Option<Sorting>,
@@ -51,7 +51,7 @@ pub fn add_culling_to_graph<'node, M: Material>(
     let mut builder = graph.add_node(format_sso!("Culling {}", name));
 
     let pre_cull_handle = gpu_culler
-        .mode()
+        .profile()
         .into_data(|| (), || builder.add_data_input(pre_cull_data));
     let cull_handle = builder.add_data_output(culled);
 
@@ -71,8 +71,10 @@ pub fn add_culling_to_graph<'node, M: Material>(
         };
 
         let culled_objects = match gpu_culler {
-            ModeData::Cpu(_) => cpu::cull_cpu::<M>(&renderer.device, camera, graph_data.object_manager, sorting, key),
-            ModeData::Gpu(ref gpu_culler) => gpu_culler.cull(
+            ProfileData::Cpu(_) => {
+                cpu::cull_cpu::<M>(&renderer.device, camera, graph_data.object_manager, sorting, key)
+            }
+            ProfileData::Gpu(ref gpu_culler) => gpu_culler.cull(
                 &renderer.device,
                 encoder,
                 camera,
@@ -85,7 +87,7 @@ pub fn add_culling_to_graph<'node, M: Material>(
         let mut per_material_bgb = BindGroupBuilder::new();
         per_material_bgb.append_buffer(&culled_objects.output_buffer);
 
-        if renderer.mode == RendererMode::GpuPowered {
+        if renderer.profile == RendererProfile::GpuDriven {
             graph_data.material_manager.add_to_bg_gpu::<M>(&mut per_material_bgb);
         }
 

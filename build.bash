@@ -12,18 +12,18 @@ case $1 in
         glslc rend3-routine/shaders/src/cull.comp   -DPREFIX_CULL                        -O -g -o rend3-routine/shaders/spirv/cull-prefix-cull.comp.spv
         glslc rend3-routine/shaders/src/cull.comp   -DPREFIX_SUM                         -O -g -o rend3-routine/shaders/spirv/cull-prefix-sum.comp.spv
         glslc rend3-routine/shaders/src/cull.comp   -DPREFIX_OUTPUT                      -O -g -o rend3-routine/shaders/spirv/cull-prefix-output.comp.spv
-        glslc rend3-routine/shaders/src/depth.vert  -DCPU_MODE                           -O -g -o rend3-routine/shaders/spirv/depth.vert.cpu.spv
-        glslc rend3-routine/shaders/src/depth.frag  -DCPU_MODE                           -O -g -o rend3-routine/shaders/spirv/depth-opaque.frag.cpu.spv
-        glslc rend3-routine/shaders/src/depth.frag  -DCPU_MODE -DALPHA_CUTOUT            -O -g -o rend3-routine/shaders/spirv/depth-cutout.frag.cpu.spv
-        glslc rend3-routine/shaders/src/depth.vert  -DGPU_MODE                           -O -g -o rend3-routine/shaders/spirv/depth.vert.gpu.spv
-        glslc rend3-routine/shaders/src/depth.frag  -DGPU_MODE                           -O -g -o rend3-routine/shaders/spirv/depth-opaque.frag.gpu.spv
-        glslc rend3-routine/shaders/src/depth.frag  -DGPU_MODE -DALPHA_CUTOUT            -O -g -o rend3-routine/shaders/spirv/depth-cutout.frag.gpu.spv
-        glslc rend3-routine/shaders/src/opaque.vert -DCPU_MODE                           -O -g -o rend3-routine/shaders/spirv/opaque.vert.cpu.spv
-        glslc rend3-routine/shaders/src/opaque.vert -DCPU_MODE -DBAKING                  -O -g -o rend3-routine/shaders/spirv/opaque-baking.vert.cpu.spv
-        glslc rend3-routine/shaders/src/opaque.frag -DCPU_MODE                           -O -g -o rend3-routine/shaders/spirv/opaque.frag.cpu.spv
-        glslc rend3-routine/shaders/src/opaque.vert -DGPU_MODE                           -O -g -o rend3-routine/shaders/spirv/opaque.vert.gpu.spv
-        glslc rend3-routine/shaders/src/opaque.vert -DGPU_MODE -DBAKING                  -O -g -o rend3-routine/shaders/spirv/opaque-baking.vert.gpu.spv
-        glslc rend3-routine/shaders/src/opaque.frag -DGPU_MODE                           -O -g -o rend3-routine/shaders/spirv/opaque.frag.gpu.spv
+        glslc rend3-routine/shaders/src/depth.vert  -DCPU_DRIVEN                         -O -g -o rend3-routine/shaders/spirv/depth.vert.cpu.spv
+        glslc rend3-routine/shaders/src/depth.frag  -DCPU_DRIVEN                         -O -g -o rend3-routine/shaders/spirv/depth-opaque.frag.cpu.spv
+        glslc rend3-routine/shaders/src/depth.frag  -DCPU_DRIVEN -DALPHA_CUTOUT          -O -g -o rend3-routine/shaders/spirv/depth-cutout.frag.cpu.spv
+        glslc rend3-routine/shaders/src/depth.vert  -DGPU_DRIVEN                         -O -g -o rend3-routine/shaders/spirv/depth.vert.gpu.spv
+        glslc rend3-routine/shaders/src/depth.frag  -DGPU_DRIVEN                         -O -g -o rend3-routine/shaders/spirv/depth-opaque.frag.gpu.spv
+        glslc rend3-routine/shaders/src/depth.frag  -DGPU_DRIVEN -DALPHA_CUTOUT          -O -g -o rend3-routine/shaders/spirv/depth-cutout.frag.gpu.spv
+        glslc rend3-routine/shaders/src/opaque.vert -DCPU_DRIVEN                         -O -g -o rend3-routine/shaders/spirv/opaque.vert.cpu.spv
+        glslc rend3-routine/shaders/src/opaque.vert -DCPU_DRIVEN -DBAKING                -O -g -o rend3-routine/shaders/spirv/opaque-baking.vert.cpu.spv
+        glslc rend3-routine/shaders/src/opaque.frag -DCPU_DRIVEN                         -O -g -o rend3-routine/shaders/spirv/opaque.frag.cpu.spv
+        glslc rend3-routine/shaders/src/opaque.vert -DGPU_DRIVEN                         -O -g -o rend3-routine/shaders/spirv/opaque.vert.gpu.spv
+        glslc rend3-routine/shaders/src/opaque.vert -DGPU_DRIVEN -DBAKING                -O -g -o rend3-routine/shaders/spirv/opaque-baking.vert.gpu.spv
+        glslc rend3-routine/shaders/src/opaque.frag -DGPU_DRIVEN                         -O -g -o rend3-routine/shaders/spirv/opaque.frag.gpu.spv
         glslc rend3-routine/shaders/src/skybox.vert                                      -O -g -o rend3-routine/shaders/spirv/skybox.vert.spv
         glslc rend3-routine/shaders/src/skybox.frag                                      -O -g -o rend3-routine/shaders/spirv/skybox.frag.spv
 

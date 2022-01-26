@@ -9,7 +9,7 @@ layout(location = 2) in vec3 i_tangent;
 layout(location = 3) in vec2 i_coords0;
 layout(location = 4) in vec2 i_coords1;
 layout(location = 5) in vec4 i_color;
-#ifdef GPU_MODE
+#ifdef GPU_DRIVEN
 layout(location = 8) in uint i_object_idx;
 #endif
 
@@ -23,7 +23,7 @@ layout(set = 1, binding = 0, std430) readonly buffer ObjectOutputDataBuffer {
 };
 
 void main() {
-    #ifdef CPU_MODE
+    #ifdef CPU_DRIVEN
     uint object_idx = gl_InstanceIndex;
     #else
     uint object_idx = i_object_idx;

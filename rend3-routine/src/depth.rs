@@ -17,7 +17,7 @@ use rend3::{
         bind_merge::{BindGroupBuilder, BindGroupLayoutBuilder},
         math::round_up_pot,
     },
-    ModeData, Renderer, RendererDataCore, RendererMode,
+    ProfileData, Renderer, RendererDataCore, RendererProfile,
 };
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
@@ -29,7 +29,8 @@ use wgpu::{
 
 use crate::{
     common::{
-        mode_safe_shader, PerMaterialArchetypeInterface, WholeFrameInterfaces, CPU_VERTEX_BUFFERS, GPU_VERTEX_BUFFERS,
+        profile_safe_shader, PerMaterialArchetypeInterface, WholeFrameInterfaces, CPU_VERTEX_BUFFERS,
+        GPU_VERTEX_BUFFERS,
     },
     culling::{self, PerMaterialArchetypeData},
     pbr::PbrMaterial,
@@ -60,9 +61,9 @@ pub struct AlphaCutoutSpec {
 #[derive(Debug, Copy, Clone)]
 #[repr(C)]
 struct AlphaDataAbi {
-    // Stride in offset into a float array (i.e. byte index / 4). Unused in CPU mode.
+    // Stride in offset into a float array (i.e. byte index / 4). Unused when CpuDriven.
     stride: u32,
-    // Must be zero in gpu mode. In cpu mode, it's the index into the material data with the texture enable bitflag.
+    // Must be zero when GpuDriven. When CpuDriven, it's the index into the material data with the texture enable bitflag.
     texture_offset: u32,
     // Stride in offset into a float array  (i.e. byte index / 4)
     cutoff_offset: u32,
@@ -98,7 +99,7 @@ impl<M: DepthRenderableMaterial> DepthRoutine<M> {
         let abi_bgl;
         let bg;
         if let Some(alpha) = M::ALPHA_CUTOUT {
-            let abi = if renderer.mode == RendererMode::GpuPowered {
+            let abi = if renderer.profile == RendererProfile::GpuDriven {
                 let data_base_offset = round_up_pot(M::TEXTURE_COUNT * 4, 16);
                 let stride = data_base_offset + round_up_pot(M::DATA_SIZE, 16);
 
@@ -224,10 +225,10 @@ impl<M: DepthRenderableMaterial> DepthRoutine<M> {
             }
 
             match culled.inner.calls {
-                ModeData::Cpu(ref draws) => {
+                ProfileData::Cpu(ref draws) => {
                     culling::draw_cpu_powered::<M>(rpass, draws, graph_data.material_manager, 3)
                 }
-                ModeData::Gpu(ref data) => {
+                ProfileData::Gpu(ref data) => {
                     rpass.set_bind_group(3, ready.d2_texture.bg.as_gpu(), &[]);
                     culling::draw_gpu_powered(rpass, data);
                 }
@@ -284,10 +285,10 @@ impl<M: DepthRenderableMaterial> DepthRoutine<M> {
             }
 
             match culled.inner.calls {
-                ModeData::Cpu(ref draws) => {
+                ProfileData::Cpu(ref draws) => {
                     culling::draw_cpu_powered::<M>(rpass, draws, graph_data.material_manager, 3)
                 }
-                ModeData::Gpu(ref data) => {
+                ProfileData::Gpu(ref data) => {
                     rpass.set_bind_group(3, ready.d2_texture.bg.as_gpu(), &[]);
                     culling::draw_gpu_powered(rpass, data);
                 }
@@ -326,9 +327,9 @@ impl DepthPipelines {
     ) -> DepthPipelines {
         profiling::scope!("build depth pass pipelines");
         let depth_vert = unsafe {
-            mode_safe_shader(
+            profile_safe_shader(
                 &renderer.device,
-                renderer.mode,
+                renderer.profile,
                 "depth pass vert",
                 "depth.vert.cpu.wgsl",
                 "depth.vert.gpu.spv",
@@ -336,9 +337,9 @@ impl DepthPipelines {
         };
 
         let depth_opaque_frag = unsafe {
-            mode_safe_shader(
+            profile_safe_shader(
                 &renderer.device,
-                renderer.mode,
+                renderer.profile,
                 "depth pass opaque frag",
                 "depth-opaque.frag.cpu.wgsl",
                 "depth-opaque.frag.gpu.spv",
@@ -346,9 +347,9 @@ impl DepthPipelines {
         };
 
         let depth_cutout_frag = unsafe {
-            mode_safe_shader(
+            profile_safe_shader(
                 &renderer.device,
-                renderer.mode,
+                renderer.profile,
                 "depth pass cutout frag",
                 "depth-cutout.frag.cpu.wgsl",
                 "depth-cutout.frag.gpu.spv",
@@ -361,7 +362,7 @@ impl DepthPipelines {
         if let Some(abi_bgl) = abi_bgl {
             bgls.push(abi_bgl);
         }
-        if renderer.mode == RendererMode::GpuPowered {
+        if renderer.profile == RendererProfile::GpuDriven {
             bgls.push(data_core.d2_texture_manager.gpu_bgl())
         } else {
             bgls.push(data_core.material_manager.get_bind_group_layout_cpu::<PbrMaterial>());
@@ -463,9 +464,9 @@ fn create_depth_inner(
         vertex: VertexState {
             module: vert,
             entry_point: "main",
-            buffers: match renderer.mode {
-                RendererMode::CpuPowered => &CPU_VERTEX_BUFFERS,
-                RendererMode::GpuPowered => &GPU_VERTEX_BUFFERS,
+            buffers: match renderer.profile {
+                RendererProfile::CpuDriven => &CPU_VERTEX_BUFFERS,
+                RendererProfile::GpuDriven => &GPU_VERTEX_BUFFERS,
             },
         },
         primitive: PrimitiveState {

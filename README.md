@@ -15,7 +15,7 @@ Library is under active development. While internals are might change in the
 future, the external api remains stable, with only minor changes occuring as
 features are added.
 
-# Examples
+## Examples
 
 Take a look at the [examples] for getting started with the api. The examples
 will show how the core library and helper crates can be used.
@@ -31,7 +31,7 @@ These screenshots are from the scene-viewer example.
 ![bistro](https://raw.githubusercontent.com/BVE-Reborn/rend3/trunk/examples/scene-viewer/bistro.jpg)
 ![emerald-square](https://raw.githubusercontent.com/BVE-Reborn/rend3/trunk/examples/scene-viewer/emerald-square.jpg)
 
-# Crates
+## Crates
 
 The `rend3` ecosystem is composed of a couple core crates which provide most
 of the functionality and exensibility to the library, extension crates, and
@@ -65,7 +65,7 @@ the rest of the ecosystem.
 - `rend3-imgui`: Integration with the [imgui](https://github.com/ocornut/imgui)
   immediate mode gui.
 
-# Features and Platform Support
+## Features and Platform Support
 
 rend3 supports two different rendering profiles one for speed and one for
 compatibility.
@@ -73,20 +73,20 @@ compatibility.
 #### Profile Features
 
 The modern profile not only offloads a lot more work to the gpu, it can do more
-aggressive performance optimizations.
+aggressive performance optimizations including only drawing exactly the triangles that are needed
 
-| Profile  | Texture Access | Object Culling | Triangle Culling | Draw Calls          |
-|:---------|----------------|----------------|------------------|---------------------|
-| Modern   | Bindless       | On GPU         | On GPU           | Merged Indirect     |
-| Legacy   | Bound          | On CPU         | ❌                | Instanced Direct    |
+| Profile   | Texture Access | Object Culling | Triangle Culling | Draw Calls          |
+|:----------|----------------|----------------|------------------|---------------------|
+| GpuDriven | Bindless       | On GPU         | On GPU           | Merged Indirect     |
+| CpuDriven | Bound          | On CPU         | ❌                | Instanced Direct    |
 
 #### Profile Support
 
 The following table shows support of various profiles on various apis/platforms. This will
 hopefully help you judge what your target demographic supports.
 
-| OS                   | API    | GPU                                        | Modern | Legacy |
-|----------------------|--------|--------------------------------------------|:------:|:------:|
+| OS                   | API    | GPU                                        | GpuDriven | CpuDriven |
+|----------------------|--------|--------------------------------------------|:---------:|:---------:|
 | Windows 7+           | Vulkan | AMD / NVIDIA                               | ✅    | —       |
 |                      | Vulkan | Intel 6XXX+                                | ❌      | ✅     |
 |                      | Dx11   | Intel 2XXX+                                | ❌      | 🚧     |
@@ -109,7 +109,7 @@ Footnotes:
 - Apple A9 = iPhone 6S, iPad 5th Gen
 - Apple A13 = iPhone 11, iPad 9th Gen
 
-# Purpose
+## Purpose
 
 `rend3` tries to fulfill the following usecases:
  1. Games and visualizations that need a customizable, and efficient
@@ -123,20 +123,14 @@ an advanced game or simulation nor care how you structure     your program.
 I do have plans for a `rend3-util` (or similar) crate that is a very basic
 framework for the second use case listed above.
 
-# GPU Culling
-
-On Vulkan and DX12 "gpu mode" is enabled by default, which uses modern
-bindless resources and gpu-based culling. This reduces CPU load and allows
-significantly more powerful culling.
-
-# Future Plans
+## Future Plans
 
 I have grand plans for this library. An overview can be found in the issue
 tracker under the [enhancement] label.
 
 [enhancement]: https://github.com/BVE-Reborn/rend3/labels/enhancement
 
-# Matrix Chatroom
+## Matrix Chatroom
 
 We have a matrix chatroom that you can come and join if you want to chat
 about using rend3 or developing it:
@@ -149,7 +143,7 @@ the matrix rooms:
 
 [![Discord](https://img.shields.io/discord/451037457475960852?color=7289DA&label=discord)](https://discord.gg/mjxXTVzaDg)
 
-# Helping Out
+## Helping Out
 
 We welcome all contributions and ideas. If you want to participate or have
 ideas for this library, we'd love to hear them!
