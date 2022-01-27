@@ -31,7 +31,7 @@ use rend3::{
 use rend3_routine::pbr;
 use std::{
     borrow::Cow,
-    collections::{hash_map::Entry, BTreeMap, VecDeque},
+    collections::{hash_map::Entry, BTreeMap, HashMap, VecDeque},
     future::Future,
     path::Path,
 };
@@ -155,6 +155,7 @@ pub struct ScaleChannel {
     pub times: Vec<f32>,
 }
 
+/// Animation data for a single joint, with translation, rotation and scale channels.
 #[derive(Debug)]
 pub struct PosRotScale {
     pub node_idx: u32,
@@ -176,7 +177,8 @@ impl PosRotScale {
 
 #[derive(Debug)]
 pub struct Animation {
-    pub channels: Vec<PosRotScale>,
+    /// Maps the node index of a joint to its animation keyframe data.
+    pub channels: HashMap<usize, PosRotScale>,
 }
 
 /// Hashmap which stores a mapping from [`ImageKey`] to a labeled handle.
@@ -229,8 +231,8 @@ pub enum GltfLoadError<E: std::error::Error + 'static> {
     TextureZeroLevels(SsoString),
     #[error("Texture {0} failed to be loaded as it has 0 layers")]
     TextureTooManyLayers(SsoString),
-    #[error("Gltf file must have at least one scene")]
-    MissingScene,
+    #[error("Rend3-gltf expects gltf files to have a single scene.")]
+    GltfSingleSceneOnly,
     #[error("Mesh {0} does not have positions")]
     MissingPositions(usize),
     #[error("Gltf file references mesh {0} but mesh does not exist")]
@@ -340,11 +342,10 @@ where
     };
 
     let loaded = load_gltf_data(renderer, &mut file, settings, io_func).await?;
-    debug_assert_eq!(
-        file.scenes().len(),
-        1,
-        "rend3-gltf expects gltf models to have a single scene."
-    );
+
+    if file.scenes().len() != 1 {
+        return Err(GltfLoadError::GltfSingleSceneOnly);
+    }
 
     let instance = instance_loaded_scene(
         renderer,
@@ -533,7 +534,7 @@ pub fn instance_loaded_scene<'a, E: std::error::Error + 'static>(
             .get(&node.index())
             .map(|p| node_transforms[*p])
             .unwrap_or(parent_transform);
-        let transform = dbg!(parent_transform) * dbg!(local_transform);
+        let transform = parent_transform * local_transform;
         node_transforms[*node_idx] = transform;
 
         let object = if let Some(mesh) = node.mesh() {
@@ -751,7 +752,7 @@ fn load_animations<E: std::error::Error + 'static>(
 ) -> Result<Vec<Labeled<Animation>>, GltfLoadError<E>> {
     let mut result = Vec::new();
     for anim in animations {
-        let mut result_channels: Vec<PosRotScale> = Vec::new();
+        let mut result_channels = HashMap::<usize, PosRotScale>::new();
 
         for (ch_idx, ch) in anim.channels().enumerate() {
             let target = ch.target();
@@ -759,12 +760,9 @@ fn load_animations<E: std::error::Error + 'static>(
 
             // Get the PosRotScale for the current target node or create a new
             // one if it doesn't exist.
-            let chs = if let Some(chs) = result_channels.iter_mut().find(|chs| chs.node_idx == node_idx as u32) {
-                chs
-            } else {
-                result_channels.push(PosRotScale::new(node_idx as u32));
-                result_channels.iter_mut().last().unwrap()
-            };
+            let chs = result_channels
+                .entry(node_idx)
+                .or_insert_with(|| PosRotScale::new(node_idx as u32));
 
             let reader = ch.reader(|b| Some(&buffers[b.index()][..b.length()]));
 
