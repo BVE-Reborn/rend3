@@ -16,7 +16,7 @@ struct SkinningExample {
 /// Locates an object in the node list that corresponds to an animated mesh
 /// and returns its list of skeletons. Note that a gltf object may contain
 /// multiple primitives, and there will be one skeleton per primitive.
-pub fn find_armature<'a>(instance: &GltfSceneInstance) -> Option<rend3_gltf::Armature> {
+pub fn find_armature(instance: &GltfSceneInstance) -> Option<rend3_gltf::Armature> {
     for node in &instance.nodes {
         if let Some(ref obj) = node.inner.object {
             if let Some(ref armature) = obj.inner.armature {

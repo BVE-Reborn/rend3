@@ -31,7 +31,7 @@ use rend3::{
 use rend3_routine::pbr;
 use std::{
     borrow::Cow,
-    collections::{hash_map::Entry, BTreeMap, HashMap, VecDeque},
+    collections::{hash_map::Entry, BTreeMap, VecDeque},
     future::Future,
     path::Path,
 };
@@ -128,7 +128,7 @@ pub struct Texture {
 
 #[derive(Debug)]
 pub struct Joint {
-    node_idx: usize,
+    pub node_idx: usize,
 }
 
 #[derive(Debug)]
@@ -304,7 +304,7 @@ impl Default for GltfLoadSettings {
 /// Supports most gltfs and glbs.
 ///
 /// **Must** keep the [`LoadedGltfScene`] alive for the scene to remain.
-/// 
+///
 /// See [`load_gltf_data`] and [`instance_loaded_scene`] if you need more
 /// fine-grained control about how and when the scene data is instanced.
 ///
@@ -474,7 +474,7 @@ pub fn add_mesh_by_index<E: std::error::Error + 'static>(
 }
 
 /// Computes topological ordering and children->parent map.
-fn node_indices_topological_sort<'a>(nodes: &Vec<gltf::Node<'a>>) -> (Vec<usize>, BTreeMap<usize, usize>) {
+fn node_indices_topological_sort(nodes: &[gltf::Node]) -> (Vec<usize>, BTreeMap<usize, usize>) {
     // NOTE: The algorithm uses BTreeMaps to guarantee consistent ordering.
 
     // Maps parent to list of children
@@ -486,8 +486,7 @@ fn node_indices_topological_sort<'a>(nodes: &Vec<gltf::Node<'a>>) -> (Vec<usize>
     // Maps child to parent
     let parents: BTreeMap<usize, usize> = children
         .iter()
-        .map(|(parent, children)| children.iter().map(|ch| (*ch, *parent)))
-        .flatten()
+        .flat_map(|(parent, children)| children.iter().map(|ch| (*ch, *parent)))
         .collect();
 
     // Initialize the BFS queue with nodes that don't have any parent (i.e. roots)
@@ -507,7 +506,7 @@ fn node_indices_topological_sort<'a>(nodes: &Vec<gltf::Node<'a>>) -> (Vec<usize>
 
 /// Instances a Gltf scene that has been loaded using [`load_gltf_data`]. Will
 /// create as many [`Object`]s as required.
-/// 
+///
 /// You need to hold onto the returned value from this function to make sure the
 /// objects don't get deleted.
 pub fn instance_loaded_scene<'a, E: std::error::Error + 'static>(
@@ -772,7 +771,7 @@ fn load_animations<E: std::error::Error + 'static>(
             // In gltf, 'inputs' refers to the keyframe times
             let times = reader
                 .read_inputs()
-                .ok_or(GltfLoadError::MissingKeyframeTimes(anim.index(), ch_idx))?
+                .ok_or_else(|| GltfLoadError::MissingKeyframeTimes(anim.index(), ch_idx))?
                 .collect();
 
             // And 'outputs' means the keyframe values, which varies depending on the type
