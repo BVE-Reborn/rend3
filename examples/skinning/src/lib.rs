@@ -1,29 +1,27 @@
 use std::{path::Path, sync::Arc, time::Instant};
 
+use rend3_gltf::GltfSceneInstance;
+
 const SAMPLE_COUNT: rend3::types::SampleCount = rend3::types::SampleCount::One;
 
 #[derive(Default)]
 struct SkinningExample {
-    loaded_model: Option<rend3_gltf::LoadedGltfScene>,
+    loaded_scene: Option<rend3_gltf::LoadedGltfScene>,
+    loaded_instance: Option<rend3_gltf::GltfSceneInstance>,
     directional_light_handle: Option<rend3::types::DirectionalLightHandle>,
     armature: Option<rend3_gltf::Armature>,
     start_time: Option<Instant>,
 }
 
-/// Locates an object in the node hierarchy that corresponds to an animated mesh
+/// Locates an object in the node list that corresponds to an animated mesh
 /// and returns its list of skeletons. Note that a gltf object may contain
 /// multiple primitives, and there will be one skeleton per primitive.
-pub fn find_armature<'a>(
-    nodes: impl Iterator<Item = &'a rend3_gltf::Labeled<rend3_gltf::Node>>,
-) -> Option<rend3_gltf::Armature> {
-    for node in nodes {
+pub fn find_armature<'a>(instance: &GltfSceneInstance) -> Option<rend3_gltf::Armature> {
+    for node in &instance.nodes {
         if let Some(ref obj) = node.inner.object {
             if let Some(ref armature) = obj.inner.armature {
                 return Some(armature.clone());
             }
-        }
-        if let Some(skels) = find_armature(node.inner.children.iter()) {
-            return Some(skels);
         }
     }
     None
@@ -34,8 +32,8 @@ impl SkinningExample {
     /// positions
     pub fn update_skeleton(&mut self, renderer: &rend3::Renderer) {
         let armature = &self.armature.as_ref().expect("Data must be loaded by now");
-        let loaded_model = &self.loaded_model.as_ref().expect("Data must be loaded by now");
-        let inverse_bind_matrices = &loaded_model.skins[armature.skin_index].inner.inverse_bind_matrices;
+        let loaded_scene = &self.loaded_scene.as_ref().expect("Data must be loaded by now");
+        let inverse_bind_matrices = &loaded_scene.skins[armature.skin_index].inner.inverse_bind_matrices;
 
         // Compute a very simple animation for the top bone
         let elapsed_time = Instant::now().duration_since(self.start_time.unwrap());
@@ -89,7 +87,7 @@ impl rend3_framework::App for SkinningExample {
         let path = Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/RiggedSimple.glb"));
         let gltf_data = std::fs::read(&path).unwrap();
         let parent_directory = path.parent().unwrap();
-        let loaded_model = pollster::block_on(rend3_gltf::load_gltf(
+        let (loaded_scene, loaded_instance) = pollster::block_on(rend3_gltf::load_gltf(
             renderer,
             &gltf_data,
             &rend3_gltf::GltfLoadSettings::default(),
@@ -100,10 +98,11 @@ impl rend3_framework::App for SkinningExample {
         // The returned loaded model contains a node hierarchy with a complete
         // scene. We know in our case there will be a single node in the tree
         // with an armature.
-        self.armature = Some(find_armature(loaded_model.nodes.iter()).unwrap());
+        self.armature = Some(find_armature(&loaded_instance).unwrap());
 
         // Store the loaded model somewhere, otherwise all the data gets freed.
-        self.loaded_model = Some(loaded_model);
+        self.loaded_scene = Some(loaded_scene);
+        self.loaded_instance = Some(loaded_instance);
 
         // Create a single directional light
         //

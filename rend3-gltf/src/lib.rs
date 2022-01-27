@@ -20,7 +20,7 @@
 //!   used.
 //! - Double sided materials are currently unsupported.
 
-use glam::{Mat3, Mat4, UVec2, Vec2, Vec3, Vec4};
+use glam::{Mat3, Mat4, Quat, UVec2, Vec2, Vec3, Vec4};
 use gltf::buffer::Source;
 use image::GenericImageView;
 use rend3::{
@@ -29,7 +29,12 @@ use rend3::{
     Renderer,
 };
 use rend3_routine::pbr;
-use std::{borrow::Cow, collections::hash_map::Entry, future::Future, path::Path};
+use std::{
+    borrow::Cow,
+    collections::{hash_map::Entry, BTreeMap, HashMap, VecDeque},
+    future::Future,
+    path::Path,
+};
 use thiserror::Error;
 
 /// Wrapper around a T that stores an optional label.
@@ -93,7 +98,10 @@ pub struct Object {
 /// Node in the gltf scene tree
 #[derive(Debug)]
 pub struct Node {
-    pub children: Vec<Labeled<Node>>,
+    /// The index of the parent node in the nodes array, if any.
+    pub parent: Option<usize>,
+    /// The index of the children nodes in the nodes array
+    pub children: Vec<usize>,
     /// Transform of this node relative to its parents.
     pub local_transform: Mat4,
     /// Object for this node.
@@ -119,21 +127,82 @@ pub struct Texture {
 }
 
 #[derive(Debug)]
+pub struct Joint {
+    node_idx: usize,
+}
+
+#[derive(Debug)]
 pub struct Skin {
     pub inverse_bind_matrices: Vec<Mat4>,
+    pub joints: Vec<Labeled<Joint>>,
 }
+
+#[derive(Debug)]
+pub struct TranslationChannel {
+    pub positions: Vec<Vec3>,
+    pub times: Vec<f32>,
+}
+
+#[derive(Debug)]
+pub struct RotationChannel {
+    pub rotations: Vec<Quat>,
+    pub times: Vec<f32>,
+}
+
+#[derive(Debug)]
+pub struct ScaleChannel {
+    pub scales: Vec<Vec3>,
+    pub times: Vec<f32>,
+}
+
+#[derive(Debug)]
+pub struct PosRotScale {
+    pub node_idx: u32,
+    pub translation: Option<TranslationChannel>,
+    pub rotation: Option<RotationChannel>,
+    pub scale: Option<ScaleChannel>,
+}
+
+impl PosRotScale {
+    pub fn new(node_idx: u32) -> Self {
+        Self {
+            node_idx,
+            translation: None,
+            rotation: None,
+            scale: None,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct Animation {
+    pub channels: Vec<PosRotScale>,
+}
+
 /// Hashmap which stores a mapping from [`ImageKey`] to a labeled handle.
 pub type ImageMap = FastHashMap<ImageKey, Labeled<Texture>>;
 
-/// A fully loaded Gltf scene.
+/// Loaded data on a gltf scene that can be reused across multiple instances of
+/// the same set of objects.
 #[derive(Debug)]
 pub struct LoadedGltfScene {
     pub meshes: Vec<Labeled<Mesh>>,
     pub materials: Vec<Labeled<types::MaterialHandle>>,
     pub default_material: types::MaterialHandle,
     pub images: ImageMap,
-    pub nodes: Vec<Labeled<Node>>,
     pub skins: Vec<Labeled<Skin>>,
+    pub animations: Vec<Labeled<Animation>>,
+}
+
+/// Data specific to each instance of a gltf scene.
+pub struct GltfSceneInstance {
+    /// The flat list of nodes in the scene. Each node points to a list of
+    /// children and optionally a parent using indices.
+    pub nodes: Vec<Labeled<Node>>,
+    /// Iterating the `nodes` following the order in this list guarantees that
+    /// parents will always be visited before children. This allows avoiding
+    /// recursion in several algorithms.
+    pub topological_order: Vec<usize>,
 }
 
 /// Describes how loading gltf failed.
@@ -174,6 +243,10 @@ pub enum GltfLoadError<E: std::error::Error + 'static> {
     UnsupportedPrimitiveMode(usize, usize, gltf::mesh::Mode),
     #[error("Mesh {0} failed validation")]
     MeshValidationError(usize, #[source] MeshValidationError),
+    #[error("Animation {0} channel {1} does not have keyframe times.")]
+    MissingKeyframeTimes(usize, usize),
+    #[error("Animation {0} channel {1} does not have keyframe values.")]
+    MissingKeyframeValues(usize, usize),
 }
 
 /// Default implementation of [`load_gltf`]'s `io_func` that loads from the
@@ -231,6 +304,9 @@ impl Default for GltfLoadSettings {
 /// Supports most gltfs and glbs.
 ///
 /// **Must** keep the [`LoadedGltfScene`] alive for the scene to remain.
+/// 
+/// See [`load_gltf_data`] and [`instance_loaded_scene`] if you need more
+/// fine-grained control about how and when the scene data is instanced.
 ///
 /// ```no_run
 /// # use std::path::Path;
@@ -250,7 +326,7 @@ pub async fn load_gltf<F, Fut, E>(
     data: &[u8],
     settings: &GltfLoadSettings,
     io_func: F,
-) -> Result<LoadedGltfScene, GltfLoadError<E>>
+) -> Result<(LoadedGltfScene, GltfSceneInstance), GltfLoadError<E>>
 where
     F: FnMut(SsoString) -> Fut,
     Fut: Future<Output = Result<Vec<u8>, E>>,
@@ -263,17 +339,17 @@ where
         gltf::Gltf::from_slice_without_validation(data)?
     };
 
-    let mut loaded = load_gltf_data(renderer, &mut file, settings, io_func).await?;
+    let loaded = load_gltf_data(renderer, &mut file, settings, io_func).await?;
+    debug_assert_eq!(
+        file.scenes().len(),
+        1,
+        "rend3-gltf expects gltf models to have a single scene."
+    );
 
-    let scene = file
-        .default_scene()
-        .or_else(|| file.scenes().next())
-        .ok_or(GltfLoadError::MissingScene)?;
-
-    loaded.nodes = load_gltf_nodes(
+    let instance = instance_loaded_scene(
         renderer,
         &loaded,
-        scene.nodes(),
+        file.nodes().collect(),
         settings,
         Mat4::from_scale(Vec3::new(
             settings.scale,
@@ -286,7 +362,7 @@ where
         )),
     )?;
 
-    Ok(loaded)
+    Ok((loaded, instance))
 }
 
 /// Load a given gltf's data, like meshes and materials, without yet adding
@@ -317,14 +393,15 @@ where
     let (materials, images) =
         load_materials_and_textures(renderer, file.materials(), &buffers, settings, &mut io_func).await?;
     let skins = load_skins(file.skins(), &buffers)?;
+    let animations = load_animations(file.animations(), &buffers)?;
 
     let loaded = LoadedGltfScene {
         meshes,
         materials,
         default_material,
         images,
-        nodes: Vec::new(),
         skins,
+        animations,
     };
 
     Ok(loaded)
@@ -396,17 +473,69 @@ pub fn add_mesh_by_index<E: std::error::Error + 'static>(
     ))
 }
 
-pub fn load_gltf_nodes<'a, E: std::error::Error + 'static>(
+/// Computes topological ordering and children->parent map.
+fn node_indices_topological_sort<'a>(nodes: &Vec<gltf::Node<'a>>) -> (Vec<usize>, BTreeMap<usize, usize>) {
+    // NOTE: The algorithm uses BTreeMaps to guarantee consistent ordering.
+
+    // Maps parent to list of children
+    let mut children = BTreeMap::<usize, Vec<usize>>::new();
+    for node in nodes {
+        children.insert(node.index(), node.children().map(|n| n.index()).collect());
+    }
+
+    // Maps child to parent
+    let parents: BTreeMap<usize, usize> = children
+        .iter()
+        .map(|(parent, children)| children.iter().map(|ch| (*ch, *parent)))
+        .flatten()
+        .collect();
+
+    // Initialize the BFS queue with nodes that don't have any parent (i.e. roots)
+    let mut queue: VecDeque<usize> = children.keys().filter(|n| parents.get(n).is_none()).cloned().collect();
+
+    let mut topological_sort = Vec::<usize>::new();
+
+    while let Some(n) = queue.pop_front() {
+        topological_sort.push(n);
+        for ch in &children[&n] {
+            queue.push_back(*ch);
+        }
+    }
+
+    (topological_sort, parents)
+}
+
+/// Instances a Gltf scene that has been loaded using [`load_gltf_data`]. Will
+/// create as many [`Object`]s as required.
+/// 
+/// You need to hold onto the returned value from this function to make sure the
+/// objects don't get deleted.
+pub fn instance_loaded_scene<'a, E: std::error::Error + 'static>(
     renderer: &Renderer,
     loaded: &LoadedGltfScene,
-    nodes: impl Iterator<Item = gltf::Node<'a>>,
+    nodes: Vec<gltf::Node<'a>>,
     settings: &GltfLoadSettings,
     parent_transform: Mat4,
-) -> Result<Vec<Labeled<Node>>, GltfLoadError<E>> {
-    let mut final_nodes = Vec::with_capacity(nodes.size_hint().0);
-    for node in nodes {
+) -> Result<GltfSceneInstance, GltfLoadError<E>> {
+    let (topological_order, parents) = node_indices_topological_sort(&nodes);
+
+    let num_nodes = nodes.len();
+
+    debug_assert_eq!(topological_order.len(), num_nodes);
+
+    let mut node_transforms = vec![Mat4::IDENTITY; num_nodes];
+
+    let mut final_nodes = Vec::with_capacity(nodes.len());
+    for node_idx in topological_order.iter() {
+        let node = &nodes[*node_idx];
+
         let local_transform = Mat4::from_cols_array_2d(&node.transform().matrix());
-        let transform = parent_transform * local_transform;
+        let parent_transform = parents
+            .get(&node.index())
+            .map(|p| node_transforms[*p])
+            .unwrap_or(parent_transform);
+        let transform = dbg!(parent_transform) * dbg!(local_transform);
+        node_transforms[*node_idx] = transform;
 
         let object = if let Some(mesh) = node.mesh() {
             Some(add_mesh_by_index(
@@ -438,10 +567,11 @@ pub fn load_gltf_nodes<'a, E: std::error::Error + 'static>(
             None
         };
 
-        let children = load_gltf_nodes(renderer, loaded, node.children(), settings, transform)?;
+        let children = node.children().map(|node| node.index()).collect();
 
         final_nodes.push(Labeled::new(
             Node {
+                parent: parents.get(&node.index()).cloned(),
                 children,
                 local_transform,
                 object,
@@ -450,7 +580,10 @@ pub fn load_gltf_nodes<'a, E: std::error::Error + 'static>(
             node.name(),
         ));
     }
-    Ok(final_nodes)
+    Ok(GltfSceneInstance {
+        nodes: final_nodes,
+        topological_order,
+    })
 }
 
 /// Loads buffers from a [`gltf::Buffer`] iterator, calling io_func to resolve
@@ -596,15 +729,91 @@ fn load_skins<E: std::error::Error + 'static>(
             vec![Mat4::IDENTITY; num_joints]
         };
 
+        let joints = skin
+            .joints()
+            .map(|node| Labeled::new(Joint { node_idx: node.index() }, node.name()))
+            .collect();
+
         res_skins.push(Labeled::new(
             Skin {
                 inverse_bind_matrices: inv_b_mats,
+                joints,
             },
             skin.name(),
         ))
     }
 
     Ok(res_skins)
+}
+
+fn load_animations<E: std::error::Error + 'static>(
+    animations: gltf::iter::Animations,
+    buffers: &[Vec<u8>],
+) -> Result<Vec<Labeled<Animation>>, GltfLoadError<E>> {
+    let mut result = Vec::new();
+    for anim in animations {
+        let mut result_channels: Vec<PosRotScale> = Vec::new();
+
+        for (ch_idx, ch) in anim.channels().enumerate() {
+            let target = ch.target();
+            let node_idx = target.node().index();
+
+            // Get the PosRotScale for the current target node or create a new
+            // one if it doesn't exist.
+            let chs = if let Some(chs) = result_channels.iter_mut().find(|chs| chs.node_idx == node_idx as u32) {
+                chs
+            } else {
+                result_channels.push(PosRotScale::new(node_idx as u32));
+                result_channels.iter_mut().last().unwrap()
+            };
+
+            let reader = ch.reader(|b| Some(&buffers[b.index()][..b.length()]));
+
+            // In gltf, 'inputs' refers to the keyframe times
+            let times = reader
+                .read_inputs()
+                .ok_or(GltfLoadError::MissingKeyframeTimes(anim.index(), ch_idx))?
+                .collect();
+
+            // And 'outputs' means the keyframe values, which varies depending on the type
+            // of keyframe
+            match reader
+                .read_outputs()
+                .ok_or_else(|| GltfLoadError::MissingKeyframeValues(anim.index(), ch_idx))?
+            {
+                gltf::animation::util::ReadOutputs::Translations(trs) => {
+                    chs.translation = Some(TranslationChannel {
+                        positions: trs.map(Vec3::from).collect(),
+                        times,
+                    })
+                }
+                gltf::animation::util::ReadOutputs::Rotations(rots) => {
+                    chs.rotation = Some(RotationChannel {
+                        rotations: rots.into_f32().map(Quat::from_array).collect(),
+                        times,
+                    });
+                }
+                gltf::animation::util::ReadOutputs::Scales(scls) => {
+                    chs.scale = Some(ScaleChannel {
+                        scales: scls.map(Vec3::from).collect(),
+                        times,
+                    });
+                }
+                gltf::animation::util::ReadOutputs::MorphTargetWeights(_) => {
+                    // TODO
+                }
+            }
+        }
+
+        result.push(Labeled::new(
+            Animation {
+                channels: result_channels,
+            },
+            anim.name(),
+        ))
+    }
+
+    Ok(result)
 }
 
 /// Creates a gltf default material.
