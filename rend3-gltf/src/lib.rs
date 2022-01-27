@@ -89,14 +89,14 @@ pub struct Armature {
 /// contain the necessary data to deform the primitives.
 ///
 /// This is to a [`ObjectHandle`], as a [`Mesh`] is to a [`MeshPrimitive`].
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Object {
     pub primitives: Vec<ObjectHandle>,
     pub armature: Option<Armature>,
 }
 
 /// Node in the gltf scene tree
-#[derive(Debug)]
+#[derive(Debug, Default, Clone)]
 pub struct Node {
     /// The index of the parent node in the nodes array, if any.
     pub parent: Option<usize>,
@@ -155,7 +155,8 @@ pub struct ScaleChannel {
     pub times: Vec<f32>,
 }
 
-/// Animation data for a single joint, with translation, rotation and scale channels.
+/// Animation data for a single joint, with translation, rotation and scale
+/// channels.
 #[derive(Debug)]
 pub struct PosRotScale {
     pub node_idx: u32,
@@ -525,7 +526,7 @@ pub fn instance_loaded_scene<'a, E: std::error::Error + 'static>(
 
     let mut node_transforms = vec![Mat4::IDENTITY; num_nodes];
 
-    let mut final_nodes = Vec::with_capacity(nodes.len());
+    let mut final_nodes = vec![Labeled::new(Node::default(), None); nodes.len()];
     for node_idx in topological_order.iter() {
         let node = &nodes[*node_idx];
 
@@ -569,7 +570,7 @@ pub fn instance_loaded_scene<'a, E: std::error::Error + 'static>(
 
         let children = node.children().map(|node| node.index()).collect();
 
-        final_nodes.push(Labeled::new(
+        final_nodes[*node_idx] = Labeled::new(
             Node {
                 parent: parents.get(&node.index()).cloned(),
                 children,
@@ -578,7 +579,7 @@ pub fn instance_loaded_scene<'a, E: std::error::Error + 'static>(
                 directional_light: light,
             },
             node.name(),
-        ));
+        )
     }
     Ok(GltfSceneInstance {
         nodes: final_nodes,
