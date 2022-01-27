@@ -38,6 +38,7 @@ Per Keep a Changelog there are 6 main categories of changes:
 - rend3-textured-quad: Add example of simple 2D rendering.
 - rend3: Allow duplicating objects overriding some of their properties. @setzer22
 - rend3: Implement mesh skinning. @setzer22
+- rend3-gltf: Load gltf animation data @setzer22
 
 ### Changes
 - rend3: Instead of passing a render routine to the render function, you now add them to a rendergraph, then pass that rendergraph into the renderer.
@@ -56,6 +57,8 @@ Per Keep a Changelog there are 6 main categories of changes:
 - rend3-routine: All transparency now has backface culling enabled. Use `Mesh::double_side` or `MeshBuilder::with_double_side` to re-enable double sided transparency.
 - rend3: Allow requesting device features explicitly in `rend3::create_iad`. @setzer22
 - rend3: Objects now take a `mesk_kind` allowind definition of static or animated meshes. @setzer22
+- rend3-gltf: Split return value of `load_gltf` into per-scene data and per-instance data. @setzer22
+- rend3-gltf: The `nodes` vector is now flat instead of nested. Hierarchy is represented using indices. @setzer22
 
 ### Fixes
 - rend3: Get vertex/index counts from RangeAllocator. @jamen

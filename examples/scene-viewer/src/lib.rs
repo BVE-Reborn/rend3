@@ -10,6 +10,7 @@ use rend3::{
     Renderer, RendererProfile,
 };
 use rend3_framework::{lock, AssetPath, Mutex};
+use rend3_gltf::GltfSceneInstance;
 use rend3_routine::{base::BaseRenderGraph, pbr::NormalTextureYDirection, skybox::SkyboxRoutine};
 use std::{collections::HashMap, future::Future, hash::BuildHasher, path::Path, sync::Arc, time::Duration};
 use wgpu_profiler::GpuTimerScopeResult;
@@ -63,7 +64,7 @@ async fn load_gltf(
     loader: &rend3_framework::AssetLoader,
     settings: &rend3_gltf::GltfLoadSettings,
     location: AssetPath<'_>,
-) -> Option<rend3_gltf::LoadedGltfScene> {
+) -> Option<(rend3_gltf::LoadedGltfScene, GltfSceneInstance)> {
     // profiling::scope!("loading gltf");
     let gltf_start = Instant::now();
     let is_default_scene = matches!(location, AssetPath::Internal(_));
@@ -103,7 +104,7 @@ async fn load_gltf(
 
     let gltf_elapsed = gltf_start.elapsed();
     let resources_start = Instant::now();
-    let scene = rend3_gltf::load_gltf(renderer, &gltf_data, settings, |uri| async {
+    let (scene, instance) = rend3_gltf::load_gltf(renderer, &gltf_data, settings, |uri| async {
         log::info!("Loading resource {}", uri);
         let uri = uri;
         let full_uri = parent_str.clone() + "/" + uri.as_str();
@@ -117,7 +118,7 @@ async fn load_gltf(
         gltf_elapsed,
         resources_start.elapsed()
     );
-    Some(scene)
+    Some((scene, instance))
 }
 
 fn button_pressed<Hash: BuildHasher>(map: &HashMap<u32, bool, Hash>, key: u32) -> bool {
