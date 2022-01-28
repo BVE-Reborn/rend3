@@ -141,11 +141,7 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
 
     // Do these in dependency order
     // Level 3
-    data_core.object_manager.ready(
-        &mut data_core.mesh_manager,
-        &mut data_core.material_manager,
-        &data_core.skeleton_manager,
-    );
+    data_core.object_manager.ready(&mut data_core.material_manager);
 
     // Level 2
     let d2_texture = data_core.d2_texture_manager.ready(&renderer.device);

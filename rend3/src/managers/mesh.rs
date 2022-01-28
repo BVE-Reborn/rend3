@@ -9,7 +9,7 @@ use crate::{
 };
 use glam::{Vec2, Vec3};
 use range_alloc::RangeAllocator;
-use rend3_types::{RawMeshHandle, RawObjectHandle, RawSkeletonHandle};
+use rend3_types::{RawMeshHandle, RawSkeletonHandle};
 use std::{
     mem::size_of,
     ops::Range,
@@ -74,9 +74,6 @@ pub struct InternalMesh {
     /// Handles to the skeletons that point to this mesh. Used for internal
     /// bookkeeping
     pub skeletons: Vec<RawSkeletonHandle>,
-    /// Handles to the objects that point to this mesh. Used for internal
-    /// bookkeeping
-    pub objects: Vec<RawObjectHandle>,
     /// For skinned meshes, stores the number of joints present in the joint
     /// index buffer
     pub num_joints: u32,
@@ -90,7 +87,6 @@ impl InternalMesh {
             index_range: 0..0,
             bounding_sphere: BoundingSphere::from_mesh(&[]),
             skeletons: Vec::new(),
-            objects: Vec::new(),
             num_joints: 0,
         }
     }
@@ -271,7 +267,6 @@ impl MeshManager {
             bounding_sphere,
             num_joints: num_joints as u32,
             skeletons: Vec::new(),
-            objects: Vec::new(),
         };
 
         self.registry.insert(handle, mesh);
@@ -442,11 +437,10 @@ impl MeshManager {
 
             mesh.vertex_range = new_vert_range;
             mesh.index_range = new_index_range;
-
-            for &object in &mesh.objects {
-                object_manager.set_mesh_ranges(object, mesh.vertex_range.clone(), mesh.index_range.clone())
-            }
         }
+
+        // Need to call this to update the vertex ranges cached inside the objects
+        object_manager.fix_objects_after_realloc(self, skeleton_manager);
 
         self.buffers = new_buffers;
         self.vertex_alloc = new_vert_alloc;
