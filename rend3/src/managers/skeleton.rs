@@ -91,19 +91,18 @@ impl SkeletonManager {
 
         self.global_joint_count += num_joints;
 
-        let mesh_range = internal_mesh.vertex_range.clone();
         let skeleton_range = mesh_manager.allocate_skeleton_mesh(device, encoder, object_manager, self, &skeleton.mesh);
 
-        // It is important that this happens after allocating the skeleton mesh.
-        // Otherwise it will try to reallocate the data for the skeleton it's
-        // trying to allocate.
+        // It is important that we fetch the internal mesh again after calling
+        // `allocate_skeleton_mesh`, because that may trigger a reallocation and
+        // data like the vertex ranges gets invalidated.
         //
-        // NOTE: Need to access internal_mesh again to avoid double borrow.
-        mesh_manager
-            .internal_data_mut(skeleton.mesh.get_raw())
-            .skeletons
-            .push(handle.get_raw());
-
+        // Similarly, we don't want to register the back reference to the
+        // skeleton before allocating, otherwise the mesh manager will try to
+        // reallocate the data for the skeleton we're trying to allocate.
+        let internal_mesh = mesh_manager.internal_data_mut(skeleton.mesh.get_raw());
+        internal_mesh.skeletons.push(handle.get_raw());
+        let mesh_range = internal_mesh.vertex_range.clone();
         let input = GpuVertexRanges {
             skeleton_range: UVec2::new(skeleton_range.start as u32, skeleton_range.end as u32),
             mesh_range: UVec2::new(mesh_range.start as u32, mesh_range.end as u32),

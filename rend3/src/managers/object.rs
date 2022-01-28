@@ -1,6 +1,5 @@
 use std::{
     any::TypeId,
-    ops::Range,
     sync::atomic::{AtomicUsize, Ordering},
 };
 
@@ -86,7 +85,6 @@ impl ObjectManager {
                 (mesh, vertex_range)
             }
         };
-        internal_mesh.objects.push(handle.get_raw());
         let bounding_sphere = internal_mesh.bounding_sphere;
         let index_range = internal_mesh.index_range.clone();
 
@@ -110,12 +108,7 @@ impl ObjectManager {
         self.registry.insert(handle, shader_object, material_key);
     }
 
-    pub fn ready(
-        &mut self,
-        mesh_manager: &mut MeshManager,
-        material_manager: &mut MaterialManager,
-        skeleton_manager: &SkeletonManager,
-    ) {
+    pub fn ready(&mut self, material_manager: &mut MaterialManager) {
         profiling::scope!("Object Manager Ready");
         self.registry.remove_all_dead(|handle, object| {
             // Remove from material list
@@ -123,16 +116,6 @@ impl ObjectManager {
                 let objects = material_manager.get_objects(object.material_handle.get_raw());
                 let index = objects.iter().position(|v| v.idx == handle).unwrap();
                 objects.swap_remove(index);
-            }
-            // Remove from mesh list
-            {
-                let mesh_handle = match object.mesh_kind {
-                    ObjectMeshKind::Animated(s) => skeleton_manager.internal_data(s.get_raw()).mesh_handle.get_raw(),
-                    ObjectMeshKind::Static(m) => m.get_raw(),
-                };
-                let mesh = mesh_manager.internal_data_mut(mesh_handle);
-                let index = mesh.objects.iter().position(|v| v.idx == handle).unwrap();
-                mesh.objects.swap_remove(index);
             }
         });
     }
@@ -142,11 +125,27 @@ impl ObjectManager {
         object.input.material_index = index as u32;
     }
 
-    pub fn set_mesh_ranges(&mut self, handle: RawObjectHandle, vertex_range: Range<usize>, index_range: Range<usize>) {
-        let object = self.registry.get_value_mut(handle);
-        object.input.start_idx = index_range.start as u32;
-        object.input.count = (index_range.end - index_range.start) as u32;
-        object.input.vertex_offset = vertex_range.start as i32;
+    /// Objects contain cached data that stores vertex ranges for the gpu
+    /// culling calls. When the vertex buffers are reallocated all this data is
+    /// invalidated. This function needs to be called to fix it.
+    pub fn fix_objects_after_realloc(&mut self, mesh_manager: &MeshManager, skeleton_manager: &SkeletonManager) {
+        for object in self.registry.iter_all_values_mut() {
+            match &object.mesh_kind {
+                ObjectMeshKind::Animated(skeleton_handle) => {
+                    let skeleton = skeleton_manager.internal_data(skeleton_handle.get_raw());
+                    let mesh = mesh_manager.internal_data(skeleton.mesh_handle.get_raw());
+                    object.input.start_idx = mesh.index_range.start as u32;
+                    object.input.count = mesh.index_range.len() as u32;
+                    object.input.vertex_offset = skeleton.skeleton_vertex_range.start as i32;
+                }
+                ObjectMeshKind::Static(mesh_handle) => {
+                    let mesh = mesh_manager.internal_data(mesh_handle.get_raw());
+                    object.input.start_idx = mesh.index_range.start as u32;
+                    object.input.count = mesh.index_range.len() as u32;
+                    object.input.vertex_offset = mesh.vertex_range.start as i32;
+                }
+            }
+        }
     }
 
     pub fn set_key(&mut self, handle: RawObjectHandle, key: MaterialKeyPair) {
