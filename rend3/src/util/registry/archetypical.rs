@@ -130,7 +130,7 @@ where
     pub fn get_archetype_vector(&self, key: &K) -> Option<&[V]> {
         Some(&self.archetype_map.get(key)?.data)
     }
-    
+
     /// Returns an iterator over all values regardless of its archetype
     pub fn iter_all_values_mut(&mut self) -> impl Iterator<Item = &mut V> {
         self.archetype_map.values_mut().flat_map(|val| val.data.iter_mut())
