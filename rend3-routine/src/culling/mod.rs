@@ -56,7 +56,7 @@ pub fn add_culling_to_graph<'node, M: Material>(
     let cull_handle = builder.add_data_output(culled);
 
     // Just connect the input, we don't need its value.
-    let skinned_handle = builder.add_data_input(skinned);
+    builder.add_data_input(skinned);
 
     builder.build(move |_pt, renderer, encoder_or_rpass, temps, ready, graph_data| {
         let encoder = encoder_or_rpass.get_encoder();
@@ -64,10 +64,6 @@ pub fn add_culling_to_graph<'node, M: Material>(
         let culling_input = pre_cull_handle.map_gpu(|handle| graph_data.get_data::<Buffer>(temps, handle).unwrap());
 
         let count = graph_data.object_manager.get_objects::<M>(key).len();
-
-        graph_data
-            .get_data(temps, skinned_handle)
-            .expect("Skinning must run before culling");
 
         let camera = match shadow_index {
             Some(idx) => &ready.directional_light_cameras[idx],
