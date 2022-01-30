@@ -30,6 +30,8 @@ Per Keep a Changelog there are 6 main categories of changes:
 
 ## Unreleased
 
+This is by far the largest release of rend3 since 0.1. I have done my best to document everything that has changed.
+
 ### Major Changes
 - rend3-pbr got renamed to rend3-routine and will host all render routines, not just PBR related ones.
 
@@ -38,11 +40,17 @@ Per Keep a Changelog there are 6 main categories of changes:
 - rend3-textured-quad: Add example of simple 2D rendering.
 - rend3: Allow duplicating objects overriding some of their properties. @setzer22
 - rend3: Implement mesh skinning. @setzer22
+- rend3: Added `CameraProjection::Raw`.
+- rend3: The renderer now has a `handedness` value that determines the handedness of its coordinate system.
+  This allows the renderer to deal with both DX-convention coordinate systems and OpenGL convention coordinate systems.
 - rend3-gltf: Load gltf animation data @setzer22
 
 ### Changes
-- rend3: Instead of passing a render routine to the render function, you now add them to a rendergraph, then pass that rendergraph into the renderer.
+- rend3: Instead of passing a render routine to the render function, 
+  you now add them to a rendergraph, then pass that rendergraph into the renderer.
   - rend3-routine:
+    - The old `PbrRoutine` has been replaced with the more vercitile `BaseRenderGraph`.
+    - This base rendergraph will put all the parts together through it's `add_to_graph` function.
     - Split the PbrRoutine into two parts `add_prepass_to_graph` and `add_forward_to_graph`.
     - Split out the skybox renderer into `SkyboxRoutine`.
     - Split out tonemapping into the `TonemappingRoutine`.
@@ -50,17 +58,18 @@ Per Keep a Changelog there are 6 main categories of changes:
   - "CpuPowered" => "CpuDriven".
   - "GpuPowered" => "GpuDriven".
 - rend3: All meshes now require validation.
+  - `MeshBuilder::new()` now takes a handedness of the mesh. If it doesn't match the handedness of the renderer, it flips the winding order.
   - `MeshBuilder::build()` now returns a `Result<Mesh, MeshValidationError>`. This validation can be unsafely omitted.
-  - The implementation functions `Mesh::calculate_normals_for_buffers` and `Mesh::calculate_tangents_for_buffers` are now unsafe.
-- rend3: Rename `CameraProjection::Projection` to `CameraProjection::Perspective`.
-- rend3: Add `CameraProjection::Raw`.
-- rend3-routine: All transparency now has backface culling enabled. Use `Mesh::double_side` or `MeshBuilder::with_double_side` to re-enable double sided transparency.
+  - The implementation functions `Mesh::calculate_normals{,_for_buffers}` and `Mesh::calculate_tangents{,_for_buffers}` are now unsafe.
+- rend3: Renamed `CameraProjection::Projection` to `CameraProjection::Perspective`.
 - rend3: Allow requesting device features explicitly in `rend3::create_iad`. @setzer22
 - rend3: Objects now take a `mesk_kind` allowind definition of static or animated meshes. @setzer22
+- rend3-routine: All transparency now has backface culling enabled. Use `Mesh::double_side` or `MeshBuilder::with_double_side` to re-enable double sided transparency.
 - rend3-gltf: Split return value of `load_gltf` into per-scene data and per-instance data. @setzer22
 - rend3-gltf: The `nodes` vector is now flat instead of nested. Hierarchy is represented using indices. @setzer22
 
 ### Fixes
+- rend3: Fixed objects becoming invalid after a vertex buffer resize occured.
 - rend3: Get vertex/index counts from RangeAllocator. @jamen
 - rend3: Fix compatibility comparison for RenderPassTargets. @setzer22
 
