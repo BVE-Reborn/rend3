@@ -101,7 +101,7 @@
 //! # Purpose
 //!
 //! `rend3` tries to fulfill the following usecases:
-//!  1. Games and visualizations that need a customizable, and efficient renderer. 
+//!  1. Games and visualizations that need a customizable, and efficient renderer.
 //!  2. Projects that just want to put objects on screen, but want lighting and effects.  
 //!  3. A small cog in a big machine: a renderer that doesn't interfere with the rest of the program.
 //!

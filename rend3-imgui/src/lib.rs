@@ -1,3 +1,7 @@
+//! Render routine integrating imgui into a rend3 rendergraph.
+//!
+//! Call [`ImguiRenderRoutine::add_to_graph`] to add it to the graph.
+
 use imgui_wgpu::RendererConfig;
 use rend3::{
     graph::{RenderGraph, RenderPassTarget, RenderPassTargets, RenderTargetHandle},
@@ -5,11 +9,14 @@ use rend3::{
     Renderer,
 };
 
+/// An instance of a render routine, holding in imgui_wgpu renderer.
 pub struct ImguiRenderRoutine {
     pub renderer: imgui_wgpu::Renderer,
 }
 
 impl ImguiRenderRoutine {
+    /// Imgui will always output gamma-encoded color. It will determine if to do
+    /// this in the shader manually based on the output format.
     pub fn new(renderer: &Renderer, imgui: &mut imgui::Context, output_format: TextureFormat) -> Self {
         let base = if output_format.describe().srgb {
             RendererConfig::new()
