@@ -112,16 +112,16 @@ Footnotes:
 ## Purpose
 
 `rend3` tries to fulfill the following usecases:
- 1. Games and visualizations that need a customizable, and efficient
-renderer.  2. Small projects that just want to put objects on screen, but
-want lighting and effects.  3. A small cog in a big machine: a renderer
-doesn't interfere with the rest of the program.
+ 1. Games and visualizations that need a customizable, and efficient renderer.
+ 2. Projects that just want to put objects on screen, but want lighting and effects.
+ 3. A small cog in a big machine: a renderer that doesn't interfere with the rest of the program.
 
 `rend3` is not:
- 1. A framework or engine. It does not include all the parts needed to make
-an advanced game or simulation nor care how you structure     your program.
-I do have plans for a `rend3-util` (or similar) crate that is a very basic
-framework for the second use case listed above.
+ 1. A framework or engine. It does not include all the parts needed to make an
+    advanced game or simulation nor care how you structure your program.
+    If you want a very basic framework to deal with windowing and event loop management,
+    `rend3-framework` can help you. This will always be optional and is just there to help
+    with the limited set of cases it canhelp
 
 ## Future Plans
 

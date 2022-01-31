@@ -1,3 +1,7 @@
+//! Render routine integrating egui into a rend3 rendergraph.
+//!
+//! Call [`EguiRenderRoutine::add_to_graph`] to add it to the graph.
+
 use rend3::{
     graph::{RenderGraph, RenderPassTarget, RenderPassTargets, RenderTargetHandle},
     types::SampleCount,
@@ -11,6 +15,10 @@ pub struct EguiRenderRoutine {
 }
 
 impl EguiRenderRoutine {
+    /// Creates a new render routine to render a egui UI.
+    ///
+    /// Egui will always output gamma-encoded color. It will determine if to do
+    /// this in the shader manually based on the output format.
     pub fn new(
         renderer: &Renderer,
         surface_format: TextureFormat,

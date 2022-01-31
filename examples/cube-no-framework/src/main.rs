@@ -73,6 +73,10 @@ fn main() {
 
     // The one line of unsafe needed. We just need to guarentee that the window
     // outlives the use of the surface.
+    //
+    // SAFETY: this surface _must_ not be used after the `window` dies. Both the
+    // event loop and the renderer are owned by the `run` closure passed to winit,
+    // so rendering work will stop after the window dies.
     let surface = Arc::new(unsafe { iad.instance.create_surface(&window) });
     // Get the preferred format for the surface.
     let format = surface.get_preferred_format(&iad.adapter).unwrap();
