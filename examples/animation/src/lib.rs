@@ -1,4 +1,4 @@
-use std::{path::Path, sync::Arc, time::Instant};
+use std::{path::Path, sync::Arc};
 
 const SAMPLE_COUNT: rend3::types::SampleCount = rend3::types::SampleCount::One;
 
@@ -7,7 +7,6 @@ struct AnimationExample {
     loaded_instance: Option<rend3_gltf::GltfSceneInstance>,
     animation_data: Option<rend3_anim::AnimationData>,
     directional_light_handle: Option<rend3::types::DirectionalLightHandle>,
-    start_time: Option<Instant>,
     animation_time: f32,
     last_frame_time: instant::Instant,
 }
@@ -41,9 +40,6 @@ impl rend3_framework::App for AnimationExample {
         _routines: &Arc<rend3_framework::DefaultRoutines>,
         _surface_format: rend3::types::TextureFormat,
     ) {
-        // Store the startup time. Use later to animate the joint rotation
-        self.start_time = Some(Instant::now());
-
         let view_location = glam::Vec3::new(0.0, 1.5, -5.0);
         let view = glam::Mat4::from_euler(glam::EulerRot::XYZ, 0.0, 0.0, 0.0);
         let view = view * glam::Mat4::from_translation(-view_location);
@@ -157,13 +153,11 @@ impl Default for AnimationExample {
             loaded_instance: Default::default(),
             animation_data: Default::default(),
             directional_light_handle: Default::default(),
-            start_time: Default::default(),
             animation_time: Default::default(),
             last_frame_time: instant::Instant::now(),
         }
     }
 }
-
 
 #[cfg_attr(target_os = "android", ndk_glue::main(backtrace = "on", logger(level = "debug")))]
 pub fn main() {

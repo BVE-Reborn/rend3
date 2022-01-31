@@ -220,21 +220,26 @@ pub fn pose_animation_frame(
 
         // Compute each bone's local transformation
         for (node_idx, channels) in &animation.inner.channels {
+            // NOTE: If a channel's property is not present, we need to set the
+            // joint at its bind pose for that individual property
+            let local_transform = instance.nodes[*node_idx].inner.local_transform;
+            let (bind_scale, bind_rotation, bind_translation) = local_transform.to_scale_rotation_translation();
+
             let translation = channels
                 .translation
                 .as_ref()
                 .map(|tra| sample_at_time(tra, time))
-                .unwrap_or(Vec3::ZERO);
+                .unwrap_or(bind_translation);
             let rotation = channels
                 .rotation
                 .as_ref()
                 .map(|rot| sample_at_time(rot, time))
-                .unwrap_or(Quat::IDENTITY);
+                .unwrap_or(bind_rotation);
             let scale = channels
                 .scale
                 .as_ref()
                 .map(|sca| sample_at_time(sca, time))
-                .unwrap_or(Vec3::ONE);
+                .unwrap_or(bind_scale);
 
             let matrix = Mat4::from_scale_rotation_translation(scale, rotation, translation);
             let joint_idx = node_to_joint_idx[&NodeIndex(*node_idx)];
