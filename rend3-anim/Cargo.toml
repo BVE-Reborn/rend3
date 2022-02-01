@@ -1,0 +1,17 @@
+[package]
+name = "rend3-anim"
+version = "0.2.0"
+authors = ["The rend3 Developers"]
+edition = "2021"
+description = "skeletal animation playback utilities"
+repository = "https://github.com/BVE-Reborn/rend3"
+license = "MIT OR Apache-2.0 OR Zlib"
+keywords = ["3d", "graphics", "animation", "rend3"]
+categories = ["game-development", "graphics", "rendering", "rendering::engine"]
+rust-version = "1.57"
+
+[dependencies]
+itertools = "0.10"
+rend3 = { version = "^0.2.0", path = "../rend3" }
+rend3-routine = { version = "^0.2.0", path = "../rend3-routine" }
+rend3-gltf = { version = "^0.2.0", path = "../rend3-gltf" }

@@ -138,20 +138,8 @@ pub struct Skin {
 }
 
 #[derive(Debug)]
-pub struct TranslationChannel {
-    pub positions: Vec<Vec3>,
-    pub times: Vec<f32>,
-}
-
-#[derive(Debug)]
-pub struct RotationChannel {
-    pub rotations: Vec<Quat>,
-    pub times: Vec<f32>,
-}
-
-#[derive(Debug)]
-pub struct ScaleChannel {
-    pub scales: Vec<Vec3>,
+pub struct AnimationChannel<T> {
+    pub values: Vec<T>,
     pub times: Vec<f32>,
 }
 
@@ -160,9 +148,9 @@ pub struct ScaleChannel {
 #[derive(Debug)]
 pub struct PosRotScale {
     pub node_idx: u32,
-    pub translation: Option<TranslationChannel>,
-    pub rotation: Option<RotationChannel>,
-    pub scale: Option<ScaleChannel>,
+    pub translation: Option<AnimationChannel<Vec3>>,
+    pub rotation: Option<AnimationChannel<Quat>>,
+    pub scale: Option<AnimationChannel<Vec3>>,
 }
 
 impl PosRotScale {
@@ -180,6 +168,9 @@ impl PosRotScale {
 pub struct Animation {
     /// Maps the node index of a joint to its animation keyframe data.
     pub channels: HashMap<usize, PosRotScale>,
+    /// The total duration of the animation. Computed as the maximum time of any
+    /// keyframe on any channel.
+    pub duration: f32,
 }
 
 /// Hashmap which stores a mapping from [`ImageKey`] to a labeled handle.
@@ -747,6 +738,31 @@ fn load_skins<E: std::error::Error + 'static>(
     Ok(res_skins)
 }
 
+fn compute_animation_duration(channels: &HashMap<usize, PosRotScale>) -> f32 {
+    fn channel_duration<T>(channel: &AnimationChannel<T>) -> f32 {
+        channel
+            .times
+            .iter()
+            .copied()
+            .map(float_ord::FloatOrd)
+            .max()
+            .map(|f_ord| f_ord.0)
+            .unwrap_or(0.0)
+    }
+    channels
+        .values()
+        .map(|ch| {
+            let m1 = ch.translation.as_ref().map(channel_duration).unwrap_or(0.0);
+            let m2 = ch.rotation.as_ref().map(channel_duration).unwrap_or(0.0);
+            let m3 = ch.scale.as_ref().map(channel_duration).unwrap_or(0.0);
+            m1.max(m2).max(m3)
+        })
+        .map(float_ord::FloatOrd)
+        .max()
+        .map(|x| x.0)
+        .unwrap_or(0.0)
+}
+
 fn load_animations<E: std::error::Error + 'static>(
     animations: gltf::iter::Animations,
     buffers: &[Vec<u8>],
@@ -780,20 +796,20 @@ fn load_animations<E: std::error::Error + 'static>(
                 .ok_or_else(|| GltfLoadError::MissingKeyframeValues(anim.index(), ch_idx))?
             {
                 gltf::animation::util::ReadOutputs::Translations(trs) => {
-                    chs.translation = Some(TranslationChannel {
-                        positions: trs.map(Vec3::from).collect(),
+                    chs.translation = Some(AnimationChannel {
+                        values: trs.map(Vec3::from).collect(),
                         times,
                     })
                 }
                 gltf::animation::util::ReadOutputs::Rotations(rots) => {
-                    chs.rotation = Some(RotationChannel {
-                        rotations: rots.into_f32().map(Quat::from_array).collect(),
+                    chs.rotation = Some(AnimationChannel {
+                        values: rots.into_f32().map(Quat::from_array).collect(),
                         times,
                     });
                 }
                 gltf::animation::util::ReadOutputs::Scales(scls) => {
-                    chs.scale = Some(ScaleChannel {
-                        scales: scls.map(Vec3::from).collect(),
+                    chs.scale = Some(AnimationChannel {
+                        values: scls.map(Vec3::from).collect(),
                         times,
                     });
                 }
@@ -805,6 +821,7 @@ fn load_animations<E: std::error::Error + 'static>(
 
         result.push(Labeled::new(
             Animation {
+                duration: compute_animation_duration(&result_channels),
                 channels: result_channels,
             },
             anim.name(),

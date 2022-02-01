@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "examples/animation",
     "examples/cube",
     "examples/cube-no-framework",
     "examples/egui",
@@ -10,6 +11,7 @@ members = [
     "examples/static-gltf",
     "examples/textured-quad",
     "rend3",
+    "rend3-anim",
     "rend3-egui",
     "rend3-framework",
     "rend3-gltf",
