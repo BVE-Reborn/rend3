@@ -211,7 +211,7 @@ pub fn pose_animation_frame(
     let animation = &scene.animations[animation_index];
     let time = time.clamp(0.0, animation.inner.duration);
 
-    for (skin_index, per_skin_data) in animation_data.skin_data.iter() {
+    for (skin_index, per_skin_data) in &animation_data.skin_data {
         let skin = &scene.skins[skin_index.0];
         let inv_bind_mats = &skin.inner.inverse_bind_matrices;
 
@@ -221,10 +221,10 @@ pub fn pose_animation_frame(
         let node_to_joint_idx = &per_skin_data.node_to_joint_idx;
 
         // Compute each bone's local transformation
-        for (node_idx, channels) in &animation.inner.channels {
+        for (&node_idx, channels) in &animation.inner.channels {
             // NOTE: If a channel's property is not present, we need to set the
             // joint at its bind pose for that individual property
-            let local_transform = instance.nodes[*node_idx].inner.local_transform;
+            let local_transform = instance.nodes[node_idx].inner.local_transform;
             let (bind_scale, bind_rotation, bind_translation) = local_transform.to_scale_rotation_translation();
 
             let translation = channels
@@ -244,7 +244,7 @@ pub fn pose_animation_frame(
                 .unwrap_or(bind_scale);
 
             let matrix = Mat4::from_scale_rotation_translation(scale, rotation, translation);
-            let joint_idx = node_to_joint_idx[&NodeIndex(*node_idx)];
+            let joint_idx = node_to_joint_idx[&NodeIndex(node_idx)];
             joint_local_matrices[joint_idx.0] = matrix;
         }
 
