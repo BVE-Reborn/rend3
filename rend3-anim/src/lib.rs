@@ -12,6 +12,8 @@
 //! current state of the animation by changing the currently played animation or
 //! increasing the playback time should be handled in user code.
 
+use std::collections::HashMap;
+
 use itertools::Itertools;
 use rend3::{
     types::{
@@ -77,7 +79,7 @@ impl AnimationData {
         // The set of joints that each animation affects, stored as node indices
         // NOTE: Uses a std HashMap because `GroupingMap::collect()` is
         // hardcoded to return that.
-        let animation_to_joint_nodes: std::collections::HashMap<AnimationIndex, FastHashSet<NodeIndex>> = scene
+        let animation_to_joint_nodes: HashMap<AnimationIndex, FastHashSet<NodeIndex>> = scene
             .animations
             .iter()
             .enumerate()

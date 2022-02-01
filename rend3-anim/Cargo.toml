@@ -15,6 +15,3 @@ itertools = "0.10"
 rend3 = { version = "^0.2.0", path = "../rend3" }
 rend3-routine = { version = "^0.2.0", path = "../rend3-routine" }
 rend3-gltf = { version = "^0.2.0", path = "../rend3-gltf" }
-
-[dev-dependencies]
-pollster = "0.2"

@@ -164,7 +164,7 @@ pub fn main() {
     rend3_framework::start(
         app,
         winit::window::WindowBuilder::new()
-            .with_title("skinning-example")
+            .with_title("animation-example")
             .with_maximized(true),
     );
 }
