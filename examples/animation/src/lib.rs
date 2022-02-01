@@ -2,26 +2,34 @@ use std::{path::Path, sync::Arc};
 
 const SAMPLE_COUNT: rend3::types::SampleCount = rend3::types::SampleCount::One;
 
-struct AnimationExample {
-    loaded_scene: Option<rend3_gltf::LoadedGltfScene>,
-    loaded_instance: Option<rend3_gltf::GltfSceneInstance>,
-    animation_data: Option<rend3_anim::AnimationData>,
-    directional_light_handle: Option<rend3::types::DirectionalLightHandle>,
+/// The application data, can only be obtained at `setup` time, so it's under an
+/// Option in the main struct.
+struct InitializedData {
+    loaded_scene: rend3_gltf::LoadedGltfScene,
+    loaded_instance: rend3_gltf::GltfSceneInstance,
+    animation_data: rend3_anim::AnimationData,
+    _directional_light_handle: rend3::types::DirectionalLightHandle,
     animation_time: f32,
     last_frame_time: instant::Instant,
 }
 
+#[derive(Default)]
+struct AnimationExample {
+    /// The application data, or `None` if it hasn't been initialized already
+    data: Option<InitializedData>,
+}
+
 impl AnimationExample {
     pub fn update(&mut self, renderer: &rend3::Renderer, delta: f32) {
-        let scene = self.loaded_scene.as_ref().unwrap();
-        self.animation_time = (self.animation_time + delta) % scene.animations[0].inner.duration;
+        let data = self.data.as_mut().unwrap();
+        data.animation_time = (data.animation_time + delta) % data.loaded_scene.animations[0].inner.duration;
         rend3_anim::pose_animation_frame(
             renderer,
-            self.loaded_scene.as_ref().unwrap(),
-            self.loaded_instance.as_ref().unwrap(),
-            self.animation_data.as_ref().unwrap(),
+            &data.loaded_scene,
+            &data.loaded_instance,
+            &data.animation_data,
             0,
-            self.animation_time,
+            data.animation_time,
         )
     }
 }
@@ -51,6 +59,7 @@ impl rend3_framework::App for AnimationExample {
         });
 
         // Load a gltf model with animation data
+        // Needs to be stored somewhere, otherwise all the data gets freed.
         let path = Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/resources/scene.gltf"));
         let gltf_data = std::fs::read(&path).unwrap();
         let parent_directory = path.parent().unwrap();
@@ -62,24 +71,27 @@ impl rend3_framework::App for AnimationExample {
         ))
         .expect("Loading gltf scene");
 
-        // Store the loaded model somewhere, otherwise all the data gets freed.
-        self.animation_data = Some(rend3_anim::AnimationData::from_gltf_scene(
-            &loaded_scene,
-            &loaded_instance,
-        ));
-        self.loaded_scene = Some(loaded_scene);
-        self.loaded_instance = Some(loaded_instance);
-
         // Create a single directional light
         //
         // We need to keep the directional light handle alive.
-        self.directional_light_handle = Some(renderer.add_directional_light(rend3::types::DirectionalLight {
+        let directional_light_handle = renderer.add_directional_light(rend3::types::DirectionalLight {
             color: glam::Vec3::ONE,
             intensity: 10.0,
             // Direction will be normalized
             direction: glam::Vec3::new(-1.0, -4.0, 2.0),
             distance: 400.0,
-        }));
+        });
+
+        let init_data = InitializedData {
+            animation_data: rend3_anim::AnimationData::from_gltf_scene(&loaded_scene, &loaded_instance),
+            loaded_scene,
+            loaded_instance,
+            _directional_light_handle: directional_light_handle,
+            animation_time: 0.0,
+            last_frame_time: instant::Instant::now(),
+        };
+
+        self.data = Some(init_data);
     }
 
     fn handle_event(
@@ -103,8 +115,9 @@ impl rend3_framework::App for AnimationExample {
             }
             rend3_framework::Event::MainEventsCleared => {
                 let now = instant::Instant::now();
-                let delta = now.duration_since(self.last_frame_time).as_secs_f32();
-                self.last_frame_time = now;
+                let last_frame_time = &mut self.data.as_mut().unwrap().last_frame_time;
+                let delta = now.duration_since(*last_frame_time).as_secs_f32();
+                *last_frame_time = now;
                 self.update(renderer, delta);
                 window.request_redraw();
             }
@@ -145,20 +158,6 @@ impl rend3_framework::App for AnimationExample {
     }
 }
 
-// Instant is not `Default` so we need a manual impl for Default
-impl Default for AnimationExample {
-    fn default() -> Self {
-        Self {
-            loaded_scene: Default::default(),
-            loaded_instance: Default::default(),
-            animation_data: Default::default(),
-            directional_light_handle: Default::default(),
-            animation_time: Default::default(),
-            last_frame_time: instant::Instant::now(),
-        }
-    }
-}
-
 #[cfg_attr(target_os = "android", ndk_glue::main(backtrace = "on", logger(level = "debug")))]
 pub fn main() {
     let app = AnimationExample::default();
@@ -169,4 +168,3 @@ pub fn main() {
             .with_maximized(true),
     );
 }
-
