@@ -18,10 +18,10 @@ use rend3::{
         glam::{Mat4, Quat, Vec3},
         SkeletonHandle,
     },
+    util::typedefs::{FastHashMap, FastHashSet},
     Renderer,
 };
 use rend3_gltf::{AnimationChannel, GltfSceneInstance, LoadedGltfScene};
-use std::collections::{HashMap, HashSet};
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct AnimationIndex(pub usize);
@@ -38,7 +38,7 @@ pub struct PerSkinData {
     /// Translates node indices to joint indices for this particular skin. This
     /// translation is necessary because an animation may be animating a scene
     /// node which is present in multiple skins.
-    pub node_to_joint_idx: HashMap<NodeIndex, JointIndex>,
+    pub node_to_joint_idx: FastHashMap<NodeIndex, JointIndex>,
     /// Stores the node indices for this skin's joints in topological order.
     /// This is used to avoid iterating all the scene hierarchy when
     /// computing global positions for a node.
@@ -53,11 +53,11 @@ pub struct PerSkinData {
 pub struct AnimationData {
     /// For each skin, stores several cached data structures that speed up the
     /// animation loop at runtime.
-    pub skin_data: HashMap<SkinIndex, PerSkinData>,
+    pub skin_data: FastHashMap<SkinIndex, PerSkinData>,
     /// For each animation, stores the list of skins it affects. An animation
     /// affects a skin if it deforms any of its joints. This is used to avoid
     /// iterating unaffected skins when playing an animation.
-    pub animation_skin_usage: HashMap<AnimationIndex, Vec<SkinIndex>>,
+    pub animation_skin_usage: FastHashMap<AnimationIndex, Vec<SkinIndex>>,
 }
 
 impl AnimationData {
@@ -75,7 +75,9 @@ impl AnimationData {
     ///   [`instance_loaded_scene`](rend3_gltf::instance_loaded_scene)
     pub fn from_gltf_scene(scene: &LoadedGltfScene, instance: &GltfSceneInstance) -> Self {
         // The set of joints that each animation affects, stored as node indices
-        let animation_to_joint_nodes: HashMap<AnimationIndex, HashSet<NodeIndex>> = scene
+        // NOTE: Uses a std HashMap because `GroupingMap::collect()` is
+        // hardcoded to return that.
+        let animation_to_joint_nodes: std::collections::HashMap<AnimationIndex, FastHashSet<NodeIndex>> = scene
             .animations
             .iter()
             .enumerate()
@@ -86,9 +88,9 @@ impl AnimationData {
                     .map(move |node_idx| (AnimationIndex(anim_idx), NodeIndex(*node_idx)))
             })
             .into_grouping_map()
-            .collect::<HashSet<_>>();
+            .collect::<FastHashSet<_>>();
 
-        let mut animation_skin_usage = HashMap::<AnimationIndex, Vec<SkinIndex>>::new();
+        let mut animation_skin_usage = FastHashMap::<AnimationIndex, Vec<SkinIndex>>::default();
         for animation_idx in 0..scene.animations.len() {
             let animation_idx = AnimationIndex(animation_idx);
             for (skin_index, skin) in scene.skins.iter().enumerate() {
@@ -109,7 +111,7 @@ impl AnimationData {
             }
         }
 
-        let mut skin_data = HashMap::new();
+        let mut skin_data = FastHashMap::default();
         for (skin_index, skin) in scene.skins.iter().enumerate() {
             let skin_index = SkinIndex(skin_index);
 
