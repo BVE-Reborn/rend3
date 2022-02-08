@@ -19,7 +19,7 @@ env_logger = { version = "0.9", default-features = false, features = ["termcolor
 # Linear algebra library
 glam = "0.20.0"
 # parsing model files
-gltf = { version = "0.16", default-features = false, features = ["import", "utils"] }
+gltf = { version = "1.0", default-features = false, features = ["import", "utils"] }
 # Renderer core
 rend3 = { version = "^0.2.0", path = "../../rend3"}
 # Framework that deals with the event loop, setting up the renderer, and platform differences.
