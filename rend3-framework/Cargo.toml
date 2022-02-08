@@ -40,4 +40,4 @@ wasm-bindgen-futures = "0.4"
 web-sys = "0.3"
 
 [target.'cfg(target_os = "android")'.dependencies]
-ndk-glue = "0.5"
+ndk-glue = "0.6"
