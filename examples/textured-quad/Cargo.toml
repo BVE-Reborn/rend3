@@ -1,7 +1,7 @@
 [package]
 name = "rend3-textured-quad-example"
 license = "MIT OR Apache-2.0 OR Zlib"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["The rend3 Developers"]
 edition = "2021"
 publish = false
@@ -19,11 +19,11 @@ env_logger = { version = "0.9", default-features = false, features = ["termcolor
 # Linear algebra library
 glam = "0.20.0"
 # Renderer core
-rend3 = { version = "^0.2.0", path = "../../rend3" }
+rend3 = { version = "^0.3.0", path = "../../rend3" }
 # Framework that deals with the event loop, setting up the renderer, and platform differences.
-rend3-framework = { version = "^0.2.0", path = "../../rend3-framework" }
+rend3-framework = { version = "^0.3.0", path = "../../rend3-framework" }
 # Programmable render list that dictates how the scene renders
-rend3-routine = { version = "^0.2.0", path = "../../rend3-routine" }
+rend3-routine = { version = "^0.3.0", path = "../../rend3-routine" }
 # windowing
 winit = "0.26"
 # Load image

@@ -1,6 +1,6 @@
 [package]
 name = "rend3-types"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["The rend3 Developers"]
 edition = "2021"
 description = "Type definitions for the rend3 rendering library."

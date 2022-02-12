@@ -1,6 +1,6 @@
 [package]
 name = "rend3-imgui"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["The rend3 Developers"]
 edition = "2021"
 description = "Imgui Render Routine for the rend3 rendering library."
@@ -15,4 +15,4 @@ rust-version = "1.57"
 imgui = "0.8"
 imgui-wgpu = "0.19" 
 glam = "0.20.0"
-rend3 = { version = "^0.2.0", path = "../rend3" }
+rend3 = { version = "^0.3.0", path = "../rend3" }

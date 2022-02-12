@@ -1,6 +1,6 @@
 [package]
 name = "rend3-routine"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["The rend3 Developers"]
 edition = "2021"
 description = "Customizable Render Routines for the rend3 rendering library."
@@ -22,6 +22,6 @@ log = "0.4"
 ordered-float = "2"
 parking_lot = "0.11.2"
 profiling = {version = "1", default-features = false }
-rend3 = { version = "^0.2.0", path = "../rend3" }
+rend3 = { version = "^0.3.0", path = "../rend3" }
 wgpu = "0.12"
 wgpu-profiler = "0.8.0"

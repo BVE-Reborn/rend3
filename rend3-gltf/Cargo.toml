@@ -1,6 +1,6 @@
 [package]
 name = "rend3-gltf"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["The rend3 Developers"]
 edition = "2021"
 description = "gltf scene and model loader for the rend3 rendering library."
@@ -26,8 +26,8 @@ image = { version = "0.23", default-features = false }
 ktx2 = { version = "0.3", optional = true }
 log = "0.4"
 profiling = {version = "1", default-features = false }
-rend3 = { version = "^0.2.0", path = "../rend3" }
-rend3-routine = { version = "^0.2.0", path = "../rend3-routine" }
+rend3 = { version = "^0.3.0", path = "../rend3" }
+rend3-routine = { version = "^0.3.0", path = "../rend3-routine" }
 rustc-hash = "1"
 thiserror = "1"
 

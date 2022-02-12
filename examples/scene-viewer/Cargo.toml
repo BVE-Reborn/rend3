@@ -1,6 +1,6 @@
 [package]
 name = "scene-viewer"
-version = "0.2.1"
+version = "0.3.0"
 authors = ["The rend3 Developers"]
 edition = "2021"
 description = "A gltf scene viewer based on the rend3 3D rendering engine."
@@ -41,10 +41,10 @@ log = "0.4"
 pico-args = "0.4"
 pollster = "0.2"
 profiling = { version = "1", default-features = false }
-rend3 = { version = "^0.2.0", path = "../../rend3" }
-rend3-framework = { version = "^0.2.0", path = "../../rend3-framework" }
-rend3-gltf = { version = "^0.2.0", default-features = false, path = "../../rend3-gltf", features = ["ddsfile", "ktx2"] }
-rend3-routine = { version = "^0.2.0", path = "../../rend3-routine" }
+rend3 = { version = "^0.3.0", path = "../../rend3" }
+rend3-framework = { version = "^0.3.0", path = "../../rend3-framework" }
+rend3-gltf = { version = "^0.3.0", default-features = false, path = "../../rend3-gltf", features = ["ddsfile", "ktx2"] }
+rend3-routine = { version = "^0.3.0", path = "../../rend3-routine" }
 rustc-hash = "1"
 smallvec = "1"
 tracy-client = { version = "0.12", optional = true }

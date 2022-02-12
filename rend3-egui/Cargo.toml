@@ -1,6 +1,6 @@
 [package]
 name = "rend3-egui"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["The rend3 Developers"]
 edition = "2021"
 description = "Egui Render Routine for the rend3 rendering library."
@@ -16,5 +16,5 @@ egui = "0.16.0"
 egui_wgpu_backend = "0.16.0"
 epi = "0.16.0"
 glam = "0.20.0"
-rend3 = { version = "^0.2.0", path = "../rend3" }
+rend3 = { version = "^0.3.0", path = "../rend3" }
 wgpu = "0.12"

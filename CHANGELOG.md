@@ -17,6 +17,7 @@ Per Keep a Changelog there are 6 main categories of changes:
 ## Versions
 
 - [Unreleased](#unreleased)
+- [v0.3.0](#v030)
 - [v0.2.0](#v020)
 - [v0.1.1](#v011)
 - [v0.1.0](#v010)
@@ -29,6 +30,10 @@ Per Keep a Changelog there are 6 main categories of changes:
 - [Diffs](#diffs)
 
 ## Unreleased
+
+## v0.3.0
+
+Released 2022-02-11
 
 This is by far the largest release of rend3 since 0.1. I have done my best to document everything that has changed.
 
@@ -235,7 +240,8 @@ Released 2021-03-06
 
 ## Diffs
 
-- [Unreleased](https://github.com/BVE-Reborn/rend3/compare/v0.2.0...HEAD)
+- [Unreleased](https://github.com/BVE-Reborn/rend3/compare/v0.3.0...HEAD)
+- [v0.3.0](https://github.com/BVE-Reborn/rend3/compare/v0.2.0...v0.3.0)
 - [v0.2.0](https://github.com/BVE-Reborn/rend3/compare/v0.1.1...v0.2.0)
 - [v0.1.1](https://github.com/BVE-Reborn/rend3/compare/v0.1.0...v0.1.1)
 - [v0.1.0](https://github.com/BVE-Reborn/rend3/compare/v0.0.6...v0.1.0)
