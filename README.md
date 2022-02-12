@@ -50,6 +50,7 @@ integration crates
 There are extension crates that are not required, but provide pre-made bits
 of useful code that I would recommend using.
 
+- `rend3-anim`: Skeletal animation playback utilities. Currently tied to rend3-gltf.
 - `rend3-framework`: Vastly simplifies correct handling of the window and
   surface across platforms.
 - `rend3-gltf`: Modular gltf file and scene loader.
@@ -60,7 +61,6 @@ Integration with other external libraries are also offered. Due to external
 dependencies, the versions of these may increase at a much higher rate than
 the rest of the ecosystem.
 
-- `rend3-anim`: Skeletal animation playback utilities. Currently tied to rend3-gltf.
 - `rend3-egui`: Integration with the [egui](https://github.com/emilk/egui)
   immediate mode gui.
 - `rend3-imgui`: Integration with the [imgui](https://github.com/ocornut/imgui)
