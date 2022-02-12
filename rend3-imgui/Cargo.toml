@@ -3,12 +3,12 @@ name = "rend3-imgui"
 version = "0.2.0"
 authors = ["The rend3 Developers"]
 edition = "2021"
-description = "Imgui Render Routine for rend3"
+description = "Imgui Render Routine for the rend3 rendering library."
 readme = "../README.md"
 license = "MIT OR Apache-2.0 OR Zlib"
 repository = "https://github.com/BVE-Reborn/rend3"
-keywords = ["3d", "graphics",  "rend3", "renderer", "wgpu"]
-categories = ["game-development", "graphics", "rendering", "rendering::engine"]
+keywords = ["3d", "graphics",  "rend3", "imgui", "wgpu"]
+categories = ["game-development", "graphics", "rendering", "rendering::engine", "wasm"]
 rust-version = "1.57"
 
 [dependencies]
