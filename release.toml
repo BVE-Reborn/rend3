@@ -1,4 +1,8 @@
 consolidate-commits = true
+consolidate-pushes = true
 dev-version = false
+sign-commit = true
+sign-tag = true
+allow-branch = ["trunk", "v*"]
 tag = false
 pre-release-commit-message = "Version {{version}}"
