@@ -282,7 +282,7 @@ impl<'node> RenderGraph<'node> {
 
                 // SAFETY: the renderpass has died, so there are no outstanding immutible
                 // borrows of the structure, and all uses of the temporaries have died.
-                unsafe { (&mut *rpass_temps_cell.get()).clear() };
+                unsafe { (*rpass_temps_cell.get()).clear() };
 
                 cmd_bufs.push(
                     mem::replace(
@@ -387,7 +387,7 @@ impl<'node> RenderGraph<'node> {
 
         // SAFETY: the renderpass has dropped, and so has all the uses of the data, and
         // the immutable borrows of the allocator.
-        unsafe { (&mut *rpass_temps_cell.get()).clear() }
+        unsafe { (*rpass_temps_cell.get()).clear() }
         drop(rpass_temps_cell);
 
         // SAFETY: this is safe as we've dropped all renderpasses that possibly borrowed

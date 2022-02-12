@@ -67,10 +67,10 @@ impl AssetLoader {
     #[cfg(all(not(target_arch = "wasm32"), not(target_os = "android")))]
     pub async fn get_asset(&self, path: AssetPath<'_>) -> Result<Vec<u8>, AssetError> {
         let full_path = path.get_path(&self.base);
-        Ok(std::fs::read(&*full_path).map_err(|error| AssetError::FileError {
+        std::fs::read(&*full_path).map_err(|error| AssetError::FileError {
             path: SsoString::from(full_path),
             error,
-        })?)
+        })
     }
 
     #[cfg(target_os = "android")]
