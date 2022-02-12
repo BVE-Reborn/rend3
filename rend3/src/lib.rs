@@ -49,6 +49,7 @@
 //! dependencies, the versions of these may increase at a much higher rate than
 //! the rest of the ecosystem.
 //!
+//! - `rend3-anim`: Skeletal animation playback utilities. Currently tied to rend3-gltf.
 //! - `rend3-egui`: Integration with the [egui](https://github.com/emilk/egui)
 //!   immediate mode gui.
 //! - `rend3-imgui`: Integration with the [imgui](https://github.com/ocornut/imgui)
