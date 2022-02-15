@@ -2,6 +2,7 @@
 //!
 //! Call [`EguiRenderRoutine::add_to_graph`] to add it to the graph.
 
+use std::sync::Arc;
 use rend3::{
     graph::{RenderGraph, RenderPassTarget, RenderPassTargets, RenderTargetHandle},
     types::SampleCount,
@@ -88,7 +89,7 @@ impl EguiRenderRoutine {
         });
     }
 
-    pub fn image_to_egui(renderer: &Arc<rend3::Renderer>, image_rgba: &image::ImageBuffer<image::Rgba<u8>, std::vec::Vec<u8>>, dimensions: (u32, u32),) -> egui::TextureId {
+    pub fn image_to_egui(&mut self, renderer: &Arc<rend3::Renderer>, image_rgba: &image::ImageBuffer<image::Rgba<u8>, std::vec::Vec<u8>>, dimensions: (u32, u32),) -> egui::TextureId {
         let device = &renderer.device;
         let queue = &renderer.queue;
 
@@ -123,12 +124,12 @@ impl EguiRenderRoutine {
             texture_size,
         );
 
-        let egui_image = RenderPass::egui_texture_from_wgpu_texture(&mut self, device, &image_texture, wgpu::FilterMode::Linear);
+        let egui_image = egui_wgpu_backend::RenderPass::egui_texture_from_wgpu_texture(&mut self.internal, device, &image_texture, wgpu::FilterMode::Linear);
 
         return egui_image;
     }
 
-    pub fn wgpu_texture_to_egui(renderer: &Arc<rend3::Renderer>, image_texture: wgpu::Texture, image_rgba: &image::ImageBuffer<image::Rgba<u8>, std::vec::Vec<u8>>, dimensions: (u32, u32),) -> egui::TextureId {
+    pub fn wgpu_texture_to_egui(&mut self, renderer: &Arc<rend3::Renderer>, image_texture: wgpu::Texture, image_rgba: &image::ImageBuffer<image::Rgba<u8>, std::vec::Vec<u8>>, dimensions: (u32, u32),) -> egui::TextureId {
         let device = &renderer.device;
         let queue = &renderer.queue;
 
@@ -154,7 +155,7 @@ impl EguiRenderRoutine {
             texture_size,
         );
         
-        let egui_image = egui_wgpu_backend::RenderPass::egui_texture_from_wgpu_texture(&mut self, device, &image_texture, wgpu::FilterMode::Linear);
+        let egui_image = egui_wgpu_backend::RenderPass::egui_texture_from_wgpu_texture(&mut self.internal, device, &image_texture, wgpu::FilterMode::Linear);
 
         return egui_image;
     }
