@@ -116,9 +116,8 @@ impl rend3_framework::App for EguiExample {
         use image::GenericImageView;
         let dimensions = image_image.dimensions();
 
-        self.rust_logo = rend3_egui::EguiRenderRoutine::image_to_egui(
-            &mut egui_routine.internal, renderer, image_rgba, dimensions,
-        );
+        self.rust_logo =
+            rend3_egui::EguiRenderRoutine::image_to_egui(&mut egui_routine.internal, renderer, image_rgba, dimensions);
 
         let start_time = instant::Instant::now();
         let color: [f32; 4] = [0.0, 0.5, 0.5, 1.0];
@@ -172,10 +171,7 @@ impl rend3_framework::App for EguiExample {
                     }
                     ui.label("Want to get rusty?");
                     if ui
-                        .add(egui::widgets::ImageButton::new(
-                            self.rust_logo,
-                            egui::Vec2::splat(64.0),
-                        ))
+                        .add(egui::widgets::ImageButton::new(self.rust_logo, egui::Vec2::splat(64.0)))
                         .clicked()
                     {
                         webbrowser::open("https://www.rust-lang.org").expect("failed to open URL");
