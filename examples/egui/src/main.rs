@@ -16,6 +16,7 @@ const SAMPLE_COUNT: rend3::types::SampleCount = rend3::types::SampleCount::One;
 #[derive(Default)]
 struct EguiExample {
     data: Option<EguiExampleData>,
+    rust_logo: egui::TextureId,
 }
 impl rend3_framework::App for EguiExample {
     const HANDEDNESS: rend3::types::Handedness = rend3::types::Handedness::Left;
@@ -34,7 +35,7 @@ impl rend3_framework::App for EguiExample {
         let window_size = window.inner_size();
 
         // Create the egui render routine
-        let egui_routine = rend3_egui::EguiRenderRoutine::new(
+        let mut egui_routine = rend3_egui::EguiRenderRoutine::new(
             renderer,
             surface_format,
             rend3::types::SampleCount::One,
@@ -107,6 +108,18 @@ impl rend3_framework::App for EguiExample {
             style: Default::default(),
         });
 
+        //Images
+        let image_bytes = include_bytes!("images/rust-logo-128x128-blk.png");
+        let image_image = image::load_from_memory(image_bytes).unwrap();
+        let image_rgba = image_image.as_rgba8().unwrap();
+
+        use image::GenericImageView;
+        let dimensions = image_image.dimensions();
+
+        self.rust_logo = rend3_egui::EguiRenderRoutine::image_to_egui(
+            &mut egui_routine.internal, renderer, image_rgba, dimensions,
+        );
+
         let start_time = instant::Instant::now();
         let color: [f32; 4] = [0.0, 0.5, 0.5, 1.0];
 
@@ -156,6 +169,16 @@ impl rend3_framework::App for EguiExample {
                                 ..rend3_routine::pbr::PbrMaterial::default()
                             },
                         );
+                    }
+                    ui.label("Want to get rusty?");
+                    if ui
+                        .add(egui::widgets::ImageButton::new(
+                            self.rust_logo,
+                            egui::Vec2::splat(64.0),
+                        ))
+                        .clicked()
+                    {
+                        webbrowser::open("https://www.rust-lang.org").expect("failed to open URL");
                     }
                 });
 
