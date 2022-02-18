@@ -111,10 +111,17 @@ impl EguiRenderRoutine {
             dimension: wgpu::TextureDimension::D2,
             format,
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-            label: Some(lable),
+            label,
         });
 
-        EguiRenderRoutine::wgpu_texture_to_egui(internal, renderer, image_texture, image_rgba, dimensions)
+        EguiRenderRoutine::wgpu_texture_to_egui(
+            internal,
+            renderer,
+            image_texture,
+            image_rgba,
+            dimensions,
+            format.describe(),
+        )
     }
 
     /// Creates egui::TextureId with wgpu backend with existing wgpu::Texture
@@ -124,6 +131,7 @@ impl EguiRenderRoutine {
         image_texture: wgpu::Texture,
         image_rgba: &[u8],
         dimensions: (u32, u32),
+        textureformatinfo: wgpu_types::TextureFormatInfo,
     ) -> egui::TextureId {
         let device = &renderer.device;
         let queue = &renderer.queue;
@@ -144,8 +152,10 @@ impl EguiRenderRoutine {
             image_rgba,
             wgpu::ImageDataLayout {
                 offset: 0,
-                bytes_per_row: std::num::NonZeroU32::new(4 * dimensions.0),
-                rows_per_image: std::num::NonZeroU32::new(dimensions.1),
+                bytes_per_row: std::num::NonZeroU32::new(
+                    (dimensions.0 / textureformatinfo.block_dimensions.0 as u32) * textureformatinfo.block_size as u32,
+                ),
+                rows_per_image: None,
             },
             texture_size,
         );

@@ -124,7 +124,7 @@ impl rend3_framework::App for EguiExample {
             format,
             &image_rgba,
             dimensions,
-            "rust_logo_texture",
+            Some("rust_logo_texture"),
         );
 
         let start_time = instant::Instant::now();
