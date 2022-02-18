@@ -18,3 +18,4 @@ epi = "0.16.0"
 glam = "0.20.0"
 rend3 = { version = "^0.3.0", path = "../rend3" }
 wgpu = "0.12"
+wgpu-types = "0.12.0"
