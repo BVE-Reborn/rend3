@@ -31,6 +31,11 @@ Per Keep a Changelog there are 6 main categories of changes:
 
 ## Unreleased
 
+### Added
+- rend3-egui: Added the ability to import images to egui::TextureId with the wgpu backend @AlbinSjoegren
+  - Added function for creating wgpu textures with rgba data and exporting to egui::TextureId @AlbinSjoegren
+  - Added function for using previous wgpu textures with rgba data and exporting to egui::TextureId @AlbinSjoegren
+
 ## v0.3.0
 
 Released 2022-02-11
