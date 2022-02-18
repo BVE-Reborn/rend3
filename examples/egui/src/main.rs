@@ -118,15 +118,13 @@ impl rend3_framework::App for EguiExample {
 
         let format = wgpu::TextureFormat::Rgba8UnormSrgb;
 
-        let rust_logo_texture =
-            rend3_egui::EguiRenderRoutine::create_wgpu_texture(renderer, format, dimensions, "rust_logo_texture");
-
-        self.rust_logo = rend3_egui::EguiRenderRoutine::wgpu_texture_to_egui(
+        self.rust_logo = rend3_egui::EguiRenderRoutine::create_egui_texture(
             &mut egui_routine.internal,
             renderer,
-            rust_logo_texture,
+            format,
             &image_rgba,
             dimensions,
+            "rust_logo_texture",
         );
 
         let start_time = instant::Instant::now();

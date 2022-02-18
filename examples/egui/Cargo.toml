@@ -22,6 +22,8 @@ egui_winit_platform = "0.13.0"
 env_logger = { version = "0.9", default-features = false, features = ["termcolor", "atty"] }
 # Linear algebra library
 glam = "0.20.0"
+# Importing png's 
+image = { version = "0.23.14", default-features = false, features = ["png"] }
 # Portable implementation of Instant.
 instant = { version = "0.1", features = ["wasm-bindgen"] }
 # Renderer core
@@ -38,8 +40,3 @@ winit = "0.26"
 webbrowser = "0.5.5"
 # Creating textures
 wgpu = "0.12"
-
-[dependencies.image]
-default-features = false
-features = ["png"]
-version = "0.23.14"

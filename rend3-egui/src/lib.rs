@@ -89,21 +89,22 @@ impl EguiRenderRoutine {
         });
     }
 
-    /// Creates a wgpu texture
-    pub fn create_wgpu_texture(
+    /// Creates an egui texture (egui::TextureId)
+    pub fn create_egui_texture(
+        internal: &mut egui_wgpu_backend::RenderPass,
         renderer: &Arc<rend3::Renderer>,
         format: wgpu::TextureFormat,
+        image_rgba: &[u8],
         dimensions: (u32, u32),
         lable: &str,
-    ) -> wgpu::Texture {
-        let device = &renderer.device;
-
+    ) -> egui::TextureId {
         let texture_size = wgpu::Extent3d {
             width: dimensions.0,
             height: dimensions.1,
             depth_or_array_layers: 1,
         };
-        device.create_texture(&wgpu::TextureDescriptor {
+
+        let image_texture = renderer.device.create_texture(&wgpu::TextureDescriptor {
             size: texture_size,
             mip_level_count: 1,
             sample_count: 1,
@@ -111,7 +112,9 @@ impl EguiRenderRoutine {
             format,
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
             label: Some(lable),
-        })
+        });
+
+        EguiRenderRoutine::wgpu_texture_to_egui(internal, renderer, image_texture, image_rgba, dimensions)
     }
 
     /// Creates egui::TextureId with wgpu backend with existing wgpu::Texture
