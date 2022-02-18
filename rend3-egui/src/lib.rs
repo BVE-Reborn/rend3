@@ -96,7 +96,7 @@ impl EguiRenderRoutine {
         format: wgpu::TextureFormat,
         image_rgba: &[u8],
         dimensions: (u32, u32),
-        lable: &str,
+        label: Option<&str>,
     ) -> egui::TextureId {
         let texture_size = wgpu::Extent3d {
             width: dimensions.0,
