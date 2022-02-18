@@ -89,53 +89,29 @@ impl EguiRenderRoutine {
         });
     }
 
-    /// Creates egui::TextureId with wgpu backend
-    pub fn image_to_egui(
-        internal: &mut egui_wgpu_backend::RenderPass,
+    /// Creates a wgpu texture
+    pub fn create_wgpu_texture(
         renderer: &Arc<rend3::Renderer>,
-        image_rgba: &image::ImageBuffer<image::Rgba<u8>, std::vec::Vec<u8>>,
+        format: wgpu::TextureFormat,
         dimensions: (u32, u32),
-    ) -> egui::TextureId {
+        lable: &str,
+    ) -> wgpu::Texture {
         let device = &renderer.device;
-        let queue = &renderer.queue;
 
         let texture_size = wgpu::Extent3d {
             width: dimensions.0,
             height: dimensions.1,
             depth_or_array_layers: 1,
         };
-        let image_texture = device.create_texture(&wgpu::TextureDescriptor {
+        device.create_texture(&wgpu::TextureDescriptor {
             size: texture_size,
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8UnormSrgb,
+            format: format,
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-            label: Some("image_texture"),
-        });
-
-        queue.write_texture(
-            wgpu::ImageCopyTexture {
-                texture: &image_texture,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-                aspect: wgpu::TextureAspect::All,
-            },
-            image_rgba,
-            wgpu::ImageDataLayout {
-                offset: 0,
-                bytes_per_row: std::num::NonZeroU32::new(4 * dimensions.0),
-                rows_per_image: std::num::NonZeroU32::new(dimensions.1),
-            },
-            texture_size,
-        );
-
-        egui_wgpu_backend::RenderPass::egui_texture_from_wgpu_texture(
-            internal,
-            device,
-            &image_texture,
-            wgpu::FilterMode::Linear,
-        )
+            label: Some(lable),
+        })
     }
 
     /// Creates egui::TextureId with wgpu backend with existing wgpu::Texture
@@ -143,7 +119,7 @@ impl EguiRenderRoutine {
         internal: &mut egui_wgpu_backend::RenderPass,
         renderer: &Arc<rend3::Renderer>,
         image_texture: wgpu::Texture,
-        image_rgba: &image::ImageBuffer<image::Rgba<u8>, std::vec::Vec<u8>>,
+        image_rgba: &[u8],
         dimensions: (u32, u32),
     ) -> egui::TextureId {
         let device = &renderer.device;

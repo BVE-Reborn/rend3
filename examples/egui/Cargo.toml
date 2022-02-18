@@ -34,7 +34,12 @@ rend3-framework = { version = "^0.3.0", path = "../../rend3-framework" }
 rend3-routine = { version = "^0.3.0",path = "../../rend3-routine" }
 # Windowing
 winit = "0.26"
-#Importing images
-image = "0.24.0"
-#Opening URL's
+# Opening URL's
 webbrowser = "0.5.5"
+# Creating textures
+wgpu = "0.12"
+
+[dependencies.image]
+default-features = false
+features = ["png"]
+version = "0.23.14"
