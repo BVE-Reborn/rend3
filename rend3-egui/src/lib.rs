@@ -89,7 +89,7 @@ impl EguiRenderRoutine {
         });
     }
 
-    /// Creates an egui texture (egui::TextureId)
+    /// Creates an egui texture from the given image data, format, and dimensions.
     pub fn create_egui_texture(
         internal: &mut egui_wgpu_backend::RenderPass,
         renderer: &Arc<rend3::Renderer>,
