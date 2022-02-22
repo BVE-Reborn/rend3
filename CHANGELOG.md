@@ -31,6 +31,9 @@ Per Keep a Changelog there are 6 main categories of changes:
 
 ## Unreleased
 
+### Fixes
+- Fixed mismatched BGLs when using a custom material with no cutout specification
+
 ## v0.3.0
 
 Released 2022-02-11
