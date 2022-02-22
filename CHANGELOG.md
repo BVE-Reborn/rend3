@@ -36,6 +36,9 @@ Per Keep a Changelog there are 6 main categories of changes:
   - Added function for creating egui textures (egui::TextureId) @AlbinSjoegren
   - Added function for writing previous wgpu textures with new rgba data and exporting to egui::TextureId @AlbinSjoegren
 
+### Fixes
+- Fixed mismatched BGLs when using a custom material with no cutout specification
+
 ## v0.3.0
 
 Released 2022-02-11

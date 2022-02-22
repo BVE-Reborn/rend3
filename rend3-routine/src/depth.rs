@@ -317,6 +317,9 @@ pub struct DepthPipelines {
     pub prepass_cutout_s4: Option<RenderPipeline>,
 }
 impl DepthPipelines {
+    /// If abi_bgl is Some, cutout shaders will be generated, otherwise they won't.
+    ///
+    /// The abi_bgl is how we communicate _how_ to do the cutout.
     pub fn new(
         renderer: &Renderer,
         data_core: &RendererDataCore,
@@ -394,6 +397,14 @@ impl DepthPipelines {
             )
         };
 
+        let optional_inner = |name, ty, pll, frag, samples| {
+            if abi_bgl.is_some() {
+                Some(inner(name, ty, pll, frag, samples))
+            } else {
+                None
+            }
+        };
+
         DepthPipelines {
             shadow_opaque_s1: inner(
                 "Shadow Opaque 1x",
@@ -402,13 +413,13 @@ impl DepthPipelines {
                 &depth_opaque_frag,
                 SampleCount::One,
             ),
-            shadow_cutout_s1: Some(inner(
+            shadow_cutout_s1: optional_inner(
                 "Shadow Cutout 1x",
                 DepthPassType::Shadow,
                 &shadow_pll,
                 &depth_cutout_frag,
                 SampleCount::One,
-            )),
+            ),
             prepass_opaque_s1: inner(
                 "Prepass Opaque 1x",
                 DepthPassType::Prepass,
@@ -416,13 +427,13 @@ impl DepthPipelines {
                 &depth_opaque_frag,
                 SampleCount::One,
             ),
-            prepass_cutout_s1: Some(inner(
+            prepass_cutout_s1: optional_inner(
                 "Prepass Cutout 1x",
                 DepthPassType::Prepass,
                 &prepass_pll,
                 &depth_cutout_frag,
                 SampleCount::One,
-            )),
+            ),
             prepass_opaque_s4: inner(
                 "Prepass Opaque 4x",
                 DepthPassType::Prepass,
@@ -430,13 +441,13 @@ impl DepthPipelines {
                 &depth_opaque_frag,
                 SampleCount::Four,
             ),
-            prepass_cutout_s4: Some(inner(
+            prepass_cutout_s4: optional_inner(
                 "Prepass Cutout 4x",
                 DepthPassType::Prepass,
                 &prepass_pll,
                 &depth_cutout_frag,
                 SampleCount::Four,
-            )),
+            ),
         }
     }
 }
