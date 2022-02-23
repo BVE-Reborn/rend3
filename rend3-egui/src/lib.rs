@@ -171,5 +171,5 @@ impl EguiRenderRoutine {
 
 pub struct Input<'a> {
     pub clipped_meshes: &'a Vec<egui::ClippedMesh>,
-    pub context: egui::CtxRef,
+    pub context: egui::Context,
 }
