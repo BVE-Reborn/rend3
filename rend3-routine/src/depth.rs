@@ -220,16 +220,19 @@ impl<M: DepthRenderableMaterial> DepthRoutine<M> {
             rpass.set_pipeline(pipeline);
             rpass.set_bind_group(0, forward_uniform_bg, &[]);
             rpass.set_bind_group(1, &culled.per_material, &[]);
-            if let Some(ref bg) = this.bg {
+            let material_index = if let Some(ref bg) = this.bg {
                 rpass.set_bind_group(2, bg, &[]);
-            }
+                3
+            } else {
+                2
+            };
 
             match culled.inner.calls {
                 ProfileData::Cpu(ref draws) => {
-                    culling::draw_cpu_powered::<M>(rpass, draws, graph_data.material_manager, 3)
+                    culling::draw_cpu_powered::<M>(rpass, draws, graph_data.material_manager, material_index)
                 }
                 ProfileData::Gpu(ref data) => {
-                    rpass.set_bind_group(3, ready.d2_texture.bg.as_gpu(), &[]);
+                    rpass.set_bind_group(material_index, ready.d2_texture.bg.as_gpu(), &[]);
                     culling::draw_gpu_powered(rpass, data);
                 }
             }
@@ -280,16 +283,19 @@ impl<M: DepthRenderableMaterial> DepthRoutine<M> {
             rpass.set_pipeline(pipeline);
             rpass.set_bind_group(0, shadow_uniform, &[]);
             rpass.set_bind_group(1, &culled.per_material, &[]);
-            if let Some(ref bg) = this.bg {
+            let material_index = if let Some(ref bg) = this.bg {
                 rpass.set_bind_group(2, bg, &[]);
-            }
+                3
+            } else {
+                2
+            };
 
             match culled.inner.calls {
                 ProfileData::Cpu(ref draws) => {
-                    culling::draw_cpu_powered::<M>(rpass, draws, graph_data.material_manager, 3)
+                    culling::draw_cpu_powered::<M>(rpass, draws, graph_data.material_manager, material_index)
                 }
                 ProfileData::Gpu(ref data) => {
-                    rpass.set_bind_group(3, ready.d2_texture.bg.as_gpu(), &[]);
+                    rpass.set_bind_group(material_index, ready.d2_texture.bg.as_gpu(), &[]);
                     culling::draw_gpu_powered(rpass, data);
                 }
             }
