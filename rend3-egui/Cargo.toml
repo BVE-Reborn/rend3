@@ -12,7 +12,7 @@ categories = ["game-development", "graphics", "rendering", "rendering::engine", 
 rust-version = "1.57"
 
 [dependencies]
-egui = "0.16.0"
+egui = "0.17.0"
 egui_wgpu_backend = "0.16.0"
 epi = "0.16.0"
 glam = "0.20.0"
