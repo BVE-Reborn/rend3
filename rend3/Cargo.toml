@@ -49,7 +49,7 @@ range-alloc = "0.1"
 rend3-types = { version = "^0.3.0", path = "../rend3-types" }
 rustc-hash = "1"
 smallvec = "1"
-smartstring = "0.2"
+smartstring = "1.0"
 thiserror = "1"
 wgpu = "0.12"
 wgpu-profiler = "0.8.0"
