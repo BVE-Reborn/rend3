@@ -157,10 +157,7 @@ impl<M: DepthRenderableMaterial> DepthRoutine<M> {
             unclipped_depth_supported,
         );
 
-        Self {
-            pipelines,
-            bg,
-        }
+        Self { pipelines, bg }
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -318,7 +315,7 @@ pub struct DepthPipelines<M> {
     pub prepass_cutout_s1: Option<RenderPipeline>,
     pub prepass_opaque_s4: RenderPipeline,
     pub prepass_cutout_s4: Option<RenderPipeline>,
-    _phantom: PhantomData<M>
+    _phantom: PhantomData<M>,
 }
 impl<M: DepthRenderableMaterial> DepthPipelines<M> {
     /// If abi_bgl is Some, cutout shaders will be generated, otherwise they won't.
