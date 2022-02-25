@@ -38,6 +38,7 @@ Per Keep a Changelog there are 6 main categories of changes:
 
 ### Fixes
 - Fixed mismatched BGLs when using a custom material with no cutout specification
+- Fixed PbrMaterial instead of generic parameter M being used in forward and depth routines. @setzer22
 
 ## v0.3.0
 
