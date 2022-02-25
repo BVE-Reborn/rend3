@@ -26,7 +26,6 @@ use crate::{
         GPU_VERTEX_BUFFERS,
     },
     culling,
-    pbr::PbrMaterial,
 };
 
 /// A set of pipelines for rendering a specific combination of a material.
@@ -121,7 +120,7 @@ impl<M: Material> ForwardRoutine<M> {
         if renderer.profile == RendererProfile::GpuDriven {
             bgls.push(data_core.d2_texture_manager.gpu_bgl())
         } else {
-            bgls.push(data_core.material_manager.get_bind_group_layout_cpu::<PbrMaterial>());
+            bgls.push(data_core.material_manager.get_bind_group_layout_cpu::<M>());
         }
         bgls.extend(extra_bgls);
 
@@ -223,7 +222,7 @@ impl<M: Material> ForwardRoutine<M> {
 
             match culled.inner.calls {
                 ProfileData::Cpu(ref draws) => {
-                    culling::draw_cpu_powered::<PbrMaterial>(rpass, draws, graph_data.material_manager, 2)
+                    culling::draw_cpu_powered::<M>(rpass, draws, graph_data.material_manager, 2)
                 }
                 ProfileData::Gpu(ref data) => {
                     rpass.set_bind_group(2, ready.d2_texture.bg.as_gpu(), &[]);

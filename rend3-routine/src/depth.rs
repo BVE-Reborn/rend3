@@ -33,7 +33,6 @@ use crate::{
         GPU_VERTEX_BUFFERS,
     },
     culling::{self, PerMaterialArchetypeData},
-    pbr::PbrMaterial,
 };
 
 /// Trait for all materials that can use the built-in shadow/prepass rendering.
@@ -83,9 +82,8 @@ unsafe impl bytemuck::Zeroable for AlphaDataAbi {}
 /// Call the appropriate add-to-graph function for each archetype with the
 /// proper settings set for that archetype.
 pub struct DepthRoutine<M> {
-    pipelines: DepthPipelines,
+    pipelines: DepthPipelines<M>,
     bg: Option<BindGroup>,
-    _phantom: PhantomData<M>,
 }
 
 impl<M: DepthRenderableMaterial> DepthRoutine<M> {
@@ -162,7 +160,6 @@ impl<M: DepthRenderableMaterial> DepthRoutine<M> {
         Self {
             pipelines,
             bg,
-            _phantom: PhantomData,
         }
     }
 
@@ -314,15 +311,16 @@ pub enum DepthPassType {
 }
 
 /// Set of all possible needed pipelines for a material.
-pub struct DepthPipelines {
+pub struct DepthPipelines<M> {
     pub shadow_opaque_s1: RenderPipeline,
     pub shadow_cutout_s1: Option<RenderPipeline>,
     pub prepass_opaque_s1: RenderPipeline,
     pub prepass_cutout_s1: Option<RenderPipeline>,
     pub prepass_opaque_s4: RenderPipeline,
     pub prepass_cutout_s4: Option<RenderPipeline>,
+    _phantom: PhantomData<M>
 }
-impl DepthPipelines {
+impl<M: DepthRenderableMaterial> DepthPipelines<M> {
     /// If abi_bgl is Some, cutout shaders will be generated, otherwise they won't.
     ///
     /// The abi_bgl is how we communicate _how_ to do the cutout.
@@ -333,7 +331,7 @@ impl DepthPipelines {
         per_material_bgl: &BindGroupLayout,
         abi_bgl: Option<&BindGroupLayout>,
         unclipped_depth_supported: bool,
-    ) -> DepthPipelines {
+    ) -> DepthPipelines<M> {
         profiling::scope!("build depth pass pipelines");
         let depth_vert = unsafe {
             profile_safe_shader(
@@ -374,7 +372,7 @@ impl DepthPipelines {
         if renderer.profile == RendererProfile::GpuDriven {
             bgls.push(data_core.d2_texture_manager.gpu_bgl())
         } else {
-            bgls.push(data_core.material_manager.get_bind_group_layout_cpu::<PbrMaterial>());
+            bgls.push(data_core.material_manager.get_bind_group_layout_cpu::<M>());
         }
 
         let shadow_pll = renderer.device.create_pipeline_layout(&PipelineLayoutDescriptor {
@@ -454,6 +452,7 @@ impl DepthPipelines {
                 &depth_cutout_frag,
                 SampleCount::Four,
             ),
+            _phantom: PhantomData::<M>::default(),
         }
     }
 }
