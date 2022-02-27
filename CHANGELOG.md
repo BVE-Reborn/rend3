@@ -35,6 +35,7 @@ Per Keep a Changelog there are 6 main categories of changes:
 - rend3-egui: Added the ability to create egui textures (egui::TextureId) with the wgpu backend @AlbinSjoegren
   - Added function for creating egui textures (egui::TextureId) @AlbinSjoegren
   - Added function for writing previous wgpu textures with new rgba data and exporting to egui::TextureId @AlbinSjoegren
+- rend3-routine: Added the option to set a custom primitive topology value when building a forward routine. @setzer22
 
 ### Fixes
 - Fixed mismatched BGLs when using a custom material with no cutout specification
