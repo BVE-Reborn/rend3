@@ -63,6 +63,7 @@ impl<M: Material> ForwardRoutine<M> {
         blend: Option<BlendState>,
         use_prepass: bool,
         label: &str,
+        primitive_topology: Option<wgpu::PrimitiveTopology>,
     ) -> Self {
         profiling::scope!("PrimaryPasses::new");
 
@@ -142,6 +143,7 @@ impl<M: Material> ForwardRoutine<M> {
                 use_prepass,
                 label,
                 samples,
+                primitive_topology,
             )
         };
 
@@ -245,6 +247,7 @@ fn build_forward_pipeline_inner(
     use_prepass: bool,
     label: &str,
     samples: SampleCount,
+    primitive_topology: Option<PrimitiveTopology>,
 ) -> RenderPipeline {
     renderer.device.create_render_pipeline(&RenderPipelineDescriptor {
         label: Some(label),
@@ -258,7 +261,7 @@ fn build_forward_pipeline_inner(
             },
         },
         primitive: PrimitiveState {
-            topology: PrimitiveTopology::TriangleList,
+            topology: primitive_topology.unwrap_or(PrimitiveTopology::TriangleList),
             strip_index_format: None,
             front_face: match renderer.handedness {
                 Handedness::Left => FrontFace::Cw,

@@ -57,6 +57,7 @@ impl PbrRoutine {
                     TransparencyType::Cutout => "cutout pass",
                     TransparencyType::Blend => "blend forward pass",
                 },
+                None,
             )
         };
 
