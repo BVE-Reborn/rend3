@@ -52,12 +52,12 @@ impl PbrRoutine {
                     TransparencyType::Blend => Some(BlendState::ALPHA_BLENDING),
                 },
                 !matches!(transparency, TransparencyType::Blend),
+                wgpu::PrimitiveTopology::TriangleList,
                 match transparency {
                     TransparencyType::Opaque => "opaque pass",
                     TransparencyType::Cutout => "cutout pass",
                     TransparencyType::Blend => "blend forward pass",
                 },
-                None,
             )
         };
 
