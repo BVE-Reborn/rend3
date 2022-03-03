@@ -19,6 +19,7 @@ struct UniformData {
     inv_origin_view_proj: mat4x4<f32>;
     frustum: Frustum;
     ambient: vec4<f32>;
+    resolution: vec2<u32>;
 };
 
 struct UniformBuffer {
