@@ -1,7 +1,7 @@
 //! Helpers for building the per-camera uniform data used for cameras and
 //! shadows.
 
-use glam::{Mat4, Vec4};
+use glam::{Mat4, UVec2, Vec4};
 use rend3::{
     graph::{DataHandle, RenderGraph},
     managers::CameraManager,
@@ -26,10 +26,11 @@ pub struct FrameUniforms {
     pub inv_origin_view_proj: Mat4,
     pub frustum: ShaderFrustum,
     pub ambient: Vec4,
+    pub resolution: UVec2,
 }
 impl FrameUniforms {
     /// Use the given camera to generate these uniforms.
-    pub fn new(camera: &CameraManager, ambient: Vec4) -> Self {
+    pub fn new(camera: &CameraManager, ambient: Vec4, resolution: UVec2) -> Self {
         profiling::scope!("create uniforms");
 
         let view = camera.view();
@@ -45,6 +46,7 @@ impl FrameUniforms {
             inv_origin_view_proj: origin_view_proj.inverse(),
             frustum: ShaderFrustum::from_matrix(camera.proj()),
             ambient,
+            resolution,
         }
     }
 }
@@ -60,6 +62,7 @@ pub fn add_to_graph<'node>(
     interfaces: &'node WholeFrameInterfaces,
     samplers: &'node Samplers,
     ambient: Vec4,
+    resolution: UVec2,
 ) {
     let mut builder = graph.add_node("build uniform data");
     let shadow_handle = builder.add_data_output(shadow_uniform_bg);
@@ -69,7 +72,7 @@ pub fn add_to_graph<'node>(
 
         samplers.add_to_bg(&mut bgb);
 
-        let uniforms = FrameUniforms::new(graph_data.camera_manager, ambient);
+        let uniforms = FrameUniforms::new(graph_data.camera_manager, ambient, resolution);
         let uniform_buffer = renderer.device.create_buffer_init(&BufferInitDescriptor {
             label: Some("frame uniform"),
             contents: bytemuck::bytes_of(&uniforms),

@@ -90,7 +90,7 @@ impl BaseRenderGraph {
         // Preparing and uploading data
         state.pre_skinning(graph);
         state.pbr_pre_culling(graph);
-        state.create_frame_uniforms(graph, self, ambient);
+        state.create_frame_uniforms(graph, self, ambient, resolution);
 
         // Skinning
         state.skinning(graph, self);
@@ -222,6 +222,7 @@ impl BaseRenderGraphIntermediateState {
         graph: &mut RenderGraph<'node>,
         base: &'node BaseRenderGraph,
         ambient: Vec4,
+        resolution: UVec2,
     ) {
         crate::uniforms::add_to_graph(
             graph,
@@ -230,6 +231,7 @@ impl BaseRenderGraphIntermediateState {
             &base.interfaces,
             &base.samplers,
             ambient,
+            resolution,
         );
     }
 
