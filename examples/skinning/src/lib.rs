@@ -91,7 +91,7 @@ impl rend3_framework::App for SkinningExample {
             renderer,
             &gltf_data,
             &rend3_gltf::GltfLoadSettings::default(),
-            |p| rend3_gltf::filesystem_io_func(&parent_directory, p),
+            |p| async move { rend3_gltf::filesystem_io_func(&parent_directory, &p).await },
         ))
         .expect("Loading gltf scene");
 

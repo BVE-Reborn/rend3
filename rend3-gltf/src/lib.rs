@@ -243,28 +243,39 @@ pub enum GltfLoadError<E: std::error::Error + 'static> {
     MissingKeyframeValues(usize, usize),
 }
 
+/// Tries to decode data as base64, failing if the prefix doesn't match.
+pub fn try_load_base64(uri: &str) -> Option<Vec<u8>> {
+    let octet_stream_header = "data:";
+
+    let base64_data = uri.strip_prefix(octet_stream_header)?;
+
+    let (_mime, rest) = base64_data.split_once(';').unwrap();
+    let (encoding, data) = rest.split_once(',').unwrap();
+    if encoding != "base64" {
+        return None;
+    }
+
+    log::info!("loading {} bytes of base64 data", data.len());
+    profiling::scope!("decoding base64 uri");
+    // TODO: errors
+    Some(base64::decode(data).unwrap())
+}
+
 /// Default implementation of [`load_gltf`]'s `io_func` that loads from the
 /// filesystem relative to the gltf.
 ///
 /// The first argumnet is the directory all relative paths should be considered
 /// against. This is more than likely the directory the gltf/glb is in.
-pub async fn filesystem_io_func(parent_directory: impl AsRef<Path>, uri: SsoString) -> Result<Vec<u8>, std::io::Error> {
-    let octet_stream_header = "data:";
-    if let Some(base64_data) = uri.strip_prefix(octet_stream_header) {
-        let (_mime, rest) = base64_data.split_once(';').unwrap();
-        let (encoding, data) = rest.split_once(',').unwrap();
-        assert_eq!(encoding, "base64");
-        // profiling::scope!("decoding base64 uri");
-        log::info!("loading {} bytes of base64 data", data.len());
-        // TODO: errors
-        Ok(base64::decode(data).unwrap())
-    } else {
-        let path_resolved = parent_directory.as_ref().join(&*uri);
-        let display = path_resolved.as_os_str().to_string_lossy();
-        // profiling::scope!("loading file", &display);
-        log::info!("loading file '{}' from disk", &display);
-        std::fs::read(path_resolved)
+pub async fn filesystem_io_func(parent_directory: impl AsRef<Path>, uri: &str) -> Result<Vec<u8>, std::io::Error> {
+    if let Some(data) = try_load_base64(uri) {
+        return Ok(data);
     }
+
+    let path_resolved = parent_directory.as_ref().join(&*uri);
+    let display = path_resolved.as_os_str().to_string_lossy();
+    // profiling::scope!("loading file", &display);
+    log::info!("loading file '{}' from disk", &display);
+    std::fs::read(path_resolved)
 }
 
 /// Determines parameters that are given to various parts of the gltf world that
@@ -312,7 +323,7 @@ impl Default for GltfLoadSettings {
 ///     &renderer,
 ///     &gltf_data,
 ///     &rend3_gltf::GltfLoadSettings::default(),
-///     |p| rend3_gltf::filesystem_io_func(&parent_directory, p)
+///     |p| async move { rend3_gltf::filesystem_io_func(&parent_directory, &p).await }
 /// ));
 /// ```
 pub async fn load_gltf<F, Fut, E>(
