@@ -165,6 +165,7 @@ impl rend3_framework::App for SkinningExample {
                     resolution,
                     SAMPLE_COUNT,
                     glam::Vec4::splat(0.15),
+                    glam::Vec4::new(0.10, 0.05, 0.10, 1.0), // Nice scene-referred purple
                 );
 
                 // Dispatch a render using the built up rendergraph!

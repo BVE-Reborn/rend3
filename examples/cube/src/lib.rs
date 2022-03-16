@@ -173,6 +173,7 @@ impl rend3_framework::App for CubeExample {
                     resolution,
                     SAMPLE_COUNT,
                     glam::Vec4::ZERO,
+                    glam::Vec4::new(0.10, 0.05, 0.10, 1.0), // Nice scene-referred purple
                 );
 
                 // Dispatch a render using the built up rendergraph!

@@ -221,6 +221,7 @@ impl rend3_framework::App for EguiExample {
                     resolution,
                     SAMPLE_COUNT,
                     glam::Vec4::ZERO,
+                    glam::Vec4::new(0.10, 0.05, 0.10, 1.0), // Nice scene-referred purple
                 );
 
                 // Add egui on top of all the other passes
