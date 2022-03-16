@@ -576,6 +576,7 @@ impl rend3_framework::App for SceneViewer {
                     resolution,
                     self.samples,
                     Vec3::splat(self.ambient_light_level).extend(1.0),
+                    glam::Vec4::new(0.0, 0.0, 0.0, 1.0),
                 );
 
                 // Dispatch a render using the built up rendergraph!
