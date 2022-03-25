@@ -139,7 +139,7 @@ impl rend3_framework::App for EguiExample {
             platform,
             start_time,
             color,
-        })
+        });
     }
 
     fn handle_event(
@@ -188,11 +188,14 @@ impl rend3_framework::App for EguiExample {
 
                 // End the UI frame. Now let's draw the UI with our Backend, we could also
                 // handle the output here
-                let (_output, paint_commands) = data.platform.end_frame(Some(window));
-                let paint_jobs = data.platform.context().tessellate(paint_commands);
+                let egui::FullOutput {
+                    shapes, textures_delta, ..
+                } = data.platform.end_frame(Some(window));
+                let paint_jobs = data.platform.context().tessellate(shapes);
 
                 let input = rend3_egui::Input {
                     clipped_meshes: &paint_jobs,
+                    textures_delta,
                     context: data.platform.context(),
                 };
 

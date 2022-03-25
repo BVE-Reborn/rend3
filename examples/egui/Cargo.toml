@@ -13,16 +13,16 @@ path = "src/main.rs"
 
 [dependencies]
 # The egui immediate mode gui library
-egui = "0.16.0"
+egui = "0.17.0"
 # Backend-agnostic interface for writing apps using egui
-epi = "0.16.0"
+epi = "0.17.0"
 # Winit integration with egui
-egui_winit_platform = "0.13.0"
+egui_winit_platform = "0.14.0"
 # logging
 env_logger = { version = "0.9", default-features = false, features = ["termcolor", "atty"] }
 # Linear algebra library
 glam = "0.20.0"
-# Importing png's 
+# Importing png's
 image = { version = "0.23.14", default-features = false, features = ["png"] }
 # Portable implementation of Instant.
 instant = { version = "0.1", features = ["wasm-bindgen"] }

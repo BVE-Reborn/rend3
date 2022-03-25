@@ -2,17 +2,19 @@
 //!
 //! Call [`EguiRenderRoutine::add_to_graph`] to add it to the graph.
 
+use egui::TexturesDelta;
 use rend3::{
     graph::{RenderGraph, RenderPassTarget, RenderPassTargets, RenderTargetHandle},
     types::SampleCount,
     Renderer,
 };
-use std::sync::Arc;
+use std::{mem, sync::Arc};
 use wgpu::{Color, TextureFormat};
 
 pub struct EguiRenderRoutine {
     pub internal: egui_wgpu_backend::RenderPass,
     screen_descriptor: egui_wgpu_backend::ScreenDescriptor,
+    textures_to_free: Vec<egui::TextureId>,
 }
 
 impl EguiRenderRoutine {
@@ -37,6 +39,7 @@ impl EguiRenderRoutine {
                 physical_width: width,
                 scale_factor,
             },
+            textures_to_free: Vec::new(),
         }
     }
 
@@ -51,7 +54,7 @@ impl EguiRenderRoutine {
     pub fn add_to_graph<'node>(
         &'node mut self,
         graph: &mut RenderGraph<'node>,
-        input: Input<'node>,
+        mut input: Input<'node>,
         output: RenderTargetHandle,
     ) {
         let mut builder = graph.add_node("egui");
@@ -67,15 +70,23 @@ impl EguiRenderRoutine {
             depth_stencil: None,
         });
 
+        // We can't free textures directly after the call to `execute_with_renderpass` as it freezes
+        // the lifetime of `self` for the remainder of the closure. so we instead buffer the textures
+        // to free for a frame so we can clean them up before the next call.
+        let textures_to_free = mem::replace(&mut self.textures_to_free, mem::take(&mut input.textures_delta.free));
         let pt_handle = builder.passthrough_ref_mut(self);
 
         builder.build(move |pt, renderer, encoder_or_pass, _temps, _ready, _graph_data| {
             let this = pt.get_mut(pt_handle);
             let rpass = encoder_or_pass.get_rpass(rpass_handle);
 
-            this.internal
-                .update_texture(&renderer.device, &renderer.queue, &input.context.font_image());
-            this.internal.update_user_textures(&renderer.device, &renderer.queue);
+            let _ = this.internal.remove_textures(TexturesDelta {
+                set: Default::default(),
+                free: textures_to_free,
+            });
+            let _ = this
+                .internal
+                .add_textures(&renderer.device, &renderer.queue, &input.textures_delta);
             this.internal.update_buffers(
                 &renderer.device,
                 &renderer.queue,
@@ -163,7 +174,10 @@ impl EguiRenderRoutine {
         egui_wgpu_backend::RenderPass::egui_texture_from_wgpu_texture(
             internal,
             device,
-            &image_texture,
+            &image_texture.create_view(&wgpu::TextureViewDescriptor {
+                dimension: Some(wgpu::TextureViewDimension::D2),
+                ..Default::default()
+            }),
             wgpu::FilterMode::Linear,
         )
     }
@@ -171,5 +185,6 @@ impl EguiRenderRoutine {
 
 pub struct Input<'a> {
     pub clipped_meshes: &'a Vec<egui::ClippedMesh>,
-    pub context: egui::CtxRef,
+    pub textures_delta: TexturesDelta,
+    pub context: egui::Context,
 }
