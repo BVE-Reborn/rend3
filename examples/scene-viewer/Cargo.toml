@@ -34,7 +34,7 @@ anyhow = "1"
 cfg-if = "1"
 glam = "0.20.0"
 histogram = "0.6"
-image = { version = "0.23", default-features = false, features = ["png", "jpeg", "tiff"]}
+image = { version = "0.24", default-features = false, features = ["png", "jpeg", "tiff"]}
 indoc = "1"
 instant = { version = "0.1", features = ["wasm-bindgen"] }
 log = "0.4"
