@@ -106,7 +106,7 @@ impl MipmapGenerator {
         sm: &ShaderModule,
     ) -> RenderPipeline {
         let label = format_sso!("mipmap pipeline {:?}", format);
-        profiling::scope!(&label);
+        profiling::scope!("mipmap pipeline");
         device.create_render_pipeline(&RenderPipelineDescriptor {
             label: Some(&label),
             layout: Some(pll),
@@ -180,9 +180,8 @@ impl MipmapGenerator {
             let dst_view = &view_window[1];
 
             let src_label = format_sso!("Mipmap level {}", idx);
-            let _dst_label = format_sso!("Mipmap level {}", idx + 1);
 
-            profiling::scope!(&_dst_label);
+            profiling::scope!("mip level generation");
             // profiler.lock().begin_scope(&dst_label, encoder, device);
 
             let bg = BindGroupBuilder::new().append_texture_view(src_view).build(
