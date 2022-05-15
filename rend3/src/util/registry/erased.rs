@@ -247,10 +247,7 @@ fn remove_all_dead<T: Send + Sync + 'static, Metadata>(
 ) {
     let mut vec = vec_any.downcast_mut::<T>().unwrap();
 
-    profiling::scope!(&format!(
-        "ArchitypicalRegistry::<{}>::remove_all_dead",
-        std::any::type_name::<T>()
-    ));
+    profiling::scope!("ArchitypicalRegistry::remove_all_dead");
 
     assert_eq!(vec.len(), non_erased.len());
     for idx in (0..vec.len()).rev() {

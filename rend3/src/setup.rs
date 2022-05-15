@@ -430,7 +430,7 @@ pub async fn create_iad(
     let mut valid_adapters = FastHashMap::<Backend, ArrayVec<PotentialAdapter<Adapter>, 4>>::default();
 
     for backend in &default_backend_order {
-        profiling::scope!("enumerating backend", &format_sso!("{:?}", backend));
+        profiling::scope!("enumerating backend");
         #[cfg(not(target_arch = "wasm32"))]
         let adapters = instance.enumerate_adapters(Backends::from(*backend));
         #[cfg(target_arch = "wasm32")]

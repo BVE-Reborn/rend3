@@ -1,5 +1,4 @@
 use crate::{
-    format_sso,
     graph::{GraphTextureStore, ReadyData},
     instruction::{InstructionKind, InstructionStreamPair},
     managers::{
@@ -277,8 +276,7 @@ impl Renderer {
         for new_mip in 0..mip_level_count {
             let old_mip = new_mip + texture.start_mip;
 
-            let _label = format_sso!("mip {} to {}", old_mip, new_mip);
-            profiling::scope!(&_label);
+            profiling::scope!("mip level generation");
 
             encoder.copy_texture_to_texture(
                 ImageCopyTexture {
