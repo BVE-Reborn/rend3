@@ -12,6 +12,7 @@
 //! current state of the animation by changing the currently played animation or
 //! increasing the playback time should be handled in user code.
 
+use std::borrow::Borrow;
 use std::collections::HashMap;
 
 use itertools::Itertools;
@@ -212,6 +213,38 @@ pub fn pose_animation_frame(
 ) {
     let animation = &scene.animations[animation_index];
     let time = time.clamp(0.0, animation.inner.duration);
+
+
+    for (&node_idx, channels) in &animation.inner.channels {
+
+        let local_transform = instance.nodes[node_idx].inner.local_transform;
+        let (bind_scale, bind_rotation, bind_translation) = local_transform.to_scale_rotation_translation();
+
+        let translation = channels
+            .translation
+            .as_ref()
+            .map(|tra| sample_at_time(tra, time))
+            .unwrap_or(bind_translation);
+        let rotation = channels
+            .rotation
+            .as_ref()
+            .map(|rot| sample_at_time(rot, time))
+            .unwrap_or(bind_rotation);
+        let scale = channels
+            .scale
+            .as_ref()
+            .map(|sca| sample_at_time(sca, time))
+            .unwrap_or(bind_scale);
+
+        let matrix = Mat4::from_scale_rotation_translation(scale, rotation, translation);
+
+        if let Some(object) = instance.nodes[node_idx].inner.object.borrow() {
+            for object_handle in object.inner.primitives.as_slice() {
+                renderer.set_object_transform(object_handle, matrix);
+            }
+        }
+    }
+
 
     for (skin_index, per_skin_data) in &animation_data.skin_data {
         let skin = &scene.skins[skin_index.0];
