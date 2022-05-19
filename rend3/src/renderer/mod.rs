@@ -166,7 +166,7 @@ impl Renderer {
 
         let mip_level_count = match texture.mip_count {
             MipmapCount::Specific(v) => v.get(),
-            MipmapCount::Maximum => size.max_mips(),
+            MipmapCount::Maximum => size.max_mips(TextureDimension::D2),
         };
 
         let desc = TextureDescriptor {
@@ -327,7 +327,7 @@ impl Renderer {
 
         let mip_level_count = match texture.mip_count {
             MipmapCount::Specific(v) => v.get(),
-            MipmapCount::Maximum => size.max_mips(),
+            MipmapCount::Maximum => size.max_mips(TextureDimension::D2),
         };
 
         let desc = TextureDescriptor {

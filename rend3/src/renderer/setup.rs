@@ -23,7 +23,7 @@ pub fn create_renderer(
 
     let features = iad.device.features();
     let limits = iad.device.limits();
-    let downlevel = iad.adapter.get_downlevel_properties();
+    let downlevel = iad.adapter.get_downlevel_capabilities();
 
     let camera_manager = CameraManager::new(Camera::default(), handedness, aspect_ratio);
 

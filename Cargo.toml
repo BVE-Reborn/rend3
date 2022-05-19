@@ -40,10 +40,10 @@ lto = "thin"
 # wgpu-core = { git = "https://github.com/gfx-rs/wgpu.git", rev = "f42342bbbfd9d7ebd61745acccc0669fc0e064d2" }
 # wgpu-hal = { git = "https://github.com/gfx-rs/wgpu.git", rev = "f42342bbbfd9d7ebd61745acccc0669fc0e064d2" }
 # wgpu-types = { git = "https://github.com/gfx-rs/wgpu.git", rev = "f42342bbbfd9d7ebd61745acccc0669fc0e064d2" }
-# wgpu = { git = "https://github.com/cwfitzgerald/wgpu.git", rev = "bda861f77e0ca0b97697850ad19d19a8b8f1cc9c" }
-# wgpu-core = { git = "https://github.com/cwfitzgerald/wgpu.git", rev = "bda861f77e0ca0b97697850ad19d19a8b8f1cc9c" }
-# wgpu-hal = { git = "https://github.com/cwfitzgerald/wgpu.git", rev = "bda861f77e0ca0b97697850ad19d19a8b8f1cc9c" }
-# wgpu-types = { git = "https://github.com/cwfitzgerald/wgpu.git", rev = "bda861f77e0ca0b97697850ad19d19a8b8f1cc9c" }
+wgpu = { git = "https://github.com/cwfitzgerald/wgpu.git", rev = "1b060b87ffa77211412a1f9efbe02fe2b647b01a" }
+wgpu-core = { git = "https://github.com/cwfitzgerald/wgpu.git", rev = "1b060b87ffa77211412a1f9efbe02fe2b647b01a" }
+wgpu-hal = { git = "https://github.com/cwfitzgerald/wgpu.git", rev = "1b060b87ffa77211412a1f9efbe02fe2b647b01a" }
+wgpu-types = { git = "https://github.com/cwfitzgerald/wgpu.git", rev = "1b060b87ffa77211412a1f9efbe02fe2b647b01a" }
 # wgpu = { path = "../wgpu/wgpu" }
 # wgpu-core = { path = "../wgpu/wgpu-core" }
 # wgpu-hal = { path = "../wgpu/wgpu-hal" }

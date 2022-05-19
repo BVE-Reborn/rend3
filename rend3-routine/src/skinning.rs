@@ -227,7 +227,7 @@ impl GpuSkinner {
 
             let num_verts = (skel.ranges.mesh_range[1] - skel.ranges.mesh_range[0]) as u32;
             let num_workgroups = round_up_div(num_verts, Self::WORKGROUP_SIZE);
-            cpass.dispatch(num_workgroups, 1, 1);
+            cpass.dispatch_workgroups(num_workgroups, 1, 1);
         }
     }
 }

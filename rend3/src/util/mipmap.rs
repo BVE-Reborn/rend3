@@ -147,7 +147,7 @@ impl MipmapGenerator {
         desc: &TextureDescriptor,
     ) {
         profiling::scope!("generating mipmaps");
-        let mips: ArrayVec<_, 14> = (0..desc.size.max_mips())
+        let mips: ArrayVec<_, 14> = (0..desc.size.max_mips(wgpu::TextureDimension::D2))
             .map(|mip_level| {
                 texture.create_view(&TextureViewDescriptor {
                     label: None,

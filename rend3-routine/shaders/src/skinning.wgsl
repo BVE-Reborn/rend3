@@ -1,51 +1,51 @@
 struct Range {
-    start: u32;
-    end: u32;
+    start: u32,
+    end: u32,
 };
 
 /// See documentation for the same struct in skinning/mod.rs
 struct GpuSkinningInput {
-    mesh_range: Range;
-    skeleton_range: Range;
-    joints_start_idx: u32;
-};
+    mesh_range: Range,
+    skeleton_range: Range,
+    joints_start_idx: u32,
+}
 
 struct JointMatrices {
-    matrices: array<mat4x4<f32>>;
-};
+    matrices: array<mat4x4<f32>>,
+}
 
 /// The arrays are tightly packed and `vec3` does not have the right stride
-struct Vec3 { x: f32; y: f32; z: f32; };
-struct Vec3Array { data: array<Vec3>; };
+struct Vec3 { x: f32, y: f32, z: f32, }
+struct Vec3Array { data: array<Vec3>, }
 
-struct JointWeightVec { ws: array<f32,4>; };
-struct JointWeightVecArray { data: array<JointWeightVec>; };
+struct JointWeightVec { ws: array<f32,4> }
+struct JointWeightVecArray { data: array<JointWeightVec> }
 
 /// The u16 type does not exist in shaders, so we need to unpack the u16 indices
 /// from a pair of u32s
-struct JointIndexVec { indices_0_1: u32; indices_2_3: u32; };
-struct JointIndexVecArray { data: array<JointIndexVec>; };
+struct JointIndexVec { indices_0_1: u32, indices_2_3: u32, }
+struct JointIndexVecArray { data: array<JointIndexVec> }
 
-[[group(0), binding(0)]]
+@group(0) @binding(0)
 var<storage, read_write> positions: Vec3Array;
 
-[[group(0), binding(1)]]
+@group(0) @binding(1)
 var<storage, read_write> normals: Vec3Array;
 
-[[group(0), binding(2)]]
+@group(0) @binding(2)
 var<storage, read_write> tangents: Vec3Array;
 
-[[group(0), binding(3)]]
+@group(0) @binding(3)
 var<storage, read_write> joint_indices: JointIndexVecArray;
 
-[[group(0), binding(4)]]
+@group(0) @binding(4)
 var<storage, read_write> joint_weights: JointWeightVecArray;
 
-[[group(0), binding(5)]]
+@group(0) @binding(5)
 var<storage> joint_matrices: JointMatrices;
 
-[[group(1), binding(0)]]
-var<storage> input : GpuSkinningInput;
+@group(1) @binding(0)
+var<storage> skin_in : GpuSkinningInput;
 
 fn to_v(v: Vec3) -> vec3<f32> {
     return vec3<f32>(v.x, v.y, v.z);
@@ -58,27 +58,27 @@ fn from_v(v: vec3<f32>) -> Vec3 {
 
 
 fn get_joint_matrix(joint_idx: u32) -> mat4x4<f32> {
-    return joint_matrices.matrices[input.joints_start_idx + joint_idx];
+    return joint_matrices.matrices[skin_in.joints_start_idx + joint_idx];
 }
 
-fn get_inv_scale_squared(matrix: mat3x3<f32>) -> vec3<f32> {
+fn get_inv_scale_squared(value: mat3x3<f32>) -> vec3<f32> {
     return vec3<f32>(
-        1.0 / dot(matrix[0].xyz, matrix[0].xyz), 
-        1.0 / dot(matrix[1].xyz, matrix[1].xyz),
-        1.0 / dot(matrix[2].xyz, matrix[2].xyz)
+        1.0 / dot(value[0].xyz, value[0].xyz), 
+        1.0 / dot(value[1].xyz, value[1].xyz),
+        1.0 / dot(value[2].xyz, value[2].xyz)
     );
 }
 
-[[stage(compute), workgroup_size(64)]]
-fn main([[builtin(global_invocation_id)]] global_id: vec3<u32>) {
+@compute @workgroup_size(64)
+fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let idx = global_id.x;
 
-    let count = input.mesh_range.end - input.mesh_range.start;
+    let count = skin_in.mesh_range.end - skin_in.mesh_range.start;
     if (idx >= count) {
         return;
     }
 
-    let joint_is = joint_indices.data[input.mesh_range.start + idx];
+    let joint_is = joint_indices.data[skin_in.mesh_range.start + idx];
 
 
     // NOTE: This should use bitfieldExtract once it is available on dx12
@@ -93,12 +93,12 @@ fn main([[builtin(global_invocation_id)]] global_id: vec3<u32>) {
     var norm_acc = vec3<f32>(0.0, 0.0, 0.0);
     var tang_acc = vec3<f32>(0.0, 0.0, 0.0);
 
-    let pos = to_v(positions.data[input.mesh_range.start + idx]);
-    let normal = to_v(normals.data[input.mesh_range.start + idx]);
-    let tangent = to_v(tangents.data[input.mesh_range.start + idx]);
+    let pos = to_v(positions.data[skin_in.mesh_range.start + idx]);
+    let normal = to_v(normals.data[skin_in.mesh_range.start + idx]);
+    let tangent = to_v(tangents.data[skin_in.mesh_range.start + idx]);
     
     for (var i = 0; i < 4; i = i + 1) {
-        let weight = joint_weights.data[input.mesh_range.start + idx].ws[i];
+        let weight = joint_weights.data[skin_in.mesh_range.start + idx].ws[i];
 
         if (weight > 0.0) {
             let joint_index = joint_indices[i];
@@ -112,7 +112,7 @@ fn main([[builtin(global_invocation_id)]] global_id: vec3<u32>) {
     }
     
     // Write to output region of buffer
-    positions.data[input.skeleton_range.start + idx] = from_v(pos_acc);
-    normals.data[input.skeleton_range.start + idx] = from_v(normalize(norm_acc));
-    tangents.data[input.skeleton_range.start + idx] = from_v(normalize(tang_acc));
+    positions.data[skin_in.skeleton_range.start + idx] = from_v(pos_acc);
+    normals.data[skin_in.skeleton_range.start + idx] = from_v(normalize(norm_acc));
+    tangents.data[skin_in.skeleton_range.start + idx] = from_v(normalize(tang_acc));
 }

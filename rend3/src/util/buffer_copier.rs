@@ -149,7 +149,7 @@ impl VertexBufferCopier {
         cpass.set_pipeline(&self.pipeline);
         cpass.set_bind_group(0, &bind_group, &[]);
         let num_workgroups = round_up_div(params.count, Self::WORKGROUP_SIZE);
-        cpass.dispatch(num_workgroups, 1, 1);
+        cpass.dispatch_workgroups(num_workgroups, 1, 1);
 
         drop(cpass);
     }

@@ -26,7 +26,6 @@ pub const GPU_DRIVEN_REQUIRED_FEATURES: Features = {
             | Features::TEXTURE_BINDING_ARRAY.bits()
             | Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING.bits()
             | Features::PARTIALLY_BOUND_BINDING_ARRAY.bits()
-            | Features::UNSIZED_BINDING_ARRAY.bits()
             | Features::MULTI_DRAW_INDIRECT.bits()
             | Features::MULTI_DRAW_INDIRECT_COUNT.bits()
             | Features::SPIRV_SHADER_PASSTHROUGH.bits(),
