@@ -190,6 +190,11 @@ fn option_arg<T>(result: Result<Option<T>, pico_args::Error>) -> Option<T> {
     }
 }
 
+// #[global_allocator]
+// #[cfg(feature = "tracy")]
+// static GLOBAL: tracy_client::ProfiledAllocator<std::alloc::System> =
+//     tracy_client::ProfiledAllocator::new(std::alloc::System, 100);
+
 #[cfg(not(target_arch = "wasm32"))]
 pub fn spawn<Fut>(fut: Fut)
 where
@@ -275,6 +280,9 @@ struct SceneViewer {
 }
 impl SceneViewer {
     pub fn new() -> Self {
+        #[cfg(feature = "tracy")]
+        tracy_client::Client::start();
+
         let mut args = Arguments::from_vec(std::env::args_os().skip(1).collect());
 
         // Meta

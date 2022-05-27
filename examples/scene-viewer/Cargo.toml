@@ -47,8 +47,8 @@ rend3-gltf = { version = "^0.3.0", default-features = false, path = "../../rend3
 rend3-routine = { version = "^0.3.0", path = "../../rend3-routine" }
 rustc-hash = "1"
 smallvec = "1"
-tracy-client = { version = "0.12", optional = true }
-wgpu-profiler = "0.8.0"
+tracy-client = { version = "0.13", optional = true }
+wgpu-profiler = { version = "0.8.0", features = ["tracy"] }
 winit = "0.26"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]

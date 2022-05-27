@@ -235,7 +235,7 @@ pub async fn async_start<A: App + 'static>(mut app: A, window_builder: WindowBui
             &iad.device,
             format,
             glam::UVec2::new(window_size.width, window_size.height),
-            rend3::types::PresentMode::Mailbox,
+            rend3::types::PresentMode::Fifo,
         );
 
         format

@@ -12,7 +12,7 @@ use crate::{
     util::mipmap::MipmapGenerator,
     ExtendedAdapterInfo, InstanceAdapterDevice, RendererInitializationError, RendererProfile,
 };
-use glam::Mat4;
+use glam::{Mat4, UVec2};
 use parking_lot::Mutex;
 use rend3_types::{
     Handedness, Material, MipmapCount, MipmapSource, ObjectChange, Skeleton, SkeletonHandle, TextureFormat,
@@ -155,7 +155,7 @@ impl Renderer {
     pub fn add_texture_2d(&self, texture: Texture) -> TextureHandle {
         profiling::scope!("Add Texture 2D");
 
-        Self::validation_texture_format(texture.format);
+        Self::validation_texture_format(texture.format, texture.size);
 
         let handle = TextureManager::allocate(&self.current_ident);
         let size = Extent3d {
@@ -316,7 +316,7 @@ impl Renderer {
     pub fn add_texture_cube(&self, texture: Texture) -> TextureHandle {
         profiling::scope!("Add Texture Cube");
 
-        Self::validation_texture_format(texture.format);
+        Self::validation_texture_format(texture.format, texture.size);
 
         let handle = TextureManager::allocate(&self.current_ident);
         let size = Extent3d {
@@ -360,20 +360,27 @@ impl Renderer {
         handle
     }
 
-    fn validation_texture_format(format: TextureFormat) {
-        let sample_type = format.describe().sample_type;
-        if let TextureSampleType::Float { filterable } = sample_type {
+    fn validation_texture_format(format: TextureFormat, extent: UVec2) {
+        let describe = format.describe();
+        if let TextureSampleType::Float { filterable } = describe.sample_type {
             if !filterable {
                 panic!(
                     "Textures formats must allow filtering with a linear filter. {:?} has sample type {:?} which does not.",
-                    format, sample_type
+                    format, describe.sample_type
                 )
             }
         } else {
             panic!(
                 "Textures formats must be sample-able as floating point. {:?} has sample type {:?}.",
-                format, sample_type
+                format, describe.sample_type
             )
+        }
+
+        if extent.x % describe.block_dimensions.0 as u32 != 0 || extent.y % describe.block_dimensions.1 as u32 != 0 {
+            panic!(
+                "Textures format {:?} requires all textures have their size be a multiple of the block size ({}x{}). ({}x{}) isn't a multiple.",
+                format, describe.block_dimensions.0, describe.block_dimensions.1, extent.x, extent.y
+            );
         }
     }
 

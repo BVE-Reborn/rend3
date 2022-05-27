@@ -1126,10 +1126,17 @@ where
             data.extend_from_slice(level);
         }
 
+        let bdxm1 = (describe.block_dimensions.0 - 1) as u32;
+        let bdym1 = (describe.block_dimensions.1 - 1) as u32;
+        let size = UVec2::new(
+            (header.pixel_width + bdxm1) & !bdxm1,
+            (header.pixel_height + bdym1) & !bdym1,
+        );
+
         texture = Some(types::Texture {
             label: image.name().map(str::to_owned),
             format,
-            size: UVec2::new(header.pixel_width, header.pixel_height),
+            size,
             data,
             mip_count: if generate {
                 types::MipmapCount::Maximum
@@ -1168,7 +1175,8 @@ where
                 return Err(GltfLoadError::TextureZeroLevels(uri.take().unwrap()));
             }
 
-            let guaranteed_format = format.describe().guaranteed_format_features;
+            let describe = format.describe();
+            let guaranteed_format = describe.guaranteed_format_features;
             let generate = dds.get_num_mipmap_levels() == 1
                 && guaranteed_format
                     .flags
@@ -1181,10 +1189,14 @@ where
                 .get_data(0)
                 .map_err(|_| GltfLoadError::TextureTooManyLayers(uri.take().unwrap()))?;
 
+            let bdxm1 = (describe.block_dimensions.0 - 1) as u32;
+            let bdym1 = (describe.block_dimensions.1 - 1) as u32;
+            let size = UVec2::new((dds.get_width() + bdxm1) & !bdxm1, (dds.get_height() + bdym1) & !bdym1);
+
             texture = Some(types::Texture {
                 label: image.name().map(str::to_owned),
                 format,
-                size: UVec2::new(dds.get_width(), dds.get_height()),
+                size,
                 data: data.to_vec(),
                 mip_count: if generate {
                     types::MipmapCount::Maximum

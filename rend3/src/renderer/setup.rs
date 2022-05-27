@@ -55,7 +55,7 @@ pub fn create_renderer(
             TextureFormat::Rgba16Float,
         ],
     );
-    let mut profiler = wgpu_profiler::GpuProfiler::new(4, iad.queue.get_timestamp_period());
+    let mut profiler = wgpu_profiler::GpuProfiler::new(iad.info.backend, &iad.device, &iad.queue, 20);
     profiler.enable_timer = features.contains(wgpu_profiler::GpuProfiler::REQUIRED_WGPU_FEATURES);
 
     Ok(Arc::new(Renderer {
