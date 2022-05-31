@@ -166,7 +166,7 @@ pub mod managers {
 pub mod types {
     pub use rend3_types::*;
     #[doc(inline)]
-    pub use wgpu::{Surface, SurfaceError};
+    pub use wgpu::{PresentMode, Surface, SurfaceError};
 }
 /// Utilities and isolated bits of functionality that need a home.
 pub mod util {
