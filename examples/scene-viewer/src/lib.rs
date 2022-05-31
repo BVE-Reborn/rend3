@@ -141,7 +141,7 @@ fn extract_backend(value: &str) -> Result<Backend, &'static str> {
     })
 }
 
-fn extract_mode(value: &str) -> Result<rend3::RendererProfile, &'static str> {
+fn extract_profile(value: &str) -> Result<rend3::RendererProfile, &'static str> {
     Ok(match value.to_lowercase().as_str() {
         "legacy" | "c" | "cpu" => rend3::RendererProfile::CpuDriven,
         "modern" | "g" | "gpu" => rend3::RendererProfile::GpuDriven,
@@ -153,6 +153,15 @@ fn extract_msaa(value: &str) -> Result<SampleCount, &'static str> {
     Ok(match value {
         "1" => SampleCount::One,
         "4" => SampleCount::Four,
+        _ => return Err("invalid msaa count"),
+    })
+}
+
+fn extract_vsync(value: &str) -> Result<rend3::types::PresentMode, &'static str> {
+    Ok(match value.to_lowercase().as_str() {
+        "immediate" => rend3::types::PresentMode::Immediate,
+        "fifo" => rend3::types::PresentMode::Fifo,
+        "mailbox" => rend3::types::PresentMode::Mailbox,
         _ => return Err("invalid msaa count"),
     })
 }
@@ -225,6 +234,7 @@ Rendering:
   -b --backend                 Choose backend to run on ('vk', 'dx12', 'dx11', 'metal', 'gl').
   -d --device                  Choose device to run on (case insensitive device substring).
   -p --profile                 Choose rendering profile to use ('cpu', 'gpu').
+  -v --vsync                   Choose vsync mode ('immediate' [no-vsync], 'fifo' [vsync], 'fifo_relaxed' [adaptive vsync], 'mailbox' [fast vsync])
   --msaa <level>               Level of antialiasing (either 1 or 4). Default 1.
 
 Windowing:
@@ -259,6 +269,7 @@ struct SceneViewer {
     directional_light_intensity: f32,
     directional_light: Option<DirectionalLightHandle>,
     ambient_light_level: f32,
+    present_mode: rend3::types::PresentMode,
     samples: SampleCount,
 
     fullscreen: bool,
@@ -289,8 +300,10 @@ impl SceneViewer {
         let desired_backend = option_arg(args.opt_value_from_fn(["-b", "--backend"], extract_backend));
         let desired_device_name: Option<String> =
             option_arg(args.opt_value_from_str(["-d", "--device"])).map(|s: String| s.to_lowercase());
-        let desired_mode = option_arg(args.opt_value_from_fn(["-p", "--profile"], extract_mode));
+        let desired_mode = option_arg(args.opt_value_from_fn(["-p", "--profile"], extract_profile));
         let samples = option_arg(args.opt_value_from_fn("--msaa", extract_msaa)).unwrap_or(SampleCount::One);
+        let present_mode = option_arg(args.opt_value_from_fn(["-v", "--vsync"], extract_vsync))
+            .unwrap_or(rend3::types::PresentMode::Fifo);
 
         // Windowing
         let absolute_mouse: bool = args.contains("--absolute-mouse");
@@ -363,6 +376,7 @@ impl SceneViewer {
             directional_light_intensity,
             directional_light: None,
             ambient_light_level,
+            present_mode,
             samples,
 
             fullscreen,
@@ -400,6 +414,10 @@ impl rend3_framework::App for SceneViewer {
 
     fn sample_count(&self) -> SampleCount {
         self.samples
+    }
+
+    fn present_mode(&self) -> rend3::types::PresentMode {
+        self.present_mode
     }
 
     fn scale_factor(&self) -> f32 {
