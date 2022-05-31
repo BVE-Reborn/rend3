@@ -36,18 +36,18 @@ debug = true
 lto = "thin"
 
 [patch.crates-io]
-# wgpu = { git = "https://github.com/gfx-rs/wgpu.git", rev = "9114283707a8b472412cf4fe685d364327d3a5b4" }
-# wgpu-core = { git = "https://github.com/gfx-rs/wgpu.git", rev = "9114283707a8b472412cf4fe685d364327d3a5b4" }
-# wgpu-hal = { git = "https://github.com/gfx-rs/wgpu.git", rev = "9114283707a8b472412cf4fe685d364327d3a5b4" }
-# wgpu-types = { git = "https://github.com/gfx-rs/wgpu.git", rev = "9114283707a8b472412cf4fe685d364327d3a5b4" }
+wgpu = { git = "https://github.com/gfx-rs/wgpu.git", rev = "8063edc6482cfc828895ec0feaa446767fecc510" }
+wgpu-core = { git = "https://github.com/gfx-rs/wgpu.git", rev = "8063edc6482cfc828895ec0feaa446767fecc510" }
+wgpu-hal = { git = "https://github.com/gfx-rs/wgpu.git", rev = "8063edc6482cfc828895ec0feaa446767fecc510" }
+wgpu-types = { git = "https://github.com/gfx-rs/wgpu.git", rev = "8063edc6482cfc828895ec0feaa446767fecc510" }
 # wgpu = { git = "https://github.com/cwfitzgerald/wgpu.git", rev = "1b060b87ffa77211412a1f9efbe02fe2b647b01a" }
 # wgpu-core = { git = "https://github.com/cwfitzgerald/wgpu.git", rev = "1b060b87ffa77211412a1f9efbe02fe2b647b01a" }
 # wgpu-hal = { git = "https://github.com/cwfitzgerald/wgpu.git", rev = "1b060b87ffa77211412a1f9efbe02fe2b647b01a" }
 # wgpu-types = { git = "https://github.com/cwfitzgerald/wgpu.git", rev = "1b060b87ffa77211412a1f9efbe02fe2b647b01a" }
-wgpu = { path = "../wgpu/wgpu" }
-wgpu-core = { path = "../wgpu/wgpu-core" }
-wgpu-hal = { path = "../wgpu/wgpu-hal" }
-wgpu-types = { path = "../wgpu/wgpu-types" }
-wgpu-profiler = { path = "../wgpu-profiler" }
+# wgpu = { path = "../wgpu/wgpu" }
+# wgpu-core = { path = "../wgpu/wgpu-core" }
+# wgpu-hal = { path = "../wgpu/wgpu-hal" }
+# wgpu-types = { path = "../wgpu/wgpu-types" }
+wgpu-profiler = { git = "https://github.com/cwfitzgerald/wgpu-profiler.git", rev = "152fd0d4ebcb31fb07d338a39538658f03c389fc" }
 profiling = { git = "https://github.com/aclysma/profiling.git", rev = "59fc51454c9a1e086289363ba1f26ab99626f6dd" }
 tracy-client = { git = "https://github.com/cwfitzgerald/rust_tracy_client.git", rev = "cdb6e034989cd645ce26f04901b29c183b5dfd9d" }

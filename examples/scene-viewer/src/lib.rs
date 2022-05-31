@@ -564,6 +564,8 @@ impl rend3_framework::App for SceneViewer {
                     }
                 }
 
+                std::thread::sleep(std::time::Duration::from_millis(10));
+
                 window.request_redraw()
             }
             Event::RedrawRequested(_) => {

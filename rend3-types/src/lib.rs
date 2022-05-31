@@ -198,7 +198,7 @@ pub use wgt::{
 ///
 /// The value allows for 8 bits of information packed in the high 8 bits of the
 /// index for object recombination.
-pub const MAX_VERTEX_COUNT: usize = 1 << 24;
+pub const MAX_VERTEX_COUNT: usize = 1 << 32;
 
 /// Identifies the semantic use of a vertex buffer.
 #[derive(Debug, Copy, Clone)]
