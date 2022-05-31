@@ -6,7 +6,7 @@ use rend3::{
     InstanceAdapterDevice, Renderer,
 };
 use rend3_routine::base::BaseRenderGraph;
-use wgpu::Instance;
+use wgpu::{Instance, PresentMode};
 use winit::{
     dpi::PhysicalSize,
     event::WindowEvent,
@@ -94,6 +94,10 @@ pub trait App<T: 'static = ()> {
     /// It is called on main events cleared and things are remade if this
     /// changes.
     fn sample_count(&self) -> SampleCount;
+
+    fn present_mode(&self) -> rend3::types::PresentMode {
+        rend3::types::PresentMode::Fifo
+    }
 
     /// Determines the scale factor used
     fn scale_factor(&self) -> f32 {
@@ -277,6 +281,7 @@ pub async fn async_start<A: App + 'static>(mut app: A, window_builder: WindowBui
         size: glam::UVec2::new(window_size.width, window_size.height),
         scale_factor: app.scale_factor(),
         sample_count: app.sample_count(),
+        present_mode: app.present_mode(),
     };
 
     winit_run(event_loop, move |event, _event_loop, control_flow| {
@@ -339,6 +344,7 @@ struct StoredSurfaceInfo {
     size: UVec2,
     scale_factor: f32,
     sample_count: SampleCount,
+    present_mode: PresentMode,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -375,14 +381,15 @@ fn handle_surface<A: App, T: 'static>(
             surface_info.size = size;
             surface_info.scale_factor = app.scale_factor();
             surface_info.sample_count = app.sample_count();
+            surface_info.present_mode = app.present_mode();
 
             // Reconfigure the surface for the new size.
             rend3::configure_surface(
                 surface.as_ref().unwrap(),
                 &renderer.device,
                 format,
-                glam::UVec2::new(size.x, size.y),
-                rend3::types::PresentMode::Mailbox,
+                surface_info.size,
+                surface_info.present_mode,
             );
             // Tell the renderer about the new aspect ratio.
             renderer.set_aspect_ratio(size.x as f32 / size.y as f32);
