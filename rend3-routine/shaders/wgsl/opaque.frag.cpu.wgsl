@@ -533,7 +533,7 @@ fn main_1() {
 }
 
 @fragment 
-fn main(@location(3) i_coords0_: vec2<f32>, @location(5) i_color: vec4<f32>, @location(1) i_normal: vec3<f32>, @location(2) i_tangent: vec3<f32>, @location(0) i_view_position: vec4<f32>) -> @location(0) vec4<f32> {
+fn main(@location(3) i_coords0_: vec2<f32>, @location(4) o_coords1: vec2<f32>, @location(5) i_color: vec4<f32>, @location(1) i_normal: vec3<f32>, @location(2) i_tangent: vec3<f32>, @location(0) i_view_position: vec4<f32>, @location(6) i_material: u32) -> @location(0) vec4<f32> {
     i_coords0_1 = i_coords0_;
     i_color_1 = i_color;
     i_normal_1 = i_normal;

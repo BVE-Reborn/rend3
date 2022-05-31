@@ -198,6 +198,8 @@ pub async fn async_start<A: App + 'static>(mut app: A, window_builder: WindowBui
     app.register_logger();
     app.register_panic_hook();
 
+    std::thread::sleep(std::time::Duration::from_secs(4));
+
     // Create the window invisible until we are rendering
     let (event_loop, window) = app.create_window(window_builder.with_visible(false));
     let window_size = window.inner_size();
