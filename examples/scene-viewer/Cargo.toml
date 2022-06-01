@@ -25,7 +25,7 @@ crate-type = ["lib", "cdylib"]
 
 
 [features]
-tracy = ["profiling/profile-with-tracy", "tracy-client"]
+tracy = ["profiling/profile-with-tracy", "tracy-client", "wgpu-profiler/tracy"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -48,7 +48,7 @@ rend3-routine = { version = "^0.3.0", path = "../../rend3-routine" }
 rustc-hash = "1"
 smallvec = "1"
 tracy-client = { version = "0.13", optional = true }
-wgpu-profiler = { version = "0.8.0", features = ["tracy"] }
+wgpu-profiler = { version = "0.8.0" }
 winit = "0.26"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
