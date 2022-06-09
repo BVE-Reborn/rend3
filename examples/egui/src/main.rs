@@ -6,8 +6,8 @@ struct EguiExampleData {
     _directional_handle: rend3::types::DirectionalLightHandle,
 
     egui_routine: rend3_egui::EguiRenderRoutine,
-    platform: egui_winit_platform::Platform,
-    start_time: instant::Instant,
+    egui_context: egui::Context,
+    winit_state: egui_winit::State,
     color: [f32; 4],
 }
 
@@ -100,13 +100,7 @@ impl rend3_framework::App for EguiExample {
         });
 
         // Create the winit/egui integration, which manages our egui context for us.
-        let platform = egui_winit_platform::Platform::new(egui_winit_platform::PlatformDescriptor {
-            physical_width: window_size.width as u32,
-            physical_height: window_size.height as u32,
-            scale_factor: window.scale_factor(),
-            font_definitions: egui::FontDefinitions::default(),
-            style: Default::default(),
-        });
+        let platform = egui_winit::State::new(renderer.limits.max_texture_dimension_2d as usize, window);
 
         //Images
         let image_bytes = include_bytes!("images/rust-logo-128x128-blk.png");
@@ -127,7 +121,6 @@ impl rend3_framework::App for EguiExample {
             Some("rust_logo_texture"),
         );
 
-        let start_time = instant::Instant::now();
         let color: [f32; 4] = [0.0, 0.5, 0.5, 1.0];
 
         self.data = Some(EguiExampleData {
@@ -136,8 +129,8 @@ impl rend3_framework::App for EguiExample {
             _directional_handle,
 
             egui_routine,
-            platform,
-            start_time,
+            egui_context: egui::Context::default(),
+            winit_state: platform,
             color,
         });
     }
@@ -156,16 +149,18 @@ impl rend3_framework::App for EguiExample {
         let data = self.data.as_mut().unwrap();
 
         // Pass the winit events to the platform integration.
-        data.platform.handle_event(&event);
+        // Only `WindowEvent`s need to be forwarded.
+        if let winit::event::Event::WindowEvent { ref event, .. } = event {
+            data.winit_state.on_event(&data.egui_context, event);
+        }
 
         match event {
             rend3_framework::Event::RedrawRequested(..) => {
-                data.platform.update_time(data.start_time.elapsed().as_secs_f64());
-                data.platform.begin_frame();
+                data.egui_context.begin_frame(data.winit_state.take_egui_input(window));
 
                 // Insert egui commands here
-                let ctx = data.platform.context();
-                egui::Window::new("Change color").resizable(true).show(&ctx, |ui| {
+                let ctx = &data.egui_context;
+                egui::Window::new("Change color").resizable(true).show(ctx, |ui| {
                     ui.label("Change the color of the cube");
                     if ui.color_edit_button_rgba_unmultiplied(&mut data.color).changed() {
                         renderer.update_material(
@@ -190,18 +185,18 @@ impl rend3_framework::App for EguiExample {
                 // handle the output here
                 let egui::FullOutput {
                     shapes, textures_delta, ..
-                } = data.platform.end_frame(Some(window));
-                let paint_jobs = data.platform.context().tessellate(shapes);
-
-                let input = rend3_egui::Input {
-                    clipped_meshes: &paint_jobs,
-                    textures_delta,
-                    context: data.platform.context(),
-                };
+                } = ctx.end_frame();
+                let paint_jobs = ctx.tessellate(shapes);
 
                 // Get a frame
                 let frame = rend3::util::output::OutputFrame::Surface {
                     surface: Arc::clone(surface.unwrap()),
+                };
+
+                let input = rend3_egui::Input {
+                    paint_jobs: &paint_jobs,
+                    textures_delta,
+                    context: ctx.clone(),
                 };
 
                 // Ready up the renderer

@@ -38,6 +38,7 @@ Per Keep a Changelog there are 6 main categories of changes:
 - rend3-routine: Added the option to set a custom primitive topology value when building a forward routine. @setzer22
 - rend3-routine: Added a resolution field to the per-frame uniforms. @setzer22
 - rend3-routine: Added add_clear_to_graph to make clears explicit and add `clear_color` argument to base rendergraph.
+- rend3-egui: Update to egui 0.18 @setzer22
 
 ### Fixes
 - Fixed mismatched BGLs when using a custom material with no cutout specification

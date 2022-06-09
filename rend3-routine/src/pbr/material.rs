@@ -420,7 +420,7 @@ impl Default for SampleType {
 
 /// The type of transparency in a material.
 #[repr(u8)]
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum TransparencyType {
     /// Alpha is completely ignored.
     Opaque,

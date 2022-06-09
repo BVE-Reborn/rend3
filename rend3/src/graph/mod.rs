@@ -123,20 +123,20 @@ enum GraphResource {
 }
 
 /// Handle to a graph-stored render target.
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct RenderTargetHandle {
     // Must only be OutputTexture or Texture
     resource: GraphResource,
 }
 
 /// Handle to a single shadow map.
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct ShadowTargetHandle {
     idx: usize,
 }
 
 /// Handle to the entire shadow atlas.
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct ShadowArrayHandle;
 
 /// Targets that make up a renderpass.

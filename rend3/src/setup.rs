@@ -335,7 +335,7 @@ impl<T> PotentialAdapter<T> {
 }
 
 /// Set of common GPU vendors.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Vendor {
     Nv,
     Amd,

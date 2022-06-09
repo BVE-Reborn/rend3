@@ -271,7 +271,7 @@ pub async fn filesystem_io_func(parent_directory: impl AsRef<Path>, uri: &str) -
         return Ok(data);
     }
 
-    let path_resolved = parent_directory.as_ref().join(&*uri);
+    let path_resolved = parent_directory.as_ref().join(&uri);
     let display = path_resolved.as_os_str().to_string_lossy();
     // profiling::scope!("loading file", &display);
     log::info!("loading file '{}' from disk", &display);
