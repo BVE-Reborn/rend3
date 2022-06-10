@@ -12,7 +12,6 @@
 //! current state of the animation by changing the currently played animation or
 //! increasing the playback time should be handled in user code.
 
-use std::borrow::Borrow;
 use std::collections::HashMap;
 
 use itertools::Itertools;
@@ -24,6 +23,7 @@ use rend3::{
     util::typedefs::{FastHashMap, FastHashSet},
     Renderer,
 };
+use rend3::types::Handedness;
 use rend3_gltf::{AnimationChannel, GltfSceneInstance, LoadedGltfScene};
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -230,21 +230,24 @@ pub fn pose_animation_frame(
             .as_ref()
             .map(|rot| sample_at_time(rot, time))
             .unwrap_or(bind_rotation);
-        let scale = channels
+        let mut scale = channels
             .scale
             .as_ref()
             .map(|sca| sample_at_time(sca, time))
             .unwrap_or(bind_scale);
 
+        if renderer.handedness == Handedness::Left {
+            scale.z = -scale.z
+        }
+
         let matrix = Mat4::from_scale_rotation_translation(scale, rotation, translation);
 
-        if let Some(object) = instance.nodes[node_idx].inner.object.borrow() {
+        if let Some(ref object) = instance.nodes[node_idx].inner.object {
             for object_handle in object.inner.primitives.as_slice() {
                 renderer.set_object_transform(object_handle, matrix);
             }
         }
     }
-
 
     for (skin_index, per_skin_data) in &animation_data.skin_data {
         let skin = &scene.skins[skin_index.0];
