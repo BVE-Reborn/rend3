@@ -38,7 +38,7 @@ bitflags = "1"
 bumpalo = "3"
 bytemuck = "1"
 flume = "0.10"
-glam = { version = "0.20.0", features = ["bytemuck"] }
+glam = { version = "0.21.1", features = ["bytemuck"] }
 indexmap = "1"
 list-any = "0.2"
 log = "0.4"

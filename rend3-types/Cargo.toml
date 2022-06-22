@@ -13,6 +13,6 @@ rust-version = "1.57"
 
 [dependencies]
 bitflags = "1"
-glam = "0.20.0"
+glam = "0.21.1"
 thiserror = "1"
 wgt = { package = "wgpu-types", version = "0.12" }
