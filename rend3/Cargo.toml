@@ -51,7 +51,7 @@ rustc-hash = "1"
 smallvec = "1"
 smartstring = "1.0"
 thiserror = "1"
-wgpu = "0.12"
+wgpu = "0.13"
 wgpu-profiler = "0.8.0"
 
 # Hard dependencies on new versions of transitive deps

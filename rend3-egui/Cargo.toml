@@ -17,5 +17,5 @@ egui_wgpu_backend = "0.17.0"
 epi = "0.17.0"
 glam = "0.20.0"
 rend3 = { version = "^0.3.0", path = "../rend3" }
-wgpu = "0.12"
+wgpu = "0.13"
 wgpu-types = "0.12.0"
