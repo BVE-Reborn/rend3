@@ -1,11 +1,11 @@
-use std::{path::Path, sync::Arc};
 use rend3::types::DirectionalLightHandle;
+use std::{path::Path, sync::Arc};
 
 const SAMPLE_COUNT: rend3::types::SampleCount = rend3::types::SampleCount::Four;
 
 /// The application data, can only be obtained at `setup` time, so it's under an
 /// Option in the main struct.
-struct InitializedData {
+struct AnimatedObject {
     loaded_scene: rend3_gltf::LoadedGltfScene,
     loaded_instance: rend3_gltf::GltfSceneInstance,
     animation_data: rend3_anim::AnimationData,
@@ -15,23 +15,23 @@ struct InitializedData {
 
 #[derive(Default)]
 struct AnimationExample {
-    /// The application data, or `None` if it hasn't been initialized already
-    data: Vec<InitializedData>,
-    _directional_light_handle: Option<DirectionalLightHandle>
+    /// The application data
+    animated_objects: Vec<AnimatedObject>,
+    _directional_light_handle: Option<DirectionalLightHandle>,
 }
 
-    fn update(renderer: &rend3::Renderer, delta: f32, init_data: &mut InitializedData) {
-        init_data.animation_time = (init_data.animation_time + delta) % init_data.loaded_scene.animations[0].inner.duration;
-        rend3_anim::pose_animation_frame(
-            renderer,
-            &init_data.loaded_scene,
-            &init_data.loaded_instance,
-            &init_data.animation_data,
-            0,
-            init_data.animation_time,
-        );
-    }
-
+fn update(renderer: &rend3::Renderer, delta: f32, animated_object: &mut AnimatedObject) {
+    animated_object.animation_time =
+        (animated_object.animation_time + delta) % animated_object.loaded_scene.animations[0].inner.duration;
+    rend3_anim::pose_animation_frame(
+        renderer,
+        &animated_object.loaded_scene,
+        &animated_object.loaded_instance,
+        &animated_object.animation_data,
+        0,
+        animated_object.animation_time,
+    );
+}
 
 impl rend3_framework::App for AnimationExample {
     const HANDEDNESS: rend3::types::Handedness = rend3::types::Handedness::Left;
@@ -83,7 +83,7 @@ impl rend3_framework::App for AnimationExample {
 
         self._directional_light_handle = Some(directional_light_handle);
 
-        let init_data = InitializedData {
+        let animated_object = AnimatedObject {
             animation_data: rend3_anim::AnimationData::from_gltf_scene(&loaded_scene, &loaded_instance),
             loaded_scene,
             loaded_instance,
@@ -100,10 +100,9 @@ impl rend3_framework::App for AnimationExample {
             &rend3_gltf::GltfLoadSettings::default(),
             |p| async move { rend3_gltf::filesystem_io_func(&parent_directory, &p).await },
         ))
-            .expect("Loading gltf scene");
+        .expect("Loading gltf scene");
 
-
-        let init_data2 = InitializedData {
+        let animated_object2 = AnimatedObject {
             animation_data: rend3_anim::AnimationData::from_gltf_scene(&loaded_scene, &loaded_instance),
             loaded_scene,
             loaded_instance,
@@ -111,8 +110,7 @@ impl rend3_framework::App for AnimationExample {
             last_frame_time: instant::Instant::now(),
         };
 
-
-        self.data = vec![init_data, init_data2];
+        self.animated_objects = vec![animated_object, animated_object2];
     }
 
     fn handle_event(
@@ -137,10 +135,10 @@ impl rend3_framework::App for AnimationExample {
             rend3_framework::Event::MainEventsCleared => {
                 let now = instant::Instant::now();
 
-                self.data.iter_mut().for_each(|init_data|{
-                    let delta = now.duration_since(init_data.last_frame_time).as_secs_f32();
-                    init_data.last_frame_time = now;
-                    update(renderer, delta, init_data);
+                self.animated_objects.iter_mut().for_each(|animated_object| {
+                    let delta = now.duration_since(animated_object.last_frame_time).as_secs_f32();
+                    animated_object.last_frame_time = now;
+                    update(renderer, delta, animated_object);
                 });
 
                 window.request_redraw();

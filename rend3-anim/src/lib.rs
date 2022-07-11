@@ -15,6 +15,7 @@
 use std::collections::HashMap;
 
 use itertools::Itertools;
+use rend3::types::Handedness;
 use rend3::{
     types::{
         glam::{Mat4, Quat, Vec3},
@@ -23,7 +24,6 @@ use rend3::{
     util::typedefs::{FastHashMap, FastHashSet},
     Renderer,
 };
-use rend3::types::Handedness;
 use rend3_gltf::{AnimationChannel, GltfSceneInstance, LoadedGltfScene};
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -214,9 +214,7 @@ pub fn pose_animation_frame(
     let animation = &scene.animations[animation_index];
     let time = time.clamp(0.0, animation.inner.duration);
 
-
     for (&node_idx, channels) in &animation.inner.channels {
-
         let local_transform = instance.nodes[node_idx].inner.local_transform;
         let (bind_scale, bind_rotation, bind_translation) = local_transform.to_scale_rotation_translation();
 
