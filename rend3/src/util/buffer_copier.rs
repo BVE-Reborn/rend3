@@ -82,7 +82,7 @@ impl VertexBufferCopier {
             push_constant_ranges: &[],
         });
 
-        let module = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+        let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("BufferCopier Compute Shader"),
             source: wgpu::ShaderSource::Wgsl(include_str!("../../shaders/buffer_copier.wgsl").into()),
         });
@@ -149,7 +149,7 @@ impl VertexBufferCopier {
         cpass.set_pipeline(&self.pipeline);
         cpass.set_bind_group(0, &bind_group, &[]);
         let num_workgroups = round_up_div(params.count, Self::WORKGROUP_SIZE);
-        cpass.dispatch(num_workgroups, 1, 1);
+        cpass.dispatch_workgroups(num_workgroups, 1, 1);
 
         drop(cpass);
     }

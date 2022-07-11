@@ -79,12 +79,14 @@ fn main() {
     // so rendering work will stop after the window dies.
     let surface = Arc::new(unsafe { iad.instance.create_surface(&window) });
     // Get the preferred format for the surface.
-    let format = surface.get_preferred_format(&iad.adapter).unwrap();
+    let formats = surface.get_supported_formats(&iad.adapter);
+    let preferred_format = formats[0];
+
     // Configure the surface to be ready for rendering.
     rend3::configure_surface(
         &surface,
         &iad.device,
-        format,
+        preferred_format,
         glam::UVec2::new(window_size.width, window_size.height),
         rend3::types::PresentMode::Mailbox,
     );
@@ -104,7 +106,7 @@ fn main() {
     let pbr_routine = rend3_routine::pbr::PbrRoutine::new(&renderer, &mut data_core, &base_rendergraph.interfaces);
     drop(data_core);
     let tonemapping_routine =
-        rend3_routine::tonemapping::TonemappingRoutine::new(&renderer, &base_rendergraph.interfaces, format);
+        rend3_routine::tonemapping::TonemappingRoutine::new(&renderer, &base_rendergraph.interfaces, preferred_format);
 
     // Create mesh and calculate smooth normals based on vertices
     let mesh = create_mesh();
@@ -175,7 +177,7 @@ fn main() {
             rend3::configure_surface(
                 &surface,
                 &renderer.device,
-                format,
+                preferred_format,
                 glam::UVec2::new(resolution.x, resolution.y),
                 rend3::types::PresentMode::Mailbox,
             );

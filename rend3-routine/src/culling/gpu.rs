@@ -195,7 +195,7 @@ impl GpuCuller {
             })
         };
 
-        let prefix_cull_sm = device.create_shader_module(&ShaderModuleDescriptor {
+        let prefix_cull_sm = device.create_shader_module(ShaderModuleDescriptor {
             label: Some("cull-prefix-cull"),
             source: ShaderSource::Wgsl(Cow::Borrowed(
                 WGSL_SHADERS
@@ -206,7 +206,7 @@ impl GpuCuller {
             )),
         });
 
-        let prefix_sum_sm = device.create_shader_module(&ShaderModuleDescriptor {
+        let prefix_sum_sm = device.create_shader_module(ShaderModuleDescriptor {
             label: Some("cull-prefix-sum"),
             source: ShaderSource::Wgsl(Cow::Borrowed(
                 WGSL_SHADERS
@@ -217,7 +217,7 @@ impl GpuCuller {
             )),
         });
 
-        let prefix_output_sm = device.create_shader_module(&ShaderModuleDescriptor {
+        let prefix_output_sm = device.create_shader_module(ShaderModuleDescriptor {
             label: Some("cull-prefix-output"),
             source: ShaderSource::Wgsl(Cow::Borrowed(
                 WGSL_SHADERS
@@ -350,7 +350,7 @@ impl GpuCuller {
 
                 cpass.set_pipeline(&self.prefix_cull_pipeline);
                 cpass.set_bind_group(0, &bg_a, &[]);
-                cpass.dispatch(dispatch_count, 1, 1);
+                cpass.dispatch_workgroups(dispatch_count, 1, 1);
 
                 cpass.set_pipeline(&self.prefix_sum_pipeline);
                 let mut stride = 1_u32;
@@ -360,7 +360,7 @@ impl GpuCuller {
 
                     cpass.set_push_constants(0, bytemuck::cast_slice(&[stride]));
                     cpass.set_bind_group(0, bind_group, &[]);
-                    cpass.dispatch(dispatch_count, 1, 1);
+                    cpass.dispatch_workgroups(dispatch_count, 1, 1);
                     stride <<= 1;
                     iteration += 1;
                 }
@@ -368,7 +368,7 @@ impl GpuCuller {
                 let bind_group = if iteration % 2 == 0 { &bg_a } else { &bg_b };
                 cpass.set_pipeline(&self.prefix_output_pipeline);
                 cpass.set_bind_group(0, bind_group, &[]);
-                cpass.dispatch(dispatch_count, 1, 1);
+                cpass.dispatch_workgroups(dispatch_count, 1, 1);
             } else {
                 let bg = BindGroupBuilder::new()
                     .append_buffer(input_buffer)
@@ -383,7 +383,7 @@ impl GpuCuller {
 
                 cpass.set_pipeline(&self.atomic_pipeline);
                 cpass.set_bind_group(0, &bg, &[]);
-                cpass.dispatch(dispatch_count, 1, 1);
+                cpass.dispatch_workgroups(dispatch_count, 1, 1);
 
                 drop(cpass);
             }

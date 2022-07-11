@@ -12,7 +12,7 @@ use crate::{
 use parking_lot::Mutex;
 use rend3_types::{Camera, Handedness, TextureFormat};
 use std::sync::{atomic::AtomicUsize, Arc};
-use wgpu::TextureViewDimension;
+use wgpu::{Features, TextureViewDimension};
 
 pub fn create_renderer(
     iad: InstanceAdapterDevice,
@@ -23,7 +23,7 @@ pub fn create_renderer(
 
     let features = iad.device.features();
     let limits = iad.device.limits();
-    let downlevel = iad.adapter.get_downlevel_properties();
+    let downlevel = iad.adapter.get_downlevel_capabilities();
 
     let camera_manager = CameraManager::new(Camera::default(), handedness, aspect_ratio);
 
@@ -55,8 +55,8 @@ pub fn create_renderer(
             TextureFormat::Rgba16Float,
         ],
     );
-    let mut profiler = wgpu_profiler::GpuProfiler::new(4, iad.queue.get_timestamp_period());
-    profiler.enable_timer = features.contains(wgpu_profiler::GpuProfiler::REQUIRED_WGPU_FEATURES);
+
+    let profiler = wgpu_profiler::GpuProfiler::new(4, iad.queue.get_timestamp_period(), Features::empty());
 
     Ok(Arc::new(Renderer {
         instructions: InstructionStreamPair::new(),

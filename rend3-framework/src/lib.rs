@@ -227,7 +227,8 @@ pub async fn async_start<A: App + 'static>(mut app: A, window_builder: WindowBui
     //
     // Assume android supports Rgba8Srgb, as it has 100% device coverage
     let format = surface.as_ref().map_or(TextureFormat::Rgba8UnormSrgb, |s| {
-        let format = s.get_preferred_format(&iad.adapter).unwrap();
+        let formats = s.get_supported_formats(&iad.adapter);
+        let format = formats[0];
 
         // Configure the surface to be ready for rendering.
         rend3::configure_surface(

@@ -31,6 +31,7 @@ pub enum LimitType {
     MaxComputeWorkgroupSizeY,
     MaxComputeWorkgroupSizeZ,
     MaxComputeWorkgroupsPerDimension,
+    MaxBufferSize,
 }
 
 /// Reason why the renderer failed to initialize.
@@ -46,8 +47,8 @@ pub enum RendererInitializationError {
     )]
     LowDeviceLimit {
         ty: LimitType,
-        device_limit: u32,
-        required_limit: u32,
+        device_limit: u64,
+        required_limit: u64,
     },
     #[error("Device is missing required features: {:?}", features)]
     MissingDeviceFeatures { features: Features },

@@ -1,73 +1,73 @@
 struct DataAbi {
-    stride: u32;
-    texture_offset: u32;
-    cutoff_offset: u32;
-    uv_transform_offset: u32;
-};
+    stride: u32,
+    texture_offset: u32,
+    cutoff_offset: u32,
+    uv_transform_offset: u32,
+}
 
 struct TextureData {
-    material_data: [[stride(4)]] array<f32>;
-};
+    material_data: array<f32>,
+}
 
-[[group(2), binding(0)]]
+@group(2) @binding(0) 
 var<uniform> unnamed: DataAbi;
 var<private> i_material_1: u32;
-[[group(3), binding(0)]]
+@group(3) @binding(0) 
 var<storage> unnamed_1: TextureData;
 var<private> i_coords0_1: vec2<f32>;
-[[group(3), binding(1)]]
+@group(3) @binding(1) 
 var texture: texture_2d<f32>;
-[[group(0), binding(0)]]
+@group(0) @binding(0) 
 var primary_sampler: sampler;
-var<private> i_position_1: vec4<f32>;
-var<private> i_color_1: vec4<f32>;
 
 fn main_1() {
     var phi_168_: vec2<f32>;
 
-    let _e28 = unnamed.stride;
-    let _e29 = i_material_1;
-    let _e30 = (_e28 * _e29);
-    let _e32 = unnamed.cutoff_offset;
-    let _e36 = unnamed_1.material_data[(_e30 + _e32)];
-    let _e38 = unnamed.uv_transform_offset;
-    if ((_e38 != 4294967295u)) {
-        let _e40 = (_e30 + _e38);
-        let _e43 = unnamed_1.material_data[_e40];
-        let _e47 = unnamed_1.material_data[(_e40 + 1u)];
-        let _e51 = unnamed_1.material_data[(_e40 + 2u)];
-        let _e55 = unnamed_1.material_data[(_e40 + 4u)];
-        let _e59 = unnamed_1.material_data[(_e40 + 5u)];
-        let _e63 = unnamed_1.material_data[(_e40 + 6u)];
-        let _e67 = unnamed_1.material_data[(_e40 + 8u)];
-        let _e71 = unnamed_1.material_data[(_e40 + 9u)];
-        let _e75 = unnamed_1.material_data[(_e40 + 10u)];
-        let _e80 = i_coords0_1;
-        let _e84 = (mat3x3<f32>(vec3<f32>(_e43, _e47, _e51), vec3<f32>(_e55, _e59, _e63), vec3<f32>(_e67, _e71, _e75)) * vec3<f32>(_e80.x, _e80.y, 1.0));
-        phi_168_ = vec2<f32>(_e84.x, _e84.y);
+    let _e26 = unnamed.stride;
+    let _e27 = i_material_1;
+    let _e28 = (_e26 * _e27);
+    let _e30 = unnamed.cutoff_offset;
+    let _e34 = unnamed_1.material_data[(_e28 + _e30)];
+    let _e36 = unnamed.uv_transform_offset;
+    if (_e36 != 4294967295u) {
+        let _e38 = (_e28 + _e36);
+        let _e41 = unnamed_1.material_data[_e38];
+        let _e45 = unnamed_1.material_data[(_e38 + 1u)];
+        let _e49 = unnamed_1.material_data[(_e38 + 2u)];
+        let _e53 = unnamed_1.material_data[(_e38 + 4u)];
+        let _e57 = unnamed_1.material_data[(_e38 + 5u)];
+        let _e61 = unnamed_1.material_data[(_e38 + 6u)];
+        let _e65 = unnamed_1.material_data[(_e38 + 8u)];
+        let _e69 = unnamed_1.material_data[(_e38 + 9u)];
+        let _e73 = unnamed_1.material_data[(_e38 + 10u)];
+        let _e78 = i_coords0_1;
+        let _e82 = (mat3x3<f32>(vec3<f32>(_e41, _e45, _e49), vec3<f32>(_e53, _e57, _e61), vec3<f32>(_e65, _e69, _e73)) * vec3<f32>(_e78.x, _e78.y, 1.0));
+        phi_168_ = vec2<f32>(_e82.x, _e82.y);
     } else {
-        let _e88 = i_coords0_1;
-        phi_168_ = _e88;
+        let _e86 = i_coords0_1;
+        phi_168_ = _e86;
     }
-    let _e90 = phi_168_;
-    let _e91 = dpdx(_e90);
-    let _e92 = dpdy(_e90);
-    let _e94 = unnamed.texture_offset;
-    let _e98 = unnamed_1.material_data[(_e30 + _e94)];
-    if (((bitcast<u32>(_e98) & 1u) != 0u)) {
-        let _e102 = textureSampleGrad(texture, primary_sampler, _e90, _e91, _e92);
-        if ((_e102.w <= _e36)) {
+    let _e88 = phi_168_;
+    let _e89 = dpdx(_e88);
+    let _e90 = dpdy(_e88);
+    let _e92 = unnamed.texture_offset;
+    let _e96 = unnamed_1.material_data[(_e28 + _e92)];
+    if ((bitcast<u32>(_e96) & 1u) != 0u) {
+        let _e100 = textureSampleGrad(texture, primary_sampler, _e88, _e89, _e90);
+        if (_e100.w <= _e34) {
             discard;
         }
     }
     return;
 }
 
-[[stage(fragment)]]
-fn main([[location(3)]] i_material: u32, [[location(1)]] i_coords0_: vec2<f32>, [[location(0)]] i_position: vec4<f32>, [[location(2)]] i_color: vec4<f32>) {
+@fragment 
+fn main( @location(0) member: vec4<f32>,
+    @builtin(position) gl_Position: vec4<f32>,
+    @location(3) @interpolate(flat) i_material: u32,
+    @location(2) member_2: vec4<f32>,
+    @location(1) i_coords0_: vec2<f32>,) {
     i_material_1 = i_material;
     i_coords0_1 = i_coords0_;
-    i_position_1 = i_position;
-    i_color_1 = i_color;
     main_1();
 }

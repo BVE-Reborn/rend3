@@ -77,7 +77,7 @@ impl MipmapGenerator {
             &sampler_bgl,
         );
 
-        let sm = device.create_shader_module(&wgpu::include_wgsl!("../../shaders/mipmap.wgsl"));
+        let sm = device.create_shader_module(wgpu::include_wgsl!("../../shaders/mipmap.wgsl"));
 
         let pll = device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: Some("mipmap generator pipeline layout"),
@@ -129,11 +129,11 @@ impl MipmapGenerator {
             fragment: Some(FragmentState {
                 module: sm,
                 entry_point: "fs_main",
-                targets: &[ColorTargetState {
+                targets: &[Some(ColorTargetState {
                     format,
                     blend: None,
                     write_mask: ColorWrites::all(),
-                }],
+                })],
             }),
             multiview: None,
         })
@@ -147,7 +147,7 @@ impl MipmapGenerator {
         desc: &TextureDescriptor,
     ) {
         profiling::scope!("generating mipmaps");
-        let mips: ArrayVec<_, 14> = (0..desc.size.max_mips())
+        let mips: ArrayVec<_, 14> = (0..desc.size.max_mips(desc.dimension))
             .map(|mip_level| {
                 texture.create_view(&TextureViewDescriptor {
                     label: None,
@@ -192,14 +192,14 @@ impl MipmapGenerator {
 
             let mut rpass = encoder.begin_render_pass(&RenderPassDescriptor {
                 label: None,
-                color_attachments: &[RenderPassColorAttachment {
+                color_attachments: &[Some(RenderPassColorAttachment {
                     view: dst_view,
                     resolve_target: None,
                     ops: Operations {
                         load: LoadOp::Clear(Color::BLACK),
                         store: true,
                     },
-                }],
+                })],
                 depth_stencil_attachment: None,
             });
 

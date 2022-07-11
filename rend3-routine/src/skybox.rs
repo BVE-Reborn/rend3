@@ -144,7 +144,7 @@ pub struct SkyboxPipelines {
 impl SkyboxPipelines {
     pub fn new(renderer: &Renderer, interfaces: &WholeFrameInterfaces, bgl: &BindGroupLayout) -> Self {
         profiling::scope!("build skybox pipeline");
-        let skybox_pass_vert = renderer.device.create_shader_module(&ShaderModuleDescriptor {
+        let skybox_pass_vert = renderer.device.create_shader_module(ShaderModuleDescriptor {
             label: Some("skybox vert"),
             source: ShaderSource::Wgsl(Cow::Borrowed(
                 WGSL_SHADERS
@@ -154,7 +154,7 @@ impl SkyboxPipelines {
                     .unwrap(),
             )),
         });
-        let skybox_pass_frag = renderer.device.create_shader_module(&ShaderModuleDescriptor {
+        let skybox_pass_frag = renderer.device.create_shader_module(ShaderModuleDescriptor {
             label: Some("skybox frag"),
             source: ShaderSource::Wgsl(Cow::Borrowed(
                 WGSL_SHADERS
@@ -203,11 +203,11 @@ impl SkyboxPipelines {
                 fragment: Some(FragmentState {
                     module: &skybox_pass_frag,
                     entry_point: "main",
-                    targets: &[ColorTargetState {
+                    targets: &[Some(ColorTargetState {
                         format: TextureFormat::Rgba16Float,
                         blend: None,
                         write_mask: ColorWrites::all(),
-                    }],
+                    })],
                 }),
                 multiview: None,
             })
