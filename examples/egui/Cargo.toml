@@ -14,8 +14,6 @@ path = "src/main.rs"
 [dependencies]
 # The egui immediate mode gui library
 egui = "0.18.0"
-# Backend-agnostic interface for writing apps using egui
-epi = "0.17.0"
 # Winit integration with egui
 egui_winit_platform = "0.15.0"
 # logging
