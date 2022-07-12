@@ -16,7 +16,7 @@ anyhow = "1"
 cfg-if = "1"
 glam = "0.20"
 log = "0.4"
-parking_lot = "0.11"
+parking_lot = "0.12"
 profiling = { version = "1", default-features = false }
 rend3 = { version = "0.3.0", path = "../rend3" }
 rend3-routine = { version = "0.3.0", path = "../rend3-routine" }
