@@ -23,6 +23,9 @@ skip = [
     # everything
     { name = "base64", version = "0.12.3" }, # gltf uses old version
     { name = "cfg-if", version = "0.1.10" },
+    { name = "hashbrown", version = "0.11.2" }, # gpu-descriptor from wgpu-hal uses old version
+    { name = "parking_lot", version = "0.11.2" }, # winit and imgui uses old version
+    { name = "parking_lot_core", version = "0.8.5" }, # winit and imgui uses old version
     # graphics
     { name = "core-foundation", version = "0.7.0" }, # winit uses old version
     { name = "core-foundation-sys", version = "0.7.0" }, # winit uses old version
