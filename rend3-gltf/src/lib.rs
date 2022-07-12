@@ -1292,7 +1292,7 @@ pub mod util {
     #[cfg(feature = "ktx2")]
     pub fn map_ktx2_format(format: ktx2::Format, srgb: bool) -> Option<rend3::types::TextureFormat> {
         use ktx2::Format as k2F;
-        use rend3::types::TextureFormat as r3F;
+        use rend3::types::{AstcBlock, AstcChannel, TextureFormat as r3F};
         Some(match format {
             k2F::R4G4_UNORM_PACK8
             | k2F::R4G4B4A4_UNORM_PACK16
@@ -1462,105 +1462,118 @@ pub mod util {
             k2F::EAC_R11_SNORM_BLOCK => r3F::EacR11Snorm,
             k2F::EAC_R11G11_UNORM_BLOCK => r3F::EacRg11Unorm,
             k2F::EAC_R11G11_SNORM_BLOCK => r3F::EacRg11Snorm,
-            // TODO: are these missing variants expected?
-            // k2F::ASTC_4x4_UNORM_BLOCK | k2F::ASTC_4x4_SRGB_BLOCK => {
-            //     if srgb {
-            //         r3F::Astc4x4RgbaUnormSrgb
-            //     } else {
-            //         r3F::Astc4x4RgbaUnorm
-            //     }
-            // }
-            // k2F::ASTC_5x4_UNORM_BLOCK | k2F::ASTC_5x4_SRGB_BLOCK => {
-            //     if srgb {
-            //         r3F::Astc5x4RgbaUnormSrgb
-            //     } else {
-            //         r3F::Astc5x4RgbaUnorm
-            //     }
-            // }
-            // k2F::ASTC_5x5_UNORM_BLOCK | k2F::ASTC_5x5_SRGB_BLOCK => {
-            //     if srgb {
-            //         r3F::Astc5x5RgbaUnormSrgb
-            //     } else {
-            //         r3F::Astc5x5RgbaUnorm
-            //     }
-            // }
-            // k2F::ASTC_6x5_UNORM_BLOCK | k2F::ASTC_6x5_SRGB_BLOCK => {
-            //     if srgb {
-            //         r3F::Astc6x5RgbaUnormSrgb
-            //     } else {
-            //         r3F::Astc6x5RgbaUnorm
-            //     }
-            // }
-            // k2F::ASTC_6x6_UNORM_BLOCK | k2F::ASTC_6x6_SRGB_BLOCK => {
-            //     if srgb {
-            //         r3F::Astc6x6RgbaUnormSrgb
-            //     } else {
-            //         r3F::Astc6x6RgbaUnorm
-            //     }
-            // }
-            // k2F::ASTC_8x5_UNORM_BLOCK | k2F::ASTC_8x5_SRGB_BLOCK => {
-            //     if srgb {
-            //         r3F::Astc8x5RgbaUnormSrgb
-            //     } else {
-            //         r3F::Astc8x5RgbaUnorm
-            //     }
-            // }
-            // k2F::ASTC_8x6_UNORM_BLOCK | k2F::ASTC_8x6_SRGB_BLOCK => {
-            //     if srgb {
-            //         r3F::Astc8x6RgbaUnormSrgb
-            //     } else {
-            //         r3F::Astc8x6RgbaUnorm
-            //     }
-            // }
-            // k2F::ASTC_8x8_UNORM_BLOCK | k2F::ASTC_8x8_SRGB_BLOCK => {
-            //     if srgb {
-            //         r3F::Astc8x8RgbaUnormSrgb
-            //     } else {
-            //         r3F::Astc8x8RgbaUnorm
-            //     }
-            // }
-            // k2F::ASTC_10x5_UNORM_BLOCK | k2F::ASTC_10x5_SRGB_BLOCK => {
-            //     if srgb {
-            //         r3F::Astc10x5RgbaUnormSrgb
-            //     } else {
-            //         r3F::Astc10x5RgbaUnorm
-            //     }
-            // }
-            // k2F::ASTC_10x6_UNORM_BLOCK | k2F::ASTC_10x6_SRGB_BLOCK => {
-            //     if srgb {
-            //         r3F::Astc10x6RgbaUnormSrgb
-            //     } else {
-            //         r3F::Astc10x6RgbaUnorm
-            //     }
-            // }
-            // k2F::ASTC_10x8_UNORM_BLOCK | k2F::ASTC_10x8_SRGB_BLOCK => {
-            //     if srgb {
-            //         r3F::Astc10x8RgbaUnormSrgb
-            //     } else {
-            //         r3F::Astc10x8RgbaUnorm
-            //     }
-            // }
-            // k2F::ASTC_10x10_UNORM_BLOCK | k2F::ASTC_10x10_SRGB_BLOCK => {
-            //     if srgb {
-            //         r3F::Astc10x10RgbaUnormSrgb
-            //     } else {
-            //         r3F::Astc10x10RgbaUnorm
-            //     }
-            // }
-            // k2F::ASTC_12x10_UNORM_BLOCK | k2F::ASTC_12x10_SRGB_BLOCK => {
-            //     if srgb {
-            //         r3F::Astc12x10RgbaUnormSrgb
-            //     } else {
-            //         r3F::Astc12x10RgbaUnorm
-            //     }
-            // }
-            // k2F::ASTC_12x12_UNORM_BLOCK | k2F::ASTC_12x12_SRGB_BLOCK => {
-            //     if srgb {
-            //         r3F::Astc12x12RgbaUnormSrgb
-            //     } else {
-            //         r3F::Astc12x12RgbaUnorm
-            //     }
-            // }
+            k2F::ASTC_4x4_UNORM_BLOCK | k2F::ASTC_4x4_SRGB_BLOCK => r3F::Astc {
+                block: AstcBlock::B4x4,
+                channel: if srgb {
+                    AstcChannel::UnormSrgb
+                } else {
+                    AstcChannel::Unorm
+                },
+            },
+            k2F::ASTC_5x4_UNORM_BLOCK | k2F::ASTC_5x4_SRGB_BLOCK => r3F::Astc {
+                block: AstcBlock::B5x4,
+                channel: if srgb {
+                    AstcChannel::UnormSrgb
+                } else {
+                    AstcChannel::Unorm
+                },
+            },
+            k2F::ASTC_5x5_UNORM_BLOCK | k2F::ASTC_5x5_SRGB_BLOCK => r3F::Astc {
+                block: AstcBlock::B5x5,
+                channel: if srgb {
+                    AstcChannel::UnormSrgb
+                } else {
+                    AstcChannel::Unorm
+                },
+            },
+            k2F::ASTC_6x5_UNORM_BLOCK | k2F::ASTC_6x5_SRGB_BLOCK => r3F::Astc {
+                block: AstcBlock::B6x5,
+                channel: if srgb {
+                    AstcChannel::UnormSrgb
+                } else {
+                    AstcChannel::Unorm
+                },
+            },
+            k2F::ASTC_6x6_UNORM_BLOCK | k2F::ASTC_6x6_SRGB_BLOCK => r3F::Astc {
+                block: AstcBlock::B6x6,
+                channel: if srgb {
+                    AstcChannel::UnormSrgb
+                } else {
+                    AstcChannel::Unorm
+                },
+            },
+            k2F::ASTC_8x5_UNORM_BLOCK | k2F::ASTC_8x5_SRGB_BLOCK => r3F::Astc {
+                block: AstcBlock::B8x5,
+                channel: if srgb {
+                    AstcChannel::UnormSrgb
+                } else {
+                    AstcChannel::Unorm
+                },
+            },
+            k2F::ASTC_8x6_UNORM_BLOCK | k2F::ASTC_8x6_SRGB_BLOCK => r3F::Astc {
+                block: AstcBlock::B8x6,
+                channel: if srgb {
+                    AstcChannel::UnormSrgb
+                } else {
+                    AstcChannel::Unorm
+                },
+            },
+            k2F::ASTC_8x8_UNORM_BLOCK | k2F::ASTC_8x8_SRGB_BLOCK => r3F::Astc {
+                block: AstcBlock::B8x8,
+                channel: if srgb {
+                    AstcChannel::UnormSrgb
+                } else {
+                    AstcChannel::Unorm
+                },
+            },
+            k2F::ASTC_10x5_UNORM_BLOCK | k2F::ASTC_10x5_SRGB_BLOCK => r3F::Astc {
+                block: AstcBlock::B10x5,
+                channel: if srgb {
+                    AstcChannel::UnormSrgb
+                } else {
+                    AstcChannel::Unorm
+                },
+            },
+            k2F::ASTC_10x6_UNORM_BLOCK | k2F::ASTC_10x6_SRGB_BLOCK => r3F::Astc {
+                block: AstcBlock::B10x6,
+                channel: if srgb {
+                    AstcChannel::UnormSrgb
+                } else {
+                    AstcChannel::Unorm
+                },
+            },
+            k2F::ASTC_10x8_UNORM_BLOCK | k2F::ASTC_10x8_SRGB_BLOCK => r3F::Astc {
+                block: AstcBlock::B10x8,
+                channel: if srgb {
+                    AstcChannel::UnormSrgb
+                } else {
+                    AstcChannel::Unorm
+                },
+            },
+            k2F::ASTC_10x10_UNORM_BLOCK | k2F::ASTC_10x10_SRGB_BLOCK => r3F::Astc {
+                block: AstcBlock::B10x10,
+                channel: if srgb {
+                    AstcChannel::UnormSrgb
+                } else {
+                    AstcChannel::Unorm
+                },
+            },
+            k2F::ASTC_12x10_UNORM_BLOCK | k2F::ASTC_12x10_SRGB_BLOCK => r3F::Astc {
+                block: AstcBlock::B12x10,
+                channel: if srgb {
+                    AstcChannel::UnormSrgb
+                } else {
+                    AstcChannel::Unorm
+                },
+            },
+            k2F::ASTC_12x12_UNORM_BLOCK | k2F::ASTC_12x12_SRGB_BLOCK => r3F::Astc {
+                block: AstcBlock::B12x12,
+                channel: if srgb {
+                    AstcChannel::UnormSrgb
+                } else {
+                    AstcChannel::Unorm
+                },
+            },
             _ => return None,
         })
     }
