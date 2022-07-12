@@ -13,10 +13,7 @@ pub(super) enum RenderGraphEncoderOrPassInner<'a, 'pass> {
 
 impl<'a, 'pass> ProfilerCommandRecorder for RenderGraphEncoderOrPassInner<'a, 'pass> {
     fn is_pass(&self) -> bool {
-        match self {
-            RenderGraphEncoderOrPassInner::RenderPass(_) => true,
-            _ => false,
-        }
+        matches!(self, RenderGraphEncoderOrPassInner::RenderPass(_))
     }
 
     fn write_timestamp(&mut self, query_set: &wgpu::QuerySet, query_index: u32) {
