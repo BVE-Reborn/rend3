@@ -190,7 +190,8 @@ macro_rules! changeable_struct {
 // WGPU REEXPORTS
 #[doc(inline)]
 pub use wgt::{
-    AstcBlock, AstcChannel, Backend, Backends, Color, DeviceType, PresentMode, TextureFormat, TextureFormatFeatureFlags, TextureUsages,
+    AstcBlock, AstcChannel, Backend, Backends, Color, DeviceType, PresentMode, TextureFormat,
+    TextureFormatFeatureFlags, TextureUsages,
 };
 
 /// The maximum amount of vertices any one object can have.
