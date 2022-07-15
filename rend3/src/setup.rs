@@ -26,7 +26,7 @@ pub const GPU_DRIVEN_REQUIRED_FEATURES: Features = {
             | Features::TEXTURE_BINDING_ARRAY.bits()
             | Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING.bits()
             | Features::PARTIALLY_BOUND_BINDING_ARRAY.bits()
-            | Features::UNSIZED_BINDING_ARRAY.bits()
+            // | Features::UNSIZED_BINDING_ARRAY.bits() // TODO: BC in wgpu?
             | Features::MULTI_DRAW_INDIRECT.bits()
             | Features::MULTI_DRAW_INDIRECT_COUNT.bits()
             | Features::SPIRV_SHADER_PASSTHROUGH.bits(),
@@ -90,6 +90,7 @@ pub const GPU_REQUIRED_LIMITS: Limits = Limits {
     max_compute_workgroup_size_y: 256,
     max_compute_workgroup_size_z: 64,
     max_compute_workgroups_per_dimension: 65535,
+    max_buffer_size: 8192 * 8 * 18, // TODO: what should this actually be?
 };
 
 /// Limits required to run in the CpuDriven profile.
@@ -121,26 +122,35 @@ pub const CPU_REQUIRED_LIMITS: Limits = Limits {
     max_compute_workgroup_size_y: 256,
     max_compute_workgroup_size_z: 64,
     max_compute_workgroups_per_dimension: 65535,
+    max_buffer_size: 8192 * 8 * 8,
 };
 
-fn check_limit_unlimited(d: u32, r: u32, ty: LimitType) -> Result<u32, RendererInitializationError> {
+fn check_limit_unlimited<LimitValue: Into<u64> + Ord>(
+    d: LimitValue,
+    r: LimitValue,
+    ty: LimitType,
+) -> Result<LimitValue, RendererInitializationError> {
     if d < r {
         Err(RendererInitializationError::LowDeviceLimit {
             ty,
-            device_limit: d,
-            required_limit: r,
+            device_limit: d.into(),
+            required_limit: r.into(),
         })
     } else {
         Ok(d)
     }
 }
 
-fn check_limit_low(d: u32, r: u32, ty: LimitType) -> Result<u32, RendererInitializationError> {
+fn check_limit_low<LimitValue: Into<u64> + Ord>(
+    d: LimitValue,
+    r: LimitValue,
+    ty: LimitType,
+) -> Result<LimitValue, RendererInitializationError> {
     if r < d {
         Err(RendererInitializationError::LowDeviceLimit {
             ty,
-            device_limit: d,
-            required_limit: r,
+            device_limit: d.into(),
+            required_limit: r.into(),
         })
     } else {
         Ok(d)
@@ -290,6 +300,11 @@ pub fn check_limits(profile: RendererProfile, device_limits: &Limits) -> Result<
             device_limits.max_compute_workgroups_per_dimension,
             required_limits.max_compute_workgroups_per_dimension,
             LimitType::MaxComputeWorkgroupsPerDimension,
+        )?,
+        max_buffer_size: check_limit_unlimited(
+            device_limits.max_buffer_size,
+            required_limits.max_buffer_size,
+            LimitType::MaxBufferSize,
         )?,
     })
 }

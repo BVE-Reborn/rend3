@@ -43,7 +43,7 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: '1.57'
+          toolchain: '1.62'
           target: ${{ matrix.target }}
           components: clippy
           default: true

@@ -289,11 +289,11 @@ fn build_forward_pipeline_inner(
         fragment: Some(FragmentState {
             module: forward_pass_frag,
             entry_point: frag_entry_point,
-            targets: &[ColorTargetState {
+            targets: &[Some(ColorTargetState {
                 format: TextureFormat::Rgba16Float,
                 blend,
                 write_mask: ColorWrites::all(),
-            }],
+            })],
         }),
         multiview: None,
     })

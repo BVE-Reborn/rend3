@@ -35,7 +35,7 @@ pub unsafe fn profile_safe_shader(
     let use_unsafe = profile == RendererProfile::GpuDriven;
 
     match use_unsafe {
-        false => device.create_shader_module(&ShaderModuleDescriptor {
+        false => device.create_shader_module(ShaderModuleDescriptor {
             label: Some(label),
             source: ShaderSource::Wgsl(Cow::Borrowed(std::str::from_utf8(source).unwrap())),
         }),

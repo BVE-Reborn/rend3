@@ -13,11 +13,9 @@ path = "src/main.rs"
 
 [dependencies]
 # The egui immediate mode gui library
-egui = "0.17.0"
-# Backend-agnostic interface for writing apps using egui
-epi = "0.17.0"
+egui = "0.18.0"
 # Winit integration with egui
-egui_winit_platform = "0.14.0"
+egui_winit_platform = "0.15.0"
 # logging
 env_logger = { version = "0.9", default-features = false, features = ["termcolor", "atty"] }
 # Linear algebra library
@@ -39,4 +37,4 @@ winit = "0.26"
 # Opening URL's
 webbrowser = "0.5.5"
 # Creating textures
-wgpu = "0.12"
+wgpu = "0.13"

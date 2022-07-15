@@ -457,6 +457,7 @@ impl<'node> RenderGraph<'node> {
                     ops: Operations { load, store },
                 }
             })
+            .map(Option::Some)
             .collect();
         let depth_stencil_attachment = desc.depth_stencil.as_ref().map(|ds_target| {
             let resource = match ds_target.target {

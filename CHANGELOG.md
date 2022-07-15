@@ -39,6 +39,9 @@ Per Keep a Changelog there are 6 main categories of changes:
 - rend3-routine: Added a resolution field to the per-frame uniforms. @setzer22
 - rend3-routine: Added add_clear_to_graph to make clears explicit and add `clear_color` argument to base rendergraph.
 
+### Changes
+- rend3: Update to wgpu 0.13, naga 0.9 @garyttierney
+
 ### Fixes
 - Fixed mismatched BGLs when using a custom material with no cutout specification
 - Fixed PbrMaterial instead of generic parameter M being used in forward and depth routines. @setzer22

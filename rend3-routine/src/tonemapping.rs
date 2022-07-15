@@ -32,7 +32,7 @@ fn create_pipeline(
     output_format: TextureFormat,
 ) -> RenderPipeline {
     profiling::scope!("TonemappingPass::new");
-    let blit_vert = device.create_shader_module(&ShaderModuleDescriptor {
+    let blit_vert = device.create_shader_module(ShaderModuleDescriptor {
         label: Some("tonemapping vert"),
         source: ShaderSource::Wgsl(Cow::Borrowed(
             WGSL_SHADERS
@@ -43,7 +43,7 @@ fn create_pipeline(
         )),
     });
 
-    let blit_frag = device.create_shader_module(&ShaderModuleDescriptor {
+    let blit_frag = device.create_shader_module(ShaderModuleDescriptor {
         label: Some("tonemapping frag"),
         source: ShaderSource::Wgsl(Cow::Borrowed(
             WGSL_SHADERS
@@ -85,11 +85,11 @@ fn create_pipeline(
         fragment: Some(FragmentState {
             module: &blit_frag,
             entry_point: "main",
-            targets: &[ColorTargetState {
+            targets: &[Some(ColorTargetState {
                 format: output_format,
                 blend: None,
                 write_mask: ColorWrites::all(),
-            }],
+            })],
         }),
         multiview: None,
     })

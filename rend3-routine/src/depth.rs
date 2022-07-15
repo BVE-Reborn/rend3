@@ -466,11 +466,11 @@ fn create_depth_inner(
     name: &str,
 ) -> RenderPipeline {
     profiling::scope!("build depth pipeline", name);
-    let color_state = [ColorTargetState {
+    let color_state = [Some(ColorTargetState {
         format: TextureFormat::Rgba16Float,
         blend: None,
         write_mask: ColorWrites::empty(),
-    }];
+    })];
     renderer.device.create_render_pipeline(&RenderPipelineDescriptor {
         label: Some(name),
         layout: Some(pll),
