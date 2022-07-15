@@ -63,7 +63,7 @@ fn main_1() {
 
 @fragment 
 fn main( @location(0) member: vec4<f32>,
-    @builtin(position) gl_Position: vec4<f32>,
+    @builtin(position) @invariant gl_Position: vec4<f32>,
     @location(3) @interpolate(flat) i_material: u32,
     @location(2) member_2: vec4<f32>,
     @location(1) i_coords0_: vec2<f32>,) {

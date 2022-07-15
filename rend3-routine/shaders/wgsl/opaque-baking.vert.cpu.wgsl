@@ -10,7 +10,7 @@ struct ObjectOutputDataBuffer {
 }
 
 struct gl_PerVertex {
-    @builtin(position) gl_Position: vec4<f32>,
+    @builtin(position) @invariant gl_Position: vec4<f32>,
 }
 
 struct VertexOutput {
@@ -21,7 +21,7 @@ struct VertexOutput {
     @location(5) member_4: vec4<f32>,
     @location(3) member_5: vec2<f32>,
     @location(4) member_6: vec2<f32>,
-    @builtin(position) gl_Position: vec4<f32>,
+    @builtin(position) @invariant gl_Position: vec4<f32>,
 }
 
 var<private> gl_InstanceIndex_1: i32;

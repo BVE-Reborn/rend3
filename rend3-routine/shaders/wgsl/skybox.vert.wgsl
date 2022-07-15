@@ -1,10 +1,10 @@
 struct gl_PerVertex {
-    @builtin(position) gl_Position: vec4<f32>,
+    @builtin(position) @invariant gl_Position: vec4<f32>,
 }
 
 struct VertexOutput {
     @location(0) member: vec2<f32>,
-    @builtin(position) gl_Position: vec4<f32>,
+    @builtin(position) @invariant gl_Position: vec4<f32>,
 }
 
 var<private> gl_VertexIndex_1: i32;
