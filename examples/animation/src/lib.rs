@@ -1,37 +1,36 @@
+use rend3::types::DirectionalLightHandle;
 use std::{path::Path, sync::Arc};
 
-const SAMPLE_COUNT: rend3::types::SampleCount = rend3::types::SampleCount::One;
+const SAMPLE_COUNT: rend3::types::SampleCount = rend3::types::SampleCount::Four;
 
 /// The application data, can only be obtained at `setup` time, so it's under an
 /// Option in the main struct.
-struct InitializedData {
+struct AnimatedObject {
     loaded_scene: rend3_gltf::LoadedGltfScene,
     loaded_instance: rend3_gltf::GltfSceneInstance,
     animation_data: rend3_anim::AnimationData,
-    _directional_light_handle: rend3::types::DirectionalLightHandle,
     animation_time: f32,
     last_frame_time: instant::Instant,
 }
 
 #[derive(Default)]
 struct AnimationExample {
-    /// The application data, or `None` if it hasn't been initialized already
-    data: Option<InitializedData>,
+    /// The application data
+    animated_objects: Vec<AnimatedObject>,
+    _directional_light_handle: Option<DirectionalLightHandle>,
 }
 
-impl AnimationExample {
-    pub fn update(&mut self, renderer: &rend3::Renderer, delta: f32) {
-        let data = self.data.as_mut().unwrap();
-        data.animation_time = (data.animation_time + delta) % data.loaded_scene.animations[0].inner.duration;
-        rend3_anim::pose_animation_frame(
-            renderer,
-            &data.loaded_scene,
-            &data.loaded_instance,
-            &data.animation_data,
-            0,
-            data.animation_time,
-        )
-    }
+fn update(renderer: &rend3::Renderer, delta: f32, animated_object: &mut AnimatedObject) {
+    animated_object.animation_time =
+        (animated_object.animation_time + delta) % animated_object.loaded_scene.animations[0].inner.duration;
+    rend3_anim::pose_animation_frame(
+        renderer,
+        &animated_object.loaded_scene,
+        &animated_object.loaded_instance,
+        &animated_object.animation_data,
+        0,
+        animated_object.animation_time,
+    );
 }
 
 impl rend3_framework::App for AnimationExample {
@@ -48,9 +47,9 @@ impl rend3_framework::App for AnimationExample {
         _routines: &Arc<rend3_framework::DefaultRoutines>,
         _surface_format: rend3::types::TextureFormat,
     ) {
-        let view_location = glam::Vec3::new(0.0, 1.5, -5.0);
+        let view_location = glam::Vec3::new(0.0, -1.5, 5.0);
         let view = glam::Mat4::from_euler(glam::EulerRot::XYZ, 0.0, 0.0, 0.0);
-        let view = view * glam::Mat4::from_translation(-view_location);
+        let view = view * glam::Mat4::from_translation(view_location);
 
         // Set camera's location
         renderer.set_camera_data(rend3::types::Camera {
@@ -76,22 +75,42 @@ impl rend3_framework::App for AnimationExample {
         // We need to keep the directional light handle alive.
         let directional_light_handle = renderer.add_directional_light(rend3::types::DirectionalLight {
             color: glam::Vec3::ONE,
-            intensity: 10.0,
+            intensity: 5.0,
             // Direction will be normalized
             direction: glam::Vec3::new(-1.0, -4.0, 2.0),
             distance: 400.0,
         });
 
-        let init_data = InitializedData {
+        self._directional_light_handle = Some(directional_light_handle);
+
+        let animated_object = AnimatedObject {
             animation_data: rend3_anim::AnimationData::from_gltf_scene(&loaded_scene, &loaded_instance),
             loaded_scene,
             loaded_instance,
-            _directional_light_handle: directional_light_handle,
             animation_time: 0.0,
             last_frame_time: instant::Instant::now(),
         };
 
-        self.data = Some(init_data);
+        let path = Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/resources/cube_3.gltf"));
+        let gltf_data = std::fs::read(&path).unwrap();
+        let parent_directory = path.parent().unwrap();
+        let (loaded_scene, loaded_instance) = pollster::block_on(rend3_gltf::load_gltf(
+            renderer,
+            &gltf_data,
+            &rend3_gltf::GltfLoadSettings::default(),
+            |p| async move { rend3_gltf::filesystem_io_func(&parent_directory, &p).await },
+        ))
+        .expect("Loading gltf scene");
+
+        let animated_object2 = AnimatedObject {
+            animation_data: rend3_anim::AnimationData::from_gltf_scene(&loaded_scene, &loaded_instance),
+            loaded_scene,
+            loaded_instance,
+            animation_time: 0.0,
+            last_frame_time: instant::Instant::now(),
+        };
+
+        self.animated_objects = vec![animated_object, animated_object2];
     }
 
     fn handle_event(
@@ -115,10 +134,13 @@ impl rend3_framework::App for AnimationExample {
             }
             rend3_framework::Event::MainEventsCleared => {
                 let now = instant::Instant::now();
-                let last_frame_time = &mut self.data.as_mut().unwrap().last_frame_time;
-                let delta = now.duration_since(*last_frame_time).as_secs_f32();
-                *last_frame_time = now;
-                self.update(renderer, delta);
+
+                self.animated_objects.iter_mut().for_each(|animated_object| {
+                    let delta = now.duration_since(animated_object.last_frame_time).as_secs_f32();
+                    animated_object.last_frame_time = now;
+                    update(renderer, delta, animated_object);
+                });
+
                 window.request_redraw();
             }
             // Render!
