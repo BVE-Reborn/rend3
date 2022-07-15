@@ -19,7 +19,7 @@ imgui = "0.8"
 # Winit integration with imgui
 imgui-winit-support = { version = "0.8.1", default-features = false, features = ["winit-26"] }
 # Linear algebra library
-glam = "0.20.0"
+glam = "0.21.2"
 # Portable implementation of Instant.
 instant = { version = "0.1", features = ["wasm-bindgen"] }
 # Renderer core

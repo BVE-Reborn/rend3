@@ -20,7 +20,7 @@ base64 = "0.13"
 bytemuck = "1"
 ddsfile = { version = "0.5", optional = true }
 float-ord = "0.3.2"
-glam = "0.20.0"
+glam = "0.21.2"
 gltf = { version = "1.0", default-features = false, features = ["KHR_lights_punctual", "KHR_texture_transform", "KHR_materials_unlit", "extras", "names", "utils"] }
 image = { version = "0.23", default-features = false }
 ktx2 = { version = "0.3", optional = true }
