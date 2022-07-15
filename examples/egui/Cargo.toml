@@ -35,6 +35,6 @@ rend3-routine = { version = "^0.3.0",path = "../../rend3-routine" }
 # Windowing
 winit = "0.26"
 # Opening URL's
-webbrowser = "0.5.5"
+webbrowser = "0.7.1"
 # Creating textures
 wgpu = "0.13"
