@@ -1,3 +1,5 @@
+{{include "math/matrix.wgsl"}}
+
 struct Range {
     start: u32,
     end: u32,
@@ -59,14 +61,6 @@ fn from_v(v: vec3<f32>) -> Vec3 {
 
 fn get_joint_matrix(joint_idx: u32) -> mat4x4<f32> {
     return joint_matrices.matrices[input.joints_start_idx + joint_idx];
-}
-
-fn get_inv_scale_squared(_matrix: mat3x3<f32>) -> vec3<f32> {
-    return vec3<f32>(
-        1.0 / dot(_matrix[0].xyz, _matrix[0].xyz),
-        1.0 / dot(_matrix[1].xyz, _matrix[1].xyz),
-        1.0 / dot(_matrix[2].xyz, _matrix[2].xyz)
-    );
 }
 
 @compute @workgroup_size(64)

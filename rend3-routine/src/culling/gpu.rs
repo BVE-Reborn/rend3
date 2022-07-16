@@ -17,7 +17,6 @@ use wgpu::{
 use crate::{
     common::{PerObjectDataAbi, Sorting},
     culling::CulledObjectSet,
-    shaders::{SPIRV_SHADERS, WGSL_SHADERS},
 };
 
 #[repr(C, align(16))]
@@ -190,7 +189,7 @@ impl GpuCuller {
             device.create_shader_module_spirv(&ShaderModuleDescriptorSpirV {
                 label: Some("cull-atomic-cull"),
                 source: wgpu::util::make_spirv_raw(
-                    SPIRV_SHADERS.get_file("cull-atomic-cull.comp.spv").unwrap().contents(),
+                    todo!(),
                 ),
             })
         };
@@ -198,33 +197,21 @@ impl GpuCuller {
         let prefix_cull_sm = device.create_shader_module(ShaderModuleDescriptor {
             label: Some("cull-prefix-cull"),
             source: ShaderSource::Wgsl(Cow::Borrowed(
-                WGSL_SHADERS
-                    .get_file("cull-prefix-cull.comp.wgsl")
-                    .unwrap()
-                    .contents_utf8()
-                    .unwrap(),
+                todo!(),
             )),
         });
 
         let prefix_sum_sm = device.create_shader_module(ShaderModuleDescriptor {
             label: Some("cull-prefix-sum"),
             source: ShaderSource::Wgsl(Cow::Borrowed(
-                WGSL_SHADERS
-                    .get_file("cull-prefix-sum.comp.wgsl")
-                    .unwrap()
-                    .contents_utf8()
-                    .unwrap(),
+                todo!(),
             )),
         });
 
         let prefix_output_sm = device.create_shader_module(ShaderModuleDescriptor {
             label: Some("cull-prefix-output"),
             source: ShaderSource::Wgsl(Cow::Borrowed(
-                WGSL_SHADERS
-                    .get_file("cull-prefix-output.comp.wgsl")
-                    .unwrap()
-                    .contents_utf8()
-                    .unwrap(),
+                todo!(),
             )),
         });
 
