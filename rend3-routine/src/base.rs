@@ -54,12 +54,7 @@ impl BaseRenderGraph {
         profiling::scope!("DefaultRenderGraphData::new");
 
         let mut spp = ShaderPreProcessor::new();
-        spp.add_shader("math/brdf.wgsl", include_str!("../shaders/src/math/brdf.wgsl"));
-        spp.add_shader("math/color.wgsl", include_str!("../shaders/src/math/color.wgsl"));
-        spp.add_shader("math/consts.wgsl", include_str!("../shaders/src/math/consts.wgsl"));
-        spp.add_shader("math/matrix.wgsl", include_str!("../shaders/src/math/matrix.wgsl"));
-        spp.add_shader("shadow/pcf.wgsl", include_str!("../shaders/src/shadow/pcf.wgsl"));
-        spp.add_shader("skinning.wgsl", include_str!("../shaders/src/skinning.wgsl"));
+        spp.add_inherent_shaders();
 
         let interfaces = common::WholeFrameInterfaces::new(&renderer.device);
 
