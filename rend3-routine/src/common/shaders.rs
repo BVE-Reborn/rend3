@@ -3,8 +3,6 @@ use std::borrow::Cow;
 use rend3::RendererProfile;
 use wgpu::{Device, ShaderModule, ShaderModuleDescriptor, ShaderModuleDescriptorSpirV, ShaderSource};
 
-use crate::shaders::{SPIRV_SHADERS, WGSL_SHADERS};
-
 /// When CpuDriven, creates a checked wgsl shader, when CpuDriven creates a
 /// passthrough SPIRV shader.
 ///
@@ -20,17 +18,11 @@ pub unsafe fn profile_safe_shader(
     gpu_source: &str,
 ) -> ShaderModule {
     let shader_dir = match profile {
-        RendererProfile::CpuDriven => &WGSL_SHADERS,
-        RendererProfile::GpuDriven => &SPIRV_SHADERS,
+        RendererProfile::CpuDriven => &todo!(),
+        RendererProfile::GpuDriven => &todo!(),
     };
 
-    let source = shader_dir
-        .get_file(match profile {
-            RendererProfile::CpuDriven => cpu_source,
-            RendererProfile::GpuDriven => gpu_source,
-        })
-        .unwrap()
-        .contents();
+    let source = todo!();
 
     let use_unsafe = profile == RendererProfile::GpuDriven;
 

@@ -23,7 +23,7 @@ use wgpu::{
     TextureViewDimension, VertexState,
 };
 
-use crate::{common::WholeFrameInterfaces, shaders::WGSL_SHADERS};
+use crate::{common::WholeFrameInterfaces};
 
 fn create_pipeline(
     device: &Device,
@@ -35,25 +35,14 @@ fn create_pipeline(
     let blit_vert = device.create_shader_module(ShaderModuleDescriptor {
         label: Some("tonemapping vert"),
         source: ShaderSource::Wgsl(Cow::Borrowed(
-            WGSL_SHADERS
-                .get_file("blit.vert.wgsl")
-                .unwrap()
-                .contents_utf8()
-                .unwrap(),
+            todo!()
         )),
     });
 
     let blit_frag = device.create_shader_module(ShaderModuleDescriptor {
         label: Some("tonemapping frag"),
         source: ShaderSource::Wgsl(Cow::Borrowed(
-            WGSL_SHADERS
-                .get_file(match output_format.describe().srgb {
-                    true => "blit-linear.frag.wgsl",
-                    false => "blit-srgb.frag.wgsl",
-                })
-                .unwrap()
-                .contents_utf8()
-                .unwrap(),
+            todo!()
         )),
     });
 

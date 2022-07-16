@@ -18,7 +18,7 @@ use wgpu::{
     ShaderStages, StencilState, TextureFormat, TextureSampleType, TextureViewDimension, VertexState,
 };
 
-use crate::{common::WholeFrameInterfaces, shaders::WGSL_SHADERS};
+use crate::{common::WholeFrameInterfaces};
 
 struct StoredSkybox {
     bg: Option<BindGroup>,
@@ -147,21 +147,13 @@ impl SkyboxPipelines {
         let skybox_pass_vert = renderer.device.create_shader_module(ShaderModuleDescriptor {
             label: Some("skybox vert"),
             source: ShaderSource::Wgsl(Cow::Borrowed(
-                WGSL_SHADERS
-                    .get_file("skybox.vert.wgsl")
-                    .unwrap()
-                    .contents_utf8()
-                    .unwrap(),
+                todo!()
             )),
         });
         let skybox_pass_frag = renderer.device.create_shader_module(ShaderModuleDescriptor {
             label: Some("skybox frag"),
             source: ShaderSource::Wgsl(Cow::Borrowed(
-                WGSL_SHADERS
-                    .get_file("skybox.frag.wgsl")
-                    .unwrap()
-                    .contents_utf8()
-                    .unwrap(),
+                todo!()
             )),
         });
 
