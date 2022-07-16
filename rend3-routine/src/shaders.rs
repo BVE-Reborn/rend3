@@ -100,54 +100,125 @@ impl<'a> HelperDef for ShaderIncluder<'a> {
     }
 }
 
-#[test]
-fn simple_include() {
-    let mut pp = ShaderPreProcessor::new();
-    pp.add_shader("simple", "{{include \"other\"}} simple");
-    pp.add_shader("other", "other");
-    let output = pp.render_shader("simple").unwrap();
+#[cfg(test)]
+mod tests {
+    use std::error::Error;
 
-    assert_eq!(output, "other simple");
-}
+    use codespan_reporting::{
+        diagnostic::{Diagnostic, Label},
+        files::SimpleFile,
+        term::{
+            self,
+            termcolor::{ColorChoice, StandardStream},
+        },
+    };
+    use naga::WithSpan;
 
-#[test]
-fn recursive_include() {
-    let mut pp = ShaderPreProcessor::new();
-    pp.add_shader("simple", "{{include \"other\"}} simple");
-    pp.add_shader("other", "{{include \"simple\"}} other");
-    let output = pp.render_shader("simple").unwrap();
+    use crate::shaders::{RawShaderSources, ShaderPreProcessor};
 
-    assert_eq!(output, " other simple");
-}
+    fn print_err(error: &dyn Error) {
+        eprint!("{}", error);
 
-#[test]
-fn error_include() {
-    let mut pp = ShaderPreProcessor::new();
-    pp.add_shader("simple", "{{include \"other\"}} simple");
-    let output = pp.render_shader("simple");
+        let mut e = error.source();
+        if e.is_some() {
+            eprintln!(": ");
+        } else {
+            eprintln!();
+        }
 
-    assert!(output.is_err(), "Expected error, got {output:?}");
-}
+        while let Some(source) = e {
+            eprintln!("\t{}", source);
+            e = source.source();
+        }
+    }
 
-#[test]
-fn no_arg_include() {
-    let mut pp = ShaderPreProcessor::new();
-    pp.add_shader("simple", "{{include}} simple");
-    let output = pp.render_shader("simple");
+    pub fn emit_annotated_error<E: Error>(ann_err: &WithSpan<E>, filename: &str, source: &str) {
+        let files = SimpleFile::new(filename, source);
+        let config = codespan_reporting::term::Config::default();
+        let writer = StandardStream::stderr(ColorChoice::Auto);
 
-    assert!(output.is_err(), "Expected error, got {output:?}");
-}
+        let diagnostic = Diagnostic::error().with_labels(
+            ann_err
+                .spans()
+                .map(|(span, desc)| Label::primary((), span.to_range().unwrap()).with_message(desc.to_owned()))
+                .collect(),
+        );
 
-#[test]
-fn real_test_include() {
-    let mut pp = ShaderPreProcessor::new();
-    pp.add_inherent_shaders();
-    let output = pp.render_shader("math/brdf.wgsl");
+        term::emit(&mut writer.lock(), &config, &files, &diagnostic).expect("cannot write error");
+    }
 
-    assert!(output.is_ok(), "Expected success, got {output:?}");
+    #[test]
+    fn simple_include() {
+        let mut pp = ShaderPreProcessor::new();
+        pp.add_shader("simple", "{{include \"other\"}} simple");
+        pp.add_shader("other", "other");
+        let output = pp.render_shader("simple").unwrap();
 
-    assert!(
-        output.as_ref().unwrap().contains("PI = "),
-        "Include failed, contents {output:?}"
-    );
+        assert_eq!(output, "other simple");
+    }
+
+    #[test]
+    fn recursive_include() {
+        let mut pp = ShaderPreProcessor::new();
+        pp.add_shader("simple", "{{include \"other\"}} simple");
+        pp.add_shader("other", "{{include \"simple\"}} other");
+        let output = pp.render_shader("simple").unwrap();
+
+        assert_eq!(output, " other simple");
+    }
+
+    #[test]
+    fn error_include() {
+        let mut pp = ShaderPreProcessor::new();
+        pp.add_shader("simple", "{{include \"other\"}} simple");
+        let output = pp.render_shader("simple");
+
+        assert!(output.is_err(), "Expected error, got {output:?}");
+    }
+
+    #[test]
+    fn no_arg_include() {
+        let mut pp = ShaderPreProcessor::new();
+        pp.add_shader("simple", "{{include}} simple");
+        let output = pp.render_shader("simple");
+
+        assert!(output.is_err(), "Expected error, got {output:?}");
+    }
+
+    #[test]
+    fn validate_inherent_shaders() {
+        let mut pp = ShaderPreProcessor::new();
+        pp.add_inherent_shaders();
+
+        for shader in RawShaderSources::iter() {
+            if !shader.contains(".wgsl") {
+                continue;
+            }
+
+            let output = pp.render_shader(&shader);
+
+            assert!(output.is_ok(), "Expected preprocessing success, got {output:?}");
+            let output = output.unwrap_or_else(|e| panic!("Expected preprocessing success, got {e:?}"));
+
+            let sm = match naga::front::wgsl::parse_str(&output) {
+                Ok(m) => m,
+                Err(e) => {
+                    e.emit_to_stderr_with_path(&output, &shader);
+                    panic!();
+                }
+            };
+
+            let mut validator =
+                naga::valid::Validator::new(naga::valid::ValidationFlags::all(), naga::valid::Capabilities::all());
+
+            match validator.validate(&sm) {
+                Ok(_) => {}
+                Err(err) => {
+                    emit_annotated_error(&err, &shader, &output);
+                    print_err(&err);
+                    panic!()
+                }
+            };
+        }
+    }
 }
