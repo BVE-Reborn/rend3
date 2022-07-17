@@ -4,11 +4,18 @@ use std::collections::{HashMap, HashSet};
 
 use handlebars::{Context, Handlebars, Helper, HelperDef, Output, RenderContext, RenderError};
 use parking_lot::Mutex;
+use rend3::RendererProfile;
 use rust_embed::RustEmbed;
+use serde::Serialize;
 
 #[derive(RustEmbed)]
 #[folder = "$CARGO_MANIFEST_DIR/shaders/src"]
 pub struct RawShaderSources;
+
+#[derive(Debug, Serialize)]
+pub struct ShaderConfig {
+    pub profile: Option<RendererProfile>,
+}
 
 pub struct ShaderPreProcessor {
     files: HashMap<String, String>,
@@ -30,7 +37,7 @@ impl ShaderPreProcessor {
         self.files.insert(name.to_owned(), contents.to_owned());
     }
 
-    pub fn render_shader(&self, base: &str) -> Result<String, RenderError> {
+    pub fn render_shader(&self, base: &str, config: &ShaderConfig) -> Result<String, RenderError> {
         let mut include_status = Mutex::new(HashSet::new());
         include_status.get_mut().insert(base.to_string());
 
@@ -44,7 +51,7 @@ impl ShaderPreProcessor {
             .get(base)
             .ok_or_else(|| RenderError::new(format!("base shader {base} is not registered")))?;
 
-        registry.render_template(&contents, &())
+        registry.render_template(&contents, config)
     }
 }
 
@@ -113,8 +120,9 @@ mod tests {
         },
     };
     use naga::WithSpan;
+    use rend3::RendererProfile;
 
-    use crate::shaders::{RawShaderSources, ShaderPreProcessor};
+    use crate::shaders::{RawShaderSources, ShaderConfig, ShaderPreProcessor};
 
     fn print_err(error: &dyn Error) {
         eprint!("{}", error);
@@ -152,7 +160,8 @@ mod tests {
         let mut pp = ShaderPreProcessor::new();
         pp.add_shader("simple", "{{include \"other\"}} simple");
         pp.add_shader("other", "other");
-        let output = pp.render_shader("simple").unwrap();
+        let config = ShaderConfig { profile: None };
+        let output = pp.render_shader("simple", &config).unwrap();
 
         assert_eq!(output, "other simple");
     }
@@ -162,7 +171,8 @@ mod tests {
         let mut pp = ShaderPreProcessor::new();
         pp.add_shader("simple", "{{include \"other\"}} simple");
         pp.add_shader("other", "{{include \"simple\"}} other");
-        let output = pp.render_shader("simple").unwrap();
+        let config = ShaderConfig { profile: None };
+        let output = pp.render_shader("simple", &config).unwrap();
 
         assert_eq!(output, " other simple");
     }
@@ -171,7 +181,8 @@ mod tests {
     fn error_include() {
         let mut pp = ShaderPreProcessor::new();
         pp.add_shader("simple", "{{include \"other\"}} simple");
-        let output = pp.render_shader("simple");
+        let config = ShaderConfig { profile: None };
+        let output = pp.render_shader("simple", &config);
 
         assert!(output.is_err(), "Expected error, got {output:?}");
     }
@@ -180,7 +191,8 @@ mod tests {
     fn no_arg_include() {
         let mut pp = ShaderPreProcessor::new();
         pp.add_shader("simple", "{{include}} simple");
-        let output = pp.render_shader("simple");
+        let config = ShaderConfig { profile: None };
+        let output = pp.render_shader("simple", &config);
 
         assert!(output.is_err(), "Expected error, got {output:?}");
     }
@@ -195,30 +207,51 @@ mod tests {
                 continue;
             }
 
-            let output = pp.render_shader(&shader);
-
-            assert!(output.is_ok(), "Expected preprocessing success, got {output:?}");
-            let output = output.unwrap_or_else(|e| panic!("Expected preprocessing success, got {e:?}"));
-
-            let sm = match naga::front::wgsl::parse_str(&output) {
-                Ok(m) => m,
-                Err(e) => {
-                    e.emit_to_stderr_with_path(&output, &shader);
-                    panic!();
-                }
+            let configs = if pp.files[&*shader].contains("#if") {
+                &[
+                    ShaderConfig {
+                        profile: Some(RendererProfile::CpuDriven),
+                    },
+                    ShaderConfig {
+                        profile: Some(RendererProfile::GpuDriven),
+                    },
+                ][..]
+            } else {
+                &[ShaderConfig { profile: None }][..]
             };
 
-            let mut validator =
-                naga::valid::Validator::new(naga::valid::ValidationFlags::all(), naga::valid::Capabilities::all());
+            for config in configs {
+                let serialized_config = serde_json::to_value(config).unwrap();
+                println!("Testing shader {shader} with config {serialized_config:?}");
 
-            match validator.validate(&sm) {
-                Ok(_) => {}
-                Err(err) => {
-                    emit_annotated_error(&err, &shader, &output);
-                    print_err(&err);
-                    panic!()
-                }
-            };
+                let output = pp.render_shader(&shader, config);
+
+                assert!(
+                    output.is_ok(),
+                    "Expected preprocessing success, got {output:?}"
+                );
+                let output = output.unwrap_or_else(|e| panic!("Expected preprocessing success, got {e:?}"));
+
+                let sm = match naga::front::wgsl::parse_str(&output) {
+                    Ok(m) => m,
+                    Err(e) => {
+                        e.emit_to_stderr_with_path(&output, &shader);
+                        panic!();
+                    }
+                };
+
+                let mut validator =
+                    naga::valid::Validator::new(naga::valid::ValidationFlags::all(), naga::valid::Capabilities::all());
+
+                match validator.validate(&sm) {
+                    Ok(_) => {}
+                    Err(err) => {
+                        emit_annotated_error(&err, &shader, &output);
+                        print_err(&err);
+                        panic!()
+                    }
+                };
+            }
         }
     }
 }

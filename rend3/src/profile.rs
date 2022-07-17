@@ -1,6 +1,8 @@
+use serde::Serialize;
+
 /// Determines if the renderer is using cpu-driven rendering, or faster gpu-driven
 /// rendering.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize)]
 pub enum RendererProfile {
     CpuDriven,
     GpuDriven,
