@@ -48,6 +48,7 @@ profiling = { version = "1", default-features = false }
 range-alloc = "0.1"
 rend3-types = { version = "^0.3.0", path = "../rend3-types" }
 rustc-hash = "1"
+serde = { version = "1", features = ["derive"] }
 smallvec = "1"
 smartstring = "1.0"
 thiserror = "1"

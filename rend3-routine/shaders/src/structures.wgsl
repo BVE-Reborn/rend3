@@ -36,3 +36,17 @@ struct UniformData {
     ambient: vec4<f32>,
     resolution: vec2<u32>,
 }
+
+struct DirectionalLight {
+    view_proj: mat4x4<f32>,
+    color: vec3<f32>,
+    direction: vec3<f32>,
+    offset: vec2<f32>,
+    size: f32,
+}
+
+struct DirectionalLightData {
+    count: u32,
+    data: array<DirectionalLight>,
+}
+
