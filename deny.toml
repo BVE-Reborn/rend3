@@ -32,15 +32,16 @@ skip = [
     { name = "core-graphics", version = "0.19.2" }, # winit uses old version
     # image
     { name = "miniz_oxide", version = "0.3.7" }, # png uses old version
+    # windows
+    { name = "windows_aarch64_msvc", version = "0.32.0" },
+    { name = "windows_i686_gnu", version = "0.32.0" },
+    { name = "windows_i686_msvc", version = "0.32.0" },
+    { name = "windows_x86_64_gnu", version = "0.32.0" },
+    { name = "windows_x86_64_msvc", version = "0.32.0" },
     # ddsfile
     { name = "num-traits", version = "0.1.43" },
-    # wayland grrr
-    { name = "wasi", version = "0.10.2" },
     # android
     { name = "env_logger", version = "0.8.4" },
-    # web
-    { name = "itoa", version = "0.4.8" },
-    { name = "mio", version = "0.7.14" },
 ]
 
 [advisories]
