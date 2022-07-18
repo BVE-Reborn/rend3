@@ -93,6 +93,56 @@ fn vs_main(vs_in: VertexInput) -> VertexOutput {
     return vs_out;
 }
 
+{{#if (eq profile "GpuDriven")}}
+type Material = GpuMaterialData;
+
+fn has_albedo_texture(material: ptr<function, Material>) -> bool { return (*material).albedo_tex != 0u; }
+fn has_normal_texture(material: ptr<function, Material>) -> bool { return (*material).normal_tex != 0u; }
+fn has_roughness_texture(material: ptr<function, Material>) -> bool { return (*material).roughness_tex != 0u; }
+fn has_metallic_texture(material: ptr<function, Material>) -> bool { return (*material).metallic_tex != 0u; }
+fn has_reflectance_texture(material: ptr<function, Material>) -> bool { return (*material).reflectance_tex != 0u; }
+fn has_clear_coat_texture(material: ptr<function, Material>) -> bool { return (*material).clear_coat_tex != 0u; }
+fn has_clear_coat_roughness_texture(material: ptr<function, Material>) -> bool { return (*material).clear_coat_roughness_tex != 0u; }
+fn has_emissive_texture(material: ptr<function, Material>) -> bool { return (*material).emissive_tex != 0u; }
+fn has_anisotropy_texture(material: ptr<function, Material>) -> bool { return (*material).anisotropy_tex != 0u; }
+fn has_ambient_occlusion_texture(material: ptr<function, Material>) -> bool { return (*material).ambient_occlusion_tex != 0u; }
+
+fn albedo_texture(material: ptr<function, Material>, samp: sampler, coords: vec2<f32>, ddx: vec2<f32>, ddy: vec2<f32>) -> vec4<f32> { return textureSampleGrad(textures[(*material).albedo_tex - 1u], samp, coords, ddx, ddy); }
+fn normal_texture(material: ptr<function, Material>, samp: sampler, coords: vec2<f32>, ddx: vec2<f32>, ddy: vec2<f32>) -> vec4<f32> { return textureSampleGrad(textures[(*material).normal_tex - 1u], samp, coords, ddx, ddy); }
+fn roughness_texture(material: ptr<function, Material>, samp: sampler, coords: vec2<f32>, ddx: vec2<f32>, ddy: vec2<f32>) -> vec4<f32> { return textureSampleGrad(textures[(*material).roughness_tex - 1u], samp, coords, ddx, ddy); }
+fn metallic_texture(material: ptr<function, Material>, samp: sampler, coords: vec2<f32>, ddx: vec2<f32>, ddy: vec2<f32>) -> vec4<f32> { return textureSampleGrad(textures[(*material).metallic_tex - 1u], samp, coords, ddx, ddy); }
+fn reflectance_texture(material: ptr<function, Material>, samp: sampler, coords: vec2<f32>, ddx: vec2<f32>, ddy: vec2<f32>) -> vec4<f32> { return textureSampleGrad(textures[(*material).reflectance_tex - 1u], samp, coords, ddx, ddy); }
+fn clear_coat_texture(material: ptr<function, Material>, samp: sampler, coords: vec2<f32>, ddx: vec2<f32>, ddy: vec2<f32>) -> vec4<f32> { return textureSampleGrad(textures[(*material).clear_coat_tex - 1u], samp, coords, ddx, ddy); }
+fn clear_coat_roughness_texture(material: ptr<function, Material>, samp: sampler, coords: vec2<f32>, ddx: vec2<f32>, ddy: vec2<f32>) -> vec4<f32> { return textureSampleGrad(textures[(*material).clear_coat_roughness_tex - 1u], samp, coords, ddx, ddy); }
+fn emissive_texture(material: ptr<function, Material>, samp: sampler, coords: vec2<f32>, ddx: vec2<f32>, ddy: vec2<f32>) -> vec4<f32> { return textureSampleGrad(textures[(*material).emissive_tex - 1u], samp, coords, ddx, ddy); }
+fn anisotropy_texture(material: ptr<function, Material>, samp: sampler, coords: vec2<f32>, ddx: vec2<f32>, ddy: vec2<f32>) -> vec4<f32> { return textureSampleGrad(textures[(*material).anisotropy_tex - 1u], samp, coords, ddx, ddy); }
+fn ambient_occlusion_texture(material: ptr<function, Material>, samp: sampler, coords: vec2<f32>, ddx: vec2<f32>, ddy: vec2<f32>) -> vec4<f32> { return textureSampleGrad(textures[(*material).ambient_occlusion_tex - 1u], samp, coords, ddx, ddy); }
+{{else}}
+type Material = CpuMaterialData;
+
+fn has_albedo_texture(material: ptr<function, Material>) -> bool { return bool(((*material).texture_enable >> 0u) & 0x1u); }
+fn has_normal_texture(material: ptr<function, Material>) -> bool { return bool(((*material).texture_enable >> 1u) & 0x1u); }
+fn has_roughness_texture(material: ptr<function, Material>) -> bool { return bool(((*material).texture_enable >> 2u) & 0x1u); }
+fn has_metallic_texture(material: ptr<function, Material>) -> bool { return bool(((*material).texture_enable >> 3u) & 0x1u); }
+fn has_reflectance_texture(material: ptr<function, Material>) -> bool { return bool(((*material).texture_enable >> 4u) & 0x1u); }
+fn has_clear_coat_texture(material: ptr<function, Material>) -> bool { return bool(((*material).texture_enable >> 5u) & 0x1u); }
+fn has_clear_coat_roughness_texture(material: ptr<function, Material>) -> bool { return bool(((*material).texture_enable >> 6u) & 0x1u); }
+fn has_emissive_texture(material: ptr<function, Material>) -> bool { return bool(((*material).texture_enable >> 7u) & 0x1u); }
+fn has_anisotropy_texture(material: ptr<function, Material>) -> bool { return bool(((*material).texture_enable >> 8u) & 0x1u); }
+fn has_ambient_occlusion_texture(material: ptr<function, Material>) -> bool { return bool(((*material).texture_enable >> 9u) & 0x1u); }
+
+fn albedo_texture(material: ptr<function, Material>, samp: sampler, coords: vec2<f32>, ddx: vec2<f32>, ddy: vec2<f32>) -> vec4<f32> { return textureSampleGrad(albedo_tex, samp, coords, ddx, ddy); }
+fn normal_texture(material: ptr<function, Material>, samp: sampler, coords: vec2<f32>, ddx: vec2<f32>, ddy: vec2<f32>) -> vec4<f32> { return textureSampleGrad(normal_tex, samp, coords, ddx, ddy); }
+fn roughness_texture(material: ptr<function, Material>, samp: sampler, coords: vec2<f32>, ddx: vec2<f32>, ddy: vec2<f32>) -> vec4<f32> { return textureSampleGrad(roughness_tex, samp, coords, ddx, ddy); }
+fn metallic_texture(material: ptr<function, Material>, samp: sampler, coords: vec2<f32>, ddx: vec2<f32>, ddy: vec2<f32>) -> vec4<f32> { return textureSampleGrad(metallic_tex, samp, coords, ddx, ddy); }
+fn reflectance_texture(material: ptr<function, Material>, samp: sampler, coords: vec2<f32>, ddx: vec2<f32>, ddy: vec2<f32>) -> vec4<f32> { return textureSampleGrad(reflectance_tex, samp, coords, ddx, ddy); }
+fn clear_coat_texture(material: ptr<function, Material>, samp: sampler, coords: vec2<f32>, ddx: vec2<f32>, ddy: vec2<f32>) -> vec4<f32> { return textureSampleGrad(clear_coat_tex, samp, coords, ddx, ddy); }
+fn clear_coat_roughness_texture(material: ptr<function, Material>, samp: sampler, coords: vec2<f32>, ddx: vec2<f32>, ddy: vec2<f32>) -> vec4<f32> { return textureSampleGrad(clear_coat_roughness_tex, samp, coords, ddx, ddy); }
+fn emissive_texture(material: ptr<function, Material>, samp: sampler, coords: vec2<f32>, ddx: vec2<f32>, ddy: vec2<f32>) -> vec4<f32> { return textureSampleGrad(emissive_tex, samp, coords, ddx, ddy); }
+fn anisotropy_texture(material: ptr<function, Material>, samp: sampler, coords: vec2<f32>, ddx: vec2<f32>, ddy: vec2<f32>) -> vec4<f32> { return textureSampleGrad(anisotropy_tex, samp, coords, ddx, ddy); }
+fn ambient_occlusion_texture(material: ptr<function, Material>, samp: sampler, coords: vec2<f32>, ddx: vec2<f32>, ddy: vec2<f32>) -> vec4<f32> { return textureSampleGrad(ambient_occlusion_tex, samp, coords, ddx, ddy); }
+{{/if}}
+
 fn fs_main(vs_out: VertexOutput) -> @location(0) vec4<f32> {
     {{#if (eq profile "GpuDriven")}}
     let material = materials[vs_out.material];
