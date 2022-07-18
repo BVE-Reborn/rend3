@@ -1,5 +1,6 @@
 {{include "structures.wgsl"}}
 {{include "material.wgsl"}}
+{{include "math/color.wgsl"}}
 
 struct VertexInput {
     @location(0) position: vec3<f32>,
@@ -142,6 +143,129 @@ fn emissive_texture(material: ptr<function, Material>, samp: sampler, coords: ve
 fn anisotropy_texture(material: ptr<function, Material>, samp: sampler, coords: vec2<f32>, ddx: vec2<f32>, ddy: vec2<f32>) -> vec4<f32> { return textureSampleGrad(anisotropy_tex, samp, coords, ddx, ddy); }
 fn ambient_occlusion_texture(material: ptr<function, Material>, samp: sampler, coords: vec2<f32>, ddx: vec2<f32>, ddy: vec2<f32>) -> vec4<f32> { return textureSampleGrad(ambient_occlusion_tex, samp, coords, ddx, ddy); }
 {{/if}}
+
+fn get_pixel_data(material: Material, s: sampler, vs_out: VertexOutput) -> PixelData {
+    var material = material;
+    var pixel: PixelData;
+
+    let coords = (material.uv_transform0 * vec3<f32>(vs_out.coords0, 1.0)).xy;
+    let uvdx = dpdx(coords);
+    let uvdy = dpdy(coords);
+
+    // --- ALBEDO ---
+
+    if (extract_material_flag(material.flags, FLAGS_ALBEDO_ACTIVE)) {
+        if (has_albedo_texture(&material)) {
+            pixel.albedo = albedo_texture(&material, s, coords, uvdx, uvdy);
+        } else {
+            pixel.albedo = vec4<f32>(1.0);
+        }
+        if (extract_material_flag(material.flags, FLAGS_ALBEDO_BLEND)) {
+            if (extract_material_flag(material.flags, FLAGS_ALBEDO_VERTEX_SRGB)) {
+                pixel.albedo *= vec4<f32>(srgb_display_to_scene(vs_out.color.rgb), vs_out.color.a);
+            } else {
+                pixel.albedo *= vs_out.color;
+            }
+        }
+    } else {
+        pixel.albedo = vec4<f32>(0.0, 0.0, 0.0, 1.0);
+    }
+    pixel.albedo *= material.albedo;
+
+    // --- STOP IF UNLIT ---
+
+    if (extract_material_flag(material.flags, FLAGS_UNLIT)) {
+        pixel.normal = normalize(vs_out.normal);
+        return pixel;
+    }
+
+    // --- NORMAL TEXTURE ---
+
+    if (has_normal_texture(&material)) {
+        let texture_read = normal_texture(&material, s, coords, uvdx, uvdy);
+        var normal: vec3<f32>;
+        if (extract_material_flag(material.flags, FLAGS_BICOMPONENT_NORMAL)) {
+            var bicomp: vec2<f32>;
+            if (extract_material_flag(material.flags, FLAGS_SWIZZLED_NORMAL)) {
+                bicomp = texture_read.ag;
+            } else {
+                bicomp = texture_read.rg;
+            }
+            bicomp = bicomp * 2.0 - 1.0;
+            let bicomp_sq = bicomp * bicomp;
+
+            normal = vec3<f32>(bicomp, sqrt(1.0 - bicomp_sq.r - bicomp_sq.g));
+        } else {
+            normal = normalize(texture_read.rgb * 2.0 - 1.0);
+        }
+        if (extract_material_flag(material.flags, FLAGS_YDOWN_NORMAL)) {
+            normal.y = -normal.y;
+        }
+        let normal_norm = normalize(vs_out.normal);
+        let tangent_norm = normalize(vs_out.tangent);
+        let bitangent = cross(normal_norm, tangent_norm);
+
+        let tbn = mat3x3(tangent_norm, bitangent, normal_norm);
+
+        pixel.normal = tbn * normal;
+    } else {
+        pixel.normal = vs_out.normal;
+    }
+    pixel.normal = normalize(pixel.normal);
+
+    // --- AO, Metallic, and Roughness ---
+
+    if (extract_material_flag(material.flags, FLAGS_AOMR_COMBINED)) {
+        // In roughness texture:
+        // Red: AO
+        // Green: Roughness
+        // Blue: Metallic
+        if (has_roughness_texture(&material)) {
+            let aomr = roughness_texture(&material, s, coords, uvdx, uvdy);
+            pixel.ambient_occlusion = material.ambient_occlusion * aomr[0];
+            pixel.perceptual_roughness = material.roughness * aomr[1];
+            pixel.metallic = material.metallic * aomr[2];
+        } else {
+            pixel.ambient_occlusion = material.ambient_occlusion;
+            pixel.perceptual_roughness = material.roughness;
+            pixel.metallic = material.metallic;
+        }
+    } else if (extract_material_flag(material.flags, FLAGS_AOMR_SWIZZLED_SPLIT) || extract_material_flag(material.flags, FLAGS_AOMR_SPLIT)) {
+        // In ao texture:
+        // Red: AO
+        //
+        // In roughness texture (FLAGS_AOMR_SPLIT):
+        // Green: Roughness
+        // Blue: Metallic
+        //
+        // In roughness texture (FLAGS_AOMR_SWIZZLED_SPLIT):
+        // Red: Roughness
+        // Green: Metallic
+        if (has_roughness_texture(&material)) {
+            let texture_read = roughness_texture(&material, s, coords, uvdx, uvdy);
+            var mr: vec2<f32>;
+            if (extract_material_flag(material.flags, FLAGS_AOMR_SWIZZLED_SPLIT)) {
+                mr = texture_read.gb;
+            } else {
+                mr = texture_read.rg;
+            }
+            pixel.perceptual_roughness = material.roughness * mr[0];
+            pixel.metallic = material.metallic * mr[1];
+        } else {
+            pixel.perceptual_roughness = material.roughness;
+            pixel.metallic = material.metallic;
+        }
+
+        if (has_ambient_occlusion_texture(&material)) {
+            let texture_read = ambient_occlusion_texture(&material, s, coords, uvdx, uvdy);
+            pixel.ambient_occlusion = material.ambient_occlusion * texture_read.r;
+        } else {
+            pixel.ambient_occlusion = material.ambient_occlusion;
+        }
+    }
+
+    return pixel;
+}
 
 fn fs_main(vs_out: VertexOutput) -> @location(0) vec4<f32> {
     {{#if (eq profile "GpuDriven")}}
