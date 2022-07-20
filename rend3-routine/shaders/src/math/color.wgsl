@@ -17,3 +17,7 @@ fn srgb_scene_to_display(opto: vec3<f32>) -> vec3<f32> {
     let electrical = select(under, over, selector);
     return electrical;
 }
+
+fn saturate(v: f32) -> f32 {
+    return clamp(v, 0.0, 1.0);
+}

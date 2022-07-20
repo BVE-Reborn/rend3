@@ -1,6 +1,8 @@
 {{include "structures.wgsl"}}
 {{include "material.wgsl"}}
+{{include "math/brdf.wgsl"}}
 {{include "math/color.wgsl"}}
+{{include "shadow/pcf.wgsl"}}
 
 struct VertexInput {
     @location(0) position: vec3<f32>,
@@ -38,7 +40,7 @@ var<uniform> uniforms: UniformData;
 @group(0) @binding(4)
 var<storage> directional_lights: DirectionalLightData;
 @group(0) @binding(5)
-var shadows: texture_2d_array<f32>;
+var shadows: texture_depth_2d_array;
 
 @group(1) @binding(0)
 var<storage> object_output: array<ObjectOutputData>;
@@ -144,7 +146,23 @@ fn anisotropy_texture(material: ptr<function, Material>, samp: sampler, coords: 
 fn ambient_occlusion_texture(material: ptr<function, Material>, samp: sampler, coords: vec2<f32>, ddx: vec2<f32>, ddy: vec2<f32>) -> vec4<f32> { return textureSampleGrad(ambient_occlusion_tex, samp, coords, ddx, ddy); }
 {{/if}}
 
-fn get_pixel_data(material: Material, s: sampler, vs_out: VertexOutput) -> PixelData {
+fn compute_diffuse_color(base_color: vec3<f32>, metallic: f32) -> vec3<f32> {
+    return base_color * (1.0 - metallic);
+}
+
+fn compute_f0(base_color: vec3<f32>, metallic: f32, reflectance: f32) -> vec3<f32> {
+    return base_color * metallic + (reflectance * (1.0 - metallic));
+}
+
+fn compute_dielectric_f0(reflectance: f32) -> f32 {
+    return 0.16 * reflectance * reflectance;
+}
+
+fn perceptual_roughness_to_roughness(perceptual_roughness: f32) -> f32 {
+    return perceptual_roughness * perceptual_roughness;
+}
+
+fn get_pixel_data_inner(material: Material, s: sampler, vs_out: VertexOutput) -> PixelData {
     var material = material;
     var pixel: PixelData;
 
@@ -230,7 +248,31 @@ fn get_pixel_data(material: Material, s: sampler, vs_out: VertexOutput) -> Pixel
             pixel.perceptual_roughness = material.roughness;
             pixel.metallic = material.metallic;
         }
-    } else if (extract_material_flag(material.flags, FLAGS_AOMR_SWIZZLED_SPLIT) || extract_material_flag(material.flags, FLAGS_AOMR_SPLIT)) {
+    } else if (extract_material_flag(material.flags, FLAGS_AOMR_BW_SPLIT)) {
+        // In ao texture:
+        // Red: AO
+        // In metallic texture:
+        // Red: Metallic
+        // In roughness texture:
+        // Red: Roughness
+        if (has_roughness_texture(&material)) {
+            pixel.perceptual_roughness = material.roughness * roughness_texture(&material, s, coords, uvdx, uvdy).r;
+        } else {
+            pixel.perceptual_roughness = material.roughness;
+        }
+
+        if (has_metallic_texture(&material)) {
+            pixel.metallic = material.metallic * metallic_texture(&material, s, coords, uvdx, uvdy).r;
+        } else {
+            pixel.metallic = material.metallic;
+        }
+
+        if (has_ambient_occlusion_texture(&material)) {
+            pixel.ambient_occlusion = material.ambient_occlusion * ambient_occlusion_texture(&material, s, coords, uvdx, uvdy).r;
+        } else {
+            pixel.ambient_occlusion = material.ambient_occlusion;
+        }
+    } else {
         // In ao texture:
         // Red: AO
         //
@@ -264,7 +306,124 @@ fn get_pixel_data(material: Material, s: sampler, vs_out: VertexOutput) -> Pixel
         }
     }
 
+    // --- REFLECTANCE ---
+
+    if (has_reflectance_texture(&material)) {
+        pixel.reflectance = material.reflectance * reflectance_texture(&material, s, coords, uvdx, uvdy).r;
+    } else {
+        pixel.reflectance = material.reflectance;
+    }
+
+    // --- CLEARCOAT ---
+
+    if (extract_material_flag(material.flags, FLAGS_CC_GLTF_COMBINED)) {
+        if (has_clear_coat_texture(&material)) {
+            let texture_read = clear_coat_texture(&material, s, coords, uvdx, uvdy);
+            pixel.clear_coat = material.clear_coat * texture_read.r;
+            pixel.clear_coat_perceptual_roughness = material.clear_coat_roughness * texture_read.g;
+        } else {
+            pixel.clear_coat = material.clear_coat;
+            pixel.clear_coat_perceptual_roughness = material.clear_coat_roughness;
+        }
+    } else {
+        if (has_clear_coat_texture(&material)) {
+            pixel.clear_coat = material.clear_coat * clear_coat_texture(&material, s, coords, uvdx, uvdy).r;
+        } else {
+            pixel.clear_coat = material.clear_coat;
+        }
+
+        if (has_clear_coat_roughness_texture(&material)) {
+            let texture_read = clear_coat_roughness_texture(&material, s, coords, uvdx, uvdy);
+
+            if (extract_material_flag(material.flags, FLAGS_CC_GLTF_SPLIT)) {
+                pixel.clear_coat_perceptual_roughness = material.clear_coat_roughness * texture_read.g;
+            } else {
+                pixel.clear_coat_perceptual_roughness = material.clear_coat_roughness * texture_read.r;
+            }
+        } else {
+            pixel.clear_coat_perceptual_roughness = material.clear_coat_roughness;
+        }
+    }
+
+    // --- EMISSIVE ---
+
+    if (has_emissive_texture(&material)) {
+        pixel.emissive = material.emissive * emissive_texture(&material, s, coords, uvdx, uvdy).r;
+    } else {
+        pixel.emissive = material.emissive;
+    }
+
+    // --- ANISOTROPY ---
+
+    if (has_anisotropy_texture(&material)) {
+        pixel.anisotropy = material.anisotropy * anisotropy_texture(&material, s, coords, uvdx, uvdy).r;
+    } else {
+        pixel.anisotropy = material.anisotropy;
+    }
+
+    // --- COMPUTATIONS---
+
+    pixel.diffuse_color = compute_diffuse_color(pixel.albedo.xyz, pixel.metallic);
+
+    // Assumes an interface from air to an IOR of 1.5 for dielectrics
+    let reflectance = compute_dielectric_f0(pixel.reflectance);
+    pixel.f0 = compute_f0(pixel.albedo.rgb, pixel.metallic, reflectance);
+
+    if (pixel.clear_coat != 0.0) {
+        let base_perceptual_roughness = max(pixel.perceptual_roughness, pixel.clear_coat_perceptual_roughness);
+        pixel.perceptual_roughness = mix(pixel.perceptual_roughness, base_perceptual_roughness, pixel.clear_coat);
+        pixel.clear_coat_roughness = perceptual_roughness_to_roughness(pixel.clear_coat_perceptual_roughness);
+    }
+    pixel.roughness = perceptual_roughness_to_roughness(pixel.perceptual_roughness);
+
     return pixel;
+}
+
+{{#if (eq profile "GpuDriven")}}
+fn get_pixel_data(material: Material, vs_out: VertexOutput) -> PixelData {
+    if (extract_material_flag(material.flags, FLAGS_NEAREST)) {
+        return get_pixel_data_inner(material, nearest_sampler, vs_out);
+    } else {
+        return get_pixel_data_inner(material, primary_sampler, vs_out);
+    }
+}
+{{else}}
+fn get_pixel_data(material: Material, vs_out: VertexOutput) -> PixelData {
+    return get_pixel_data_inner(material, primary_sampler, vs_out);
+}
+{{/if}}
+
+fn surface_shading(light: DirectionalLight, pixel: PixelData, v: vec3<f32>, occlusion: f32) -> vec3<f32> {
+    let view_mat3 = mat3x3<f32>(uniforms.view[0].xyz, uniforms.view[1].xyz, uniforms.view[2].xyz);
+    let l = normalize(view_mat3 * -light.direction);
+
+    let n = pixel.normal;
+    let h = normalize(v + l);
+
+    let nov = abs(dot(n, v)) + 0.00001;
+    let nol = saturate(dot(n, l));
+    let noh = saturate(dot(n, h));
+    let loh = saturate(dot(l, h));
+
+    let f90 = saturate(dot(pixel.f0, vec3<f32>(50.0 * 0.33)));
+
+    let d = brdf_d_ggx(noh, pixel.roughness);
+    let f = brdf_f_schlick_vec3(loh, pixel.f0, f90);
+    let v = brdf_v_smith_ggx_correlated(nov, nol, pixel.roughness);
+
+    // TODO: figure out how they generate their lut
+    let energy_comp = 1.0;
+
+    // specular
+    let fr = (d * v) * f;
+    // diffuse
+    let fd = pixel.diffuse_color * brdf_fd_lambert();
+
+    let color = fd + fr * energy_comp;
+
+    let light_attenuation = 1.0;
+
+    return (color * light.color) * (light_attenuation * nol * occlusion);
 }
 
 fn fs_main(vs_out: VertexOutput) -> @location(0) vec4<f32> {
@@ -272,9 +431,31 @@ fn fs_main(vs_out: VertexOutput) -> @location(0) vec4<f32> {
     let material = materials[vs_out.material];
     {{/if}}
 
+    let pixel = get_pixel_data(material, vs_out);
+
     if (extract_material_flag(material.flags, FLAGS_UNLIT)) {
-        
+        return pixel.albedo;
     }
 
-    return vec4<f32>(0.0);
+    let v = -normalize(vs_out.view_position.xyz);
+
+    var color = pixel.emissive.rgb;
+    for (var i = 0; i < i32(directional_lights.count); i += 1) {
+        let light = directional_lights.data[i];
+
+        let shadow_ndc = (light.view_proj * uniforms.inv_view * vs_out.view_position).xyz;
+        let shadow_flipped = (shadow_ndc.xy * 0.5) + 0.5;
+        let shadow_coords = vec2<f32>(shadow_flipped.x, 1.0 - shadow_flipped.y);
+
+        var shadow_value = 1.0;
+        if (any(shadow_flipped >= vec2<f32>(0.0) || shadow_flipped <= vec2<f32>(1.0))) {
+            shadow_value = shadow_sample_pcf5(shadows, comparison_sampler, shadow_coords, i, shadow_ndc.z);
+        }
+
+        color += surface_shading(light, pixel, v, shadow_value * pixel.ambient_occlusion);
+    }
+
+    let ambient = uniforms.ambient * pixel.albedo;
+    let shaded = vec4<f32>(color, pixel.albedo.a);
+    return max(ambient, shaded);
 }
