@@ -3,7 +3,7 @@
 //! Any material that implements [`DepthRenderableMaterial`] will be able to use
 //! this routine to render their shadows or a depth prepass.
 
-use std::{marker::PhantomData, mem, num::NonZeroU64};
+use std::{borrow::Cow, marker::PhantomData, mem, num::NonZeroU64};
 
 use arrayvec::ArrayVec;
 use rend3::{
@@ -23,16 +23,14 @@ use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
     BindGroup, BindGroupLayout, BufferUsages, Color, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState,
     DepthStencilState, Face, FragmentState, FrontFace, MultisampleState, PipelineLayoutDescriptor, PolygonMode,
-    PrimitiveState, PrimitiveTopology, RenderPipeline, RenderPipelineDescriptor, ShaderStages, StencilState,
-    TextureFormat, VertexState,
+    PrimitiveState, PrimitiveTopology, RenderPipeline, RenderPipelineDescriptor, ShaderModule, ShaderModuleDescriptor,
+    ShaderSource, ShaderStages, StencilState, TextureFormat, VertexState,
 };
 
 use crate::{
-    common::{
-        profile_safe_shader, PerMaterialArchetypeInterface, WholeFrameInterfaces, CPU_VERTEX_BUFFERS,
-        GPU_VERTEX_BUFFERS,
-    },
+    common::{PerMaterialArchetypeInterface, WholeFrameInterfaces, CPU_VERTEX_BUFFERS, GPU_VERTEX_BUFFERS},
     culling::{self, PerMaterialArchetypeData},
+    shaders::{ShaderConfig, ShaderPreProcessor},
 };
 
 /// Trait for all materials that can use the built-in shadow/prepass rendering.
@@ -90,6 +88,7 @@ impl<M: DepthRenderableMaterial> DepthRoutine<M> {
     pub fn new(
         renderer: &Renderer,
         data_core: &RendererDataCore,
+        spp: &ShaderPreProcessor,
         interfaces: &WholeFrameInterfaces,
         per_material: &PerMaterialArchetypeInterface<M>,
         unclipped_depth_supported: bool,
@@ -151,6 +150,7 @@ impl<M: DepthRenderableMaterial> DepthRoutine<M> {
         let pipelines = DepthPipelines::new(
             renderer,
             data_core,
+            spp,
             interfaces,
             &per_material.bgl,
             abi_bgl.as_ref(),
@@ -324,41 +324,25 @@ impl<M: DepthRenderableMaterial> DepthPipelines<M> {
     pub fn new(
         renderer: &Renderer,
         data_core: &RendererDataCore,
+        spp: &ShaderPreProcessor,
         interfaces: &WholeFrameInterfaces,
         per_material_bgl: &BindGroupLayout,
         abi_bgl: Option<&BindGroupLayout>,
         unclipped_depth_supported: bool,
     ) -> DepthPipelines<M> {
         profiling::scope!("build depth pass pipelines");
-        let depth_vert = unsafe {
-            profile_safe_shader(
-                &renderer.device,
-                renderer.profile,
-                "depth pass vert",
-                "depth.vert.cpu.wgsl",
-                "depth.vert.gpu.spv",
-            )
-        };
-
-        let depth_opaque_frag = unsafe {
-            profile_safe_shader(
-                &renderer.device,
-                renderer.profile,
-                "depth pass opaque frag",
-                "depth-opaque.frag.cpu.wgsl",
-                "depth-opaque.frag.gpu.spv",
-            )
-        };
-
-        let depth_cutout_frag = unsafe {
-            profile_safe_shader(
-                &renderer.device,
-                renderer.profile,
-                "depth pass cutout frag",
-                "depth-cutout.frag.cpu.wgsl",
-                "depth-cutout.frag.gpu.spv",
-            )
-        };
+        let module = renderer.device.create_shader_module(ShaderModuleDescriptor {
+            label: Some("depth"),
+            source: ShaderSource::Wgsl(Cow::Owned(
+                spp.render_shader(
+                    "depth.wgsl",
+                    &ShaderConfig {
+                        profile: Some(renderer.profile),
+                    },
+                )
+                .unwrap(),
+            )),
+        });
 
         let mut bgls: ArrayVec<&BindGroupLayout, 4> = ArrayVec::new();
         bgls.push(&interfaces.depth_uniform_bgl);
@@ -392,7 +376,8 @@ impl<M: DepthRenderableMaterial> DepthPipelines<M> {
                 ty,
                 unclipped_depth_supported,
                 pll,
-                &depth_vert,
+                &module,
+                "vs_main",
                 frag,
                 name,
             )
@@ -411,42 +396,42 @@ impl<M: DepthRenderableMaterial> DepthPipelines<M> {
                 "Shadow Opaque 1x",
                 DepthPassType::Shadow,
                 &shadow_pll,
-                &depth_opaque_frag,
+                "fs_no_cutout",
                 SampleCount::One,
             ),
             shadow_cutout_s1: optional_inner(
                 "Shadow Cutout 1x",
                 DepthPassType::Shadow,
                 &shadow_pll,
-                &depth_cutout_frag,
+                "fs_cutout",
                 SampleCount::One,
             ),
             prepass_opaque_s1: inner(
                 "Prepass Opaque 1x",
                 DepthPassType::Prepass,
                 &prepass_pll,
-                &depth_opaque_frag,
+                "fs_no_cutout",
                 SampleCount::One,
             ),
             prepass_cutout_s1: optional_inner(
                 "Prepass Cutout 1x",
                 DepthPassType::Prepass,
                 &prepass_pll,
-                &depth_cutout_frag,
+                "fs_cutout",
                 SampleCount::One,
             ),
             prepass_opaque_s4: inner(
                 "Prepass Opaque 4x",
                 DepthPassType::Prepass,
                 &prepass_pll,
-                &depth_opaque_frag,
+                "fs_no_cutout",
                 SampleCount::Four,
             ),
             prepass_cutout_s4: optional_inner(
                 "Prepass Cutout 4x",
                 DepthPassType::Prepass,
                 &prepass_pll,
-                &depth_cutout_frag,
+                "fs_cutout",
                 SampleCount::Four,
             ),
             _phantom: PhantomData::<M>::default(),
@@ -461,8 +446,9 @@ fn create_depth_inner(
     ty: DepthPassType,
     unclipped_depth_supported: bool,
     pll: &wgpu::PipelineLayout,
-    vert: &wgpu::ShaderModule,
-    frag: &wgpu::ShaderModule,
+    sm: &ShaderModule,
+    vert: &str,
+    frag: &str,
     name: &str,
 ) -> RenderPipeline {
     profiling::scope!("build depth pipeline", name);
@@ -475,8 +461,8 @@ fn create_depth_inner(
         label: Some(name),
         layout: Some(pll),
         vertex: VertexState {
-            module: vert,
-            entry_point: "main",
+            module: sm,
+            entry_point: vert,
             buffers: match renderer.profile {
                 RendererProfile::CpuDriven => &CPU_VERTEX_BUFFERS,
                 RendererProfile::GpuDriven => &GPU_VERTEX_BUFFERS,
@@ -516,8 +502,8 @@ fn create_depth_inner(
             ..Default::default()
         },
         fragment: Some(FragmentState {
-            module: frag,
-            entry_point: "main",
+            module: sm,
+            entry_point: frag,
             targets: match ty {
                 DepthPassType::Prepass => &color_state,
                 DepthPassType::Shadow => &[],

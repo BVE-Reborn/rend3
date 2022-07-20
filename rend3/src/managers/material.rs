@@ -295,7 +295,7 @@ impl MaterialManager {
             BindingType::Buffer {
                 ty: BufferBindingType::Storage { read_only: true },
                 has_dynamic_offset: false,
-                min_binding_size: NonZeroU64::new((M::TEXTURE_COUNT * 4 + M::DATA_SIZE) as _),
+                min_binding_size: NonZeroU64::new((round_up_pot(M::TEXTURE_COUNT * 4, 16) + round_up_pot(M::DATA_SIZE, 16)) as _),
             },
             None,
         );

@@ -50,6 +50,7 @@ struct DataAbi {
 @group(2) @binding(0)
 var<uniform> abi: DataAbi;
 
+@vertex
 fn vs_main(vs_in: VertexInput) -> VertexOutput {
     let data = object_output[vs_in.object_idx];
 
@@ -65,6 +66,7 @@ fn vs_main(vs_in: VertexInput) -> VertexOutput {
     return vs_out;
 }
 
+@fragment
 fn fs_cutout(vs_out: VertexOutput) {
     let base_material_offset = abi.stride * vs_out.material;
     let cutoff = material_data[base_material_offset + abi.cutoff_offset];
@@ -112,6 +114,5 @@ fn fs_cutout(vs_out: VertexOutput) {
     {{/if}}
 }
 
-fn fs_no_cutout(vs_out: VertexOutput) {
-
-}
+@fragment
+fn fs_no_cutout(vs_out: VertexOutput) {}

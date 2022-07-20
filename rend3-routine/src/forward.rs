@@ -2,7 +2,7 @@
 //!
 //! Will default to the PBR shader code if custom code is not specified.
 
-use std::marker::PhantomData;
+use std::{borrow::Cow, marker::PhantomData};
 
 use arrayvec::ArrayVec;
 use rend3::{
@@ -16,16 +16,14 @@ use rend3::{
 use wgpu::{
     BindGroup, BindGroupLayout, BlendState, Color, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState,
     DepthStencilState, Face, FragmentState, FrontFace, MultisampleState, PipelineLayoutDescriptor, PolygonMode,
-    PrimitiveState, PrimitiveTopology, RenderPipeline, RenderPipelineDescriptor, ShaderModule, StencilState,
-    TextureFormat, VertexState,
+    PrimitiveState, PrimitiveTopology, RenderPipeline, RenderPipelineDescriptor, ShaderModule, ShaderModuleDescriptor,
+    ShaderSource, StencilState, TextureFormat, VertexState,
 };
 
 use crate::{
-    common::{
-        profile_safe_shader, PerMaterialArchetypeInterface, WholeFrameInterfaces, CPU_VERTEX_BUFFERS,
-        GPU_VERTEX_BUFFERS,
-    },
+    common::{PerMaterialArchetypeInterface, WholeFrameInterfaces, CPU_VERTEX_BUFFERS, GPU_VERTEX_BUFFERS},
     culling,
+    shaders::{ShaderConfig, ShaderPreProcessor},
 };
 
 /// A set of pipelines for rendering a specific combination of a material.
@@ -53,6 +51,7 @@ impl<M: Material> ForwardRoutine<M> {
     pub fn new(
         renderer: &Renderer,
         data_core: &mut RendererDataCore,
+        spp: &ShaderPreProcessor,
         interfaces: &WholeFrameInterfaces,
         per_material: &PerMaterialArchetypeInterface<M>,
 
@@ -67,51 +66,41 @@ impl<M: Material> ForwardRoutine<M> {
     ) -> Self {
         profiling::scope!("PrimaryPasses::new");
 
-        let _forward_pass_vert_owned;
+        let sm_owned = renderer.device.create_shader_module(ShaderModuleDescriptor {
+            label: Some("forward"),
+            source: ShaderSource::Wgsl(Cow::Owned(
+                spp.render_shader(
+                    "opaque.wgsl",
+                    &ShaderConfig {
+                        profile: Some(renderer.profile),
+                    },
+                )
+                .unwrap(),
+            )),
+        });
         let forward_pass_vert;
         let vert_entry_point;
         match vertex {
             Some((inner_name, inner)) => {
-                _forward_pass_vert_owned = None;
                 forward_pass_vert = inner;
                 vert_entry_point = inner_name;
             }
             None => {
-                _forward_pass_vert_owned = Some(unsafe {
-                    profile_safe_shader(
-                        &renderer.device,
-                        renderer.profile,
-                        "forward pass vert",
-                        "opaque.vert.cpu.wgsl",
-                        "opaque.vert.gpu.spv",
-                    )
-                });
-                vert_entry_point = "main";
-                forward_pass_vert = _forward_pass_vert_owned.as_ref().unwrap();
+                vert_entry_point = "vs_main";
+                forward_pass_vert = &sm_owned;
             }
         };
 
-        let _forward_pass_frag_owned;
         let forward_pass_frag;
         let frag_entry_point;
         match fragment {
             Some((inner_name, inner)) => {
-                _forward_pass_frag_owned = None;
                 forward_pass_frag = inner;
                 frag_entry_point = inner_name;
             }
             None => {
-                _forward_pass_frag_owned = Some(unsafe {
-                    profile_safe_shader(
-                        &renderer.device,
-                        renderer.profile,
-                        "forward pass frag",
-                        "opaque.frag.cpu.wgsl",
-                        "opaque.frag.gpu.spv",
-                    )
-                });
-                frag_entry_point = "main";
-                forward_pass_frag = _forward_pass_frag_owned.as_ref().unwrap()
+                frag_entry_point = "fs_main";
+                forward_pass_frag = &sm_owned;
             }
         };
 

@@ -23,9 +23,9 @@ var<storage, read> object_input: array<ObjectInputData>;
 @group(0) @binding(1)
 var<uniform> uniforms: CullingUniforms;
 @group(0) @binding(2)
-var<storage, write> object_output: array<ObjectOutputData>;
+var<storage, read_write> object_output: array<ObjectOutputData>;
 @group(0) @binding(3)
-var<storage, write> draw_call_output: IndirectBuffer;
+var<storage, read_write> draw_call_output: IndirectBuffer;
 @group(0) @binding(4)
 var<storage, read_write> result_index_a: array<u32>;
 @group(0) @binding(5)

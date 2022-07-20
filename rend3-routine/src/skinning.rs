@@ -1,4 +1,4 @@
-use std::{mem, num::NonZeroU64};
+use std::{borrow::Cow, mem, num::NonZeroU64};
 
 use glam::{Mat4, UVec2};
 use rend3::{
@@ -17,6 +17,8 @@ use wgpu::{
     ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor, Device, PipelineLayoutDescriptor,
     ShaderModuleDescriptor, ShaderStages,
 };
+
+use crate::shaders::{ShaderConfig, ShaderPreProcessor};
 
 /// The per-skeleton data, as uploaded to the GPU compute shader.
 #[repr(C, align(16))]
@@ -124,7 +126,7 @@ pub struct GpuSkinner {
 impl GpuSkinner {
     const WORKGROUP_SIZE: u32 = 64;
 
-    pub fn new(device: &wgpu::Device) -> GpuSkinner {
+    pub fn new(device: &wgpu::Device, spp: &ShaderPreProcessor) -> GpuSkinner {
         let storage_buffer_ty = |read_only, size| BindingType::Buffer {
             ty: BufferBindingType::Storage { read_only },
             has_dynamic_offset: false,
@@ -174,7 +176,9 @@ impl GpuSkinner {
 
         let module = device.create_shader_module(ShaderModuleDescriptor {
             label: Some("Gpu skinning compute shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("../shaders/src/skinning.wgsl").into()),
+            source: wgpu::ShaderSource::Wgsl(Cow::Owned(
+                spp.render_shader("skinning.wgsl", &ShaderConfig::default()).unwrap(),
+            )),
         });
 
         let pipeline = device.create_compute_pipeline(&ComputePipelineDescriptor {

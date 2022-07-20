@@ -77,6 +77,7 @@ var anisotropy_tex: texture_2d<f32>;
 var ambient_occlusion_tex: texture_2d<f32>;
 {{/if}}
 
+@vertex
 fn vs_main(vs_in: VertexInput) -> VertexOutput {
     let data = object_output[vs_in.object_idx];
 
@@ -426,6 +427,7 @@ fn surface_shading(light: DirectionalLight, pixel: PixelData, v: vec3<f32>, occl
     return (color * light.color) * (light_attenuation * nol * occlusion);
 }
 
+@fragment
 fn fs_main(vs_out: VertexOutput) -> @location(0) vec4<f32> {
     {{#if (eq profile "GpuDriven")}}
     let material = materials[vs_out.material];

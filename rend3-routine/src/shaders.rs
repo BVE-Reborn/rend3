@@ -12,7 +12,7 @@ use serde::Serialize;
 #[folder = "$CARGO_MANIFEST_DIR/shaders/src"]
 pub struct RawShaderSources;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Default, Serialize)]
 pub struct ShaderConfig {
     pub profile: Option<RendererProfile>,
 }
@@ -24,6 +24,12 @@ pub struct ShaderPreProcessor {
 impl ShaderPreProcessor {
     pub fn new() -> Self {
         Self { files: HashMap::new() }
+    }
+
+    pub fn new_with_inherent_shaders() -> Self {
+        let mut v = Self::new();
+        v.add_inherent_shaders();
+        v
     }
 
     pub fn add_inherent_shaders(&mut self) {
@@ -51,7 +57,13 @@ impl ShaderPreProcessor {
             .get(base)
             .ok_or_else(|| RenderError::new(format!("base shader {base} is not registered")))?;
 
-        registry.render_template(&contents, config)
+        registry.render_template(contents, config)
+    }
+}
+
+impl Default for ShaderPreProcessor {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -226,10 +238,7 @@ mod tests {
 
                 let output = pp.render_shader(&shader, config);
 
-                assert!(
-                    output.is_ok(),
-                    "Expected preprocessing success, got {output:?}"
-                );
+                assert!(output.is_ok(), "Expected preprocessing success, got {output:?}");
                 let output = output.unwrap_or_else(|e| panic!("Expected preprocessing success, got {e:?}"));
 
                 let sm = match naga::front::wgsl::parse_str(&output) {

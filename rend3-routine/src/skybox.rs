@@ -18,7 +18,10 @@ use wgpu::{
     ShaderStages, StencilState, TextureFormat, TextureSampleType, TextureViewDimension, VertexState,
 };
 
-use crate::{common::WholeFrameInterfaces};
+use crate::{
+    common::WholeFrameInterfaces,
+    shaders::{ShaderConfig, ShaderPreProcessor},
+};
 
 struct StoredSkybox {
     bg: Option<BindGroup>,
@@ -36,7 +39,7 @@ pub struct SkyboxRoutine {
 
 impl SkyboxRoutine {
     /// Create the routine.
-    pub fn new(renderer: &Renderer, interfaces: &WholeFrameInterfaces) -> Self {
+    pub fn new(renderer: &Renderer, spp: &ShaderPreProcessor, interfaces: &WholeFrameInterfaces) -> Self {
         let bgl = BindGroupLayoutBuilder::new()
             .append(
                 ShaderStages::FRAGMENT,
@@ -49,7 +52,7 @@ impl SkyboxRoutine {
             )
             .build(&renderer.device, Some("skybox bgl"));
 
-        let pipelines = SkyboxPipelines::new(renderer, interfaces, &bgl);
+        let pipelines = SkyboxPipelines::new(renderer, spp, interfaces, &bgl);
 
         Self {
             current_skybox: StoredSkybox { bg: None, handle: None },
@@ -142,18 +145,17 @@ pub struct SkyboxPipelines {
     pub pipeline_s4: RenderPipeline,
 }
 impl SkyboxPipelines {
-    pub fn new(renderer: &Renderer, interfaces: &WholeFrameInterfaces, bgl: &BindGroupLayout) -> Self {
+    pub fn new(
+        renderer: &Renderer,
+        spp: &ShaderPreProcessor,
+        interfaces: &WholeFrameInterfaces,
+        bgl: &BindGroupLayout,
+    ) -> Self {
         profiling::scope!("build skybox pipeline");
-        let skybox_pass_vert = renderer.device.create_shader_module(ShaderModuleDescriptor {
+        let skybox_sm = renderer.device.create_shader_module(ShaderModuleDescriptor {
             label: Some("skybox vert"),
-            source: ShaderSource::Wgsl(Cow::Borrowed(
-                todo!()
-            )),
-        });
-        let skybox_pass_frag = renderer.device.create_shader_module(ShaderModuleDescriptor {
-            label: Some("skybox frag"),
-            source: ShaderSource::Wgsl(Cow::Borrowed(
-                todo!()
+            source: ShaderSource::Wgsl(Cow::Owned(
+                spp.render_shader("skybox.wgsl", &ShaderConfig::default()).unwrap(),
             )),
         });
 
@@ -168,8 +170,8 @@ impl SkyboxPipelines {
                 label: Some("skybox pass"),
                 layout: Some(&pll),
                 vertex: VertexState {
-                    module: &skybox_pass_vert,
-                    entry_point: "main",
+                    module: &skybox_sm,
+                    entry_point: "vs_main",
                     buffers: &[],
                 },
                 primitive: PrimitiveState {
@@ -193,8 +195,8 @@ impl SkyboxPipelines {
                     ..Default::default()
                 },
                 fragment: Some(FragmentState {
-                    module: &skybox_pass_frag,
-                    entry_point: "main",
+                    module: &skybox_sm,
+                    entry_point: "fs_main",
                     targets: &[Some(ColorTargetState {
                         format: TextureFormat::Rgba16Float,
                         blend: None,
