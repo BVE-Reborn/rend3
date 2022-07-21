@@ -22,7 +22,6 @@
 
 use glam::{Mat3, Mat4, Quat, UVec2, Vec2, Vec3, Vec4};
 use gltf::buffer::Source;
-use image::GenericImageView;
 use rend3::{
     types::{self, Handedness, MeshValidationError, ObjectHandle, ObjectMeshKind, Skeleton, SkeletonHandle},
     util::typedefs::{FastHashMap, SsoString},
@@ -1228,7 +1227,7 @@ where
 pub mod util {
     use std::future::Future;
 
-    use image::{buffer::ConvertBuffer, Bgra, ImageBuffer, Luma, Rgba};
+    use image::{buffer::ConvertBuffer, ImageBuffer, Luma, Rgba};
     use rend3::types;
 
     use crate::{Labeled, Texture};
@@ -1273,13 +1272,6 @@ pub mod util {
             ),
             image::DynamicImage::ImageRgba8(i) => {
                 (i.into_raw(), if srgb { r3F::Rgba8UnormSrgb } else { r3F::Rgba8Unorm })
-            }
-            image::DynamicImage::ImageBgr8(i) => (
-                ConvertBuffer::<ImageBuffer<Bgra<u8>, Vec<u8>>>::convert(&i).into_raw(),
-                if srgb { r3F::Bgra8UnormSrgb } else { r3F::Bgra8Unorm },
-            ),
-            image::DynamicImage::ImageBgra8(i) => {
-                (i.into_raw(), if srgb { r3F::Bgra8UnormSrgb } else { r3F::Bgra8Unorm })
             }
             i => (
                 i.into_rgba8().into_raw(),
