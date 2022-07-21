@@ -38,7 +38,7 @@ image = { version = "0.23", default-features = false, features = ["png", "jpeg",
 indoc = "1"
 instant = { version = "0.1", features = ["wasm-bindgen"] }
 log = "0.4"
-pico-args = "0.4"
+pico-args = "0.5"
 pollster = "0.2"
 profiling = { version = "1", default-features = false }
 rend3 = { version = "^0.3.0", path = "../../rend3" }
