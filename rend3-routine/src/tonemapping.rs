@@ -36,7 +36,8 @@ fn create_pipeline(
     let module = device.create_shader_module(ShaderModuleDescriptor {
         label: Some("tonemapping"),
         source: ShaderSource::Wgsl(Cow::Owned(
-            spp.render_shader("rend3-routine/blit.wgsl", &ShaderConfig::default()).unwrap(),
+            spp.render_shader("rend3-routine/blit.wgsl", &ShaderConfig::default())
+                .unwrap(),
         )),
     });
 

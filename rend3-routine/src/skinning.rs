@@ -176,7 +176,8 @@ impl GpuSkinner {
         let module = device.create_shader_module(ShaderModuleDescriptor {
             label: Some("Gpu skinning compute shader"),
             source: wgpu::ShaderSource::Wgsl(Cow::Owned(
-                spp.render_shader("rend3-routine/skinning.wgsl", &ShaderConfig::default()).unwrap(),
+                spp.render_shader("rend3-routine/skinning.wgsl", &ShaderConfig::default())
+                    .unwrap(),
             )),
         });
 
