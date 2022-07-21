@@ -48,3 +48,5 @@ lto = "thin"
 # wgpu-core = { path = "../wgpu/wgpu-core" }
 # wgpu-hal = { path = "../wgpu/wgpu-hal" }
 # wgpu-types = { path = "../wgpu/wgpu-types" }
+
+gltf = { git = "https://github.com/gltf-rs/gltf.git", rev = "7031e7a8ec7c991b1b1d29eaf7c531c6f4842083" }

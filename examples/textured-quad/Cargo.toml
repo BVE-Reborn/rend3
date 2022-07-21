@@ -27,4 +27,4 @@ rend3-routine = { version = "^0.3.0", path = "../../rend3-routine" }
 # windowing
 winit = "0.26"
 # Load image
-image = { version = "0.23", default-features = false, features = ["png"]}
+image = { version = "0.24", default-features = false, features = ["png"]}
