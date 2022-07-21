@@ -1,4 +1,4 @@
-use rend3::{Renderer, RendererDataCore};
+use rend3::{Renderer, RendererDataCore, ShaderPreProcessor};
 use wgpu::{BlendState, Features};
 
 use crate::{
@@ -6,7 +6,6 @@ use crate::{
     depth::DepthRoutine,
     forward::ForwardRoutine,
     pbr::{PbrMaterial, TransparencyType},
-    shaders::ShaderPreProcessor,
 };
 
 /// Render routine that renders the using PBR materials

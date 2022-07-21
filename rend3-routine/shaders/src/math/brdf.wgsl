@@ -1,4 +1,4 @@
-{{include "math/consts.wgsl"}}
+{{include "rend3-routine/math/consts.wgsl"}}
 
 fn brdf_d_ggx(noh: f32, a: f32) -> f32 {
     let a2 = a * a;

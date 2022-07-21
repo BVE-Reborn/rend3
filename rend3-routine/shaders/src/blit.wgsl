@@ -1,4 +1,4 @@
-{{include "math/color.wgsl"}}
+{{include "rend3-routine/math/color.wgsl"}}
 
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,

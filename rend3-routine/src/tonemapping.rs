@@ -14,7 +14,7 @@ use std::borrow::Cow;
 use rend3::{
     graph::{DataHandle, RenderGraph, RenderPassTarget, RenderPassTargets, RenderTargetHandle},
     util::bind_merge::{BindGroupBuilder, BindGroupLayoutBuilder},
-    Renderer,
+    Renderer, ShaderConfig, ShaderPreProcessor,
 };
 use wgpu::{
     BindGroup, BindGroupLayout, BindingType, Color, ColorTargetState, ColorWrites, Device, FragmentState, FrontFace,
@@ -23,10 +23,7 @@ use wgpu::{
     TextureViewDimension, VertexState,
 };
 
-use crate::{
-    common::WholeFrameInterfaces,
-    shaders::{ShaderConfig, ShaderPreProcessor},
-};
+use crate::common::WholeFrameInterfaces;
 
 fn create_pipeline(
     device: &Device,
@@ -39,7 +36,7 @@ fn create_pipeline(
     let module = device.create_shader_module(ShaderModuleDescriptor {
         label: Some("tonemapping"),
         source: ShaderSource::Wgsl(Cow::Owned(
-            spp.render_shader("blit.wgsl", &ShaderConfig::default()).unwrap(),
+            spp.render_shader("rend3-routine/blit.wgsl", &ShaderConfig::default()).unwrap(),
         )),
     });
 

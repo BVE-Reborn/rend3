@@ -4,20 +4,19 @@ use glam::Mat4;
 use rend3::{
     managers::{CameraManager, GpuCullingInput, InternalObject, VERTEX_OBJECT_INDEX_SLOT},
     util::{bind_merge::BindGroupBuilder, frustum::ShaderFrustum},
-    ProfileData,
+    ProfileData, ShaderConfig, ShaderPreProcessor,
 };
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
     BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, Buffer, BufferBindingType,
     BufferDescriptor, BufferUsages, CommandEncoder, ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor,
-    Device, PipelineLayoutDescriptor, PushConstantRange, RenderPass, ShaderModuleDescriptor,
-    ShaderSource, ShaderStages,
+    Device, PipelineLayoutDescriptor, PushConstantRange, RenderPass, ShaderModuleDescriptor, ShaderSource,
+    ShaderStages,
 };
 
 use crate::{
     common::{PerObjectDataAbi, Sorting},
     culling::CulledObjectSet,
-    shaders::{ShaderConfig, ShaderPreProcessor},
 };
 
 #[repr(C, align(16))]
@@ -189,7 +188,8 @@ impl GpuCuller {
         let culling_sm = device.create_shader_module(ShaderModuleDescriptor {
             label: Some("culling"),
             source: ShaderSource::Wgsl(Cow::Owned(
-                spp.render_shader("cull.wgsl", &ShaderConfig::default()).unwrap(),
+                spp.render_shader("rend3-routine/cull.wgsl", &ShaderConfig::default())
+                    .unwrap(),
             )),
         });
 

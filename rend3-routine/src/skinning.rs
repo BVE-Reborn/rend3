@@ -11,14 +11,13 @@ use rend3::{
         bind_merge::{BindGroupBuilder, BindGroupLayoutBuilder},
         math::round_up_div,
     },
+    ShaderConfig, ShaderPreProcessor,
 };
 use wgpu::{
     BindGroupLayout, BindingType, Buffer, BufferBindingType, BufferDescriptor, BufferUsages, CommandEncoder,
     ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor, Device, PipelineLayoutDescriptor,
     ShaderModuleDescriptor, ShaderStages,
 };
-
-use crate::shaders::{ShaderConfig, ShaderPreProcessor};
 
 /// The per-skeleton data, as uploaded to the GPU compute shader.
 #[repr(C, align(16))]
@@ -177,7 +176,7 @@ impl GpuSkinner {
         let module = device.create_shader_module(ShaderModuleDescriptor {
             label: Some("Gpu skinning compute shader"),
             source: wgpu::ShaderSource::Wgsl(Cow::Owned(
-                spp.render_shader("skinning.wgsl", &ShaderConfig::default()).unwrap(),
+                spp.render_shader("rend3-routine/skinning.wgsl", &ShaderConfig::default()).unwrap(),
             )),
         });
 

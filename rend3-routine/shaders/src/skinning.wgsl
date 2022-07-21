@@ -1,4 +1,4 @@
-{{include "math/matrix.wgsl"}}
+{{include "rend3-routine/math/matrix.wgsl"}}
 
 struct Range {
     start: u32,

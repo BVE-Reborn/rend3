@@ -17,7 +17,6 @@ bitflags = "1"
 bytemuck = "1"
 flume = "0.10"
 glam = { version = "0.21.2", features = ["bytemuck"] }
-handlebars = "4"
 log = "0.4"
 ordered-float = "3"
 parking_lot = "0.12"

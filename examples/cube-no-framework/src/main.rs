@@ -100,7 +100,9 @@ fn main() {
     .unwrap();
 
     // Create the shader preprocessor with all the default shaders added.
-    let spp = rend3_routine::shaders::ShaderPreProcessor::new_with_inherent_shaders();
+    let mut spp = rend3::ShaderPreProcessor::new();
+    rend3_routine::builtin_shaders(&mut spp);
+
     // Create the base rendergraph.
     let base_rendergraph = rend3_routine::base::BaseRenderGraph::new(&renderer, &spp);
 

@@ -1,8 +1,8 @@
-{{include "structures.wgsl"}}
-{{include "material.wgsl"}}
-{{include "math/brdf.wgsl"}}
-{{include "math/color.wgsl"}}
-{{include "shadow/pcf.wgsl"}}
+{{include "rend3-routine/structures.wgsl"}}
+{{include "rend3-routine/material.wgsl"}}
+{{include "rend3-routine/math/brdf.wgsl"}}
+{{include "rend3-routine/math/color.wgsl"}}
+{{include "rend3-routine/shadow/pcf.wgsl"}}
 
 struct VertexInput {
     @location(0) position: vec3<f32>,
@@ -163,8 +163,8 @@ fn perceptual_roughness_to_roughness(perceptual_roughness: f32) -> f32 {
     return perceptual_roughness * perceptual_roughness;
 }
 
-fn get_pixel_data_inner(material: Material, s: sampler, vs_out: VertexOutput) -> PixelData {
-    var material = material;
+fn get_pixel_data_inner(material_arg: Material, s: sampler, vs_out: VertexOutput) -> PixelData {
+    var material = material_arg;
     var pixel: PixelData;
 
     let coords = (material.uv_transform0 * vec3<f32>(vs_out.coords0, 1.0)).xy;
@@ -394,14 +394,14 @@ fn get_pixel_data(material: Material, vs_out: VertexOutput) -> PixelData {
 }
 {{/if}}
 
-fn surface_shading(light: DirectionalLight, pixel: PixelData, v: vec3<f32>, occlusion: f32) -> vec3<f32> {
+fn surface_shading(light: DirectionalLight, pixel: PixelData, view_pos: vec3<f32>, occlusion: f32) -> vec3<f32> {
     let view_mat3 = mat3x3<f32>(uniforms.view[0].xyz, uniforms.view[1].xyz, uniforms.view[2].xyz);
     let l = normalize(view_mat3 * -light.direction);
 
     let n = pixel.normal;
-    let h = normalize(v + l);
+    let h = normalize(view_pos + l);
 
-    let nov = abs(dot(n, v)) + 0.00001;
+    let nov = abs(dot(n, view_pos)) + 0.00001;
     let nol = saturate(dot(n, l));
     let noh = saturate(dot(n, h));
     let loh = saturate(dot(l, h));
@@ -450,7 +450,7 @@ fn fs_main(vs_out: VertexOutput) -> @location(0) vec4<f32> {
         let shadow_coords = vec2<f32>(shadow_flipped.x, 1.0 - shadow_flipped.y);
 
         var shadow_value = 1.0;
-        if (any(shadow_flipped >= vec2<f32>(0.0) || shadow_flipped <= vec2<f32>(1.0))) {
+        if (any(shadow_flipped >= vec2<f32>(0.0)) || any(shadow_flipped <= vec2<f32>(1.0))) {
             shadow_value = shadow_sample_pcf5(shadows, comparison_sampler, shadow_coords, i, shadow_ndc.z);
         }
 

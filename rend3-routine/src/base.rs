@@ -19,13 +19,12 @@ use rend3::{
     format_sso,
     graph::{DataHandle, ReadyData, RenderGraph, RenderTargetDescriptor, RenderTargetHandle},
     types::{SampleCount, TextureFormat, TextureUsages},
-    ProfileData, Renderer,
+    ProfileData, Renderer, ShaderPreProcessor,
 };
 use wgpu::{BindGroup, Buffer};
 
 use crate::{
     common, culling, pbr,
-    shaders::ShaderPreProcessor,
     skinning::{self, GpuSkinner, SkinningOutput},
     skybox, tonemapping,
 };

@@ -17,7 +17,7 @@ use rend3::{
         bind_merge::{BindGroupBuilder, BindGroupLayoutBuilder},
         math::round_up_pot,
     },
-    ProfileData, Renderer, RendererDataCore, RendererProfile,
+    ProfileData, Renderer, RendererDataCore, RendererProfile, ShaderConfig, ShaderPreProcessor,
 };
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
@@ -30,7 +30,6 @@ use wgpu::{
 use crate::{
     common::{PerMaterialArchetypeInterface, WholeFrameInterfaces, CPU_VERTEX_BUFFERS, GPU_VERTEX_BUFFERS},
     culling::{self, PerMaterialArchetypeData},
-    shaders::{ShaderConfig, ShaderPreProcessor},
 };
 
 /// Trait for all materials that can use the built-in shadow/prepass rendering.
@@ -335,7 +334,7 @@ impl<M: DepthRenderableMaterial> DepthPipelines<M> {
             label: Some("depth"),
             source: ShaderSource::Wgsl(Cow::Owned(
                 spp.render_shader(
-                    "depth.wgsl",
+                    "rend3-routine/depth.wgsl",
                     &ShaderConfig {
                         profile: Some(renderer.profile),
                     },

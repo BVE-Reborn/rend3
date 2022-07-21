@@ -1,4 +1,4 @@
-{{include "math/sphere.wgsl"}}
+{{include "rend3-routine/math/sphere.wgsl"}}
 
 struct Plane {
     inner: vec4<f32>,

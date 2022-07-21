@@ -11,7 +11,7 @@ use rend3::{
         RenderTargetHandle,
     },
     types::{Handedness, Material, SampleCount},
-    ProfileData, Renderer, RendererDataCore, RendererProfile,
+    ProfileData, Renderer, RendererDataCore, RendererProfile, ShaderConfig, ShaderPreProcessor,
 };
 use wgpu::{
     BindGroup, BindGroupLayout, BlendState, Color, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState,
@@ -23,7 +23,6 @@ use wgpu::{
 use crate::{
     common::{PerMaterialArchetypeInterface, WholeFrameInterfaces, CPU_VERTEX_BUFFERS, GPU_VERTEX_BUFFERS},
     culling,
-    shaders::{ShaderConfig, ShaderPreProcessor},
 };
 
 /// A set of pipelines for rendering a specific combination of a material.
@@ -70,7 +69,7 @@ impl<M: Material> ForwardRoutine<M> {
             label: Some("forward"),
             source: ShaderSource::Wgsl(Cow::Owned(
                 spp.render_shader(
-                    "opaque.wgsl",
+                    "rend3-routine/opaque.wgsl",
                     &ShaderConfig {
                         profile: Some(renderer.profile),
                     },

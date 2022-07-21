@@ -39,6 +39,7 @@ bumpalo = "3"
 bytemuck = "1"
 flume = "0.10"
 glam = { version = "0.21.2", features = ["bytemuck"] }
+handlebars = "4"
 indexmap = "1"
 list-any = "0.2"
 log = "0.4"
@@ -47,6 +48,7 @@ parking_lot = "0.12"
 profiling = { version = "1", default-features = false }
 range-alloc = "0.1"
 rend3-types = { version = "^0.3.0", path = "../rend3-types" }
+rust-embed = { version = "6", features = ["interpolate-folder-path"] }
 rustc-hash = "1"
 serde = { version = "1", features = ["derive"] }
 smallvec = "1"
@@ -56,6 +58,10 @@ wgpu = "0.13"
 wgpu-profiler = "0.9.0"
 
 # Hard dependencies on new versions of transitive deps
-wgpu-core = "0.13.1"
-wgpu-hal = "0.13.1"
+wgpu-core = "0.13.2"
+wgpu-hal = "0.13.2"
 naga = "0.9.0"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+# Needed to embed shaders in the binary on wasm
+rust-embed = { version = "6", features = ["interpolate-folder-path", "debug-embed"] }

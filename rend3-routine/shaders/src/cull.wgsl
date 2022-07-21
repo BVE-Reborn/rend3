@@ -1,7 +1,7 @@
-{{include "math/frustum.wgsl"}}
-{{include "math/matrix.wgsl"}}
-{{include "math/sphere.wgsl"}}
-{{include "structures.wgsl"}}
+{{include "rend3-routine/math/frustum.wgsl"}}
+{{include "rend3-routine/math/matrix.wgsl"}}
+{{include "rend3-routine/math/sphere.wgsl"}}
+{{include "rend3-routine/structures.wgsl"}}
 
 struct CullingUniforms {
     view: mat4x4<f32>,

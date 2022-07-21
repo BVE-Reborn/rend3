@@ -3,9 +3,9 @@ use std::{future::Future, pin::Pin, sync::Arc};
 use glam::UVec2;
 use rend3::{
     types::{Handedness, SampleCount, Surface, TextureFormat},
-    InstanceAdapterDevice, Renderer,
+    InstanceAdapterDevice, Renderer, ShaderPreProcessor,
 };
-use rend3_routine::{base::BaseRenderGraph, shaders::ShaderPreProcessor};
+use rend3_routine::base::BaseRenderGraph;
 use wgpu::Instance;
 use winit::{
     dpi::PhysicalSize,
@@ -242,7 +242,9 @@ pub async fn async_start<A: App<T> + 'static, T: 'static>(mut app: A, window_bui
         format
     });
 
-    let spp = rend3_routine::shaders::ShaderPreProcessor::new_with_inherent_shaders();
+    let mut spp = rend3::ShaderPreProcessor::new();
+    rend3_routine::builtin_shaders(&mut spp);
+
     let base_rendergraph = app.create_base_rendergraph(&renderer, &spp);
     let mut data_core = renderer.data_core.lock();
     let routines = Arc::new(DefaultRoutines {

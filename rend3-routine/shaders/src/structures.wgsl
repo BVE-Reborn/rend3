@@ -1,5 +1,5 @@
-{{include "math/sphere.wgsl"}}
-{{include "math/frustum.wgsl"}}
+{{include "rend3-routine/math/sphere.wgsl"}}
+{{include "rend3-routine/math/frustum.wgsl"}}
 
 struct ObjectInputData {
     start_idx: u32,

@@ -191,11 +191,13 @@ pub mod graph;
 mod instruction;
 mod profile;
 mod setup;
+mod shader;
 mod surface;
 
 pub use profile::*;
 pub use renderer::{error::*, Renderer, RendererDataCore};
 pub use setup::*;
+pub use shader::*;
 pub use surface::*;
 
 /// Format of all shadow maps.
