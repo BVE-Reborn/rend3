@@ -349,7 +349,7 @@ fn get_pixel_data_inner(material: Material, s: sampler, vs_out: VertexOutput) ->
     // --- EMISSIVE ---
 
     if (has_emissive_texture(&material)) {
-        pixel.emissive = material.emissive * emissive_texture(&material, s, coords, uvdx, uvdy).r;
+        pixel.emissive = material.emissive * emissive_texture(&material, s, coords, uvdx, uvdy).rgb;
     } else {
         pixel.emissive = material.emissive;
     }
