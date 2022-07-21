@@ -3,7 +3,7 @@ use std::{future::Future, pin::Pin, sync::Arc};
 use glam::UVec2;
 use rend3::{
     types::{Handedness, SampleCount, Surface, TextureFormat},
-    InstanceAdapterDevice, Renderer,
+    InstanceAdapterDevice, Renderer, ShaderPreProcessor,
 };
 use rend3_routine::base::BaseRenderGraph;
 use wgpu::Instance;
@@ -83,8 +83,8 @@ pub trait App<T: 'static = ()> {
         Box::pin(async move { Ok(rend3::create_iad(None, None, None, None).await?) })
     }
 
-    fn create_base_rendergraph(&mut self, renderer: &Renderer) -> BaseRenderGraph {
-        BaseRenderGraph::new(renderer)
+    fn create_base_rendergraph(&mut self, renderer: &Renderer, spp: &ShaderPreProcessor) -> BaseRenderGraph {
+        BaseRenderGraph::new(renderer, spp)
     }
 
     /// Determines the sample count used, this may change dynamically. This
@@ -194,7 +194,7 @@ where
     }
 }
 
-pub async fn async_start<A: App + 'static>(mut app: A, window_builder: WindowBuilder) {
+pub async fn async_start<A: App<T> + 'static, T: 'static>(mut app: A, window_builder: WindowBuilder) {
     app.register_logger();
     app.register_panic_hook();
 
@@ -242,20 +242,26 @@ pub async fn async_start<A: App + 'static>(mut app: A, window_builder: WindowBui
         format
     });
 
-    let base_rendergraph = app.create_base_rendergraph(&renderer);
+    let mut spp = rend3::ShaderPreProcessor::new();
+    rend3_routine::builtin_shaders(&mut spp);
+
+    let base_rendergraph = app.create_base_rendergraph(&renderer, &spp);
     let mut data_core = renderer.data_core.lock();
     let routines = Arc::new(DefaultRoutines {
         pbr: Mutex::new(rend3_routine::pbr::PbrRoutine::new(
             &renderer,
             &mut data_core,
+            &spp,
             &base_rendergraph.interfaces,
         )),
         skybox: Mutex::new(rend3_routine::skybox::SkyboxRoutine::new(
             &renderer,
+            &spp,
             &base_rendergraph.interfaces,
         )),
         tonemapping: Mutex::new(rend3_routine::tonemapping::TonemappingRoutine::new(
             &renderer,
+            &spp,
             &base_rendergraph.interfaces,
             format,
         )),
@@ -341,7 +347,7 @@ struct StoredSurfaceInfo {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn handle_surface<A: App, T: 'static>(
+fn handle_surface<A: App<T>, T: 'static>(
     app: &A,
     window: &Window,
     event: &Event<T>,
@@ -391,7 +397,7 @@ fn handle_surface<A: App, T: 'static>(
     }
 }
 
-pub fn start<A: App + 'static>(app: A, window_builder: WindowBuilder) {
+pub fn start<A: App<T> + 'static, T: 'static>(app: A, window_builder: WindowBuilder) {
     #[cfg(target_arch = "wasm32")]
     {
         wasm_bindgen_futures::spawn_local(async_start(app, window_builder));

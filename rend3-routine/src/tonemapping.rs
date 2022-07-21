@@ -14,7 +14,7 @@ use std::borrow::Cow;
 use rend3::{
     graph::{DataHandle, RenderGraph, RenderPassTarget, RenderPassTargets, RenderTargetHandle},
     util::bind_merge::{BindGroupBuilder, BindGroupLayoutBuilder},
-    Renderer,
+    Renderer, ShaderConfig, ShaderPreProcessor,
 };
 use wgpu::{
     BindGroup, BindGroupLayout, BindingType, Color, ColorTargetState, ColorWrites, Device, FragmentState, FrontFace,
@@ -23,39 +23,29 @@ use wgpu::{
     TextureViewDimension, VertexState,
 };
 
-use crate::{common::WholeFrameInterfaces, shaders::WGSL_SHADERS};
+use crate::common::WholeFrameInterfaces;
 
 fn create_pipeline(
     device: &Device,
+    spp: &ShaderPreProcessor,
     interfaces: &WholeFrameInterfaces,
     bgl: &BindGroupLayout,
     output_format: TextureFormat,
 ) -> RenderPipeline {
     profiling::scope!("TonemappingPass::new");
-    let blit_vert = device.create_shader_module(ShaderModuleDescriptor {
-        label: Some("tonemapping vert"),
-        source: ShaderSource::Wgsl(Cow::Borrowed(
-            WGSL_SHADERS
-                .get_file("blit.vert.wgsl")
-                .unwrap()
-                .contents_utf8()
+    let module = device.create_shader_module(ShaderModuleDescriptor {
+        label: Some("tonemapping"),
+        source: ShaderSource::Wgsl(Cow::Owned(
+            spp.render_shader("rend3-routine/blit.wgsl", &ShaderConfig::default())
                 .unwrap(),
         )),
     });
 
-    let blit_frag = device.create_shader_module(ShaderModuleDescriptor {
-        label: Some("tonemapping frag"),
-        source: ShaderSource::Wgsl(Cow::Borrowed(
-            WGSL_SHADERS
-                .get_file(match output_format.describe().srgb {
-                    true => "blit-linear.frag.wgsl",
-                    false => "blit-srgb.frag.wgsl",
-                })
-                .unwrap()
-                .contents_utf8()
-                .unwrap(),
-        )),
-    });
+    let fs_entry_point = if output_format.describe().srgb {
+        "fs_main_scene"
+    } else {
+        "fs_main_monitor"
+    };
 
     let pll = device.create_pipeline_layout(&PipelineLayoutDescriptor {
         label: Some("tonemapping pass"),
@@ -67,8 +57,8 @@ fn create_pipeline(
         label: Some("tonemapping pass"),
         layout: Some(&pll),
         vertex: VertexState {
-            module: &blit_vert,
-            entry_point: "main",
+            module: &module,
+            entry_point: "vs_main",
             buffers: &[],
         },
         primitive: PrimitiveState {
@@ -83,8 +73,8 @@ fn create_pipeline(
         depth_stencil: None,
         multisample: MultisampleState::default(),
         fragment: Some(FragmentState {
-            module: &blit_frag,
-            entry_point: "main",
+            module: &module,
+            entry_point: fs_entry_point,
             targets: &[Some(ColorTargetState {
                 format: output_format,
                 blend: None,
@@ -104,7 +94,12 @@ pub struct TonemappingRoutine {
 }
 
 impl TonemappingRoutine {
-    pub fn new(renderer: &Renderer, interfaces: &WholeFrameInterfaces, output_format: TextureFormat) -> Self {
+    pub fn new(
+        renderer: &Renderer,
+        spp: &ShaderPreProcessor,
+        interfaces: &WholeFrameInterfaces,
+        output_format: TextureFormat,
+    ) -> Self {
         let bgl = BindGroupLayoutBuilder::new()
             .append(
                 ShaderStages::FRAGMENT,
@@ -117,7 +112,7 @@ impl TonemappingRoutine {
             )
             .build(&renderer.device, Some("bind bgl"));
 
-        let pipeline = create_pipeline(&renderer.device, interfaces, &bgl, output_format);
+        let pipeline = create_pipeline(&renderer.device, spp, interfaces, &bgl, output_format);
 
         Self { bgl, pipeline }
     }

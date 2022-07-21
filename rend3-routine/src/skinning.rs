@@ -1,4 +1,4 @@
-use std::{mem, num::NonZeroU64};
+use std::{borrow::Cow, mem, num::NonZeroU64};
 
 use glam::{Mat4, UVec2};
 use rend3::{
@@ -11,6 +11,7 @@ use rend3::{
         bind_merge::{BindGroupBuilder, BindGroupLayoutBuilder},
         math::round_up_div,
     },
+    ShaderConfig, ShaderPreProcessor,
 };
 use wgpu::{
     BindGroupLayout, BindingType, Buffer, BufferBindingType, BufferDescriptor, BufferUsages, CommandEncoder,
@@ -124,7 +125,7 @@ pub struct GpuSkinner {
 impl GpuSkinner {
     const WORKGROUP_SIZE: u32 = 64;
 
-    pub fn new(device: &wgpu::Device) -> GpuSkinner {
+    pub fn new(device: &wgpu::Device, spp: &ShaderPreProcessor) -> GpuSkinner {
         let storage_buffer_ty = |read_only, size| BindingType::Buffer {
             ty: BufferBindingType::Storage { read_only },
             has_dynamic_offset: false,
@@ -174,7 +175,10 @@ impl GpuSkinner {
 
         let module = device.create_shader_module(ShaderModuleDescriptor {
             label: Some("Gpu skinning compute shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("../shaders/src/skinning.wgsl").into()),
+            source: wgpu::ShaderSource::Wgsl(Cow::Owned(
+                spp.render_shader("rend3-routine/skinning.wgsl", &ShaderConfig::default())
+                    .unwrap(),
+            )),
         });
 
         let pipeline = device.create_compute_pipeline(&ComputePipelineDescriptor {

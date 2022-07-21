@@ -35,7 +35,7 @@ rend3-anim = { version = "^0.3.0", path = "../../rend3-anim" }
 rend3-gltf = { version = "^0.3.0", path = "../../rend3-gltf" }
 # windowing
 winit = "0.26"
-image = { version = "0.23", features = ["jpeg"] }
+image = { version = "0.23", default-features = false, features = ["jpeg"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_log = "0.2"

@@ -4,20 +4,19 @@ use glam::Mat4;
 use rend3::{
     managers::{CameraManager, GpuCullingInput, InternalObject, VERTEX_OBJECT_INDEX_SLOT},
     util::{bind_merge::BindGroupBuilder, frustum::ShaderFrustum},
-    ProfileData,
+    ProfileData, ShaderConfig, ShaderPreProcessor,
 };
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
     BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, Buffer, BufferBindingType,
     BufferDescriptor, BufferUsages, CommandEncoder, ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor,
-    Device, PipelineLayoutDescriptor, PushConstantRange, RenderPass, ShaderModuleDescriptor,
-    ShaderModuleDescriptorSpirV, ShaderSource, ShaderStages,
+    Device, PipelineLayoutDescriptor, PushConstantRange, RenderPass, ShaderModuleDescriptor, ShaderSource,
+    ShaderStages,
 };
 
 use crate::{
     common::{PerObjectDataAbi, Sorting},
     culling::CulledObjectSet,
-    shaders::{SPIRV_SHADERS, WGSL_SHADERS},
 };
 
 #[repr(C, align(16))]
@@ -50,7 +49,7 @@ pub struct GpuCuller {
     prefix_output_pipeline: ComputePipeline,
 }
 impl GpuCuller {
-    pub fn new(device: &Device) -> Self {
+    pub fn new(device: &Device, spp: &ShaderPreProcessor) -> Self {
         profiling::scope!("GpuCuller::new");
 
         let atomic_bgl = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
@@ -128,7 +127,7 @@ impl GpuCuller {
                     ty: BindingType::Buffer {
                         ty: BufferBindingType::Storage { read_only: false },
                         has_dynamic_offset: false,
-                        min_binding_size: NonZeroU64::new(mem::size_of::<u32>() as _),
+                        min_binding_size: NonZeroU64::new(mem::size_of::<PerObjectDataAbi>() as _),
                     },
                     count: None,
                 },
@@ -138,7 +137,7 @@ impl GpuCuller {
                     ty: BindingType::Buffer {
                         ty: BufferBindingType::Storage { read_only: false },
                         has_dynamic_offset: false,
-                        min_binding_size: NonZeroU64::new(mem::size_of::<u32>() as _),
+                        min_binding_size: NonZeroU64::new(16 + 20),
                     },
                     count: None,
                 },
@@ -148,7 +147,7 @@ impl GpuCuller {
                     ty: BindingType::Buffer {
                         ty: BufferBindingType::Storage { read_only: false },
                         has_dynamic_offset: false,
-                        min_binding_size: NonZeroU64::new(mem::size_of::<PerObjectDataAbi>() as _),
+                        min_binding_size: NonZeroU64::new(mem::size_of::<u32>() as _),
                     },
                     count: None,
                 },
@@ -158,7 +157,7 @@ impl GpuCuller {
                     ty: BindingType::Buffer {
                         ty: BufferBindingType::Storage { read_only: false },
                         has_dynamic_offset: false,
-                        min_binding_size: NonZeroU64::new(16 + 20),
+                        min_binding_size: NonZeroU64::new(mem::size_of::<u32>() as _),
                     },
                     count: None,
                 },
@@ -186,44 +185,10 @@ impl GpuCuller {
             }],
         });
 
-        let atomic_sm = unsafe {
-            device.create_shader_module_spirv(&ShaderModuleDescriptorSpirV {
-                label: Some("cull-atomic-cull"),
-                source: wgpu::util::make_spirv_raw(
-                    SPIRV_SHADERS.get_file("cull-atomic-cull.comp.spv").unwrap().contents(),
-                ),
-            })
-        };
-
-        let prefix_cull_sm = device.create_shader_module(ShaderModuleDescriptor {
-            label: Some("cull-prefix-cull"),
-            source: ShaderSource::Wgsl(Cow::Borrowed(
-                WGSL_SHADERS
-                    .get_file("cull-prefix-cull.comp.wgsl")
-                    .unwrap()
-                    .contents_utf8()
-                    .unwrap(),
-            )),
-        });
-
-        let prefix_sum_sm = device.create_shader_module(ShaderModuleDescriptor {
-            label: Some("cull-prefix-sum"),
-            source: ShaderSource::Wgsl(Cow::Borrowed(
-                WGSL_SHADERS
-                    .get_file("cull-prefix-sum.comp.wgsl")
-                    .unwrap()
-                    .contents_utf8()
-                    .unwrap(),
-            )),
-        });
-
-        let prefix_output_sm = device.create_shader_module(ShaderModuleDescriptor {
-            label: Some("cull-prefix-output"),
-            source: ShaderSource::Wgsl(Cow::Borrowed(
-                WGSL_SHADERS
-                    .get_file("cull-prefix-output.comp.wgsl")
-                    .unwrap()
-                    .contents_utf8()
+        let culling_sm = device.create_shader_module(ShaderModuleDescriptor {
+            label: Some("culling"),
+            source: ShaderSource::Wgsl(Cow::Owned(
+                spp.render_shader("rend3-routine/cull.wgsl", &ShaderConfig::default())
                     .unwrap(),
             )),
         });
@@ -231,29 +196,29 @@ impl GpuCuller {
         let atomic_pipeline = device.create_compute_pipeline(&ComputePipelineDescriptor {
             label: Some("atomic culling pl"),
             layout: Some(&atomic_pll),
-            module: &atomic_sm,
-            entry_point: "main",
+            module: &culling_sm,
+            entry_point: "atomic_main",
         });
 
         let prefix_cull_pipeline = device.create_compute_pipeline(&ComputePipelineDescriptor {
             label: Some("prefix cull pl"),
             layout: Some(&prefix_pll),
-            module: &prefix_cull_sm,
-            entry_point: "main",
+            module: &culling_sm,
+            entry_point: "prefix_begin",
         });
 
         let prefix_sum_pipeline = device.create_compute_pipeline(&ComputePipelineDescriptor {
             label: Some("prefix sum pl"),
             layout: Some(&prefix_sum_pll),
-            module: &prefix_sum_sm,
-            entry_point: "main",
+            module: &culling_sm,
+            entry_point: "prefix_intermediate",
         });
 
         let prefix_output_pipeline = device.create_compute_pipeline(&ComputePipelineDescriptor {
             label: Some("prefix output pl"),
             layout: Some(&prefix_pll),
-            module: &prefix_output_sm,
-            entry_point: "main",
+            module: &culling_sm,
+            entry_point: "prefix_end",
         });
 
         Self {
@@ -329,19 +294,19 @@ impl GpuCuller {
                 let bg_a = BindGroupBuilder::new()
                     .append_buffer(input_buffer)
                     .append_buffer(&uniform_buffer)
-                    .append_buffer(&buffer_a)
-                    .append_buffer(&buffer_b)
                     .append_buffer(&output_buffer)
                     .append_buffer(&indirect_buffer)
+                    .append_buffer(&buffer_a)
+                    .append_buffer(&buffer_b)
                     .build(device, Some("prefix cull A bg"), &self.prefix_bgl);
 
                 let bg_b = BindGroupBuilder::new()
                     .append_buffer(input_buffer)
                     .append_buffer(&uniform_buffer)
-                    .append_buffer(&buffer_b)
-                    .append_buffer(&buffer_a)
                     .append_buffer(&output_buffer)
                     .append_buffer(&indirect_buffer)
+                    .append_buffer(&buffer_b)
+                    .append_buffer(&buffer_a)
                     .build(device, Some("prefix cull B bg"), &self.prefix_bgl);
 
                 let mut cpass = encoder.begin_compute_pass(&ComputePassDescriptor {

@@ -1,3 +1,5 @@
+{{include "rend3-routine/math/matrix.wgsl"}}
+
 struct Range {
     start: u32,
     end: u32,
@@ -61,14 +63,6 @@ fn get_joint_matrix(joint_idx: u32) -> mat4x4<f32> {
     return joint_matrices.matrices[input.joints_start_idx + joint_idx];
 }
 
-fn get_inv_scale_squared(_matrix: mat3x3<f32>) -> vec3<f32> {
-    return vec3<f32>(
-        1.0 / dot(_matrix[0].xyz, _matrix[0].xyz),
-        1.0 / dot(_matrix[1].xyz, _matrix[1].xyz),
-        1.0 / dot(_matrix[2].xyz, _matrix[2].xyz)
-    );
-}
-
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let idx = global_id.x;
@@ -105,7 +99,7 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
             let joint_matrix = get_joint_matrix(joint_index);
             let joint_matrix3 = mat3x3<f32>(joint_matrix[0].xyz, joint_matrix[1].xyz, joint_matrix[2].xyz);
             pos_acc = pos_acc + ((joint_matrix * vec4<f32>(pos, 1.0)) * weight).xyz;
-            let inv_scale_sq = get_inv_scale_squared(joint_matrix3);
+            let inv_scale_sq = mat3_inv_scale_squared(joint_matrix3);
             norm_acc = norm_acc + (joint_matrix3 * (inv_scale_sq * normal)) * weight;
             tang_acc = tang_acc + (joint_matrix3 * (inv_scale_sq * tangent)) * weight;
         }

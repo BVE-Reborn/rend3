@@ -41,6 +41,7 @@ Per Keep a Changelog there are 6 main categories of changes:
 
 ### Changes
 - rend3: Update to wgpu 0.13, naga 0.9 @garyttierney
+- rend3: Convert all shaders to WGSL using a custom preprocessing solution @cwfitzgerald
 
 ### Fixes
 - Fixed mismatched BGLs when using a custom material with no cutout specification

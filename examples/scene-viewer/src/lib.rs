@@ -275,6 +275,9 @@ struct SceneViewer {
 }
 impl SceneViewer {
     pub fn new() -> Self {
+        #[cfg(feature = "tracy")]
+        tracy_client::Client::start();
+
         let mut args = Arguments::from_vec(std::env::args_os().skip(1).collect());
 
         // Meta

@@ -1,4 +1,4 @@
-use rend3::{Renderer, RendererDataCore};
+use rend3::{Renderer, RendererDataCore, ShaderPreProcessor};
 use wgpu::{BlendState, Features};
 
 use crate::{
@@ -18,7 +18,12 @@ pub struct PbrRoutine {
 }
 
 impl PbrRoutine {
-    pub fn new(renderer: &Renderer, data_core: &mut RendererDataCore, interfaces: &WholeFrameInterfaces) -> Self {
+    pub fn new(
+        renderer: &Renderer,
+        data_core: &mut RendererDataCore,
+        spp: &ShaderPreProcessor,
+        interfaces: &WholeFrameInterfaces,
+    ) -> Self {
         profiling::scope!("PbrRenderRoutine::new");
 
         // This ensures the BGLs for the material are created
@@ -33,6 +38,7 @@ impl PbrRoutine {
         let depth_pipelines = DepthRoutine::<PbrMaterial>::new(
             renderer,
             data_core,
+            spp,
             interfaces,
             &per_material,
             unclipped_depth_supported,
@@ -42,6 +48,7 @@ impl PbrRoutine {
             ForwardRoutine::new(
                 renderer,
                 data_core,
+                spp,
                 interfaces,
                 &per_material,
                 None,

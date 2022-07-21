@@ -19,7 +19,7 @@ use rend3::{
     format_sso,
     graph::{DataHandle, ReadyData, RenderGraph, RenderTargetDescriptor, RenderTargetHandle},
     types::{SampleCount, TextureFormat, TextureUsages},
-    ProfileData, Renderer,
+    ProfileData, Renderer, ShaderPreProcessor,
 };
 use wgpu::{BindGroup, Buffer};
 
@@ -49,7 +49,7 @@ pub struct BaseRenderGraph {
 }
 
 impl BaseRenderGraph {
-    pub fn new(renderer: &Renderer) -> Self {
+    pub fn new(renderer: &Renderer, spp: &ShaderPreProcessor) -> Self {
         profiling::scope!("DefaultRenderGraphData::new");
 
         let interfaces = common::WholeFrameInterfaces::new(&renderer.device);
@@ -58,9 +58,9 @@ impl BaseRenderGraph {
 
         let gpu_culler = renderer
             .profile
-            .into_data(|| (), || culling::GpuCuller::new(&renderer.device));
+            .into_data(|| (), || culling::GpuCuller::new(&renderer.device, spp));
 
-        let gpu_skinner = GpuSkinner::new(&renderer.device);
+        let gpu_skinner = GpuSkinner::new(&renderer.device, spp);
 
         Self {
             interfaces,

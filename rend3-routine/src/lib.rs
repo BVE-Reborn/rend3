@@ -24,8 +24,10 @@ pub mod depth;
 pub mod forward;
 pub mod pbr;
 pub mod pre_cull;
-pub mod shaders;
+mod shaders;
 pub mod skinning;
 pub mod skybox;
 pub mod tonemapping;
 pub mod uniforms;
+
+pub use shaders::builtin_shaders;

@@ -42,6 +42,11 @@ skip = [
     { name = "num-traits", version = "0.1.43" },
     # android
     { name = "env_logger", version = "0.8.4" },
+    # handlebars
+    { name = "block-buffer", version = "0.7.3" },
+    { name = "digest", version = "0.8.1" },
+    { name = "generic-array", version = "0.12.4" },
+    { name = "opaque-debug", version = "0.2.3" },
 ]
 
 [advisories]
