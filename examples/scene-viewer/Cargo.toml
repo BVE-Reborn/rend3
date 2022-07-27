@@ -49,7 +49,7 @@ rustc-hash = "1"
 smallvec = "1"
 tracy-client = { version = "0.13", optional = true }
 wgpu-profiler = "0.9.0"
-winit = "0.26"
+winit = "0.27"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen-futures = "0.4"
