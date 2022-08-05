@@ -4,11 +4,12 @@
 //! api arguments.
 
 use glam::{Mat4, UVec2, Vec2, Vec3, Vec3A, Vec4};
+use list_any::VecAny;
 use std::{
     fmt::Debug,
     hash::Hash,
     marker::PhantomData,
-    mem,
+    mem::{self, size_of},
     num::NonZeroU32,
     sync::{Arc, Weak},
 };
@@ -16,6 +17,9 @@ use thiserror::Error;
 
 /// Reexport of the glam version rend3 is using.
 pub use glam;
+
+mod attribute;
+pub use attribute::{VertexAttribute, VertexAttributeId, VertexFormat, VERTEX_ATTRIBUTE_POSITION};
 
 /// Non-owning resource handle.
 ///
@@ -230,18 +234,34 @@ pub enum MeshValidationError {
     IndexOutOfBounds { index: usize, value: u32, max: usize },
 }
 
+#[derive(Debug)]
+pub struct StoredVertexAttributeData {
+    id: VertexAttributeId,
+    data: VecAny,
+    ptr: *const (),
+    bytes: usize,
+}
+impl StoredVertexAttributeData {
+    pub fn new<T>(attribute: &'static VertexAttribute<T>, data: Vec<T>) -> Self
+    where
+        T: VertexFormat,
+    {
+        let bytes = data.len() * size_of::<T>();
+        let ptr = data.as_ptr() as *const ();
+        Self {
+            id: attribute.id(),
+            data: VecAny::from(data),
+            ptr,
+            bytes,
+        }
+    }
+}
+
 /// Easy to use builder for a [`Mesh`] that deals with common operations for
 /// you.
 #[derive(Debug, Default)]
 pub struct MeshBuilder {
-    vertex_positions: Vec<Vec3>,
-    vertex_normals: Option<Vec<Vec3>>,
-    vertex_tangents: Option<Vec<Vec3>>,
-    vertex_uv0: Option<Vec<Vec2>>,
-    vertex_uv1: Option<Vec<Vec2>>,
-    vertex_colors: Option<Vec<[u8; 4]>>,
-    vertex_joint_indices: Option<Vec<[u16; 4]>>,
-    vertex_joint_weights: Option<Vec<Vec4>>,
+    vertex_attributes: Vec<StoredVertexAttributeData>,
     vertex_count: usize,
 
     indices: Option<Vec<u32>>,
@@ -258,81 +278,84 @@ impl MeshBuilder {
     pub fn new(vertex_positions: Vec<Vec3>, handedness: Handedness) -> Self {
         Self {
             vertex_count: vertex_positions.len(),
-            vertex_positions,
+            vertex_attributes: vec![StoredVertexAttributeData::new(
+                &VERTEX_ATTRIBUTE_POSITION,
+                vertex_positions,
+            )],
             handedness,
             ..Self::default()
         }
     }
 
-    /// Add vertex normals to the given mesh.
-    ///
-    /// # Panic
-    ///
-    /// Will panic if the length is different from the position buffer length.
-    pub fn with_vertex_normals(mut self, normals: Vec<Vec3>) -> Self {
-        self.vertex_normals = Some(normals);
-        self
-    }
+    // /// Add vertex normals to the given mesh.
+    // ///
+    // /// # Panic
+    // ///
+    // /// Will panic if the length is different from the position buffer length.
+    // pub fn with_vertex_normals(mut self, normals: Vec<Vec3>) -> Self {
+    //     self.vertex_attributes.push = Some(normals);
+    //     self
+    // }
 
-    /// Add vertex tangents to the given mesh.
-    ///
-    /// # Panic
-    ///
-    /// Will panic if the length is different from the position buffer length.
-    pub fn with_vertex_tangents(mut self, tangents: Vec<Vec3>) -> Self {
-        self.vertex_tangents = Some(tangents);
-        self
-    }
+    // /// Add vertex tangents to the given mesh.
+    // ///
+    // /// # Panic
+    // ///
+    // /// Will panic if the length is different from the position buffer length.
+    // pub fn with_vertex_tangents(mut self, tangents: Vec<Vec3>) -> Self {
+    //     self.vertex_tangents = Some(tangents);
+    //     self
+    // }
 
-    /// Add the first set of texture coordinates to the given mesh.
-    ///
-    /// # Panic
-    ///
-    /// Will panic if the length is different from the position buffer length.
-    pub fn with_vertex_uv0(mut self, uvs: Vec<Vec2>) -> Self {
-        self.vertex_uv0 = Some(uvs);
-        self
-    }
+    // /// Add the first set of texture coordinates to the given mesh.
+    // ///
+    // /// # Panic
+    // ///
+    // /// Will panic if the length is different from the position buffer length.
+    // pub fn with_vertex_uv0(mut self, uvs: Vec<Vec2>) -> Self {
+    //     self.vertex_uv0 = Some(uvs);
+    //     self
+    // }
 
-    /// Add the second set of texture coordinates to the given mesh.
-    ///
-    /// # Panic
-    ///
-    /// Will panic if the length is different from the position buffer length.
-    pub fn with_vertex_uv1(mut self, uvs: Vec<Vec2>) -> Self {
-        self.vertex_uv1 = Some(uvs);
-        self
-    }
+    // /// Add the second set of texture coordinates to the given mesh.
+    // ///
+    // /// # Panic
+    // ///
+    // /// Will panic if the length is different from the position buffer length.
+    // pub fn with_vertex_uv1(mut self, uvs: Vec<Vec2>) -> Self {
+    //     self.vertex_uv1 = Some(uvs);
+    //     self
+    // }
 
-    /// Add vertex colors to the given mesh.
-    ///
-    /// # Panic
-    ///
-    /// Will panic if the length is different from the position buffer length.
-    pub fn with_vertex_colors(mut self, colors: Vec<[u8; 4]>) -> Self {
-        self.vertex_colors = Some(colors);
-        self
-    }
+    // /// Add vertex colors to the given mesh.
+    // ///
+    // /// # Panic
+    // ///
+    // /// Will panic if the length is different from the position buffer length.
+    // pub fn with_vertex_colors(mut self, colors: Vec<[u8; 4]>) -> Self {
+    //     self.vertex_colors = Some(colors);
+    //     self
+    // }
 
-    /// Add vertex joint indices to the given mesh.
-    ///
-    /// # Panic
-    ///
-    /// Will panic if the length is different from the position buffer length.
-    pub fn with_vertex_joint_indices(mut self, joint_indices: Vec<[u16; 4]>) -> Self {
-        self.vertex_joint_indices = Some(joint_indices);
-        self
-    }
+    // /// Add vertex joint indices to the given mesh.
+    // ///
+    // /// # Panic
+    // ///
+    // /// Will panic if the length is different from the position buffer length.
+    // pub fn with_vertex_joint_indices(mut self, joint_indices: Vec<[u16; 4]>) -> Self {
+    //     self.vertex_joint_indices = Some(joint_indices);
+    //     self
+    // }
 
-    /// Add vertex joint weights to the given mesh.
-    ///
-    /// # Panic
-    ///
-    /// Will panic if the length is different from the position buffer length.
-    pub fn with_vertex_joint_weights(mut self, joint_weights: Vec<Vec4>) -> Self {
-        self.vertex_joint_weights = Some(joint_weights);
-        self
-    }
+    // /// Add vertex joint weights to the given mesh.
+    // ///
+    // /// # Panic
+    // ///
+    // /// Will panic if the length is different from the position buffer length.
+    // pub fn with_vertex_joint_weights(mut self, joint_weights: Vec<Vec4>) -> Self {
+    //     self.vertex_joint_weights = Some(joint_weights);
+    //     self
+    // }
 
     /// Add indices to the given mesh.
     ///
@@ -385,44 +408,46 @@ impl MeshBuilder {
     pub fn build(self) -> Result<Mesh, MeshValidationError> {
         let length = self.vertex_count;
 
-        let has_normals = self.vertex_normals.is_some();
-        let has_tangents = self.vertex_tangents.is_some();
-        let has_uvs = self.vertex_uv0.is_some();
+        // let has_normals = self.vertex_normals.is_some();
+        // let has_tangents = self.vertex_tangents.is_some();
+        // let has_uvs = self.vertex_uv0.is_some();
 
-        let mut mesh = Mesh {
-            vertex_positions: self.vertex_positions,
-            vertex_normals: self.vertex_normals.unwrap_or_else(|| vec![Vec3::ZERO; length]),
-            vertex_tangents: self.vertex_tangents.unwrap_or_else(|| vec![Vec3::ZERO; length]),
-            vertex_uv0: self.vertex_uv0.unwrap_or_else(|| vec![Vec2::ZERO; length]),
-            vertex_uv1: self.vertex_uv1.unwrap_or_else(|| vec![Vec2::ZERO; length]),
-            vertex_colors: self.vertex_colors.unwrap_or_else(|| vec![[255; 4]; length]),
-            vertex_joint_indices: self.vertex_joint_indices.unwrap_or_else(|| vec![[0; 4]; length]),
-            vertex_joint_weights: self.vertex_joint_weights.unwrap_or_else(|| vec![Vec4::ZERO; length]),
-            indices: self.indices.unwrap_or_else(|| (0..length as u32).collect()),
-        };
+        // let mut mesh = Mesh {
+        //     vertex_positions: self.vertex_positions,
+        //     vertex_normals: self.vertex_normals.unwrap_or_else(|| vec![Vec3::ZERO; length]),
+        //     vertex_tangents: self.vertex_tangents.unwrap_or_else(|| vec![Vec3::ZERO; length]),
+        //     vertex_uv0: self.vertex_uv0.unwrap_or_else(|| vec![Vec2::ZERO; length]),
+        //     vertex_uv1: self.vertex_uv1.unwrap_or_else(|| vec![Vec2::ZERO; length]),
+        //     vertex_colors: self.vertex_colors.unwrap_or_else(|| vec![[255; 4]; length]),
+        //     vertex_joint_indices: self.vertex_joint_indices.unwrap_or_else(|| vec![[0; 4]; length]),
+        //     vertex_joint_weights: self.vertex_joint_weights.unwrap_or_else(|| vec![Vec4::ZERO; length]),
+        //     indices: self.indices.unwrap_or_else(|| (0..length as u32).collect()),
+        // };
 
-        if !self.without_validation {
-            mesh.validate()?;
-        }
+        // if !self.without_validation {
+        //     mesh.validate()?;
+        // }
 
-        // We need to flip winding order first, so the normals will be facing the right
-        // direction.
-        if self.flip_winding_order {
-            mesh.flip_winding_order();
-        }
+        // // We need to flip winding order first, so the normals will be facing the right
+        // // direction.
+        // if self.flip_winding_order {
+        //     mesh.flip_winding_order();
+        // }
 
-        if !has_normals {
-            // SAFETY: We've validated this mesh or had its validity unsafely asserted.
-            unsafe { mesh.calculate_normals(self.handedness, true) };
-        }
+        // if !has_normals {
+        //     // SAFETY: We've validated this mesh or had its validity unsafely asserted.
+        //     unsafe { mesh.calculate_normals(self.handedness, true) };
+        // }
 
-        // Don't need to bother with tangents if there are no meaningful UVs
-        if !has_tangents && has_uvs {
-            // SAFETY: We've validated this mesh or had its validity unsafely asserted.
-            unsafe { mesh.calculate_tangents(true) };
-        }
+        // // Don't need to bother with tangents if there are no meaningful UVs
+        // if !has_tangents && has_uvs {
+        //     // SAFETY: We've validated this mesh or had its validity unsafely asserted.
+        //     unsafe { mesh.calculate_tangents(true) };
+        // }
 
-        Ok(mesh)
+        // Ok(mesh)
+
+        todo!()
     }
 }
 
@@ -436,83 +461,63 @@ impl MeshBuilder {
 /// easier.
 #[derive(Debug)]
 pub struct Mesh {
-    pub vertex_positions: Vec<Vec3>,
-    pub vertex_normals: Vec<Vec3>,
-    pub vertex_tangents: Vec<Vec3>,
-    pub vertex_uv0: Vec<Vec2>,
-    pub vertex_uv1: Vec<Vec2>,
-    pub vertex_colors: Vec<[u8; 4]>,
-    pub vertex_joint_indices: Vec<[u16; 4]>,
-    pub vertex_joint_weights: Vec<Vec4>,
+    pub attributes: Vec<StoredVertexAttributeData>,
+    pub vertex_count: u32,
 
     pub indices: Vec<u32>,
-}
-
-impl Clone for Mesh {
-    fn clone(&self) -> Self {
-        Self {
-            vertex_positions: self.vertex_positions.clone(),
-            vertex_normals: self.vertex_normals.clone(),
-            vertex_tangents: self.vertex_tangents.clone(),
-            vertex_uv0: self.vertex_uv0.clone(),
-            vertex_uv1: self.vertex_uv1.clone(),
-            vertex_colors: self.vertex_colors.clone(),
-            vertex_joint_indices: self.vertex_joint_indices.clone(),
-            vertex_joint_weights: self.vertex_joint_weights.clone(),
-            indices: self.indices.clone(),
-        }
-    }
 }
 
 impl Mesh {
     /// Validates that all vertex attributes have the same length.
     pub fn validate(&self) -> Result<(), MeshValidationError> {
-        let position_length = self.vertex_positions.len();
-        let indices_length = self.indices.len();
+        // let position_length = self.vertex_positions.len();
+        // let indices_length = self.indices.len();
 
-        if position_length > MAX_VERTEX_COUNT {
-            return Err(MeshValidationError::ExceededMaxVertexCount { count: position_length });
-        }
+        // if position_length > MAX_VERTEX_COUNT {
+        //     return Err(MeshValidationError::ExceededMaxVertexCount { count: position_length });
+        // }
 
-        let first_different_length = [
-            (self.vertex_normals.len(), VertexBufferType::Normal),
-            (self.vertex_tangents.len(), VertexBufferType::Tangent),
-            (self.vertex_uv0.len(), VertexBufferType::Uv0),
-            (self.vertex_uv1.len(), VertexBufferType::Uv1),
-            (self.vertex_colors.len(), VertexBufferType::Colors),
-        ]
-        .iter()
-        .find_map(|&(len, ty)| if len != position_length { Some((len, ty)) } else { None });
+        // let first_different_length = [
+        //     (self.vertex_normals.len(), VertexBufferType::Normal),
+        //     (self.vertex_tangents.len(), VertexBufferType::Tangent),
+        //     (self.vertex_uv0.len(), VertexBufferType::Uv0),
+        //     (self.vertex_uv1.len(), VertexBufferType::Uv1),
+        //     (self.vertex_colors.len(), VertexBufferType::Colors),
+        // ]
+        // .iter()
+        // .find_map(|&(len, ty)| if len != position_length { Some((len, ty)) } else { None });
 
-        if let Some((len, ty)) = first_different_length {
-            return Err(MeshValidationError::MismatchedVertexCount {
-                ty,
-                actual: len,
-                expected: position_length,
-            });
-        }
+        // if let Some((len, ty)) = first_different_length {
+        //     return Err(MeshValidationError::MismatchedVertexCount {
+        //         ty,
+        //         actual: len,
+        //         expected: position_length,
+        //     });
+        // }
 
-        if indices_length % 3 != 0 {
-            return Err(MeshValidationError::IndexCountNotMultipleOfThree { count: indices_length });
-        }
+        // if indices_length % 3 != 0 {
+        //     return Err(MeshValidationError::IndexCountNotMultipleOfThree { count: indices_length });
+        // }
 
-        let first_oob_index = self.indices.iter().enumerate().find_map(|(idx, &i)| {
-            if (i as usize) >= position_length {
-                Some((idx, i))
-            } else {
-                None
-            }
-        });
+        // let first_oob_index = self.indices.iter().enumerate().find_map(|(idx, &i)| {
+        //     if (i as usize) >= position_length {
+        //         Some((idx, i))
+        //     } else {
+        //         None
+        //     }
+        // });
 
-        if let Some((index, value)) = first_oob_index {
-            return Err(MeshValidationError::IndexOutOfBounds {
-                index,
-                value,
-                max: position_length,
-            });
-        }
+        // if let Some((index, value)) = first_oob_index {
+        //     return Err(MeshValidationError::IndexOutOfBounds {
+        //         index,
+        //         value,
+        //         max: position_length,
+        //     });
+        // }
 
-        Ok(())
+        // Ok(())
+
+        todo!()
     }
 
     /// Calculate normals for the given mesh, assuming smooth shading and
@@ -533,21 +538,23 @@ impl Mesh {
     /// If a mesh has passed a call to validate, it is sound to call this
     /// function.
     pub unsafe fn calculate_normals(&mut self, handedness: Handedness, zeroed: bool) {
-        if handedness == Handedness::Left {
-            Self::calculate_normals_for_buffers::<true>(
-                &mut self.vertex_normals,
-                &self.vertex_positions,
-                &self.indices,
-                zeroed,
-            )
-        } else {
-            Self::calculate_normals_for_buffers::<false>(
-                &mut self.vertex_normals,
-                &self.vertex_positions,
-                &self.indices,
-                zeroed,
-            )
-        }
+        // if handedness == Handedness::Left {
+        //     Self::calculate_normals_for_buffers::<true>(
+        //         &mut self.vertex_normals,
+        //         &self.vertex_positions,
+        //         &self.indices,
+        //         zeroed,
+        //     )
+        // } else {
+        //     Self::calculate_normals_for_buffers::<false>(
+        //         &mut self.vertex_normals,
+        //         &self.vertex_positions,
+        //         &self.indices,
+        //         zeroed,
+        //     )
+        // }
+
+        todo!()
     }
 
     /// Calculate normals for the given buffers representing a mesh, assuming
@@ -628,15 +635,17 @@ impl Mesh {
     /// If a mesh has passed a call to validate, it is sound to call this
     /// function.
     pub unsafe fn calculate_tangents(&mut self, zeroed: bool) {
-        // SAFETY: The mesh unconditionally has a validation token, so it must be valid.
-        Self::calculate_tangents_for_buffers(
-            &mut self.vertex_tangents,
-            &self.vertex_positions,
-            &self.vertex_normals,
-            &self.vertex_uv0,
-            &self.indices,
-            zeroed,
-        )
+        // // SAFETY: The mesh unconditionally has a validation token, so it must be valid.
+        // Self::calculate_tangents_for_buffers(
+        //     &mut self.vertex_tangents,
+        //     &self.vertex_positions,
+        //     &self.vertex_normals,
+        //     &self.vertex_uv0,
+        //     &self.indices,
+        //     zeroed,
+        // )
+
+        todo!()
     }
 
     /// Calculate tangents for the given set of buffers, based on normals and

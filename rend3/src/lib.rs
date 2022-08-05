@@ -168,7 +168,6 @@ pub mod types {
 pub mod util {
     pub mod bind_merge;
     pub mod buffer;
-    pub mod buffer_copier;
     pub mod frustum;
     pub mod math;
     pub mod mipmap;

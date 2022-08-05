@@ -1,11 +1,7 @@
 use crate::{
     managers::{ObjectManager, SkeletonManager},
-    types::{Mesh, MeshHandle},
-    util::{
-        buffer_copier::{VertexBufferCopier, VertexBufferCopierParams},
-        frustum::BoundingSphere,
-        registry::ResourceRegistry,
-    },
+    types::{types::VertexAttributeId, Mesh, MeshHandle},
+    util::{frustum::BoundingSphere, registry::ResourceRegistry},
 };
 use glam::{Vec2, Vec3};
 use range_alloc::RangeAllocator;
@@ -19,55 +15,19 @@ use wgpu::{
     Buffer, BufferAddress, BufferDescriptor, BufferUsages, CommandEncoder, Device, IndexFormat, Queue, RenderPass,
 };
 
-/// Size of a single vertex position.
-pub const VERTEX_POSITION_SIZE: usize = size_of::<Vec3>();
-/// Size of a single vertex normal.
-pub const VERTEX_NORMAL_SIZE: usize = size_of::<Vec3>();
-/// Size of a single vertex tangent.
-pub const VERTEX_TANGENT_SIZE: usize = size_of::<Vec3>();
-/// Size of a single vertex texture coordinate.
-pub const VERTEX_UV_SIZE: usize = size_of::<Vec2>();
-/// Size of a single vertex color.
-pub const VERTEX_COLOR_SIZE: usize = size_of::<[u8; 4]>();
-/// Size of a single index.
-pub const INDEX_SIZE: usize = size_of::<u32>();
-/// Size of a joint index vector
-pub const VERTEX_JOINT_INDEX_SIZE: usize = size_of::<[u16; 4]>();
-/// Size of a joint weight vector
-pub const VERTEX_JOINT_WEIGHT_SIZE: usize = size_of::<[f32; 4]>();
-
-/// Vertex buffer slot for positions
-pub const VERTEX_POSITION_SLOT: u32 = 0;
-/// Vertex buffer slot for normals
-pub const VERTEX_NORMAL_SLOT: u32 = 1;
-/// Vertex buffer slot for tangents
-pub const VERTEX_TANGENT_SLOT: u32 = 2;
-/// Vertex buffer slot for uv0
-pub const VERTEX_UV0_SLOT: u32 = 3;
-/// Vertex buffer slot for uv1
-pub const VERTEX_UV1_SLOT: u32 = 4;
-/// Vertex buffer slot for colors
-pub const VERTEX_COLOR_SLOT: u32 = 5;
-/// Vertex buffer slot for joint indices
-pub const VERTEX_JOINT_INDEX_SLOT: u32 = 6;
-/// Vertex buffer slot for joint weights
-pub const VERTEX_JOINT_WEIGHT_SLOT: u32 = 7;
 /// Vertex buffer slot for object indices
 /// Note that this slot is only used in the GpuDriven profile.
-pub const VERTEX_OBJECT_INDEX_SLOT: u32 = 8;
+pub const VERTEX_OBJECT_INDEX_SLOT: u32 = 0;
 
-/// Pre-allocated vertex count in the vertex megabuffers.
-pub const STARTING_VERTICES: usize = 1 << 16;
-/// Pre-allocated index count in the index megabuffer.
-pub const STARTING_INDICES: usize = 1 << 16;
+/// Pre-allocated mesh data. 32MB.
+pub const STARTING_MESH_DATA: usize = 1 << 25;
 
 /// Internal representation of a mesh.
 pub struct InternalMesh {
     /// Range of values from the [`MeshBuffers`] where vertex data for this mesh
     /// is
-    pub vertex_range: Range<usize>,
-    /// Range of values from the [`MeshBuffers`] where index data for this mesh
-    /// is
+    pub vertex_attribute_ranges: Vec<(VertexAttributeId, Range<usize>)>,
+    /// Range in the mesh data buffer where index data for this mesh resides.
     pub index_range: Range<usize>,
     /// The bounding sphere of this mesh. Used for culling.
     pub bounding_sphere: BoundingSphere,
@@ -83,7 +43,7 @@ impl InternalMesh {
     /// Returns an empty InternalMesh
     fn new_empty() -> Self {
         InternalMesh {
-            vertex_range: 0..0,
+            vertex_attribute_ranges: Vec::new(),
             index_range: 0..0,
             bounding_sphere: BoundingSphere::from_mesh(&[]),
             skeletons: Vec::new(),
@@ -92,64 +52,35 @@ impl InternalMesh {
     }
 }
 
-/// Set of megabuffers used by the mesh manager.
-pub struct MeshBuffers {
-    pub vertex_position: Buffer,
-    pub vertex_normal: Buffer,
-    pub vertex_tangent: Buffer,
-    pub vertex_uv0: Buffer,
-    pub vertex_uv1: Buffer,
-    pub vertex_color: Buffer,
-    pub vertex_joint_index: Buffer,
-    pub vertex_joint_weight: Buffer,
-
-    pub index: Buffer,
-}
-
-impl MeshBuffers {
-    pub fn bind<'rpass>(&'rpass self, rpass: &mut RenderPass<'rpass>) {
-        rpass.set_vertex_buffer(VERTEX_POSITION_SLOT, self.vertex_position.slice(..));
-        rpass.set_vertex_buffer(VERTEX_NORMAL_SLOT, self.vertex_normal.slice(..));
-        rpass.set_vertex_buffer(VERTEX_TANGENT_SLOT, self.vertex_tangent.slice(..));
-        rpass.set_vertex_buffer(VERTEX_UV0_SLOT, self.vertex_uv0.slice(..));
-        rpass.set_vertex_buffer(VERTEX_UV1_SLOT, self.vertex_uv1.slice(..));
-        rpass.set_vertex_buffer(VERTEX_COLOR_SLOT, self.vertex_color.slice(..));
-        rpass.set_vertex_buffer(VERTEX_JOINT_INDEX_SLOT, self.vertex_joint_index.slice(..));
-        rpass.set_vertex_buffer(VERTEX_JOINT_WEIGHT_SLOT, self.vertex_joint_weight.slice(..));
-        rpass.set_index_buffer(self.index.slice(..), IndexFormat::Uint32);
-    }
-}
-
 /// Manages vertex and instance buffers. All buffers are sub-allocated from
 /// megabuffers.
 pub struct MeshManager {
-    buffers: MeshBuffers,
+    buffer: wgpu::Buffer,
 
-    vertex_alloc: RangeAllocator<usize>,
-    index_alloc: RangeAllocator<usize>,
+    allocator: RangeAllocator<usize>,
 
     registry: ResourceRegistry<InternalMesh, Mesh>,
-
-    buffer_copier: VertexBufferCopier,
 }
 
 impl MeshManager {
     pub fn new(device: &Device) -> Self {
         profiling::scope!("MeshManager::new");
 
-        let buffers = create_buffers(device, STARTING_VERTICES, STARTING_INDICES);
+        let buffer = device.create_buffer(&BufferDescriptor {
+            label: Some("mesh data buffer"),
+            size: STARTING_MESH_DATA as BufferAddress,
+            usage: BufferUsages::COPY_SRC | BufferUsages::COPY_DST | BufferUsages::INDEX | BufferUsages::STORAGE,
+            mapped_at_creation: false,
+        });
 
-        let vertex_alloc = RangeAllocator::new(0..STARTING_VERTICES);
-        let index_alloc = RangeAllocator::new(0..STARTING_INDICES);
+        let allocator = RangeAllocator::new(0..STARTING_MESH_DATA);
 
         let registry = ResourceRegistry::new();
 
         Self {
-            buffers,
-            vertex_alloc,
-            index_alloc,
+            buffer,
+            allocator,
             registry,
-            buffer_copier: VertexBufferCopier::new(device),
         }
     }
 
@@ -172,12 +103,12 @@ impl MeshManager {
     ) {
         profiling::scope!("MeshManager::fill");
 
-        let vertex_count = mesh.vertex_positions.len();
+        let vertex_count = mesh.vertex_count as usize;
         let index_count = mesh.indices.len();
 
         // This value is used later when setting joints, to make sure all indices are
         // in-bounds
-        let num_joints = mesh.vertex_joint_indices.iter().flatten().max().map_or(0, |i| i + 1);
+        // let num_joints = mesh.vertex_joint_indices.iter().flatten().max().map_or(0, |i| i + 1);
 
         // If vertex_count is 0, index_count _must_ also be 0, as all indices would be
         // out of range.
@@ -188,7 +119,7 @@ impl MeshManager {
         }
 
         let mut vertex_range = self.vertex_alloc.allocate_range(vertex_count).ok();
-        let mut index_range = self.index_alloc.allocate_range(index_count).ok();
+        let mut index_range = self.allocator.allocate_range(index_count * 4).ok();
 
         let needed = match (&vertex_range, &index_range) {
             (None, Some(_)) => Some((vertex_count, 0)),
@@ -453,186 +384,5 @@ impl MeshManager {
 
     fn index_count(&self) -> usize {
         self.index_alloc.initial_range().end
-    }
-}
-
-fn copy_to_new_buffers(
-    encoder: &mut CommandEncoder,
-    current_buffers: &MeshBuffers,
-    new_buffers: &MeshBuffers,
-    current_range: &Range<usize>,
-    new_range: &Range<usize>,
-) {
-    copy_vert(
-        encoder,
-        &current_buffers.vertex_position,
-        &new_buffers.vertex_position,
-        current_range,
-        new_range,
-        VERTEX_POSITION_SIZE,
-    );
-    copy_vert(
-        encoder,
-        &current_buffers.vertex_normal,
-        &new_buffers.vertex_normal,
-        current_range,
-        new_range,
-        VERTEX_NORMAL_SIZE,
-    );
-    copy_vert(
-        encoder,
-        &current_buffers.vertex_tangent,
-        &new_buffers.vertex_tangent,
-        current_range,
-        new_range,
-        VERTEX_TANGENT_SIZE,
-    );
-    copy_vert(
-        encoder,
-        &current_buffers.vertex_uv0,
-        &new_buffers.vertex_uv0,
-        current_range,
-        new_range,
-        VERTEX_UV_SIZE,
-    );
-    copy_vert(
-        encoder,
-        &current_buffers.vertex_uv1,
-        &new_buffers.vertex_uv1,
-        current_range,
-        new_range,
-        VERTEX_UV_SIZE,
-    );
-    copy_vert(
-        encoder,
-        &current_buffers.vertex_color,
-        &new_buffers.vertex_color,
-        current_range,
-        new_range,
-        VERTEX_COLOR_SIZE,
-    );
-    copy_vert(
-        encoder,
-        &current_buffers.vertex_joint_index,
-        &new_buffers.vertex_joint_index,
-        current_range,
-        new_range,
-        VERTEX_JOINT_INDEX_SIZE,
-    );
-    copy_vert(
-        encoder,
-        &current_buffers.vertex_joint_weight,
-        &new_buffers.vertex_joint_weight,
-        current_range,
-        new_range,
-        VERTEX_JOINT_WEIGHT_SIZE,
-    );
-}
-
-fn copy_vert(
-    encoder: &mut CommandEncoder,
-    src: &Buffer,
-    dst: &Buffer,
-    orig_vert_range: &Range<usize>,
-    new_vert_range: &Range<usize>,
-    size: usize,
-) {
-    let vert_copy_start = orig_vert_range.start * size;
-    let vert_copy_size = (orig_vert_range.end * size) - vert_copy_start;
-    let vert_output = new_vert_range.start * size;
-    encoder.copy_buffer_to_buffer(
-        src,
-        vert_copy_start as u64,
-        dst,
-        vert_output as u64,
-        vert_copy_size as u64,
-    );
-}
-
-fn create_buffers(device: &Device, vertex_count: usize, index_count: usize) -> MeshBuffers {
-    profiling::scope!("mesh buffers creation");
-
-    let position_bytes = vertex_count * VERTEX_POSITION_SIZE;
-    let normal_bytes = vertex_count * VERTEX_NORMAL_SIZE;
-    let tangent_bytes = vertex_count * VERTEX_TANGENT_SIZE;
-    let uv_bytes = vertex_count * VERTEX_UV_SIZE;
-    let color_bytes = vertex_count * VERTEX_COLOR_SIZE;
-    let joint_index_bytes = vertex_count * VERTEX_JOINT_INDEX_SIZE;
-    let joint_weight_bytes = vertex_count * VERTEX_JOINT_WEIGHT_SIZE;
-    let index_bytes = index_count * INDEX_SIZE;
-
-    let vertex_position = device.create_buffer(&BufferDescriptor {
-        label: Some("position vertex buffer"),
-        size: position_bytes as BufferAddress,
-        usage: BufferUsages::COPY_SRC | BufferUsages::COPY_DST | BufferUsages::VERTEX | BufferUsages::STORAGE,
-        mapped_at_creation: false,
-    });
-
-    let vertex_normal = device.create_buffer(&BufferDescriptor {
-        label: Some("normal vertex buffer"),
-        size: normal_bytes as BufferAddress,
-        usage: BufferUsages::COPY_SRC | BufferUsages::COPY_DST | BufferUsages::VERTEX | BufferUsages::STORAGE,
-        mapped_at_creation: false,
-    });
-
-    let vertex_tangent = device.create_buffer(&BufferDescriptor {
-        label: Some("tangent vertex buffer"),
-        size: tangent_bytes as BufferAddress,
-        usage: BufferUsages::COPY_SRC | BufferUsages::COPY_DST | BufferUsages::VERTEX | BufferUsages::STORAGE,
-        mapped_at_creation: false,
-    });
-
-    let vertex_uv0 = device.create_buffer(&BufferDescriptor {
-        label: Some("uv0 vertex buffer"),
-        size: uv_bytes as BufferAddress,
-        usage: BufferUsages::COPY_SRC | BufferUsages::COPY_DST | BufferUsages::VERTEX | BufferUsages::STORAGE,
-        mapped_at_creation: false,
-    });
-
-    let vertex_uv1 = device.create_buffer(&BufferDescriptor {
-        label: Some("uv1 vertex buffer"),
-        size: uv_bytes as BufferAddress,
-        usage: BufferUsages::COPY_SRC | BufferUsages::COPY_DST | BufferUsages::VERTEX | BufferUsages::STORAGE,
-        mapped_at_creation: false,
-    });
-
-    let vertex_color = device.create_buffer(&BufferDescriptor {
-        label: Some("color vertex buffer"),
-        size: color_bytes as BufferAddress,
-        usage: BufferUsages::COPY_SRC | BufferUsages::COPY_DST | BufferUsages::VERTEX | BufferUsages::STORAGE,
-        mapped_at_creation: false,
-    });
-
-    let vertex_joint_index = device.create_buffer(&BufferDescriptor {
-        label: Some("joint index vertex buffer"),
-        size: joint_index_bytes as BufferAddress,
-        usage: BufferUsages::COPY_SRC | BufferUsages::COPY_DST | BufferUsages::VERTEX | BufferUsages::STORAGE,
-        mapped_at_creation: false,
-    });
-
-    let vertex_joint_weight = device.create_buffer(&BufferDescriptor {
-        label: Some("joint weight vertex buffer"),
-        size: joint_weight_bytes as BufferAddress,
-        usage: BufferUsages::COPY_SRC | BufferUsages::COPY_DST | BufferUsages::VERTEX | BufferUsages::STORAGE,
-        mapped_at_creation: false,
-    });
-
-    let index = device.create_buffer(&BufferDescriptor {
-        label: Some("index buffer"),
-        size: index_bytes as BufferAddress,
-        usage: BufferUsages::COPY_SRC | BufferUsages::COPY_DST | BufferUsages::INDEX | BufferUsages::STORAGE,
-        mapped_at_creation: false,
-    });
-
-    MeshBuffers {
-        vertex_position,
-        vertex_normal,
-        vertex_tangent,
-        vertex_uv0,
-        vertex_uv1,
-        vertex_color,
-        vertex_joint_index,
-        vertex_joint_weight,
-        index,
     }
 }
