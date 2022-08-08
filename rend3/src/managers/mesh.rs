@@ -101,14 +101,11 @@ impl MeshManager {
         device: &Device,
         queue: &Queue,
         encoder: &mut CommandEncoder,
-        object_manager: &mut ObjectManager,
-        skeleton_manager: &mut SkeletonManager,
         handle: &MeshHandle,
         mesh: Mesh,
     ) {
         profiling::scope!("MeshManager::fill");
 
-        let vertex_count = mesh.vertex_count as usize;
         let index_count = mesh.indices.len();
 
         // If vertex_count is 0, index_count _must_ also be 0, as all indices would be
@@ -132,23 +129,11 @@ impl MeshManager {
 
         let mut vertex_attribute_ranges = Vec::with_capacity(mesh.attributes.len());
         for attribute in &mesh.attributes {
-            match self.allocator.allocate_range(attribute.bytes()) {
-                Ok(range) => {
-                    vertex_attribute_ranges.push((attribute.id(), range));
-                }
-                Err(..) => {
-                    todo!()
-                }
-            }
+            let range = self.allocate_range(device, encoder, attribute.bytes());
+            vertex_attribute_ranges.push((attribute.id(), range));
         }
 
-        let mut index_range = self.allocator.allocate_range(index_count as u64 * 4);
-        let index_range = match index_range {
-            Ok(range) => range,
-            Err(..) => {
-                todo!()
-            }
-        };
+        let index_range = self.allocate_range(device, encoder, index_count as u64 * 4);
 
         for (attribute_data, (_, range)) in mesh.attributes.iter().zip(&vertex_attribute_ranges) {
             queue.write_buffer(&self.buffer, range.start as u64, attribute_data.untyped_data());

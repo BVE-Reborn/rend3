@@ -6,13 +6,14 @@
 use std::{borrow::Cow, marker::PhantomData, mem, num::NonZeroU64};
 
 use arrayvec::ArrayVec;
+use encase::ShaderSize;
 use rend3::{
     format_sso,
     graph::{
         DataHandle, DepthHandle, RenderGraph, RenderPassDepthTarget, RenderPassTarget, RenderPassTargets,
         RenderTargetHandle,
     },
-    types::{Handedness, Material, SampleCount},
+    types::{Handedness, Material, MaterialTextureArray, SampleCount},
     util::{
         bind_merge::{BindGroupBuilder, BindGroupLayoutBuilder},
         math::round_up_pot,
@@ -96,8 +97,8 @@ impl<M: DepthRenderableMaterial> DepthRoutine<M> {
         let bg;
         if let Some(alpha) = M::ALPHA_CUTOUT {
             let abi = if renderer.profile == RendererProfile::GpuDriven {
-                let data_base_offset = round_up_pot(M::TEXTURE_COUNT * 4, 16);
-                let stride = data_base_offset + round_up_pot(M::DATA_SIZE, 16);
+                let data_base_offset = round_up_pot(M::TextureArrayType::COUNT * 4, 16);
+                let stride = data_base_offset + round_up_pot(M::DataType::SHADER_SIZE.get() as u32, 16);
 
                 AlphaDataAbi {
                     stride: stride / 4,
@@ -109,7 +110,7 @@ impl<M: DepthRenderableMaterial> DepthRoutine<M> {
                         .unwrap_or(0xFF_FF_FF_FF),
                 }
             } else {
-                let texture_enable_offset = round_up_pot(M::DATA_SIZE, 16);
+                let texture_enable_offset = round_up_pot(M::DataType::SHADER_SIZE.get() as u32, 16);
                 AlphaDataAbi {
                     stride: 0,
                     texture_offset: texture_enable_offset / 4,

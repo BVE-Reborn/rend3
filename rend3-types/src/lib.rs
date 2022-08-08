@@ -11,8 +11,9 @@ use std::{
     marker::PhantomData,
     mem::{self, size_of},
     num::NonZeroU32,
+    ops::Index,
     slice,
-    sync::{Arc, Weak}, ops::Index,
+    sync::{Arc, Weak},
 };
 use thiserror::Error;
 
@@ -883,12 +884,11 @@ pub trait Material: Send + Sync + 'static {
     /// objects with this key.
     fn object_key(&self) -> u64;
 
-    /// Fill up the given slice with textures.
-    fn to_textures<'a>(&'a self) -> Self::TextureArrayType;
+    /// The array of textures that should be bound.
+    fn to_textures(&self) -> Self::TextureArrayType;
 
-    /// Fill up the given slice with binary material data. This can be whatever
-    /// data a shader expects.
-    fn to_data(&self, slice: &mut [u8]);
+    /// Fill up the given slice with data. This can be whatever data the shader expects.
+    fn to_data(&self) -> Self::DataType;
 }
 
 /// Source of a mesh for an object.

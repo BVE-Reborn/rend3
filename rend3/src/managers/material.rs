@@ -1,7 +1,7 @@
 use crate::{
     managers::{ObjectManager, TextureManager},
     profile::ProfileData,
-    types::{MaterialHandle, TextureHandle},
+    types::{MaterialHandle},
     util::{
         bind_merge::{BindGroupBuilder, BindGroupLayoutBuilder},
         buffer::WrappedPotBuffer,
@@ -11,8 +11,9 @@ use crate::{
     },
     RendererProfile,
 };
+use encase::{ShaderSize, StorageBuffer};
 use list_any::VecAny;
-use rend3_types::{Material, MaterialTag, RawMaterialHandle, RawObjectHandle};
+use rend3_types::{Material, MaterialTag, MaterialTextureArray, RawMaterialHandle, RawObjectHandle, RawTextureHandle};
 use std::{
     any::TypeId,
     num::{NonZeroU32, NonZeroU64},
@@ -40,8 +41,8 @@ struct PerTypeInfo {
     bgl: ProfileData<BindGroupLayout, ()>,
     data_size: u32,
     texture_count: u32,
-    write_gpu_materials_fn: fn(&mut [u8], &VecAny, &mut (dyn FnMut(&TextureHandle) -> NonZeroU32 + '_)) -> usize,
-    get_material_key: fn(vec_any: &VecAny, usize) -> MaterialKeyPair,
+    write_gpu_materials_fn: fn(&mut [u8], &VecAny, &mut (dyn FnMut(RawTextureHandle) -> NonZeroU32 + '_)) -> usize,
+    get_material_key: fn(&VecAny, usize) -> MaterialKeyPair,
 }
 
 /// Key which determine's an object's archetype.
@@ -113,7 +114,7 @@ impl MaterialManager {
                         count: None,
                     };
 
-                    let mut entries: Vec<_> = Vec::with_capacity(M::TEXTURE_COUNT as usize);
+                    let mut entries: Vec<_> = Vec::with_capacity(M::TextureArrayType::COUNT as usize);
                     entries.push(BindGroupLayoutEntry {
                         binding: 0,
                         visibility: ShaderStages::VERTEX_FRAGMENT,
@@ -121,12 +122,13 @@ impl MaterialManager {
                             ty: BufferBindingType::Storage { read_only: true },
                             has_dynamic_offset: false,
                             min_binding_size: NonZeroU64::new(
-                                (round_up_pot(M::DATA_SIZE, 16) + round_up_pot(TEXTURE_MASK_SIZE, 16)) as _,
+                                (round_up_pot(M::DataType::SHADER_SIZE.get() as u32, 16)
+                                    + round_up_pot(TEXTURE_MASK_SIZE, 16)) as _,
                             ),
                         },
                         count: None,
                     });
-                    entries.extend((0..M::TEXTURE_COUNT).map(texture_binding));
+                    entries.extend((0..M::TextureArrayType::COUNT).map(texture_binding));
                     device.create_bind_group_layout(&BindGroupLayoutDescriptor {
                         label: Some("cpu material bgl"),
                         entries: &entries,
@@ -142,8 +144,8 @@ impl MaterialManager {
 
         self.type_info.entry(ty).or_insert_with(|| PerTypeInfo {
             bgl: create_bgl(),
-            data_size: M::DATA_SIZE,
-            texture_count: M::TEXTURE_COUNT,
+            data_size: M::DataType::SHADER_SIZE.get() as _,
+            texture_count: M::TextureArrayType::COUNT,
             write_gpu_materials_fn: write_gpu_materials::<M>,
             get_material_key: get_material_key::<M>,
         })
@@ -163,14 +165,15 @@ impl MaterialManager {
         let type_info = self.ensure_archetype_inner::<M>(device, profile);
 
         let (bind_group, material_buffer) = if profile == RendererProfile::CpuDriven {
-            let mut textures = vec![None; M::TEXTURE_COUNT as usize];
-            material.to_textures(&mut textures);
+            let textures = material.to_textures();
 
             // TODO(material): stack allocation
-            let material_uprounded = round_up_pot(M::DATA_SIZE, 16) as usize;
+            let material_uprounded = round_up_pot(M::DataType::SHADER_SIZE.get(), 16) as usize;
             let actual_size = material_uprounded + round_up_pot(TEXTURE_MASK_SIZE, 16) as usize;
             let mut data = vec![0u8; actual_size as usize];
-            material.to_data(&mut data[..M::DATA_SIZE as usize]);
+            StorageBuffer::new(&mut data[..M::DataType::SHADER_SIZE.get() as usize])
+                .write(&material.to_data())
+                .unwrap();
 
             let material_buffer = device.create_buffer(&BufferDescriptor {
                 label: None,
@@ -296,7 +299,8 @@ impl MaterialManager {
                 ty: BufferBindingType::Storage { read_only: true },
                 has_dynamic_offset: false,
                 min_binding_size: NonZeroU64::new(
-                    (round_up_pot(M::TEXTURE_COUNT * 4, 16) + round_up_pot(M::DATA_SIZE, 16)) as _,
+                    (round_up_pot(M::TextureArrayType::COUNT * 4, 16)
+                        + round_up_pot(M::DataType::SHADER_SIZE.get() as u32, 16)) as _,
                 ),
             },
             None,
@@ -408,30 +412,27 @@ impl MaterialManager {
 fn write_gpu_materials<M: Material>(
     dest: &mut [u8],
     vec_any: &VecAny,
-    translation_fn: &mut (dyn FnMut(&TextureHandle) -> NonZeroU32 + '_),
+    translation_fn: &mut (dyn FnMut(RawTextureHandle) -> NonZeroU32 + '_),
 ) -> usize {
     let materials = vec_any.downcast_slice::<M>().unwrap();
 
     let mut offset = 0_usize;
 
-    let texture_bytes = (M::TEXTURE_COUNT * 4) as usize;
+    let texture_bytes = (M::TextureArrayType::COUNT * 4) as usize;
     let mat_size = round_up_pot(texture_bytes, 16);
-    let data_size = round_up_pot(M::DATA_SIZE, 16) as usize;
-
-    // Temporary buffer to store the texture handle references in.
-    let mut texture_ref_tmp = vec![None; M::TEXTURE_COUNT as usize];
+    let data_size = round_up_pot(M::DataType::SHADER_SIZE.get(), 16) as usize;
 
     for mat in materials {
         // If we have no textures, we should skip this operation as the cast_slice_mut
         // will fail
         if mat_size != 0 {
             // Get the texture handles from the material
-            mat.to_textures(&mut texture_ref_tmp);
+            let texture_refs = mat.to_textures();
 
             // Translate them and write them into the slice.
             let texture_slice = bytemuck::cast_slice_mut(&mut dest[offset..offset + texture_bytes]);
-            for (idx, tex) in texture_ref_tmp.iter_mut().enumerate() {
-                texture_slice[idx] = tex.take().map(|tex| translation_fn(tex));
+            for (idx, tex) in texture_refs.into_iter().enumerate() {
+                texture_slice[idx] = tex.map(|tex| translation_fn(tex));
             }
 
             offset += mat_size;
@@ -439,7 +440,11 @@ fn write_gpu_materials<M: Material>(
 
         // If we have no data, skip calling the material for data.
         if data_size != 0 {
-            mat.to_data(&mut dest[offset..offset + M::DATA_SIZE as usize]);
+            let data = mat.to_data();
+
+            StorageBuffer::new(&mut dest[offset..offset + M::DataType::SHADER_SIZE.get() as usize])
+                .write(&data)
+                .unwrap();
 
             offset += data_size;
         }

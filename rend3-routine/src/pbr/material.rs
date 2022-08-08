@@ -1,9 +1,8 @@
 //! Types which make up `rend3-routine`'s material [`PbrMaterial`]
 
-use std::mem;
-
-use glam::{Mat3, Mat3A, Vec3, Vec4};
-use rend3::types::{Material, TextureHandle};
+use encase::{ShaderType};
+use glam::{Mat3, Vec3, Vec4};
+use rend3::types::{Material, RawTextureHandle, TextureHandle};
 
 use crate::{
     common::Sorting,
@@ -12,7 +11,7 @@ use crate::{
 
 bitflags::bitflags! {
     /// Flags which shaders use to determine properties of a material
-    #[derive(Default)]
+    #[derive(Default, ShaderType)]
     pub struct MaterialFlags : u32 {
         const ALBEDO_ACTIVE =       0b0000_0000_0000_0001;
         const ALBEDO_BLEND =        0b0000_0000_0000_0010;
@@ -514,28 +513,31 @@ pub struct PbrMaterial {
 }
 
 impl Material for PbrMaterial {
-    const TEXTURE_COUNT: u32 = 10;
-    const DATA_SIZE: u32 = mem::size_of::<ShaderMaterial>() as _;
+    type DataType = ShaderMaterial;
+    type TextureArrayType = [Option<RawTextureHandle>; 10];
 
     fn object_key(&self) -> u64 {
         TransparencyType::from(self.transparency) as u64
     }
 
-    fn to_textures<'a>(&'a self, slice: &mut [Option<&'a TextureHandle>]) {
-        slice[0] = self.albedo.to_texture();
-        slice[1] = self.normal.to_texture();
-        slice[2] = self.aomr_textures.to_roughness_texture();
-        slice[3] = self.aomr_textures.to_metallic_texture();
-        slice[4] = self.reflectance.to_texture();
-        slice[5] = self.clearcoat_textures.to_clearcoat_texture();
-        slice[6] = self.clearcoat_textures.to_clearcoat_roughness_texture();
-        slice[7] = self.emissive.to_texture();
-        slice[8] = self.anisotropy.to_texture();
-        slice[9] = self.aomr_textures.to_ao_texture();
+    fn to_textures<'a>(&'a self) -> Self::TextureArrayType {
+        [
+            self.albedo.to_texture(),
+            self.normal.to_texture(),
+            self.aomr_textures.to_roughness_texture(),
+            self.aomr_textures.to_metallic_texture(),
+            self.reflectance.to_texture(),
+            self.clearcoat_textures.to_clearcoat_texture(),
+            self.clearcoat_textures.to_clearcoat_roughness_texture(),
+            self.emissive.to_texture(),
+            self.anisotropy.to_texture(),
+            self.aomr_textures.to_ao_texture(),
+        ]
+        .map(|opt| opt.map(|r| r.get_raw()))
     }
 
-    fn to_data(&self, slice: &mut [u8]) {
-        slice.copy_from_slice(bytemuck::bytes_of(&ShaderMaterial::from_material(self)));
+    fn to_data(&self) -> Self::DataType {
+        ShaderMaterial::from_material(self)
     }
 }
 
@@ -554,10 +556,10 @@ fn cutout_offset() {
 }
 
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone)]
+#[derive(Debug, Default, Copy, Clone, ShaderType)]
 struct ShaderMaterial {
-    uv_transform0: Mat3A,
-    uv_transform1: Mat3A,
+    uv_transform0: Mat3,
+    uv_transform1: Mat3,
 
     albedo: Vec4,
     emissive: Vec3,
