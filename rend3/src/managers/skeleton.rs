@@ -3,10 +3,7 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 
-use crate::{
-    managers::{MeshManager, ObjectManager},
-    util::registry::ResourceRegistry,
-};
+use crate::{managers::MeshManager, util::registry::ResourceRegistry};
 
 use arrayvec::ArrayVec;
 use glam::Mat4;
@@ -65,7 +62,6 @@ impl SkeletonManager {
         device: &Device,
         encoder: &mut CommandEncoder,
         mesh_manager: &mut MeshManager,
-        object_manager: &mut ObjectManager,
         handle: &SkeletonHandle,
         skeleton: Skeleton,
     ) {

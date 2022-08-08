@@ -1,5 +1,4 @@
 use crate::{
-    managers::{ObjectManager, SkeletonManager},
     types::{Mesh, MeshHandle},
     util::{frustum::BoundingSphere, registry::ResourceRegistry},
 };

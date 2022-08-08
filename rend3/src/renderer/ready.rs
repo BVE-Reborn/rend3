@@ -49,7 +49,6 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
                         &renderer.device,
                         &mut encoder,
                         &mut data_core.mesh_manager,
-                        &mut data_core.object_manager,
                         &handle,
                         skeleton,
                     );
