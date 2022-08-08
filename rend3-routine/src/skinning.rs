@@ -3,10 +3,7 @@ use std::{borrow::Cow, mem, num::NonZeroU64};
 use glam::{Mat4, UVec2};
 use rend3::{
     graph::{DataHandle, RenderGraph},
-    managers::{
-        MeshBuffers, SkeletonManager, VERTEX_JOINT_INDEX_SIZE, VERTEX_JOINT_WEIGHT_SIZE, VERTEX_NORMAL_SIZE,
-        VERTEX_POSITION_SIZE, VERTEX_TANGENT_SIZE,
-    },
+    managers::SkeletonManager,
     util::{
         bind_merge::{BindGroupBuilder, BindGroupLayoutBuilder},
         math::round_up_div,

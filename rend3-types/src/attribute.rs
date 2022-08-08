@@ -5,11 +5,17 @@ use bytemuck::Pod;
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct VertexAttributeId(usize);
 
-pub struct VertexAttribute<T> {
+pub struct VertexAttribute<T>
+where
+    T: VertexFormat,
+{
     name: &'static str,
     _phantom: PhantomData<T>,
 }
-impl<T> VertexAttribute<T> {
+impl<T> VertexAttribute<T>
+where
+    T: VertexFormat,
+{
     pub const fn new(name: &'static str) -> Self {
         Self {
             name,
@@ -44,4 +50,12 @@ impl VertexFormat for glam::Vec4 {
     const SIZE: u32 = 16;
 }
 
-pub static VERTEX_ATTRIBUTE_POSITION: VertexAttribute<glam::Vec3> = VertexAttribute::new("positions");
+impl VertexFormat for [u16; 4] {
+    const SIZE: u32 = 8;
+}
+
+pub static VERTEX_ATTRIBUTE_POSITION: VertexAttribute<glam::Vec3> = VertexAttribute::new("position");
+pub static VERTEX_ATTRIBUTE_NORMAL: VertexAttribute<glam::Vec3> = VertexAttribute::new("normal");
+pub static VERTEX_ATTRIBUTE_TANGENT: VertexAttribute<glam::Vec3> = VertexAttribute::new("tangent");
+pub static VERTEX_ATTRIBUTE_JOINT_INDICES: VertexAttribute<[u16; 4]> = VertexAttribute::new("joint indices");
+pub static VERTEX_ATTRIBUTE_JOINT_WEIGHTS: VertexAttribute<glam::Vec4> = VertexAttribute::new("joint weights");

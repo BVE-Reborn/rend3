@@ -37,6 +37,7 @@ arrayvec = "0.7"
 bitflags = "1"
 bumpalo = "3"
 bytemuck = "1"
+encase = { version = "0.3" }
 flume = "0.10"
 glam = { version = "0.21.2", features = ["bytemuck"] }
 handlebars = "4"

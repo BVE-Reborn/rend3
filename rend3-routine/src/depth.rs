@@ -28,7 +28,7 @@ use wgpu::{
 };
 
 use crate::{
-    common::{PerMaterialArchetypeInterface, WholeFrameInterfaces, CPU_VERTEX_BUFFERS, GPU_VERTEX_BUFFERS},
+    common::{PerMaterialArchetypeInterface, WholeFrameInterfaces},
     culling::{self, PerMaterialArchetypeData},
 };
 

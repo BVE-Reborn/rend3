@@ -48,5 +48,6 @@ lto = "thin"
 # wgpu-core = { path = "../wgpu/wgpu-core" }
 # wgpu-hal = { path = "../wgpu/wgpu-hal" }
 # wgpu-types = { path = "../wgpu/wgpu-types" }
+range-alloc = { git = "https://github.com/expenses/gfx.git", rev = "6afbeb6d9733e295404f4fe0ac936591e277a26e" }
 
 gltf = { git = "https://github.com/gltf-rs/gltf.git", rev = "7031e7a8ec7c991b1b1d29eaf7c531c6f4842083" }

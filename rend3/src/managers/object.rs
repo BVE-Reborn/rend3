@@ -73,39 +73,41 @@ impl ObjectManager {
         skeleton_manager: &SkeletonManager,
         material_manager: &mut MaterialManager,
     ) {
-        let (internal_mesh, vertex_range) = match &object.mesh_kind {
-            ObjectMeshKind::Animated(skeleton) => {
-                let skeleton = skeleton_manager.internal_data(skeleton.get_raw());
-                let mesh = mesh_manager.internal_data_mut(skeleton.mesh_handle.get_raw());
-                (mesh, skeleton.skeleton_vertex_range.clone())
-            }
-            ObjectMeshKind::Static(mesh) => {
-                let mesh = mesh_manager.internal_data_mut(mesh.get_raw());
-                let vertex_range = mesh.vertex_range.clone();
-                (mesh, vertex_range)
-            }
-        };
-        let bounding_sphere = internal_mesh.bounding_sphere;
-        let index_range = internal_mesh.index_range.clone();
+        // let (internal_mesh, vertex_range) = match &object.mesh_kind {
+        //     ObjectMeshKind::Animated(skeleton) => {
+        //         let skeleton = skeleton_manager.internal_data(skeleton.get_raw());
+        //         let mesh = mesh_manager.internal_data_mut(skeleton.mesh_handle.get_raw());
+        //         (mesh, skeleton.skeleton_vertex_range.clone())
+        //     }
+        //     ObjectMeshKind::Static(mesh) => {
+        //         let mesh = mesh_manager.internal_data_mut(mesh.get_raw());
+        //         let vertex_range = mesh.vertex_range.clone();
+        //         (mesh, vertex_range)
+        //     }
+        // };
+        // let bounding_sphere = internal_mesh.bounding_sphere;
+        // let index_range = internal_mesh.index_range.clone();
 
-        let (material_key, object_list) = material_manager.get_material_key_and_objects(object.material.get_raw());
-        object_list.push(handle.get_raw());
+        // let (material_key, object_list) = material_manager.get_m0aterial_key_and_objects(object.material.get_raw());
+        // object_list.push(handle.get_raw());
 
-        let shader_object = InternalObject {
-            location: object.transform.transform_point3a(Vec3A::ZERO),
-            input: GpuCullingInput {
-                material_index: material_manager.get_internal_index(object.material.get_raw()) as u32,
-                transform: object.transform,
-                bounding_sphere,
-                start_idx: index_range.start as u32,
-                count: (index_range.end - index_range.start) as u32,
-                vertex_offset: vertex_range.start as i32,
-            },
-            material_handle: object.material,
-            mesh_kind: object.mesh_kind,
-        };
+        // let shader_object = InternalObject {
+        //     location: object.transform.transform_point3a(Vec3A::ZERO),
+        //     input: GpuCullingInput {
+        //         material_index: material_manager.get_internal_index(object.material.get_raw()) as u32,
+        //         transform: object.transform,
+        //         bounding_sphere,
+        //         start_idx: index_range.start as u32,
+        //         count: (index_range.end - index_range.start) as u32,
+        //         vertex_offset: vertex_range.start as i32,
+        //     },
+        //     material_handle: object.material,
+        //     mesh_kind: object.mesh_kind,
+        // };
 
-        self.registry.insert(handle, shader_object, material_key);
+        // self.registry.insert(handle, shader_object, material_key);
+
+        todo!()
     }
 
     pub fn ready(&mut self, material_manager: &mut MaterialManager) {
@@ -123,29 +125,6 @@ impl ObjectManager {
     pub fn set_material_index(&mut self, handle: RawObjectHandle, index: usize) {
         let object = self.registry.get_value_mut(handle);
         object.input.material_index = index as u32;
-    }
-
-    /// Objects contain cached data that stores vertex ranges for the gpu
-    /// culling calls. When the vertex buffers are reallocated all this data is
-    /// invalidated. This function needs to be called to fix it.
-    pub fn fix_objects_after_realloc(&mut self, mesh_manager: &MeshManager, skeleton_manager: &SkeletonManager) {
-        for object in self.registry.iter_all_values_mut() {
-            match &object.mesh_kind {
-                ObjectMeshKind::Animated(skeleton_handle) => {
-                    let skeleton = skeleton_manager.internal_data(skeleton_handle.get_raw());
-                    let mesh = mesh_manager.internal_data(skeleton.mesh_handle.get_raw());
-                    object.input.start_idx = mesh.index_range.start as u32;
-                    object.input.count = mesh.index_range.len() as u32;
-                    object.input.vertex_offset = skeleton.skeleton_vertex_range.start as i32;
-                }
-                ObjectMeshKind::Static(mesh_handle) => {
-                    let mesh = mesh_manager.internal_data(mesh_handle.get_raw());
-                    object.input.start_idx = mesh.index_range.start as u32;
-                    object.input.count = mesh.index_range.len() as u32;
-                    object.input.vertex_offset = mesh.vertex_range.start as i32;
-                }
-            }
-        }
     }
 
     pub fn set_key(&mut self, handle: RawObjectHandle, key: MaterialKeyPair) {

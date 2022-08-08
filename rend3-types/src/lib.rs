@@ -11,7 +11,8 @@ use std::{
     marker::PhantomData,
     mem::{self, size_of},
     num::NonZeroU32,
-    sync::{Arc, Weak},
+    slice,
+    sync::{Arc, Weak}, ops::Index,
 };
 use thiserror::Error;
 
@@ -19,7 +20,10 @@ use thiserror::Error;
 pub use glam;
 
 mod attribute;
-pub use attribute::{VertexAttribute, VertexAttributeId, VertexFormat, VERTEX_ATTRIBUTE_POSITION};
+pub use attribute::{
+    VertexAttribute, VertexAttributeId, VertexFormat, VERTEX_ATTRIBUTE_JOINT_INDICES, VERTEX_ATTRIBUTE_JOINT_WEIGHTS,
+    VERTEX_ATTRIBUTE_NORMAL, VERTEX_ATTRIBUTE_POSITION, VERTEX_ATTRIBUTE_TANGENT,
+};
 
 /// Non-owning resource handle.
 ///
@@ -238,22 +242,44 @@ pub enum MeshValidationError {
 pub struct StoredVertexAttributeData {
     id: VertexAttributeId,
     data: VecAny,
-    ptr: *const (),
-    bytes: usize,
+    ptr: *const u8,
+    bytes: u64,
 }
 impl StoredVertexAttributeData {
     pub fn new<T>(attribute: &'static VertexAttribute<T>, data: Vec<T>) -> Self
     where
         T: VertexFormat,
     {
-        let bytes = data.len() * size_of::<T>();
-        let ptr = data.as_ptr() as *const ();
+        let bytes = (data.len() * size_of::<T>()) as u64;
+        let ptr = data.as_ptr() as *const u8;
         Self {
             id: attribute.id(),
             data: VecAny::from(data),
             ptr,
             bytes,
         }
+    }
+
+    pub fn id(&self) -> VertexAttributeId {
+        self.id
+    }
+
+    pub fn bytes(&self) -> u64 {
+        self.bytes
+    }
+
+    pub fn untyped_data(&self) -> &[u8] {
+        // SAFETY: the pointer is to the vector's allocation which is still live and will be for the length of 'self.
+        //         the length is the exact byte length of the allocation.
+        unsafe { slice::from_raw_parts(self.ptr, self.bytes as usize) }
+    }
+
+    /// Gets the typed data if the attributes match ids and have the same types.
+    pub fn typed_data<T: VertexFormat>(&self, attribute: &'static VertexAttribute<T>) -> Option<&[T]> {
+        if attribute.id() != self.id {
+            return None;
+        }
+        self.data.downcast_slice::<T>()
     }
 }
 
@@ -817,6 +843,15 @@ pub struct TextureFromTexture {
 #[doc(hidden)]
 pub struct MaterialTag;
 
+/// Trait that abstracts over all possible arrays of optional raw texture handles.
+pub trait MaterialTextureArray: IntoIterator<Item = Option<RawTextureHandle>> {
+    const COUNT: u32;
+}
+
+impl<const C: usize> MaterialTextureArray for [Option<RawTextureHandle>; C] {
+    const COUNT: u32 = C as u32;
+}
+
 /// Interface that all materials must use.
 ///
 /// The material will provide a set of textures, and a pile of bytes. It will
@@ -840,10 +875,8 @@ pub struct MaterialTag;
 ///   - Padding to 16 byte alignemnet.
 ///   - The data provided by the material.
 pub trait Material: Send + Sync + 'static {
-    /// The texture count that will be provided to `to_textures`.
-    const TEXTURE_COUNT: u32;
-    /// The amount of data that will be provided to `to_data`.
-    const DATA_SIZE: u32;
+    type DataType: encase::ShaderSize + encase::internal::WriteInto;
+    type TextureArrayType: MaterialTextureArray;
 
     /// u64 key that determine's an object's archetype. When you query for
     /// objects from the object manager, you must provide this key to get all
@@ -851,7 +884,7 @@ pub trait Material: Send + Sync + 'static {
     fn object_key(&self) -> u64;
 
     /// Fill up the given slice with textures.
-    fn to_textures<'a>(&'a self, slice: &mut [Option<&'a TextureHandle>]);
+    fn to_textures<'a>(&'a self) -> Self::TextureArrayType;
 
     /// Fill up the given slice with binary material data. This can be whatever
     /// data a shader expects.
