@@ -31,13 +31,9 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
                     data_core
                         .profiler
                         .begin_scope("Add Mesh", &mut encoder, &renderer.device);
-                    data_core.mesh_manager.fill(
-                        &renderer.device,
-                        &renderer.queue,
-                        &mut encoder,
-                        &handle,
-                        mesh,
-                    );
+                    data_core
+                        .mesh_manager
+                        .fill(&renderer.device, &renderer.queue, &mut encoder, &handle, mesh);
                     data_core.profiler.end_scope(&mut encoder);
                 }
                 InstructionKind::AddSkeleton { handle, skeleton } => {

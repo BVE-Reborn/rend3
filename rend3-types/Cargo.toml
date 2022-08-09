@@ -17,5 +17,6 @@ bytemuck = "1"
 encase = { version = "0.3", features = ["glam"] }
 glam = { version = "0.21.2", features = ["bytemuck"] }
 list-any = "0.2"
+once_cell = "1"
 thiserror = "1"
 wgt = { package = "wgpu-types", version = "0.13" }

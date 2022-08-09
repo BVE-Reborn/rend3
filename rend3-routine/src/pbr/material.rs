@@ -1,8 +1,11 @@
 //! Types which make up `rend3-routine`'s material [`PbrMaterial`]
 
-use encase::{ShaderType};
+use encase::ShaderType;
 use glam::{Mat3, Vec3, Vec4};
-use rend3::types::{Material, RawTextureHandle, TextureHandle};
+use rend3::types::{
+    Material, RawTextureHandle, TextureHandle, VertexAttributeId, VERTEX_ATTRIBUTE_NORMAL, VERTEX_ATTRIBUTE_POSITION,
+    VERTEX_ATTRIBUTE_TANGENT,
+};
 
 use crate::{
     common::Sorting,
@@ -515,6 +518,20 @@ pub struct PbrMaterial {
 impl Material for PbrMaterial {
     type DataType = ShaderMaterial;
     type TextureArrayType = [Option<RawTextureHandle>; 10];
+    type RequredAttributeArrayType = [&'static VertexAttributeId; 3];
+    type SupportedAttributeArrayType = [&'static VertexAttributeId; 3];
+
+    fn required_attributes() -> Self::RequredAttributeArrayType {
+        [
+            &VERTEX_ATTRIBUTE_POSITION,
+            &VERTEX_ATTRIBUTE_NORMAL,
+            &VERTEX_ATTRIBUTE_TANGENT,
+        ]
+    }
+
+    fn supported_attributes() -> Self::SupportedAttributeArrayType {
+        Self::required_attributes()
+    }
 
     fn object_key(&self) -> u64 {
         TransparencyType::from(self.transparency) as u64

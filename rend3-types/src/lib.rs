@@ -11,7 +11,7 @@ use std::{
     marker::PhantomData,
     mem::{self, size_of},
     num::NonZeroU32,
-    ops::Index,
+    ops::{Deref, Index},
     slice,
     sync::{Arc, Weak},
 };
@@ -65,7 +65,7 @@ impl<T> Eq for RawResourceHandle<T> {}
 /// Owning resource handle. Used as part of rend3's interface.
 pub struct ResourceHandle<T> {
     refcount: Arc<()>,
-    idx: usize,
+    raw: RawResourceHandle<T>,
     _phantom: PhantomData<T>,
 }
 
@@ -73,7 +73,7 @@ impl<T> Debug for ResourceHandle<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ResourceHandle")
             .field("refcount", &Arc::strong_count(&self.refcount))
-            .field("idx", &self.idx)
+            .field("idx", &self.raw.idx)
             .finish()
     }
 }
@@ -82,7 +82,7 @@ impl<T> Clone for ResourceHandle<T> {
     fn clone(&self) -> Self {
         Self {
             refcount: self.refcount.clone(),
-            idx: self.idx,
+            raw: self.raw,
             _phantom: self._phantom,
         }
     }
@@ -90,7 +90,7 @@ impl<T> Clone for ResourceHandle<T> {
 
 impl<T> PartialEq for ResourceHandle<T> {
     fn eq(&self, other: &Self) -> bool {
-        self.idx == other.idx
+        self.raw.idx == other.raw.idx
     }
 }
 
@@ -98,7 +98,7 @@ impl<T> Eq for ResourceHandle<T> {}
 
 impl<T> Hash for ResourceHandle<T> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.idx.hash(state);
+        self.raw.idx.hash(state);
     }
 }
 
@@ -109,7 +109,10 @@ impl<T> ResourceHandle<T> {
     pub fn new(idx: usize) -> Self {
         Self {
             refcount: Arc::new(()),
-            idx,
+            raw: RawResourceHandle {
+                idx,
+                _phantom: PhantomData,
+            },
             _phantom: PhantomData,
         }
     }
@@ -118,10 +121,7 @@ impl<T> ResourceHandle<T> {
     ///
     /// Part of rend3's internal interface for accessing internal resrouces
     pub fn get_raw(&self) -> RawResourceHandle<T> {
-        RawResourceHandle {
-            idx: self.idx,
-            _phantom: PhantomData,
-        }
+        self.raw
     }
 
     /// Get the weak refcount for this owned handle.
@@ -129,6 +129,14 @@ impl<T> ResourceHandle<T> {
     /// Part of rend3's internal interface.
     pub fn get_weak_refcount(&self) -> Weak<()> {
         Arc::downgrade(&self.refcount)
+    }
+}
+
+impl<T> Deref for ResourceHandle<T> {
+    type Target = RawResourceHandle<T>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.raw
     }
 }
 
@@ -845,11 +853,11 @@ pub struct TextureFromTexture {
 pub struct MaterialTag;
 
 /// Trait that abstracts over all possible arrays of optional raw texture handles.
-pub trait MaterialTextureArray: IntoIterator<Item = Option<RawTextureHandle>> {
+pub trait MaterialArray<T>: IntoIterator<Item = T> + AsRef<[T]> {
     const COUNT: u32;
 }
 
-impl<const C: usize> MaterialTextureArray for [Option<RawTextureHandle>; C] {
+impl<const C: usize, T> MaterialArray<T> for [T; C] {
     const COUNT: u32 = C as u32;
 }
 
@@ -877,7 +885,12 @@ impl<const C: usize> MaterialTextureArray for [Option<RawTextureHandle>; C] {
 ///   - The data provided by the material.
 pub trait Material: Send + Sync + 'static {
     type DataType: encase::ShaderSize + encase::internal::WriteInto;
-    type TextureArrayType: MaterialTextureArray;
+    type TextureArrayType: MaterialArray<Option<RawTextureHandle>>;
+    type RequredAttributeArrayType: MaterialArray<&'static VertexAttributeId>;
+    type SupportedAttributeArrayType: MaterialArray<&'static VertexAttributeId>;
+
+    fn required_attributes() -> Self::RequredAttributeArrayType;
+    fn supported_attributes() -> Self::SupportedAttributeArrayType;
 
     /// u64 key that determine's an object's archetype. When you query for
     /// objects from the object manager, you must provide this key to get all

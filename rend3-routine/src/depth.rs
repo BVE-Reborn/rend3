@@ -13,7 +13,7 @@ use rend3::{
         DataHandle, DepthHandle, RenderGraph, RenderPassDepthTarget, RenderPassTarget, RenderPassTargets,
         RenderTargetHandle,
     },
-    types::{Handedness, Material, MaterialTextureArray, SampleCount},
+    types::{Handedness, Material, MaterialArray, SampleCount},
     util::{
         bind_merge::{BindGroupBuilder, BindGroupLayoutBuilder},
         math::round_up_pot,
@@ -209,8 +209,6 @@ impl<M: DepthRenderableMaterial> DepthRoutine<M> {
                 (true, SampleCount::Four) => this.pipelines.prepass_cutout_s4.as_ref().unwrap(),
             };
 
-            graph_data.mesh_manager.buffers().bind(rpass);
-
             rpass.set_pipeline(pipeline);
             rpass.set_bind_group(0, forward_uniform_bg, &[]);
             rpass.set_bind_group(1, &culled.per_material, &[]);
@@ -273,7 +271,6 @@ impl<M: DepthRenderableMaterial> DepthRoutine<M> {
                 true => this.pipelines.shadow_cutout_s1.as_ref().unwrap(),
             };
 
-            graph_data.mesh_manager.buffers().bind(rpass);
             rpass.set_pipeline(pipeline);
             rpass.set_bind_group(0, shadow_uniform, &[]);
             rpass.set_bind_group(1, &culled.per_material, &[]);
@@ -463,10 +460,7 @@ fn create_depth_inner(
         vertex: VertexState {
             module: sm,
             entry_point: vert,
-            buffers: match renderer.profile {
-                RendererProfile::CpuDriven => &CPU_VERTEX_BUFFERS,
-                RendererProfile::GpuDriven => &GPU_VERTEX_BUFFERS,
-            },
+            buffers: &[],
         },
         primitive: PrimitiveState {
             topology: PrimitiveTopology::TriangleList,

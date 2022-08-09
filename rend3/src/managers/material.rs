@@ -1,7 +1,7 @@
 use crate::{
     managers::{ObjectManager, TextureManager},
     profile::ProfileData,
-    types::{MaterialHandle},
+    types::MaterialHandle,
     util::{
         bind_merge::{BindGroupBuilder, BindGroupLayoutBuilder},
         buffer::WrappedPotBuffer,
@@ -13,7 +13,9 @@ use crate::{
 };
 use encase::{ShaderSize, StorageBuffer};
 use list_any::VecAny;
-use rend3_types::{Material, MaterialTag, MaterialTextureArray, RawMaterialHandle, RawObjectHandle, RawTextureHandle};
+use rend3_types::{
+    Material, MaterialArray, MaterialTag, RawMaterialHandle, RawObjectHandle, RawTextureHandle, VertexAttributeId,
+};
 use std::{
     any::TypeId,
     num::{NonZeroU32, NonZeroU64},
@@ -43,6 +45,7 @@ struct PerTypeInfo {
     texture_count: u32,
     write_gpu_materials_fn: fn(&mut [u8], &VecAny, &mut (dyn FnMut(RawTextureHandle) -> NonZeroU32 + '_)) -> usize,
     get_material_key: fn(&VecAny, usize) -> MaterialKeyPair,
+    get_attributes: fn(&mut dyn FnMut(&[&'static VertexAttributeId], &[&'static VertexAttributeId])),
 }
 
 /// Key which determine's an object's archetype.
@@ -148,6 +151,7 @@ impl MaterialManager {
             texture_count: M::TextureArrayType::COUNT,
             write_gpu_materials_fn: write_gpu_materials::<M>,
             get_material_key: get_material_key::<M>,
+            get_attributes: get_attributes::<M>,
         })
     }
 
@@ -346,6 +350,17 @@ impl MaterialManager {
         &mut arch.non_erased[index].inner.objects
     }
 
+    pub fn get_attributes(
+        &self,
+        handle: RawMaterialHandle,
+        mut callback: impl FnMut(&[&'static VertexAttributeId], &[&'static VertexAttributeId]),
+    ) {
+        let ty = self.registry.get_type_id(handle);
+        let type_info = &self.type_info[&ty];
+
+        (type_info.get_attributes)(&mut callback)
+    }
+
     pub fn get_internal_index(&self, handle: RawMaterialHandle) -> usize {
         self.registry.get_index(handle)
     }
@@ -462,4 +477,8 @@ fn get_material_key<M: Material>(vec_any: &VecAny, index: usize) -> MaterialKeyP
         ty: TypeId::of::<M>(),
         key,
     }
+}
+
+fn get_attributes<M: Material>(callback: &mut dyn FnMut(&[&'static VertexAttributeId], &[&'static VertexAttributeId])) {
+    callback(M::required_attributes().as_ref(), M::supported_attributes().as_ref())
 }

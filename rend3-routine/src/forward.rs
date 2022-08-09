@@ -199,8 +199,6 @@ impl<M: Material> ForwardRoutine<M> {
                 SampleCount::Four => &this.pipeline_s4,
             };
 
-            graph_data.mesh_manager.buffers().bind(rpass);
-
             rpass.set_pipeline(pipeline);
             rpass.set_bind_group(0, forward_uniform_bg, &[]);
             rpass.set_bind_group(1, &culled.per_material, &[]);
@@ -243,10 +241,7 @@ fn build_forward_pipeline_inner(
         vertex: VertexState {
             module: forward_pass_vert,
             entry_point: vert_entry_point,
-            buffers: match renderer.profile {
-                RendererProfile::CpuDriven => &CPU_VERTEX_BUFFERS,
-                RendererProfile::GpuDriven => &GPU_VERTEX_BUFFERS,
-            },
+            buffers: &[],
         },
         primitive: PrimitiveState {
             topology: primitive_topology,

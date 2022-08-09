@@ -10,6 +10,7 @@ use crate::{
 };
 use glam::{Mat4, Vec3A};
 use rend3_types::{Material, MaterialHandle, ObjectChange, ObjectMeshKind, RawObjectHandle};
+use smallvec::SmallVec;
 
 use super::SkeletonManager;
 
@@ -73,39 +74,79 @@ impl ObjectManager {
         skeleton_manager: &SkeletonManager,
         material_manager: &mut MaterialManager,
     ) {
-        // let (internal_mesh, vertex_range) = match &object.mesh_kind {
-        //     ObjectMeshKind::Animated(skeleton) => {
-        //         let skeleton = skeleton_manager.internal_data(skeleton.get_raw());
-        //         let mesh = mesh_manager.internal_data_mut(skeleton.mesh_handle.get_raw());
-        //         (mesh, skeleton.skeleton_vertex_range.clone())
-        //     }
-        //     ObjectMeshKind::Static(mesh) => {
-        //         let mesh = mesh_manager.internal_data_mut(mesh.get_raw());
-        //         let vertex_range = mesh.vertex_range.clone();
-        //         (mesh, vertex_range)
-        //     }
-        // };
-        // let bounding_sphere = internal_mesh.bounding_sphere;
-        // let index_range = internal_mesh.index_range.clone();
+        let (internal_mesh, skeleton_ranges) = match &object.mesh_kind {
+            ObjectMeshKind::Animated(skeleton) => {
+                let skeleton = skeleton_manager.internal_data(skeleton.get_raw());
+                let mesh = mesh_manager.internal_data(skeleton.mesh_handle.get_raw());
+                (mesh, &*skeleton.overridden_attribute_ranges)
+            }
+            ObjectMeshKind::Static(mesh) => {
+                let mesh = mesh_manager.internal_data(mesh.get_raw());
+                (mesh, &[][..])
+            }
+        };
 
-        // let (material_key, object_list) = material_manager.get_m0aterial_key_and_objects(object.material.get_raw());
-        // object_list.push(handle.get_raw());
+        let mut vertex_attribute_start_offsets: SmallVec<[_; 16]> = SmallVec::new();
+        material_manager.get_attributes(object.material.get_raw(), |required, supported| {
+            // Make sure all required attributes are in the mesh and the supported attribute list.
+            for &&required_attribute in required {
+                // We can just directly use the internal mesh, as every attribute in the skeleton is also in the mesh.
+                let found_in_mesh = internal_mesh
+                    .vertex_attribute_ranges
+                    .iter()
+                    .any(|&(id, _)| id == required_attribute);
 
-        // let shader_object = InternalObject {
-        //     location: object.transform.transform_point3a(Vec3A::ZERO),
-        //     input: GpuCullingInput {
-        //         material_index: material_manager.get_internal_index(object.material.get_raw()) as u32,
-        //         transform: object.transform,
-        //         bounding_sphere,
-        //         start_idx: index_range.start as u32,
-        //         count: (index_range.end - index_range.start) as u32,
-        //         vertex_offset: vertex_range.start as i32,
-        //     },
-        //     material_handle: object.material,
-        //     mesh_kind: object.mesh_kind,
-        // };
+                // Check that our required attributes are in the supported one.
+                let found_in_supported = internal_mesh
+                    .vertex_attribute_ranges
+                    .iter()
+                    .any(|&(id, _)| id == required_attribute);
 
-        // self.registry.insert(handle, shader_object, material_key);
+                assert!(found_in_mesh);
+                assert!(found_in_supported);
+            }
+
+            for &&supported_attribute in supported {
+                // We first check the skeleton for the attribute's base offset.
+                let found_start_offset = skeleton_ranges
+                    .iter()
+                    .find_map(|(id, range)| (*id == supported_attribute).then_some(range.start));
+
+                if let Some(start_offset) = found_start_offset {
+                    vertex_attribute_start_offsets.push(start_offset as u32);
+                    continue;
+                }
+
+                // After the skeleton, check the mesh for non-overriden attributes.
+                match internal_mesh.get_attribute(&supported_attribute) {
+                    Some(range) => vertex_attribute_start_offsets.push(range.start as u32),
+                    // If the attribute isn't there, push u32::MAX.
+                    None => vertex_attribute_start_offsets.push(u32::MAX),
+                }
+            }
+        });
+
+        let bounding_sphere = internal_mesh.bounding_sphere;
+        let index_range = internal_mesh.index_range.clone();
+
+        let (material_key, object_list) = material_manager.get_material_key_and_objects(object.material.get_raw());
+        object_list.push(handle.get_raw());
+
+        let shader_object = InternalObject {
+            location: object.transform.transform_point3a(Vec3A::ZERO),
+            input: GpuCullingInput {
+                material_index: material_manager.get_internal_index(object.material.get_raw()) as u32,
+                transform: object.transform,
+                bounding_sphere,
+                start_idx: index_range.start as u32,
+                count: (index_range.end - index_range.start) as u32,
+                vertex_offset: vertex_range.start as i32,
+            },
+            material_handle: object.material,
+            mesh_kind: object.mesh_kind,
+        };
+
+        self.registry.insert(handle, shader_object, material_key);
 
         todo!()
     }
