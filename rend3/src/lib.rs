@@ -172,6 +172,7 @@ pub mod util {
     pub mod math;
     pub mod mipmap;
     pub mod output;
+    pub mod scatter_copy;
     /// Core datastructures that associate handles with data in a gpu-friendly
     /// format.
     pub mod registry {
