@@ -1,6 +1,6 @@
-use std::{mem::size_of, num::NonZeroU64, slice};
+use std::{num::NonZeroU64};
 
-use bytemuck::Pod;
+use encase::{private::WriteInto, ShaderSize};
 use wgpu::{
     BindGroupLayout, BindingType, Buffer, BufferBindingType, BufferDescriptor, BufferUsages, CommandEncoder,
     ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor, Device, PipelineLayoutDescriptor, ShaderStages,
@@ -76,13 +76,13 @@ impl ScatterCopy {
         destination_buffer: &Buffer,
         data: D,
     ) where
-        T: Pod,
+        T: ShaderSize + WriteInto,
         D: IntoIterator<Item = ScatterData<T>>,
         D::IntoIter: ExactSizeIterator,
     {
         let data_iterator = data.into_iter();
 
-        let size_of_t = size_of::<T>() as u64;
+        let size_of_t = T::SHADER_SIZE.get();
         assert_eq!(size_of_t % 4, 0);
         let size_of_t_u32: u32 = size_of_t.try_into().unwrap();
 
@@ -111,7 +111,13 @@ impl ScatterCopy {
             let range_end = range_start + stride_words;
 
             mapped_slice[range_start] = item.word_offset;
-            mapped_slice[range_start + 1..range_end].copy_from_slice(bytemuck::cast_slice(slice::from_ref(&item.data)));
+            let mut writer = encase::internal::Writer::new(
+                &item.data,
+                bytemuck::cast_slice_mut(&mut mapped_slice[range_start + 1..range_end]),
+                0,
+            )
+            .unwrap();
+            item.data.write_into(&mut writer);
         }
 
         source_buffer.unmap();

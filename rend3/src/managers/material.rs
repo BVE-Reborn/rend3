@@ -5,13 +5,14 @@ use crate::{
     util::{
         bind_merge::{BindGroupBuilder, BindGroupLayoutBuilder},
         buffer::WrappedPotBuffer,
+        freelist::{FreelistBuffer, FreelistBufferIndex},
         math::round_up_pot,
         registry::ArchitypicalErasedRegistry,
         typedefs::FastHashMap,
     },
     RendererProfile,
 };
-use encase::{ShaderSize, StorageBuffer};
+use encase::{ShaderSize, ShaderType, StorageBuffer};
 use list_any::VecAny;
 use rend3_types::{
     Material, MaterialArray, MaterialTag, RawMaterialHandle, RawObjectHandle, RawTextureHandle, VertexAttributeId,
@@ -31,11 +32,22 @@ mod texture_dedupe;
 
 pub use texture_dedupe::TextureBindGroupIndex;
 
-const TEXTURE_MASK_SIZE: u32 = 4;
+#[derive(ShaderType)]
+struct GpuPoweredShaderWrapper<M: Material> {
+    textures: <M::TextureArrayType as MaterialArray<Option<RawTextureHandle>>>::U32Array,
+    data: M::DataType,
+}
+
+#[derive(ShaderType)]
+struct CpuPoweredShaderWrapper<M: Material> {
+    data: M::DataType,
+    texture_enable: u32,
+}
 
 /// Internal representation of a material.
 pub struct InternalMaterial {
     pub bind_group_index: ProfileData<TextureBindGroupIndex, ()>,
+    pub buffer_index: FreelistBufferIndex,
     pub key: u64,
     /// Handles of all objects
     pub objects: Vec<RawObjectHandle>,
@@ -43,6 +55,7 @@ pub struct InternalMaterial {
 
 #[allow(clippy::type_complexity)]
 struct PerTypeInfo {
+    buffer: FreelistBuffer,
     data_size: u32,
     texture_count: u32,
     write_gpu_materials_fn: fn(&mut [u8], &VecAny, &mut (dyn FnMut(RawTextureHandle) -> NonZeroU32 + '_)) -> usize,
@@ -71,19 +84,12 @@ pub struct MaterialManager {
 
     texture_deduplicator: texture_dedupe::TextureDeduplicator,
 
-    buffer: ProfileData<(), WrappedPotBuffer>,
-
     registry: ArchitypicalErasedRegistry<MaterialTag, InternalMaterial>,
 }
 
 impl MaterialManager {
     pub fn new(device: &Device, profile: RendererProfile) -> Self {
         profiling::scope!("MaterialManager::new");
-
-        let buffer = profile.into_data(
-            || (),
-            || WrappedPotBuffer::new(device, 0, 16, BufferUsages::STORAGE, Some("material buffer")),
-        );
 
         let registry = ArchitypicalErasedRegistry::new();
 
@@ -93,7 +99,6 @@ impl MaterialManager {
             bg: FastHashMap::default(),
             type_info: FastHashMap::default(),
             texture_deduplicator,
-            buffer,
             registry,
         }
     }
@@ -116,6 +121,10 @@ impl MaterialManager {
         let ty = TypeId::of::<M>();
 
         self.type_info.entry(ty).or_insert_with(|| PerTypeInfo {
+            buffer: match profile {
+                RendererProfile::CpuDriven => FreelistBuffer::new::<CpuPoweredShaderWrapper<M>>(device),
+                RendererProfile::GpuDriven => FreelistBuffer::new::<GpuPoweredShaderWrapper<M>>(device),
+            },
             data_size: M::DataType::SHADER_SIZE.get() as _,
             texture_count: M::TextureArrayType::COUNT,
             write_gpu_materials_fn: write_gpu_materials::<M>,
@@ -149,8 +158,10 @@ impl MaterialManager {
         } else {
             bind_group_index = ProfileData::Gpu(());
         };
+        let buffer_index = type_info.buffer.add();
 
         InternalMaterial {
+            buffer_index,
             bind_group_index,
             key: material.object_key(),
             objects: Vec::new(),
@@ -179,16 +190,22 @@ impl MaterialManager {
         handle: &MaterialHandle,
         material: M,
     ) {
-        let internal = self.fill_inner(device, profile, texture_manager_2d, &material);
+        let new_key = material.object_key();
 
         self.registry.update(handle, material);
 
-        let new_internal = self.registry.get_metadata_mut::<M>(handle.get_raw());
-        if let ProfileData::Cpu(index) = new_internal.bind_group_index {
-            self.texture_deduplicator.remove(index);
+        let internal = self.registry.get_metadata_mut::<M>(handle.get_raw());
+        if let ProfileData::Cpu(ref mut index) = internal.bind_group_index {
+            // Create the new bind group first. If the bind group didn't change, this will prevent
+            // the bind group from dying on the call to remove.
+            let bind_group_index =
+                self.texture_deduplicator
+                    .get_or_insert(device, texture_manager_2d, material.to_textures().as_ref());
+            self.texture_deduplicator.remove(*index);
+            *index = bind_group_index;
         }
-        if internal.key != new_internal.key {
-            for object in &new_internal.objects {
+        if internal.key != new_key {
+            for object in &internal.objects {
                 object_manager.set_key(
                     *object,
                     MaterialKeyPair {
@@ -197,9 +214,8 @@ impl MaterialManager {
                     },
                 )
             }
-            new_internal.key = internal.key;
+            internal.key = new_key;
         }
-        new_internal.bind_group_index = internal.bind_group_index;
     }
 
     pub fn get_material<M: Material>(&self, handle: RawMaterialHandle) -> &M {
@@ -226,12 +242,7 @@ impl MaterialManager {
     }
 
     pub fn add_to_bg_gpu<'a, M: Material>(&'a self, bgb: &mut BindGroupBuilder<'a>) {
-        let range = self.bg[&TypeId::of::<M>()].as_gpu();
-        bgb.append(BindingResource::Buffer(BufferBinding {
-            buffer: self.buffer.as_gpu(),
-            offset: range.offset,
-            size: Some(range.size),
-        }));
+        todo!()
     }
 
     pub fn get_internal_material_full<M: Material>(&self, handle: RawMaterialHandle) -> (&M, &InternalMaterial) {
@@ -287,99 +298,27 @@ impl MaterialManager {
         texture_manager: &TextureManager,
     ) {
         profiling::scope!("Material Ready");
-        self.registry.remove_all_dead(|internal, idx| {
+        self.registry.remove_all_dead(|type_id, internal, idx| {
             for object in &internal.objects {
                 object_manager.set_material_index(*object, idx);
             }
-        });
-
-        if let ProfileData::Gpu(ref mut buffer) = self.buffer {
-            profiling::scope!("Update GPU Material Buffer");
-            let mut translate_texture = texture_manager.translation_fn();
-
-            let bytes: usize = self
-                .registry
-                .archetype_lengths()
-                .map(|(ty, len)| {
-                    let type_info = &self.type_info[&ty];
-
-                    len.max(1)
-                        * (round_up_pot(type_info.texture_count * 4, 16) + round_up_pot(type_info.data_size, 16))
-                            as usize
-                })
-                .sum::<usize>();
-
-            buffer.ensure_size(device, bytes as u64);
-
-            let mut data = vec![0u8; bytes];
-
-            let mut offset = 0_usize;
-            for (ty, archetype) in self.registry.archetypes_mut() {
-                let type_info = &self.type_info[&ty];
-
-                let size = (type_info.write_gpu_materials_fn)(&mut data[offset..], archetype, &mut translate_texture);
-                let size = size.max(16);
-
-                self.bg.insert(
-                    ty,
-                    ProfileData::Gpu(BufferRange {
-                        offset: offset as u64,
-                        size: NonZeroU64::new(size as u64).unwrap(),
-                    }),
-                );
-
-                offset += size;
+            if let ProfileData::Cpu(index) = internal.bind_group_index {
+                self.texture_deduplicator.remove(index);
             }
-
-            // TODO(material): I know the size before hand, we could elide this cpu side
-            // copy
-            buffer.write_to_buffer(device, queue, bytemuck::cast_slice(&data));
-        }
+            self.type_info[&type_id].buffer.remove(internal.buffer_index);
+        });
     }
 }
 
 fn write_gpu_materials<M: Material>(
-    dest: &mut [u8],
+    type_info: &PerTypeInfo,
     vec_any: &VecAny,
     translation_fn: &mut (dyn FnMut(RawTextureHandle) -> NonZeroU32 + '_),
 ) -> usize {
     let materials = vec_any.downcast_slice::<M>().unwrap();
 
-    let mut offset = 0_usize;
-
-    let texture_bytes = (M::TextureArrayType::COUNT * 4) as usize;
-    let mat_size = round_up_pot(texture_bytes, 16);
-    let data_size = round_up_pot(M::DataType::SHADER_SIZE.get(), 16) as usize;
-
-    for mat in materials {
-        // If we have no textures, we should skip this operation as the cast_slice_mut
-        // will fail
-        if mat_size != 0 {
-            // Get the texture handles from the material
-            let texture_refs = mat.to_textures();
-
-            // Translate them and write them into the slice.
-            let texture_slice = bytemuck::cast_slice_mut(&mut dest[offset..offset + texture_bytes]);
-            for (idx, tex) in texture_refs.into_iter().enumerate() {
-                texture_slice[idx] = tex.map(|tex| translation_fn(tex));
-            }
-
-            offset += mat_size;
-        }
-
-        // If we have no data, skip calling the material for data.
-        if data_size != 0 {
-            let data = mat.to_data();
-
-            StorageBuffer::new(&mut dest[offset..offset + M::DataType::SHADER_SIZE.get() as usize])
-                .write(&data)
-                .unwrap();
-
-            offset += data_size;
-        }
-    }
-
-    offset.max(mat_size + data_size)
+    // TODO: figure out how to deal with freelist buffer and material registry wanting
+    // to give materials their own ids.
 }
 
 fn get_material_key<M: Material>(vec_any: &VecAny, index: usize) -> MaterialKeyPair {

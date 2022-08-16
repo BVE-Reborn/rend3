@@ -860,10 +860,14 @@ pub struct MaterialTag;
 
 /// Trait that abstracts over all possible arrays of optional raw texture handles.
 pub trait MaterialArray<T>: IntoIterator<Item = T> + AsRef<[T]> {
+    /// An array of the [u32; COUNT]. We need this internally
+    /// for shader layout stuff.
+    type U32Array: encase::ShaderSize + encase::internal::WriteInto;
     const COUNT: u32;
 }
 
 impl<const C: usize, T> MaterialArray<T> for [T; C] {
+    type U32Array = [u32; C];
     const COUNT: u32 = C as u32;
 }
 

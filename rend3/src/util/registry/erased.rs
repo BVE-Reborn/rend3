@@ -36,7 +36,7 @@ pub struct Archetype<Metadata> {
         &mut VecAny,
         &mut Vec<NonErasedData<Metadata>>,
         &mut FastHashMap<usize, PerHandleData>,
-        &mut dyn FnMut(&Metadata, usize),
+        &mut dyn FnMut(TypeId, &Metadata, usize),
     ),
 }
 
@@ -120,11 +120,11 @@ impl<HandleType, Metadata> ArchitypicalErasedRegistry<HandleType, Metadata> {
             // We're just updating the data
             archetype.vec.downcast_slice_mut::<T>().unwrap()[index] = data;
         } else {
-            panic!("Cannot update material to a material of a different ")
+            panic!("Cannot update material to a material of a different type")
         }
     }
 
-    pub fn remove_all_dead(&mut self, mut renormalize: impl FnMut(&Metadata, usize)) {
+    pub fn remove_all_dead(&mut self, mut renormalize: impl FnMut(TypeId, &Metadata, usize)) {
         profiling::scope!("ResourceRegistry::remove_all_dead");
         for archetype in self.archetype_map.values_mut() {
             (archetype.remove_all_dead)(
@@ -228,8 +228,9 @@ fn remove_all_dead<T: Send + Sync + 'static, Metadata>(
     vec_any: &mut VecAny,
     non_erased: &mut Vec<NonErasedData<Metadata>>,
     per_handle_map: &mut FastHashMap<usize, PerHandleData>,
-    renormalize: &mut dyn FnMut(&Metadata, usize),
+    renormalize: &mut dyn FnMut(TypeId, &Metadata, usize),
 ) {
+    let type_id = TypeId::of::<T>();
     let mut vec = vec_any.downcast_mut::<T>().unwrap();
 
     profiling::scope!("ArchitypicalRegistry::remove_all_dead");
@@ -248,7 +249,7 @@ fn remove_all_dead<T: Send + Sync + 'static, Metadata>(
             // If we swapped an element, update its value in the index map
             if let Some(metadata) = non_erased.get(idx) {
                 per_handle_map.get_mut(&metadata.handle).unwrap().index = idx;
-                renormalize(&metadata.inner, idx);
+                renormalize(type_id, &metadata.inner, idx);
             }
         }
     }

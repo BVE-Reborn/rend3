@@ -5,7 +5,7 @@ use crate::{
 
 use range_alloc::RangeAllocator;
 use rend3_types::{
-    RawMeshHandle, VertexAttribute, VertexAttributeId, VertexFormat, VERTEX_ATTRIBUTE_JOINT_INDICES,
+    RawMeshHandle, VertexAttributeId, VERTEX_ATTRIBUTE_JOINT_INDICES,
     VERTEX_ATTRIBUTE_POSITION,
 };
 use std::{

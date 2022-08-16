@@ -169,7 +169,13 @@ pub mod util {
     pub mod bind_merge;
     pub mod buffer;
     pub mod frustum;
-    pub mod freelist;
+    pub mod freelist {
+        mod buffer;
+        mod vec;
+
+        pub use buffer::*;
+        pub use vec::*;
+    }
     pub mod math;
     pub mod mipmap;
     pub mod output;
