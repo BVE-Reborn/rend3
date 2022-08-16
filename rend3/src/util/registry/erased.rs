@@ -109,8 +109,7 @@ impl<HandleType, Metadata> ArchitypicalErasedRegistry<HandleType, Metadata> {
         &mut self,
         handle: &ResourceHandle<HandleType>,
         data: T,
-        mut renormalize: impl FnMut(&Metadata, usize),
-    ) -> bool {
+    ) {
         let per_handle_data = self.handle_map.get_mut(&handle.get_raw().idx).unwrap();
         let index = per_handle_data.index;
         let current_type_id = &mut per_handle_data.ty;
@@ -120,22 +119,8 @@ impl<HandleType, Metadata> ArchitypicalErasedRegistry<HandleType, Metadata> {
         if *current_type_id == new_type_id {
             // We're just updating the data
             archetype.vec.downcast_slice_mut::<T>().unwrap()[index] = data;
-
-            false
         } else {
-            // We need to change archetype, so we clean up, then insert with the old handle.
-            // We must clean up first, so the value in the index map is still accurate.
-            let metadata = (archetype.remove_single)(
-                &mut archetype.vec,
-                &mut archetype.non_erased,
-                &mut self.handle_map,
-                index,
-                &mut renormalize,
-            );
-
-            self.insert(handle, data, metadata);
-
-            true
+            panic!("Cannot update material to a material of a different ")
         }
     }
 

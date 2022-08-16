@@ -35,6 +35,7 @@ replace = "[Unreleased](https://github.com/BVE-Reborn/rend3/compare/v{{version}}
 [dependencies]
 arrayvec = "0.7"
 bitflags = "1"
+bimap = "0.6"
 bumpalo = "3"
 bytemuck = "1"
 encase = { version = "0.3" }

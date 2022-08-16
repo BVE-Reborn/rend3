@@ -62,6 +62,12 @@ impl<T> PartialEq for RawResourceHandle<T> {
 
 impl<T> Eq for RawResourceHandle<T> {}
 
+impl<T> Hash for RawResourceHandle<T> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.idx.hash(state);
+    }
+}
+
 /// Owning resource handle. Used as part of rend3's interface.
 pub struct ResourceHandle<T> {
     refcount: Arc<()>,
@@ -897,7 +903,7 @@ pub trait Material: Send + Sync + 'static {
     /// objects with this key.
     fn object_key(&self) -> u64;
 
-    /// The array of textures that should be bound.
+    /// The array of textures that should be bound. Rend3 supports up to 32.
     fn to_textures(&self) -> Self::TextureArrayType;
 
     /// Fill up the given slice with data. This can be whatever data the shader expects.

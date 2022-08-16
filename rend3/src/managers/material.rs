@@ -27,12 +27,15 @@ use wgpu::{
     TextureViewDimension,
 };
 
+mod texture_dedupe;
+
+pub use texture_dedupe::TextureBindGroupIndex;
+
 const TEXTURE_MASK_SIZE: u32 = 4;
 
 /// Internal representation of a material.
 pub struct InternalMaterial {
-    pub bind_group: ProfileData<BindGroup, ()>,
-    pub material_buffer: ProfileData<Buffer, ()>,
+    pub bind_group_index: ProfileData<TextureBindGroupIndex, ()>,
     pub key: u64,
     /// Handles of all objects
     pub objects: Vec<RawObjectHandle>,
@@ -40,7 +43,6 @@ pub struct InternalMaterial {
 
 #[allow(clippy::type_complexity)]
 struct PerTypeInfo {
-    bgl: ProfileData<BindGroupLayout, ()>,
     data_size: u32,
     texture_count: u32,
     write_gpu_materials_fn: fn(&mut [u8], &VecAny, &mut (dyn FnMut(RawTextureHandle) -> NonZeroU32 + '_)) -> usize,
@@ -67,6 +69,8 @@ pub struct MaterialManager {
     bg: FastHashMap<TypeId, ProfileData<(), BufferRange>>,
     type_info: FastHashMap<TypeId, PerTypeInfo>,
 
+    texture_deduplicator: texture_dedupe::TextureDeduplicator,
+
     buffer: ProfileData<(), WrappedPotBuffer>,
 
     registry: ArchitypicalErasedRegistry<MaterialTag, InternalMaterial>,
@@ -83,9 +87,12 @@ impl MaterialManager {
 
         let registry = ArchitypicalErasedRegistry::new();
 
+        let texture_deduplicator = texture_dedupe::TextureDeduplicator::new(device);
+
         Self {
             bg: FastHashMap::default(),
             type_info: FastHashMap::default(),
+            texture_deduplicator,
             buffer,
             registry,
         }
@@ -103,50 +110,12 @@ impl MaterialManager {
 
     fn ensure_archetype_inner<M: Material>(&mut self, device: &Device, profile: RendererProfile) -> &mut PerTypeInfo {
         profiling::scope!("MaterialManager::ensure_archetype");
-        let create_bgl = || {
-            profile.into_data(
-                || {
-                    let texture_binding = |idx: u32| BindGroupLayoutEntry {
-                        binding: (idx + 1) as u32,
-                        visibility: ShaderStages::FRAGMENT,
-                        ty: BindingType::Texture {
-                            sample_type: TextureSampleType::Float { filterable: true },
-                            view_dimension: TextureViewDimension::D2,
-                            multisampled: false,
-                        },
-                        count: None,
-                    };
-
-                    let mut entries: Vec<_> = Vec::with_capacity(M::TextureArrayType::COUNT as usize);
-                    entries.push(BindGroupLayoutEntry {
-                        binding: 0,
-                        visibility: ShaderStages::VERTEX_FRAGMENT,
-                        ty: BindingType::Buffer {
-                            ty: BufferBindingType::Storage { read_only: true },
-                            has_dynamic_offset: false,
-                            min_binding_size: NonZeroU64::new(
-                                (round_up_pot(M::DataType::SHADER_SIZE.get() as u32, 16)
-                                    + round_up_pot(TEXTURE_MASK_SIZE, 16)) as _,
-                            ),
-                        },
-                        count: None,
-                    });
-                    entries.extend((0..M::TextureArrayType::COUNT).map(texture_binding));
-                    device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-                        label: Some("cpu material bgl"),
-                        entries: &entries,
-                    })
-                },
-                || (),
-            )
-        };
 
         self.registry.ensure_archetype::<M>();
 
         let ty = TypeId::of::<M>();
 
         self.type_info.entry(ty).or_insert_with(|| PerTypeInfo {
-            bgl: create_bgl(),
             data_size: M::DataType::SHADER_SIZE.get() as _,
             texture_count: M::TextureArrayType::COUNT,
             write_gpu_materials_fn: write_gpu_materials::<M>,
@@ -168,53 +137,21 @@ impl MaterialManager {
 
         let type_info = self.ensure_archetype_inner::<M>(device, profile);
 
-        let (bind_group, material_buffer) = if profile == RendererProfile::CpuDriven {
+        let bind_group_index;
+        if profile == RendererProfile::CpuDriven {
             let textures = material.to_textures();
 
-            // TODO(material): stack allocation
-            let material_uprounded = round_up_pot(M::DataType::SHADER_SIZE.get(), 16) as usize;
-            let actual_size = material_uprounded + round_up_pot(TEXTURE_MASK_SIZE, 16) as usize;
-            let mut data = vec![0u8; actual_size as usize];
-            StorageBuffer::new(&mut data[..M::DataType::SHADER_SIZE.get() as usize])
-                .write(&material.to_data())
-                .unwrap();
+            let texture_bg_index =
+                self.texture_deduplicator
+                    .get_or_insert(device, texture_manager_2d, textures.as_ref());
 
-            let material_buffer = device.create_buffer(&BufferDescriptor {
-                label: None,
-                usage: BufferUsages::COPY_DST | BufferUsages::STORAGE,
-                size: data.len() as _,
-                mapped_at_creation: true,
-            });
-            let mut material_buffer_mapping = material_buffer.slice(..).get_mapped_range_mut();
-
-            let mut builder = BindGroupBuilder::new();
-            builder.append_buffer(&material_buffer);
-
-            let mut texture_mask = 0_u32;
-            for (idx, texture) in textures.into_iter().enumerate() {
-                let view = texture.map(|tex| texture_manager_2d.get_view_from_index(translation_fn(tex)));
-                builder.append(BindingResource::TextureView(view.unwrap_or(null_tex)));
-
-                let enabled = texture.is_some();
-                texture_mask |= (enabled as u32) << idx as u32;
-            }
-
-            *bytemuck::from_bytes_mut(&mut data[material_uprounded..material_uprounded + 4]) = texture_mask;
-
-            material_buffer_mapping.copy_from_slice(&data);
-            drop(material_buffer_mapping);
-            material_buffer.unmap();
-
-            let bind_group = builder.build(device, None, type_info.bgl.as_ref().as_cpu());
-
-            (ProfileData::Cpu(bind_group), ProfileData::Cpu(material_buffer))
+            bind_group_index = ProfileData::Cpu(texture_bg_index);
         } else {
-            (ProfileData::Gpu(()), ProfileData::Gpu(()))
+            bind_group_index = ProfileData::Gpu(());
         };
 
         InternalMaterial {
-            bind_group,
-            material_buffer,
+            bind_group_index,
             key: material.object_key(),
             objects: Vec::new(),
         }
@@ -242,22 +179,16 @@ impl MaterialManager {
         handle: &MaterialHandle,
         material: M,
     ) {
-        // TODO(material): if this doesn't change archetype, this should do a buffer
-        // write cpu side.
         let internal = self.fill_inner(device, profile, texture_manager_2d, &material);
 
-        let archetype_changed = self.registry.update(handle, material, |internal, idx| {
-            for object in &internal.objects {
-                object_manager.set_material_index(*object, idx)
-            }
-        });
+        self.registry.update(handle, material);
 
-        if archetype_changed {
-            let new_index = self.registry.get_index(handle.get_raw());
-            let new_internal = self.registry.get_metadata_mut::<M>(handle.get_raw());
-
+        let new_internal = self.registry.get_metadata_mut::<M>(handle.get_raw());
+        if let ProfileData::Cpu(index) = new_internal.bind_group_index {
+            self.texture_deduplicator.remove(index);
+        }
+        if internal.key != new_internal.key {
             for object in &new_internal.objects {
-                object_manager.set_material_index(*object, new_index);
                 object_manager.set_key(
                     *object,
                     MaterialKeyPair {
@@ -266,26 +197,9 @@ impl MaterialManager {
                     },
                 )
             }
-            new_internal.bind_group = internal.bind_group;
-            new_internal.material_buffer = internal.material_buffer;
             new_internal.key = internal.key;
-        } else {
-            let new_internal = self.registry.get_metadata_mut::<M>(handle.get_raw());
-            if internal.key != new_internal.key {
-                for object in &new_internal.objects {
-                    object_manager.set_key(
-                        *object,
-                        MaterialKeyPair {
-                            ty: TypeId::of::<M>(),
-                            key: internal.key,
-                        },
-                    )
-                }
-                new_internal.key = internal.key;
-            }
-            new_internal.bind_group = internal.bind_group;
-            new_internal.material_buffer = internal.material_buffer;
         }
+        new_internal.bind_group_index = internal.bind_group_index;
     }
 
     pub fn get_material<M: Material>(&self, handle: RawMaterialHandle) -> &M {
@@ -293,7 +207,7 @@ impl MaterialManager {
     }
 
     pub fn get_bind_group_layout_cpu<M: Material>(&self) -> &BindGroupLayout {
-        self.type_info[&TypeId::of::<M>()].bgl.as_cpu()
+        todo!()
     }
 
     pub fn add_to_bgl_gpu<M: Material>(bglb: &mut BindGroupLayoutBuilder) {
