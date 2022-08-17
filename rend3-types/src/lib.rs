@@ -11,9 +11,9 @@ use std::{
     marker::PhantomData,
     mem::{self, size_of},
     num::NonZeroU32,
-    ops::{Deref, Index},
+    ops::{Deref},
     slice,
-    sync::{Arc, Weak},
+    sync::{Arc},
 };
 use thiserror::Error;
 
@@ -70,9 +70,22 @@ impl<T> Hash for RawResourceHandle<T> {
 
 /// Owning resource handle. Used as part of rend3's interface.
 pub struct ResourceHandle<T> {
-    refcount: Arc<()>,
+    refcount: Arc<flume::Sender<RawResourceHandle<T>>>,
     raw: RawResourceHandle<T>,
     _phantom: PhantomData<T>,
+}
+
+impl<T> Drop for ResourceHandle<T> {
+    fn drop(&mut self) {
+        if Arc::strong_count(&self.refcount) == 1 {
+            // We don't actually care if this fails to send.
+            //
+            // Failure occurs when the renderer was dropped
+            // before the handles were, and if the renderer
+            // is dropped, who gives.
+            let _ = self.refcount.send(self.raw);
+        }
+    }
 }
 
 impl<T> Debug for ResourceHandle<T> {
@@ -112,9 +125,9 @@ impl<T> ResourceHandle<T> {
     /// Create a new resource handle from an index.
     ///
     /// Part of rend3's internal interface, use `Renderer::add_*` instead.
-    pub fn new(idx: usize) -> Self {
+    pub fn new(sender: flume::Sender<RawResourceHandle<T>>, idx: usize) -> Self {
         Self {
-            refcount: Arc::new(()),
+            refcount: Arc::new(sender),
             raw: RawResourceHandle {
                 idx,
                 _phantom: PhantomData,
@@ -128,13 +141,6 @@ impl<T> ResourceHandle<T> {
     /// Part of rend3's internal interface for accessing internal resrouces
     pub fn get_raw(&self) -> RawResourceHandle<T> {
         self.raw
-    }
-
-    /// Get the weak refcount for this owned handle.
-    ///
-    /// Part of rend3's internal interface.
-    pub fn get_weak_refcount(&self) -> Weak<()> {
-        Arc::downgrade(&self.refcount)
     }
 }
 

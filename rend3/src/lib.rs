@@ -143,6 +143,7 @@ mod renderer;
 pub mod managers {
     mod camera;
     mod directional;
+    mod handle_alloc;
     mod material;
     mod mesh;
     mod object;
