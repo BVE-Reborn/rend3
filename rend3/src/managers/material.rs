@@ -5,7 +5,7 @@ use crate::{
     util::{
         bind_merge::{BindGroupBuilder, BindGroupLayoutBuilder},
         buffer::WrappedPotBuffer,
-        freelist::{FreelistBuffer, FreelistBufferIndex},
+        freelist::FreelistDerivedBuffer,
         math::round_up_pot,
         registry::ArchitypicalErasedRegistry,
         typedefs::FastHashMap,
@@ -45,22 +45,14 @@ struct CpuPoweredShaderWrapper<M: Material> {
 }
 
 /// Internal representation of a material.
-pub struct InternalMaterial {
-    pub bind_group_index: ProfileData<TextureBindGroupIndex, ()>,
-    pub buffer_index: FreelistBufferIndex,
-    pub key: u64,
-    /// Handles of all objects
-    pub objects: Vec<RawObjectHandle>,
+struct InternalMaterial<M> {
+    bind_group_index: ProfileData<TextureBindGroupIndex, ()>,
+    inner: M,
 }
 
-#[allow(clippy::type_complexity)]
 struct PerTypeInfo {
-    buffer: FreelistBuffer,
-    data_size: u32,
-    texture_count: u32,
-    write_gpu_materials_fn: fn(&mut [u8], &VecAny, &mut (dyn FnMut(RawTextureHandle) -> NonZeroU32 + '_)) -> usize,
-    get_material_key: fn(&VecAny, usize) -> MaterialKeyPair,
-    get_attributes: fn(&mut dyn FnMut(&[&'static VertexAttributeId], &[&'static VertexAttributeId])),
+    buffer: FreelistDerivedBuffer,
+    data_vec: VecAny,
 }
 
 /// Key which determine's an object's archetype.
@@ -79,34 +71,23 @@ struct BufferRange {
 
 /// Manages materials and their associated BindGroups in CPU modes.
 pub struct MaterialManager {
-    bg: FastHashMap<TypeId, ProfileData<(), BufferRange>>,
-    type_info: FastHashMap<TypeId, PerTypeInfo>,
+    handle_to_typeid: FastHashMap<RawMaterialHandle, TypeId>,
+    storage: FastHashMap<TypeId, PerTypeInfo>,
 
     texture_deduplicator: texture_dedupe::TextureDeduplicator,
-
-    registry: ArchitypicalErasedRegistry<MaterialTag, InternalMaterial>,
 }
 
 impl MaterialManager {
     pub fn new(device: &Device, profile: RendererProfile) -> Self {
         profiling::scope!("MaterialManager::new");
 
-        let registry = ArchitypicalErasedRegistry::new();
-
         let texture_deduplicator = texture_dedupe::TextureDeduplicator::new(device);
 
         Self {
-            bg: FastHashMap::default(),
-            type_info: FastHashMap::default(),
+            handle_to_typeid: FastHashMap::default(),
+            storage: FastHashMap::default(),
             texture_deduplicator,
-            registry,
         }
-    }
-
-    pub fn allocate(counter: &AtomicUsize) -> MaterialHandle {
-        let idx = counter.fetch_add(1, Ordering::Relaxed);
-
-        MaterialHandle::new(idx)
     }
 
     pub fn ensure_archetype<M: Material>(&mut self, device: &Device, profile: RendererProfile) {
@@ -116,36 +97,25 @@ impl MaterialManager {
     fn ensure_archetype_inner<M: Material>(&mut self, device: &Device, profile: RendererProfile) -> &mut PerTypeInfo {
         profiling::scope!("MaterialManager::ensure_archetype");
 
-        self.registry.ensure_archetype::<M>();
-
         let ty = TypeId::of::<M>();
 
-        self.type_info.entry(ty).or_insert_with(|| PerTypeInfo {
+        self.storage.entry(ty).or_insert_with(|| PerTypeInfo {
             buffer: match profile {
-                RendererProfile::CpuDriven => FreelistBuffer::new::<CpuPoweredShaderWrapper<M>>(device),
-                RendererProfile::GpuDriven => FreelistBuffer::new::<GpuPoweredShaderWrapper<M>>(device),
+                RendererProfile::CpuDriven => FreelistDerivedBuffer::new::<CpuPoweredShaderWrapper<M>>(device),
+                RendererProfile::GpuDriven => FreelistDerivedBuffer::new::<GpuPoweredShaderWrapper<M>>(device),
             },
-            data_size: M::DataType::SHADER_SIZE.get() as _,
-            texture_count: M::TextureArrayType::COUNT,
-            write_gpu_materials_fn: write_gpu_materials::<M>,
-            get_material_key: get_material_key::<M>,
-            get_attributes: get_attributes::<M>,
+            data_vec: VecAny::new::<Option<M>>(),
         })
     }
 
-    fn fill_inner<M: Material>(
+    pub fn add<M: Material>(
         &mut self,
         device: &Device,
         profile: RendererProfile,
         texture_manager_2d: &mut TextureManager,
-        material: &M,
-    ) -> InternalMaterial {
-        let null_tex = texture_manager_2d.get_null_view();
-
-        let translation_fn = texture_manager_2d.translation_fn();
-
-        let type_info = self.ensure_archetype_inner::<M>(device, profile);
-
+        handle: &MaterialHandle,
+        material: M,
+    ) {
         let bind_group_index;
         if profile == RendererProfile::CpuDriven {
             let textures = material.to_textures();
@@ -158,27 +128,20 @@ impl MaterialManager {
         } else {
             bind_group_index = ProfileData::Gpu(());
         };
-        let buffer_index = type_info.buffer.add();
 
-        InternalMaterial {
-            buffer_index,
-            bind_group_index,
-            key: material.object_key(),
-            objects: Vec::new(),
+        let type_info = self.ensure_archetype_inner::<M>(device, profile);
+        type_info.buffer.use_index(handle.idx);
+
+        let mut data_vec = type_info.data_vec.downcast_mut::<Option<M>>().unwrap();
+        if handle.idx > data_vec.len() {
+            data_vec.resize_with(handle.idx.saturating_sub(1).next_power_of_two(), || None);
+            data_vec[handle.idx] = Some(InternalMaterial {
+                bind_group_index,
+                inner: material,
+            });
         }
-    }
 
-    pub fn fill<M: Material>(
-        &mut self,
-        device: &Device,
-        profile: RendererProfile,
-        texture_manager_2d: &mut TextureManager,
-        handle: &MaterialHandle,
-        material: M,
-    ) {
-        let internal = self.fill_inner(device, profile, texture_manager_2d, &material);
-
-        self.registry.insert(handle, material, internal);
+        self.handle_to_typeid.insert(*handle, TypeId::of::<M>());
     }
 
     pub fn update<M: Material>(
@@ -190,9 +153,9 @@ impl MaterialManager {
         handle: &MaterialHandle,
         material: M,
     ) {
-        let new_key = material.object_key();
+        let type_id = self.handle_to_typeid[&**handle];
 
-        self.registry.update(handle, material);
+        assert_eq!(type_id, TypeId::of::<M>());
 
         let internal = self.registry.get_metadata_mut::<M>(handle.get_raw());
         if let ProfileData::Cpu(ref mut index) = internal.bind_group_index {
@@ -203,18 +166,6 @@ impl MaterialManager {
                     .get_or_insert(device, texture_manager_2d, material.to_textures().as_ref());
             self.texture_deduplicator.remove(*index);
             *index = bind_group_index;
-        }
-        if internal.key != new_key {
-            for object in &internal.objects {
-                object_manager.set_key(
-                    *object,
-                    MaterialKeyPair {
-                        ty: TypeId::of::<M>(),
-                        key: internal.key,
-                    },
-                )
-            }
-            internal.key = new_key;
         }
     }
 

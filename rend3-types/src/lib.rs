@@ -11,9 +11,9 @@ use std::{
     marker::PhantomData,
     mem::{self, size_of},
     num::NonZeroU32,
-    ops::{Deref},
+    ops::Deref,
     slice,
-    sync::{Arc},
+    sync::Arc,
 };
 use thiserror::Error;
 
@@ -70,7 +70,12 @@ impl<T> Hash for RawResourceHandle<T> {
 
 /// Owning resource handle. Used as part of rend3's interface.
 pub struct ResourceHandle<T> {
-    refcount: Arc<flume::Sender<RawResourceHandle<T>>>,
+    /// Inside this arc is the function to call when
+    /// this resource handle is destroyed and we
+    /// need to phone home. We're just reusing
+    /// the allocation for both refcount and function
+    /// purposes.
+    refcount: Arc<dyn Fn(RawResourceHandle<T>) + Send + Sync>,
     raw: RawResourceHandle<T>,
     _phantom: PhantomData<T>,
 }
@@ -78,12 +83,7 @@ pub struct ResourceHandle<T> {
 impl<T> Drop for ResourceHandle<T> {
     fn drop(&mut self) {
         if Arc::strong_count(&self.refcount) == 1 {
-            // We don't actually care if this fails to send.
-            //
-            // Failure occurs when the renderer was dropped
-            // before the handles were, and if the renderer
-            // is dropped, who gives.
-            let _ = self.refcount.send(self.raw);
+            (self.refcount)(self.raw);
         }
     }
 }
@@ -125,9 +125,9 @@ impl<T> ResourceHandle<T> {
     /// Create a new resource handle from an index.
     ///
     /// Part of rend3's internal interface, use `Renderer::add_*` instead.
-    pub fn new(sender: flume::Sender<RawResourceHandle<T>>, idx: usize) -> Self {
+    pub fn new(destroy_fn: impl Fn(RawResourceHandle<T>) + Send + Sync + 'static, idx: usize) -> Self {
         Self {
-            refcount: Arc::new(sender),
+            refcount: Arc::new(destroy_fn),
             raw: RawResourceHandle {
                 idx,
                 _phantom: PhantomData,
@@ -303,6 +303,9 @@ impl StoredVertexAttributeData {
         self.data.downcast_slice::<T>()
     }
 }
+
+unsafe impl Send for StoredVertexAttributeData {}
+unsafe impl Sync for StoredVertexAttributeData {}
 
 /// Easy to use builder for a [`Mesh`] that deals with common operations for
 /// you.

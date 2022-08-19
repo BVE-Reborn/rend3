@@ -6,8 +6,8 @@ use crate::{
 use glam::Mat4;
 use parking_lot::Mutex;
 use rend3_types::{
-    MaterialHandle, MeshHandle, ObjectChange, ObjectHandle, RawDirectionalLightHandle, RawSkeletonHandle, Skeleton,
-    SkeletonHandle, TextureHandle,
+    MaterialHandle, MeshHandle, ObjectChange, ObjectHandle, RawDirectionalLightHandle, RawMaterialHandle,
+    RawMeshHandle, RawSkeletonHandle, RawTextureHandle, Skeleton, SkeletonHandle, TextureHandle,
 };
 use std::{mem, panic::Location};
 use wgpu::{CommandBuffer, Device, Texture, TextureDescriptor, TextureView};
@@ -43,6 +43,14 @@ pub enum InstructionKind {
                 + Sync,
         >,
     },
+    AddObject {
+        handle: ObjectHandle,
+        object: Object,
+    },
+    AddDirectionalLight {
+        handle: DirectionalLightHandle,
+        light: DirectionalLight,
+    },
     ChangeMaterial {
         handle: MaterialHandle,
         change_invoke: Box<
@@ -57,9 +65,27 @@ pub enum InstructionKind {
                 + Sync,
         >,
     },
-    AddObject {
-        handle: ObjectHandle,
-        object: Object,
+    ChangeDirectionalLight {
+        handle: RawDirectionalLightHandle,
+        change: DirectionalLightChange,
+    },
+    DeleteMesh {
+        handle: RawMeshHandle,
+    },
+    DeleteSkeleton {
+        handle: RawSkeletonHandle,
+    },
+    DeleteTexture {
+        handle: RawTextureHandle,
+    },
+    DeleteMaterial {
+        handle: RawMaterialHandle,
+    },
+    DeleteObject {
+        handle: RawObjectHandle,
+    },
+    DeleteDirectionalLight {
+        handle: RawDirectionalLightHandle,
     },
     SetObjectTransform {
         handle: RawObjectHandle,
@@ -68,14 +94,6 @@ pub enum InstructionKind {
     SetSkeletonJointDeltas {
         handle: RawSkeletonHandle,
         joint_matrices: Vec<Mat4>,
-    },
-    AddDirectionalLight {
-        handle: DirectionalLightHandle,
-        light: DirectionalLight,
-    },
-    ChangeDirectionalLight {
-        handle: RawDirectionalLightHandle,
-        change: DirectionalLightChange,
     },
     SetAspectRatio {
         ratio: f32,
@@ -111,5 +129,53 @@ impl InstructionStreamPair {
 
     pub fn push(&self, kind: InstructionKind, location: Location<'static>) {
         self.producer.lock().push(Instruction { kind, location })
+    }
+}
+
+/// Allows RawResourceHandle<T> to be turned into a delete instruction.
+pub(super) trait DeletableRawResourceHandle {
+    #[track_caller]
+    fn into_delete_instruction_kind(self) -> InstructionKind;
+}
+
+impl DeletableRawResourceHandle for RawMeshHandle {
+    #[track_caller]
+    fn into_delete_instruction_kind(self) -> InstructionKind {
+        InstructionKind::DeleteMesh { handle: self }
+    }
+}
+
+impl DeletableRawResourceHandle for RawSkeletonHandle {
+    #[track_caller]
+    fn into_delete_instruction_kind(self) -> InstructionKind {
+        InstructionKind::DeleteSkeleton { handle: self }
+    }
+}
+
+impl DeletableRawResourceHandle for RawTextureHandle {
+    #[track_caller]
+    fn into_delete_instruction_kind(self) -> InstructionKind {
+        InstructionKind::DeleteTexture { handle: self }
+    }
+}
+
+impl DeletableRawResourceHandle for RawMaterialHandle {
+    #[track_caller]
+    fn into_delete_instruction_kind(self) -> InstructionKind {
+        InstructionKind::DeleteMaterial { handle: self }
+    }
+}
+
+impl DeletableRawResourceHandle for RawObjectHandle {
+    #[track_caller]
+    fn into_delete_instruction_kind(self) -> InstructionKind {
+        InstructionKind::DeleteObject { handle: self }
+    }
+}
+
+impl DeletableRawResourceHandle for RawDirectionalLightHandle {
+    #[track_caller]
+    fn into_delete_instruction_kind(self) -> InstructionKind {
+        InstructionKind::DeleteDirectionalLight { handle: self }
     }
 }

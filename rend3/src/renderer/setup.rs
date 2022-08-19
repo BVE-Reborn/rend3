@@ -5,13 +5,13 @@ use crate::{
         CameraManager, DirectionalLightManager, MaterialManager, MeshManager, ObjectManager, SkeletonManager,
         TextureManager,
     },
-    renderer::RendererDataCore,
+    renderer::{HandleAllocators, RendererDataCore},
     util::mipmap::MipmapGenerator,
     InstanceAdapterDevice, Renderer, RendererInitializationError,
 };
 use parking_lot::Mutex;
 use rend3_types::{Camera, Handedness, TextureFormat};
-use std::sync::{atomic::AtomicUsize, Arc};
+use std::sync::Arc;
 use wgpu::{Features, TextureViewDimension};
 
 pub fn create_renderer(
@@ -71,7 +71,7 @@ pub fn create_renderer(
         downlevel,
         handedness,
 
-        current_ident: AtomicUsize::new(0),
+        resource_handle_allocators: HandleAllocators::default(),
         data_core: Mutex::new(RendererDataCore {
             camera_manager,
             mesh_manager,

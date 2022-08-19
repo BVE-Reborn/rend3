@@ -1,41 +1,63 @@
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::{
+    marker::PhantomData,
+    panic::Location,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
+};
 
 use parking_lot::Mutex;
 use rend3_types::{RawResourceHandle, ResourceHandle};
 
-pub struct HandleAllocator<T> {
-    death_channel_sender: flume::Sender<RawResourceHandle<T>>,
-    death_channel_receiver: flume::Receiver<RawResourceHandle<T>>,
+use crate::{instruction::DeletableRawResourceHandle, Renderer};
 
+pub struct HandleAllocator<T>
+where
+    RawResourceHandle<T>: DeletableRawResourceHandle,
+{
     max_allocated: AtomicUsize,
     freelist: Mutex<Vec<usize>>,
+    _phantom: PhantomData<T>,
 }
 
-impl<T> HandleAllocator<T> {
+impl<T> HandleAllocator<T>
+where
+    RawResourceHandle<T>: DeletableRawResourceHandle,
+{
     pub fn new() -> Self {
-        let (death_channel_sender, death_channel_receiver) = flume::unbounded();
         Self {
-            death_channel_sender,
-            death_channel_receiver,
             max_allocated: AtomicUsize::new(0),
             freelist: Mutex::new(Vec::new()),
+            _phantom: PhantomData,
         }
     }
 
-    pub fn allocate(&self) -> ResourceHandle<T> {
+    pub fn allocate(&self, renderer: &Arc<Renderer>) -> ResourceHandle<T> {
         let maybe_idx = self.freelist.lock().pop();
         let idx = maybe_idx.unwrap_or_else(|| self.max_allocated.fetch_add(1, Ordering::Relaxed));
 
-        ResourceHandle::new(self.death_channel_sender.clone(), idx)
+        let renderer = Arc::clone(&renderer);
+        let destroy_fn = move |handle: RawResourceHandle<T>| {
+            renderer
+                .instructions
+                .push(handle.into_delete_instruction_kind(), *Location::caller())
+        };
+
+        ResourceHandle::new(destroy_fn, idx)
     }
 
-    pub fn flush_dead(&self) -> impl Iterator<Item = RawResourceHandle<T>> + '_ {
-        std::iter::from_fn(|| {
-            let handle = self.death_channel_receiver.try_recv().ok();
-            
-            // We intentionally do not add to the freelist here 
+    pub fn deallocate(&self, handle: RawResourceHandle<T>) {
+        let idx = handle.idx;
+        self.freelist.lock().push(idx);
+    }
+}
 
-            handle
-        })
+impl<T> Default for HandleAllocator<T>
+where
+    RawResourceHandle<T>: DeletableRawResourceHandle,
+{
+    fn default() -> Self {
+        Self::new()
     }
 }

@@ -10,21 +10,17 @@ const NEEDED_USAGES: BufferUsages = BufferUsages::STORAGE
     .union(BufferUsages::COPY_DST)
     .union(BufferUsages::COPY_SRC);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct FreelistBufferIndex(pub usize);
-
-pub struct FreelistBuffer {
+pub struct FreelistDerivedBuffer {
     inner: Buffer,
 
     current_count: usize,
     reserved_count: usize,
     rounded_size: u64,
     stored_type: TypeId,
-    freelist: Vec<usize>,
 
     stale: Vec<usize>,
 }
-impl FreelistBuffer {
+impl FreelistDerivedBuffer {
     pub fn new<T>(device: &Device) -> Self
     where
         T: ShaderSize + WriteInto + 'static,
@@ -45,35 +41,17 @@ impl FreelistBuffer {
             reserved_count: STARTING_SIZE,
             rounded_size,
             stored_type: TypeId::of::<T>(),
-            freelist: Vec::new(),
 
             stale: Vec::new(),
         }
     }
 
-    pub fn add(&mut self) -> FreelistBufferIndex {
-        if let Some(idx) = self.freelist.pop() {
-            self.stale.push(idx);
-            return FreelistBufferIndex(idx);
+    pub fn use_index(&mut self, index: usize) {
+        if index > self.reserved_count {
+            self.reserved_count = index.saturating_sub(1).next_power_of_two();
         }
 
-        let old_count = self.reserved_count;
-        self.reserved_count = old_count.next_power_of_two();
-
-        self.freelist.extend(old_count..self.reserved_count);
-
-        let idx = self.freelist.pop().unwrap();
-        self.stale.push(idx);
-
-        FreelistBufferIndex(idx)
-    }
-
-    pub fn update(&mut self, index: FreelistBufferIndex) {
-        self.stale.push(index.0);
-    }
-
-    pub fn remove(&mut self, index: FreelistBufferIndex) {
-        self.freelist.push(index.0);
+        self.stale.push(index);
     }
 
     pub fn apply<T>(

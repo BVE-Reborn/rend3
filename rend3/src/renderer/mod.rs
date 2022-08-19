@@ -2,8 +2,8 @@ use crate::{
     graph::{GraphTextureStore, ReadyData},
     instruction::{InstructionKind, InstructionStreamPair},
     managers::{
-        CameraManager, DirectionalLightManager, InternalTexture, MaterialManager, MeshManager, ObjectManager,
-        SkeletonManager, TextureManager,
+        CameraManager, DirectionalLightManager, HandleAllocator, InternalTexture, MaterialManager, MeshManager,
+        ObjectManager, SkeletonManager, TextureManager,
     },
     types::{
         Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, MaterialHandle, Mesh, MeshHandle,
@@ -15,14 +15,10 @@ use crate::{
 use glam::Mat4;
 use parking_lot::Mutex;
 use rend3_types::{
-    Handedness, Material, MipmapCount, MipmapSource, ObjectChange, Skeleton, SkeletonHandle, TextureFormat,
-    TextureFromTexture, TextureUsages,
+    Handedness, Material, MaterialTag, MipmapCount, MipmapSource, ObjectChange, Skeleton, SkeletonHandle,
+    TextureFormat, TextureFromTexture, TextureUsages,
 };
-use std::{
-    num::NonZeroU32,
-    panic::Location,
-    sync::{atomic::AtomicUsize, Arc},
-};
+use std::{num::NonZeroU32, panic::Location, sync::Arc};
 use wgpu::{
     util::DeviceExt, CommandBuffer, CommandEncoderDescriptor, Device, DownlevelCapabilities, Extent3d, Features,
     ImageCopyTexture, ImageDataLayout, Limits, Origin3d, Queue, TextureAspect, TextureDescriptor, TextureDimension,
@@ -37,7 +33,7 @@ mod setup;
 /// Core struct which contains the renderer world. Primary way to interact with
 /// the world.
 pub struct Renderer {
-    instructions: InstructionStreamPair,
+    pub(crate) instructions: InstructionStreamPair,
 
     /// The rendering profile used.
     pub profile: RendererProfile,
@@ -57,13 +53,24 @@ pub struct Renderer {
     /// Handedness of all parts of this renderer.
     pub handedness: Handedness,
 
-    /// Identifier allocator.
-    current_ident: AtomicUsize,
+    /// Allocators for resource handles
+    resource_handle_allocators: HandleAllocators,
     /// All the lockable data
     pub data_core: Mutex<RendererDataCore>,
 
     /// Tool which generates mipmaps from a texture.
     pub mipmap_generator: MipmapGenerator,
+}
+
+/// Handle allocators
+#[derive(Default)]
+struct HandleAllocators {
+    pub mesh: HandleAllocator<Mesh>,
+    pub skeleton: HandleAllocator<Skeleton>,
+    pub d2_texture: HandleAllocator<Texture>,
+    pub material: HandleAllocator<MaterialTag>,
+    pub object: HandleAllocator<Object>,
+    pub directional_light: HandleAllocator<DirectionalLight>,
 }
 
 /// All the mutex protected data within the renderer
@@ -114,8 +121,8 @@ impl Renderer {
     /// The handle will keep the mesh alive. All objects created will also keep
     /// the mesh alive.
     #[track_caller]
-    pub fn add_mesh(&self, mesh: Mesh) -> MeshHandle {
-        let handle = MeshManager::allocate(&self.current_ident);
+    pub fn add_mesh(self: &Arc<Self>, mesh: Mesh) -> MeshHandle {
+        let handle = self.resource_handle_allocators.mesh.allocate(self);
 
         self.instructions.push(
             InstructionKind::AddMesh {
@@ -135,8 +142,8 @@ impl Renderer {
     /// keep the skeleton alive. The skeleton will also keep the mesh it
     /// references alive.
     #[track_caller]
-    pub fn add_skeleton(&self, skeleton: Skeleton) -> SkeletonHandle {
-        let handle = SkeletonManager::allocate(&self.current_ident);
+    pub fn add_skeleton(self: &Arc<Self>, skeleton: Skeleton) -> SkeletonHandle {
+        let handle = self.resource_handle_allocators.skeleton.allocate(self);
         self.instructions.push(
             InstructionKind::AddSkeleton {
                 handle: handle.clone(),
@@ -152,12 +159,12 @@ impl Renderer {
     /// The handle will keep the texture alive. All materials created with this
     /// texture will also keep the texture alive.
     #[track_caller]
-    pub fn add_texture_2d(&self, texture: Texture) -> TextureHandle {
+    pub fn add_texture_2d(self: &Arc<Self>, texture: Texture) -> TextureHandle {
         profiling::scope!("Add Texture 2D");
 
         Self::validation_texture_format(texture.format);
 
-        let handle = TextureManager::allocate(&self.current_ident);
+        let handle = self.resource_handle_allocators.d2_texture.allocate(self);
         let size = Extent3d {
             width: texture.size.x,
             height: texture.size.y,
@@ -243,12 +250,12 @@ impl Renderer {
     /// The handle will keep the texture alive. All materials created with this
     /// texture will also keep the texture alive.
     #[track_caller]
-    pub fn add_texture_2d_from_texture(&self, texture: TextureFromTexture) -> TextureHandle {
+    pub fn add_texture_2d_from_texture(self: &Arc<Self>, texture: TextureFromTexture) -> TextureHandle {
         profiling::scope!("Add Texture 2D From Texture");
 
         let mut encoder = self.device.create_command_encoder(&CommandEncoderDescriptor::default());
 
-        let handle = TextureManager::allocate(&self.current_ident);
+        let handle = self.resource_handle_allocators.d2_texture.allocate(self);
 
         let data_core = self.data_core.lock();
 
@@ -313,12 +320,13 @@ impl Renderer {
     ///
     /// The handle will keep the texture alive.
     #[track_caller]
-    pub fn add_texture_cube(&self, texture: Texture) -> TextureHandle {
+    pub fn add_texture_cube(self: &Arc<Self>, texture: Texture) -> TextureHandle {
         profiling::scope!("Add Texture Cube");
 
         Self::validation_texture_format(texture.format);
 
-        let handle = TextureManager::allocate(&self.current_ident);
+        assert!(false);
+        let handle = self.resource_handle_allocators.d2_texture.allocate(self);
         let size = Extent3d {
             width: texture.size.x,
             height: texture.size.y,
@@ -384,13 +392,13 @@ impl Renderer {
     ///
     /// The material will keep the inside textures alive.
     #[track_caller]
-    pub fn add_material<M: Material>(&self, material: M) -> MaterialHandle {
-        let handle = MaterialManager::allocate(&self.current_ident);
+    pub fn add_material<M: Material>(self: &Arc<Self>, material: M) -> MaterialHandle {
+        let handle = self.resource_handle_allocators.material.allocate(self);
         self.instructions.push(
             InstructionKind::AddMaterial {
                 handle: handle.clone(),
                 fill_invoke: Box::new(move |material_manager, device, profile, d2_manager, mat_handle| {
-                    material_manager.fill(device, profile, d2_manager, mat_handle, material)
+                    material_manager.add(device, profile, d2_manager, mat_handle, material)
                 }),
             },
             *Location::caller(),
@@ -421,8 +429,8 @@ impl Renderer {
     ///
     /// The object will keep all materials, textures, and meshes alive.
     #[track_caller]
-    pub fn add_object(&self, object: Object) -> ObjectHandle {
-        let handle = ObjectManager::allocate(&self.current_ident);
+    pub fn add_object(self: &Arc<Self>, object: Object) -> ObjectHandle {
+        let handle = self.resource_handle_allocators.object.allocate(self);
         self.instructions.push(
             InstructionKind::AddObject {
                 handle: handle.clone(),
@@ -438,8 +446,8 @@ impl Renderer {
     /// applied to the duplicated object, and the same mesh, material and
     /// transform as the original object will be used otherwise.
     #[track_caller]
-    pub fn duplicate_object(&self, object_handle: &ObjectHandle, change: ObjectChange) -> ObjectHandle {
-        let dst_handle = ObjectManager::allocate(&self.current_ident);
+    pub fn duplicate_object(self: &Arc<Self>, object_handle: &ObjectHandle, change: ObjectChange) -> ObjectHandle {
+        let dst_handle = self.resource_handle_allocators.object.allocate(self);
         self.instructions.push(
             InstructionKind::DuplicateObject {
                 src_handle: object_handle.clone(),
@@ -507,8 +515,8 @@ impl Renderer {
     ///
     /// The handle will keep the light alive.
     #[track_caller]
-    pub fn add_directional_light(&self, light: DirectionalLight) -> DirectionalLightHandle {
-        let handle = DirectionalLightManager::allocate(&self.current_ident);
+    pub fn add_directional_light(self: &Arc<Self>, light: DirectionalLight) -> DirectionalLightHandle {
+        let handle = self.resource_handle_allocators.directional_light.allocate(self);
 
         self.instructions.push(
             InstructionKind::AddDirectionalLight {

@@ -152,6 +152,7 @@ pub mod managers {
 
     pub use camera::*;
     pub use directional::*;
+    pub(crate) use handle_alloc::*;
     pub use material::*;
     pub use mesh::*;
     pub use object::*;
