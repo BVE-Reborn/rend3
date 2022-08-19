@@ -412,11 +412,9 @@ impl Renderer {
         self.instructions.push(
             InstructionKind::ChangeMaterial {
                 handle: handle.clone(),
-                change_invoke: Box::new(
-                    move |material_manager, device, profile, d2_manager, object_manager, mat_handle| {
-                        material_manager.update(device, profile, d2_manager, object_manager, mat_handle, material)
-                    },
-                ),
+                change_invoke: Box::new(move |material_manager, device, d2_manager, mat_handle| {
+                    material_manager.update(device, d2_manager, mat_handle, material)
+                }),
             },
             *Location::caller(),
         )

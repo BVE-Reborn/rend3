@@ -1,4 +1,4 @@
-use std::any::TypeId;
+use std::{any::TypeId, ops::Deref};
 
 use encase::{private::WriteInto, ShaderSize};
 use wgpu::{Buffer, BufferDescriptor, BufferUsages, CommandEncoder, Device};
@@ -54,14 +54,15 @@ impl FreelistDerivedBuffer {
         self.stale.push(index);
     }
 
-    pub fn apply<T>(
+    pub fn apply<T, F>(
         &mut self,
         device: &Device,
         encoder: &mut CommandEncoder,
         scatter: &ScatterCopy,
-        mut get_value: impl FnMut(FreelistBufferIndex) -> T,
+        mut get_value: F,
     ) where
         T: ShaderSize + WriteInto + 'static,
+        F: FnMut(usize) -> T,
     {
         assert_eq!(self.stored_type, TypeId::of::<T>());
 
@@ -86,7 +87,7 @@ impl FreelistDerivedBuffer {
         }
 
         let data = self.stale.drain(..).map(|idx| {
-            let data = get_value(FreelistBufferIndex(idx));
+            let data = get_value(idx);
             ScatterData {
                 word_offset: (idx as u64 * self.rounded_size).try_into().unwrap(),
                 data,
@@ -94,5 +95,13 @@ impl FreelistDerivedBuffer {
         });
 
         scatter.execute_copy(device, encoder, &self.inner, data);
+    }
+}
+
+impl Deref for FreelistDerivedBuffer {
+    type Target = wgpu::Buffer;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
     }
 }

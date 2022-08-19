@@ -53,17 +53,7 @@ pub enum InstructionKind {
     },
     ChangeMaterial {
         handle: MaterialHandle,
-        change_invoke: Box<
-            dyn FnOnce(
-                    &mut MaterialManager,
-                    &Device,
-                    RendererProfile,
-                    &mut TextureManager,
-                    &mut ObjectManager,
-                    &MaterialHandle,
-                ) + Send
-                + Sync,
-        >,
+        change_invoke: Box<dyn FnOnce(&mut MaterialManager, &Device, &TextureManager, &MaterialHandle) + Send + Sync>,
     },
     ChangeDirectionalLight {
         handle: RawDirectionalLightHandle,

@@ -4,12 +4,14 @@ use crate::{
     util::{
         bind_merge::{BindGroupBuilder, BindGroupLayoutBuilder},
         buffer::WrappedPotBuffer,
+        freelist::FreelistDerivedBuffer,
         registry::ResourceRegistry,
         typedefs::FastHashMap,
     },
     INTERNAL_SHADOW_DEPTH_FORMAT, SHADOW_DIMENSIONS,
 };
 use arrayvec::ArrayVec;
+use encase::ShaderType;
 use glam::{Mat4, UVec2, Vec2, Vec3, Vec3A};
 use rend3_types::{DirectionalLightChange, Handedness, RawDirectionalLightHandle};
 use std::{
@@ -28,31 +30,24 @@ pub struct InternalDirectionalLight {
     pub inner: DirectionalLight,
 }
 
-#[derive(Debug, Copy, Clone)]
-#[repr(C, align(16))]
+#[derive(Debug, Copy, Clone, ShaderType)]
 struct ShaderDirectionalLightBufferHeader {
     total_lights: u32,
 }
 
-unsafe impl bytemuck::Zeroable for ShaderDirectionalLightBufferHeader {}
-unsafe impl bytemuck::Pod for ShaderDirectionalLightBufferHeader {}
-
-#[derive(Debug, Copy, Clone)]
-#[repr(C, align(16))]
+#[derive(Debug, Copy, Clone, ShaderType)]
 struct ShaderDirectionalLight {
     pub view_proj: Mat4,
-    pub color: Vec3A,
-    pub direction: Vec3A,
+    pub color: Vec3,
+    pub direction: Vec3,
     pub offset: Vec2,
     pub size: f32,
 }
 
-unsafe impl bytemuck::Zeroable for ShaderDirectionalLight {}
-unsafe impl bytemuck::Pod for ShaderDirectionalLight {}
-
 /// Manages directional lights and their associated shadow maps.
 pub struct DirectionalLightManager {
-    buffer: WrappedPotBuffer,
+    buffer: FreelistDerivedBuffer,
+    data: Vec<Option<InternalDirectionalLight>>,
 
     view: TextureView,
     layer_views: Vec<TextureView>,
@@ -61,22 +56,12 @@ pub struct DirectionalLightManager {
 
     bgl: BindGroupLayout,
     bg: BindGroup,
-
-    registry: ResourceRegistry<InternalDirectionalLight, DirectionalLight>,
 }
 impl DirectionalLightManager {
     pub fn new(device: &Device) -> Self {
         profiling::scope!("DirectionalLightManager::new");
 
-        let registry = ResourceRegistry::new();
-
-        let buffer = WrappedPotBuffer::new(
-            device,
-            0,
-            mem::size_of::<ShaderDirectionalLight>() as _,
-            BufferUsages::STORAGE,
-            Some("directional lights"),
-        );
+        let buffer = FreelistDerivedBuffer::new::<ShaderDirectionalLight>(device);
 
         let (view, layer_views) = create_shadow_texture(device, Extent3d::default());
 
@@ -85,6 +70,8 @@ impl DirectionalLightManager {
 
         Self {
             buffer,
+            data: Vec::new(),
+
             view,
             layer_views,
             coords: Vec::default(),
@@ -92,32 +79,28 @@ impl DirectionalLightManager {
 
             bgl,
             bg,
-
-            registry,
         }
     }
 
-    pub fn allocate(counter: &AtomicUsize) -> DirectionalLightHandle {
-        let idx = counter.fetch_add(1, Ordering::Relaxed);
-
-        DirectionalLightHandle::new(idx)
+    pub fn add(&mut self, handle: &DirectionalLightHandle, light: DirectionalLight) {
+        self.buffer.use_index(handle.idx);
+        if handle.idx > self.data.len() {
+            self.data.resize_with(handle.idx + 1, || None);
+            self.data[handle.idx] = Some(InternalDirectionalLight { inner: light })
+        }
     }
 
-    pub fn fill(&mut self, handle: &DirectionalLightHandle, light: DirectionalLight) {
-        self.registry.insert(handle, InternalDirectionalLight { inner: light });
+    pub fn update(&mut self, handle: RawDirectionalLightHandle, change: DirectionalLightChange) {
+        self.buffer.use_index(handle.idx);
+        self.data[handle.idx]
+            .as_mut()
+            .unwrap()
+            .inner
+            .update_from_changes(change);
     }
 
-    pub fn get_mut(&mut self, handle: RawDirectionalLightHandle) -> &mut InternalDirectionalLight {
-        self.registry.get_mut(handle)
-    }
-
-    pub fn get_layer_views(&self) -> &[TextureView] {
-        &self.layer_views
-    }
-
-    pub fn update_directional_light(&mut self, handle: RawDirectionalLightHandle, change: DirectionalLightChange) {
-        let internal = self.registry.get_mut(handle);
-        internal.inner.update_from_changes(change);
+    pub fn remove(&mut self, handle: RawDirectionalLightHandle) {
+        self.data[handle.idx].take().unwrap();
     }
 
     pub fn add_to_bgl(bglb: &mut BindGroupLayoutBuilder) {

@@ -1,32 +1,24 @@
 use crate::{
-    managers::{ObjectManager, TextureManager},
+    managers::TextureManager,
     profile::ProfileData,
     types::MaterialHandle,
     util::{
         bind_merge::{BindGroupBuilder, BindGroupLayoutBuilder},
-        buffer::WrappedPotBuffer,
         freelist::FreelistDerivedBuffer,
         math::round_up_pot,
-        registry::ArchitypicalErasedRegistry,
+        scatter_copy::ScatterCopy,
         typedefs::FastHashMap,
     },
     RendererProfile,
 };
-use encase::{ShaderSize, ShaderType, StorageBuffer};
+use encase::{ShaderSize, ShaderType};
 use list_any::VecAny;
-use rend3_types::{
-    Material, MaterialArray, MaterialTag, RawMaterialHandle, RawObjectHandle, RawTextureHandle, VertexAttributeId,
-};
+use rend3_types::{Material, MaterialArray, RawMaterialHandle, RawObjectHandle, RawTextureHandle, VertexAttributeId};
 use std::{
     any::TypeId,
     num::{NonZeroU32, NonZeroU64},
-    sync::atomic::{AtomicUsize, Ordering},
 };
-use wgpu::{
-    BindGroup, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType, Buffer,
-    BufferBinding, BufferBindingType, BufferDescriptor, BufferUsages, Device, Queue, ShaderStages, TextureSampleType,
-    TextureViewDimension,
-};
+use wgpu::{BindingType, BufferBindingType, CommandEncoder, Device, ShaderStages};
 
 mod texture_dedupe;
 
@@ -53,6 +45,12 @@ struct InternalMaterial<M> {
 struct PerTypeInfo {
     buffer: FreelistDerivedBuffer,
     data_vec: VecAny,
+    remove_data: fn(&mut VecAny, RawMaterialHandle) -> ProfileData<TextureBindGroupIndex, ()>,
+    apply_data_cpu: fn(&mut FreelistDerivedBuffer, &Device, &mut CommandEncoder, &ScatterCopy, &mut VecAny),
+    apply_data_gpu:
+        fn(&mut FreelistDerivedBuffer, &Device, &mut CommandEncoder, &ScatterCopy, &mut VecAny, &TextureManager),
+    get_attributes: fn(&mut dyn FnMut(&[&'static VertexAttributeId], &[&'static VertexAttributeId])),
+    get_material_key: fn(&VecAny, usize) -> MaterialKeyPair,
 }
 
 /// Key which determine's an object's archetype.
@@ -105,6 +103,11 @@ impl MaterialManager {
                 RendererProfile::GpuDriven => FreelistDerivedBuffer::new::<GpuPoweredShaderWrapper<M>>(device),
             },
             data_vec: VecAny::new::<Option<M>>(),
+            remove_data: remove_data::<M>,
+            apply_data_cpu: apply_buffer_cpu::<M>,
+            apply_data_gpu: apply_buffer_gpu::<M>,
+            get_attributes: get_attributes::<M>,
+            get_material_key: get_material_key::<M>,
         })
     }
 
@@ -132,7 +135,10 @@ impl MaterialManager {
         let type_info = self.ensure_archetype_inner::<M>(device, profile);
         type_info.buffer.use_index(handle.idx);
 
-        let mut data_vec = type_info.data_vec.downcast_mut::<Option<M>>().unwrap();
+        let mut data_vec = type_info
+            .data_vec
+            .downcast_mut::<Option<InternalMaterial<M>>>()
+            .unwrap();
         if handle.idx > data_vec.len() {
             data_vec.resize_with(handle.idx.saturating_sub(1).next_power_of_two(), || None);
             data_vec[handle.idx] = Some(InternalMaterial {
@@ -141,15 +147,13 @@ impl MaterialManager {
             });
         }
 
-        self.handle_to_typeid.insert(*handle, TypeId::of::<M>());
+        self.handle_to_typeid.insert(**handle, TypeId::of::<M>());
     }
 
     pub fn update<M: Material>(
         &mut self,
         device: &Device,
-        profile: RendererProfile,
-        texture_manager_2d: &mut TextureManager,
-        object_manager: &mut ObjectManager,
+        texture_manager_2d: &TextureManager,
         handle: &MaterialHandle,
         material: M,
     ) {
@@ -157,7 +161,14 @@ impl MaterialManager {
 
         assert_eq!(type_id, TypeId::of::<M>());
 
-        let internal = self.registry.get_metadata_mut::<M>(handle.get_raw());
+        let type_info = &mut self.storage[&type_id];
+
+        let data_vec = type_info
+            .data_vec
+            .downcast_slice_mut::<Option<InternalMaterial<M>>>()
+            .unwrap();
+        let internal = data_vec[handle.idx].as_mut().unwrap();
+
         if let ProfileData::Cpu(ref mut index) = internal.bind_group_index {
             // Create the new bind group first. If the bind group didn't change, this will prevent
             // the bind group from dying on the call to remove.
@@ -167,14 +178,46 @@ impl MaterialManager {
             self.texture_deduplicator.remove(*index);
             *index = bind_group_index;
         }
+        type_info.buffer.use_index(handle.idx);
+        internal.inner = material;
     }
 
-    pub fn get_material<M: Material>(&self, handle: RawMaterialHandle) -> &M {
-        self.registry.get_ref::<M>(handle)
+    pub fn remove(&mut self, handle: RawMaterialHandle) {
+        let type_id = self.handle_to_typeid.remove(&handle).unwrap();
+
+        let type_info = &mut self.storage[&type_id];
+        let bind_group_index = (type_info.remove_data)(&mut type_info.data_vec, handle);
+
+        if let ProfileData::Cpu(index) = bind_group_index {
+            self.texture_deduplicator.remove(index);
+        }
     }
 
-    pub fn get_bind_group_layout_cpu<M: Material>(&self) -> &BindGroupLayout {
-        todo!()
+    pub fn ready(
+        &mut self,
+        device: &Device,
+        encoder: &mut CommandEncoder,
+        scatter: &ScatterCopy,
+        profile: RendererProfile,
+        texture_manager: &TextureManager,
+    ) {
+        profiling::scope!("Material Ready");
+
+        for (&type_id, type_info) in &mut self.storage {
+            match profile {
+                RendererProfile::CpuDriven => {
+                    (type_info.apply_data_cpu)(&mut type_info.buffer, device, encoder, scatter, &mut type_info.data_vec)
+                }
+                RendererProfile::GpuDriven => (type_info.apply_data_gpu)(
+                    &mut type_info.buffer,
+                    device,
+                    encoder,
+                    scatter,
+                    &mut type_info.data_vec,
+                    texture_manager,
+                ),
+            }
+        }
     }
 
     pub fn add_to_bgl_gpu<M: Material>(bglb: &mut BindGroupLayoutBuilder) {
@@ -196,34 +239,16 @@ impl MaterialManager {
         todo!()
     }
 
-    pub fn get_internal_material_full<M: Material>(&self, handle: RawMaterialHandle) -> (&M, &InternalMaterial) {
-        self.registry.get_ref_full::<M>(handle)
-    }
+    pub fn get_material_key(&mut self, handle: RawMaterialHandle) -> MaterialKeyPair {
+        let type_id = self.handle_to_typeid[&handle];
 
-    pub fn get_internal_material_full_by_index<M: Material>(&self, index: usize) -> (&M, &InternalMaterial) {
-        self.registry.get_ref_full_by_index::<M>(index)
-    }
+        let type_info = self.storage[&type_id];
 
-    pub fn get_material_key_and_objects(
-        &mut self,
-        handle: RawMaterialHandle,
-    ) -> (MaterialKeyPair, &mut Vec<RawObjectHandle>) {
-        let index = self.registry.get_index(handle);
-        let ty = self.registry.get_type_id(handle);
-        let type_info = &self.type_info[&ty];
-        let arch = self.registry.get_archetype_mut(ty);
-
-        let key_pair = (type_info.get_material_key)(&arch.vec, index);
-
-        (key_pair, &mut arch.non_erased[index].inner.objects)
+        (type_info.get_material_key)(&type_info.data_vec, handle.idx)
     }
 
     pub fn get_objects(&mut self, handle: RawMaterialHandle) -> &mut Vec<RawObjectHandle> {
-        let index = self.registry.get_index(handle);
-        let ty = self.registry.get_type_id(handle);
-        let arch = self.registry.get_archetype_mut(ty);
-
-        &mut arch.non_erased[index].inner.objects
+        todo!()
     }
 
     pub fn get_attributes(
@@ -231,45 +256,66 @@ impl MaterialManager {
         handle: RawMaterialHandle,
         mut callback: impl FnMut(&[&'static VertexAttributeId], &[&'static VertexAttributeId]),
     ) {
-        let ty = self.registry.get_type_id(handle);
-        let type_info = &self.type_info[&ty];
-
-        (type_info.get_attributes)(&mut callback)
-    }
-
-    pub fn get_internal_index(&self, handle: RawMaterialHandle) -> usize {
-        self.registry.get_index(handle)
-    }
-
-    pub fn ready(
-        &mut self,
-        device: &Device,
-        queue: &Queue,
-        object_manager: &mut ObjectManager,
-        texture_manager: &TextureManager,
-    ) {
-        profiling::scope!("Material Ready");
-        self.registry.remove_all_dead(|type_id, internal, idx| {
-            for object in &internal.objects {
-                object_manager.set_material_index(*object, idx);
-            }
-            if let ProfileData::Cpu(index) = internal.bind_group_index {
-                self.texture_deduplicator.remove(index);
-            }
-            self.type_info[&type_id].buffer.remove(internal.buffer_index);
-        });
+        todo!()
     }
 }
 
-fn write_gpu_materials<M: Material>(
-    type_info: &PerTypeInfo,
-    vec_any: &VecAny,
-    translation_fn: &mut (dyn FnMut(RawTextureHandle) -> NonZeroU32 + '_),
-) -> usize {
-    let materials = vec_any.downcast_slice::<M>().unwrap();
+fn remove_data<M: Material>(
+    data_vec: &mut VecAny,
+    handle: RawMaterialHandle,
+) -> ProfileData<TextureBindGroupIndex, ()> {
+    let data_vec = data_vec.downcast_slice_mut::<Option<InternalMaterial<M>>>().unwrap();
+    let internal: InternalMaterial<M> = data_vec[handle.idx].take().unwrap();
 
-    // TODO: figure out how to deal with freelist buffer and material registry wanting
-    // to give materials their own ids.
+    internal.bind_group_index
+}
+
+fn apply_buffer_cpu<M: Material>(
+    buffer: &mut FreelistDerivedBuffer,
+    device: &Device,
+    encoder: &mut CommandEncoder,
+    scatter: &ScatterCopy,
+    data_vec: &mut VecAny,
+) {
+    let data_vec = data_vec.downcast_slice::<Option<InternalMaterial<M>>>().unwrap();
+
+    buffer.apply(device, encoder, scatter, |idx| {
+        let material = data_vec[idx].as_ref().unwrap().inner;
+        CpuPoweredShaderWrapper::<M> {
+            data: material.to_data(),
+            texture_enable: {
+                let mut bits = 0x0;
+                for t in material.to_textures().as_ref().into_iter().rev() {
+                    bits |= t.is_some() as u32;
+                    bits <<= 1;
+                }
+                bits
+            },
+        }
+    });
+}
+
+fn apply_buffer_gpu<M: Material>(
+    buffer: &mut FreelistDerivedBuffer,
+    device: &Device,
+    encoder: &mut CommandEncoder,
+    scatter: &ScatterCopy,
+    data_vec: &mut VecAny,
+    texture_manager: &TextureManager,
+) {
+    let data_vec = data_vec.downcast_slice::<Option<InternalMaterial<M>>>().unwrap();
+
+    let translation_fn = texture_manager.translation_fn();
+
+    buffer.apply(device, encoder, scatter, |idx| {
+        let material = data_vec[idx].as_ref().unwrap().inner;
+        GpuPoweredShaderWrapper::<M> {
+            textures: material
+                .to_textures()
+                .map_to_u32(|handle_opt| handle_opt.map(translation_fn).map_or(0, NonZeroU32::get)),
+            data: material.to_data(),
+        }
+    });
 }
 
 fn get_material_key<M: Material>(vec_any: &VecAny, index: usize) -> MaterialKeyPair {

@@ -105,11 +105,7 @@ impl<HandleType, Metadata> ArchitypicalErasedRegistry<HandleType, Metadata> {
         &mut archetype.non_erased[vec_index].inner
     }
 
-    pub fn update<T: Send + Sync + 'static>(
-        &mut self,
-        handle: &ResourceHandle<HandleType>,
-        data: T,
-    ) {
+    pub fn update<T: Send + Sync + 'static>(&mut self, handle: &ResourceHandle<HandleType>, data: T) {
         let per_handle_data = self.handle_map.get_mut(&handle.get_raw().idx).unwrap();
         let index = per_handle_data.index;
         let current_type_id = &mut per_handle_data.ty;

@@ -873,11 +873,22 @@ pub trait MaterialArray<T>: IntoIterator<Item = T> + AsRef<[T]> {
     /// for shader layout stuff.
     type U32Array: encase::ShaderSize + encase::internal::WriteInto;
     const COUNT: u32;
+
+    fn map_to_u32<F>(self, func: F) -> Self::U32Array
+    where
+        F: FnMut(T) -> u32;
 }
 
 impl<const C: usize, T> MaterialArray<T> for [T; C] {
     type U32Array = [u32; C];
     const COUNT: u32 = C as u32;
+
+    fn map_to_u32<F>(self, func: F) -> Self::U32Array
+    where
+        F: FnMut(T) -> u32,
+    {
+        self.map(func)
+    }
 }
 
 /// Interface that all materials must use.
