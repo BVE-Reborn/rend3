@@ -15,11 +15,10 @@
 use std::collections::HashMap;
 
 use itertools::Itertools;
-use rend3::types::Handedness;
 use rend3::{
     types::{
         glam::{Mat4, Quat, Vec3},
-        SkeletonHandle,
+        Handedness, SkeletonHandle,
     },
     util::typedefs::{FastHashMap, FastHashSet},
     Renderer,
