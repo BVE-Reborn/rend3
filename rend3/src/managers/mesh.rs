@@ -349,7 +349,7 @@ impl MeshManager {
 
         let vertex_alloc = &mut self.vertex_alloc;
         let index_alloc = &mut self.index_alloc;
-        self.registry.remove_all_dead(|_, _, mesh| {
+        self.registry.remove_all_dead(|_, _, _, mesh| {
             if mesh.vertex_range.is_empty() {
                 return;
             }

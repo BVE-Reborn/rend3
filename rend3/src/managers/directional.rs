@@ -155,7 +155,7 @@ impl DirectionalLightManager {
     pub fn ready(&mut self, device: &Device, queue: &Queue, user_camera: &CameraManager) -> Vec<CameraManager> {
         profiling::scope!("Directional Light Ready");
 
-        self.registry.remove_all_dead(|_, _, _| ());
+        self.registry.remove_all_dead(|_, _, _, _| ());
 
         let registered_count: usize = self.registry.values().len();
         let recreate_view = registered_count != self.coords.len() && registered_count != 0;

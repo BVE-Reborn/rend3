@@ -123,7 +123,7 @@ impl SkeletonManager {
 
     pub fn ready(&mut self, mesh_manager: &mut MeshManager) {
         profiling::scope!("Skeleton Manager Ready");
-        self.registry.remove_all_dead(|_, handle_idx, skeleton| {
+        self.registry.remove_all_dead(|_, _, handle_idx, skeleton| {
             self.global_joint_count -= skeleton.joint_matrices.len();
 
             // Clean back references in the mesh data
