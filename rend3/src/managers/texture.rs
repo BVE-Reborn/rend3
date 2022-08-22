@@ -103,7 +103,7 @@ impl TextureManager {
         profiling::scope!("TextureManager::ready");
 
         let views = &mut self.views;
-        self.registry.remove_all_dead(|_, index, _| {
+        self.registry.remove_all_dead(|_, index, _, _| {
             // Do the same swap remove move as the registry did
             views.swap_remove(index);
         });

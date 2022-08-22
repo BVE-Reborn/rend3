@@ -48,6 +48,7 @@ Per Keep a Changelog there are 6 main categories of changes:
 - Fixed PbrMaterial instead of generic parameter M being used in forward and depth routines. @setzer22
 - Fixes loading of gltf with embedded base64 binary data.
 - Fixed building with `profiling/profile-with-tracing`. @SparkyPotato
+- Fixed panic when a mesh object with a skeleton was despawned. @setzer22
 
 ## v0.3.0
 
