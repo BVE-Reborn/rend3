@@ -8,13 +8,18 @@ readme = "../README.md"
 license = "MIT OR Apache-2.0 OR Zlib"
 repository = "https://github.com/BVE-Reborn/rend3"
 keywords = ["3d", "graphics", "rend3", "renderer", "egui"]
-categories = ["game-development", "graphics", "rendering", "rendering::engine", "wasm"]
+categories = [
+    "game-development",
+    "graphics",
+    "rendering",
+    "rendering::engine",
+    "wasm",
+]
 rust-version = "1.57"
 
 [dependencies]
-egui = "0.18.0"
-egui_wgpu_backend = "0.18.0"
-glam = "0.21.2"
+egui = { version = "0.19.0", features = ["bytemuck"] }
 rend3 = { version = "^0.3.0", path = "../rend3" }
 wgpu = "0.13"
-wgpu-types = "0.13.0"
+bytemuck = "1"
+intmap = "2"
