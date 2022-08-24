@@ -7,7 +7,7 @@ fn load_gltf(
     let (doc, datas, _) = gltf::import(path).unwrap();
     let mesh_data = doc.meshes().next().expect("no meshes in data.glb");
 
-    let primitive = mesh_data.primitives().next().expect("no primitives in data.glb");
+    let primitive = mesh_data.primitives().next().expect("no primitives in repro.glb");
     let reader = primitive.reader(|b| Some(&datas.get(b.index())?.0[..b.length()]));
 
     let vertex_positions: Vec<_> = reader.read_positions().unwrap().map(glam::Vec3::from).collect();
@@ -74,12 +74,20 @@ impl rend3_framework::App for GltfExample {
         // Create mesh and calculate smooth normals based on vertices.
         //
         // We do not need to keep these handles alive once we make the object
-        let (mesh, material) = load_gltf(renderer, concat!(env!("CARGO_MANIFEST_DIR"), "/data.glb"));
+        let (mesh, material) = load_gltf(renderer, concat!(env!("CARGO_MANIFEST_DIR"), "/repro.glb"));
+
+
+        let material_override = rend3_routine::pbr::PbrMaterial {
+            albedo: rend3_routine::pbr::AlbedoComponent::Value(glam::Vec4::new(0.0, 0.5, 0.5, 0.5)),
+            transparency: rend3_routine::pbr::Transparency::Blend,
+            ..rend3_routine::pbr::PbrMaterial::default()
+        };
+        let material_override = renderer.add_material(material_override);
 
         // Combine the mesh and the material with a location to give an object.
         let object = rend3::types::Object {
             mesh_kind: rend3::types::ObjectMeshKind::Static(mesh),
-            material,
+            material: material_override,
             transform: glam::Mat4::from_scale(glam::Vec3::new(1.0, 1.0, -1.0)),
         };
         // We need to keep the object alive.
