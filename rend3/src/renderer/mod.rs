@@ -262,6 +262,7 @@ impl Renderer {
         let InternalTexture {
             texture: old_texture,
             desc: old_texture_desc,
+            ..
         } = data_core.d2_texture_manager.get_internal(texture.src.get_raw());
 
         let new_size = old_texture_desc.mip_level_size(texture.start_mip).unwrap();

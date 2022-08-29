@@ -1,14 +1,11 @@
 use crate::{
     types::{Mesh, MeshHandle},
-    util::{frustum::BoundingSphere, registry::ResourceRegistry},
+    util::frustum::BoundingSphere,
 };
 
 use range_alloc::RangeAllocator;
 use rend3_types::{RawMeshHandle, VertexAttributeId, VERTEX_ATTRIBUTE_JOINT_INDICES, VERTEX_ATTRIBUTE_POSITION};
-use std::{
-    ops::Range,
-    sync::atomic::{AtomicUsize, Ordering},
-};
+use std::ops::Range;
 use wgpu::{BufferAddress, BufferDescriptor, BufferUsages, CommandEncoder, Device, Queue};
 
 /// Vertex buffer slot for object indices
@@ -60,7 +57,7 @@ pub struct MeshManager {
 
     allocator: RangeAllocator<u64>,
 
-    registry: ResourceRegistry<InternalMesh, Mesh>,
+    data: Vec<Option<InternalMesh>>,
 }
 
 impl MeshManager {
@@ -76,23 +73,16 @@ impl MeshManager {
 
         let allocator = RangeAllocator::new(0..STARTING_MESH_DATA);
 
-        let registry = ResourceRegistry::new();
+        let data = Vec::new();
 
         Self {
             buffer,
             allocator,
-            registry,
+            data,
         }
     }
 
-    pub fn allocate(counter: &AtomicUsize) -> MeshHandle {
-        let idx = counter.fetch_add(1, Ordering::Relaxed);
-
-        MeshHandle::new(idx)
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    pub fn fill(
+    pub fn add(
         &mut self,
         device: &Device,
         queue: &Queue,
@@ -108,7 +98,7 @@ impl MeshManager {
         // out of range.
         if index_count == 0 {
             let mesh = InternalMesh::new_empty();
-            self.registry.insert(handle, mesh);
+            self.data[handle.idx] = Some(mesh);
             return;
         }
 
@@ -153,7 +143,25 @@ impl MeshManager {
             bounding_sphere,
         };
 
-        self.registry.insert(handle, mesh);
+        if handle.idx >= self.data.len() {
+            self.data.resize_with(handle.idx + 1, || None);
+        }
+        self.data[handle.idx] = Some(mesh);
+    }
+
+    pub fn remove(&mut self, object_id: RawMeshHandle) {
+        let mesh = self.data[object_id.idx].take().unwrap();
+
+        for (_id, range) in mesh.vertex_attribute_ranges {
+            if range.is_empty() {
+                continue;
+            }
+            self.allocator.free_range(range);
+        }
+        if mesh.index_range.is_empty() {
+            return;
+        }
+        self.allocator.free_range(mesh.index_range);
     }
 
     /// Duplicates a mesh's vertex data so that it can be skinned on the GPU.
@@ -175,28 +183,11 @@ impl MeshManager {
     }
 
     pub fn internal_data(&self, handle: RawMeshHandle) -> &InternalMesh {
-        self.registry.get(handle)
+        self.data[handle.idx].as_ref().unwrap()
     }
 
     pub fn internal_data_mut(&mut self, handle: RawMeshHandle) -> &mut InternalMesh {
-        self.registry.get_mut(handle)
-    }
-
-    pub fn ready(&mut self) {
-        profiling::scope!("MeshManager::ready");
-
-        self.registry.remove_all_dead(|_, _, mesh| {
-            for (_id, range) in mesh.vertex_attribute_ranges {
-                if range.is_empty() {
-                    continue;
-                }
-                self.allocator.free_range(range);
-            }
-            if mesh.index_range.is_empty() {
-                return;
-            }
-            self.allocator.free_range(mesh.index_range);
-        });
+        self.data[handle.idx].as_mut().unwrap()
     }
 
     fn reallocate_buffers(&mut self, device: &Device, encoder: &mut CommandEncoder, needed_bytes: u64) {

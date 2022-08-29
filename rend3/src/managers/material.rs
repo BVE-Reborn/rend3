@@ -1,5 +1,5 @@
 use crate::{
-    managers::TextureManager,
+    managers::{object_callback, ObjectCallbackArgs, TextureManager},
     profile::ProfileData,
     types::MaterialHandle,
     util::{
@@ -16,6 +16,7 @@ use list_any::VecAny;
 use rend3_types::{Material, MaterialArray, RawMaterialHandle, RawObjectHandle, RawTextureHandle, VertexAttributeId};
 use std::{
     any::TypeId,
+    mem,
     num::{NonZeroU32, NonZeroU64},
 };
 use wgpu::{BindingType, BufferBindingType, CommandEncoder, Device, ShaderStages};
@@ -43,7 +44,9 @@ struct InternalMaterial<M> {
 }
 
 struct PerTypeInfo {
+    // Inner type is CpuPoweredShaderWrapper<M> or GpuPoweredShaderWrapper<M>
     buffer: FreelistDerivedBuffer,
+    // Inner type is Option<M>
     data_vec: VecAny,
     remove_data: fn(&mut VecAny, RawMaterialHandle) -> ProfileData<TextureBindGroupIndex, ()>,
     apply_data_cpu: fn(&mut FreelistDerivedBuffer, &Device, &mut CommandEncoder, &ScatterCopy, &mut VecAny),
@@ -51,6 +54,7 @@ struct PerTypeInfo {
         fn(&mut FreelistDerivedBuffer, &Device, &mut CommandEncoder, &ScatterCopy, &mut VecAny, &TextureManager),
     get_attributes: fn(&mut dyn FnMut(&[&'static VertexAttributeId], &[&'static VertexAttributeId])),
     get_material_key: fn(&VecAny, usize) -> MaterialKeyPair,
+    object_callback: fn(&VecAny, usize, ObjectCallbackArgs<'_>),
 }
 
 /// Key which determine's an object's archetype.
@@ -108,6 +112,7 @@ impl MaterialManager {
             apply_data_gpu: apply_buffer_gpu::<M>,
             get_attributes: get_attributes::<M>,
             get_material_key: get_material_key::<M>,
+            object_callback: object_callback_wrapper::<M>,
         })
     }
 
@@ -141,11 +146,11 @@ impl MaterialManager {
             .unwrap();
         if handle.idx > data_vec.len() {
             data_vec.resize_with(handle.idx.saturating_sub(1).next_power_of_two(), || None);
-            data_vec[handle.idx] = Some(InternalMaterial {
-                bind_group_index,
-                inner: material,
-            });
         }
+        data_vec[handle.idx] = Some(InternalMaterial {
+            bind_group_index,
+            inner: material,
+        });
 
         self.handle_to_typeid.insert(**handle, TypeId::of::<M>());
     }
@@ -239,10 +244,18 @@ impl MaterialManager {
         todo!()
     }
 
+    pub(super) fn call_object_callback(&self, handle: RawMaterialHandle, args: ObjectCallbackArgs) {
+        let type_id = self.handle_to_typeid[&handle];
+
+        let type_info = &self.storage[&type_id];
+
+        (type_info.object_callback)(&type_info.data_vec, handle.idx, args);
+    }
+
     pub fn get_material_key(&mut self, handle: RawMaterialHandle) -> MaterialKeyPair {
         let type_id = self.handle_to_typeid[&handle];
 
-        let type_info = self.storage[&type_id];
+        let type_info = &self.storage[&type_id];
 
         (type_info.get_material_key)(&type_info.data_vec, handle.idx)
     }
@@ -256,7 +269,11 @@ impl MaterialManager {
         handle: RawMaterialHandle,
         mut callback: impl FnMut(&[&'static VertexAttributeId], &[&'static VertexAttributeId]),
     ) {
-        todo!()
+        let type_id = self.handle_to_typeid[&handle];
+
+        let type_info = &self.storage[&type_id];
+
+        (type_info.get_attributes)(&mut callback)
     }
 }
 
@@ -265,7 +282,8 @@ fn remove_data<M: Material>(
     handle: RawMaterialHandle,
 ) -> ProfileData<TextureBindGroupIndex, ()> {
     let data_vec = data_vec.downcast_slice_mut::<Option<InternalMaterial<M>>>().unwrap();
-    let internal: InternalMaterial<M> = data_vec[handle.idx].take().unwrap();
+    // This should be .take() instead of mem::take, but RA gets confused due to https://github.com/rust-lang/rust-analyzer/issues/6418
+    let internal: InternalMaterial<M> = mem::take(&mut data_vec[handle.idx]).unwrap();
 
     internal.bind_group_index
 }
@@ -331,4 +349,12 @@ fn get_material_key<M: Material>(vec_any: &VecAny, index: usize) -> MaterialKeyP
 
 fn get_attributes<M: Material>(callback: &mut dyn FnMut(&[&'static VertexAttributeId], &[&'static VertexAttributeId])) {
     callback(M::required_attributes().as_ref(), M::supported_attributes().as_ref())
+}
+
+fn object_callback_wrapper<M: Material>(vec_any: &VecAny, idx: usize, args: ObjectCallbackArgs) {
+    let data_vec = vec_any.downcast_slice::<Option<InternalMaterial<M>>>().unwrap();
+
+    let material = &data_vec[idx].as_ref().unwrap().inner;
+
+    object_callback(material, args)
 }

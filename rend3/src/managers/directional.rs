@@ -6,7 +6,7 @@ use crate::{
         buffer::WrappedPotBuffer,
         freelist::FreelistDerivedBuffer,
         registry::ResourceRegistry,
-        typedefs::FastHashMap,
+        typedefs::FastHashMap, scatter_copy::ScatterCopy,
     },
     INTERNAL_SHADOW_DEPTH_FORMAT, SHADOW_DIMENSIONS,
 };
@@ -22,7 +22,7 @@ use std::{
 use wgpu::{
     BindGroup, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, Buffer,
     BufferBindingType, BufferUsages, Device, Extent3d, Queue, ShaderStages, TextureAspect, TextureDescriptor,
-    TextureDimension, TextureSampleType, TextureUsages, TextureView, TextureViewDescriptor, TextureViewDimension,
+    TextureDimension, TextureSampleType, TextureUsages, TextureView, TextureViewDescriptor, TextureViewDimension, CommandEncoder,
 };
 
 /// Internal representation of a directional light.
@@ -135,10 +135,10 @@ impl DirectionalLightManager {
         &self.coords
     }
 
-    pub fn ready(&mut self, device: &Device, queue: &Queue, user_camera: &CameraManager) -> Vec<CameraManager> {
+    pub fn ready(&mut self, device: &Device, encoder: &mut CommandEncoder, scatter: &ScatterCopy, user_camera: &CameraManager) -> Vec<CameraManager> {
         profiling::scope!("Directional Light Ready");
 
-        self.registry.remove_all_dead(|_, _, _| ());
+        self.buffer.apply(device, encoder, scatter, |idx| self.data[idx].as_ref().unwrap());
 
         let registered_count: usize = self.registry.values().len();
         let recreate_view = registered_count != self.coords.len() && registered_count != 0;

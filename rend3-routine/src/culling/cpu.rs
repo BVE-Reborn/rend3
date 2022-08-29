@@ -89,8 +89,8 @@ fn cull_internal(
         let model_view_proj = view_proj * model;
 
         calls.push(CpuDrawCall {
-            start_idx: object.input.start_idx,
-            end_idx: object.input.start_idx + object.input.count,
+            start_idx: object.input.first_index,
+            end_idx: object.input.first_index + object.input.index_count,
             vertex_offset: object.input.vertex_offset,
             material_index: object.input.material_index,
         });

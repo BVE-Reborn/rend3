@@ -33,7 +33,7 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
                         .begin_scope("Add Mesh", &mut encoder, &renderer.device);
                     data_core
                         .mesh_manager
-                        .fill(&renderer.device, &renderer.queue, &mut encoder, &handle, mesh);
+                        .add(&renderer.device, &renderer.queue, &mut encoder, &handle, mesh);
                     data_core.profiler.end_scope(&mut encoder);
                 }
                 InstructionKind::AddSkeleton { handle, skeleton } => {
@@ -60,9 +60,9 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
                 } => {
                     cmd_bufs.extend(buffer);
                     if cube {
-                        data_core.d2c_texture_manager.fill(&handle, desc, texture, view);
+                        data_core.d2c_texture_manager.add(&handle, desc, texture, view);
                     } else {
-                        data_core.d2_texture_manager.fill(&handle, desc, texture, view);
+                        data_core.d2_texture_manager.add(&handle, desc, texture, view);
                     }
                 }
                 InstructionKind::AddMaterial { handle, fill_invoke } => {
@@ -81,14 +81,12 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
                     change_invoke(
                         &mut data_core.material_manager,
                         &renderer.device,
-                        renderer.profile,
                         &mut data_core.d2_texture_manager,
-                        &mut data_core.object_manager,
                         &handle,
                     )
                 }
                 InstructionKind::AddObject { handle, object } => {
-                    data_core.object_manager.fill(
+                    data_core.object_manager.add(
                         &handle,
                         object,
                         &mut data_core.mesh_manager,
@@ -103,7 +101,7 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
                     data_core.skeleton_manager.set_joint_matrices(handle, joint_matrices);
                 }
                 InstructionKind::AddDirectionalLight { handle, light } => {
-                    data_core.directional_light_manager.fill(&handle, light);
+                    data_core.directional_light_manager.add(&handle, light);
                 }
                 InstructionKind::ChangeDirectionalLight { handle, change } => {
                     data_core
