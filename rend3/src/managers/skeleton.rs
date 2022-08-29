@@ -1,9 +1,6 @@
-use std::{
-    ops::Range,
-    sync::atomic::{AtomicUsize, Ordering},
-};
+use std::ops::Range;
 
-use crate::{managers::MeshManager, util::registry::ResourceRegistry};
+use crate::managers::MeshManager;
 
 use arrayvec::ArrayVec;
 use glam::Mat4;
@@ -34,7 +31,7 @@ pub struct InternalSkeleton {
 /// Skeletons only contain the relevant data for vertex skinning. No bone
 /// hierarchy is stored.
 pub struct SkeletonManager {
-    registry: ResourceRegistry<InternalSkeleton, Skeleton>,
+    data: Vec<Option<InternalSkeleton>>,
     /// The number of joints of all the skeletons in this manager
     global_joint_count: usize,
 }
@@ -42,22 +39,14 @@ impl SkeletonManager {
     pub fn new() -> Self {
         profiling::scope!("SkeletonManager::new");
 
-        let registry = ResourceRegistry::new();
-
         Self {
-            registry,
+            data: Vec::new(),
             global_joint_count: 0,
         }
     }
 
-    pub fn allocate(counter: &AtomicUsize) -> SkeletonHandle {
-        let idx = counter.fetch_add(1, Ordering::Relaxed);
-
-        SkeletonHandle::new(idx)
-    }
-
     #[allow(clippy::too_many_arguments)]
-    pub fn fill(
+    pub fn add(
         &mut self,
         device: &Device,
         encoder: &mut CommandEncoder,
@@ -126,23 +115,25 @@ impl SkeletonManager {
             source_attribute_ranges,
             overridden_attribute_ranges,
         };
-        self.registry.insert(handle, internal);
+
+        if handle.idx >= self.data.len() {
+            self.data.resize_with(handle.idx + 1, || None);
+        }
+        self.data[handle.idx] = Some(internal);
     }
 
-    pub fn ready(&mut self, mesh_manager: &mut MeshManager) {
-        profiling::scope!("Skeleton Manager Ready");
-        self.registry.remove_all_dead(|_, _, skeleton| {
-            self.global_joint_count -= skeleton.joint_matrices.len();
+    pub fn remove(&mut self, mesh_manager: &mut MeshManager, handle: RawSkeletonHandle) {
+        let skeleton = self.data[handle.idx].take().unwrap();
+        self.global_joint_count -= skeleton.joint_matrices.len();
 
-            // Free the owned regions of the mesh data buffer
-            for (_, range) in skeleton.overridden_attribute_ranges {
-                mesh_manager.free_range(range);
-            }
-        });
+        // Free the owned regions of the mesh data buffer
+        for (_, range) in skeleton.overridden_attribute_ranges {
+            mesh_manager.free_range(range);
+        }
     }
 
     pub fn set_joint_matrices(&mut self, handle: RawSkeletonHandle, mut joint_matrices: Vec<Mat4>) {
-        let skeleton = self.registry.get_mut(handle);
+        let skeleton = self.data[handle.idx].as_mut().unwrap();
         assert!(
             skeleton.joint_matrices.len() <= joint_matrices.len(),
             "Not enough joints to update this skeleton. The mesh has {} joints, \
@@ -156,12 +147,12 @@ impl SkeletonManager {
     }
 
     pub fn internal_data(&self, handle: RawSkeletonHandle) -> &InternalSkeleton {
-        self.registry.get(handle)
+        self.data[handle.idx].as_ref().unwrap()
     }
 
-    pub fn skeletons(&self) -> impl ExactSizeIterator<Item = &InternalSkeleton> {
-        self.registry.values()
-    }
+    // pub fn skeletons(&self) -> impl ExactSizeIterator<Item = &InternalSkeleton> {
+    //     self.data.iter()
+    // }
 
     /// Get the skeleton manager's global joint count.
     pub fn global_joint_count(&self) -> usize {

@@ -1,7 +1,4 @@
-use std::{
-    any::TypeId,
-    ops::Range,
-};
+use std::{any::TypeId, ops::Range};
 
 use crate::{
     managers::{InternalMesh, MaterialManager, MeshManager},
@@ -48,6 +45,7 @@ struct ObjectArchetype {
     data_vec: VecAny,
     set_object_transform: fn(&VecAny, usize, Mat4),
     duplicate_object: fn(&VecAny, usize, ObjectChange) -> Object,
+    remove: fn(&VecAny, usize),
 }
 
 /// Manages objects. That's it. ¯\\\_(ツ)\_/¯
@@ -71,6 +69,7 @@ impl ObjectManager {
             data_vec: VecAny::new::<Option<InternalObject<M>>>(),
             set_object_transform: set_object_transform::<M>,
             duplicate_object: duplicate_object::<M>,
+            remove: remove::<M>,
         })
     }
 
@@ -112,6 +111,14 @@ impl ObjectManager {
         let storage = &self.storage[&type_id];
 
         (storage.set_object_transform)(&storage.data_vec, handle.idx, transform);
+    }
+
+    pub fn remove(&mut self, handle: RawObjectHandle) {
+        let type_id = self.handle_to_typeid[&handle];
+
+        let storage = &self.storage[&type_id];
+
+        (storage.remove)(&storage.data_vec, handle.idx);
     }
 
     pub fn get_objects<M: Material>(&self) -> &[Option<InternalObject<M>>] {
@@ -166,6 +173,12 @@ fn duplicate_object<M: Material>(data: &VecAny, idx: usize, change: ObjectChange
         material: change.material.unwrap_or_else(|| src_obj.material_handle.clone()),
         transform: change.transform.unwrap_or(src_obj.input.transform),
     }
+}
+
+fn remove<M: Material>(data: &VecAny, idx: usize) {
+    let data_vec = data.downcast_slice::<Option<InternalObject<M>>>().unwrap();
+
+    data_vec[idx] = None;
 }
 
 pub(super) struct ObjectCallbackArgs<'a> {

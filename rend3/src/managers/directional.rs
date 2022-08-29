@@ -6,7 +6,8 @@ use crate::{
         buffer::WrappedPotBuffer,
         freelist::FreelistDerivedBuffer,
         registry::ResourceRegistry,
-        typedefs::FastHashMap, scatter_copy::ScatterCopy,
+        scatter_copy::ScatterCopy,
+        typedefs::FastHashMap,
     },
     INTERNAL_SHADOW_DEPTH_FORMAT, SHADOW_DIMENSIONS,
 };
@@ -21,8 +22,9 @@ use std::{
 };
 use wgpu::{
     BindGroup, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, Buffer,
-    BufferBindingType, BufferUsages, Device, Extent3d, Queue, ShaderStages, TextureAspect, TextureDescriptor,
-    TextureDimension, TextureSampleType, TextureUsages, TextureView, TextureViewDescriptor, TextureViewDimension, CommandEncoder,
+    BufferBindingType, BufferUsages, CommandEncoder, Device, Extent3d, Queue, ShaderStages, TextureAspect,
+    TextureDescriptor, TextureDimension, TextureSampleType, TextureUsages, TextureView, TextureViewDescriptor,
+    TextureViewDimension,
 };
 
 /// Internal representation of a directional light.
@@ -86,8 +88,8 @@ impl DirectionalLightManager {
         self.buffer.use_index(handle.idx);
         if handle.idx > self.data.len() {
             self.data.resize_with(handle.idx + 1, || None);
-            self.data[handle.idx] = Some(InternalDirectionalLight { inner: light })
         }
+        self.data[handle.idx] = Some(InternalDirectionalLight { inner: light })
     }
 
     pub fn update(&mut self, handle: RawDirectionalLightHandle, change: DirectionalLightChange) {
@@ -135,10 +137,17 @@ impl DirectionalLightManager {
         &self.coords
     }
 
-    pub fn ready(&mut self, device: &Device, encoder: &mut CommandEncoder, scatter: &ScatterCopy, user_camera: &CameraManager) -> Vec<CameraManager> {
+    pub fn ready(
+        &mut self,
+        device: &Device,
+        encoder: &mut CommandEncoder,
+        scatter: &ScatterCopy,
+        user_camera: &CameraManager,
+    ) -> Vec<CameraManager> {
         profiling::scope!("Directional Light Ready");
 
-        self.buffer.apply(device, encoder, scatter, |idx| self.data[idx].as_ref().unwrap());
+        self.buffer
+            .apply(device, encoder, scatter, |idx| self.data[idx].as_ref().unwrap());
 
         let registered_count: usize = self.registry.values().len();
         let recreate_view = registered_count != self.coords.len() && registered_count != 0;

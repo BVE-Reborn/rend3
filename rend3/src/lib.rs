@@ -182,17 +182,6 @@ pub mod util {
     pub mod mipmap;
     pub mod output;
     pub mod scatter_copy;
-    /// Core datastructures that associate handles with data in a gpu-friendly
-    /// format.
-    pub mod registry {
-        mod archetypical;
-        mod basic;
-        mod erased;
-
-        pub use archetypical::*;
-        pub use basic::*;
-        pub use erased::*;
-    }
     pub mod typedefs;
 }
 

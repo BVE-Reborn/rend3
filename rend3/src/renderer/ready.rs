@@ -41,7 +41,7 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
                     data_core
                         .profiler
                         .begin_scope("Add Skeleton", &mut encoder, &renderer.device);
-                    data_core.skeleton_manager.fill(
+                    data_core.skeleton_manager.add(
                         &renderer.device,
                         &mut encoder,
                         &mut data_core.mesh_manager,
@@ -104,9 +104,7 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
                     data_core.directional_light_manager.add(&handle, light);
                 }
                 InstructionKind::ChangeDirectionalLight { handle, change } => {
-                    data_core
-                        .directional_light_manager
-                        .update_directional_light(handle, change);
+                    data_core.directional_light_manager.update(handle, change);
                 }
                 InstructionKind::SetAspectRatio { ratio } => data_core.camera_manager.set_aspect_ratio(Some(ratio)),
                 InstructionKind::SetCameraData { data } => {
@@ -126,6 +124,14 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
                         &mut data_core.material_manager,
                     );
                 }
+                InstructionKind::DeleteMesh { handle } => data_core.mesh_manager.remove(handle),
+                InstructionKind::DeleteSkeleton { handle } => {
+                    data_core.skeleton_manager.remove(&mut data_core.mesh_manager, handle)
+                }
+                InstructionKind::DeleteTexture { handle } => data_core.d2_texture_manager.remove(handle),
+                InstructionKind::DeleteMaterial { handle } => data_core.material_manager.remove(handle),
+                InstructionKind::DeleteObject { handle } => data_core.object_manager.remove(handle),
+                InstructionKind::DeleteDirectionalLight { handle } => todo!(),
             }
         }
     }
