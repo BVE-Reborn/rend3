@@ -43,7 +43,7 @@ impl InternalMesh {
         }
     }
 
-    pub fn get_attribute(&self, attribute: &'static VertexAttributeId) -> Option<Range<u64>> {
+    pub fn get_attribute(&self, attribute: &VertexAttributeId) -> Option<Range<u64>> {
         self.vertex_attribute_ranges
             .iter()
             .find_map(|(id, range)| (*id == *attribute).then_some(range.clone()))

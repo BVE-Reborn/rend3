@@ -169,7 +169,6 @@ pub mod types {
 /// Utilities and isolated bits of functionality that need a home.
 pub mod util {
     pub mod bind_merge;
-    pub mod buffer;
     pub mod frustum;
     pub mod freelist {
         mod buffer;

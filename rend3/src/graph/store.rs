@@ -88,7 +88,10 @@ impl<'a> RenderGraphDataStore<'a> {
         ShadowTarget {
             view: self
                 .shadow_views
-                .get(coords.layer)
+                .get({
+                    todo!();
+                    0
+                })
                 .expect("internal rendergraph error: failed to get shadow layer"),
             offset: coords.offset,
             size: coords.size,

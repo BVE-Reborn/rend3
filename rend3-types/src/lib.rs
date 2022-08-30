@@ -985,6 +985,8 @@ changeable_struct! {
     pub struct DirectionalLight <- DirectionalLightChange {
         /// Color of the light.
         pub color: Vec3,
+        /// Resolution of the shadow map cascades (in pix)
+        pub resolution: u16,
         /// Constant multiplier for the light.
         pub intensity: f32,
         /// Direction of the sun.

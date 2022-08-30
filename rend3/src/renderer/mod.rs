@@ -9,7 +9,7 @@ use crate::{
         Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, MaterialHandle, Mesh, MeshHandle,
         Object, ObjectHandle, Texture, TextureHandle,
     },
-    util::mipmap::MipmapGenerator,
+    util::{mipmap::MipmapGenerator, scatter_copy::ScatterCopy},
     ExtendedAdapterInfo, InstanceAdapterDevice, RendererInitializationError, RendererProfile,
 };
 use glam::Mat4;
@@ -60,6 +60,8 @@ pub struct Renderer {
 
     /// Tool which generates mipmaps from a texture.
     pub mipmap_generator: MipmapGenerator,
+    /// Tool which allows scatter uploads to happen.
+    pub scatter: ScatterCopy,
 }
 
 /// Handle allocators

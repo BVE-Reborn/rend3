@@ -12,8 +12,8 @@ use crate::util::{
 };
 
 pub struct ScatterData<T> {
-    word_offset: u32,
-    data: T,
+    pub word_offset: u32,
+    pub data: T,
 }
 impl<T> ScatterData<T> {
     pub fn new(byte_offset: u32, data: T) -> Self {

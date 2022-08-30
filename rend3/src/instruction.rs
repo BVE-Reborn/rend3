@@ -1,5 +1,5 @@
 use crate::{
-    managers::{MaterialManager, ObjectManager, TextureManager},
+    managers::{MaterialManager, TextureManager},
     types::{Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Mesh, Object, RawObjectHandle},
     RendererProfile,
 };

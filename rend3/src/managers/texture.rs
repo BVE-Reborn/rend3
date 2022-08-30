@@ -175,7 +175,7 @@ fn create_bind_group<'a>(
 ) -> Arc<BindGroup> {
     let count = data.len();
     let mut view_array = Vec::with_capacity(count);
-    view_array.extend(data.iter().map(|tex| match *tex {
+    view_array.extend(data.iter().map(|tex| match tex {
         Some(t) => &t.view,
         None => null_view,
     }));

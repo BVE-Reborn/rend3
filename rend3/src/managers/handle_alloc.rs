@@ -12,7 +12,7 @@ use rend3_types::{RawResourceHandle, ResourceHandle};
 
 use crate::{instruction::DeletableRawResourceHandle, Renderer};
 
-pub struct HandleAllocator<T>
+pub(crate) struct HandleAllocator<T>
 where
     RawResourceHandle<T>: DeletableRawResourceHandle,
 {

@@ -6,7 +6,7 @@ use crate::{
         TextureManager,
     },
     renderer::{HandleAllocators, RendererDataCore},
-    util::mipmap::MipmapGenerator,
+    util::{mipmap::MipmapGenerator, scatter_copy::ScatterCopy},
     InstanceAdapterDevice, Renderer, RendererInitializationError,
 };
 use parking_lot::Mutex;
@@ -58,6 +58,8 @@ pub fn create_renderer(
 
     let profiler = wgpu_profiler::GpuProfiler::new(4, iad.queue.get_timestamp_period(), Features::empty());
 
+    let scatter = ScatterCopy::new(&iad.device);
+
     Ok(Arc::new(Renderer {
         instructions: InstructionStreamPair::new(),
 
@@ -86,5 +88,6 @@ pub fn create_renderer(
         }),
 
         mipmap_generator,
+        scatter,
     }))
 }

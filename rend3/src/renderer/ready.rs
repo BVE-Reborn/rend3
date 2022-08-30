@@ -124,21 +124,37 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
                         &mut data_core.material_manager,
                     );
                 }
-                InstructionKind::DeleteMesh { handle } => data_core.mesh_manager.remove(handle),
+                InstructionKind::DeleteMesh { handle } => {
+                    renderer.resource_handle_allocators.mesh.deallocate(handle);
+                    data_core.mesh_manager.remove(handle)
+                }
                 InstructionKind::DeleteSkeleton { handle } => {
+                    renderer.resource_handle_allocators.skeleton.deallocate(handle);
                     data_core.skeleton_manager.remove(&mut data_core.mesh_manager, handle)
                 }
-                InstructionKind::DeleteTexture { handle } => data_core.d2_texture_manager.remove(handle),
-                InstructionKind::DeleteMaterial { handle } => data_core.material_manager.remove(handle),
-                InstructionKind::DeleteObject { handle } => data_core.object_manager.remove(handle),
-                InstructionKind::DeleteDirectionalLight { handle } => todo!(),
+                InstructionKind::DeleteTexture { handle } => {
+                    renderer.resource_handle_allocators.d2_texture.deallocate(handle);
+                    data_core.d2_texture_manager.remove(handle)
+                }
+                InstructionKind::DeleteMaterial { handle } => {
+                    renderer.resource_handle_allocators.material.deallocate(handle);
+                    data_core.material_manager.remove(handle)
+                }
+                InstructionKind::DeleteObject { handle } => {
+                    renderer.resource_handle_allocators.object.deallocate(handle);
+                    data_core.object_manager.remove(handle)
+                }
+                InstructionKind::DeleteDirectionalLight { handle } => {
+                    renderer.resource_handle_allocators.directional_light.deallocate(handle);
+                    data_core.directional_light_manager.remove(handle)
+                }
             }
         }
     }
 
     // Do these in dependency order
     // Level 3
-    data_core.object_manager.ready(&mut data_core.material_manager);
+    data_core.object_manager.ready();
 
     // Level 2
     let d2_texture = data_core.d2_texture_manager.ready(&renderer.device);
@@ -148,19 +164,17 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
     // the d2 texture manager, so it has to go first.
     data_core.material_manager.ready(
         &renderer.device,
-        &renderer.queue,
-        &mut data_core.object_manager,
+        &mut encoder,
+        &renderer.scatter,
+        renderer.profile,
         &data_core.d2_texture_manager,
     );
 
     // Level 0
     let d2c_texture = data_core.d2c_texture_manager.ready(&renderer.device);
-    let directional_light_cameras =
-        data_core
-            .directional_light_manager
-            .ready(&renderer.device, &renderer.queue, &data_core.camera_manager);
-    data_core.mesh_manager.ready();
-    data_core.skeleton_manager.ready(&mut data_core.mesh_manager);
+    let directional_light_cameras = data_core
+        .directional_light_manager
+        .ready(&renderer.device, &data_core.camera_manager);
 
     cmd_bufs.push(encoder.finish());
 

@@ -43,9 +43,9 @@ impl<M: Material> InternalObject<M> {
 struct ObjectArchetype {
     /// Inner type is Option<InternalObject<M>>
     data_vec: VecAny,
-    set_object_transform: fn(&VecAny, usize, Mat4),
+    set_object_transform: fn(&mut VecAny, usize, Mat4),
     duplicate_object: fn(&VecAny, usize, ObjectChange) -> Object,
-    remove: fn(&VecAny, usize),
+    remove: fn(&mut VecAny, usize),
 }
 
 /// Manages objects. That's it. ¯\\\_(ツ)\_/¯
@@ -108,17 +108,21 @@ impl ObjectManager {
     pub fn set_object_transform(&mut self, handle: RawObjectHandle, transform: Mat4) {
         let type_id = self.handle_to_typeid[&handle];
 
-        let storage = &self.storage[&type_id];
+        let storage = self.storage.get_mut(&type_id).unwrap();
 
-        (storage.set_object_transform)(&storage.data_vec, handle.idx, transform);
+        (storage.set_object_transform)(&mut storage.data_vec, handle.idx, transform);
     }
 
     pub fn remove(&mut self, handle: RawObjectHandle) {
         let type_id = self.handle_to_typeid[&handle];
 
-        let storage = &self.storage[&type_id];
+        let storage = self.storage.get_mut(&type_id).unwrap();
 
-        (storage.remove)(&storage.data_vec, handle.idx);
+        (storage.remove)(&mut storage.data_vec, handle.idx);
+    }
+
+    pub fn ready(&self) {
+        todo!()
     }
 
     pub fn get_objects<M: Material>(&self) -> &[Option<InternalObject<M>>] {
@@ -141,9 +145,9 @@ impl ObjectManager {
     ) {
         let type_id = self.handle_to_typeid[&*src_handle];
 
-        let archetype = self.storage[&type_id];
+        let archetype = self.storage.get_mut(&type_id).unwrap();
 
-        let dst_obj = (archetype.duplicate_object)(&archetype.data_vec, src_handle.idx, change);
+        let dst_obj = (archetype.duplicate_object)(&mut archetype.data_vec, src_handle.idx, change);
 
         self.add(&dst_handle, dst_obj, mesh_manager, skeleton_manager, material_manager);
     }
@@ -155,10 +159,10 @@ impl Default for ObjectManager {
     }
 }
 
-fn set_object_transform<M: Material>(data: &VecAny, idx: usize, transform: Mat4) {
-    let data_vec = data.downcast_slice::<Option<InternalObject<M>>>().unwrap();
+fn set_object_transform<M: Material>(data: &mut VecAny, idx: usize, transform: Mat4) {
+    let data_vec = data.downcast_slice_mut::<Option<InternalObject<M>>>().unwrap();
 
-    let object = data_vec[idx].as_ref().unwrap();
+    let object = data_vec[idx].as_mut().unwrap();
     object.input.transform = transform;
     object.location = transform.transform_point3a(Vec3A::ZERO)
 }
@@ -175,8 +179,8 @@ fn duplicate_object<M: Material>(data: &VecAny, idx: usize, change: ObjectChange
     }
 }
 
-fn remove<M: Material>(data: &VecAny, idx: usize) {
-    let data_vec = data.downcast_slice::<Option<InternalObject<M>>>().unwrap();
+fn remove<M: Material>(data: &mut VecAny, idx: usize) {
+    let data_vec = data.downcast_slice_mut::<Option<InternalObject<M>>>().unwrap();
 
     data_vec[idx] = None;
 }
@@ -251,6 +255,6 @@ pub(super) fn object_callback<M: Material>(material: &M, args: ObjectCallbackArg
     args.manager.handle_to_typeid.insert(args.handle, type_id);
     let archetype = args.manager.ensure_archetype::<M>();
 
-    let data_vec = archetype.data_vec.downcast_mut::<Option<InternalObject<M>>>().unwrap();
+    let data_vec = archetype.data_vec.downcast_slice_mut::<Option<InternalObject<M>>>().unwrap();
     data_vec[args.handle.idx] = Some(internal_object);
 }

@@ -260,7 +260,7 @@ impl<'node> RenderGraph<'node> {
 
         profiling::scope!("Run Nodes");
 
-        let shadow_views = data_core.directional_light_manager.get_layer_views();
+        let shadow_views = todo!();
 
         let output_cell = UnsafeCell::new(output);
         let encoder_cell = UnsafeCell::new(
@@ -330,8 +330,8 @@ impl<'node> RenderGraph<'node> {
             {
                 let store = RenderGraphDataStore {
                     texture_mapping: &active_views,
-                    shadow_coordinates: data_core.directional_light_manager.get_coords(),
-                    shadow_views: data_core.directional_light_manager.get_layer_views(),
+                    shadow_coordinates: todo!(),
+                    shadow_views: todo!(),
                     data: &self.data,
                     // SAFETY: This is only viewed mutably when no renderpass exists
                     output: unsafe { &*output_cell.get() }.as_view(),

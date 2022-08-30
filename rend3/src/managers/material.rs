@@ -151,6 +151,7 @@ impl MaterialManager {
             bind_group_index,
             inner: material,
         });
+        drop(data_vec);
 
         self.handle_to_typeid.insert(**handle, TypeId::of::<M>());
     }
@@ -166,7 +167,7 @@ impl MaterialManager {
 
         assert_eq!(type_id, TypeId::of::<M>());
 
-        let type_info = &mut self.storage[&type_id];
+        let type_info = self.storage.get_mut(&type_id).unwrap();
 
         let data_vec = type_info
             .data_vec
@@ -190,7 +191,7 @@ impl MaterialManager {
     pub fn remove(&mut self, handle: RawMaterialHandle) {
         let type_id = self.handle_to_typeid.remove(&handle).unwrap();
 
-        let type_info = &mut self.storage[&type_id];
+        let type_info = self.storage.get_mut(&type_id).unwrap();
         let bind_group_index = (type_info.remove_data)(&mut type_info.data_vec, handle);
 
         if let ProfileData::Cpu(index) = bind_group_index {
@@ -208,7 +209,7 @@ impl MaterialManager {
     ) {
         profiling::scope!("Material Ready");
 
-        for (&type_id, type_info) in &mut self.storage {
+        for type_info in self.storage.values_mut() {
             match profile {
                 RendererProfile::CpuDriven => {
                     (type_info.apply_data_cpu)(&mut type_info.buffer, device, encoder, scatter, &mut type_info.data_vec)
@@ -298,7 +299,7 @@ fn apply_buffer_cpu<M: Material>(
     let data_vec = data_vec.downcast_slice::<Option<InternalMaterial<M>>>().unwrap();
 
     buffer.apply(device, encoder, scatter, |idx| {
-        let material = data_vec[idx].as_ref().unwrap().inner;
+        let material = &data_vec[idx].as_ref().unwrap().inner;
         CpuPoweredShaderWrapper::<M> {
             data: material.to_data(),
             texture_enable: {
@@ -326,7 +327,7 @@ fn apply_buffer_gpu<M: Material>(
     let translation_fn = texture_manager.translation_fn();
 
     buffer.apply(device, encoder, scatter, |idx| {
-        let material = data_vec[idx].as_ref().unwrap().inner;
+        let material = &data_vec[idx].as_ref().unwrap().inner;
         GpuPoweredShaderWrapper::<M> {
             textures: material
                 .to_textures()

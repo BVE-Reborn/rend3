@@ -30,7 +30,7 @@ impl FreelistDerivedBuffer {
         let buffer = device.create_buffer(&BufferDescriptor {
             label: Some("freelist buffer"),
             size: rounded_size * STARTING_SIZE as u64,
-            usage: BufferUsages::STORAGE | BufferUsages::COPY_SRC | BufferUsages::COPY_DST,
+            usage: NEEDED_USAGES,
             mapped_at_creation: false,
         });
 
@@ -70,7 +70,7 @@ impl FreelistDerivedBuffer {
             let new_buffer = device.create_buffer(&BufferDescriptor {
                 label: Some("freelist buffer"),
                 size: self.rounded_size * self.reserved_count as u64,
-                usage: BufferUsages::STORAGE,
+                usage: NEEDED_USAGES,
                 mapped_at_creation: false,
             });
 
