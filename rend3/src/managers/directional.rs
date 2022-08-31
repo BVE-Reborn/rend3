@@ -22,6 +22,8 @@ use wgpu::{
 
 mod shadow_alloc;
 
+pub use shadow_alloc::ShadowCoordinate;
+
 /// Internal representation of a directional light.
 pub struct InternalDirectionalLight {
     pub inner: DirectionalLight,
@@ -78,13 +80,6 @@ impl DirectionalLightManager {
 
         todo!()
     }
-}
-
-/// The location of a shadow map in the shadow atlas.
-#[derive(Debug, Default, Clone, Copy)]
-pub struct ShadowCoordinates {
-    pub offset: UVec2,
-    pub size: usize,
 }
 
 fn create_shadow_texture(device: &Device, size: Extent3d) -> (TextureView, Vec<TextureView>) {

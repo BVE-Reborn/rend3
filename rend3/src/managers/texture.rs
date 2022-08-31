@@ -1,11 +1,6 @@
 use crate::{profile::ProfileData, types::TextureHandle, RendererProfile};
 use rend3_types::{RawTextureHandle, TextureFormat, TextureUsages};
-use std::{
-    num::NonZeroU32,
-    sync::{
-        Arc,
-    },
-};
+use std::{num::NonZeroU32, sync::Arc};
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
     BindingResource, BindingType, Device, Extent3d, ShaderStages, Texture, TextureDescriptor, TextureDimension,
@@ -87,12 +82,9 @@ impl TextureManager {
         self.data[handle.idx] = Some(InternalTexture { texture, view, desc });
     }
 
-    pub fn remove(
-        &mut self,
-        handle: RawTextureHandle,
-    ) {
+    pub fn remove(&mut self, handle: RawTextureHandle) {
         self.group_dirty = self.group_dirty.map_gpu(|_| true);
-        
+
         self.data[handle.idx] = None;
     }
 

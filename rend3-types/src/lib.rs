@@ -36,6 +36,17 @@ pub struct RawResourceHandle<T> {
     _phantom: PhantomData<T>,
 }
 
+impl<T> RawResourceHandle<T> {
+    /// Dummy handle for testing.
+    #[doc(hidden)]
+    pub const fn new(idx: usize) -> Self {
+        Self {
+            idx,
+            _phantom: PhantomData,
+        }
+    }
+}
+
 // Need Debug/Copy/Clone impls that don't require T: Trait.
 impl<T> Debug for RawResourceHandle<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

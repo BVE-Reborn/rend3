@@ -110,7 +110,7 @@ pub struct ShadowTarget<'a> {
     /// 2D offset in the image.
     pub offset: UVec2,
     /// Size in both dimentions of the viewport
-    pub size: usize,
+    pub size: u32,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]

@@ -255,6 +255,9 @@ pub(super) fn object_callback<M: Material>(material: &M, args: ObjectCallbackArg
     args.manager.handle_to_typeid.insert(args.handle, type_id);
     let archetype = args.manager.ensure_archetype::<M>();
 
-    let data_vec = archetype.data_vec.downcast_slice_mut::<Option<InternalObject<M>>>().unwrap();
+    let data_vec = archetype
+        .data_vec
+        .downcast_slice_mut::<Option<InternalObject<M>>>()
+        .unwrap();
     data_vec[args.handle.idx] = Some(internal_object);
 }

@@ -7,7 +7,7 @@ use crate::{
         DeclaredDependency, GraphResource, RenderTargetHandle, RpassTemporaryPool, ShadowTarget, ShadowTargetHandle,
     },
     managers::{
-        CameraManager, DirectionalLightManager, MaterialManager, MeshManager, ObjectManager, ShadowCoordinates,
+        CameraManager, DirectionalLightManager, MaterialManager, MeshManager, ObjectManager, ShadowCoordinate,
         SkeletonManager, TextureManager,
     },
     util::typedefs::FastHashMap,
@@ -47,7 +47,7 @@ impl<T> PartialEq for DataHandle<T> {
 /// This is how you turn [DeclaredDependency] into actual wgpu resources.
 pub struct RenderGraphDataStore<'a> {
     pub(super) texture_mapping: &'a FastHashMap<usize, TextureView>,
-    pub(super) shadow_coordinates: &'a [ShadowCoordinates],
+    pub(super) shadow_coordinates: &'a [ShadowCoordinate],
     pub(super) shadow_views: &'a [TextureView],
     pub(super) data: &'a [Box<dyn Any>], // Any is RefCell<Option<T>> where T is the stored data
     pub(super) output: Option<&'a TextureView>,
