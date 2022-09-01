@@ -262,7 +262,7 @@ fn build_forward_pipeline_inner(
         },
         depth_stencil: Some(DepthStencilState {
             format: TextureFormat::Depth32Float,
-            depth_write_enabled: blend.is_none() && use_prepass,
+            depth_write_enabled: blend.is_none() && !use_prepass,
             depth_compare: match use_prepass {
                 true => CompareFunction::Equal,
                 false => CompareFunction::GreaterEqual,
