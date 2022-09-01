@@ -1,28 +1,20 @@
 use crate::{
     managers::CameraManager,
-    types::{Camera, CameraProjection, DirectionalLight, DirectionalLightHandle},
-    util::{
-        bind_merge::BindGroupBuilder, freelist::FreelistDerivedBuffer, scatter_copy::ScatterCopy, typedefs::FastHashMap,
-    },
-    INTERNAL_SHADOW_DEPTH_FORMAT, SHADOW_DIMENSIONS,
+    types::{DirectionalLight, DirectionalLightHandle},
+    Renderer, INTERNAL_SHADOW_DEPTH_FORMAT,
 };
-use arrayvec::ArrayVec;
+
 use encase::{ArrayLength, ShaderType};
-use glam::{Mat4, UVec2, Vec2, Vec3, Vec3A};
-use rend3_types::{DirectionalLightChange, Handedness, RawDirectionalLightHandle};
-use std::{
-    mem::{self, size_of},
-    num::{NonZeroU32, NonZeroU64},
-};
-use wgpu::{
-    BindGroup, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, Buffer,
-    BufferBindingType, CommandEncoder, Device, Extent3d, ShaderStages, TextureAspect, TextureDescriptor,
-    TextureDimension, TextureSampleType, TextureUsages, TextureView, TextureViewDescriptor, TextureViewDimension,
-};
+use glam::{Mat4, UVec2, Vec2, Vec3};
+use rend3_types::{DirectionalLightChange, RawDirectionalLightHandle};
+use wgpu::{Device, Extent3d, TextureDescriptor, TextureDimension, TextureUsages, TextureView, TextureViewDescriptor};
 
 mod shadow_alloc;
+mod shadow_camera;
 
-pub use shadow_alloc::ShadowCoordinate;
+pub use shadow_alloc::ShadowMap;
+
+const MINIMUM_SHADOW_MAP_SIZE: UVec2 = UVec2::splat(32);
 
 /// Internal representation of a directional light.
 pub struct InternalDirectionalLight {
@@ -48,12 +40,22 @@ struct ShaderDirectionalLight {
 /// Manages directional lights and their associated shadow maps.
 pub struct DirectionalLightManager {
     data: Vec<Option<InternalDirectionalLight>>,
+
+    texture_size: UVec2,
+    texture_view: TextureView,
 }
 impl DirectionalLightManager {
     pub fn new(device: &Device) -> Self {
         profiling::scope!("DirectionalLightManager::new");
 
-        Self { data: Vec::new() }
+        let texture_size = MINIMUM_SHADOW_MAP_SIZE;
+        let texture_view = create_shadow_texture(device, texture_size);
+
+        Self {
+            data: Vec::new(),
+            texture_size,
+            texture_view,
+        }
     }
 
     pub fn add(&mut self, handle: &DirectionalLightHandle, light: DirectionalLight) {
@@ -75,19 +77,46 @@ impl DirectionalLightManager {
         self.data[handle.idx].take().unwrap();
     }
 
-    pub fn ready(&mut self, device: &Device, user_camera: &CameraManager) -> Vec<CameraManager> {
+    pub fn ready(&mut self, renderer: &Renderer, user_camera: &CameraManager) -> Vec<CameraManager> {
         profiling::scope!("Directional Light Ready");
+
+        let shadow_maps: Vec<_> = self
+            .data
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, light)| Some((RawDirectionalLightHandle::new(idx), light.as_ref()?.inner.resolution)))
+            .collect();
+        let shadow_atlas = shadow_alloc::allocate_shadow_atlas(shadow_maps, renderer.limits.max_texture_dimension_2d);
+
+        let new_shadow_map_size = match shadow_atlas {
+            Some(ref m) => m.texture_dimensions.max(MINIMUM_SHADOW_MAP_SIZE),
+            None => MINIMUM_SHADOW_MAP_SIZE,
+        };
+
+        if new_shadow_map_size != self.texture_size {
+            self.texture_size = new_shadow_map_size;
+            self.texture_view = create_shadow_texture(&renderer.device, self.texture_size);
+        }
+
+        let coordinates = match shadow_atlas {
+            Some(m) => m.maps,
+            None => return Vec::new(),
+        };
 
         todo!()
     }
 }
 
-fn create_shadow_texture(device: &Device, size: Extent3d) -> (TextureView, Vec<TextureView>) {
+fn create_shadow_texture(device: &Device, size: UVec2) -> TextureView {
     profiling::scope!("shadow texture creation");
 
     let texture = device.create_texture(&TextureDescriptor {
-        label: Some("shadow texture"),
-        size,
+        label: Some("rend3 shadow texture"),
+        size: Extent3d {
+            width: size.x,
+            height: size.y,
+            depth_or_array_layers: 1,
+        },
         mip_level_count: 1,
         sample_count: 1,
         dimension: TextureDimension::D2,
@@ -95,31 +124,8 @@ fn create_shadow_texture(device: &Device, size: Extent3d) -> (TextureView, Vec<T
         usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
     });
 
-    let primary_view = texture.create_view(&TextureViewDescriptor {
-        label: Some("shadow texture view"),
-        format: None,
-        dimension: Some(TextureViewDimension::D2Array),
-        aspect: TextureAspect::All,
-        base_mip_level: 0,
-        mip_level_count: None,
-        base_array_layer: 0,
-        array_layer_count: None,
-    });
-
-    let layer_views: Vec<_> = (0..size.depth_or_array_layers)
-        .map(|idx| {
-            texture.create_view(&TextureViewDescriptor {
-                label: Some(&format!("shadow texture layer {}", idx)),
-                format: None,
-                dimension: Some(TextureViewDimension::D2),
-                aspect: TextureAspect::All,
-                base_mip_level: 0,
-                mip_level_count: None,
-                base_array_layer: idx,
-                array_layer_count: NonZeroU32::new(1),
-            })
-        })
-        .collect();
-
-    (primary_view, layer_views)
+    texture.create_view(&TextureViewDescriptor {
+        label: Some("rend3 shadow texture view"),
+        ..TextureViewDescriptor::default()
+    })
 }

@@ -1,40 +1,7 @@
-use std::{array, collections::VecDeque};
+use std::{array, cmp::Reverse, collections::VecDeque};
 
-use glam::{Mat4, UVec2, Vec3, Vec3A};
-use rend3_types::{Camera, CameraProjection, Handedness, RawDirectionalLightHandle};
-
-use crate::managers::{CameraManager, InternalDirectionalLight};
-
-fn shadow_camera(l: &InternalDirectionalLight, user_camera: &CameraManager) -> CameraManager {
-    let camera_location = user_camera.location();
-
-    let shadow_texel_size = l.inner.distance / l.inner.resolution as f32;
-
-    let look_at = match user_camera.handedness() {
-        Handedness::Left => Mat4::look_at_lh,
-        Handedness::Right => Mat4::look_at_rh,
-    };
-
-    let origin_view = look_at(Vec3::ZERO, l.inner.direction, Vec3::Y);
-    let camera_origin_view = origin_view.transform_point3(camera_location);
-
-    let offset = camera_origin_view.truncate() % shadow_texel_size;
-    let shadow_location = camera_origin_view - Vec3::from((offset, 0.0));
-
-    let inv_origin_view = origin_view.inverse();
-    let new_shadow_location = inv_origin_view.transform_point3(shadow_location);
-
-    CameraManager::new(
-        Camera {
-            projection: CameraProjection::Orthographic {
-                size: Vec3A::splat(l.inner.distance),
-            },
-            view: look_at(new_shadow_location, new_shadow_location + l.inner.direction, Vec3::Y),
-        },
-        user_camera.handedness(),
-        None,
-    )
-}
+use glam::UVec2;
+use rend3_types::RawDirectionalLightHandle;
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
 enum ShadowNode {
@@ -79,22 +46,22 @@ impl ShadowNode {
     }
 }
 
-pub(super) struct ShadowMap {
+pub(super) struct ShadowAtlas {
     pub texture_dimensions: UVec2,
-    pub coordinates: Vec<ShadowCoordinate>,
+    pub maps: Vec<ShadowMap>,
 }
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
-pub struct ShadowCoordinate {
+pub struct ShadowMap {
     pub offset: UVec2,
     pub size: u32,
     pub handle: RawDirectionalLightHandle,
 }
 
-pub(super) fn allocate_shadows(
+pub(super) fn allocate_shadow_atlas(
     mut maps: Vec<(RawDirectionalLightHandle, u16)>,
     max_dimension: u32,
-) -> Option<ShadowMap> {
+) -> Option<ShadowAtlas> {
     if maps.is_empty() {
         return None;
     }
@@ -102,7 +69,7 @@ pub(super) fn allocate_shadows(
         return None;
     }
 
-    maps.sort_by_key(|(_idx, res)| *res);
+    maps.sort_by_key(|(_idx, res)| Reverse(*res));
 
     let root_size = maps.first().unwrap().1 as u32;
     let min_leading_zeros = (root_size as u16).leading_zeros();
@@ -110,19 +77,22 @@ pub(super) fn allocate_shadows(
     let mut nodes = Vec::with_capacity(maps.len().saturating_sub(1).next_power_of_two());
     let mut roots = Vec::new();
 
+    nodes.push(ShadowNode::Vacant);
+    roots.push(0);
+
     for (handle, resolution) in maps {
         debug_assert!(resolution.is_power_of_two());
         debug_assert_ne!(resolution, 0);
         let order = resolution.leading_zeros() - min_leading_zeros;
 
         loop {
-            let idx = nodes.len();
-            nodes.push(ShadowNode::Vacant);
-            roots.push(idx);
-
             if ShadowNode::try_alloc(&mut nodes, *roots.last().unwrap(), order, handle) {
                 break;
             }
+
+            let idx = nodes.len();
+            nodes.push(ShadowNode::Vacant);
+            roots.push(idx);
         }
     }
 
@@ -146,14 +116,14 @@ pub(super) fn allocate_shadows(
         })
         .collect();
 
-    let mut coordinates = Vec::with_capacity(nodes.len());
+    let mut output_maps = Vec::with_capacity(nodes.len());
     while let Some((root_divisor, offset, node_idx)) = nodes_to_visit.pop_front() {
         let size = root_size / root_divisor;
         let half_size = size / 2;
 
         match nodes[node_idx] {
-            ShadowNode::Vacant => unreachable!(),
-            ShadowNode::Leaf(handle) => coordinates.push(ShadowCoordinate { offset, size, handle }),
+            ShadowNode::Vacant => {}
+            ShadowNode::Leaf(handle) => output_maps.push(ShadowMap { offset, size, handle }),
             ShadowNode::Children(children) => {
                 let child_divisor = root_divisor * 2;
                 nodes_to_visit.extend(children.into_iter().enumerate().map(|(child_idx, node_idx)| {
@@ -167,9 +137,9 @@ pub(super) fn allocate_shadows(
         }
     }
 
-    Some(ShadowMap {
+    Some(ShadowAtlas {
         texture_dimensions,
-        coordinates,
+        maps: output_maps,
     })
 }
 
@@ -178,7 +148,7 @@ mod tests {
     use glam::UVec2;
     use rend3_types::RawDirectionalLightHandle as RDLH;
 
-    use crate::managers::directional::shadow_alloc::{allocate_shadows, ShadowCoordinate};
+    use crate::managers::directional::shadow_alloc::{allocate_shadow_atlas, ShadowMap};
 
     use super::ShadowNode;
 
@@ -266,11 +236,11 @@ mod tests {
     fn allocate_single() {
         let maps = vec![(RDLH::new(0), 16)];
 
-        let res = allocate_shadows(maps, 16).unwrap();
+        let res = allocate_shadow_atlas(maps, 16).unwrap();
         assert_eq!(res.texture_dimensions, UVec2::splat(16));
         assert_eq!(
-            res.coordinates,
-            &[ShadowCoordinate {
+            res.maps,
+            &[ShadowMap {
                 offset: UVec2::splat(0),
                 size: 16,
                 handle: RDLH::new(0)
@@ -282,22 +252,22 @@ mod tests {
     fn allocate_single_level_single_row() {
         let maps = vec![(RDLH::new(0), 16), (RDLH::new(1), 16), (RDLH::new(2), 16)];
 
-        let res = allocate_shadows(maps, 48).unwrap();
+        let res = allocate_shadow_atlas(maps, 48).unwrap();
         assert_eq!(res.texture_dimensions, UVec2::new(48, 16));
         assert_eq!(
-            res.coordinates,
+            res.maps,
             &[
-                ShadowCoordinate {
+                ShadowMap {
                     offset: UVec2::splat(0),
                     size: 16,
                     handle: RDLH::new(0)
                 },
-                ShadowCoordinate {
+                ShadowMap {
                     offset: UVec2::new(16, 0),
                     size: 16,
                     handle: RDLH::new(1)
                 },
-                ShadowCoordinate {
+                ShadowMap {
                     offset: UVec2::new(32, 0),
                     size: 16,
                     handle: RDLH::new(2)
@@ -310,22 +280,22 @@ mod tests {
     fn allocate_single_level_double_row() {
         let maps = vec![(RDLH::new(0), 16), (RDLH::new(1), 16), (RDLH::new(2), 16)];
 
-        let res = allocate_shadows(maps, 32).unwrap();
+        let res = allocate_shadow_atlas(maps, 32).unwrap();
         assert_eq!(res.texture_dimensions, UVec2::new(32, 32));
         assert_eq!(
-            res.coordinates,
+            res.maps,
             &[
-                ShadowCoordinate {
+                ShadowMap {
                     offset: UVec2::splat(0),
                     size: 16,
                     handle: RDLH::new(0)
                 },
-                ShadowCoordinate {
+                ShadowMap {
                     offset: UVec2::new(16, 0),
                     size: 16,
                     handle: RDLH::new(1)
                 },
-                ShadowCoordinate {
+                ShadowMap {
                     offset: UVec2::new(0, 16),
                     size: 16,
                     handle: RDLH::new(2)
@@ -344,36 +314,95 @@ mod tests {
             (RDLH::new(4), 16),
         ];
 
-        let res = allocate_shadows(maps, 64).unwrap();
+        let res = allocate_shadow_atlas(maps, 64).unwrap();
         assert_eq!(res.texture_dimensions, UVec2::new(48, 32));
         assert_eq!(
-            res.coordinates,
+            res.maps,
             &[
-                ShadowCoordinate {
+                ShadowMap {
                     offset: UVec2::splat(0),
                     size: 16,
                     handle: RDLH::new(0)
                 },
-                ShadowCoordinate {
+                ShadowMap {
                     offset: UVec2::new(16, 0),
                     size: 16,
                     handle: RDLH::new(1)
                 },
-                ShadowCoordinate {
+                ShadowMap {
                     offset: UVec2::new(32, 0),
                     size: 16,
                     handle: RDLH::new(2)
                 },
-                ShadowCoordinate {
+                ShadowMap {
                     offset: UVec2::new(0, 16),
                     size: 16,
                     handle: RDLH::new(3)
                 },
-                ShadowCoordinate {
+                ShadowMap {
                     offset: UVec2::new(16, 16),
                     size: 16,
                     handle: RDLH::new(4)
                 }
+            ]
+        );
+    }
+
+    /// ┌───────────────┬───────┬───────┐
+    /// │               │       │       │
+    /// │               │   1   │   2   │
+    /// │               │       │       │
+    /// │       0       ├───┬───┼───────┘
+    /// │               │ 3 │ 4 │
+    /// │               ├───┼───┘
+    /// │               │ 5 │
+    /// └───────────────┴───┘
+    #[test]
+    fn allocate_multiple_level() {
+        let maps = vec![
+            (RDLH::new(0), 16),
+            (RDLH::new(1), 8),
+            (RDLH::new(2), 8),
+            (RDLH::new(3), 4),
+            (RDLH::new(4), 4),
+            (RDLH::new(5), 4),
+        ];
+
+        let res = allocate_shadow_atlas(maps, 32).unwrap();
+        assert_eq!(res.texture_dimensions, UVec2::new(32, 16));
+        assert_eq!(
+            res.maps,
+            &[
+                ShadowMap {
+                    offset: UVec2::splat(0),
+                    size: 16,
+                    handle: RDLH::new(0)
+                },
+                ShadowMap {
+                    offset: UVec2::new(16, 0),
+                    size: 8,
+                    handle: RDLH::new(1)
+                },
+                ShadowMap {
+                    offset: UVec2::new(24, 0),
+                    size: 8,
+                    handle: RDLH::new(2)
+                },
+                ShadowMap {
+                    offset: UVec2::new(16, 8),
+                    size: 4,
+                    handle: RDLH::new(3)
+                },
+                ShadowMap {
+                    offset: UVec2::new(20, 8),
+                    size: 4,
+                    handle: RDLH::new(4)
+                },
+                ShadowMap {
+                    offset: UVec2::new(16, 12),
+                    size: 4,
+                    handle: RDLH::new(5)
+                },
             ]
         );
     }

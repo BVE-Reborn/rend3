@@ -37,8 +37,7 @@ pub struct RawResourceHandle<T> {
 }
 
 impl<T> RawResourceHandle<T> {
-    /// Dummy handle for testing.
-    #[doc(hidden)]
+    /// Creates a new handle with the given value
     pub const fn new(idx: usize) -> Self {
         Self {
             idx,

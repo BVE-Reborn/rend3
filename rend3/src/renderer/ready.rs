@@ -174,7 +174,7 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
     let d2c_texture = data_core.d2c_texture_manager.ready(&renderer.device);
     let directional_light_cameras = data_core
         .directional_light_manager
-        .ready(&renderer.device, &data_core.camera_manager);
+        .ready(renderer, &data_core.camera_manager);
 
     cmd_bufs.push(encoder.finish());
 
