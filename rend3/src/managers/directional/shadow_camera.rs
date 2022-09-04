@@ -1,7 +1,7 @@
 use glam::{Mat4, Vec3, Vec3A};
-use rend3_types::{Handedness, CameraProjection, Camera};
+use rend3_types::{Camera, CameraProjection, Handedness};
 
-use crate::managers::{InternalDirectionalLight, CameraManager};
+use crate::managers::{CameraManager, InternalDirectionalLight};
 
 pub(super) fn shadow_camera(l: &InternalDirectionalLight, user_camera: &CameraManager) -> CameraManager {
     let camera_location = user_camera.location();

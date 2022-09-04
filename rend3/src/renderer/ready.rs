@@ -172,7 +172,7 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
 
     // Level 0
     let d2c_texture = data_core.d2c_texture_manager.ready(&renderer.device);
-    let directional_light_cameras = data_core
+    data_core
         .directional_light_manager
         .ready(renderer, &data_core.camera_manager);
 
@@ -183,7 +183,6 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
         ReadyData {
             d2_texture,
             d2c_texture,
-            directional_light_cameras,
         },
     )
 }

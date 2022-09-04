@@ -1,13 +1,17 @@
 use crate::{
     managers::CameraManager,
     types::{DirectionalLight, DirectionalLightHandle},
+    util::buffer::WrappedPotBuffer,
     Renderer, INTERNAL_SHADOW_DEPTH_FORMAT,
 };
 
 use encase::{ArrayLength, ShaderType};
 use glam::{Mat4, UVec2, Vec2, Vec3};
 use rend3_types::{DirectionalLightChange, RawDirectionalLightHandle};
-use wgpu::{Device, Extent3d, TextureDescriptor, TextureDimension, TextureUsages, TextureView, TextureViewDescriptor};
+use wgpu::{
+    BufferUsages, Device, Extent3d, TextureDescriptor, TextureDimension, TextureUsages, TextureView,
+    TextureViewDescriptor,
+};
 
 mod shadow_alloc;
 mod shadow_camera;
@@ -33,16 +37,21 @@ struct ShaderDirectionalLight {
     pub view_proj: Mat4,
     pub color: Vec3,
     pub direction: Vec3,
-    pub offset: Vec2,
-    pub size: f32,
+    /// [0, 1]
+    pub atlas_offset: Vec2,
+    /// [0, 1]
+    pub atlas_size: Vec2,
 }
 
 /// Manages directional lights and their associated shadow maps.
 pub struct DirectionalLightManager {
     data: Vec<Option<InternalDirectionalLight>>,
+    data_buffer: WrappedPotBuffer<ShaderDirectionalLightBuffer>,
 
     texture_size: UVec2,
     texture_view: TextureView,
+
+    shadow_data: Option<Vec<(ShadowMap, CameraManager)>>,
 }
 impl DirectionalLightManager {
     pub fn new(device: &Device) -> Self {
@@ -53,8 +62,10 @@ impl DirectionalLightManager {
 
         Self {
             data: Vec::new(),
+            data_buffer: WrappedPotBuffer::new(device, BufferUsages::STORAGE, "shadow data buffer"),
             texture_size,
             texture_view,
+            shadow_data: None,
         }
     }
 
@@ -77,7 +88,7 @@ impl DirectionalLightManager {
         self.data[handle.idx].take().unwrap();
     }
 
-    pub fn ready(&mut self, renderer: &Renderer, user_camera: &CameraManager) -> Vec<CameraManager> {
+    pub fn ready(&mut self, renderer: &Renderer, user_camera: &CameraManager) {
         profiling::scope!("Directional Light Ready");
 
         let shadow_maps: Vec<_> = self
@@ -92,6 +103,7 @@ impl DirectionalLightManager {
             Some(ref m) => m.texture_dimensions.max(MINIMUM_SHADOW_MAP_SIZE),
             None => MINIMUM_SHADOW_MAP_SIZE,
         };
+        let new_shadow_map_size_f32 = new_shadow_map_size.as_vec2();
 
         if new_shadow_map_size != self.texture_size {
             self.texture_size = new_shadow_map_size;
@@ -100,10 +112,43 @@ impl DirectionalLightManager {
 
         let coordinates = match shadow_atlas {
             Some(m) => m.maps,
-            None => return Vec::new(),
+            None => return,
         };
 
-        todo!()
+        self.shadow_data = Some(
+            coordinates
+                .into_iter()
+                .map(|map| {
+                    let camera = shadow_camera::shadow_camera(self.data[map.handle.idx].as_ref().unwrap(), user_camera);
+
+                    (map, camera)
+                })
+                .collect(),
+        );
+
+        let buffer = ShaderDirectionalLightBuffer {
+            count: ArrayLength,
+            array: self
+                .shadow_data
+                .as_ref()
+                .unwrap()
+                .iter()
+                .map(|(map, camera)| {
+                    let light = &self.data[map.handle.idx].as_ref().unwrap().inner;
+
+                    ShaderDirectionalLight {
+                        view_proj: camera.view_proj(),
+                        color: light.color,
+                        direction: light.direction,
+                        atlas_offset: map.offset.as_vec2() / new_shadow_map_size_f32,
+                        atlas_size: Vec2::splat(map.size as f32) / new_shadow_map_size_f32,
+                    }
+                })
+                .collect(),
+        };
+
+        self.data_buffer
+            .write_to_buffer(&renderer.device, &renderer.queue, &buffer);
     }
 }
 

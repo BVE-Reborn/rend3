@@ -30,7 +30,6 @@ use crate::{
 pub struct ReadyData {
     pub d2_texture: TextureManagerReadyOutput,
     pub d2c_texture: TextureManagerReadyOutput,
-    pub directional_light_cameras: Vec<CameraManager>,
 }
 
 /// Implementation of a rendergraph. See module docs for details.
