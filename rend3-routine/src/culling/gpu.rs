@@ -2,7 +2,7 @@ use std::{borrow::Cow, mem, num::NonZeroU64};
 
 use glam::Mat4;
 use rend3::{
-    managers::{CameraManager, GpuCullingInput, InternalObject, VERTEX_OBJECT_INDEX_SLOT},
+    managers::{CameraManager, InternalObject, ShaderObject, VERTEX_OBJECT_INDEX_SLOT},
     util::{bind_merge::BindGroupBuilder, frustum::ShaderFrustum},
     ProfileData, ShaderConfig, ShaderPreProcessor,
 };
@@ -61,7 +61,7 @@ impl GpuCuller {
                     ty: BindingType::Buffer {
                         ty: BufferBindingType::Storage { read_only: true },
                         has_dynamic_offset: false,
-                        min_binding_size: NonZeroU64::new(mem::size_of::<GpuCullingInput>() as _),
+                        min_binding_size: NonZeroU64::new(mem::size_of::<ShaderObject>() as _),
                     },
                     count: None,
                 },
@@ -107,7 +107,7 @@ impl GpuCuller {
                     ty: BindingType::Buffer {
                         ty: BufferBindingType::Storage { read_only: true },
                         has_dynamic_offset: false,
-                        min_binding_size: NonZeroU64::new(mem::size_of::<GpuCullingInput>() as _),
+                        min_binding_size: NonZeroU64::new(mem::size_of::<ShaderObject>() as _),
                     },
                     count: None,
                 },
@@ -366,7 +366,7 @@ impl GpuCuller {
 pub fn build_gpu_cull_input(device: &Device, objects: &[InternalObject]) -> Buffer {
     profiling::scope!("Building Input Data");
 
-    let total_length = objects.len() * mem::size_of::<GpuCullingInput>();
+    let total_length = objects.len() * mem::size_of::<ShaderObject>();
 
     let buffer = device.create_buffer(&BufferDescriptor {
         label: Some("culling inputs"),
@@ -380,7 +380,7 @@ pub fn build_gpu_cull_input(device: &Device, objects: &[InternalObject]) -> Buff
     // This unsafe block measured a bit faster in my tests, and as this is basically
     // _the_ hot path, so this is worthwhile.
     unsafe {
-        let data_ptr = data.as_mut_ptr() as *mut GpuCullingInput;
+        let data_ptr = data.as_mut_ptr() as *mut ShaderObject;
 
         // Iterate over the objects
         for idx in 0..objects.len() {
@@ -389,7 +389,7 @@ pub fn build_gpu_cull_input(device: &Device, objects: &[InternalObject]) -> Buff
 
             // This is aligned, and we know the vector has enough bytes to hold this, so
             // this is safe
-            data_ptr.add(idx).write_unaligned(object.input);
+            data_ptr.add(idx).write_unaligned(object.inner);
         }
     }
 

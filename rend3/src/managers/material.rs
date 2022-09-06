@@ -1,5 +1,5 @@
 use crate::{
-    managers::{object_callback, ObjectCallbackArgs, TextureManager},
+    managers::{object_add_callback, ObjectAddCallbackArgs, TextureManager},
     profile::ProfileData,
     types::MaterialHandle,
     util::{
@@ -54,7 +54,7 @@ struct PerTypeInfo {
         fn(&mut FreelistDerivedBuffer, &Device, &mut CommandEncoder, &ScatterCopy, &mut VecAny, &TextureManager),
     get_attributes: fn(&mut dyn FnMut(&[&'static VertexAttributeId], &[&'static VertexAttributeId])),
     get_material_key: fn(&VecAny, usize) -> MaterialKeyPair,
-    object_callback: fn(&VecAny, usize, ObjectCallbackArgs<'_>),
+    object_add_callback_wrapper: fn(&VecAny, usize, ObjectAddCallbackArgs<'_>),
 }
 
 /// Key which determine's an object's archetype.
@@ -112,7 +112,7 @@ impl MaterialManager {
             apply_data_gpu: apply_buffer_gpu::<M>,
             get_attributes: get_attributes::<M>,
             get_material_key: get_material_key::<M>,
-            object_callback: object_callback_wrapper::<M>,
+            object_add_callback_wrapper: object_add_callback_wrapper::<M>,
         })
     }
 
@@ -245,12 +245,12 @@ impl MaterialManager {
         todo!()
     }
 
-    pub(super) fn call_object_callback(&self, handle: RawMaterialHandle, args: ObjectCallbackArgs) {
+    pub(super) fn call_object_add_callback(&self, handle: RawMaterialHandle, args: ObjectAddCallbackArgs) {
         let type_id = self.handle_to_typeid[&handle];
 
         let type_info = &self.storage[&type_id];
 
-        (type_info.object_callback)(&type_info.data_vec, handle.idx, args);
+        (type_info.object_add_callback_wrapper)(&type_info.data_vec, handle.idx, args);
     }
 
     pub fn get_material_key(&mut self, handle: RawMaterialHandle) -> MaterialKeyPair {
@@ -352,10 +352,10 @@ fn get_attributes<M: Material>(callback: &mut dyn FnMut(&[&'static VertexAttribu
     callback(M::required_attributes().as_ref(), M::supported_attributes().as_ref())
 }
 
-fn object_callback_wrapper<M: Material>(vec_any: &VecAny, idx: usize, args: ObjectCallbackArgs) {
+fn object_add_callback_wrapper<M: Material>(vec_any: &VecAny, idx: usize, args: ObjectAddCallbackArgs) {
     let data_vec = vec_any.downcast_slice::<Option<InternalMaterial<M>>>().unwrap();
 
     let material = &data_vec[idx].as_ref().unwrap().inner;
 
-    object_callback(material, args)
+    object_add_callback(material, args)
 }

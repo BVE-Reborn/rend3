@@ -3,7 +3,9 @@ use std::{any::TypeId, ops::Range};
 use crate::{
     managers::{InternalMesh, MaterialManager, MeshManager},
     types::{Object, ObjectHandle},
-    util::{frustum::BoundingSphere, typedefs::FastHashMap},
+    util::{
+        freelist::FreelistDerivedBuffer, frustum::BoundingSphere, scatter_copy::ScatterCopy, typedefs::FastHashMap,
+    },
 };
 use encase::ShaderType;
 use glam::{Mat4, Vec3A};
@@ -11,12 +13,13 @@ use list_any::VecAny;
 use rend3_types::{
     Material, MaterialArray, MaterialHandle, ObjectChange, ObjectMeshKind, RawObjectHandle, VertexAttributeId,
 };
+use wgpu::{CommandEncoder, Device};
 
 use super::SkeletonManager;
 
 /// Cpu side input to gpu-based culling
 #[derive(ShaderType)]
-pub struct GpuCullingInput<M: Material> {
+pub struct ShaderObject<M: Material> {
     pub transform: Mat4,
     pub bounding_sphere: BoundingSphere,
     pub first_index: u32,
@@ -26,26 +29,45 @@ pub struct GpuCullingInput<M: Material> {
         <M::SupportedAttributeArrayType as MaterialArray<&'static VertexAttributeId>>::U32Array,
 }
 
+// Manual impl so that M: !Copy
+impl<M: Material> Copy for ShaderObject<M> {}
+
+// Manual impl so that M: !Clone
+impl<M: Material> Clone for ShaderObject<M> {
+    fn clone(&self) -> Self {
+        Self {
+            transform: self.transform.clone(),
+            bounding_sphere: self.bounding_sphere.clone(),
+            first_index: self.first_index.clone(),
+            index_count: self.index_count.clone(),
+            material_index: self.material_index.clone(),
+            vertex_attribute_start_offsets: self.vertex_attribute_start_offsets.clone(),
+        }
+    }
+}
+
 /// Internal representation of a Object.
 pub struct InternalObject<M: Material> {
     pub mesh_kind: ObjectMeshKind,
     pub material_handle: MaterialHandle,
     pub location: Vec3A,
-    pub input: GpuCullingInput<M>,
+    pub inner: ShaderObject<M>,
 }
 
 impl<M: Material> InternalObject<M> {
     pub fn mesh_location(&self) -> Vec3A {
-        self.location + Vec3A::from(self.input.bounding_sphere.center)
+        self.location + Vec3A::from(self.inner.bounding_sphere.center)
     }
 }
 
 struct ObjectArchetype {
     /// Inner type is Option<InternalObject<M>>
     data_vec: VecAny,
-    set_object_transform: fn(&mut VecAny, usize, Mat4),
+    buffer: FreelistDerivedBuffer,
+    set_object_transform: fn(&mut VecAny, &mut FreelistDerivedBuffer, usize, Mat4),
     duplicate_object: fn(&VecAny, usize, ObjectChange) -> Object,
     remove: fn(&mut VecAny, usize),
+    ready: fn(&mut ObjectArchetype, &Device, &mut CommandEncoder, &ScatterCopy),
 }
 
 /// Manages objects. That's it. ¯\\\_(ツ)\_/¯
@@ -63,18 +85,21 @@ impl ObjectManager {
         }
     }
 
-    fn ensure_archetype<M: Material>(&mut self) -> &mut ObjectArchetype {
+    fn ensure_archetype<M: Material>(&mut self, device: &Device) -> &mut ObjectArchetype {
         let type_id = TypeId::of::<M>();
         self.storage.entry(type_id).or_insert_with(|| ObjectArchetype {
             data_vec: VecAny::new::<Option<InternalObject<M>>>(),
+            buffer: FreelistDerivedBuffer::new::<ShaderObject<M>>(device),
             set_object_transform: set_object_transform::<M>,
             duplicate_object: duplicate_object::<M>,
             remove: remove::<M>,
+            ready: ready::<M>,
         })
     }
 
     pub fn add(
         &mut self,
+        device: &Device,
         handle: &ObjectHandle,
         object: Object,
         mesh_manager: &mut MeshManager,
@@ -93,9 +118,10 @@ impl ObjectManager {
             }
         };
 
-        material_manager.call_object_callback(
+        material_manager.call_object_add_callback(
             *object.material,
-            ObjectCallbackArgs {
+            ObjectAddCallbackArgs {
+                device,
                 manager: self,
                 internal_mesh,
                 skeleton_ranges,
@@ -110,7 +136,7 @@ impl ObjectManager {
 
         let storage = self.storage.get_mut(&type_id).unwrap();
 
-        (storage.set_object_transform)(&mut storage.data_vec, handle.idx, transform);
+        (storage.set_object_transform)(&mut storage.data_vec, &mut storage.buffer, handle.idx, transform);
     }
 
     pub fn remove(&mut self, handle: RawObjectHandle) {
@@ -121,8 +147,10 @@ impl ObjectManager {
         (storage.remove)(&mut storage.data_vec, handle.idx);
     }
 
-    pub fn ready(&self) {
-        todo!()
+    pub fn ready(&mut self, device: &Device, encoder: &mut CommandEncoder, scatter: &ScatterCopy) {
+        for storage in self.storage.values_mut() {
+            (storage.ready)(storage, device, encoder, scatter);
+        }
     }
 
     pub fn get_objects<M: Material>(&self) -> &[Option<InternalObject<M>>] {
@@ -136,6 +164,7 @@ impl ObjectManager {
 
     pub fn duplicate_object(
         &mut self,
+        device: &Device,
         src_handle: ObjectHandle,
         dst_handle: ObjectHandle,
         change: ObjectChange,
@@ -149,7 +178,14 @@ impl ObjectManager {
 
         let dst_obj = (archetype.duplicate_object)(&mut archetype.data_vec, src_handle.idx, change);
 
-        self.add(&dst_handle, dst_obj, mesh_manager, skeleton_manager, material_manager);
+        self.add(
+            device,
+            &dst_handle,
+            dst_obj,
+            mesh_manager,
+            skeleton_manager,
+            material_manager,
+        );
     }
 }
 
@@ -159,33 +195,8 @@ impl Default for ObjectManager {
     }
 }
 
-fn set_object_transform<M: Material>(data: &mut VecAny, idx: usize, transform: Mat4) {
-    let data_vec = data.downcast_slice_mut::<Option<InternalObject<M>>>().unwrap();
-
-    let object = data_vec[idx].as_mut().unwrap();
-    object.input.transform = transform;
-    object.location = transform.transform_point3a(Vec3A::ZERO)
-}
-
-fn duplicate_object<M: Material>(data: &VecAny, idx: usize, change: ObjectChange) -> Object {
-    let data_vec = data.downcast_slice::<Option<InternalObject<M>>>().unwrap();
-
-    let src_obj = data_vec[idx].as_ref().unwrap();
-
-    Object {
-        mesh_kind: change.mesh_kind.unwrap_or_else(|| src_obj.mesh_kind.clone()),
-        material: change.material.unwrap_or_else(|| src_obj.material_handle.clone()),
-        transform: change.transform.unwrap_or(src_obj.input.transform),
-    }
-}
-
-fn remove<M: Material>(data: &mut VecAny, idx: usize) {
-    let data_vec = data.downcast_slice_mut::<Option<InternalObject<M>>>().unwrap();
-
-    data_vec[idx] = None;
-}
-
-pub(super) struct ObjectCallbackArgs<'a> {
+pub(super) struct ObjectAddCallbackArgs<'a> {
+    device: &'a Device,
     manager: &'a mut ObjectManager,
     internal_mesh: &'a InternalMesh,
     skeleton_ranges: &'a [(VertexAttributeId, Range<u64>)],
@@ -193,7 +204,7 @@ pub(super) struct ObjectCallbackArgs<'a> {
     object: Object,
 }
 
-pub(super) fn object_callback<M: Material>(material: &M, args: ObjectCallbackArgs<'_>) {
+pub(super) fn object_add_callback<M: Material>(material: &M, args: ObjectAddCallbackArgs<'_>) {
     // Make sure all required attributes are in the mesh and the supported attribute list.
     for &required_attribute in M::required_attributes() {
         // We can just directly use the internal mesh, as every attribute in the skeleton is also in the mesh.
@@ -238,7 +249,7 @@ pub(super) fn object_callback<M: Material>(material: &M, args: ObjectCallbackArg
 
     let internal_object = InternalObject::<M> {
         location: args.object.transform.transform_point3a(Vec3A::ZERO),
-        input: GpuCullingInput {
+        inner: ShaderObject {
             material_index: args.object.material.idx as u32,
             transform: args.object.transform,
             bounding_sphere,
@@ -253,11 +264,58 @@ pub(super) fn object_callback<M: Material>(material: &M, args: ObjectCallbackArg
     let type_id = TypeId::of::<M>();
 
     args.manager.handle_to_typeid.insert(args.handle, type_id);
-    let archetype = args.manager.ensure_archetype::<M>();
+    let archetype = args.manager.ensure_archetype::<M>(args.device);
 
     let data_vec = archetype
         .data_vec
         .downcast_slice_mut::<Option<InternalObject<M>>>()
         .unwrap();
     data_vec[args.handle.idx] = Some(internal_object);
+    archetype.buffer.use_index(args.handle.idx);
+}
+
+fn set_object_transform<M: Material>(
+    data: &mut VecAny,
+    buffer: &mut FreelistDerivedBuffer,
+    idx: usize,
+    transform: Mat4,
+) {
+    let data_vec = data.downcast_slice_mut::<Option<InternalObject<M>>>().unwrap();
+
+    let object = data_vec[idx].as_mut().unwrap();
+    object.inner.transform = transform;
+    object.location = transform.transform_point3a(Vec3A::ZERO);
+
+    buffer.use_index(idx);
+}
+
+fn duplicate_object<M: Material>(data: &VecAny, idx: usize, change: ObjectChange) -> Object {
+    let data_vec = data.downcast_slice::<Option<InternalObject<M>>>().unwrap();
+
+    let src_obj = data_vec[idx].as_ref().unwrap();
+
+    Object {
+        mesh_kind: change.mesh_kind.unwrap_or_else(|| src_obj.mesh_kind.clone()),
+        material: change.material.unwrap_or_else(|| src_obj.material_handle.clone()),
+        transform: change.transform.unwrap_or(src_obj.inner.transform),
+    }
+}
+
+fn remove<M: Material>(data: &mut VecAny, idx: usize) {
+    let data_vec = data.downcast_slice_mut::<Option<InternalObject<M>>>().unwrap();
+
+    data_vec[idx] = None;
+}
+
+fn ready<M: Material>(
+    storage: &mut ObjectArchetype,
+    device: &Device,
+    encoder: &mut CommandEncoder,
+    scatter: &ScatterCopy,
+) {
+    let data_vec = storage.data_vec.downcast_slice::<Option<InternalObject<M>>>().unwrap();
+
+    storage.buffer.apply(device, encoder, scatter, |idx| {
+        data_vec[idx].as_ref().unwrap().inner.clone()
+    })
 }

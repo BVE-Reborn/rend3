@@ -87,6 +87,7 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
                 }
                 InstructionKind::AddObject { handle, object } => {
                     data_core.object_manager.add(
+                        &renderer.device,
                         &handle,
                         object,
                         &mut data_core.mesh_manager,
@@ -116,6 +117,7 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
                     change,
                 } => {
                     data_core.object_manager.duplicate_object(
+                        &renderer.device,
                         src_handle,
                         dst_handle,
                         change,
@@ -154,7 +156,7 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
 
     // Do these in dependency order
     // Level 3
-    data_core.object_manager.ready();
+    data_core.object_manager.ready(&renderer.device, &mut encoder, &renderer.scatter);
 
     // Level 2
     let d2_texture = data_core.d2_texture_manager.ready(&renderer.device);

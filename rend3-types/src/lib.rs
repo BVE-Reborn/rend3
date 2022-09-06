@@ -881,7 +881,7 @@ pub struct MaterialTag;
 pub trait MaterialArray<T>: IntoIterator<Item = T> + AsRef<[T]> {
     /// An array of the [u32; COUNT]. We need this internally
     /// for shader layout stuff.
-    type U32Array: encase::ShaderSize + encase::internal::WriteInto + Send + Sync + 'static;
+    type U32Array: encase::ShaderSize + encase::internal::WriteInto + Clone + Copy + Send + Sync + 'static;
     const COUNT: u32;
 
     fn map_to_u32<F>(self, func: F) -> Self::U32Array

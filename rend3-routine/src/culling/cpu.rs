@@ -78,10 +78,10 @@ fn cull_internal(
     let mut calls = Vec::with_capacity(objects.len());
 
     for object in objects {
-        let model = object.input.transform;
+        let model = object.inner.transform;
         let model_view = view * model;
 
-        let transformed = object.input.bounding_sphere.apply_transform(model_view);
+        let transformed = object.inner.bounding_sphere.apply_transform(model_view);
         if !frustum.contains_sphere(transformed) {
             continue;
         }
@@ -89,10 +89,10 @@ fn cull_internal(
         let model_view_proj = view_proj * model;
 
         calls.push(CpuDrawCall {
-            start_idx: object.input.first_index,
-            end_idx: object.input.first_index + object.input.index_count,
-            vertex_offset: object.input.vertex_offset,
-            material_index: object.input.material_index,
+            start_idx: object.inner.first_index,
+            end_idx: object.inner.first_index + object.inner.index_count,
+            vertex_offset: object.inner.vertex_offset,
+            material_index: object.inner.material_index,
         });
 
         let squared_scale = Vec3::new(
