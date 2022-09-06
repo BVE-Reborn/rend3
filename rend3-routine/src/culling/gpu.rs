@@ -3,6 +3,7 @@ use std::{borrow::Cow, mem, num::NonZeroU64};
 use glam::Mat4;
 use rend3::{
     managers::{CameraManager, InternalObject, ShaderObject, VERTEX_OBJECT_INDEX_SLOT},
+    types::Material,
     util::{bind_merge::BindGroupBuilder, frustum::ShaderFrustum},
     ProfileData, ShaderConfig, ShaderPreProcessor,
 };
@@ -363,7 +364,7 @@ impl GpuCuller {
 
 /// Build and upload the inputs into a buffer to be passed to
 /// [`GpuCuller::cull`].
-pub fn build_gpu_cull_input(device: &Device, objects: &[InternalObject]) -> Buffer {
+pub fn build_gpu_cull_input<M: Material>(device: &Device, objects: &[InternalObject<M>]) -> Buffer {
     profiling::scope!("Building Input Data");
 
     let total_length = objects.len() * mem::size_of::<ShaderObject>();

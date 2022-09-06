@@ -1,3 +1,5 @@
+use std::ops::Index;
+
 use arrayvec::ArrayVec;
 use bimap::BiMap;
 use rend3_types::RawTextureHandle;
@@ -107,5 +109,13 @@ impl TextureDeduplicator {
             self.storage.remove(index.0);
             self.deduplication_map.remove_by_right(&index);
         }
+    }
+}
+
+impl Index<TextureBindGroupIndex> for TextureDeduplicator {
+    type Output = BindGroup;
+
+    fn index(&self, index: TextureBindGroupIndex) -> &Self::Output {
+        &self.storage[index.0].inner
     }
 }

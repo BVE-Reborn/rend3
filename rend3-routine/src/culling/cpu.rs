@@ -37,7 +37,7 @@ pub fn cull_cpu<M: Material>(
     let view = camera.view();
     let view_proj = camera.view_proj();
 
-    let objects = objects.get_objects::<M>(key);
+    let objects = objects.get_objects::<M>();
 
     let objects = crate::common::sort_objects(objects, camera, sorting);
 
@@ -68,8 +68,8 @@ pub fn cull_cpu<M: Material>(
     }
 }
 
-fn cull_internal(
-    objects: &[InternalObject],
+fn cull_internal<M: Material>(
+    objects: &[InternalObject<M>],
     frustum: ShaderFrustum,
     view: Mat4,
     view_proj: Mat4,

@@ -1,7 +1,10 @@
 use std::borrow::Cow;
 
 use ordered_float::OrderedFloat;
-use rend3::managers::{CameraManager, InternalObject};
+use rend3::{
+    managers::{CameraManager, InternalObject},
+    types::Material,
+};
 
 /// An object sorting order.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -13,11 +16,11 @@ pub enum Sorting {
 }
 
 /// Takes a set of objects and possibly sorts them if a sorting is provided.
-pub fn sort_objects<'a>(
-    objects: &'a [InternalObject],
+pub fn sort_objects<'a, M: Material>(
+    objects: &'a [InternalObject<M>],
     camera_manager: &CameraManager,
     sorting: Option<Sorting>,
-) -> Cow<'a, [InternalObject]> {
+) -> Cow<'a, [InternalObject<M>]> {
     if let Some(sorting) = sorting {
         profiling::scope!("Sorting");
 

@@ -40,7 +40,7 @@ pub fn create_renderer(
         TextureViewDimension::Cube,
     );
     let mesh_manager = MeshManager::new(&iad.device);
-    let material_manager = MaterialManager::new(&iad.device, iad.profile);
+    let material_manager = MaterialManager::new(&iad.device);
     let object_manager = ObjectManager::new();
     let directional_light_manager = DirectionalLightManager::new(&iad.device);
     let skeleton_manager = SkeletonManager::new();

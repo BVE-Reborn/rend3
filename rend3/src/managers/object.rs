@@ -54,6 +54,18 @@ pub struct InternalObject<M: Material> {
     pub inner: ShaderObject<M>,
 }
 
+// Manual impl so that M: !Clone
+impl<M: Material> Clone for InternalObject<M> {
+    fn clone(&self) -> Self {
+        Self {
+            mesh_kind: self.mesh_kind.clone(),
+            material_handle: self.material_handle.clone(),
+            location: self.location.clone(),
+            inner: self.inner.clone(),
+        }
+    }
+}
+
 impl<M: Material> InternalObject<M> {
     pub fn mesh_location(&self) -> Vec3A {
         self.location + Vec3A::from(self.inner.bounding_sphere.center)
@@ -72,7 +84,7 @@ struct ObjectArchetype {
 
 /// Manages objects. That's it. ¯\\\_(ツ)\_/¯
 pub struct ObjectManager {
-    storage: FastHashMap<TypeId, ObjectArchetype>,
+    archetype: FastHashMap<TypeId, ObjectArchetype>,
     handle_to_typeid: FastHashMap<RawObjectHandle, TypeId>,
 }
 impl ObjectManager {
@@ -80,14 +92,14 @@ impl ObjectManager {
         profiling::scope!("ObjectManager::new");
 
         Self {
-            storage: FastHashMap::default(),
+            archetype: FastHashMap::default(),
             handle_to_typeid: FastHashMap::default(),
         }
     }
 
     fn ensure_archetype<M: Material>(&mut self, device: &Device) -> &mut ObjectArchetype {
         let type_id = TypeId::of::<M>();
-        self.storage.entry(type_id).or_insert_with(|| ObjectArchetype {
+        self.archetype.entry(type_id).or_insert_with(|| ObjectArchetype {
             data_vec: VecAny::new::<Option<InternalObject<M>>>(),
             buffer: FreelistDerivedBuffer::new::<ShaderObject<M>>(device),
             set_object_transform: set_object_transform::<M>,
@@ -134,29 +146,29 @@ impl ObjectManager {
     pub fn set_object_transform(&mut self, handle: RawObjectHandle, transform: Mat4) {
         let type_id = self.handle_to_typeid[&handle];
 
-        let storage = self.storage.get_mut(&type_id).unwrap();
+        let archetype = self.archetype.get_mut(&type_id).unwrap();
 
-        (storage.set_object_transform)(&mut storage.data_vec, &mut storage.buffer, handle.idx, transform);
+        (archetype.set_object_transform)(&mut archetype.data_vec, &mut archetype.buffer, handle.idx, transform);
     }
 
     pub fn remove(&mut self, handle: RawObjectHandle) {
         let type_id = self.handle_to_typeid[&handle];
 
-        let storage = self.storage.get_mut(&type_id).unwrap();
+        let archetype = self.archetype.get_mut(&type_id).unwrap();
 
-        (storage.remove)(&mut storage.data_vec, handle.idx);
+        (archetype.remove)(&mut archetype.data_vec, handle.idx);
     }
 
     pub fn ready(&mut self, device: &Device, encoder: &mut CommandEncoder, scatter: &ScatterCopy) {
-        for storage in self.storage.values_mut() {
-            (storage.ready)(storage, device, encoder, scatter);
+        for archetype in self.archetype.values_mut() {
+            (archetype.ready)(archetype, device, encoder, scatter);
         }
     }
 
     pub fn get_objects<M: Material>(&self) -> &[Option<InternalObject<M>>] {
         let type_id = TypeId::of::<M>();
 
-        self.storage[&type_id]
+        self.archetype[&type_id]
             .data_vec
             .downcast_slice::<Option<InternalObject<M>>>()
             .unwrap()
@@ -174,7 +186,7 @@ impl ObjectManager {
     ) {
         let type_id = self.handle_to_typeid[&*src_handle];
 
-        let archetype = self.storage.get_mut(&type_id).unwrap();
+        let archetype = self.archetype.get_mut(&type_id).unwrap();
 
         let dst_obj = (archetype.duplicate_object)(&mut archetype.data_vec, src_handle.idx, change);
 
@@ -204,7 +216,7 @@ pub(super) struct ObjectAddCallbackArgs<'a> {
     object: Object,
 }
 
-pub(super) fn object_add_callback<M: Material>(material: &M, args: ObjectAddCallbackArgs<'_>) {
+pub(super) fn object_add_callback<M: Material>(_material: &M, args: ObjectAddCallbackArgs<'_>) {
     // Make sure all required attributes are in the mesh and the supported attribute list.
     for &required_attribute in M::required_attributes() {
         // We can just directly use the internal mesh, as every attribute in the skeleton is also in the mesh.
@@ -308,14 +320,17 @@ fn remove<M: Material>(data: &mut VecAny, idx: usize) {
 }
 
 fn ready<M: Material>(
-    storage: &mut ObjectArchetype,
+    archetype: &mut ObjectArchetype,
     device: &Device,
     encoder: &mut CommandEncoder,
     scatter: &ScatterCopy,
 ) {
-    let data_vec = storage.data_vec.downcast_slice::<Option<InternalObject<M>>>().unwrap();
+    let data_vec = archetype
+        .data_vec
+        .downcast_slice::<Option<InternalObject<M>>>()
+        .unwrap();
 
-    storage.buffer.apply(device, encoder, scatter, |idx| {
+    archetype.buffer.apply(device, encoder, scatter, |idx| {
         data_vec[idx].as_ref().unwrap().inner.clone()
     })
 }

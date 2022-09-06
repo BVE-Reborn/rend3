@@ -932,9 +932,7 @@ pub trait Material: Send + Sync + 'static {
     fn required_attributes() -> Self::RequredAttributeArrayType;
     fn supported_attributes() -> Self::SupportedAttributeArrayType;
 
-    /// u64 key that determine's an object's archetype. When you query for
-    /// objects from the object manager, you must provide this key to get all
-    /// objects with this key.
+    /// u64 key that allows different materials to be somehow categorized.
     fn object_key(&self) -> u64;
 
     /// The array of textures that should be bound. Rend3 supports up to 32.

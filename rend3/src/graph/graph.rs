@@ -17,7 +17,7 @@ use crate::{
         RenderGraphEncoderOrPass, RenderGraphEncoderOrPassInner, RenderGraphNode, RenderGraphNodeBuilder,
         RenderPassTargets, RenderTargetDescriptor, RenderTargetHandle, RpassTemporaryPool,
     },
-    managers::{CameraManager, TextureManagerReadyOutput},
+    managers::TextureManagerReadyOutput,
     util::{
         output::OutputFrame,
         typedefs::{FastHashMap, FastHashSet, RendererStatistics, SsoString},
@@ -259,8 +259,6 @@ impl<'node> RenderGraph<'node> {
 
         profiling::scope!("Run Nodes");
 
-        let shadow_views = todo!();
-
         let output_cell = UnsafeCell::new(output);
         let encoder_cell = UnsafeCell::new(
             renderer
@@ -320,7 +318,6 @@ impl<'node> RenderGraph<'node> {
                         unsafe { &mut *output_cell.get() },
                         &resource_spans,
                         &active_views,
-                        shadow_views,
                     ));
                 }
                 next_rpass_idx += 1;
@@ -329,8 +326,6 @@ impl<'node> RenderGraph<'node> {
             {
                 let store = RenderGraphDataStore {
                     texture_mapping: &active_views,
-                    shadow_coordinates: todo!(),
-                    shadow_views: todo!(),
                     data: &self.data,
                     // SAFETY: This is only viewed mutably when no renderpass exists
                     output: unsafe { &*output_cell.get() }.as_view(),
@@ -418,7 +413,6 @@ impl<'node> RenderGraph<'node> {
         output: &'rpass OutputFrame,
         resource_spans: &'rpass FastHashMap<GraphResource, (usize, Option<usize>)>,
         active_views: &'rpass FastHashMap<usize, TextureView>,
-        shadow_views: &'rpass [TextureView],
     ) -> RenderPass<'rpass> {
         let color_attachments: Vec<_> = desc
             .targets
@@ -494,7 +488,6 @@ impl<'node> RenderGraph<'node> {
                         .as_view()
                         .expect("internal rendergraph error: tried to use output texture before acquire"),
                     GraphResource::Texture(t) => &active_views[t],
-                    GraphResource::Shadow(s) => &shadow_views[*s],
                     _ => {
                         panic!("internal rendergraph error: using a non-texture as a renderpass attachment")
                     }
@@ -503,16 +496,6 @@ impl<'node> RenderGraph<'node> {
                 stencil_ops: stencil_load,
             }
         });
-
-        // TODO: Properly read viewport
-        // rpass.set_viewport(
-        //     shadow_map.offset.x as f32,
-        //     shadow_map.offset.y as f32,
-        //     shadow_map.size as f32,
-        //     shadow_map.size as f32,
-        //     0.0,
-        //     1.0,
-        // );
         encoder.begin_render_pass(&RenderPassDescriptor {
             label: None,
             color_attachments: &color_attachments,
