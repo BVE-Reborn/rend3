@@ -12,6 +12,7 @@ struct ShaderCullingJobs {
     keys: Vec<ShaderJobKey>,
     jobs: Vec<ShaderCullingJob>,
 }
+
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 struct ShaderJobKey {
     material_key: u64,
@@ -57,7 +58,7 @@ fn batch_objects<M: Material>(material_manager: &MaterialManager, object_manager
 
     sorted_objects.sort_unstable_by_key(|(k, _, _)| k);
 
-    let buffer = ShaderCullingJobs {
+    let jobs = ShaderCullingJobs {
         jobs: Vec::new(),
         keys: Vec::new(),
     };
@@ -70,12 +71,12 @@ fn batch_objects<M: Material>(material_manager: &MaterialManager, object_manager
 
         for (key, handle, object) in sorted_objects {
             if key != current_key {
-                buffer.jobs.push(ShaderCullingJob {
+                jobs.jobs.push(ShaderCullingJob {
                     ranges: current_ranges,
                     total_objects: current_object_index,
                     total_invocations: current_invocation,
                 });
-                buffer.keys.push(key);
+                jobs.keys.push(key);
 
                 current_key = key;
                 current_invocation = 0;
@@ -94,5 +95,5 @@ fn batch_objects<M: Material>(material_manager: &MaterialManager, object_manager
         }
     }
 
-    todo!()
+    jobs
 }
