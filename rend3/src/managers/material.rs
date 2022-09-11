@@ -16,7 +16,7 @@ use std::{
     mem,
     num::{NonZeroU32, NonZeroU64},
 };
-use wgpu::{BindingType, BufferBindingType, CommandEncoder, Device, ShaderStages};
+use wgpu::{BindGroup, BindingType, BufferBindingType, CommandEncoder, Device, ShaderStages};
 
 mod texture_dedupe;
 
@@ -35,23 +35,32 @@ struct CpuPoweredShaderWrapper<M: Material> {
 }
 
 /// Internal representation of a material.
-struct InternalMaterial<M> {
-    bind_group_index: ProfileData<TextureBindGroupIndex, ()>,
-    inner: M,
+pub struct InternalMaterial<M> {
+    pub bind_group_index: ProfileData<TextureBindGroupIndex, ()>,
+    pub inner: M,
 }
 
 struct MaterialArchetype {
     // Inner type is CpuPoweredShaderWrapper<M> or GpuPoweredShaderWrapper<M>
     buffer: FreelistDerivedBuffer,
-    // Inner type is Option<M>
+    // Inner type is Option<InnerMaterial<M>>
     data_vec: VecAny,
     remove_data: fn(&mut VecAny, RawMaterialHandle) -> ProfileData<TextureBindGroupIndex, ()>,
     apply_data_cpu: fn(&mut FreelistDerivedBuffer, &Device, &mut CommandEncoder, &ScatterCopy, &mut VecAny),
     apply_data_gpu:
         fn(&mut FreelistDerivedBuffer, &Device, &mut CommandEncoder, &ScatterCopy, &mut VecAny, &TextureManager),
     get_attributes: fn(&mut dyn FnMut(&[&'static VertexAttributeId], &[&'static VertexAttributeId])),
-    get_material_key: fn(&VecAny, usize) -> MaterialKeyPair,
     object_add_callback_wrapper: fn(&VecAny, usize, ObjectAddCallbackArgs<'_>),
+}
+
+pub struct MaterialArchetypeView<'a, M: Material> {
+    data_vec: &'a [Option<InternalMaterial<M>>],
+}
+
+impl<'a, M: Material> MaterialArchetypeView<'a, M> {
+    pub fn material(&self, handle: RawMaterialHandle) -> &InternalMaterial<M> {
+        self.data_vec[handle.idx].as_ref().unwrap()
+    }
 }
 
 /// Key which determine's an object's archetype.
@@ -66,7 +75,7 @@ pub struct MaterialKeyPair {
 /// Manages materials and their associated BindGroups in CPU modes.
 pub struct MaterialManager {
     handle_to_typeid: FastHashMap<RawMaterialHandle, TypeId>,
-    storage: FastHashMap<TypeId, MaterialArchetype>,
+    archetypes: FastHashMap<TypeId, MaterialArchetype>,
 
     texture_deduplicator: texture_dedupe::TextureDeduplicator,
 }
@@ -79,7 +88,7 @@ impl MaterialManager {
 
         Self {
             handle_to_typeid: FastHashMap::default(),
-            storage: FastHashMap::default(),
+            archetypes: FastHashMap::default(),
             texture_deduplicator,
         }
     }
@@ -97,7 +106,7 @@ impl MaterialManager {
 
         let ty = TypeId::of::<M>();
 
-        self.storage.entry(ty).or_insert_with(|| MaterialArchetype {
+        self.archetypes.entry(ty).or_insert_with(|| MaterialArchetype {
             buffer: match profile {
                 RendererProfile::CpuDriven => FreelistDerivedBuffer::new::<CpuPoweredShaderWrapper<M>>(device),
                 RendererProfile::GpuDriven => FreelistDerivedBuffer::new::<GpuPoweredShaderWrapper<M>>(device),
@@ -107,7 +116,6 @@ impl MaterialManager {
             apply_data_cpu: apply_buffer_cpu::<M>,
             apply_data_gpu: apply_buffer_gpu::<M>,
             get_attributes: get_attributes::<M>,
-            get_material_key: get_material_key::<M>,
             object_add_callback_wrapper: object_add_callback_wrapper::<M>,
         })
     }
@@ -163,7 +171,7 @@ impl MaterialManager {
 
         assert_eq!(type_id, TypeId::of::<M>());
 
-        let archetype = self.storage.get_mut(&type_id).unwrap();
+        let archetype = self.archetypes.get_mut(&type_id).unwrap();
 
         let data_vec = archetype
             .data_vec
@@ -187,7 +195,7 @@ impl MaterialManager {
     pub fn remove(&mut self, handle: RawMaterialHandle) {
         let type_id = self.handle_to_typeid.remove(&handle).unwrap();
 
-        let archetype = self.storage.get_mut(&type_id).unwrap();
+        let archetype = self.archetypes.get_mut(&type_id).unwrap();
         let bind_group_index = (archetype.remove_data)(&mut archetype.data_vec, handle);
 
         if let ProfileData::Cpu(index) = bind_group_index {
@@ -205,7 +213,7 @@ impl MaterialManager {
     ) {
         profiling::scope!("Material Ready");
 
-        for archetype in self.storage.values_mut() {
+        for archetype in self.archetypes.values_mut() {
             match profile {
                 RendererProfile::CpuDriven => {
                     (archetype.apply_data_cpu)(&mut archetype.buffer, device, encoder, scatter, &mut archetype.data_vec)
@@ -220,6 +228,18 @@ impl MaterialManager {
                 ),
             }
         }
+    }
+
+    pub fn archetype_view<M: Material>(&self) -> MaterialArchetypeView<'_, M> {
+        let archetype = &self.archetypes[&TypeId::of::<M>()];
+
+        MaterialArchetypeView {
+            data_vec: archetype.data_vec.downcast_slice().unwrap(),
+        }
+    }
+
+    pub fn texture_bind_group(&self, index: TextureBindGroupIndex) -> &BindGroup {
+        &self.texture_deduplicator[index]
     }
 
     pub fn add_to_bgl_gpu<M: Material>(bglb: &mut BindGroupLayoutBuilder) {
@@ -240,17 +260,9 @@ impl MaterialManager {
     pub(super) fn call_object_add_callback(&self, handle: RawMaterialHandle, args: ObjectAddCallbackArgs) {
         let type_id = self.handle_to_typeid[&handle];
 
-        let archetype = &self.storage[&type_id];
+        let archetype = &self.archetypes[&type_id];
 
         (archetype.object_add_callback_wrapper)(&archetype.data_vec, handle.idx, args);
-    }
-
-    pub fn get_material_key(&mut self, handle: RawMaterialHandle) -> MaterialKeyPair {
-        let type_id = self.handle_to_typeid[&handle];
-
-        let archetype = &self.storage[&type_id];
-
-        (archetype.get_material_key)(&archetype.data_vec, handle.idx)
     }
 
     pub fn get_attributes(
@@ -260,7 +272,7 @@ impl MaterialManager {
     ) {
         let type_id = self.handle_to_typeid[&handle];
 
-        let archetype = &self.storage[&type_id];
+        let archetype = &self.archetypes[&type_id];
 
         (archetype.get_attributes)(&mut callback)
     }
@@ -323,17 +335,6 @@ fn apply_buffer_gpu<M: Material>(
             data: material.to_data(),
         }
     });
-}
-
-fn get_material_key<M: Material>(vec_any: &VecAny, index: usize) -> MaterialKeyPair {
-    let materials = vec_any.downcast_slice::<M>().unwrap();
-
-    let key = materials[index].object_key();
-
-    MaterialKeyPair {
-        ty: TypeId::of::<M>(),
-        key,
-    }
 }
 
 fn get_attributes<M: Material>(callback: &mut dyn FnMut(&[&'static VertexAttributeId], &[&'static VertexAttributeId])) {

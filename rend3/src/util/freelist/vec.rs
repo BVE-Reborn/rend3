@@ -1,6 +1,6 @@
 use std::ops::{Index, IndexMut};
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct FreelistIndex(pub usize);
 
 pub struct FreelistVec<T> {

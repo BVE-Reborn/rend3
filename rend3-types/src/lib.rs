@@ -878,19 +878,31 @@ pub struct TextureFromTexture {
 pub struct MaterialTag;
 
 /// Trait that abstracts over all possible arrays of optional raw texture handles.
-pub trait MaterialArray<T>: IntoIterator<Item = T> + AsRef<[T]> {
+///
+/// The IntoIterator stuff in this trait is because rust-analyzer gets totally
+/// confused when multiple IntoIterator bounds are involved. If I were to have
+/// MaterialArray<T>: IntoIterator<Item = T> like I would want, any into_iter
+/// based iteration of any iterator with a material argument in it
+/// (so Iterator<Item = ObjectWrapper<M>> for example) will completely stop being
+/// type deduced by RA. So to work around this, this trait also needs to act as
+/// IntoIterator. See https://github.com/rust-lang/rust-analyzer/issues/11242.
+pub trait MaterialArray<T>: AsRef<[T]> {
     /// An array of the [u32; COUNT]. We need this internally
     /// for shader layout stuff.
     type U32Array: encase::ShaderSize + encase::internal::WriteInto + Clone + Copy + Send + Sync + 'static;
+    type IntoIter: Iterator<Item = T>;
     const COUNT: u32;
 
     fn map_to_u32<F>(self, func: F) -> Self::U32Array
     where
         F: FnMut(T) -> u32;
+
+    fn into_iter(self) -> Self::IntoIter;
 }
 
 impl<const C: usize, T> MaterialArray<T> for [T; C] {
     type U32Array = [u32; C];
+    type IntoIter = <[T; C] as IntoIterator>::IntoIter;
     const COUNT: u32 = C as u32;
 
     fn map_to_u32<F>(self, func: F) -> Self::U32Array
@@ -898,6 +910,10 @@ impl<const C: usize, T> MaterialArray<T> for [T; C] {
         F: FnMut(T) -> u32,
     {
         self.map(func)
+    }
+
+    fn into_iter(self) -> Self::IntoIter {
+        <Self as IntoIterator>::into_iter(self)
     }
 }
 
@@ -933,7 +949,7 @@ pub trait Material: Send + Sync + 'static {
     fn supported_attributes() -> Self::SupportedAttributeArrayType;
 
     /// u64 key that allows different materials to be somehow categorized.
-    fn object_key(&self) -> u64;
+    fn key(&self) -> u64;
 
     /// The array of textures that should be bound. Rend3 supports up to 32.
     fn to_textures(&self) -> Self::TextureArrayType;

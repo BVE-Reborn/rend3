@@ -165,13 +165,16 @@ impl ObjectManager {
         }
     }
 
-    pub fn get_objects<M: Material>(&self) -> &[Option<InternalObject<M>>] {
+    pub fn enumerated_objects<M: Material>(&self) -> impl Iterator<Item = (RawObjectHandle, &InternalObject<M>)> + '_ {
         let type_id = TypeId::of::<M>();
 
         self.archetype[&type_id]
             .data_vec
             .downcast_slice::<Option<InternalObject<M>>>()
             .unwrap()
+            .into_iter()
+            .enumerate()
+            .filter_map(|(idx, o)| o.as_ref().map(|o| (RawObjectHandle::new(idx), o)))
     }
 
     pub fn duplicate_object(
@@ -218,7 +221,7 @@ pub(super) struct ObjectAddCallbackArgs<'a> {
 
 pub(super) fn object_add_callback<M: Material>(_material: &M, args: ObjectAddCallbackArgs<'_>) {
     // Make sure all required attributes are in the mesh and the supported attribute list.
-    for &required_attribute in M::required_attributes() {
+    for &required_attribute in M::required_attributes().into_iter() {
         // We can just directly use the internal mesh, as every attribute in the skeleton is also in the mesh.
         let found_in_mesh = args
             .internal_mesh

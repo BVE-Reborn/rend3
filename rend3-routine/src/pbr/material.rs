@@ -533,7 +533,7 @@ impl Material for PbrMaterial {
         Self::required_attributes()
     }
 
-    fn object_key(&self) -> u64 {
+    fn key(&self) -> u64 {
         TransparencyType::from(self.transparency) as u64
     }
 

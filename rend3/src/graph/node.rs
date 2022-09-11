@@ -4,7 +4,7 @@ use crate::{
     graph::{
         DataHandle, GraphResource, PassthroughDataContainer, PassthroughDataRef, PassthroughDataRefMut, ReadyData,
         RenderGraph, RenderGraphDataStore, RenderGraphEncoderOrPass, RenderPassHandle, RenderPassTargets,
-        RenderTargetHandle, RpassTemporaryPool, ShadowArrayHandle, ShadowTargetHandle,
+        RenderTargetHandle, RpassTemporaryPool,
     },
     util::typedefs::SsoString,
     Renderer,
@@ -81,28 +81,6 @@ impl<'a, 'node> RenderGraphNodeBuilder<'a, 'node> {
         self.rpass = Some(targets);
         DeclaredDependency {
             handle: RenderPassHandle,
-        }
-    }
-
-    /// Declares use of the entire shadow atlas for reading.
-    pub fn add_shadow_array_input(&mut self) -> DeclaredDependency<ShadowArrayHandle> {
-        for i in &self.graph.shadows {
-            let resource = GraphResource::Shadow(*i);
-            self.inputs.push(resource);
-        }
-        DeclaredDependency {
-            handle: ShadowArrayHandle,
-        }
-    }
-
-    /// Declares use of a particular shadow map for both reading and writing.
-    pub fn add_shadow_output(&mut self, idx: usize) -> DeclaredDependency<ShadowTargetHandle> {
-        let resource = GraphResource::Shadow(idx);
-        self.graph.shadows.insert(idx);
-        self.inputs.push(resource);
-        self.outputs.push(resource);
-        DeclaredDependency {
-            handle: ShadowTargetHandle { idx },
         }
     }
 

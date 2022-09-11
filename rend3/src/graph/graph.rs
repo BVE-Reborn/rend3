@@ -35,7 +35,6 @@ pub struct ReadyData {
 /// Implementation of a rendergraph. See module docs for details.
 pub struct RenderGraph<'node> {
     pub(super) targets: Vec<RenderTargetDescriptor>,
-    pub(super) shadows: FastHashSet<usize>,
     pub(super) data: Vec<Box<dyn Any>>, // Any is RefCell<Option<T>> where T is the stored data
     pub(super) nodes: Vec<RenderGraphNode<'node>>,
 }
@@ -43,7 +42,6 @@ impl<'node> RenderGraph<'node> {
     pub fn new() -> Self {
         Self {
             targets: Vec::with_capacity(32),
-            shadows: FastHashSet::with_capacity_and_hasher(32, Default::default()),
             data: Vec::with_capacity(32),
             nodes: Vec::with_capacity(64),
         }

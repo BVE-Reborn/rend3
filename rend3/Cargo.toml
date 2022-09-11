@@ -34,8 +34,8 @@ replace = "[Unreleased](https://github.com/BVE-Reborn/rend3/compare/v{{version}}
 
 [dependencies]
 arrayvec = "0.7"
-bitflags = "1"
 bimap = "0.6"
+bitflags = "1"
 bumpalo = "3"
 bytemuck = "1"
 encase = { version = "0.3" }
@@ -46,6 +46,7 @@ indexmap = "1"
 list-any = "0.2"
 log = "0.4"
 num-traits = "0.2"
+once_cell = "1"
 parking_lot = "0.12"
 profiling = { version = "1", default-features = false }
 range-alloc = "0.1"

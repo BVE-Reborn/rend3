@@ -1,104 +1,98 @@
-//! Material agnostic culling on either the CPU or GPU.
-
+use encase::ShaderType;
 use rend3::{
-    format_sso,
-    graph::{DataHandle, RenderGraph},
+    managers::{MaterialManager, ObjectManager, TextureBindGroupIndex},
     types::Material,
-    util::bind_merge::BindGroupBuilder,
-    ProfileData, RendererProfile,
-};
-use wgpu::{BindGroup, Buffer};
-
-use crate::{
-    common::{PerMaterialArchetypeInterface, Sorting},
-    skinning::SkinningOutput,
+    util::math::round_up_pot,
 };
 
-mod cpu;
-mod gpu;
+const BATCH_SIZE: usize = 256;
+const WORKGROUP_SIZE: u32 = 256;
 
-pub use cpu::*;
-pub use gpu::*;
-
-/// Handles to the data that corresponds with a single material archetype.
-pub struct PerMaterialArchetypeData {
-    pub inner: CulledObjectSet,
-    pub per_material: BindGroup,
+struct ShaderCullingJobs {
+    keys: Vec<ShaderJobKey>,
+    jobs: Vec<ShaderCullingJob>,
+}
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct ShaderJobKey {
+    material_key: u64,
+    bind_group_index: TextureBindGroupIndex,
 }
 
-/// A set of objects that have been called. Contains the information needed to
-/// dispatch a render.
-pub struct CulledObjectSet {
-    pub calls: ProfileData<Vec<cpu::CpuDrawCall>, gpu::GpuIndirectData>,
-    pub output_buffer: Buffer,
+#[derive(ShaderType)]
+struct ShaderCullingJob {
+    ranges: [ShaderObjectRange; BATCH_SIZE],
+    total_objects: u32,
+    total_invocations: u32,
 }
 
-/// Add the profile-approprate culling for the given material archetype to the
-/// graph.
-#[allow(clippy::too_many_arguments)]
-pub fn add_culling_to_graph<'node, M: Material>(
-    graph: &mut RenderGraph<'node>,
-    pre_cull_data: DataHandle<Buffer>,
-    culled: DataHandle<PerMaterialArchetypeData>,
-    skinned: DataHandle<SkinningOutput>,
-    per_material: &'node PerMaterialArchetypeInterface<M>,
-    gpu_culler: &'node ProfileData<(), gpu::GpuCuller>,
-    shadow_index: Option<usize>,
-    key: u64,
-    sorting: Option<Sorting>,
-    name: &str,
-) {
-    let mut builder = graph.add_node(format_sso!("Culling {}", name));
+#[derive(Copy, Clone, Default, ShaderType)]
+struct ShaderObjectRange {
+    invocation_start: u32,
+    invocation_end: u32,
+    object_id: u32,
+}
 
-    let pre_cull_handle = gpu_culler
-        .profile()
-        .into_data(|| (), || builder.add_data_input(pre_cull_data));
-    let cull_handle = builder.add_data_output(culled);
+fn batch_objects<M: Material>(material_manager: &MaterialManager, object_manager: &ObjectManager) -> ShaderCullingJobs {
+    let objects = object_manager.enumerated_objects::<M>();
+    let predicted_count = objects.size_hint().1.unwrap_or(0);
 
-    // Just connect the input, we don't need its value.
-    builder.add_data_input(skinned);
+    let material_archetype = material_manager.archetype_view::<M>();
 
-    builder.build(move |_pt, renderer, encoder_or_rpass, temps, ready, graph_data| {
-        let encoder = encoder_or_rpass.get_encoder();
+    let mut sorted_objects = Vec::with_capacity(predicted_count);
+    for (handle, object) in objects {
+        let material = material_archetype.material(*object.material_handle);
+        let bind_group_index = material.bind_group_index.into_cpu();
 
-        let culling_input = pre_cull_handle.map_gpu(|handle| graph_data.get_data::<Buffer>(temps, handle).unwrap());
+        let material_key = material.inner.key();
 
-        let count = graph_data.object_manager.get_objects::<M>(key).len();
+        sorted_objects.push((
+            ShaderJobKey {
+                material_key,
+                bind_group_index,
+            },
+            handle,
+            object,
+        ))
+    }
 
-        let camera = match shadow_index {
-            Some(idx) => &ready.directional_light_cameras[idx],
-            None => graph_data.camera_manager,
-        };
+    sorted_objects.sort_unstable_by_key(|(k, _, _)| k);
 
-        let culled_objects = match gpu_culler {
-            ProfileData::Cpu(_) => {
-                cpu::cull_cpu::<M>(&renderer.device, camera, graph_data.object_manager, sorting, key)
+    let buffer = ShaderCullingJobs {
+        jobs: Vec::new(),
+        keys: Vec::new(),
+    };
+
+    if !sorted_objects.is_empty() {
+        let mut current_invocation = 0_u32;
+        let mut current_object_index = 0_u32;
+        let mut current_ranges = [ShaderObjectRange::default(); BATCH_SIZE];
+        let mut current_key = sorted_objects.first().unwrap().0;
+
+        for (key, handle, object) in sorted_objects {
+            if key != current_key {
+                buffer.jobs.push(ShaderCullingJob {
+                    ranges: current_ranges,
+                    total_objects: current_object_index,
+                    total_invocations: current_invocation,
+                });
+                buffer.keys.push(key);
+
+                current_key = key;
+                current_invocation = 0;
+                current_object_index = 0;
             }
-            ProfileData::Gpu(ref gpu_culler) => gpu_culler.cull(
-                &renderer.device,
-                encoder,
-                camera,
-                culling_input.into_gpu(),
-                count,
-                sorting,
-            ),
-        };
 
-        let mut per_material_bgb = BindGroupBuilder::new();
-        per_material_bgb.append_buffer(&culled_objects.output_buffer);
+            let invocation_count = round_up_pot(object.inner.index_count, WORKGROUP_SIZE);
+            let range = ShaderObjectRange {
+                invocation_start: current_invocation,
+                invocation_end: current_invocation + invocation_count,
+                object_id: handle.idx as u32,
+            };
 
-        if renderer.profile == RendererProfile::GpuDriven {
-            graph_data.material_manager.add_to_bg_gpu::<M>(&mut per_material_bgb);
+            current_ranges[current_object_index as usize] = range;
+            current_object_index += 1;
         }
+    }
 
-        let per_material_bg = per_material_bgb.build(&renderer.device, None, &per_material.bgl);
-
-        graph_data.set_data(
-            cull_handle,
-            Some(PerMaterialArchetypeData {
-                inner: culled_objects,
-                per_material: per_material_bg,
-            }),
-        );
-    });
+    todo!()
 }
