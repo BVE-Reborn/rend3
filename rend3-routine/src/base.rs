@@ -370,6 +370,7 @@ impl BaseRenderGraphIntermediateState {
                 self.forward_uniform_bg,
                 trans.cull,
                 None,
+                None,
                 &format_sso!("PBR Forward {:?}", trans.ty),
                 samples,
                 self.color,

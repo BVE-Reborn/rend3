@@ -11,7 +11,7 @@ use rend3::{
         RenderTargetHandle,
     },
     types::{Handedness, Material, SampleCount},
-    ProfileData, Renderer, RendererDataCore, RendererProfile, ShaderConfig, ShaderPreProcessor,
+    ProfileData, Renderer, RendererDataCore, RendererProfile, ShaderConfig, ShaderPreProcessor, util::bind_merge::BindGroupBuilder,
 };
 use wgpu::{
     BindGroup, BindGroupLayout, BlendState, Color, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState,
@@ -154,6 +154,7 @@ impl<M: Material> ForwardRoutine<M> {
         forward_uniform_bg: DataHandle<BindGroup>,
         culled: DataHandle<culling::PerMaterialArchetypeData>,
         extra_bgs: Option<&'node Vec<BindGroup>>,
+        render_target_inputs: Option<(&[RenderTargetHandle], &'node BindGroupLayout)>,
         label: &str,
         samples: SampleCount,
         color: RenderTargetHandle,
@@ -161,6 +162,15 @@ impl<M: Material> ForwardRoutine<M> {
         depth: RenderTargetHandle,
     ) {
         let mut builder = graph.add_node(label);
+
+        let render_target_inputs = render_target_inputs.map(|(handles, bind_group)| {
+            let handles = handles
+                .iter()
+                .map(|handle| builder.add_render_target_input(*handle))
+                .collect::<Vec<_>>();
+
+            (handles, bind_group)
+        });
 
         let hdr_color_handle = builder.add_render_target_output(color);
         let hdr_resolve = builder.add_optional_render_target_output(resolve);
@@ -187,7 +197,7 @@ impl<M: Material> ForwardRoutine<M> {
         let this_pt_handle = builder.passthrough_ref(self);
         let extra_bg_pt_handle = extra_bgs.map(|v| builder.passthrough_ref(v));
 
-        builder.build(move |pt, _renderer, encoder_or_pass, temps, ready, graph_data| {
+        builder.build(move |pt, renderer, encoder_or_pass, temps, ready, graph_data| {
             let this = pt.get(this_pt_handle);
             let extra_bgs = extra_bg_pt_handle.map(|h| pt.get(h));
             let rpass = encoder_or_pass.get_rpass(rpass_handle);
@@ -204,10 +214,23 @@ impl<M: Material> ForwardRoutine<M> {
             rpass.set_pipeline(pipeline);
             rpass.set_bind_group(0, forward_uniform_bg, &[]);
             rpass.set_bind_group(1, &culled.per_material, &[]);
-            if let Some(v) = extra_bgs {
+            let group = if let Some(v) = extra_bgs {
                 for (idx, bg) in v.iter().enumerate() {
                     rpass.set_bind_group((idx + 3) as _, bg, &[])
                 }
+                v.len() as u32 + 3
+            } else {
+                3
+            };
+            if let Some((handles, bind_group)) = render_target_inputs {
+                let mut builder = BindGroupBuilder::new();
+                for handle in handles {
+                    let view = graph_data.get_render_target(handle);
+                    builder.append_texture_view(view);
+                }
+
+                let input_render_targets_bg = temps.add(builder.build(&renderer.device, Some("input render targets"), bind_group));
+                rpass.set_bind_group(group, input_render_targets_bg, &[]);
             }
 
             match culled.inner.calls {
