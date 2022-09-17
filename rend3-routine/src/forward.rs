@@ -11,7 +11,8 @@ use rend3::{
         RenderTargetHandle,
     },
     types::{Handedness, Material, SampleCount},
-    ProfileData, Renderer, RendererDataCore, RendererProfile, ShaderConfig, ShaderPreProcessor, util::bind_merge::BindGroupBuilder,
+    util::bind_merge::BindGroupBuilder,
+    ProfileData, Renderer, RendererDataCore, RendererProfile, ShaderConfig, ShaderPreProcessor,
 };
 use wgpu::{
     BindGroup, BindGroupLayout, BlendState, Color, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState,
@@ -229,7 +230,8 @@ impl<M: Material> ForwardRoutine<M> {
                     builder.append_texture_view(view);
                 }
 
-                let input_render_targets_bg = temps.add(builder.build(&renderer.device, Some("input render targets"), bind_group));
+                let input_render_targets_bg =
+                    temps.add(builder.build(&renderer.device, Some("input render targets"), bind_group));
                 rpass.set_bind_group(group, input_render_targets_bg, &[]);
             }
 
