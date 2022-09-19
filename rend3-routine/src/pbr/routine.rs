@@ -54,6 +54,7 @@ impl PbrRoutine {
                 None,
                 None,
                 &[],
+                None,
                 match transparency {
                     TransparencyType::Opaque | TransparencyType::Cutout => None,
                     TransparencyType::Blend => Some(BlendState::ALPHA_BLENDING),

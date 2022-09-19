@@ -30,6 +30,7 @@ use crate::{
 pub struct ForwardRoutine<M: Material> {
     pub pipeline_s1: RenderPipeline,
     pub pipeline_s4: RenderPipeline,
+    pub render_targets_bgl: Option<BindGroupLayout>,
     pub _phantom: PhantomData<M>,
 }
 impl<M: Material> ForwardRoutine<M> {
@@ -58,6 +59,7 @@ impl<M: Material> ForwardRoutine<M> {
         vertex: Option<(&str, &ShaderModule)>,
         fragment: Option<(&str, &ShaderModule)>,
         extra_bgls: &[BindGroupLayout],
+        render_targets_bgl: Option<BindGroupLayout>,
 
         blend: Option<BlendState>,
         use_prepass: bool,
@@ -113,6 +115,9 @@ impl<M: Material> ForwardRoutine<M> {
             bgls.push(data_core.material_manager.get_bind_group_layout_cpu::<M>());
         }
         bgls.extend(extra_bgls);
+        if let Some(ref render_targets_bgl) = render_targets_bgl {
+            bgls.push(render_targets_bgl);
+        }
 
         let pll = renderer.device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: Some("opaque pass"),
@@ -139,6 +144,10 @@ impl<M: Material> ForwardRoutine<M> {
         Self {
             pipeline_s1: inner(SampleCount::One),
             pipeline_s4: inner(SampleCount::Four),
+            render_targets_bgl: {
+                drop(bgls);
+                render_targets_bgl
+            },
             _phantom: PhantomData,
         }
     }
@@ -155,7 +164,7 @@ impl<M: Material> ForwardRoutine<M> {
         forward_uniform_bg: DataHandle<BindGroup>,
         culled: DataHandle<culling::PerMaterialArchetypeData>,
         extra_bgs: Option<&'node Vec<BindGroup>>,
-        render_target_inputs: Option<(&[RenderTargetHandle], &'node BindGroupLayout)>,
+        render_target_inputs: Option<&[RenderTargetHandle]>,
         label: &str,
         samples: SampleCount,
         color: RenderTargetHandle,
@@ -164,13 +173,11 @@ impl<M: Material> ForwardRoutine<M> {
     ) {
         let mut builder = graph.add_node(label);
 
-        let render_target_inputs = render_target_inputs.map(|(handles, bind_group)| {
-            let handles = handles
+        let render_target_inputs = render_target_inputs.map(|handles| {
+            handles
                 .iter()
                 .map(|handle| builder.add_render_target_input(*handle))
-                .collect::<Vec<_>>();
-
-            (handles, bind_group)
+                .collect::<Vec<_>>()
         });
 
         let hdr_color_handle = builder.add_render_target_output(color);
@@ -223,15 +230,18 @@ impl<M: Material> ForwardRoutine<M> {
             } else {
                 3
             };
-            if let Some((handles, bind_group)) = render_target_inputs {
+            if let Some(handles) = render_target_inputs {
                 let mut builder = BindGroupBuilder::new();
                 for handle in handles {
                     let view = graph_data.get_render_target(handle);
                     builder.append_texture_view(view);
                 }
 
-                let input_render_targets_bg =
-                    temps.add(builder.build(&renderer.device, Some("input render targets"), bind_group));
+                let input_render_targets_bg = temps.add(builder.build(
+                    &renderer.device,
+                    Some("input render targets"),
+                    self.render_targets_bgl.as_ref().expect("Render targets bgl wasn't set"),
+                ));
                 rpass.set_bind_group(group, input_render_targets_bg, &[]);
             }
 
