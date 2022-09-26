@@ -1,14 +1,18 @@
-use std::marker::PhantomData;
+use std::{any::type_name, marker::PhantomData, num::NonZeroU64};
 
-use encase::ShaderType;
+use encase::{ShaderSize, ShaderType};
 use rend3::{
-    managers::{MaterialManager, ObjectManager, TextureBindGroupIndex},
+    format_sso,
+    managers::{MaterialManager, ObjectManager, ShaderObject, TextureBindGroupIndex},
     types::{Material, MaterialArray},
     util::math::round_up_pot,
     Renderer, ShaderPreProcessor,
 };
 use serde::Serialize;
-use wgpu::RenderPipeline;
+use wgpu::{
+    BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, BufferBindingType, ComputePipeline,
+    ComputePipelineDescriptor, PipelineLayoutDescriptor, RenderPipeline, ShaderModuleDescriptor, ShaderStages,
+};
 
 const BATCH_SIZE: usize = 256;
 const WORKGROUP_SIZE: u32 = 256;
@@ -104,13 +108,16 @@ fn batch_objects<M: Material>(material_manager: &MaterialManager, object_manager
     jobs
 }
 
+struct DrawCall {}
+
 #[derive(Serialize)]
 struct CullingPreprocessingArguments {
     vertex_array_counts: u32,
 }
 
 struct GpuCuller<M> {
-    pipeline: RenderPipeline,
+    bgl: BindGroupLayout,
+    pipeline: ComputePipeline,
     _phantom: PhantomData<M>,
 }
 
@@ -119,8 +126,87 @@ where
     M: Material,
 {
     pub fn new(renderer: &Renderer, spp: &ShaderPreProcessor) {
-        spp.render_shader("base", &CullingPreprocessingArguments {
-            vertex_array_counts: <M::SupportedAttributeArrayType as MaterialArray>::COUNT,
-        })
+        let type_name = type_name::<M>();
+
+        let source = spp
+            .render_shader(
+                "base",
+                &CullingPreprocessingArguments {
+                    vertex_array_counts: <M::SupportedAttributeArrayType as MaterialArray>::COUNT,
+                },
+            )
+            .unwrap();
+
+        let sm = renderer.device.create_shader_module(ShaderModuleDescriptor {
+            label: Some(&format_sso!("GpuCuller {type_name} SM")),
+            source: todo!(),
+        });
+
+        let bgl = renderer.device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+            label: Some(&format_sso!("GpuCuller {type_name} BGL")),
+            entries: &[
+                BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: ShaderStages::COMPUTE,
+                    ty: BindingType::Buffer {
+                        ty: BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: false,
+                        min_binding_size: NonZeroU64::new(4),
+                    },
+                    count: None,
+                },
+                BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: ShaderStages::COMPUTE,
+                    ty: BindingType::Buffer {
+                        ty: BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: false,
+                        min_binding_size: Some(ShaderObject::<M>::SHADER_SIZE),
+                    },
+                    count: None,
+                },
+                BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: ShaderStages::COMPUTE,
+                    ty: BindingType::Buffer {
+                        ty: BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: false,
+                        min_binding_size: Some(ShaderCullingJob::SHADER_SIZE),
+                    },
+                    count: None,
+                },
+                BindGroupLayoutEntry {
+                    binding: 3,
+                    visibility: ShaderStages::COMPUTE,
+                    ty: BindingType::Buffer {
+                        ty: BufferBindingType::Storage { read_only: false },
+                        has_dynamic_offset: false,
+                        min_binding_size: Some(NonZeroU64::new(4)),
+                    },
+                    count: None,
+                },
+            ],
+        });
+
+        let pll = renderer.device.create_pipeline_layout(&PipelineLayoutDescriptor {
+            label: Some(&format_sso!("GpuCuller {type_name} PLL")),
+            bind_group_layouts: &[&bgl],
+            push_constant_ranges: &[],
+        });
+
+        let pipeline = renderer.device.create_compute_pipeline(&ComputePipelineDescriptor {
+            label: Some(&format_sso!("GpuCuller {type_name} PLL")),
+            layout: Some(&pll),
+            module: todo!(),
+            entry_point: todo!(),
+        });
+
+        Self {
+            bgl,
+            pipeline: todo!(),
+            _phantom: PhantomData,
+        }
     }
+
+    pub fn cull(&self, jobs: ShaderCullingJobs) -> DrawCall {}
 }

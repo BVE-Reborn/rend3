@@ -23,7 +23,6 @@ pub mod culling;
 pub mod depth;
 pub mod forward;
 pub mod pbr;
-pub mod pre_cull;
 mod shaders;
 pub mod skinning;
 pub mod skybox;
