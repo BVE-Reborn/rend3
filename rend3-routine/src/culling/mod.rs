@@ -1,9 +1,14 @@
+use std::marker::PhantomData;
+
 use encase::ShaderType;
 use rend3::{
     managers::{MaterialManager, ObjectManager, TextureBindGroupIndex},
-    types::Material,
+    types::{Material, MaterialArray},
     util::math::round_up_pot,
+    Renderer, ShaderPreProcessor,
 };
+use serde::Serialize;
+use wgpu::RenderPipeline;
 
 const BATCH_SIZE: usize = 256;
 const WORKGROUP_SIZE: u32 = 256;
@@ -83,7 +88,7 @@ fn batch_objects<M: Material>(material_manager: &MaterialManager, object_manager
                 current_object_index = 0;
             }
 
-            let invocation_count = round_up_pot(object.inner.index_count, WORKGROUP_SIZE);
+            let invocation_count = object.inner.index_count / 3;
             let range = ShaderObjectRange {
                 invocation_start: current_invocation,
                 invocation_end: current_invocation + invocation_count,
@@ -92,8 +97,30 @@ fn batch_objects<M: Material>(material_manager: &MaterialManager, object_manager
 
             current_ranges[current_object_index as usize] = range;
             current_object_index += 1;
+            current_invocation += round_up_pot(invocation_count, WORKGROUP_SIZE);
         }
     }
 
     jobs
+}
+
+#[derive(Serialize)]
+struct CullingPreprocessingArguments {
+    vertex_array_counts: u32,
+}
+
+struct GpuCuller<M> {
+    pipeline: RenderPipeline,
+    _phantom: PhantomData<M>,
+}
+
+impl<M> GpuCuller<M>
+where
+    M: Material,
+{
+    pub fn new(renderer: &Renderer, spp: &ShaderPreProcessor) {
+        spp.render_shader("base", &CullingPreprocessingArguments {
+            vertex_array_counts: <M::SupportedAttributeArrayType as MaterialArray>::COUNT,
+        })
+    }
 }

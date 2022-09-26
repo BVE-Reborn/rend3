@@ -48,7 +48,10 @@ impl ShaderPreProcessor {
         self.files.get(name)
     }
 
-    pub fn render_shader<T: Serialize>(&self, base: &str, config: &T) -> Result<String, RenderError> {
+    pub fn render_shader<T>(&self, base: &str, config: &T) -> Result<String, RenderError>
+    where
+        T: Serialize,
+    {
         let mut include_status = Mutex::new(HashSet::new());
         include_status.get_mut().insert(base.to_string());
 

@@ -1,155 +1,81 @@
-{{include "rend3-routine/math/frustum.wgsl"}}
-{{include "rend3-routine/math/matrix.wgsl"}}
 {{include "rend3-routine/math/sphere.wgsl"}}
-{{include "rend3-routine/structures.wgsl"}}
 
-struct CullingUniforms {
-    view: mat4x4<f32>,
-    view_proj: mat4x4<f32>,
-    frustum: Frustum,
-    object_count: u32,
+struct Object {
+    transform: mat4x4<f32>,
+    bounding_sphere: Sphere,
+    first_index: u32,
+    index_count: u32,
+    material_index: u32,
+    vertex_attribute_start_offsets: array<u32, {{vertex_array_counts}}>,
 }
 
-struct IndirectBuffer {
-    count: atomic<u32>,
-    pad0: u32,
-    pad1: u32,
-    pad2: u32,
-    calls: array<IndirectCall>,
+struct ObjectRange {
+    invocation_start: u32,
+    invocation_end: u32,
+    object_id: u32,
+}
+
+struct CullingJob {
+    ranges: array<ObjectRange, 256>,
+    total_objects: u32,
+    total_invocations: u32,
 }
 
 @group(0) @binding(0)
-var<storage, read> object_input: array<ObjectInputData>;
+var<storage> vertex_buffer: array<u32>;
 @group(0) @binding(1)
-var<uniform> uniforms: CullingUniforms;
+var<storage> object_buffer: array<Object>;
 @group(0) @binding(2)
-var<storage, read_write> object_output: array<ObjectOutputData>;
+var<storage> culling_job: CullingJob;
 @group(0) @binding(3)
-var<storage, read_write> draw_call_output: IndirectBuffer;
-@group(0) @binding(4)
-var<storage, read_write> result_index_a: array<u32>;
-@group(0) @binding(5)
-var<storage, read_write> result_index_b: array<u32>;
+var<storage, read_write> output_buffer: array<u32>;
 
-var<push_constant> stride: u32;
-
-fn write_output(in_data: ObjectInputData, index: u32) {
-    var out_data: ObjectOutputData;
-
-    out_data.model_view = uniforms.view * in_data.transform;
-    out_data.model_view_proj = uniforms.view_proj * in_data.transform;
-    out_data.inv_scale_sq = mat3_inv_scale_squared(
-        mat3x3<f32>(
-            out_data.model_view[0].xyz,
-            out_data.model_view[1].xyz,
-            out_data.model_view[2].xyz
-        )
-    );
-    out_data.material_idx = in_data.material_idx;
-
-    object_output[index] = out_data;
-
-    var call: IndirectCall;
-    call.vertex_count = in_data.count;
-    call.instance_count = 1u;
-    call.base_index = in_data.start_idx;
-    call.vertex_offset = in_data.vertex_offset;
-    call.base_instance = index;
-    draw_call_output.calls[index] = call;
-}
+var<workgroup> workgroup_object_range: ObjectRange;
 
 @compute @workgroup_size(256)
-fn atomic_main(@builtin(global_invocation_id) input_idx_vec: vec3<u32>) {
-    let input_idx = input_idx_vec.x;
-    if (input_idx >= uniforms.object_count) {
+fn cs_main(
+    @builtin(workgroup_id) wid: vec3<u32>,
+    @builtin(global_invocation_id) gid: vec3<u32>,
+    @builtin(local_invocation_id) lid: vec3<u32>,
+) {
+    if (local_invocation_id.x == 0) {
+        let target_invocation = wid.x * 256;
+        // pulled directly from https://doc.rust-lang.org/src/core/slice/mod.rs.html#2412-2438
+
+        var size = culling_job.total_objects;
+        var left = 0;
+        var right = size;
+        while left < right {
+            let mid = left + size / 2;
+
+            let probe = culling_job.ranges[mid];
+
+            if probe.invocation_end < target_invocation {
+                left = mid + 1;
+            } else if range.invocation_start > target_invocation {
+                right = mid;
+            } else {
+                workgroup_object_range = probe;
+                break;
+            }
+
+            size = right - left;
+        }
+    }
+
+    workgroupBarrier();
+
+    let object_range = workgroup_object_range;
+
+    if (gid.x > object_range.invocation_end) {
         return;
     }
 
-    let in_data = object_input[input_idx];
+    let index_index = gid.x - object_range.invocation_start;
 
-    let model_view = uniforms.view * in_data.transform;
-    let mesh_sphere = sphere_transform_by_mat4(in_data.bounding_sphere, model_view);
+    let object = object_buffer[object_range.object_id];
 
-    let visible = frustum_contains_sphere(uniforms.frustum, mesh_sphere);
+    let index = vertex_buffer[object.first_index + index_index];
 
-    if (!visible) {
-        return;
-    }
-
-    let output_idx = atomicAdd(&draw_call_output.count, 1u);
-
-    write_output(in_data, output_idx);
-}
-
-@compute @workgroup_size(256)
-fn prefix_begin(@builtin(global_invocation_id) input_idx_vec: vec3<u32>) {
-    let input_idx = input_idx_vec.x;
-    if (input_idx >= uniforms.object_count) {
-        return;
-    }
-
-    let in_data = object_input[input_idx];
-
-    let model_view = uniforms.view * in_data.transform;
-    let mesh_sphere = sphere_transform_by_mat4(in_data.bounding_sphere, model_view);
-
-    let visible = frustum_contains_sphere(uniforms.frustum, mesh_sphere);
-
-    let result_index = u32(visible) << 31u;
-    let result_index2 = result_index | u32(visible);
-
-    result_index_a[input_idx] = result_index2;
-}
-
-@compute @workgroup_size(256)
-fn prefix_intermediate(@builtin(global_invocation_id) input_idx: vec3<u32>) {
-    let my_idx = input_idx.x;
-    
-    if (my_idx >= uniforms.object_count) {
-        return;
-    }
-
-    if (my_idx < stride) {
-        result_index_b[my_idx] = result_index_a[my_idx];
-        return;
-    }
-
-    let other_idx = my_idx - stride;
-
-    let in_data = object_input[my_idx];
-
-    let me = result_index_a[my_idx];
-    let other = result_index_a[other_idx];
-    let me_high_bit = me & 0x80000000u;
-
-    let low_bits_me = me & 0x7FFFFFFFu;
-    let low_bits_other = other & 0x7FFFFFFFu;
-
-    let result = me_high_bit | (low_bits_me + low_bits_other);
-
-    result_index_b[my_idx] = result;
-}
-
-@compute @workgroup_size(256)
-fn prefix_end(@builtin(global_invocation_id) input_idx_vec: vec3<u32>) {
-    let input_idx = input_idx_vec.x;
-    if (input_idx >= uniforms.object_count) {
-        return;
-    }
-    
-    let result = result_index_a[input_idx];
-    let objects_before = result & 0x7FFFFFFFu;
-    let enabled = bool(result & 0x80000000u);
-
-    let output_idx = objects_before - 1u;
-
-    if (input_idx == uniforms.object_count - 1u) {
-        atomicStore(&draw_call_output.count, 1u);
-    }
-
-    if (!enabled) {
-        return;
-    }
-
-    write_output(object_input[input_idx], output_idx);
+    output_buffer[gid.x] = object_range.object_id << 24u || index & ((1u << 24u) - 1u);
 }
