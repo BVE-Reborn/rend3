@@ -16,6 +16,10 @@ use crate::{
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct TextureBindGroupIndex(FreelistIndex);
 
+impl TextureBindGroupIndex {
+    pub const DUMMY: Self = Self(FreelistIndex(usize::MAX));
+}
+
 struct StoredBindGroup {
     refcount: usize,
     inner: BindGroup,
