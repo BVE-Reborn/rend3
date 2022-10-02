@@ -30,7 +30,7 @@ use wgpu::{
 
 use crate::{
     common::{PerMaterialArchetypeInterface, WholeFrameInterfaces},
-    culling::{self, PerMaterialArchetypeData},
+    culling,
 };
 
 /// Trait for all materials that can use the built-in shadow/prepass rendering.

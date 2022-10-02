@@ -1,7 +1,10 @@
 use crate::{
     managers::CameraManager,
     types::{DirectionalLight, DirectionalLightHandle},
-    util::buffer::WrappedPotBuffer,
+    util::{
+        bind_merge::{BindGroupBuilder, BindGroupLayoutBuilder},
+        buffer::WrappedPotBuffer,
+    },
     Renderer, INTERNAL_SHADOW_DEPTH_FORMAT,
 };
 
@@ -9,8 +12,8 @@ use encase::{ArrayLength, ShaderType};
 use glam::{Mat4, UVec2, Vec2, Vec3};
 use rend3_types::{DirectionalLightChange, RawDirectionalLightHandle};
 use wgpu::{
-    BufferUsages, Device, Extent3d, TextureDescriptor, TextureDimension, TextureUsages, TextureView,
-    TextureViewDescriptor,
+    BindingType, BufferBindingType, BufferUsages, Device, Extent3d, ShaderStages, TextureDescriptor, TextureDimension,
+    TextureSampleType, TextureUsages, TextureView, TextureViewDescriptor, TextureViewDimension,
 };
 
 mod shadow_alloc;
@@ -149,6 +152,32 @@ impl DirectionalLightManager {
 
         self.data_buffer
             .write_to_buffer(&renderer.device, &renderer.queue, &buffer);
+    }
+
+    pub fn add_to_bgl(bglb: &mut BindGroupLayoutBuilder) {
+        bglb.append(
+            ShaderStages::FRAGMENT,
+            BindingType::Buffer {
+                ty: BufferBindingType::Storage { read_only: true },
+                has_dynamic_offset: false,
+                min_binding_size: Some(ShaderDirectionalLight::min_size()),
+            },
+            None,
+        );
+        bglb.append(
+            ShaderStages::FRAGMENT,
+            BindingType::Texture {
+                sample_type: TextureSampleType::Depth,
+                view_dimension: TextureViewDimension::D2,
+                multisampled: false,
+            },
+            None,
+        );
+    }
+
+    pub fn add_to_bg<'a>(&'a self, bgb: &mut BindGroupBuilder<'a>) {
+        bgb.append_buffer(&self.data_buffer);
+        bgb.append_texture_view(&self.texture_view);
     }
 }
 

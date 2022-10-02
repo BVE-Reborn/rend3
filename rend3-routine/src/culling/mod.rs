@@ -1,10 +1,16 @@
-use std::{any::type_name, marker::PhantomData, num::NonZeroU64, ops::Range};
+use std::{
+    any::{type_name, TypeId},
+    borrow::Cow,
+    iter::zip,
+    num::NonZeroU64,
+    ops::Range,
+};
 
 use encase::{ShaderSize, ShaderType, StorageBuffer};
 use rend3::{
     format_sso,
     managers::{MaterialManager, ObjectManager, ShaderObject, TextureBindGroupIndex},
-    types::{Material, MaterialArray},
+    types::{Material, MaterialArray, VertexAttributeId},
     util::math::round_up_pot,
     Renderer, ShaderPreProcessor,
 };
@@ -56,7 +62,7 @@ fn batch_objects<M: Material>(material_manager: &MaterialManager, object_manager
         let material = material_archetype.material(*object.material_handle);
         let bind_group_index = material
             .bind_group_index
-            .map_gpu(|| TextureBindGroupIndex::DUMMY)
+            .map_gpu(|_| TextureBindGroupIndex::DUMMY)
             .into_common();
 
         let material_key = material.inner.key();
@@ -117,13 +123,15 @@ fn batch_objects<M: Material>(material_manager: &MaterialManager, object_manager
     jobs
 }
 
-struct DrawCallSet {
-    object_data_buffer: Buffer,
+pub struct DrawCallSet {
+    object_reference_buffer: Buffer,
     index_buffer: Buffer,
-    calls: Vec<DrawCall>,
+    draw_calls: Vec<DrawCall>,
 }
 
-struct DrawCall {
+pub struct DrawCall {
+    material_key: u64,
+    bind_group_index: TextureBindGroupIndex,
     index_range: Range<u32>,
 }
 
@@ -132,31 +140,33 @@ struct CullingPreprocessingArguments {
     vertex_array_counts: u32,
 }
 
-struct GpuCuller<M> {
+pub struct GpuCuller {
     bgl: BindGroupLayout,
     pipeline: ComputePipeline,
-    _phantom: PhantomData<M>,
+    type_id: TypeId,
 }
 
-impl<M> GpuCuller<M>
-where
-    M: Material,
-{
-    pub fn new(renderer: &Renderer, spp: &ShaderPreProcessor) {
+impl GpuCuller {
+    pub fn new<M>(renderer: &Renderer, spp: &ShaderPreProcessor) -> Self
+    where
+        M: Material,
+    {
         let type_name = type_name::<M>();
 
         let source = spp
             .render_shader(
                 "base",
                 &CullingPreprocessingArguments {
-                    vertex_array_counts: <M::SupportedAttributeArrayType as MaterialArray>::COUNT,
+                    vertex_array_counts: <M::SupportedAttributeArrayType as MaterialArray<
+                        &'static VertexAttributeId,
+                    >>::COUNT,
                 },
             )
             .unwrap();
 
         let sm = renderer.device.create_shader_module(ShaderModuleDescriptor {
             label: Some(&format_sso!("GpuCuller {type_name} SM")),
-            source: todo!(),
+            source: wgpu::ShaderSource::Wgsl(Cow::Owned(source)),
         });
 
         let bgl = renderer.device.create_bind_group_layout(&BindGroupLayoutDescriptor {
@@ -198,7 +208,7 @@ where
                     ty: BindingType::Buffer {
                         ty: BufferBindingType::Storage { read_only: false },
                         has_dynamic_offset: false,
-                        min_binding_size: Some(NonZeroU64::new(4)),
+                        min_binding_size: Some(NonZeroU64::new(4).unwrap()),
                     },
                     count: None,
                 },
@@ -221,28 +231,33 @@ where
         Self {
             bgl,
             pipeline,
-            _phantom: PhantomData,
+            type_id: TypeId::of::<M>(),
         }
     }
 
-    pub fn cull(
+    pub fn cull<M>(
         &self,
         renderer: &Renderer,
         encoder: &mut CommandEncoder,
         jobs: ShaderCullingJobs,
         vertex_data_buffer: &Buffer,
         object_data_buffer: &Buffer,
-    ) -> DrawCallSet {
+    ) -> DrawCallSet
+    where
+        M: Material,
+    {
+        assert_eq!(TypeId::of::<M>(), self.type_id);
+
         let type_name = type_name::<M>();
 
-        let job_buffer = renderer.device.create_buffer(&BufferDescriptor {
-            label: Some(&format_sso!("GpuCuller {type_name} Job Buffer")),
-            size: jobs.size().get(),
+        let object_reference_buffer = renderer.device.create_buffer(&BufferDescriptor {
+            label: Some(&format_sso!("GpuCuller {type_name} Object Reference Buffer")),
+            size: jobs.jobs.size().get(),
             usage: BufferUsages::STORAGE,
             mapped_at_creation: true,
         });
-        StorageBuffer::new(&mut *job_buffer.slice(..).get_mapped_range_mut()).write(&jobs.jobs);
-        job_buffer.unmap();
+        StorageBuffer::new(&mut *object_reference_buffer.slice(..).get_mapped_range_mut()).write(&jobs.jobs);
+        object_reference_buffer.unmap();
 
         let total_invocations: u32 = jobs
             .jobs
@@ -254,7 +269,7 @@ where
             .sum();
         let output_buffer = renderer.device.create_buffer(&BufferDescriptor {
             label: Some(&format_sso!("GpuCuller {type_name} Output Buffer")),
-            size: total_invocations * 3,
+            size: total_invocations as u64 * 3,
             usage: BufferUsages::STORAGE | BufferUsages::INDEX,
             mapped_at_creation: false,
         });
@@ -273,7 +288,7 @@ where
                 },
                 BindGroupEntry {
                     binding: 2,
-                    resource: job_buffer.as_entire_binding(),
+                    resource: object_reference_buffer.as_entire_binding(),
                 },
                 BindGroupEntry {
                     binding: 3,
@@ -282,16 +297,30 @@ where
             ],
         });
 
+        let mut draw_calls = Vec::with_capacity(jobs.jobs.len());
         let cpass = encoder.begin_compute_pass(&ComputePassDescriptor {
             label: Some(&format_sso!("GpuCuller {type_name} Culling")),
         });
         cpass.set_pipeline(&self.pipeline);
-        for (idx, job) in jobs.jobs.into_iter().enumerate() {
-            let job: ShaderCullingJob = job;
+        for (idx, (key, job)) in zip(jobs.keys, jobs.jobs).enumerate() {
+            // RA is having a lot of trouble with into_iter.
+            let (key, job): (ShaderJobKey, ShaderCullingJob) = (key, job);
 
-            cpass.set_bind_group(0, &bg, &[idx * ShaderCullingJob::SHADER_SIZE]);
+            cpass.set_bind_group(0, &bg, &[idx as u32 * ShaderCullingJob::SHADER_SIZE.get() as u32]);
             cpass.dispatch_workgroups(job.total_invocations / WORKGROUP_SIZE, 1, 1);
+
+            draw_calls.push(DrawCall {
+                index_range: job.base_output_invocation..job.base_output_invocation + job.total_invocations,
+                material_key: key.material_key,
+                bind_group_index: key.bind_group_index,
+            });
         }
         drop(cpass);
+
+        DrawCallSet {
+            object_reference_buffer,
+            index_buffer: output_buffer,
+            draw_calls,
+        }
     }
 }

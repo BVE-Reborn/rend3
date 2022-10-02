@@ -19,7 +19,7 @@ use rend3::{
     format_sso,
     graph::{DataHandle, ReadyData, RenderGraph, RenderTargetDescriptor, RenderTargetHandle},
     types::{SampleCount, TextureFormat, TextureUsages},
-    ProfileData, Renderer, ShaderPreProcessor,
+    Renderer, ShaderPreProcessor,
 };
 use wgpu::{BindGroup, Buffer};
 
@@ -34,8 +34,8 @@ use crate::{
 pub struct PerTransparencyInfo {
     ty: pbr::TransparencyType,
     pre_cull: DataHandle<Buffer>,
-    shadow_cull: Vec<DataHandle<culling::PerMaterialArchetypeData>>,
-    cull: DataHandle<culling::PerMaterialArchetypeData>,
+    shadow_cull: Vec<DataHandle<culling::DrawCallSet>>,
+    cull: DataHandle<culling::DrawCallSet>,
 }
 
 /// Starter RenderGraph.
@@ -44,7 +44,7 @@ pub struct PerTransparencyInfo {
 pub struct BaseRenderGraph {
     pub interfaces: common::WholeFrameInterfaces,
     pub samplers: common::Samplers,
-    pub gpu_culler: ProfileData<(), culling::GpuCuller>,
+    pub gpu_culler: culling::GpuCuller,
     pub gpu_skinner: GpuSkinner,
 }
 
@@ -56,9 +56,8 @@ impl BaseRenderGraph {
 
         let samplers = common::Samplers::new(&renderer.device);
 
-        let gpu_culler = renderer
-            .profile
-            .into_data(|| (), || culling::GpuCuller::new(&renderer.device, spp));
+        // TODO: Support more materials
+        let gpu_culler = culling::GpuCuller::new::<pbr::PbrMaterial>(&renderer, spp);
 
         let gpu_skinner = GpuSkinner::new(&renderer.device, spp);
 
@@ -90,7 +89,6 @@ impl BaseRenderGraph {
 
         // Preparing and uploading data
         state.pre_skinning(graph);
-        state.pbr_pre_culling(graph);
         state.create_frame_uniforms(graph, self, ambient, resolution);
 
         // Skinning
@@ -199,19 +197,6 @@ impl BaseRenderGraphIntermediateState {
             depth,
             pre_skinning_buffers,
             skinned_data,
-        }
-    }
-
-    /// Upload culling input data to the GPU.
-    pub fn pbr_pre_culling(&self, graph: &mut RenderGraph<'_>) {
-        for trans in &self.per_transparency {
-            crate::pre_cull::add_to_graph::<pbr::PbrMaterial>(
-                graph,
-                trans.ty as u64,
-                trans.ty.to_sorting(),
-                &format_sso!("{:?}", trans.ty),
-                trans.pre_cull,
-            );
         }
     }
 
