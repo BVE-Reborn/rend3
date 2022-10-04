@@ -6,7 +6,7 @@ use crate::{
 use range_alloc::RangeAllocator;
 use rend3_types::{RawMeshHandle, VertexAttributeId, VERTEX_ATTRIBUTE_JOINT_INDICES, VERTEX_ATTRIBUTE_POSITION};
 use std::ops::Range;
-use wgpu::{BufferAddress, BufferDescriptor, BufferUsages, CommandEncoder, Device, Queue};
+use wgpu::{BufferAddress, BufferDescriptor, BufferUsages, CommandEncoder, Device, Queue, Buffer};
 
 /// Vertex buffer slot for object indices
 /// Note that this slot is only used in the GpuDriven profile.
@@ -53,7 +53,7 @@ impl InternalMesh {
 /// Manages vertex and instance buffers. All buffers are sub-allocated from
 /// megabuffers.
 pub struct MeshManager {
-    buffer: wgpu::Buffer,
+    buffer: Buffer,
 
     allocator: RangeAllocator<u64>,
 
@@ -180,6 +180,10 @@ impl MeshManager {
             return;
         }
         self.allocator.free_range(range);
+    }
+
+    pub fn buffer(&self) -> &Buffer {
+        &self.buffer
     }
 
     pub fn internal_data(&self, handle: RawMeshHandle) -> &InternalMesh {

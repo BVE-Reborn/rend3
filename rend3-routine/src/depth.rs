@@ -30,7 +30,7 @@ use wgpu::{
 
 use crate::{
     common::{PerMaterialArchetypeInterface, WholeFrameInterfaces},
-    culling,
+    culling::{self, DrawCallSet},
 };
 
 /// Trait for all materials that can use the built-in shadow/prepass rendering.
@@ -165,7 +165,7 @@ impl<M: DepthRenderableMaterial> DepthRoutine<M> {
         &'node self,
         graph: &mut RenderGraph<'node>,
         forward_uniform_bg: DataHandle<BindGroup>,
-        culled: DataHandle<PerMaterialArchetypeData>,
+        draw_call_set_hdl: DataHandle<DrawCallSet>,
         samples: SampleCount,
         cutout: bool,
         color: RenderTargetHandle,
@@ -179,7 +179,7 @@ impl<M: DepthRenderableMaterial> DepthRoutine<M> {
         let hdr_depth_handle = builder.add_render_target_output(depth);
 
         let forward_uniform_handle = builder.add_data_input(forward_uniform_bg);
-        let cull_handle = builder.add_data_input(culled);
+        let draw_call_set_hdl = builder.add_data_input(draw_call_set_hdl);
 
         let rpass_handle = builder.add_renderpass(RenderPassTargets {
             targets: vec![RenderPassTarget {
@@ -200,7 +200,7 @@ impl<M: DepthRenderableMaterial> DepthRoutine<M> {
             let this = pt.get(pt_handle);
             let rpass = encoder_or_pass.get_rpass(rpass_handle);
             let forward_uniform_bg = graph_data.get_data(temps, forward_uniform_handle).unwrap();
-            let culled = graph_data.get_data(temps, cull_handle).unwrap();
+            let draw_call_set_hdl = graph_data.get_data(temps, draw_call_set_hdl).unwrap();
 
             let pipeline = match (cutout, samples) {
                 (false, SampleCount::One) => &this.pipelines.prepass_opaque_s1,
@@ -211,7 +211,7 @@ impl<M: DepthRenderableMaterial> DepthRoutine<M> {
 
             rpass.set_pipeline(pipeline);
             rpass.set_bind_group(0, forward_uniform_bg, &[]);
-            rpass.set_bind_group(1, &culled.per_material, &[]);
+            rpass.set_bind_group(1, &draw_call_set_hdl.per_material, &[]);
             let material_index = if let Some(ref bg) = this.bg {
                 rpass.set_bind_group(2, bg, &[]);
                 3
@@ -219,7 +219,7 @@ impl<M: DepthRenderableMaterial> DepthRoutine<M> {
                 2
             };
 
-            match culled.inner.calls {
+            match draw_call_set_hdl.inner.calls {
                 ProfileData::Cpu(ref draws) => {
                     culling::draw_cpu_powered::<M>(rpass, draws, graph_data.material_manager, material_index)
                 }

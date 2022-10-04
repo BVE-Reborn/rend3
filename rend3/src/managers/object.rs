@@ -13,7 +13,7 @@ use list_any::VecAny;
 use rend3_types::{
     Material, MaterialArray, MaterialHandle, ObjectChange, ObjectMeshKind, RawObjectHandle, VertexAttributeId,
 };
-use wgpu::{CommandEncoder, Device};
+use wgpu::{CommandEncoder, Device, Buffer};
 
 use super::SkeletonManager;
 
@@ -163,6 +163,10 @@ impl ObjectManager {
         for archetype in self.archetype.values_mut() {
             (archetype.ready)(archetype, device, encoder, scatter);
         }
+    }
+
+    pub fn buffer<M: Material>(&self) -> &Buffer {
+        &self.archetype[&TypeId::of::<M>()].buffer
     }
 
     pub fn enumerated_objects<M: Material>(&self) -> impl Iterator<Item = (RawObjectHandle, &InternalObject<M>)> + '_ {

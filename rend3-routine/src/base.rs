@@ -135,7 +135,8 @@ impl BaseRenderGraphIntermediateState {
     /// Create the default setting for all state.
     pub fn new(graph: &mut RenderGraph<'_>, ready: &ReadyData, resolution: UVec2, samples: SampleCount) -> Self {
         // We need to know how many shadows we need to render
-        let shadow_count = ready.directional_light_cameras.len();
+        // TODO
+        let shadow_count = 1;
 
         // Setup all of our per-transparency data
         let mut per_transparency = ArrayVec::new();
@@ -235,14 +236,8 @@ impl BaseRenderGraphIntermediateState {
             for (shadow_index, &shadow_culled) in trans.shadow_cull.iter().enumerate() {
                 crate::culling::add_culling_to_graph::<pbr::PbrMaterial>(
                     graph,
-                    trans.pre_cull,
                     shadow_culled,
-                    self.skinned_data,
-                    &pbr.per_material,
                     &base.gpu_culler,
-                    Some(shadow_index),
-                    trans.ty as u64,
-                    trans.ty.to_sorting(),
                     &format_sso!("Shadow Culling S{} {:?}", shadow_index, trans.ty),
                 );
             }
@@ -263,14 +258,8 @@ impl BaseRenderGraphIntermediateState {
         for trans in &self.per_transparency {
             crate::culling::add_culling_to_graph::<pbr::PbrMaterial>(
                 graph,
-                trans.pre_cull,
                 trans.cull,
-                self.skinned_data,
-                &pbr.per_material,
                 &base.gpu_culler,
-                None,
-                trans.ty as u64,
-                trans.ty.to_sorting(),
                 &format_sso!("Primary Culling {:?}", trans.ty),
             );
         }

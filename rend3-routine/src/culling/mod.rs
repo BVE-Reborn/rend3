@@ -9,6 +9,7 @@ use std::{
 use encase::{ShaderSize, ShaderType, StorageBuffer};
 use rend3::{
     format_sso,
+    graph::{DataHandle, RenderGraph},
     managers::{MaterialManager, ObjectManager, ShaderObject, TextureBindGroupIndex},
     types::{Material, MaterialArray, VertexAttributeId},
     util::math::round_up_pot,
@@ -24,9 +25,9 @@ use wgpu::{
 const BATCH_SIZE: usize = 256;
 const WORKGROUP_SIZE: u32 = 256;
 
-struct ShaderCullingJobs {
+struct ShaderBatchDatas {
     keys: Vec<ShaderJobKey>,
-    jobs: Vec<ShaderCullingJob>,
+    jobs: Vec<ShaderBatchData>,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -36,7 +37,7 @@ struct ShaderJobKey {
 }
 
 #[derive(ShaderType)]
-struct ShaderCullingJob {
+struct ShaderBatchData {
     #[align(256)]
     ranges: [ShaderObjectRange; BATCH_SIZE],
     total_objects: u32,
@@ -51,7 +52,7 @@ struct ShaderObjectRange {
     object_id: u32,
 }
 
-fn batch_objects<M: Material>(material_manager: &MaterialManager, object_manager: &ObjectManager) -> ShaderCullingJobs {
+fn batch_objects<M: Material>(material_manager: &MaterialManager, object_manager: &ObjectManager) -> ShaderBatchDatas {
     let objects = object_manager.enumerated_objects::<M>();
     let predicted_count = objects.size_hint().1.unwrap_or(0);
 
@@ -79,7 +80,7 @@ fn batch_objects<M: Material>(material_manager: &MaterialManager, object_manager
 
     sorted_objects.sort_unstable_by_key(|(k, _, _)| k);
 
-    let jobs = ShaderCullingJobs {
+    let jobs = ShaderBatchDatas {
         jobs: Vec::new(),
         keys: Vec::new(),
     };
@@ -93,7 +94,7 @@ fn batch_objects<M: Material>(material_manager: &MaterialManager, object_manager
 
         for (key, handle, object) in sorted_objects {
             if key != current_key {
-                jobs.jobs.push(ShaderCullingJob {
+                jobs.jobs.push(ShaderBatchData {
                     ranges: current_ranges,
                     total_objects: current_object_index,
                     total_invocations: current_invocation,
@@ -198,7 +199,7 @@ impl GpuCuller {
                     ty: BindingType::Buffer {
                         ty: BufferBindingType::Storage { read_only: true },
                         has_dynamic_offset: true,
-                        min_binding_size: Some(ShaderCullingJob::SHADER_SIZE),
+                        min_binding_size: Some(ShaderBatchData::SHADER_SIZE),
                     },
                     count: None,
                 },
@@ -239,7 +240,7 @@ impl GpuCuller {
         &self,
         renderer: &Renderer,
         encoder: &mut CommandEncoder,
-        jobs: ShaderCullingJobs,
+        jobs: ShaderBatchDatas,
         vertex_data_buffer: &Buffer,
         object_data_buffer: &Buffer,
     ) -> DrawCallSet
@@ -262,7 +263,7 @@ impl GpuCuller {
         let total_invocations: u32 = jobs
             .jobs
             .iter()
-            .map(|j: &ShaderCullingJob| {
+            .map(|j: &ShaderBatchData| {
                 debug_assert_eq!(j.total_invocations % 256, 0);
                 j.total_invocations
             })
@@ -304,9 +305,9 @@ impl GpuCuller {
         cpass.set_pipeline(&self.pipeline);
         for (idx, (key, job)) in zip(jobs.keys, jobs.jobs).enumerate() {
             // RA is having a lot of trouble with into_iter.
-            let (key, job): (ShaderJobKey, ShaderCullingJob) = (key, job);
+            let (key, job): (ShaderJobKey, ShaderBatchData) = (key, job);
 
-            cpass.set_bind_group(0, &bg, &[idx as u32 * ShaderCullingJob::SHADER_SIZE.get() as u32]);
+            cpass.set_bind_group(0, &bg, &[idx as u32 * ShaderBatchData::SHADER_SIZE.get() as u32]);
             cpass.dispatch_workgroups(job.total_invocations / WORKGROUP_SIZE, 1, 1);
 
             draw_calls.push(DrawCall {
@@ -323,4 +324,29 @@ impl GpuCuller {
             draw_calls,
         }
     }
+}
+
+pub fn add_culling_to_graph<'node, M: Material>(
+    graph: &mut RenderGraph<'node>,
+    draw_calls_hdl: DataHandle<DrawCallSet>,
+    culler: &GpuCuller,
+    name: &str,
+) {
+    let node = graph.add_node(name);
+    let output = node.add_data_output(draw_calls_hdl);
+
+    node.build(move |pt, renderer, encoder_or_pass, temps, ready, graph_data| {
+        let jobs = batch_objects::<M>(graph_data.material_manager, graph_data.object_manager);
+
+        let encoder = encoder_or_pass.get_encoder();
+        let draw_calls = culler.cull::<M>(
+            renderer,
+            encoder,
+            jobs,
+            graph_data.mesh_manager.buffer(),
+            graph_data.object_manager.buffer::<M>(),
+        );
+
+        graph_data.set_data(output, Some(draw_calls));
+    });
 }

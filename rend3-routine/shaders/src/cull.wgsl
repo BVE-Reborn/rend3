@@ -1,33 +1,11 @@
-{{include "rend3-routine/math/sphere.wgsl"}}
-
-struct Object {
-    transform: mat4x4<f32>,
-    bounding_sphere: Sphere,
-    first_index: u32,
-    index_count: u32,
-    material_index: u32,
-    vertex_attribute_start_offsets: array<u32, {{vertex_array_counts}}>,
-}
-
-struct ObjectRange {
-    invocation_start: u32,
-    invocation_end: u32,
-    object_id: u32,
-}
-
-struct CullingJob {
-    ranges: array<ObjectRange, 256>,
-    total_objects: u32,
-    total_invocations: u32,
-    base_output_invocation: u32,
-}
+{{include "rend3-routine/structures.wgsl}}
 
 @group(0) @binding(0)
 var<storage> vertex_buffer: array<u32>;
 @group(0) @binding(1)
 var<storage> object_buffer: array<Object>;
 @group(0) @binding(2)
-var<storage> culling_job: CullingJob;
+var<storage> culling_job: BatchData;
 @group(0) @binding(3)
 var<storage, read_write> output_buffer: array<u32>;
 
