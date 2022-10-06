@@ -29,5 +29,5 @@ wgpu-profiler = "0.9.0"
 
 [dev-dependencies]
 codespan-reporting = "0.11"
-naga = "0.9"
+naga = "0.10"
 serde_json = { version = "1" }
