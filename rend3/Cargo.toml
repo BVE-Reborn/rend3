@@ -54,7 +54,7 @@ serde = { version = "1", features = ["derive"] }
 smallvec = "1"
 smartstring = "1.0"
 thiserror = "1"
-wgpu = "0.13"
+wgpu = "0.14"
 wgpu-profiler = "0.9.0"
 
 # Hard dependencies on new versions of transitive deps

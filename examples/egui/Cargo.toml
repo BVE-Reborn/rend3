@@ -37,4 +37,4 @@ winit = "0.26"
 # Opening URL's
 webbrowser = "0.5.5"
 # Creating textures
-wgpu = "0.13"
+wgpu = "0.14"
