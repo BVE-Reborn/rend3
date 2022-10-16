@@ -3,6 +3,7 @@
 {{include "rend3-routine/math/brdf.wgsl"}}
 {{include "rend3-routine/math/color.wgsl"}}
 {{include "rend3-routine/shadow/pcf.wgsl"}}
+
 @group(0) @binding(0)
 var primary_sampler: sampler;
 @group(0) @binding(1)
@@ -18,11 +19,13 @@ var shadows: texture_depth_2d_array;
 
 @group(1) @binding(0)
 var<storage> object_buffer: array<Object>;
-@group(1) @binding(0)
+@group(1) @binding(1)
 var<storage> batch_data: BatchData;
+@group(1) @binding(2)
+var<storage> vertex_buffer: array<u32>;
 
 {{#if (eq profile "GpuDriven")}}
-@group(1) @binding(1)
+@group(1) @binding(3)
 var<storage> materials: array<GpuMaterialData>;
 @group(2) @binding(0)
 var textures: binding_array<texture_2d<f32>>;
@@ -53,7 +56,6 @@ var anisotropy_tex: texture_2d<f32>;
 var ambient_occlusion_tex: texture_2d<f32>;
 {{/if}}
 
-var<storage> vertex_buffer: array<u32>;
 
 fn extract_attribute_vec2_f32(byte_base_offset: u32, vertex_index: u32) -> vec2<f32> {
     let first_element_idx = byte_base_offset / 4 + vertex_index * 2;

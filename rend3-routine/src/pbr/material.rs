@@ -9,7 +9,6 @@ use rend3::types::{
 
 use crate::{
     common::Sorting,
-    depth::{AlphaCutoutSpec, DepthRenderableMaterial},
 };
 
 bitflags::bitflags! {
@@ -556,20 +555,6 @@ impl Material for PbrMaterial {
     fn to_data(&self) -> Self::DataType {
         ShaderMaterial::from_material(self)
     }
-}
-
-impl DepthRenderableMaterial for PbrMaterial {
-    const ALPHA_CUTOUT: Option<AlphaCutoutSpec> = Some(AlphaCutoutSpec {
-        index: 0,
-        cutoff_offset: 152,
-        uv_transform_offset: Some(0),
-    });
-}
-
-#[test]
-fn cutout_offset() {
-    assert_eq!(bytemuck::offset_of!(ShaderMaterial, alpha_cutout), 152);
-    assert_eq!(bytemuck::offset_of!(ShaderMaterial, uv_transform0), 0);
 }
 
 #[repr(C)]

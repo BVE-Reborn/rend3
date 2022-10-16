@@ -3,7 +3,6 @@ use wgpu::{BlendState, Features};
 
 use crate::{
     common::{PerMaterialArchetypeInterface, WholeFrameInterfaces},
-    depth::DepthRoutine,
     forward::ForwardRoutine,
     pbr::{PbrMaterial, TransparencyType},
 };
@@ -13,7 +12,6 @@ pub struct PbrRoutine {
     pub opaque_routine: ForwardRoutine<PbrMaterial>,
     pub cutout_routine: ForwardRoutine<PbrMaterial>,
     pub blend_routine: ForwardRoutine<PbrMaterial>,
-    pub depth_pipelines: DepthRoutine<PbrMaterial>,
     pub per_material: PerMaterialArchetypeInterface<PbrMaterial>,
 }
 
@@ -34,15 +32,6 @@ impl PbrRoutine {
         let unclipped_depth_supported = renderer.features.contains(Features::DEPTH_CLIP_CONTROL);
 
         let per_material = PerMaterialArchetypeInterface::<PbrMaterial>::new(&renderer.device, renderer.profile);
-
-        let depth_pipelines = DepthRoutine::<PbrMaterial>::new(
-            renderer,
-            data_core,
-            spp,
-            interfaces,
-            &per_material,
-            unclipped_depth_supported,
-        );
 
         let mut inner = |transparency| {
             ForwardRoutine::new(
@@ -72,7 +61,6 @@ impl PbrRoutine {
             opaque_routine: inner(TransparencyType::Opaque),
             cutout_routine: inner(TransparencyType::Cutout),
             blend_routine: inner(TransparencyType::Blend),
-            depth_pipelines,
             per_material,
         }
     }
