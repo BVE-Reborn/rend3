@@ -21,7 +21,7 @@ fn create_quad(size: f32) -> rend3::types::Mesh {
     let index_data: &[u32] = &[0, 1, 2, 2, 3, 0];
 
     rend3::types::MeshBuilder::new(vertex_positions.to_vec(), rend3::types::Handedness::Left)
-        .with_vertex_uv0(uv_positions.to_vec())
+        .with_vertex_texture_coordinates_0(uv_positions.to_vec())
         .with_indices(index_data.to_vec())
         .build()
         .unwrap()

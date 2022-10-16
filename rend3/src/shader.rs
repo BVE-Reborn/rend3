@@ -104,7 +104,7 @@ impl<'a> HelperDef for ShaderIncluder<'a> {
         &self,
         h: &Helper<'reg, 'rc>,
         r: &'reg Handlebars<'reg>,
-        _ctx: &'rc Context,
+        ctx: &'rc Context,
         _rc: &mut RenderContext<'reg, 'rc>,
         out: &mut dyn Output,
     ) -> handlebars::HelperResult {
@@ -131,7 +131,7 @@ impl<'a> HelperDef for ShaderIncluder<'a> {
             ))
         })?;
 
-        out.write(&r.render_template(contents, &())?)?;
+        out.write(&r.render_template(contents, ctx.data())?)?;
 
         Ok(())
     }

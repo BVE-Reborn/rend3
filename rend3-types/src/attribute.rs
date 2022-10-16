@@ -117,8 +117,20 @@ impl VertexFormat for [u16; 4] {
     };
 }
 
+impl VertexFormat for [u8; 4] {
+    const METADATA: VertexFormatMetadata = VertexFormatMetadata {
+        size: 8,
+        shader_extract_fn: "extract_attribute_vec4_u8_unorm",
+        shader_type: "vec4<f32>",
+    };
+}
+
 pub static VERTEX_ATTRIBUTE_POSITION: VertexAttribute<glam::Vec3> = VertexAttribute::new("position");
 pub static VERTEX_ATTRIBUTE_NORMAL: VertexAttribute<glam::Vec3> = VertexAttribute::new("normal");
 pub static VERTEX_ATTRIBUTE_TANGENT: VertexAttribute<glam::Vec3> = VertexAttribute::new("tangent");
+pub static VERTEX_ATTRIBUTE_TEXTURE_COORDINATES_0: VertexAttribute<glam::Vec2> = VertexAttribute::new("texture_coords_0");
+pub static VERTEX_ATTRIBUTE_TEXTURE_COORDINATES_1: VertexAttribute<glam::Vec2> = VertexAttribute::new("texture_coords_1");
+pub static VERTEX_ATTRIBUTE_COLOR_0: VertexAttribute<[u8; 4]> = VertexAttribute::new("color_0");
+pub static VERTEX_ATTRIBUTE_COLOR_1: VertexAttribute<[u8; 4]> = VertexAttribute::new("color_1");
 pub static VERTEX_ATTRIBUTE_JOINT_INDICES: VertexAttribute<[u16; 4]> = VertexAttribute::new("joint indices");
 pub static VERTEX_ATTRIBUTE_JOINT_WEIGHTS: VertexAttribute<glam::Vec4> = VertexAttribute::new("joint weights");

@@ -25,7 +25,7 @@ use wgpu::{
 const BATCH_SIZE: usize = 256;
 const WORKGROUP_SIZE: u32 = 256;
 
-struct ShaderBatchDatas {
+pub struct ShaderBatchDatas {
     keys: Vec<ShaderJobKey>,
     jobs: Vec<ShaderBatchData>,
 }
@@ -37,7 +37,7 @@ struct ShaderJobKey {
 }
 
 #[derive(ShaderType)]
-struct ShaderBatchData {
+pub struct ShaderBatchData {
     #[align(256)]
     ranges: [ShaderObjectRange; BATCH_SIZE],
     total_objects: u32,
@@ -78,9 +78,9 @@ fn batch_objects<M: Material>(material_manager: &MaterialManager, object_manager
         ))
     }
 
-    sorted_objects.sort_unstable_by_key(|(k, _, _)| k);
+    sorted_objects.sort_unstable_by_key(|(k, _, _)| *k);
 
-    let jobs = ShaderBatchDatas {
+    let mut jobs = ShaderBatchDatas {
         jobs: Vec::new(),
         keys: Vec::new(),
     };
@@ -125,15 +125,15 @@ fn batch_objects<M: Material>(material_manager: &MaterialManager, object_manager
 }
 
 pub struct DrawCallSet {
-    object_reference_buffer: Buffer,
-    index_buffer: Buffer,
-    draw_calls: Vec<DrawCall>,
+    pub object_reference_buffer: Buffer,
+    pub index_buffer: Buffer,
+    pub draw_calls: Vec<DrawCall>,
 }
 
 pub struct DrawCall {
-    material_key: u64,
-    bind_group_index: TextureBindGroupIndex,
-    index_range: Range<u32>,
+    pub material_key: u64,
+    pub bind_group_index: TextureBindGroupIndex,
+    pub index_range: Range<u32>,
 }
 
 #[derive(Serialize)]
@@ -156,7 +156,7 @@ impl GpuCuller {
 
         let source = spp
             .render_shader(
-                "base",
+                "rend3-routine/cull.wgsl",
                 &CullingPreprocessingArguments {
                     vertex_array_counts: <M::SupportedAttributeArrayType as MaterialArray<
                         &'static VertexAttributeId,
@@ -257,7 +257,9 @@ impl GpuCuller {
             usage: BufferUsages::STORAGE,
             mapped_at_creation: true,
         });
-        StorageBuffer::new(&mut *object_reference_buffer.slice(..).get_mapped_range_mut()).write(&jobs.jobs);
+        StorageBuffer::new(&mut *object_reference_buffer.slice(..).get_mapped_range_mut())
+            .write(&jobs.jobs)
+            .unwrap();
         object_reference_buffer.unmap();
 
         let total_invocations: u32 = jobs
@@ -270,7 +272,7 @@ impl GpuCuller {
             .sum();
         let output_buffer = renderer.device.create_buffer(&BufferDescriptor {
             label: Some(&format_sso!("GpuCuller {type_name} Output Buffer")),
-            size: total_invocations as u64 * 3,
+            size: (total_invocations as u64 * 3).max(4),
             usage: BufferUsages::STORAGE | BufferUsages::INDEX,
             mapped_at_creation: false,
         });
@@ -299,7 +301,7 @@ impl GpuCuller {
         });
 
         let mut draw_calls = Vec::with_capacity(jobs.jobs.len());
-        let cpass = encoder.begin_compute_pass(&ComputePassDescriptor {
+        let mut cpass = encoder.begin_compute_pass(&ComputePassDescriptor {
             label: Some(&format_sso!("GpuCuller {type_name} Culling")),
         });
         cpass.set_pipeline(&self.pipeline);
@@ -329,10 +331,10 @@ impl GpuCuller {
 pub fn add_culling_to_graph<'node, M: Material>(
     graph: &mut RenderGraph<'node>,
     draw_calls_hdl: DataHandle<DrawCallSet>,
-    culler: &GpuCuller,
+    culler: &'node GpuCuller,
     name: &str,
 ) {
-    let node = graph.add_node(name);
+    let mut node = graph.add_node(name);
     let output = node.add_data_output(draw_calls_hdl);
 
     node.build(move |pt, renderer, encoder_or_pass, temps, ready, graph_data| {

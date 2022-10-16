@@ -3,13 +3,12 @@
 use encase::ShaderType;
 use glam::{Mat3, Vec3, Vec4};
 use rend3::types::{
-    Material, RawTextureHandle, TextureHandle, VertexAttributeId, VERTEX_ATTRIBUTE_NORMAL, VERTEX_ATTRIBUTE_POSITION,
-    VERTEX_ATTRIBUTE_TANGENT,
+    Material, RawTextureHandle, TextureHandle, VertexAttributeId, VERTEX_ATTRIBUTE_COLOR_0, VERTEX_ATTRIBUTE_COLOR_1,
+    VERTEX_ATTRIBUTE_NORMAL, VERTEX_ATTRIBUTE_POSITION, VERTEX_ATTRIBUTE_TANGENT,
+    VERTEX_ATTRIBUTE_TEXTURE_COORDINATES_0, VERTEX_ATTRIBUTE_TEXTURE_COORDINATES_1,
 };
 
-use crate::{
-    common::Sorting,
-};
+use crate::common::Sorting;
 
 bitflags::bitflags! {
     /// Flags which shaders use to determine properties of a material
@@ -517,19 +516,25 @@ pub struct PbrMaterial {
 impl Material for PbrMaterial {
     type DataType = ShaderMaterial;
     type TextureArrayType = [Option<RawTextureHandle>; 10];
-    type RequredAttributeArrayType = [&'static VertexAttributeId; 3];
-    type SupportedAttributeArrayType = [&'static VertexAttributeId; 3];
+    type RequredAttributeArrayType = [&'static VertexAttributeId; 1];
+    type SupportedAttributeArrayType = [&'static VertexAttributeId; 6];
 
     fn required_attributes() -> Self::RequredAttributeArrayType {
         [
+            // TODO: Add normal and tangents back when normal generation is on
             &VERTEX_ATTRIBUTE_POSITION,
-            &VERTEX_ATTRIBUTE_NORMAL,
-            &VERTEX_ATTRIBUTE_TANGENT,
         ]
     }
 
     fn supported_attributes() -> Self::SupportedAttributeArrayType {
-        Self::required_attributes()
+        [
+            &VERTEX_ATTRIBUTE_POSITION,
+            &VERTEX_ATTRIBUTE_NORMAL,
+            &VERTEX_ATTRIBUTE_TANGENT,
+            &VERTEX_ATTRIBUTE_TEXTURE_COORDINATES_0,
+            &VERTEX_ATTRIBUTE_TEXTURE_COORDINATES_1,
+            &VERTEX_ATTRIBUTE_COLOR_0,
+        ]
     }
 
     fn key(&self) -> u64 {
@@ -559,7 +564,7 @@ impl Material for PbrMaterial {
 
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, ShaderType)]
-struct ShaderMaterial {
+pub struct ShaderMaterial {
     uv_transform0: Mat3,
     uv_transform1: Mat3,
 

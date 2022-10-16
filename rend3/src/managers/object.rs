@@ -13,7 +13,7 @@ use list_any::VecAny;
 use rend3_types::{
     Material, MaterialArray, MaterialHandle, ObjectChange, ObjectMeshKind, RawObjectHandle, VertexAttributeId,
 };
-use wgpu::{CommandEncoder, Device, Buffer};
+use wgpu::{Buffer, CommandEncoder, Device};
 
 use super::SkeletonManager;
 
@@ -285,10 +285,10 @@ pub(super) fn object_add_callback<M: Material>(_material: &M, args: ObjectAddCal
     args.manager.handle_to_typeid.insert(args.handle, type_id);
     let archetype = args.manager.ensure_archetype::<M>(args.device);
 
-    let data_vec = archetype
-        .data_vec
-        .downcast_slice_mut::<Option<InternalObject<M>>>()
-        .unwrap();
+    let mut data_vec = archetype.data_vec.downcast_mut::<Option<InternalObject<M>>>().unwrap();
+    if args.handle.idx >= data_vec.len() {
+        data_vec.resize_with(args.handle.idx.saturating_sub(1).next_power_of_two(), || None);
+    }
     data_vec[args.handle.idx] = Some(internal_object);
     archetype.buffer.use_index(args.handle.idx);
 }

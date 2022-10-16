@@ -21,10 +21,7 @@ use thiserror::Error;
 pub use glam;
 
 mod attribute;
-pub use attribute::{
-    VertexAttribute, VertexAttributeId, VertexFormat, VERTEX_ATTRIBUTE_JOINT_INDICES, VERTEX_ATTRIBUTE_JOINT_WEIGHTS,
-    VERTEX_ATTRIBUTE_NORMAL, VERTEX_ATTRIBUTE_POSITION, VERTEX_ATTRIBUTE_TANGENT,
-};
+pub use attribute::*;
 
 /// Non-owning resource handle.
 ///
@@ -347,75 +344,74 @@ impl MeshBuilder {
         }
     }
 
-    // /// Add vertex normals to the given mesh.
-    // ///
-    // /// # Panic
-    // ///
-    // /// Will panic if the length is different from the position buffer length.
-    // pub fn with_vertex_normals(mut self, normals: Vec<Vec3>) -> Self {
-    //     self.vertex_attributes.push = Some(normals);
-    //     self
-    // }
+    pub fn with_attribute<T: VertexFormat>(mut self, attribute: &'static VertexAttribute<T>, values: Vec<T>) -> Self {
+        self.vertex_attributes
+            .push(StoredVertexAttributeData::new(attribute, values));
+        self
+    }
 
-    // /// Add vertex tangents to the given mesh.
-    // ///
-    // /// # Panic
-    // ///
-    // /// Will panic if the length is different from the position buffer length.
-    // pub fn with_vertex_tangents(mut self, tangents: Vec<Vec3>) -> Self {
-    //     self.vertex_tangents = Some(tangents);
-    //     self
-    // }
+    /// Add vertex normals to the given mesh.
+    ///
+    /// # Panic
+    ///
+    /// Will panic if the length is different from the position buffer length.
+    pub fn with_vertex_normals(self, normals: Vec<Vec3>) -> Self {
+        self.with_attribute(&VERTEX_ATTRIBUTE_NORMAL, normals)
+    }
 
-    // /// Add the first set of texture coordinates to the given mesh.
-    // ///
-    // /// # Panic
-    // ///
-    // /// Will panic if the length is different from the position buffer length.
-    // pub fn with_vertex_uv0(mut self, uvs: Vec<Vec2>) -> Self {
-    //     self.vertex_uv0 = Some(uvs);
-    //     self
-    // }
+    /// Add vertex tangents to the given mesh.
+    ///
+    /// # Panic
+    ///
+    /// Will panic if the length is different from the position buffer length.
+    pub fn with_vertex_tangents(self, tangents: Vec<Vec3>) -> Self {
+        self.with_attribute(&VERTEX_ATTRIBUTE_TANGENT, tangents)
+    }
 
-    // /// Add the second set of texture coordinates to the given mesh.
-    // ///
-    // /// # Panic
-    // ///
-    // /// Will panic if the length is different from the position buffer length.
-    // pub fn with_vertex_uv1(mut self, uvs: Vec<Vec2>) -> Self {
-    //     self.vertex_uv1 = Some(uvs);
-    //     self
-    // }
+    /// Add the first set of texture coordinates to the given mesh.
+    ///
+    /// # Panic
+    ///
+    /// Will panic if the length is different from the position buffer length.
+    pub fn with_vertex_texture_coordinates_0(self, coords: Vec<Vec2>) -> Self {
+        self.with_attribute(&VERTEX_ATTRIBUTE_TEXTURE_COORDINATES_0, coords)
+    }
 
-    // /// Add vertex colors to the given mesh.
-    // ///
-    // /// # Panic
-    // ///
-    // /// Will panic if the length is different from the position buffer length.
-    // pub fn with_vertex_colors(mut self, colors: Vec<[u8; 4]>) -> Self {
-    //     self.vertex_colors = Some(colors);
-    //     self
-    // }
+    /// Add the second set of texture coordinates to the given mesh.
+    ///
+    /// # Panic
+    ///
+    /// Will panic if the length is different from the position buffer length.
+    pub fn with_vertex_texture_coordinates_1(self, coords: Vec<Vec2>) -> Self {
+        self.with_attribute(&VERTEX_ATTRIBUTE_TEXTURE_COORDINATES_1, coords)
+    }
 
-    // /// Add vertex joint indices to the given mesh.
-    // ///
-    // /// # Panic
-    // ///
-    // /// Will panic if the length is different from the position buffer length.
-    // pub fn with_vertex_joint_indices(mut self, joint_indices: Vec<[u16; 4]>) -> Self {
-    //     self.vertex_joint_indices = Some(joint_indices);
-    //     self
-    // }
+    /// Add vertex colors to the given mesh.
+    ///
+    /// # Panic
+    ///
+    /// Will panic if the length is different from the position buffer length.
+    pub fn with_vertex_color_0(self, colors: Vec<[u8; 4]>) -> Self {
+        self.with_attribute(&VERTEX_ATTRIBUTE_COLOR_0, colors)
+    }
 
-    // /// Add vertex joint weights to the given mesh.
-    // ///
-    // /// # Panic
-    // ///
-    // /// Will panic if the length is different from the position buffer length.
-    // pub fn with_vertex_joint_weights(mut self, joint_weights: Vec<Vec4>) -> Self {
-    //     self.vertex_joint_weights = Some(joint_weights);
-    //     self
-    // }
+    /// Add vertex joint indices to the given mesh.
+    ///
+    /// # Panic
+    ///
+    /// Will panic if the length is different from the position buffer length.
+    pub fn with_vertex_joint_indices(self, joint_indices: Vec<[u16; 4]>) -> Self {
+        self.with_attribute(&VERTEX_ATTRIBUTE_JOINT_INDICES, joint_indices)
+    }
+
+    /// Add vertex joint weights to the given mesh.
+    ///
+    /// # Panic
+    ///
+    /// Will panic if the length is different from the position buffer length.
+    pub fn with_vertex_joint_weights(self, joint_weights: Vec<Vec4>) -> Self {
+        self.with_attribute(&VERTEX_ATTRIBUTE_JOINT_WEIGHTS, joint_weights)
+    }
 
     /// Add indices to the given mesh.
     ///
@@ -507,7 +503,11 @@ impl MeshBuilder {
 
         // Ok(mesh)
 
-        todo!()
+        Ok(Mesh {
+            attributes: self.vertex_attributes,
+            vertex_count: self.vertex_count as _,
+            indices: self.indices.unwrap_or_else(|| (0..length as u32).collect()),
+        })
     }
 }
 

@@ -60,7 +60,7 @@ where
         self.ensure_size(device, size.get());
 
         let mut mapped = queue.write_buffer_with(&self.inner, 0, size);
-        encase::UniformBuffer::new(&mut *mapped).write(data).unwrap();
+        encase::StorageBuffer::new(&mut *mapped).write(data).unwrap();
         drop(mapped);
     }
 }

@@ -43,7 +43,7 @@ fn cs_main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let struct_word_offset = index * stride;
 
     let destination_word_offset = transfer_source.data[struct_word_offset];
-    let data_word_offset = base_word_offset + 1;
+    let data_word_offset = struct_word_offset + 1u;
     
     for (var i = 0u; i < words_to_copy; i++) {
         transfer_destination[destination_word_offset + i] = transfer_source.data[data_word_offset + i];

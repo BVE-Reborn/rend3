@@ -16,7 +16,7 @@ use std::{
     mem,
     num::{NonZeroU32, NonZeroU64},
 };
-use wgpu::{BindGroup, BindingType, BufferBindingType, CommandEncoder, Device, ShaderStages};
+use wgpu::{BindGroup, BindingType, BufferBindingType, CommandEncoder, Device, ShaderStages, BindGroupLayout, Buffer};
 
 mod texture_dedupe;
 
@@ -54,11 +54,16 @@ struct MaterialArchetype {
 }
 
 pub struct MaterialArchetypeView<'a, M: Material> {
+    buffer: &'a Buffer,
     data_vec: &'a [Option<InternalMaterial<M>>],
 }
 
 impl<'a, M: Material> MaterialArchetypeView<'a, M> {
-    pub fn material(&self, handle: RawMaterialHandle) -> &InternalMaterial<M> {
+    pub fn buffer(&self) -> &'a Buffer {
+        self.buffer
+    }
+
+    pub fn material(&self, handle: RawMaterialHandle) -> &'a InternalMaterial<M> {
         self.data_vec[handle.idx].as_ref().unwrap()
     }
 }
@@ -111,7 +116,7 @@ impl MaterialManager {
                 RendererProfile::CpuDriven => FreelistDerivedBuffer::new::<CpuPoweredShaderWrapper<M>>(device),
                 RendererProfile::GpuDriven => FreelistDerivedBuffer::new::<GpuPoweredShaderWrapper<M>>(device),
             },
-            data_vec: VecAny::new::<Option<M>>(),
+            data_vec: VecAny::new::<Option<InternalMaterial<M>>>(),
             remove_data: remove_data::<M>,
             apply_data_cpu: apply_buffer_cpu::<M>,
             apply_data_gpu: apply_buffer_gpu::<M>,
@@ -148,7 +153,7 @@ impl MaterialManager {
             .data_vec
             .downcast_mut::<Option<InternalMaterial<M>>>()
             .unwrap();
-        if handle.idx > data_vec.len() {
+        if handle.idx >= data_vec.len() {
             data_vec.resize_with(handle.idx.saturating_sub(1).next_power_of_two(), || None);
         }
         data_vec[handle.idx] = Some(InternalMaterial {
@@ -234,6 +239,7 @@ impl MaterialManager {
         let archetype = &self.archetypes[&TypeId::of::<M>()];
 
         MaterialArchetypeView {
+            buffer: &archetype.buffer,
             data_vec: archetype.data_vec.downcast_slice().unwrap(),
         }
     }
@@ -257,12 +263,18 @@ impl MaterialManager {
         );
     }
 
+
+
     pub(super) fn call_object_add_callback(&self, handle: RawMaterialHandle, args: ObjectAddCallbackArgs) {
         let type_id = self.handle_to_typeid[&handle];
 
         let archetype = &self.archetypes[&type_id];
 
         (archetype.object_add_callback_wrapper)(&archetype.data_vec, handle.idx, args);
+    }
+
+    pub fn get_bind_group_layout_cpu<M: Material>(&self) -> &BindGroupLayout {
+        self.texture_deduplicator.get_bgl(<M::TextureArrayType as MaterialArray<Option<RawTextureHandle>>>::COUNT as usize)
     }
 
     pub fn get_attributes(

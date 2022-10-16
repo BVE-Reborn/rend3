@@ -1,7 +1,9 @@
 {{include "rend3-routine/structures.wgsl"}}
+{{include "rend3-routine/structures_object.wgsl"}}
 {{include "rend3-routine/material.wgsl"}}
 {{include "rend3-routine/math/brdf.wgsl"}}
 {{include "rend3-routine/math/color.wgsl"}}
+{{include "rend3-routine/math/matrix.wgsl"}}
 {{include "rend3-routine/shadow/pcf.wgsl"}}
 
 @group(0) @binding(0)
@@ -15,7 +17,7 @@ var<uniform> uniforms: UniformData;
 @group(0) @binding(4)
 var<storage> directional_lights: DirectionalLightData;
 @group(0) @binding(5)
-var shadows: texture_depth_2d_array;
+var shadows: texture_depth_2d;
 
 @group(1) @binding(0)
 var<storage> object_buffer: array<Object>;
@@ -32,68 +34,73 @@ var textures: binding_array<texture_2d<f32>>;
 {{/if}}
 
 {{#if (eq profile "CpuDriven")}}
-@group(2) @binding(0)
+@group(1) @binding(3)
 var<storage> material: CpuMaterialData;
-@group(2) @binding(1)
+@group(2) @binding(0)
 var albedo_tex: texture_2d<f32>;
-@group(2) @binding(2)
+@group(2) @binding(1)
 var normal_tex: texture_2d<f32>;
-@group(2) @binding(3)
+@group(2) @binding(2)
 var roughness_tex: texture_2d<f32>;
-@group(2) @binding(4)
+@group(2) @binding(3)
 var metallic_tex: texture_2d<f32>;
-@group(2) @binding(5)
+@group(2) @binding(4)
 var reflectance_tex: texture_2d<f32>;
-@group(2) @binding(6)
+@group(2) @binding(5)
 var clear_coat_tex: texture_2d<f32>;
-@group(2) @binding(7)
+@group(2) @binding(6)
 var clear_coat_roughness_tex: texture_2d<f32>;
-@group(2) @binding(8)
+@group(2) @binding(7)
 var emissive_tex: texture_2d<f32>;
-@group(2) @binding(9)
+@group(2) @binding(8)
 var anisotropy_tex: texture_2d<f32>;
-@group(2) @binding(10)
+@group(2) @binding(9)
 var ambient_occlusion_tex: texture_2d<f32>;
 {{/if}}
 
 
 fn extract_attribute_vec2_f32(byte_base_offset: u32, vertex_index: u32) -> vec2<f32> {
-    let first_element_idx = byte_base_offset / 4 + vertex_index * 2;
+    let first_element_idx = byte_base_offset / 4u + vertex_index * 2u;
     return vec2<f32>(
         bitcast<f32>(vertex_buffer[first_element_idx]),
-        bitcast<f32>(vertex_buffer[first_element_idx + 1]),
+        bitcast<f32>(vertex_buffer[first_element_idx + 1u]),
     );
 }
 
 fn extract_attribute_vec3_f32(byte_base_offset: u32, vertex_index: u32) -> vec3<f32> {
-    let first_element_idx = byte_base_offset / 4 + vertex_index * 3;
+    let first_element_idx = byte_base_offset / 4u + vertex_index * 3u;
     return vec3<f32>(
         bitcast<f32>(vertex_buffer[first_element_idx]),
-        bitcast<f32>(vertex_buffer[first_element_idx + 1]),
-        bitcast<f32>(vertex_buffer[first_element_idx + 2]),
+        bitcast<f32>(vertex_buffer[first_element_idx + 1u]),
+        bitcast<f32>(vertex_buffer[first_element_idx + 2u]),
     );
 }
 
 fn extract_attribute_vec4_f32(byte_base_offset: u32, vertex_index: u32) -> vec4<f32> {
-    let first_element_idx = byte_base_offset / 4 + vertex_index * 4;
+    let first_element_idx = byte_base_offset / 4u + vertex_index * 4u;
     return vec4<f32>(
         bitcast<f32>(vertex_buffer[first_element_idx]),
-        bitcast<f32>(vertex_buffer[first_element_idx + 1]),
-        bitcast<f32>(vertex_buffer[first_element_idx + 2]),
-        bitcast<f32>(vertex_buffer[first_element_idx + 3]),
+        bitcast<f32>(vertex_buffer[first_element_idx + 1u]),
+        bitcast<f32>(vertex_buffer[first_element_idx + 2u]),
+        bitcast<f32>(vertex_buffer[first_element_idx + 3u]),
     );
 }
 
 fn extract_attribute_vec4_u16(byte_base_offset: u32, vertex_index: u32) -> vec4<u32> {
-    let first_element_idx = byte_base_offset / 4 + vertex_index * 2;
+    let first_element_idx = byte_base_offset / 4u + vertex_index * 2u;
     let value_0 = vertex_buffer[first_element_idx];
-    let value_1 = vertex_buffer[first_element_idx + 1];
+    let value_1 = vertex_buffer[first_element_idx + 1u];
     return vec4<u32>(
         value_0 & 0xFFFFu,
-        (value_0 >> 16) & 0xFFFFu,
+        (value_0 >> 16u) & 0xFFFFu,
         value_1 & 0xFFFFu,
-        (value_1 >> 16) & 0xFFFFu,
+        (value_1 >> 16u) & 0xFFFFu,
     );
+}
+
+fn extract_attribute_vec4_u8_unorm(byte_base_offset: u32, vertex_index: u32) -> vec4<f32> {
+    let first_element_idx = byte_base_offset / 4u + vertex_index;
+    return unpack4x8unorm(vertex_buffer[first_element_idx]);
 }
 
 struct VertexInput {
@@ -102,7 +109,7 @@ struct VertexInput {
     tangent: vec3<f32>,
     coords0: vec2<f32>,
     coords1: vec2<f32>,
-    color: vec4<u32>,
+    color: vec4<f32>,
 }
 
 struct Indices {
@@ -111,7 +118,7 @@ struct Indices {
 }
 
 fn unpack_vertex_index(vertex_index: u32) -> Indices {
-    let local_object_id = vertex_index >> 24;
+    let local_object_id = vertex_index >> 24u;
     let vertex_id = vertex_index & 0xFFFFFFu;
     let object_id = batch_data.ranges[local_object_id].object_id;
 
@@ -120,12 +127,44 @@ fn unpack_vertex_index(vertex_index: u32) -> Indices {
 
 fn get_vertices(indices: Indices) -> VertexInput {
     var verts: VertexInput;
-    verts.position = extract_attribute_vec3_f32(object_buffer[indices.object].vertex_attribute_start_offsets[0], indices.vertex);
-    verts.normal = extract_attribute_vec3_f32(object_buffer[indices.object].vertex_attribute_start_offsets[1], indices.vertex);
-    verts.tangent = extract_attribute_vec3_f32(object_buffer[indices.object].vertex_attribute_start_offsets[2], indices.vertex);
-    verts.coords0 = extract_attribute_vec2_f32(object_buffer[indices.object].vertex_attribute_start_offsets[3], indices.vertex);
-    verts.coords1 = extract_attribute_vec2_f32(object_buffer[indices.object].vertex_attribute_start_offsets[4], indices.vertex);
-    verts.color = extract_attribute_vec4_u16(object_buffer[indices.object].vertex_attribute_start_offsets[5], indices.vertex);
+
+    let position_offset = object_buffer[indices.object].vertex_attribute_start_offsets[0];
+    verts.position = extract_attribute_vec3_f32(position_offset, indices.vertex);
+
+    let normal_offset = object_buffer[indices.object].vertex_attribute_start_offsets[1];
+    if (normal_offset == 0xFFFFFFFFu) {
+        verts.normal = extract_attribute_vec3_f32(normal_offset, indices.vertex);
+    } else {
+        verts.normal = vec3<f32>(0.0);
+    }
+
+    let tangent_offset = object_buffer[indices.object].vertex_attribute_start_offsets[2];
+    if (tangent_offset == 0xFFFFFFFFu) {
+        verts.tangent = extract_attribute_vec3_f32(tangent_offset, indices.vertex);
+    } else {
+        verts.tangent = vec3<f32>(0.0);
+    }
+
+    let coords0_offset = object_buffer[indices.object].vertex_attribute_start_offsets[3];
+    if (coords0_offset == 0xFFFFFFFFu) {
+        verts.coords0 = extract_attribute_vec2_f32(coords0_offset, indices.vertex);
+    } else {
+        verts.coords0 = vec2<f32>(0.0);
+    }
+
+    let coords1_offset = object_buffer[indices.object].vertex_attribute_start_offsets[4];
+    if (coords1_offset == 0xFFFFFFFFu) {
+        verts.coords1 = extract_attribute_vec2_f32(coords1_offset, indices.vertex);
+    } else {
+        verts.coords1 = vec2<f32>(0.0);
+    }
+
+    let color_offset = object_buffer[indices.object].vertex_attribute_start_offsets[5];
+    if (color_offset == 0xFFFFFFFFu) {
+        verts.color = extract_attribute_vec4_u8_unorm(color_offset, indices.vertex);
+    } else {
+        verts.color = vec4<f32>(0.0);
+    }
     return verts;
 }
 
@@ -146,20 +185,26 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
     let indices = unpack_vertex_index(vertex_index);
 
     let vs_in = get_vertices(indices);
-    let data = object_buffer[vs_in.object_idx];
+    let data = object_buffer[indices.object];
+
+    // TODO: Store these in uniforms
+    let model_view = uniforms.view * data.transform;
+    let model_view_proj = uniforms.view_proj * data.transform;
 
     let position_vec4 = vec4<f32>(vs_in.position, 1.0);
-    let mv_mat3 = mat3x3<f32>(data.model_view[0].xyz, data.model_view[1].xyz, data.model_view[2].xyz);
+    let mv_mat3 = mat3x3<f32>(model_view[0].xyz, model_view[1].xyz, model_view[2].xyz);
+
+    let inv_scale_sq = mat3_inv_scale_squared(mv_mat3);
 
     var vs_out: VertexOutput;
-    vs_out.material = data.material_idx;
-    vs_out.view_position = data.model_view * position_vec4;
-    vs_out.normal = normalize(mv_mat3 * (data.inv_scale_sq * vs_in.normal));
-    vs_out.tangent = normalize(mv_mat3 * (data.inv_scale_sq * vs_in.tangent));
+    vs_out.material = data.material_index;
+    vs_out.view_position = model_view * position_vec4;
+    vs_out.normal = normalize(mv_mat3 * (inv_scale_sq * vs_in.normal));
+    vs_out.tangent = normalize(mv_mat3 * (inv_scale_sq * vs_in.tangent));
     vs_out.color = vs_in.color;
     vs_out.coords0 = vs_in.coords0;
     vs_out.coords1 = vs_in.coords1;
-    vs_out.position = data.model_view_proj * position_vec4;
+    vs_out.position = model_view_proj * position_vec4;
 
     return vs_out;
 }
@@ -518,7 +563,7 @@ fn fs_main(vs_out: VertexOutput) -> @location(0) vec4<f32> {
 
         var shadow_value = 1.0;
         if (any(shadow_flipped >= vec2<f32>(0.0)) || any(shadow_flipped <= vec2<f32>(1.0))) {
-            shadow_value = shadow_sample_pcf5(shadows, comparison_sampler, shadow_coords, i, shadow_ndc.z);
+            shadow_value = shadow_sample_pcf5(shadows, comparison_sampler, shadow_coords, shadow_ndc.z);
         }
 
         color += surface_shading(light, pixel, v, shadow_value * pixel.ambient_occlusion);

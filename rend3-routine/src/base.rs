@@ -274,13 +274,13 @@ impl BaseRenderGraphIntermediateState {
     pub fn pbr_shadow_rendering<'node>(&self, graph: &mut RenderGraph<'node>, pbr: &'node pbr::PbrRoutine) {
         for trans in &self.per_transparency[0..2] {
             for (shadow_index, &shadow_culled) in trans.shadow_cull.iter().enumerate() {
-                pbr.depth_pipelines.add_shadow_rendering_to_graph(
-                    graph,
-                    matches!(trans.ty, pbr::TransparencyType::Cutout),
-                    shadow_index,
-                    self.shadow_uniform_bg,
-                    shadow_culled,
-                );
+                // pbr.depth_pipelines.add_shadow_rendering_to_graph(
+                //     graph,
+                //     matches!(trans.ty, pbr::TransparencyType::Cutout),
+                //     shadow_index,
+                //     self.shadow_uniform_bg,
+                //     shadow_culled,
+                // );
             }
         }
     }
@@ -293,16 +293,16 @@ impl BaseRenderGraphIntermediateState {
         samples: SampleCount,
     ) {
         for trans in &self.per_transparency[0..2] {
-            pbr.depth_pipelines.add_prepass_to_graph(
-                graph,
-                self.forward_uniform_bg,
-                trans.cull,
-                samples,
-                matches!(trans.ty, pbr::TransparencyType::Cutout),
-                self.color,
-                self.resolve,
-                self.depth,
-            );
+            // pbr.depth_pipelines.add_prepass_to_graph(
+            //     graph,
+            //     self.forward_uniform_bg,
+            //     trans.cull,
+            //     samples,
+            //     matches!(trans.ty, pbr::TransparencyType::Cutout),
+            //     self.color,
+            //     self.resolve,
+            //     self.depth,
+            // );
         }
     }
 
@@ -343,6 +343,7 @@ impl BaseRenderGraphIntermediateState {
                 graph,
                 self.forward_uniform_bg,
                 trans.cull,
+                &pbr.per_material,
                 None,
                 &format_sso!("PBR Forward {:?}", trans.ty),
                 samples,

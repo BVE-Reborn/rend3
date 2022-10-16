@@ -17,6 +17,22 @@ impl RendererProfile {
             Self::GpuDriven => ProfileData::Gpu(gpu()),
         }
     }
+
+    /// Returns `true` if the renderer profile is [`CpuDriven`].
+    ///
+    /// [`CpuDriven`]: RendererProfile::CpuDriven
+    #[must_use]
+    pub fn is_cpu_driven(&self) -> bool {
+        matches!(self, Self::CpuDriven)
+    }
+
+    /// Returns `true` if the renderer profile is [`GpuDriven`].
+    ///
+    /// [`GpuDriven`]: RendererProfile::GpuDriven
+    #[must_use]
+    pub fn is_gpu_driven(&self) -> bool {
+        matches!(self, Self::GpuDriven)
+    }
 }
 
 /// Stores two different types of data depending on the renderer mode.

@@ -73,7 +73,7 @@ impl DirectionalLightManager {
     }
 
     pub fn add(&mut self, handle: &DirectionalLightHandle, light: DirectionalLight) {
-        if handle.idx > self.data.len() {
+        if handle.idx >= self.data.len() {
             self.data.resize_with(handle.idx + 1, || None);
         }
         self.data[handle.idx] = Some(InternalDirectionalLight { inner: light })
@@ -160,7 +160,7 @@ impl DirectionalLightManager {
             BindingType::Buffer {
                 ty: BufferBindingType::Storage { read_only: true },
                 has_dynamic_offset: false,
-                min_binding_size: Some(ShaderDirectionalLight::min_size()),
+                min_binding_size: Some(ShaderDirectionalLightBuffer::min_size()),
             },
             None,
         );

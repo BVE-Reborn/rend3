@@ -120,6 +120,7 @@ impl ScatterCopy {
             item.data.write_into(&mut writer);
         }
 
+        drop(mapped_range);
         source_buffer.unmap();
 
         let bg = BindGroupBuilder::new()

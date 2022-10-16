@@ -5,25 +5,34 @@
 use std::{borrow::Cow, marker::PhantomData};
 
 use arrayvec::ArrayVec;
+use encase::ShaderSize;
 use rend3::{
     graph::{
         DataHandle, DepthHandle, RenderGraph, RenderPassDepthTarget, RenderPassTarget, RenderPassTargets,
         RenderTargetHandle,
     },
-    types::{Handedness, Material, SampleCount},
+    types::{Handedness, Material, SampleCount, MaterialArray, VertexAttributeId},
+    util::bind_merge::BindGroupBuilder,
     ProfileData, Renderer, RendererDataCore, RendererProfile, ShaderConfig, ShaderPreProcessor,
 };
+use serde::Serialize;
 use wgpu::{
     BindGroup, BindGroupLayout, BlendState, Color, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState,
-    DepthStencilState, Face, FragmentState, FrontFace, MultisampleState, PipelineLayoutDescriptor, PolygonMode,
-    PrimitiveState, PrimitiveTopology, RenderPipeline, RenderPipelineDescriptor, ShaderModule, ShaderModuleDescriptor,
-    ShaderSource, StencilState, TextureFormat, VertexState,
+    DepthStencilState, Face, FragmentState, FrontFace, IndexFormat, MultisampleState, PipelineLayoutDescriptor,
+    PolygonMode, PrimitiveState, PrimitiveTopology, RenderPipeline, RenderPipelineDescriptor, ShaderModule,
+    ShaderModuleDescriptor, ShaderSource, StencilState, TextureFormat, VertexState,
 };
 
 use crate::{
     common::{PerMaterialArchetypeInterface, WholeFrameInterfaces},
-    culling,
+    culling::{self, DrawCall},
 };
+
+#[derive(Serialize)]
+struct ForwardPreprocessingArguments {
+    profile: Option<RendererProfile>,
+    vertex_array_counts: u32,
+}
 
 /// A set of pipelines for rendering a specific combination of a material.
 pub struct ForwardRoutine<M: Material> {
@@ -70,8 +79,11 @@ impl<M: Material> ForwardRoutine<M> {
             source: ShaderSource::Wgsl(Cow::Owned(
                 spp.render_shader(
                     "rend3-routine/opaque.wgsl",
-                    &ShaderConfig {
+                    &ForwardPreprocessingArguments {
                         profile: Some(renderer.profile),
+                        vertex_array_counts: <M::SupportedAttributeArrayType as MaterialArray<
+                            &'static VertexAttributeId,
+                        >>::COUNT,
                     },
                 )
                 .unwrap(),
@@ -152,7 +164,8 @@ impl<M: Material> ForwardRoutine<M> {
         &'node self,
         graph: &mut RenderGraph<'node>,
         forward_uniform_bg: DataHandle<BindGroup>,
-        culled: DataHandle<culling::PerMaterialArchetypeData>,
+        culled: DataHandle<culling::DrawCallSet>,
+        per_material: &'node PerMaterialArchetypeInterface<M>,
         extra_bgs: Option<&'node Vec<BindGroup>>,
         label: &str,
         samples: SampleCount,
@@ -179,20 +192,30 @@ impl<M: Material> ForwardRoutine<M> {
             }),
         });
 
-        let _ = builder.add_shadow_array_input();
-
         let forward_uniform_handle = builder.add_data_input(forward_uniform_bg);
         let cull_handle = builder.add_data_input(culled);
 
         let this_pt_handle = builder.passthrough_ref(self);
         let extra_bg_pt_handle = extra_bgs.map(|v| builder.passthrough_ref(v));
 
-        builder.build(move |pt, _renderer, encoder_or_pass, temps, ready, graph_data| {
+        builder.build(move |pt, renderer, encoder_or_pass, temps, ready, graph_data| {
             let this = pt.get(this_pt_handle);
             let extra_bgs = extra_bg_pt_handle.map(|h| pt.get(h));
             let rpass = encoder_or_pass.get_rpass(rpass_handle);
             let forward_uniform_bg = graph_data.get_data(temps, forward_uniform_handle).unwrap();
             let culled = graph_data.get_data(temps, cull_handle).unwrap();
+
+            let per_material_bg = temps.add(
+                BindGroupBuilder::new()
+                    .append_buffer(graph_data.object_manager.buffer::<M>())
+                    .append_buffer_with_size(
+                        &culled.object_reference_buffer,
+                        culling::ShaderBatchData::SHADER_SIZE.get(),
+                    )
+                    .append_buffer(graph_data.mesh_manager.buffer())
+                    .append_buffer(graph_data.material_manager.archetype_view::<M>().buffer())
+                    .build(&renderer.device, Some("Per-Material BG"), &per_material.bgl),
+            );
 
             let pipeline = match samples {
                 SampleCount::One => &this.pipeline_s1,
@@ -201,21 +224,32 @@ impl<M: Material> ForwardRoutine<M> {
 
             rpass.set_pipeline(pipeline);
             rpass.set_bind_group(0, forward_uniform_bg, &[]);
-            rpass.set_bind_group(1, &culled.per_material, &[]);
             if let Some(v) = extra_bgs {
                 for (idx, bg) in v.iter().enumerate() {
                     rpass.set_bind_group((idx + 3) as _, bg, &[])
                 }
             }
+            if let ProfileData::Gpu(ref bg) = ready.d2_texture.bg {
+                rpass.set_bind_group(2, bg, &[]);
+            }
 
-            match culled.inner.calls {
-                ProfileData::Cpu(ref draws) => {
-                    culling::draw_cpu_powered::<M>(rpass, draws, graph_data.material_manager, 2)
+            for (idx, call) in culled.draw_calls.iter().enumerate() {
+                let call: &DrawCall = call;
+
+                if renderer.profile.is_cpu_driven() {
+                    rpass.set_bind_group(
+                        2,
+                        graph_data.material_manager.texture_bind_group(call.bind_group_index),
+                        &[],
+                    );
                 }
-                ProfileData::Gpu(ref data) => {
-                    rpass.set_bind_group(2, ready.d2_texture.bg.as_gpu(), &[]);
-                    culling::draw_gpu_powered(rpass, data);
-                }
+                rpass.set_bind_group(
+                    1,
+                    per_material_bg,
+                    &[idx as u32 * culling::ShaderBatchData::SHADER_SIZE.get() as u32],
+                );
+                rpass.set_index_buffer(culled.index_buffer.slice(..), IndexFormat::Uint32);
+                rpass.draw_indexed(call.index_range.clone(), 0, 0..1);
             }
         });
     }

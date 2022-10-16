@@ -114,6 +114,10 @@ impl TextureDeduplicator {
             self.deduplication_map.remove_by_right(&index);
         }
     }
+
+    pub fn get_bgl(&self, count: usize) -> &BindGroupLayout {
+        &self.bgls[count]
+    }
 }
 
 impl Index<TextureBindGroupIndex> for TextureDeduplicator {

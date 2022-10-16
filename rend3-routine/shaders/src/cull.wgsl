@@ -1,4 +1,5 @@
-{{include "rend3-routine/structures.wgsl}}
+{{include "rend3-routine/structures.wgsl"}}
+{{include "rend3-routine/structures_object.wgsl"}}
 
 @group(0) @binding(0)
 var<storage> vertex_buffer: array<u32>;
@@ -14,7 +15,7 @@ struct ObjectRangeIndex {
     index: u32,
 }
 
-var<workgroup> workgroup_object_range: ObjectRange;
+var<workgroup> workgroup_object_range: ObjectRangeIndex;
 
 @compute @workgroup_size(256)
 fn cs_main(
@@ -22,21 +23,21 @@ fn cs_main(
     @builtin(global_invocation_id) gid: vec3<u32>,
     @builtin(local_invocation_id) lid: vec3<u32>,
 ) {
-    if (local_invocation_id.x == 0) {
-        let target_invocation = wid.x * 256;
+    if (lid.x == 0u) {
+        let target_invocation = wid.x * 256u;
         // pulled directly from https://doc.rust-lang.org/src/core/slice/mod.rs.html#2412-2438
 
         var size = culling_job.total_objects;
-        var left = 0;
+        var left = 0u;
         var right = size;
         while left < right {
-            let mid = left + size / 2;
+            let mid = left + size / 2u;
 
             let probe = culling_job.ranges[mid];
 
             if probe.invocation_end < target_invocation {
-                left = mid + 1;
-            } else if range.invocation_start > target_invocation {
+                left = mid + 1u;
+            } else if probe.invocation_start > target_invocation {
                 right = mid;
             } else {
                 workgroup_object_range = ObjectRangeIndex(probe, mid);
@@ -66,7 +67,7 @@ fn cs_main(
     let index1 = vertex_buffer[object.first_index + index_1_index];
     let index2 = vertex_buffer[object.first_index + index_2_index];
 
-    output_buffer[culling_job.base_output_invocation + gid.x * 3u + 0u] = local_object_index << 24u || index0 & ((1u << 24u) - 1u);
-    output_buffer[culling_job.base_output_invocation + gid.x * 3u + 1u] = local_object_index << 24u || index1 & ((1u << 24u) - 1u);
-    output_buffer[culling_job.base_output_invocation + gid.x * 3u + 2u] = local_object_index << 24u || index2 & ((1u << 24u) - 1u);
+    output_buffer[culling_job.base_output_invocation + gid.x * 3u + 0u] = local_object_index << 24u | index0 & ((1u << 24u) - 1u);
+    output_buffer[culling_job.base_output_invocation + gid.x * 3u + 1u] = local_object_index << 24u | index1 & ((1u << 24u) - 1u);
+    output_buffer[culling_job.base_output_invocation + gid.x * 3u + 2u] = local_object_index << 24u | index2 & ((1u << 24u) - 1u);
 }

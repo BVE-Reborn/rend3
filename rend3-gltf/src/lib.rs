@@ -674,15 +674,15 @@ pub fn load_meshes<'a, E: std::error::Error + 'static>(
                 }
 
                 if let Some(uvs) = reader.read_tex_coords(0) {
-                    builder = builder.with_vertex_uv0(uvs.into_f32().map(Vec2::from).collect())
+                    builder = builder.with_vertex_texture_coordinates_0(uvs.into_f32().map(Vec2::from).collect())
                 }
 
                 if let Some(uvs) = reader.read_tex_coords(1) {
-                    builder = builder.with_vertex_uv1(uvs.into_f32().map(Vec2::from).collect())
+                    builder = builder.with_vertex_texture_coordinates_1(uvs.into_f32().map(Vec2::from).collect())
                 }
 
                 if let Some(colors) = reader.read_colors(0) {
-                    builder = builder.with_vertex_colors(colors.into_rgba_u8().collect())
+                    builder = builder.with_vertex_color_0(colors.into_rgba_u8().collect())
                 }
 
                 if let Some(indices) = reader.read_indices() {
