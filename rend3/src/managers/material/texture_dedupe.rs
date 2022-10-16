@@ -32,7 +32,7 @@ pub struct TextureDeduplicator {
 }
 impl TextureDeduplicator {
     pub fn new(device: &Device) -> Self {
-        let entries: Vec<_> = (0..32)
+        let entries: Vec<_> = (0..16)
             .map(|i| BindGroupLayoutEntry {
                 binding: i,
                 visibility: ShaderStages::VERTEX_FRAGMENT,
@@ -45,7 +45,7 @@ impl TextureDeduplicator {
             })
             .collect();
 
-        let bgls = (0..32_usize)
+        let bgls = (0..16_usize)
             .map(|max| {
                 let max_name = max + 1;
                 device.create_bind_group_layout(&BindGroupLayoutDescriptor {

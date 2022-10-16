@@ -11,7 +11,7 @@ use rend3::{
         DataHandle, DepthHandle, RenderGraph, RenderPassDepthTarget, RenderPassTarget, RenderPassTargets,
         RenderTargetHandle,
     },
-    types::{Handedness, Material, SampleCount, MaterialArray, VertexAttributeId},
+    types::{Handedness, Material, MaterialArray, SampleCount, VertexAttributeId},
     util::bind_merge::BindGroupBuilder,
     ProfileData, Renderer, RendererDataCore, RendererProfile, ShaderConfig, ShaderPreProcessor,
 };
