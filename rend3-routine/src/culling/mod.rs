@@ -25,18 +25,19 @@ use wgpu::{
 const BATCH_SIZE: usize = 256;
 const WORKGROUP_SIZE: u32 = 256;
 
+#[derive(Debug)]
 pub struct ShaderBatchDatas {
     keys: Vec<ShaderJobKey>,
     jobs: Vec<ShaderBatchData>,
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 struct ShaderJobKey {
     material_key: u64,
     bind_group_index: TextureBindGroupIndex,
 }
 
-#[derive(ShaderType)]
+#[derive(Debug, ShaderType)]
 pub struct ShaderBatchData {
     #[align(256)]
     ranges: [ShaderObjectRange; BATCH_SIZE],
@@ -45,7 +46,7 @@ pub struct ShaderBatchData {
     base_output_invocation: u32,
 }
 
-#[derive(Copy, Clone, Default, ShaderType)]
+#[derive(Debug, Copy, Clone, Default, ShaderType)]
 struct ShaderObjectRange {
     invocation_start: u32,
     invocation_end: u32,
