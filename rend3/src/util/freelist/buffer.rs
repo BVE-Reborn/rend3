@@ -48,7 +48,7 @@ impl FreelistDerivedBuffer {
 
     pub fn use_index(&mut self, index: usize) {
         if index > self.reserved_count {
-            self.reserved_count = index.saturating_sub(1).next_power_of_two();
+            self.reserved_count = index.next_power_of_two();
         }
 
         self.stale.push(index);

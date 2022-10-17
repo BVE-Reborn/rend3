@@ -12,14 +12,14 @@ use rend3::{
     graph::{DataHandle, RenderGraph},
     managers::{MaterialManager, ObjectManager, ShaderObject, TextureBindGroupIndex},
     types::{Material, MaterialArray, VertexAttributeId},
-    util::math::{round_up_pot, round_up_div},
+    util::math::{round_up_div, round_up_pot},
     Renderer, ShaderPreProcessor,
 };
 use serde::Serialize;
 use wgpu::{
     BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType,
     Buffer, BufferBindingType, BufferDescriptor, BufferUsages, CommandEncoder, ComputePassDescriptor, ComputePipeline,
-    ComputePipelineDescriptor, PipelineLayoutDescriptor, ShaderModuleDescriptor, ShaderStages,
+    ComputePipelineDescriptor, PipelineLayoutDescriptor, ShaderModuleDescriptor, ShaderStages, BufferBinding,
 };
 
 const BATCH_SIZE: usize = 256;
@@ -54,7 +54,16 @@ struct ShaderObjectRange {
 }
 
 fn batch_objects<M: Material>(material_manager: &MaterialManager, object_manager: &ObjectManager) -> ShaderBatchDatas {
-    let objects = object_manager.enumerated_objects::<M>();
+    let mut jobs = ShaderBatchDatas {
+        jobs: Vec::new(),
+        keys: Vec::new(),
+    };
+
+    let objects = match object_manager.enumerated_objects::<M>() {
+        Some(o) => o,
+        None => return jobs,
+    };
+
     let predicted_count = objects.size_hint().1.unwrap_or(0);
 
     let material_archetype = material_manager.archetype_view::<M>();
@@ -80,11 +89,6 @@ fn batch_objects<M: Material>(material_manager: &MaterialManager, object_manager
     }
 
     sorted_objects.sort_unstable_by_key(|(k, _, _)| *k);
-
-    let mut jobs = ShaderBatchDatas {
-        jobs: Vec::new(),
-        keys: Vec::new(),
-    };
 
     if !sorted_objects.is_empty() {
         let mut current_base_invocation = 0_u32;
@@ -300,7 +304,11 @@ impl GpuCuller {
                 },
                 BindGroupEntry {
                     binding: 2,
-                    resource: object_reference_buffer.as_entire_binding(),
+                    resource: wgpu::BindingResource::Buffer(BufferBinding {
+                        buffer: &object_reference_buffer,
+                        offset: 0,
+                        size: Some(ShaderBatchData::SHADER_SIZE),
+                    }),
                 },
                 BindGroupEntry {
                     binding: 3,
@@ -349,13 +357,17 @@ pub fn add_culling_to_graph<'node, M: Material>(
     node.build(move |pt, renderer, encoder_or_pass, temps, ready, graph_data| {
         let jobs = batch_objects::<M>(graph_data.material_manager, graph_data.object_manager);
 
+        if jobs.jobs.is_empty() {
+            return;
+        }
+
         let encoder = encoder_or_pass.get_encoder();
         let draw_calls = culler.cull::<M>(
             renderer,
             encoder,
             jobs,
             graph_data.mesh_manager.buffer(),
-            graph_data.object_manager.buffer::<M>(),
+            graph_data.object_manager.buffer::<M>().unwrap(),
         );
 
         graph_data.set_data(output, Some(draw_calls));

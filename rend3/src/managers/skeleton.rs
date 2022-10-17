@@ -83,8 +83,8 @@ impl SkeletonManager {
         ];
 
         let mut source_attribute_ranges: ArrayVec<_, 5> = ArrayVec::new();
-        source_attribute_ranges.push((VERTEX_ATTRIBUTE_JOINT_WEIGHTS.id(), joint_weight_range));
-        source_attribute_ranges.push((VERTEX_ATTRIBUTE_JOINT_INDICES.id(), joint_indices_range));
+        source_attribute_ranges.push((*VERTEX_ATTRIBUTE_JOINT_WEIGHTS.id(), joint_weight_range));
+        source_attribute_ranges.push((*VERTEX_ATTRIBUTE_JOINT_INDICES.id(), joint_indices_range));
 
         let mut overridden_attribute_ranges: ArrayVec<_, 3> = ArrayVec::new();
         for attribute in overridden_attributes {
@@ -92,7 +92,7 @@ impl SkeletonManager {
                 Some(a) => a,
                 None => continue,
             };
-            source_attribute_ranges.push((attribute.id(), original_range));
+            source_attribute_ranges.push((*attribute.id(), original_range));
         }
 
         // We split this for loop into two parts so that because we need &mut on the mesh manager

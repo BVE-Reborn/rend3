@@ -1,3 +1,5 @@
+#![warn(unsafe_op_in_unsafe_fn)]
+
 //! Type declarations for the rend3 3D rendering crate.
 //!
 //! This is reexported in the rend3 crate proper and includes all the "surface"
@@ -235,29 +237,33 @@ pub use wgt::{
 /// The value allows for 8 bits of information packed in the high 8 bits of the
 /// index for object recombination.
 pub const MAX_VERTEX_COUNT: u32 = 1 << 24;
+/// The maximum amount of indices any one object can have.
+pub const MAX_INDEX_COUNT: u32 = u32::MAX;
 
 /// Error returned from mesh validation.
 #[derive(Debug, Error)]
 pub enum MeshValidationError {
-    #[error("Mesh's {ty:?} buffer has {actual} vertices but the position buffer has {expected}")]
+    #[error("Mesh's {:?} buffer has {actual} vertices but the position buffer has {expected}", .attribute_id.name())]
     MismatchedVertexCount {
-        ty: &'static VertexAttributeId,
+        attribute_id: &'static VertexAttributeId,
         expected: usize,
         actual: usize,
     },
-    #[error("Mesh has {count} vertices when the vertex limit is {}", MAX_VERTEX_COUNT)]
-    ExceededMaxVertexCount { count: u32 },
+    #[error("Mesh has {count} vertices when the vertex limit is {MAX_VERTEX_COUNT}")]
+    ExceededMaxVertexCount { count: usize },
+    #[error("Mesh has {count} indicies when maximum index count is {MAX_INDEX_COUNT}")]
+    ExceededMaxIndexCount { count: usize },
     #[error("Mesh has {count} indices which is not a multiple of three. Meshes are always composed of triangles")]
-    IndexCountNotMultipleOfThree { count: u32 },
+    IndexCountNotMultipleOfThree { count: usize },
     #[error(
         "Index at position {index} has the value {value} which is out of bounds for vertex buffers of {max} length"
     )]
-    IndexOutOfBounds { index: u32, value: u32, max: u32 },
+    IndexOutOfBounds { index: usize, value: u32, max: u32 },
 }
 
 #[derive(Debug)]
 pub struct StoredVertexAttributeData {
-    id: VertexAttributeId,
+    id: &'static VertexAttributeId,
     data: VecAny,
     ptr: *const u8,
     bytes: u64,
@@ -277,7 +283,7 @@ impl StoredVertexAttributeData {
         }
     }
 
-    pub fn id(&self) -> VertexAttributeId {
+    pub fn id(&self) -> &'static VertexAttributeId {
         self.id
     }
 
@@ -297,6 +303,13 @@ impl StoredVertexAttributeData {
             return None;
         }
         self.data.downcast_slice::<T>()
+    }
+
+    pub fn typed_data_mut<T: VertexFormat>(&mut self, attribute: &'static VertexAttribute<T>) -> Option<&mut [T]> {
+        if attribute.id() != self.id {
+            return None;
+        }
+        self.data.downcast_slice_mut::<T>()
     }
 }
 
@@ -451,52 +464,36 @@ impl MeshBuilder {
     ///
     /// All others will be filled with defaults.
     pub fn build(self) -> Result<Mesh, MeshValidationError> {
-        let length = self.vertex_count;
-
-        // let has_normals = self.vertex_normals.is_some();
-        // let has_tangents = self.vertex_tangents.is_some();
-        // let has_uvs = self.vertex_uv0.is_some();
-
-        // let mut mesh = Mesh {
-        //     vertex_positions: self.vertex_positions,
-        //     vertex_normals: self.vertex_normals.unwrap_or_else(|| vec![Vec3::ZERO; length]),
-        //     vertex_tangents: self.vertex_tangents.unwrap_or_else(|| vec![Vec3::ZERO; length]),
-        //     vertex_uv0: self.vertex_uv0.unwrap_or_else(|| vec![Vec2::ZERO; length]),
-        //     vertex_uv1: self.vertex_uv1.unwrap_or_else(|| vec![Vec2::ZERO; length]),
-        //     vertex_colors: self.vertex_colors.unwrap_or_else(|| vec![[255; 4]; length]),
-        //     vertex_joint_indices: self.vertex_joint_indices.unwrap_or_else(|| vec![[0; 4]; length]),
-        //     vertex_joint_weights: self.vertex_joint_weights.unwrap_or_else(|| vec![Vec4::ZERO; length]),
-        //     indices: self.indices.unwrap_or_else(|| (0..length as u32).collect()),
-        // };
-
-        // if !self.without_validation {
-        //     mesh.validate()?;
-        // }
-
-        // // We need to flip winding order first, so the normals will be facing the right
-        // // direction.
-        // if self.flip_winding_order {
-        //     mesh.flip_winding_order();
-        // }
-
-        // if !has_normals {
-        //     // SAFETY: We've validated this mesh or had its validity unsafely asserted.
-        //     unsafe { mesh.calculate_normals(self.handedness, true) };
-        // }
-
-        // // Don't need to bother with tangents if there are no meaningful UVs
-        // if !has_tangents && has_uvs {
-        //     // SAFETY: We've validated this mesh or had its validity unsafely asserted.
-        //     unsafe { mesh.calculate_tangents(true) };
-        // }
-
-        // Ok(mesh)
-
-        Ok(Mesh {
+        let mut mesh = Mesh {
             attributes: self.vertex_attributes,
-            vertex_count: self.vertex_count as _,
-            indices: self.indices.unwrap_or_else(|| (0..length as u32).collect()),
-        })
+            vertex_count: self.vertex_count,
+            indices: self.indices.unwrap_or_else(|| (0..self.vertex_count as u32).collect()),
+        };
+
+        let has_normals = mesh.find_attribute_index(&VERTEX_ATTRIBUTE_NORMAL).is_some();
+        let has_tangents = mesh.find_attribute_index(&VERTEX_ATTRIBUTE_TANGENT).is_some();
+
+        if !self.without_validation {
+            mesh.validate()?;
+        }
+
+        // We need to flip winding order first, so the normals will be facing the right
+        // direction.
+        if self.flip_winding_order {
+            mesh.flip_winding_order();
+        }
+
+        if !has_normals {
+            // SAFETY: We've validated this mesh or had its validity unsafely asserted.
+            unsafe { mesh.calculate_normals(self.handedness, true) };
+        }
+
+        if !has_tangents {
+            // SAFETY: We've validated this mesh or had its validity unsafely asserted.
+            unsafe { mesh.calculate_tangents(true) };
+        }
+
+        Ok(mesh)
     }
 }
 
@@ -511,7 +508,7 @@ impl MeshBuilder {
 #[derive(Debug)]
 pub struct Mesh {
     pub attributes: Vec<StoredVertexAttributeData>,
-    pub vertex_count: u32,
+    pub vertex_count: usize,
 
     pub indices: Vec<u32>,
 }
@@ -520,51 +517,75 @@ impl Mesh {
     /// Validates that all vertex attributes have the same length.
     pub fn validate(&self) -> Result<(), MeshValidationError> {
         let position_length = self.vertex_count;
-        let indices_length = self.indices.len() as u32;
+        let indices_length = self.indices.len();
 
-        if position_length > MAX_VERTEX_COUNT {
+        if position_length > MAX_VERTEX_COUNT as usize {
             return Err(MeshValidationError::ExceededMaxVertexCount { count: position_length });
         }
 
-        let first_different_length = [
-            (self.vertex_normals.len(), VertexBufferType::Normal),
-            (self.vertex_tangents.len(), VertexBufferType::Tangent),
-            (self.vertex_uv0.len(), VertexBufferType::Uv0),
-            (self.vertex_uv1.len(), VertexBufferType::Uv1),
-            (self.vertex_colors.len(), VertexBufferType::Colors),
-        ]
-        .iter()
-        .find_map(|&(len, ty)| if len != position_length { Some((len, ty)) } else { None });
-
-        if let Some((len, ty)) = first_different_length {
-            return Err(MeshValidationError::MismatchedVertexCount {
-                ty,
-                actual: len,
-                expected: position_length,
-            });
+        for attribute in &self.attributes {
+            let attribute_len = attribute.data.len();
+            if attribute_len != position_length as usize {
+                return Err(MeshValidationError::MismatchedVertexCount {
+                    attribute_id: attribute.id(),
+                    actual: attribute_len,
+                    expected: position_length as usize,
+                });
+            }
         }
 
         if indices_length % 3 != 0 {
             return Err(MeshValidationError::IndexCountNotMultipleOfThree { count: indices_length });
         }
 
-        let first_oob_index = self.indices.iter().enumerate().find_map(|(idx, &i)| {
-            if (i as usize) >= position_length {
-                Some((idx, i))
-            } else {
-                None
-            }
-        });
+        if indices_length >= MAX_INDEX_COUNT as usize {
+            return Err(MeshValidationError::ExceededMaxIndexCount { count: indices_length });
+        }
 
-        if let Some((index, value)) = first_oob_index {
-            return Err(MeshValidationError::IndexOutOfBounds {
-                index,
-                value,
-                max: position_length,
-            });
+        for (index, &value) in self.indices.iter().enumerate() {
+            if value as usize >= position_length {
+                return Err(MeshValidationError::IndexOutOfBounds {
+                    index,
+                    value,
+                    max: position_length as u32,
+                });
+            }
         }
 
         Ok(())
+    }
+
+    /// Returns the index in to the attribute array for a given attribute. If
+    /// there is no such attribute, returns None.
+    pub fn find_attribute_index(&self, desired_attribute: &'static VertexAttributeId) -> Option<usize> {
+        self.attributes
+            .iter()
+            .enumerate()
+            .find_map(|(idx, attribute)| (attribute.id == desired_attribute).then(|| idx))
+    }
+
+    /// Returns the index in to the attribute array for a given attribute. Creates the attribute
+    /// if the attribute is not found, filling it with zeros.
+    ///
+    /// Returns true if the attribute is newly created.
+    pub fn find_or_create_attribute_index<T: VertexFormat>(
+        &mut self,
+        desired_attribute: &'static VertexAttribute<T>,
+    ) -> (usize, bool) {
+        let index = self.find_attribute_index(desired_attribute.id());
+
+        index.map_or_else(
+            || {
+                let idx = self.attributes.len();
+                self.attributes.push(StoredVertexAttributeData::new(
+                    &desired_attribute,
+                    vec![T::zeroed(); self.vertex_count],
+                ));
+                // There were no normals, and our created normals are already zeroed.
+                (idx, true)
+            },
+            |idx| (idx, false),
+        )
     }
 
     /// Calculate normals for the given mesh, assuming smooth shading and
@@ -585,23 +606,33 @@ impl Mesh {
     /// If a mesh has passed a call to validate, it is sound to call this
     /// function.
     pub unsafe fn calculate_normals(&mut self, handedness: Handedness, zeroed: bool) {
-        // if handedness == Handedness::Left {
-        //     Self::calculate_normals_for_buffers::<true>(
-        //         &mut self.vertex_normals,
-        //         &self.vertex_positions,
-        //         &self.indices,
-        //         zeroed,
-        //     )
-        // } else {
-        //     Self::calculate_normals_for_buffers::<false>(
-        //         &mut self.vertex_normals,
-        //         &self.vertex_positions,
-        //         &self.indices,
-        //         zeroed,
-        //     )
-        // }
+        let (normals_index, normals_created) = self.find_or_create_attribute_index(&VERTEX_ATTRIBUTE_NORMAL);
 
-        todo!()
+        let (position_attribute, remaining_attributes) = self.attributes.split_first_mut().unwrap();
+        let positions = position_attribute.typed_data(&VERTEX_ATTRIBUTE_POSITION).unwrap();
+        let normals = remaining_attributes[normals_index - 1]
+            .typed_data_mut(&VERTEX_ATTRIBUTE_NORMAL)
+            .unwrap();
+
+        if handedness == Handedness::Left {
+            unsafe {
+                Self::calculate_normals_for_buffers::<true>(
+                    normals,
+                    positions,
+                    &self.indices,
+                    zeroed || normals_created,
+                )
+            }
+        } else {
+            unsafe {
+                Self::calculate_normals_for_buffers::<false>(
+                    normals,
+                    positions,
+                    &self.indices,
+                    zeroed || normals_created,
+                )
+            }
+        }
     }
 
     /// Calculate normals for the given buffers representing a mesh, assuming
@@ -639,13 +670,13 @@ impl Mesh {
             let (idx0, idx1, idx2) = match *idx {
                 [idx0, idx1, idx2] => (idx0, idx1, idx2),
                 // SAFETY: This is guaranteed by chunks_exact(3)
-                _ => std::hint::unreachable_unchecked(),
+                _ => unsafe { std::hint::unreachable_unchecked() },
             };
 
             // SAFETY: The conditions of this function assert all thes indices are in-bounds
-            let pos1 = *positions.get_unchecked(idx0 as usize);
-            let pos2 = *positions.get_unchecked(idx1 as usize);
-            let pos3 = *positions.get_unchecked(idx2 as usize);
+            let pos1 = unsafe { *positions.get_unchecked(idx0 as usize) };
+            let pos2 = unsafe { *positions.get_unchecked(idx1 as usize) };
+            let pos3 = unsafe { *positions.get_unchecked(idx2 as usize) };
 
             let edge1 = pos2 - pos1;
             let edge2 = pos3 - pos1;
@@ -657,9 +688,9 @@ impl Mesh {
             };
 
             // SAFETY: The conditions of this function assert all thes indices are in-bounds
-            *normals.get_unchecked_mut(idx0 as usize) += normal;
-            *normals.get_unchecked_mut(idx1 as usize) += normal;
-            *normals.get_unchecked_mut(idx2 as usize) += normal;
+            unsafe { *normals.get_unchecked_mut(idx0 as usize) += normal };
+            unsafe { *normals.get_unchecked_mut(idx1 as usize) += normal };
+            unsafe { *normals.get_unchecked_mut(idx2 as usize) += normal };
         }
 
         for normal in normals.iter_mut() {
@@ -669,6 +700,8 @@ impl Mesh {
 
     /// Calculate tangents for the given mesh, based on normals and texture
     /// coordinates.
+    ///
+    /// If either normals or uv_0 don't exist on the mesh, this will not generate tangents.
     ///
     /// If zeroed is true, the normals will not be zeroed before hand. If this
     /// is falsely set, it is safe, just returns incorrect results.
@@ -682,17 +715,49 @@ impl Mesh {
     /// If a mesh has passed a call to validate, it is sound to call this
     /// function.
     pub unsafe fn calculate_tangents(&mut self, zeroed: bool) {
-        // // SAFETY: The mesh unconditionally has a validation token, so it must be valid.
-        // Self::calculate_tangents_for_buffers(
-        //     &mut self.vertex_tangents,
-        //     &self.vertex_positions,
-        //     &self.vertex_normals,
-        //     &self.vertex_uv0,
-        //     &self.indices,
-        //     zeroed,
-        // )
+        let normal_index = match self.find_attribute_index(&VERTEX_ATTRIBUTE_NORMAL) {
+            Some(i) => i,
+            None => return,
+        };
+        let uv_index = match self.find_attribute_index(&VERTEX_ATTRIBUTE_TEXTURE_COORDINATES_0) {
+            Some(i) => i,
+            None => return,
+        };
+        let (tangent_index, tangents_created) = self.find_or_create_attribute_index(&VERTEX_ATTRIBUTE_TANGENT);
 
-        todo!()
+        // Assert that all indices are disjoint. This should never
+        // not be the case, but we need to validate it to prove the unsafe.
+        assert_ne!(0, tangent_index);
+        assert_ne!(0, normal_index);
+        assert_ne!(0, uv_index);
+        assert_ne!(tangent_index, normal_index);
+        assert_ne!(tangent_index, uv_index);
+        assert_ne!(normal_index, uv_index);
+
+        // SAFETY: These references never escape this function, the attributes array isn't modified, and all indices are disjoint.
+        //
+        // We only use unsafe because we need to split-borrow different members of the array.
+        let positions_ref = unsafe { &*(&self.attributes[0] as *const StoredVertexAttributeData) };
+        let tangents_mut = unsafe { &mut *(&mut self.attributes[tangent_index] as *mut StoredVertexAttributeData) };
+        let normals_ref = unsafe { &*(&self.attributes[normal_index] as *const StoredVertexAttributeData) };
+        let uv_0_ref = unsafe { &*(&self.attributes[uv_index] as *const StoredVertexAttributeData) };
+
+        let positions = positions_ref.typed_data(&VERTEX_ATTRIBUTE_POSITION).unwrap();
+        let tangents = tangents_mut.typed_data_mut(&VERTEX_ATTRIBUTE_TANGENT).unwrap();
+        let normals = normals_ref.typed_data(&VERTEX_ATTRIBUTE_NORMAL).unwrap();
+        let uv_0 = uv_0_ref.typed_data(&VERTEX_ATTRIBUTE_TEXTURE_COORDINATES_0).unwrap();
+
+        // SAFETY: This function's caller has the same requirements as this one.
+        unsafe {
+            Self::calculate_tangents_for_buffers(
+                tangents,
+                positions,
+                normals,
+                uv_0,
+                &self.indices,
+                zeroed || tangents_created,
+            )
+        };
     }
 
     /// Calculate tangents for the given set of buffers, based on normals and
@@ -727,17 +792,17 @@ impl Mesh {
             let (idx0, idx1, idx2) = match *idx {
                 [idx0, idx1, idx2] => (idx0, idx1, idx2),
                 // SAFETY: This is guaranteed by chunks_exact(3)
-                _ => std::hint::unreachable_unchecked(),
+                _ => unsafe { std::hint::unreachable_unchecked() },
             };
 
             // SAFETY: The conditions of this function assert all thes indices are in-bounds
-            let pos1 = *positions.get_unchecked(idx0 as usize);
-            let pos2 = *positions.get_unchecked(idx1 as usize);
-            let pos3 = *positions.get_unchecked(idx2 as usize);
+            let pos1 = unsafe { *positions.get_unchecked(idx0 as usize) };
+            let pos2 = unsafe { *positions.get_unchecked(idx1 as usize) };
+            let pos3 = unsafe { *positions.get_unchecked(idx2 as usize) };
 
-            let tex1 = *uvs.get_unchecked(idx0 as usize);
-            let tex2 = *uvs.get_unchecked(idx1 as usize);
-            let tex3 = *uvs.get_unchecked(idx2 as usize);
+            let tex1 = unsafe { *uvs.get_unchecked(idx0 as usize) };
+            let tex2 = unsafe { *uvs.get_unchecked(idx1 as usize) };
+            let tex3 = unsafe { *uvs.get_unchecked(idx2 as usize) };
 
             let edge1 = pos2 - pos1;
             let edge2 = pos3 - pos1;
@@ -747,16 +812,12 @@ impl Mesh {
 
             let r = 1.0 / (uv1.x * uv2.y - uv1.y * uv2.x);
 
-            let tangent = Vec3::new(
-                ((edge1.x * uv2.y) - (edge2.x * uv1.y)) * r,
-                ((edge1.y * uv2.y) - (edge2.y * uv1.y)) * r,
-                ((edge1.z * uv2.y) - (edge2.z * uv1.y)) * r,
-            );
+            let tangent = (edge1 * Vec3::splat(uv2.y)) - (edge2 * Vec3::splat(uv1.y)) * r;
 
             // SAFETY: The conditions of this function assert all thes indices are in-bounds
-            *tangents.get_unchecked_mut(idx0 as usize) += tangent;
-            *tangents.get_unchecked_mut(idx1 as usize) += tangent;
-            *tangents.get_unchecked_mut(idx2 as usize) += tangent;
+            unsafe { *tangents.get_unchecked_mut(idx0 as usize) += tangent };
+            unsafe { *tangents.get_unchecked_mut(idx1 as usize) += tangent };
+            unsafe { *tangents.get_unchecked_mut(idx2 as usize) += tangent };
         }
 
         for (tan, norm) in tangents.iter_mut().zip(normals) {

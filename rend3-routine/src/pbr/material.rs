@@ -521,7 +521,6 @@ impl Material for PbrMaterial {
 
     fn required_attributes() -> Self::RequredAttributeArrayType {
         [
-            // TODO: Add normal and tangents back when normal generation is on
             &VERTEX_ATTRIBUTE_POSITION,
         ]
     }

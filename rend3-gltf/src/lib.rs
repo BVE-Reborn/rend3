@@ -32,7 +32,7 @@ use std::{
     borrow::Cow,
     collections::{hash_map::Entry, BTreeMap, HashMap, VecDeque},
     future::Future,
-    path::Path,
+    path::Path, sync::Arc,
 };
 use thiserror::Error;
 
@@ -326,7 +326,7 @@ impl Default for GltfLoadSettings {
 /// ));
 /// ```
 pub async fn load_gltf<F, Fut, E>(
-    renderer: &Renderer,
+    renderer: &Arc<Renderer>,
     data: &[u8],
     settings: &GltfLoadSettings,
     io_func: F,
@@ -376,7 +376,7 @@ where
 ///
 /// **Must** keep the [`LoadedGltfScene`] alive for the meshes and materials
 pub async fn load_gltf_data<F, Fut, E>(
-    renderer: &Renderer,
+    renderer: &Arc<Renderer>,
     file: &mut gltf::Gltf,
     settings: &GltfLoadSettings,
     mut io_func: F,
@@ -413,7 +413,7 @@ where
 /// Adds a single mesh from the [`LoadedGltfScene`] found by its index,
 /// as an object to the scene.
 pub fn add_mesh_by_index<E: std::error::Error + 'static>(
-    renderer: &Renderer,
+    renderer: &Arc<Renderer>,
     loaded: &LoadedGltfScene,
     mesh_index: usize,
     name: Option<&str>,
@@ -513,7 +513,7 @@ fn node_indices_topological_sort(nodes: &[gltf::Node]) -> (Vec<usize>, BTreeMap<
 /// You need to hold onto the returned value from this function to make sure the
 /// objects don't get deleted.
 pub fn instance_loaded_scene<'a, E: std::error::Error + 'static>(
-    renderer: &Renderer,
+    renderer: &Arc<Renderer>,
     loaded: &LoadedGltfScene,
     nodes: Vec<gltf::Node<'a>>,
     settings: &GltfLoadSettings,
@@ -561,6 +561,7 @@ pub fn instance_loaded_scene<'a, E: std::error::Error + 'static>(
                         intensity: light.intensity(),
                         direction,
                         distance: settings.directional_light_shadow_distance,
+                        resolution: 2048
                     }))
                 }
                 _ => None,
@@ -632,7 +633,7 @@ where
 /// All binary data buffers must be provided. Call this with
 /// [`gltf::Document::meshes`] as the mesh argument.
 pub fn load_meshes<'a, E: std::error::Error + 'static>(
-    renderer: &Renderer,
+    renderer: &Arc<Renderer>,
     meshes: impl Iterator<Item = gltf::Mesh<'a>>,
     buffers: &[Vec<u8>],
 ) -> Result<Vec<Labeled<Mesh>>, GltfLoadError<E>> {
@@ -842,7 +843,7 @@ fn load_animations<E: std::error::Error + 'static>(
 }
 
 /// Creates a gltf default material.
-pub fn load_default_material(renderer: &Renderer) -> types::MaterialHandle {
+pub fn load_default_material(renderer: &Arc<Renderer>) -> types::MaterialHandle {
     profiling::scope!("creating default material");
     renderer.add_material(pbr::PbrMaterial {
         albedo: pbr::AlbedoComponent::Value(Vec4::splat(1.0)),
@@ -872,7 +873,7 @@ pub fn load_default_material(renderer: &Renderer) -> types::MaterialHandle {
 ///
 /// io_func determines how URIs are resolved into their underlying data.
 pub async fn load_materials_and_textures<F, Fut, E>(
-    renderer: &Renderer,
+    renderer: &Arc<Renderer>,
     materials: impl ExactSizeIterator<Item = gltf::Material<'_>>,
     buffers: &[Vec<u8>],
     settings: &GltfLoadSettings,
@@ -1023,7 +1024,7 @@ where
 ///
 /// io_func determines how URIs are resolved into their underlying data.
 pub async fn load_image_cached<F, Fut, E>(
-    renderer: &Renderer,
+    renderer: &Arc<Renderer>,
     images: &mut ImageMap,
     image: gltf::Image<'_>,
     srgb: bool,
@@ -1059,7 +1060,7 @@ where
 ///
 /// io_func determines how URIs are resolved into their underlying data.
 pub async fn load_image<F, Fut, E>(
-    renderer: &Renderer,
+    renderer: &Arc<Renderer>,
     image: gltf::Image<'_>,
     srgb: bool,
     buffers: &[Vec<u8>],

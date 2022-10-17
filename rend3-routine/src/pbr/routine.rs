@@ -29,8 +29,6 @@ impl PbrRoutine {
             .material_manager
             .ensure_archetype::<PbrMaterial>(&renderer.device, renderer.profile);
 
-        let unclipped_depth_supported = renderer.features.contains(Features::DEPTH_CLIP_CONTROL);
-
         let per_material = PerMaterialArchetypeInterface::<PbrMaterial>::new(&renderer.device, renderer.profile);
 
         let mut inner = |transparency| {
@@ -47,7 +45,6 @@ impl PbrRoutine {
                     TransparencyType::Opaque | TransparencyType::Cutout => None,
                     TransparencyType::Blend => Some(BlendState::ALPHA_BLENDING),
                 },
-                !matches!(transparency, TransparencyType::Blend),
                 wgpu::PrimitiveTopology::TriangleList,
                 match transparency {
                     TransparencyType::Opaque => "opaque pass",

@@ -35,7 +35,7 @@ async fn load_skybox_image(loader: &rend3_framework::AssetLoader, data: &mut Vec
 }
 
 async fn load_skybox(
-    renderer: &Renderer,
+    renderer: &Arc<Renderer>,
     loader: &rend3_framework::AssetLoader,
     skybox_routine: &Mutex<SkyboxRoutine>,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -47,20 +47,20 @@ async fn load_skybox(
     load_skybox_image(loader, &mut data, "skybox/front.jpg").await;
     load_skybox_image(loader, &mut data, "skybox/back.jpg").await;
 
-    let handle = renderer.add_texture_cube(Texture {
-        format: TextureFormat::Rgba8UnormSrgb,
-        size: UVec2::new(2048, 2048),
-        data,
-        label: Some("background".into()),
-        mip_count: rend3::types::MipmapCount::ONE,
-        mip_source: rend3::types::MipmapSource::Uploaded,
-    });
-    lock(skybox_routine).set_background_texture(Some(handle));
+    // let handle = renderer.add_texture_cube(Texture {
+    //     format: TextureFormat::Rgba8UnormSrgb,
+    //     size: UVec2::new(2048, 2048),
+    //     data,
+    //     label: Some("background".into()),
+    //     mip_count: rend3::types::MipmapCount::ONE,
+    //     mip_source: rend3::types::MipmapSource::Uploaded,
+    // });
+    // lock(skybox_routine).set_background_texture(Some(handle));
     Ok(())
 }
 
 async fn load_gltf(
-    renderer: &Renderer,
+    renderer: &Arc<Renderer>,
     loader: &rend3_framework::AssetLoader,
     settings: &rend3_gltf::GltfLoadSettings,
     location: AssetPath<'_>,
@@ -423,6 +423,7 @@ impl rend3_framework::App for SceneViewer {
                 intensity: self.directional_light_intensity,
                 direction,
                 distance: self.gltf_settings.directional_light_shadow_distance,
+                resolution: 2048,
             }));
         }
 

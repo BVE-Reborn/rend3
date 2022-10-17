@@ -23,7 +23,7 @@ where
     pub fn new(device: &Device, usage: BufferUsages, label: &str) -> Self {
         profiling::scope!("WrappedPotBuffer::new");
 
-        let minimum = (T::min_size().get() - 1).next_power_of_two().max(4);
+        let minimum = T::min_size().get().next_power_of_two().max(4);
 
         let usage = usage | BufferUsages::COPY_DST;
 

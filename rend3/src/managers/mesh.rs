@@ -116,14 +116,14 @@ impl MeshManager {
         let mut vertex_attribute_ranges = Vec::with_capacity(mesh.attributes.len());
         for attribute in &mesh.attributes {
             let range = self.allocate_range(device, encoder, attribute.bytes());
-            vertex_attribute_ranges.push((attribute.id(), range));
+            vertex_attribute_ranges.push((*attribute.id(), range));
         }
 
 
         for (attribute_data, (_, range)) in mesh.attributes.iter().zip(&vertex_attribute_ranges) {
             queue.write_buffer(&self.buffer, range.start as u64, attribute_data.untyped_data());
         }
-        
+
         let index_range = self.allocate_range(device, encoder, index_count as u64 * 4);
         queue.write_buffer(&self.buffer, index_range.start, bytemuck::cast_slice(&mesh.indices));
 
@@ -139,7 +139,7 @@ impl MeshManager {
 
         let mesh = InternalMesh {
             vertex_attribute_ranges,
-            vertex_count: mesh.vertex_count,
+            vertex_count: mesh.vertex_count as u32,
             index_range,
             required_joint_count,
             bounding_sphere,
@@ -199,14 +199,12 @@ impl MeshManager {
     fn reallocate_buffers(&mut self, device: &Device, encoder: &mut CommandEncoder, needed_bytes: u64) {
         profiling::scope!("reallocate mesh buffers");
 
-        // We subtract one, in case we end up at a power of two after adding.
         let new_bytes = self
             .allocator
             .initial_range()
             .end
             .checked_add(needed_bytes)
             .unwrap()
-            .saturating_sub(1)
             .next_power_of_two();
 
         let new_buffer = device.create_buffer(&BufferDescriptor {

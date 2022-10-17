@@ -132,35 +132,35 @@ fn get_vertices(indices: Indices) -> VertexInput {
     verts.position = extract_attribute_vec3_f32(position_offset, indices.vertex);
 
     let normal_offset = object_buffer[indices.object].vertex_attribute_start_offsets[1];
-    if (normal_offset == 0xFFFFFFFFu) {
+    if (normal_offset != 0xFFFFFFFFu) {
         verts.normal = extract_attribute_vec3_f32(normal_offset, indices.vertex);
     } else {
         verts.normal = vec3<f32>(0.0);
     }
 
     let tangent_offset = object_buffer[indices.object].vertex_attribute_start_offsets[2];
-    if (tangent_offset == 0xFFFFFFFFu) {
+    if (tangent_offset != 0xFFFFFFFFu) {
         verts.tangent = extract_attribute_vec3_f32(tangent_offset, indices.vertex);
     } else {
         verts.tangent = vec3<f32>(0.0);
     }
 
     let coords0_offset = object_buffer[indices.object].vertex_attribute_start_offsets[3];
-    if (coords0_offset == 0xFFFFFFFFu) {
+    if (coords0_offset != 0xFFFFFFFFu) {
         verts.coords0 = extract_attribute_vec2_f32(coords0_offset, indices.vertex);
     } else {
         verts.coords0 = vec2<f32>(0.0);
     }
 
     let coords1_offset = object_buffer[indices.object].vertex_attribute_start_offsets[4];
-    if (coords1_offset == 0xFFFFFFFFu) {
+    if (coords1_offset != 0xFFFFFFFFu) {
         verts.coords1 = extract_attribute_vec2_f32(coords1_offset, indices.vertex);
     } else {
         verts.coords1 = vec2<f32>(0.0);
     }
 
     let color_offset = object_buffer[indices.object].vertex_attribute_start_offsets[5];
-    if (color_offset == 0xFFFFFFFFu) {
+    if (color_offset != 0xFFFFFFFFu) {
         verts.color = extract_attribute_vec4_u8_unorm(color_offset, indices.vertex);
     } else {
         verts.color = vec4<f32>(0.0);

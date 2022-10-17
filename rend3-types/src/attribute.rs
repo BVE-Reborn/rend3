@@ -5,7 +5,7 @@ use std::{
 };
 
 use bytemuck::Pod;
-use once_cell::sync::Lazy;
+use once_cell::sync::OnceCell;
 
 #[derive(Debug, Copy, Clone)]
 pub struct VertexAttributeId {
@@ -38,7 +38,8 @@ pub struct VertexAttribute<T>
 where
     T: VertexFormat,
 {
-    id: Lazy<VertexAttributeId, Box<dyn FnOnce() -> VertexAttributeId + Send + Sync + 'static>>,
+    name: &'static str,
+    id: OnceCell<VertexAttributeId>,
     _phantom: PhantomData<T>,
 }
 impl<T> VertexAttribute<T>
@@ -47,21 +48,22 @@ where
 {
     pub const fn new(name: &'static str) -> Self {
         Self {
-            id: Lazy::new(Box::new(move || VertexAttributeId {
-                name,
-                inner: VERTEX_ATTRIBUTE_INDEX_ALLOCATOR.fetch_add(1, Ordering::Relaxed),
-                metadata: &T::METADATA,
-            })),
+            name,
+            id: OnceCell::new(),
             _phantom: PhantomData,
         }
     }
 
-    pub fn name(&'static self) -> &'static str {
+    pub fn name(&self) -> &'static str {
         self.name
     }
 
-    pub fn id(&'static self) -> VertexAttributeId {
-        *self.id
+    pub fn id(&self) -> &VertexAttributeId {
+        self.id.get_or_init(|| VertexAttributeId {
+            name: self.name,
+            inner: VERTEX_ATTRIBUTE_INDEX_ALLOCATOR.fetch_add(1, Ordering::Relaxed),
+            metadata: &T::METADATA,
+        })
     }
 }
 
@@ -72,7 +74,7 @@ where
     type Target = VertexAttributeId;
 
     fn deref(&self) -> &Self::Target {
-        &self.id
+        self.id()
     }
 }
 

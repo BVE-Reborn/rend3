@@ -74,7 +74,7 @@ pub(super) fn allocate_shadow_atlas(
     let root_size = maps.first().unwrap().1 as u32;
     let min_leading_zeros = (root_size as u16).leading_zeros();
 
-    let mut nodes = Vec::with_capacity(maps.len().saturating_sub(1).next_power_of_two());
+    let mut nodes = Vec::with_capacity(maps.len().next_power_of_two());
     let mut roots = Vec::new();
 
     nodes.push(ShadowNode::Vacant);

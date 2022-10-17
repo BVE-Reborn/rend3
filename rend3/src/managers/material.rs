@@ -16,7 +16,7 @@ use std::{
     mem,
     num::{NonZeroU32, NonZeroU64},
 };
-use wgpu::{BindGroup, BindingType, BufferBindingType, CommandEncoder, Device, ShaderStages, BindGroupLayout, Buffer};
+use wgpu::{BindGroup, BindGroupLayout, BindingType, Buffer, BufferBindingType, CommandEncoder, Device, ShaderStages};
 
 mod texture_dedupe;
 
@@ -154,7 +154,7 @@ impl MaterialManager {
             .downcast_mut::<Option<InternalMaterial<M>>>()
             .unwrap();
         if handle.idx >= data_vec.len() {
-            data_vec.resize_with(handle.idx.saturating_sub(1).next_power_of_two(), || None);
+            data_vec.resize_with((handle.idx + 1).next_power_of_two(), || None);
         }
         data_vec[handle.idx] = Some(InternalMaterial {
             bind_group_index,
@@ -263,8 +263,6 @@ impl MaterialManager {
         );
     }
 
-
-
     pub(super) fn call_object_add_callback(&self, handle: RawMaterialHandle, args: ObjectAddCallbackArgs) {
         let type_id = self.handle_to_typeid[&handle];
 
@@ -274,7 +272,8 @@ impl MaterialManager {
     }
 
     pub fn get_bind_group_layout_cpu<M: Material>(&self) -> &BindGroupLayout {
-        self.texture_deduplicator.get_bgl(<M::TextureArrayType as MaterialArray<Option<RawTextureHandle>>>::COUNT as usize)
+        self.texture_deduplicator
+            .get_bgl(<M::TextureArrayType as MaterialArray<Option<RawTextureHandle>>>::COUNT as usize)
     }
 
     pub fn get_attributes(

@@ -165,20 +165,25 @@ impl ObjectManager {
         }
     }
 
-    pub fn buffer<M: Material>(&self) -> &Buffer {
-        &self.archetype[&TypeId::of::<M>()].buffer
+    pub fn buffer<M: Material>(&self) -> Option<&Buffer> {
+        Some(&self.archetype.get(&TypeId::of::<M>())?.buffer)
     }
 
-    pub fn enumerated_objects<M: Material>(&self) -> impl Iterator<Item = (RawObjectHandle, &InternalObject<M>)> + '_ {
+    pub fn enumerated_objects<M: Material>(
+        &self,
+    ) -> Option<impl Iterator<Item = (RawObjectHandle, &InternalObject<M>)> + '_> {
         let type_id = TypeId::of::<M>();
 
-        self.archetype[&type_id]
-            .data_vec
-            .downcast_slice::<Option<InternalObject<M>>>()
-            .unwrap()
-            .into_iter()
-            .enumerate()
-            .filter_map(|(idx, o)| o.as_ref().map(|o| (RawObjectHandle::new(idx), o)))
+        Some(
+            self.archetype
+                .get(&type_id)?
+                .data_vec
+                .downcast_slice::<Option<InternalObject<M>>>()
+                .unwrap()
+                .into_iter()
+                .enumerate()
+                .filter_map(|(idx, o)| o.as_ref().map(|o| (RawObjectHandle::new(idx), o))),
+        )
     }
 
     pub fn duplicate_object(
@@ -287,7 +292,7 @@ pub(super) fn object_add_callback<M: Material>(_material: &M, args: ObjectAddCal
 
     let mut data_vec = archetype.data_vec.downcast_mut::<Option<InternalObject<M>>>().unwrap();
     if args.handle.idx >= data_vec.len() {
-        data_vec.resize_with(args.handle.idx.saturating_sub(1).next_power_of_two(), || None);
+        data_vec.resize_with((args.handle.idx + 1).next_power_of_two(), || None);
     }
     data_vec[args.handle.idx] = Some(internal_object);
     archetype.buffer.use_index(args.handle.idx);

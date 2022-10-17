@@ -68,7 +68,6 @@ impl<M: Material> ForwardRoutine<M> {
         extra_bgls: &[BindGroupLayout],
 
         blend: Option<BlendState>,
-        use_prepass: bool,
         primitive_topology: wgpu::PrimitiveTopology,
         label: &str,
     ) -> Self {
@@ -140,7 +139,6 @@ impl<M: Material> ForwardRoutine<M> {
                 frag_entry_point,
                 forward_pass_frag,
                 blend,
-                use_prepass,
                 primitive_topology,
                 label,
                 samples,
@@ -203,11 +201,14 @@ impl<M: Material> ForwardRoutine<M> {
             let extra_bgs = extra_bg_pt_handle.map(|h| pt.get(h));
             let rpass = encoder_or_pass.get_rpass(rpass_handle);
             let forward_uniform_bg = graph_data.get_data(temps, forward_uniform_handle).unwrap();
-            let culled = graph_data.get_data(temps, cull_handle).unwrap();
+            let culled = match graph_data.get_data(temps, cull_handle) {
+                Some(c) => c,
+                None => return,
+            };
 
             let per_material_bg = temps.add(
                 BindGroupBuilder::new()
-                    .append_buffer(graph_data.object_manager.buffer::<M>())
+                    .append_buffer(graph_data.object_manager.buffer::<M>().unwrap())
                     .append_buffer_with_size(
                         &culled.object_reference_buffer,
                         culling::ShaderBatchData::SHADER_SIZE.get(),
@@ -264,7 +265,6 @@ fn build_forward_pipeline_inner(
     frag_entry_point: &str,
     forward_pass_frag: &wgpu::ShaderModule,
     blend: Option<BlendState>,
-    use_prepass: bool,
     primitive_topology: PrimitiveTopology,
     label: &str,
     samples: SampleCount,
@@ -291,11 +291,8 @@ fn build_forward_pipeline_inner(
         },
         depth_stencil: Some(DepthStencilState {
             format: TextureFormat::Depth32Float,
-            depth_write_enabled: blend.is_none() && use_prepass,
-            depth_compare: match use_prepass {
-                true => CompareFunction::Equal,
-                false => CompareFunction::GreaterEqual,
-            },
+            depth_write_enabled: blend.is_none(),
+            depth_compare: CompareFunction::GreaterEqual,
             stencil: StencilState::default(),
             bias: DepthBiasState::default(),
         }),
