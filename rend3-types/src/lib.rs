@@ -302,14 +302,14 @@ impl StoredVertexAttributeData {
         if attribute.id() != self.id {
             return None;
         }
-        self.data.downcast_slice::<T>()
+        Some(self.data.downcast_slice::<T>().unwrap())
     }
 
     pub fn typed_data_mut<T: VertexFormat>(&mut self, attribute: &'static VertexAttribute<T>) -> Option<&mut [T]> {
         if attribute.id() != self.id {
             return None;
         }
-        self.data.downcast_slice_mut::<T>()
+        Some(self.data.downcast_slice_mut::<T>().unwrap())
     }
 }
 
@@ -719,28 +719,35 @@ impl Mesh {
             Some(i) => i,
             None => return,
         };
-        let uv_index = match self.find_attribute_index(&VERTEX_ATTRIBUTE_TEXTURE_COORDINATES_0) {
+        let uv_0_index = match self.find_attribute_index(&VERTEX_ATTRIBUTE_TEXTURE_COORDINATES_0) {
             Some(i) => i,
             None => return,
         };
         let (tangent_index, tangents_created) = self.find_or_create_attribute_index(&VERTEX_ATTRIBUTE_TANGENT);
 
         // Assert that all indices are disjoint. This should never
-        // not be the case, but we need to validate it to prove the unsafe.
-        assert_ne!(0, tangent_index);
-        assert_ne!(0, normal_index);
-        assert_ne!(0, uv_index);
-        assert_ne!(tangent_index, normal_index);
-        assert_ne!(tangent_index, uv_index);
-        assert_ne!(normal_index, uv_index);
+        // not be the case, but validate in debug to make sure it is the case.
+        debug_assert_ne!(0, tangent_index);
+        debug_assert_ne!(0, normal_index);
+        debug_assert_ne!(0, uv_0_index);
+        debug_assert_ne!(tangent_index, normal_index);
+        debug_assert_ne!(tangent_index, uv_0_index);
+        debug_assert_ne!(normal_index, uv_0_index);
+
+        // Assert that all indices are in bounds.
+        debug_assert!(self.attributes.get(0).is_some());
+        debug_assert!(self.attributes.get(tangent_index).is_some());
+        debug_assert!(self.attributes.get(normal_index).is_some());
+        debug_assert!(self.attributes.get(uv_0_index).is_some());
 
         // SAFETY: These references never escape this function, the attributes array isn't modified, and all indices are disjoint.
         //
         // We only use unsafe because we need to split-borrow different members of the array.
-        let positions_ref = unsafe { &*(&self.attributes[0] as *const StoredVertexAttributeData) };
-        let tangents_mut = unsafe { &mut *(&mut self.attributes[tangent_index] as *mut StoredVertexAttributeData) };
-        let normals_ref = unsafe { &*(&self.attributes[normal_index] as *const StoredVertexAttributeData) };
-        let uv_0_ref = unsafe { &*(&self.attributes[uv_index] as *const StoredVertexAttributeData) };
+        let attr_ptr = self.attributes.as_mut_ptr();
+        let positions_ref = unsafe { &*attr_ptr.add(0) };
+        let tangents_mut = unsafe { &mut *attr_ptr.add(tangent_index) };
+        let normals_ref = unsafe { &*attr_ptr.add(normal_index) };
+        let uv_0_ref = unsafe { &*attr_ptr.add(uv_0_index) };
 
         let positions = positions_ref.typed_data(&VERTEX_ATTRIBUTE_POSITION).unwrap();
         let tangents = tangents_mut.typed_data_mut(&VERTEX_ATTRIBUTE_TANGENT).unwrap();
