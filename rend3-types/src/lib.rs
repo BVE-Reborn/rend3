@@ -234,36 +234,25 @@ pub use wgt::{
 ///
 /// The value allows for 8 bits of information packed in the high 8 bits of the
 /// index for object recombination.
-pub const MAX_VERTEX_COUNT: usize = 1 << 24;
-
-/// Identifies the semantic use of a vertex buffer.
-#[derive(Debug, Copy, Clone)]
-pub enum VertexBufferType {
-    Position,
-    Normal,
-    Tangent,
-    Uv0,
-    Uv1,
-    Colors,
-}
+pub const MAX_VERTEX_COUNT: u32 = 1 << 24;
 
 /// Error returned from mesh validation.
 #[derive(Debug, Error)]
 pub enum MeshValidationError {
     #[error("Mesh's {ty:?} buffer has {actual} vertices but the position buffer has {expected}")]
     MismatchedVertexCount {
-        ty: VertexBufferType,
+        ty: &'static VertexAttributeId,
         expected: usize,
         actual: usize,
     },
     #[error("Mesh has {count} vertices when the vertex limit is {}", MAX_VERTEX_COUNT)]
-    ExceededMaxVertexCount { count: usize },
+    ExceededMaxVertexCount { count: u32 },
     #[error("Mesh has {count} indices which is not a multiple of three. Meshes are always composed of triangles")]
-    IndexCountNotMultipleOfThree { count: usize },
+    IndexCountNotMultipleOfThree { count: u32 },
     #[error(
         "Index at position {index} has the value {value} which is out of bounds for vertex buffers of {max} length"
     )]
-    IndexOutOfBounds { index: usize, value: u32, max: usize },
+    IndexOutOfBounds { index: u32, value: u32, max: u32 },
 }
 
 #[derive(Debug)]
@@ -530,54 +519,52 @@ pub struct Mesh {
 impl Mesh {
     /// Validates that all vertex attributes have the same length.
     pub fn validate(&self) -> Result<(), MeshValidationError> {
-        // let position_length = self.vertex_positions.len();
-        // let indices_length = self.indices.len();
+        let position_length = self.vertex_count;
+        let indices_length = self.indices.len() as u32;
 
-        // if position_length > MAX_VERTEX_COUNT {
-        //     return Err(MeshValidationError::ExceededMaxVertexCount { count: position_length });
-        // }
+        if position_length > MAX_VERTEX_COUNT {
+            return Err(MeshValidationError::ExceededMaxVertexCount { count: position_length });
+        }
 
-        // let first_different_length = [
-        //     (self.vertex_normals.len(), VertexBufferType::Normal),
-        //     (self.vertex_tangents.len(), VertexBufferType::Tangent),
-        //     (self.vertex_uv0.len(), VertexBufferType::Uv0),
-        //     (self.vertex_uv1.len(), VertexBufferType::Uv1),
-        //     (self.vertex_colors.len(), VertexBufferType::Colors),
-        // ]
-        // .iter()
-        // .find_map(|&(len, ty)| if len != position_length { Some((len, ty)) } else { None });
+        let first_different_length = [
+            (self.vertex_normals.len(), VertexBufferType::Normal),
+            (self.vertex_tangents.len(), VertexBufferType::Tangent),
+            (self.vertex_uv0.len(), VertexBufferType::Uv0),
+            (self.vertex_uv1.len(), VertexBufferType::Uv1),
+            (self.vertex_colors.len(), VertexBufferType::Colors),
+        ]
+        .iter()
+        .find_map(|&(len, ty)| if len != position_length { Some((len, ty)) } else { None });
 
-        // if let Some((len, ty)) = first_different_length {
-        //     return Err(MeshValidationError::MismatchedVertexCount {
-        //         ty,
-        //         actual: len,
-        //         expected: position_length,
-        //     });
-        // }
+        if let Some((len, ty)) = first_different_length {
+            return Err(MeshValidationError::MismatchedVertexCount {
+                ty,
+                actual: len,
+                expected: position_length,
+            });
+        }
 
-        // if indices_length % 3 != 0 {
-        //     return Err(MeshValidationError::IndexCountNotMultipleOfThree { count: indices_length });
-        // }
+        if indices_length % 3 != 0 {
+            return Err(MeshValidationError::IndexCountNotMultipleOfThree { count: indices_length });
+        }
 
-        // let first_oob_index = self.indices.iter().enumerate().find_map(|(idx, &i)| {
-        //     if (i as usize) >= position_length {
-        //         Some((idx, i))
-        //     } else {
-        //         None
-        //     }
-        // });
+        let first_oob_index = self.indices.iter().enumerate().find_map(|(idx, &i)| {
+            if (i as usize) >= position_length {
+                Some((idx, i))
+            } else {
+                None
+            }
+        });
 
-        // if let Some((index, value)) = first_oob_index {
-        //     return Err(MeshValidationError::IndexOutOfBounds {
-        //         index,
-        //         value,
-        //         max: position_length,
-        //     });
-        // }
+        if let Some((index, value)) = first_oob_index {
+            return Err(MeshValidationError::IndexOutOfBounds {
+                index,
+                value,
+                max: position_length,
+            });
+        }
 
-        // Ok(())
-
-        todo!()
+        Ok(())
     }
 
     /// Calculate normals for the given mesh, assuming smooth shading and

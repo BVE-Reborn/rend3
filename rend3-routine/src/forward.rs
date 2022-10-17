@@ -13,7 +13,7 @@ use rend3::{
     },
     types::{Handedness, Material, MaterialArray, SampleCount, VertexAttributeId},
     util::bind_merge::BindGroupBuilder,
-    ProfileData, Renderer, RendererDataCore, RendererProfile, ShaderConfig, ShaderPreProcessor,
+    ProfileData, Renderer, RendererDataCore, RendererProfile, ShaderPreProcessor,
 };
 use serde::Serialize;
 use wgpu::{

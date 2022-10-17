@@ -10,6 +10,7 @@ use once_cell::sync::Lazy;
 #[derive(Debug, Copy, Clone)]
 pub struct VertexAttributeId {
     inner: usize,
+    name: &'static str,
     metadata: &'static VertexFormatMetadata,
 }
 
@@ -22,6 +23,10 @@ impl PartialEq for VertexAttributeId {
 impl Eq for VertexAttributeId {}
 
 impl VertexAttributeId {
+    pub fn name(&self) -> &'static str {
+        self.name
+    }
+
     pub fn metadata(&self) -> &'static VertexFormatMetadata {
         self.metadata
     }
@@ -33,8 +38,7 @@ pub struct VertexAttribute<T>
 where
     T: VertexFormat,
 {
-    name: &'static str,
-    id: Lazy<VertexAttributeId>,
+    id: Lazy<VertexAttributeId, Box<dyn FnOnce() -> VertexAttributeId + Send + Sync + 'static>>,
     _phantom: PhantomData<T>,
 }
 impl<T> VertexAttribute<T>
@@ -43,11 +47,11 @@ where
 {
     pub const fn new(name: &'static str) -> Self {
         Self {
-            name,
-            id: Lazy::new(|| VertexAttributeId {
+            id: Lazy::new(Box::new(move || VertexAttributeId {
+                name,
                 inner: VERTEX_ATTRIBUTE_INDEX_ALLOCATOR.fetch_add(1, Ordering::Relaxed),
                 metadata: &T::METADATA,
-            }),
+            })),
             _phantom: PhantomData,
         }
     }
@@ -128,8 +132,10 @@ impl VertexFormat for [u8; 4] {
 pub static VERTEX_ATTRIBUTE_POSITION: VertexAttribute<glam::Vec3> = VertexAttribute::new("position");
 pub static VERTEX_ATTRIBUTE_NORMAL: VertexAttribute<glam::Vec3> = VertexAttribute::new("normal");
 pub static VERTEX_ATTRIBUTE_TANGENT: VertexAttribute<glam::Vec3> = VertexAttribute::new("tangent");
-pub static VERTEX_ATTRIBUTE_TEXTURE_COORDINATES_0: VertexAttribute<glam::Vec2> = VertexAttribute::new("texture_coords_0");
-pub static VERTEX_ATTRIBUTE_TEXTURE_COORDINATES_1: VertexAttribute<glam::Vec2> = VertexAttribute::new("texture_coords_1");
+pub static VERTEX_ATTRIBUTE_TEXTURE_COORDINATES_0: VertexAttribute<glam::Vec2> =
+    VertexAttribute::new("texture_coords_0");
+pub static VERTEX_ATTRIBUTE_TEXTURE_COORDINATES_1: VertexAttribute<glam::Vec2> =
+    VertexAttribute::new("texture_coords_1");
 pub static VERTEX_ATTRIBUTE_COLOR_0: VertexAttribute<[u8; 4]> = VertexAttribute::new("color_0");
 pub static VERTEX_ATTRIBUTE_COLOR_1: VertexAttribute<[u8; 4]> = VertexAttribute::new("color_1");
 pub static VERTEX_ATTRIBUTE_JOINT_INDICES: VertexAttribute<[u16; 4]> = VertexAttribute::new("joint indices");
