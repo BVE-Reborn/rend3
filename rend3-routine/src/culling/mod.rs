@@ -12,7 +12,7 @@ use rend3::{
     graph::{DataHandle, RenderGraph},
     managers::{MaterialManager, ObjectManager, ShaderObject, TextureBindGroupIndex},
     types::{Material, MaterialArray, VertexAttributeId},
-    util::math::round_up_pot,
+    util::math::{round_up_pot, round_up_div},
     Renderer, ShaderPreProcessor,
 };
 use serde::Serialize;
@@ -101,7 +101,7 @@ fn batch_objects<M: Material>(material_manager: &MaterialManager, object_manager
                     total_invocations: current_invocation,
                     base_output_invocation: current_base_invocation,
                 });
-                jobs.keys.push(key);
+                jobs.keys.push(current_key);
 
                 current_base_invocation += current_invocation;
                 current_key = key;
@@ -120,6 +120,14 @@ fn batch_objects<M: Material>(material_manager: &MaterialManager, object_manager
             current_object_index += 1;
             current_invocation += round_up_pot(invocation_count, WORKGROUP_SIZE);
         }
+
+        jobs.jobs.push(ShaderBatchData {
+            ranges: current_ranges,
+            total_objects: current_object_index,
+            total_invocations: current_invocation,
+            base_output_invocation: current_base_invocation,
+        });
+        jobs.keys.push(current_key);
     }
 
     jobs
@@ -273,7 +281,7 @@ impl GpuCuller {
             .sum();
         let output_buffer = renderer.device.create_buffer(&BufferDescriptor {
             label: Some(&format_sso!("GpuCuller {type_name} Output Buffer")),
-            size: (total_invocations as u64 * 3).max(4),
+            size: (total_invocations as u64 * 3 * 4).max(4),
             usage: BufferUsages::STORAGE | BufferUsages::INDEX,
             mapped_at_creation: false,
         });
@@ -311,7 +319,7 @@ impl GpuCuller {
             let (key, job): (ShaderJobKey, ShaderBatchData) = (key, job);
 
             cpass.set_bind_group(0, &bg, &[idx as u32 * ShaderBatchData::SHADER_SIZE.get() as u32]);
-            cpass.dispatch_workgroups(job.total_invocations / WORKGROUP_SIZE, 1, 1);
+            cpass.dispatch_workgroups(round_up_div(job.total_invocations, WORKGROUP_SIZE), 1, 1);
 
             draw_calls.push(DrawCall {
                 index_range: job.base_output_invocation..job.base_output_invocation + job.total_invocations,

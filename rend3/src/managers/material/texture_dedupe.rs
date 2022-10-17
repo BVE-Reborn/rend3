@@ -13,8 +13,20 @@ use crate::{
     util::freelist::{FreelistIndex, FreelistVec},
 };
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct TextureBindGroupIndex(FreelistIndex);
+
+impl std::fmt::Debug for TextureBindGroupIndex {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut tuple = f.debug_tuple("TextureBindGroupIndex");
+        if *self == Self::DUMMY {
+            tuple.field(&"DUMMY");
+        } else {
+            tuple.field(&self.0.0);
+        }
+        tuple.finish()
+    }
+}
 
 impl TextureBindGroupIndex {
     pub const DUMMY: Self = Self(FreelistIndex(usize::MAX));

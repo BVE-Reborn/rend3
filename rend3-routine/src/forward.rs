@@ -222,6 +222,7 @@ impl<M: Material> ForwardRoutine<M> {
                 SampleCount::Four => &this.pipeline_s4,
             };
 
+            rpass.set_index_buffer(culled.index_buffer.slice(..), IndexFormat::Uint32);
             rpass.set_pipeline(pipeline);
             rpass.set_bind_group(0, forward_uniform_bg, &[]);
             if let Some(v) = extra_bgs {
@@ -248,7 +249,6 @@ impl<M: Material> ForwardRoutine<M> {
                     per_material_bg,
                     &[idx as u32 * culling::ShaderBatchData::SHADER_SIZE.get() as u32],
                 );
-                rpass.set_index_buffer(culled.index_buffer.slice(..), IndexFormat::Uint32);
                 rpass.draw_indexed(call.index_range.clone(), 0, 0..1);
             }
         });
