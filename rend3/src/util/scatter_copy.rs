@@ -102,7 +102,7 @@ impl ScatterCopy {
         let mapped_slice: &mut [u32] = bytemuck::cast_slice_mut(&mut mapped_range);
 
         let count_u32: u32 = count.try_into().unwrap();
-        mapped_slice[0] = size_of_t_u32;
+        mapped_slice[0] = size_of_t_u32 / 4;
         mapped_slice[1] = count_u32;
 
         for (idx, item) in data_iterator.enumerate() {
@@ -135,5 +135,158 @@ impl ScatterCopy {
         cpass.set_bind_group(0, &bg, &[]);
         cpass.dispatch_workgroups(round_up_div(count_u32, 64), 1, 1);
         drop(cpass);
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use wgpu::util::DeviceExt;
+
+    use crate::util::scatter_copy::{ScatterCopy, ScatterData};
+
+    struct TestContext {
+        device: wgpu::Device,
+        queue: wgpu::Queue,
+    }
+
+    impl TestContext {
+        fn new() -> Self {
+            let backends = wgpu::util::backend_bits_from_env().unwrap_or(wgpu::Backends::all());
+            let instance = wgpu::Instance::new(backends);
+            let adapter = pollster::block_on(wgpu::util::initialize_adapter_from_env_or_default(
+                &instance, backends, None,
+            ))
+            .unwrap();
+            let (device, queue) = pollster::block_on(adapter.request_device(
+                &wgpu::DeviceDescriptor {
+                    label: None,
+                    features: wgpu::Features::empty(),
+                    limits: wgpu::Limits::default(),
+                },
+                None,
+            ))
+            .unwrap();
+
+            Self { device, queue }
+        }
+
+        fn buffer<T: bytemuck::Pod>(&self, data: &[T]) -> wgpu::Buffer {
+            self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("target buffer"),
+                contents: bytemuck::cast_slice(&data),
+                usage: wgpu::BufferUsages::all() - wgpu::BufferUsages::MAP_READ - wgpu::BufferUsages::MAP_WRITE,
+            })
+        }
+
+        fn encoder(&self) -> wgpu::CommandEncoder {
+            self.device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None })
+        }
+
+        fn readback<T: bytemuck::Pod>(
+            &self,
+            mut encoder: wgpu::CommandEncoder,
+            buffer: &wgpu::Buffer,
+            bytes: u64,
+        ) -> Vec<T> {
+            let staging = self.device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("staging"),
+                size: bytes as u64,
+                usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            });
+
+            encoder.copy_buffer_to_buffer(&buffer, 0, &staging, 0, bytes);
+
+            self.queue.submit(Some(encoder.finish()));
+
+            let _ = staging.slice(..).map_async(wgpu::MapMode::Read, |_| ());
+            self.device.poll(wgpu::Maintain::Wait);
+
+            let res = bytemuck::cast_slice(&*staging.slice(..).get_mapped_range()).to_vec();
+
+            res
+        }
+    }
+
+    #[test]
+    fn single_word() {
+        let ctx = TestContext::new();
+
+        let scatter = ScatterCopy::new(&ctx.device);
+
+        let buffer = ctx.buffer(&[5.0_f32; 4]);
+
+        let mut encoder = ctx.encoder();
+
+        scatter.execute_copy(
+            &ctx.device,
+            &mut encoder,
+            &buffer,
+            [ScatterData {
+                word_offset: 0,
+                data: 1.0_f32,
+            }],
+        );
+
+        assert_eq!(&ctx.readback::<f32>(encoder, &buffer, 16), &[1.0, 5.0, 5.0, 5.0]);
+    }
+
+    #[test]
+    fn sparse_words() {
+        let ctx = TestContext::new();
+
+        let scatter = ScatterCopy::new(&ctx.device);
+
+        let buffer = ctx.buffer(&[5.0_f32; 4]);
+
+        let mut encoder = ctx.encoder();
+
+        scatter.execute_copy(
+            &ctx.device,
+            &mut encoder,
+            &buffer,
+            [
+                ScatterData {
+                    word_offset: 0,
+                    data: 1.0_f32,
+                },
+                ScatterData {
+                    word_offset: 2,
+                    data: 3.0_f32,
+                },
+            ],
+        );
+
+        assert_eq!(&ctx.readback::<f32>(encoder, &buffer, 16), &[1.0, 5.0, 3.0, 5.0]);
+    }
+
+    #[test]
+    fn sparse_multi_words() {
+        let ctx = TestContext::new();
+
+        let scatter = ScatterCopy::new(&ctx.device);
+
+        let buffer = ctx.buffer(&[[9.0_f32; 2]; 4]);
+
+        let mut encoder = ctx.encoder();
+
+        scatter.execute_copy(
+            &ctx.device,
+            &mut encoder,
+            &buffer,
+            [
+                ScatterData {
+                    word_offset: 0,
+                    data: [1.0_f32, 2.0_f32],
+                },
+                ScatterData {
+                    word_offset: 4,
+                    data: [5.0_f32, 6.0_f32],
+                },
+            ],
+        );
+
+        assert_eq!(&ctx.readback::<[f32; 2]>(encoder, &buffer, 32), &[[1.0, 2.0], [9.0, 9.0], [5.0, 6.0], [9.0, 9.0]]);
     }
 }
