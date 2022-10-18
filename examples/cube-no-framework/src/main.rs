@@ -88,7 +88,7 @@ fn main() {
         &iad.device,
         preferred_format,
         glam::UVec2::new(window_size.width, window_size.height),
-        rend3::types::PresentMode::Mailbox,
+        rend3::types::PresentMode::Fifo,
     );
 
     // Make us a renderer.
