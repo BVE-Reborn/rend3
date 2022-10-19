@@ -1,5 +1,5 @@
 use rend3::{Renderer, RendererDataCore, ShaderPreProcessor};
-use wgpu::{BlendState, Features};
+use wgpu::{BlendState};
 
 use crate::{
     common::{PerMaterialArchetypeInterface, WholeFrameInterfaces},

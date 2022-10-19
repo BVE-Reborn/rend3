@@ -2,7 +2,7 @@ use std::ops::Index;
 
 use arrayvec::ArrayVec;
 use bimap::BiMap;
-use rend3_types::RawTextureHandle;
+use rend3_types::RawTexture2DHandle;
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
     BindingResource, Device, ShaderStages, TextureViewDimension,
@@ -22,7 +22,7 @@ impl std::fmt::Debug for TextureBindGroupIndex {
         if *self == Self::DUMMY {
             tuple.field(&"DUMMY");
         } else {
-            tuple.field(&self.0.0);
+            tuple.field(&self.0 .0);
         }
         tuple.finish()
     }
@@ -39,7 +39,7 @@ struct StoredBindGroup {
 
 pub struct TextureDeduplicator {
     bgls: Vec<BindGroupLayout>,
-    deduplication_map: BiMap<Vec<Option<RawTextureHandle>>, TextureBindGroupIndex>,
+    deduplication_map: BiMap<Vec<Option<RawTexture2DHandle>>, TextureBindGroupIndex>,
     storage: FreelistVec<StoredBindGroup>,
 }
 impl TextureDeduplicator {
@@ -77,8 +77,8 @@ impl TextureDeduplicator {
     pub fn get_or_insert(
         &mut self,
         device: &Device,
-        texture_manager_2d: &TextureManager,
-        array: &[Option<RawTextureHandle>],
+        texture_manager_2d: &TextureManager<crate::types::Texture2DTag>,
+        array: &[Option<RawTexture2DHandle>],
     ) -> TextureBindGroupIndex {
         if let Some(&index) = self.deduplication_map.get_by_left(array) {
             self.storage[index.0].refcount += 1;

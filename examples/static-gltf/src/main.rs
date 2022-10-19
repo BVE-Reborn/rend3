@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 fn load_gltf(
-    renderer: &rend3::Renderer,
+    renderer: &Arc<rend3::Renderer>,
     path: &'static str,
 ) -> (rend3::types::MeshHandle, rend3::types::MaterialHandle) {
     let (doc, datas, _) = gltf::import(path).unwrap();
@@ -104,6 +104,7 @@ impl rend3_framework::App for GltfExample {
             // Direction will be normalized
             direction: glam::Vec3::new(-1.0, -4.0, 2.0),
             distance: 20.0,
+            resolution: 2048,
         }));
     }
 

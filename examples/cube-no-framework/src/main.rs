@@ -164,6 +164,7 @@ fn main() {
         // Direction will be normalized
         direction: glam::Vec3::new(-1.0, -4.0, 2.0),
         distance: 400.0,
+        resolution: 2048,
     });
 
     let mut resolution = glam::UVec2::new(window_size.width, window_size.height);

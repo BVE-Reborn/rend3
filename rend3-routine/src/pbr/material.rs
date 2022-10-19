@@ -3,7 +3,7 @@
 use encase::ShaderType;
 use glam::{Mat3, Vec3, Vec4};
 use rend3::types::{
-    Material, RawTextureHandle, TextureHandle, VertexAttributeId, VERTEX_ATTRIBUTE_COLOR_0, VERTEX_ATTRIBUTE_COLOR_1,
+    Material, RawTexture2DHandle, Texture2DHandle, VertexAttributeId, VERTEX_ATTRIBUTE_COLOR_0,
     VERTEX_ATTRIBUTE_NORMAL, VERTEX_ATTRIBUTE_POSITION, VERTEX_ATTRIBUTE_TANGENT,
     VERTEX_ATTRIBUTE_TEXTURE_COORDINATES_0, VERTEX_ATTRIBUTE_TEXTURE_COORDINATES_1,
 };
@@ -53,22 +53,22 @@ pub enum AlbedoComponent {
         srgb: bool,
     },
     /// Albedo color is loaded from the given texture.
-    Texture(TextureHandle),
+    Texture(Texture2DHandle),
     /// Albedo color is loaded from the given texture, then multiplied
     /// by the vertex color.
     TextureVertex {
-        texture: TextureHandle,
+        texture: Texture2DHandle,
         /// Vertex should be converted from srgb -> linear before
         /// multiplication.
         srgb: bool,
     },
     /// Albedo color is loaded from given texture, then multiplied
     /// by the given value.
-    TextureValue { texture: TextureHandle, value: Vec4 },
+    TextureValue { texture: Texture2DHandle, value: Vec4 },
     /// Albedo color is loaded from the given texture, then multiplied
     /// by the vertex color and the given value.
     TextureVertexValue {
-        texture: TextureHandle,
+        texture: Texture2DHandle,
         /// Vertex should be converted from srgb -> linear before
         /// multiplication.
         srgb: bool,
@@ -121,7 +121,7 @@ impl AlbedoComponent {
         )
     }
 
-    pub fn to_texture(&self) -> Option<&TextureHandle> {
+    pub fn to_texture(&self) -> Option<&Texture2DHandle> {
         match *self {
             Self::None | Self::Vertex { .. } | Self::Value(_) | Self::ValueVertex { .. } => None,
             Self::Texture(ref texture)
@@ -138,8 +138,8 @@ impl AlbedoComponent {
 pub enum MaterialComponent<T> {
     None,
     Value(T),
-    Texture(TextureHandle),
-    TextureValue { texture: TextureHandle, value: T },
+    Texture(Texture2DHandle),
+    TextureValue { texture: Texture2DHandle, value: T },
 }
 
 impl<T> Default for MaterialComponent<T> {
@@ -160,7 +160,7 @@ impl<T: Copy> MaterialComponent<T> {
         matches!(*self, Self::Texture(..) | Self::TextureValue { .. })
     }
 
-    pub fn to_texture(&self) -> Option<&TextureHandle> {
+    pub fn to_texture(&self) -> Option<&Texture2DHandle> {
         match *self {
             Self::None | Self::Value(_) => None,
             Self::Texture(ref texture) | Self::TextureValue { ref texture, .. } => Some(texture),
@@ -189,13 +189,13 @@ pub enum NormalTexture {
     /// No normal texture.
     None,
     /// Normal stored in RGB values.
-    Tricomponent(TextureHandle, NormalTextureYDirection),
+    Tricomponent(Texture2DHandle, NormalTextureYDirection),
     /// Normal stored in RG values, third value should be reconstructed.
-    Bicomponent(TextureHandle, NormalTextureYDirection),
+    Bicomponent(Texture2DHandle, NormalTextureYDirection),
     /// Normal stored in Green and Alpha values, third value should be
     /// reconstructed. This is useful for storing in BC3 or BC7 compressed
     /// textures.
-    BicomponentSwizzled(TextureHandle, NormalTextureYDirection),
+    BicomponentSwizzled(Texture2DHandle, NormalTextureYDirection),
 }
 impl Default for NormalTexture {
     fn default() -> Self {
@@ -204,7 +204,7 @@ impl Default for NormalTexture {
 }
 
 impl NormalTexture {
-    pub fn to_texture(&self) -> Option<&TextureHandle> {
+    pub fn to_texture(&self) -> Option<&Texture2DHandle> {
         match *self {
             Self::None => None,
             Self::Tricomponent(ref texture, _)
@@ -240,32 +240,32 @@ pub enum AoMRTextures {
     Combined {
         /// Texture with Ambient Occlusion in R, Roughness in G, and Metallic in
         /// B
-        texture: Option<TextureHandle>,
+        texture: Option<Texture2DHandle>,
     },
     SwizzledSplit {
         /// Texture with Ambient Occlusion in R
-        ao_texture: Option<TextureHandle>,
+        ao_texture: Option<Texture2DHandle>,
         /// Texture with Roughness in G and Metallic in B
-        mr_texture: Option<TextureHandle>,
+        mr_texture: Option<Texture2DHandle>,
     },
     Split {
         /// Texture with Ambient Occlusion in R
-        ao_texture: Option<TextureHandle>,
+        ao_texture: Option<Texture2DHandle>,
         /// Texture with Roughness in R and Metallic in G
-        mr_texture: Option<TextureHandle>,
+        mr_texture: Option<Texture2DHandle>,
     },
     BWSplit {
         /// Texture with Ambient Occlusion in R
-        ao_texture: Option<TextureHandle>,
+        ao_texture: Option<Texture2DHandle>,
         /// Texture with Metallic in R
-        m_texture: Option<TextureHandle>,
+        m_texture: Option<Texture2DHandle>,
         /// Texture with Roughness in R
-        r_texture: Option<TextureHandle>,
+        r_texture: Option<Texture2DHandle>,
     },
 }
 
 impl AoMRTextures {
-    pub fn to_roughness_texture(&self) -> Option<&TextureHandle> {
+    pub fn to_roughness_texture(&self) -> Option<&Texture2DHandle> {
         match *self {
             Self::Combined {
                 texture: Some(ref texture),
@@ -286,7 +286,7 @@ impl AoMRTextures {
         }
     }
 
-    pub fn to_metallic_texture(&self) -> Option<&TextureHandle> {
+    pub fn to_metallic_texture(&self) -> Option<&Texture2DHandle> {
         match *self {
             Self::Combined { .. } => None,
             Self::SwizzledSplit { .. } => None,
@@ -299,7 +299,7 @@ impl AoMRTextures {
         }
     }
 
-    pub fn to_ao_texture(&self) -> Option<&TextureHandle> {
+    pub fn to_ao_texture(&self) -> Option<&Texture2DHandle> {
         match *self {
             Self::Combined { .. } => None,
             Self::SwizzledSplit {
@@ -340,25 +340,25 @@ impl Default for AoMRTextures {
 pub enum ClearcoatTextures {
     GltfCombined {
         /// Texture with Clearcoat in R, and Clearcoat Roughness in G
-        texture: Option<TextureHandle>,
+        texture: Option<Texture2DHandle>,
     },
     GltfSplit {
         /// Texture with Clearcoat in R
-        clearcoat_texture: Option<TextureHandle>,
+        clearcoat_texture: Option<Texture2DHandle>,
         /// Texture with Clearcoat Roughness in G
-        clearcoat_roughness_texture: Option<TextureHandle>,
+        clearcoat_roughness_texture: Option<Texture2DHandle>,
     },
     BWSplit {
         /// Texture with Clearcoat in R
-        clearcoat_texture: Option<TextureHandle>,
+        clearcoat_texture: Option<Texture2DHandle>,
         /// Texture with Clearcoat Roughness in R
-        clearcoat_roughness_texture: Option<TextureHandle>,
+        clearcoat_roughness_texture: Option<Texture2DHandle>,
     },
     None,
 }
 
 impl ClearcoatTextures {
-    pub fn to_clearcoat_texture(&self) -> Option<&TextureHandle> {
+    pub fn to_clearcoat_texture(&self) -> Option<&Texture2DHandle> {
         match *self {
             Self::GltfCombined {
                 texture: Some(ref texture),
@@ -375,7 +375,7 @@ impl ClearcoatTextures {
         }
     }
 
-    pub fn to_clearcoat_roughness_texture(&self) -> Option<&TextureHandle> {
+    pub fn to_clearcoat_roughness_texture(&self) -> Option<&Texture2DHandle> {
         match *self {
             Self::GltfCombined { .. } => None,
             Self::GltfSplit {
@@ -508,21 +508,19 @@ pub struct PbrMaterial {
     pub anisotropy: MaterialComponent<f32>,
     pub uv_transform0: Mat3,
     pub uv_transform1: Mat3,
-    // TODO: Determine how to make this a clearer part of the type system, esp. with the changable_struct macro.
+    // TODO: Make unlit a different shader entirely.
     pub unlit: bool,
     pub sample_type: SampleType,
 }
 
 impl Material for PbrMaterial {
     type DataType = ShaderMaterial;
-    type TextureArrayType = [Option<RawTextureHandle>; 10];
+    type TextureArrayType = [Option<RawTexture2DHandle>; 10];
     type RequredAttributeArrayType = [&'static VertexAttributeId; 1];
     type SupportedAttributeArrayType = [&'static VertexAttributeId; 6];
 
     fn required_attributes() -> Self::RequredAttributeArrayType {
-        [
-            &VERTEX_ATTRIBUTE_POSITION,
-        ]
+        [&VERTEX_ATTRIBUTE_POSITION]
     }
 
     fn supported_attributes() -> Self::SupportedAttributeArrayType {

@@ -7,7 +7,7 @@ use crate::{
     },
     types::{
         Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, MaterialHandle, Mesh, MeshHandle,
-        Object, ObjectHandle, Texture, TextureHandle,
+        Object, ObjectHandle, Texture, Texture2DHandle,
     },
     util::{mipmap::MipmapGenerator, scatter_copy::ScatterCopy},
     ExtendedAdapterInfo, InstanceAdapterDevice, RendererInitializationError, RendererProfile,
@@ -16,7 +16,7 @@ use glam::Mat4;
 use parking_lot::Mutex;
 use rend3_types::{
     Handedness, Material, MaterialTag, MipmapCount, MipmapSource, ObjectChange, Skeleton, SkeletonHandle,
-    TextureFormat, TextureFromTexture, TextureUsages,
+    TextureCubeTag, TextureFormat, TextureFromTexture, TextureUsages, TextureCubeHandle, Texture2DTag,
 };
 use std::{num::NonZeroU32, panic::Location, sync::Arc};
 use wgpu::{
@@ -69,7 +69,8 @@ pub struct Renderer {
 struct HandleAllocators {
     pub mesh: HandleAllocator<Mesh>,
     pub skeleton: HandleAllocator<Skeleton>,
-    pub d2_texture: HandleAllocator<Texture>,
+    pub d2_texture: HandleAllocator<Texture2DTag>,
+    pub d2c_texture: HandleAllocator<TextureCubeTag>,
     pub material: HandleAllocator<MaterialTag>,
     pub object: HandleAllocator<Object>,
     pub directional_light: HandleAllocator<DirectionalLight>,
@@ -82,9 +83,9 @@ pub struct RendererDataCore {
     /// Manages all vertex and index data.
     pub mesh_manager: MeshManager,
     /// Manages all 2D textures, including bindless bind group.
-    pub d2_texture_manager: TextureManager,
+    pub d2_texture_manager: TextureManager<Texture2DTag>,
     /// Manages all Cube textures, including bindless bind groups.
-    pub d2c_texture_manager: TextureManager,
+    pub d2c_texture_manager: TextureManager<TextureCubeTag>,
     /// Manages all materials, including material bind groups when CpuDriven.
     pub material_manager: MaterialManager,
     /// Manages all objects.
@@ -161,7 +162,7 @@ impl Renderer {
     /// The handle will keep the texture alive. All materials created with this
     /// texture will also keep the texture alive.
     #[track_caller]
-    pub fn add_texture_2d(self: &Arc<Self>, texture: Texture) -> TextureHandle {
+    pub fn add_texture_2d(self: &Arc<Self>, texture: Texture) -> Texture2DHandle {
         profiling::scope!("Add Texture 2D");
 
         Self::validation_texture_format(texture.format);
@@ -233,13 +234,12 @@ impl Renderer {
 
         let view = tex.create_view(&TextureViewDescriptor::default());
         self.instructions.push(
-            InstructionKind::AddTexture {
+            InstructionKind::AddTexture2D {
                 handle: handle.clone(),
                 desc,
                 texture: tex,
                 view,
                 buffer,
-                cube: false,
             },
             *Location::caller(),
         );
@@ -252,7 +252,7 @@ impl Renderer {
     /// The handle will keep the texture alive. All materials created with this
     /// texture will also keep the texture alive.
     #[track_caller]
-    pub fn add_texture_2d_from_texture(self: &Arc<Self>, texture: TextureFromTexture) -> TextureHandle {
+    pub fn add_texture_2d_from_texture(self: &Arc<Self>, texture: TextureFromTexture) -> Texture2DHandle {
         profiling::scope!("Add Texture 2D From Texture");
 
         let mut encoder = self.device.create_command_encoder(&CommandEncoderDescriptor::default());
@@ -305,13 +305,12 @@ impl Renderer {
             );
         }
         self.instructions.push(
-            InstructionKind::AddTexture {
+            InstructionKind::AddTexture2D {
                 handle: handle.clone(),
                 texture: tex,
                 desc,
                 view,
                 buffer: Some(encoder.finish()),
-                cube: false,
             },
             *Location::caller(),
         );
@@ -323,13 +322,12 @@ impl Renderer {
     ///
     /// The handle will keep the texture alive.
     #[track_caller]
-    pub fn add_texture_cube(self: &Arc<Self>, texture: Texture) -> TextureHandle {
+    pub fn add_texture_cube(self: &Arc<Self>, texture: Texture) -> TextureCubeHandle {
         profiling::scope!("Add Texture Cube");
 
         Self::validation_texture_format(texture.format);
 
-        assert!(false);
-        let handle = self.resource_handle_allocators.d2_texture.allocate(self);
+        let handle = self.resource_handle_allocators.d2c_texture.allocate(self);
         let size = Extent3d {
             width: texture.size.x,
             height: texture.size.y,
@@ -358,13 +356,12 @@ impl Renderer {
             ..TextureViewDescriptor::default()
         });
         self.instructions.push(
-            InstructionKind::AddTexture {
+            InstructionKind::AddTextureCube {
                 handle: handle.clone(),
                 texture: tex,
                 desc,
                 view,
                 buffer: None,
-                cube: true,
             },
             *Location::caller(),
         );

@@ -47,15 +47,15 @@ async fn load_skybox(
     load_skybox_image(loader, &mut data, "skybox/front.jpg").await;
     load_skybox_image(loader, &mut data, "skybox/back.jpg").await;
 
-    // let handle = renderer.add_texture_cube(Texture {
-    //     format: TextureFormat::Rgba8UnormSrgb,
-    //     size: UVec2::new(2048, 2048),
-    //     data,
-    //     label: Some("background".into()),
-    //     mip_count: rend3::types::MipmapCount::ONE,
-    //     mip_source: rend3::types::MipmapSource::Uploaded,
-    // });
-    // lock(skybox_routine).set_background_texture(Some(handle));
+    let handle = renderer.add_texture_cube(Texture {
+        format: TextureFormat::Rgba8UnormSrgb,
+        size: UVec2::new(2048, 2048),
+        data,
+        label: Some("background".into()),
+        mip_count: rend3::types::MipmapCount::ONE,
+        mip_source: rend3::types::MipmapSource::Uploaded,
+    });
+    lock(skybox_routine).set_background_texture(Some(handle));
     Ok(())
 }
 

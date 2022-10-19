@@ -172,7 +172,8 @@ macro_rules! declare_handle {
 
 declare_handle!(
     MeshHandle<Mesh>,
-    TextureHandle<Texture>,
+    Texture2DHandle<Texture2DTag>,
+    TextureCubeHandle<TextureCubeTag>,
     MaterialHandle<MaterialTag>,
     ObjectHandle<Object>,
     DirectionalLightHandle<DirectionalLight>,
@@ -190,7 +191,8 @@ macro_rules! declare_raw_handle {
 
 declare_raw_handle!(
     RawMeshHandle<Mesh>,
-    RawTextureHandle<Texture>,
+    RawTexture2DHandle<Texture2DTag>,
+    RawTextureCubeHandle<TextureCubeTag>,
     RawMaterialHandle<MaterialTag>,
     RawObjectHandle<Object>,
     RawDirectionalLightHandle<DirectionalLight>,
@@ -924,11 +926,15 @@ pub struct Texture {
 #[derive(Debug, Clone)]
 pub struct TextureFromTexture {
     pub label: Option<String>,
-    pub src: TextureHandle,
+    pub src: Texture2DHandle,
     pub start_mip: u32,
     pub mip_count: Option<NonZeroU32>,
 }
 
+#[doc(hidden)]
+pub struct Texture2DTag;
+#[doc(hidden)]
+pub struct TextureCubeTag;
 #[doc(hidden)]
 pub struct MaterialTag;
 
@@ -996,7 +1002,7 @@ impl<const C: usize, T> MaterialArray<T> for [T; C] {
 ///   - The data provided by the material.
 pub trait Material: Send + Sync + 'static {
     type DataType: encase::ShaderSize + encase::internal::WriteInto;
-    type TextureArrayType: MaterialArray<Option<RawTextureHandle>>;
+    type TextureArrayType: MaterialArray<Option<RawTexture2DHandle>>;
     type RequredAttributeArrayType: MaterialArray<&'static VertexAttributeId>;
     type SupportedAttributeArrayType: MaterialArray<&'static VertexAttributeId>;
 

@@ -12,7 +12,7 @@ use crate::{
 use parking_lot::Mutex;
 use rend3_types::{Camera, Handedness, TextureFormat};
 use std::sync::Arc;
-use wgpu::{Features, TextureViewDimension};
+use wgpu::{TextureViewDimension};
 
 pub fn create_renderer(
     iad: InstanceAdapterDevice,
@@ -56,7 +56,7 @@ pub fn create_renderer(
         ],
     );
 
-    let profiler = wgpu_profiler::GpuProfiler::new(4, iad.queue.get_timestamp_period(), Features::empty());
+    let profiler = wgpu_profiler::GpuProfiler::new(4, iad.queue.get_timestamp_period(), iad.device.features());
 
     let scatter = ScatterCopy::new(&iad.device);
 

@@ -7,7 +7,7 @@ use rend3::{
         DataHandle, DepthHandle, RenderGraph, RenderPassDepthTarget, RenderPassTarget, RenderPassTargets,
         RenderTargetHandle,
     },
-    types::{SampleCount, TextureHandle},
+    types::{SampleCount, TextureCubeHandle},
     util::bind_merge::{BindGroupBuilder, BindGroupLayoutBuilder},
     Renderer, ShaderConfig, ShaderPreProcessor,
 };
@@ -22,7 +22,7 @@ use crate::common::WholeFrameInterfaces;
 
 struct StoredSkybox {
     bg: Option<BindGroup>,
-    handle: Option<TextureHandle>,
+    handle: Option<TextureCubeHandle>,
 }
 
 /// Skybox rendering routine.
@@ -60,7 +60,7 @@ impl SkyboxRoutine {
 
     /// Set the current background texture. Bad things will happen if this isn't
     /// a cube texture.
-    pub fn set_background_texture(&mut self, texture: Option<TextureHandle>) {
+    pub fn set_background_texture(&mut self, texture: Option<TextureCubeHandle>) {
         self.current_skybox.handle = texture;
         self.current_skybox.bg = None;
     }

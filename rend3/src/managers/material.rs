@@ -10,7 +10,7 @@ use crate::{
 };
 use encase::{ShaderSize, ShaderType};
 use list_any::VecAny;
-use rend3_types::{Material, MaterialArray, RawMaterialHandle, RawTextureHandle, VertexAttributeId};
+use rend3_types::{Material, MaterialArray, RawMaterialHandle, RawTexture2DHandle, VertexAttributeId};
 use std::{
     any::TypeId,
     mem,
@@ -24,7 +24,7 @@ pub use texture_dedupe::TextureBindGroupIndex;
 
 #[derive(ShaderType)]
 struct GpuPoweredShaderWrapper<M: Material> {
-    textures: <M::TextureArrayType as MaterialArray<Option<RawTextureHandle>>>::U32Array,
+    textures: <M::TextureArrayType as MaterialArray<Option<RawTexture2DHandle>>>::U32Array,
     data: M::DataType,
 }
 
@@ -47,8 +47,14 @@ struct MaterialArchetype {
     data_vec: VecAny,
     remove_data: fn(&mut VecAny, RawMaterialHandle) -> ProfileData<TextureBindGroupIndex, ()>,
     apply_data_cpu: fn(&mut FreelistDerivedBuffer, &Device, &mut CommandEncoder, &ScatterCopy, &mut VecAny),
-    apply_data_gpu:
-        fn(&mut FreelistDerivedBuffer, &Device, &mut CommandEncoder, &ScatterCopy, &mut VecAny, &TextureManager),
+    apply_data_gpu: fn(
+        &mut FreelistDerivedBuffer,
+        &Device,
+        &mut CommandEncoder,
+        &ScatterCopy,
+        &mut VecAny,
+        &TextureManager<crate::types::Texture2DTag>,
+    ),
     get_attributes: fn(&mut dyn FnMut(&[&'static VertexAttributeId], &[&'static VertexAttributeId])),
     object_add_callback_wrapper: fn(&VecAny, usize, ObjectAddCallbackArgs<'_>),
 }
@@ -129,7 +135,7 @@ impl MaterialManager {
         &mut self,
         device: &Device,
         profile: RendererProfile,
-        texture_manager_2d: &mut TextureManager,
+        texture_manager_2d: &mut TextureManager<crate::types::Texture2DTag>,
         handle: &MaterialHandle,
         material: M,
     ) {
@@ -168,7 +174,7 @@ impl MaterialManager {
     pub fn update<M: Material>(
         &mut self,
         device: &Device,
-        texture_manager_2d: &TextureManager,
+        texture_manager_2d: &TextureManager<crate::types::Texture2DTag>,
         handle: &MaterialHandle,
         material: M,
     ) {
@@ -214,7 +220,7 @@ impl MaterialManager {
         encoder: &mut CommandEncoder,
         scatter: &ScatterCopy,
         profile: RendererProfile,
-        texture_manager: &TextureManager,
+        texture_manager: &TextureManager<crate::types::Texture2DTag>,
     ) {
         profiling::scope!("Material Ready");
 
@@ -273,7 +279,7 @@ impl MaterialManager {
 
     pub fn get_bind_group_layout_cpu<M: Material>(&self) -> &BindGroupLayout {
         self.texture_deduplicator
-            .get_bgl(<M::TextureArrayType as MaterialArray<Option<RawTextureHandle>>>::COUNT as usize)
+            .get_bgl(<M::TextureArrayType as MaterialArray<Option<RawTexture2DHandle>>>::COUNT as usize)
     }
 
     pub fn get_attributes(
@@ -331,7 +337,7 @@ fn apply_buffer_gpu<M: Material>(
     encoder: &mut CommandEncoder,
     scatter: &ScatterCopy,
     data_vec: &mut VecAny,
-    texture_manager: &TextureManager,
+    texture_manager: &TextureManager<crate::types::Texture2DTag>,
 ) {
     let data_vec = data_vec.downcast_slice::<Option<InternalMaterial<M>>>().unwrap();
 

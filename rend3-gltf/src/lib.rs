@@ -32,7 +32,8 @@ use std::{
     borrow::Cow,
     collections::{hash_map::Entry, BTreeMap, HashMap, VecDeque},
     future::Future,
-    path::Path, sync::Arc,
+    path::Path,
+    sync::Arc,
 };
 use thiserror::Error;
 
@@ -121,7 +122,7 @@ pub struct ImageKey {
 /// A uploaded texture and its format.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Texture {
-    pub handle: types::TextureHandle,
+    pub handle: types::Texture2DHandle,
     pub format: types::TextureFormat,
 }
 
@@ -561,7 +562,7 @@ pub fn instance_loaded_scene<'a, E: std::error::Error + 'static>(
                         intensity: light.intensity(),
                         direction,
                         distance: settings.directional_light_shadow_distance,
-                        resolution: 2048
+                        resolution: 2048,
                     }))
                 }
                 _ => None,
@@ -1234,7 +1235,7 @@ pub mod util {
     use crate::{Labeled, Texture};
 
     /// Turns an `Option<Texture>` into `Option<types::TextureHandle>`
-    pub fn extract_handle(texture: Option<Texture>) -> Option<types::TextureHandle> {
+    pub fn extract_handle(texture: Option<Texture>) -> Option<types::Texture2DHandle> {
         texture.map(|t| t.handle)
     }
 

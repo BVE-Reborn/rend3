@@ -50,20 +50,25 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
                     );
                     data_core.profiler.end_scope(&mut encoder);
                 }
-                InstructionKind::AddTexture {
+                InstructionKind::AddTexture2D {
                     handle,
                     desc,
                     texture,
                     view,
                     buffer,
-                    cube,
                 } => {
                     cmd_bufs.extend(buffer);
-                    if cube {
-                        data_core.d2c_texture_manager.add(&handle, desc, texture, view);
-                    } else {
-                        data_core.d2_texture_manager.add(&handle, desc, texture, view);
-                    }
+                    data_core.d2_texture_manager.add(*handle, desc, texture, view);
+                }
+                InstructionKind::AddTextureCube {
+                    handle,
+                    desc,
+                    texture,
+                    view,
+                    buffer,
+                } => {
+                    cmd_bufs.extend(buffer);
+                    data_core.d2c_texture_manager.add(*handle, desc, texture, view);
                 }
                 InstructionKind::AddMaterial { handle, fill_invoke } => {
                     profiling::scope!("Add Material");
@@ -134,9 +139,13 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
                     renderer.resource_handle_allocators.skeleton.deallocate(handle);
                     data_core.skeleton_manager.remove(&mut data_core.mesh_manager, handle)
                 }
-                InstructionKind::DeleteTexture { handle } => {
+                InstructionKind::DeleteTexture2D { handle } => {
                     renderer.resource_handle_allocators.d2_texture.deallocate(handle);
                     data_core.d2_texture_manager.remove(handle)
+                }
+                InstructionKind::DeleteTextureCube { handle } => {
+                    renderer.resource_handle_allocators.d2c_texture.deallocate(handle);
+                    data_core.d2c_texture_manager.remove(handle)
                 }
                 InstructionKind::DeleteMaterial { handle } => {
                     renderer.resource_handle_allocators.material.deallocate(handle);

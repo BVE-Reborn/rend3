@@ -1,6 +1,6 @@
-use crate::{profile::ProfileData, types::TextureHandle, RendererProfile};
-use rend3_types::{RawTextureHandle, TextureFormat, TextureUsages};
-use std::{num::NonZeroU32, sync::Arc};
+use crate::{profile::ProfileData, RendererProfile};
+use rend3_types::{RawResourceHandle, TextureFormat, TextureUsages};
+use std::{marker::PhantomData, num::NonZeroU32, sync::Arc};
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
     BindingResource, BindingType, Device, Extent3d, ShaderStages, Texture, TextureDescriptor, TextureDimension,
@@ -29,7 +29,7 @@ const TEXTURE_PREALLOCATION: usize = 1024;
 const BGL_DIVISOR: u32 = 4;
 
 /// Manages textures and associated bindless bind groups
-pub struct TextureManager {
+pub struct TextureManager<T> {
     layout: ProfileData<(), Arc<BindGroupLayout>>,
     group: ProfileData<(), Arc<BindGroup>>,
     group_dirty: ProfileData<(), bool>,
@@ -39,8 +39,10 @@ pub struct TextureManager {
     data: Vec<Option<InternalTexture>>,
 
     dimension: TextureViewDimension,
+
+    _phantom: PhantomData<T>,
 }
-impl TextureManager {
+impl<T: 'static> TextureManager<T> {
     pub fn new(device: &Device, profile: RendererProfile, texture_limit: u32, dimension: TextureViewDimension) -> Self {
         profiling::scope!("TextureManager::new");
 
@@ -64,12 +66,13 @@ impl TextureManager {
             null_view,
             data,
             dimension,
+            _phantom: PhantomData,
         }
     }
 
     pub fn add(
         &mut self,
-        handle: &TextureHandle,
+        handle: RawResourceHandle<T>,
         desc: TextureDescriptor<'static>,
         texture: Texture,
         view: TextureView,
@@ -82,7 +85,7 @@ impl TextureManager {
         self.data[handle.idx] = Some(InternalTexture { texture, view, desc });
     }
 
-    pub fn remove(&mut self, handle: RawTextureHandle) {
+    pub fn remove(&mut self, handle: RawResourceHandle<T>) {
         self.group_dirty = self.group_dirty.map_gpu(|_| true);
 
         self.data[handle.idx] = None;
@@ -115,11 +118,11 @@ impl TextureManager {
         }
     }
 
-    pub fn get_internal(&self, handle: RawTextureHandle) -> &InternalTexture {
+    pub fn get_internal(&self, handle: RawResourceHandle<T>) -> &InternalTexture {
         self.data[handle.idx].as_ref().unwrap()
     }
 
-    pub fn get_view(&self, handle: RawTextureHandle) -> &TextureView {
+    pub fn get_view(&self, handle: RawResourceHandle<T>) -> &TextureView {
         &self.data[handle.idx].as_ref().unwrap().view
     }
 
@@ -131,8 +134,8 @@ impl TextureManager {
         self.layout.as_gpu()
     }
 
-    pub fn translation_fn(&self) -> impl Fn(RawTextureHandle) -> NonZeroU32 + Copy + '_ {
-        move |v: RawTextureHandle| NonZeroU32::new(v.idx as u32 + 1).unwrap()
+    pub fn translation_fn(&self) -> impl Fn(RawResourceHandle<T>) -> NonZeroU32 + Copy + '_ {
+        move |v: RawResourceHandle<T>| NonZeroU32::new(v.idx as u32 + 1).unwrap()
     }
 }
 

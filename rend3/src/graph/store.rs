@@ -54,8 +54,8 @@ pub struct RenderGraphDataStore<'a> {
     pub mesh_manager: &'a MeshManager,
     pub skeleton_manager: &'a SkeletonManager,
     pub object_manager: &'a ObjectManager,
-    pub d2_texture_manager: &'a TextureManager,
-    pub d2c_texture_manager: &'a TextureManager,
+    pub d2_texture_manager: &'a TextureManager<crate::types::Texture2DTag>,
+    pub d2c_texture_manager: &'a TextureManager<crate::types::TextureCubeTag>,
 }
 
 impl<'a> RenderGraphDataStore<'a> {
