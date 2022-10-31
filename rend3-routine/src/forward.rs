@@ -11,9 +11,10 @@ use rend3::{
         DataHandle, DepthHandle, RenderGraph, RenderPassDepthTarget, RenderPassTarget, RenderPassTargets,
         RenderTargetHandle,
     },
-    types::{Handedness, Material, MaterialArray, SampleCount, VertexAttributeId},
+    types::{Handedness, Material, SampleCount},
     util::bind_merge::BindGroupBuilder,
-    ProfileData, Renderer, RendererDataCore, RendererProfile, ShaderPreProcessor,
+    ProfileData, Renderer, RendererDataCore, RendererProfile, ShaderConfig, ShaderPreProcessor,
+    ShaderVertexBufferConfig,
 };
 use serde::Serialize;
 use wgpu::{
@@ -78,12 +79,10 @@ impl<M: Material> ForwardRoutine<M> {
             source: ShaderSource::Wgsl(Cow::Owned(
                 spp.render_shader(
                     "rend3-routine/opaque.wgsl",
-                    &ForwardPreprocessingArguments {
+                    &ShaderConfig {
                         profile: Some(renderer.profile),
-                        vertex_array_counts: <M::SupportedAttributeArrayType as MaterialArray<
-                            &'static VertexAttributeId,
-                        >>::COUNT,
                     },
+                    Some(&ShaderVertexBufferConfig::from_material::<M>()),
                 )
                 .unwrap(),
             )),

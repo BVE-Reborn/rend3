@@ -18,8 +18,8 @@ use rend3::{
 use serde::Serialize;
 use wgpu::{
     BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType,
-    Buffer, BufferBindingType, BufferDescriptor, BufferUsages, CommandEncoder, ComputePassDescriptor, ComputePipeline,
-    ComputePipelineDescriptor, PipelineLayoutDescriptor, ShaderModuleDescriptor, ShaderStages, BufferBinding,
+    Buffer, BufferBinding, BufferBindingType, BufferDescriptor, BufferUsages, CommandEncoder, ComputePassDescriptor,
+    ComputePipeline, ComputePipelineDescriptor, PipelineLayoutDescriptor, ShaderModuleDescriptor, ShaderStages,
 };
 
 const BATCH_SIZE: usize = 256;
@@ -175,6 +175,7 @@ impl GpuCuller {
                         &'static VertexAttributeId,
                     >>::COUNT,
                 },
+                None,
             )
             .unwrap();
 
@@ -354,7 +355,7 @@ pub fn add_culling_to_graph<'node, M: Material>(
     let mut node = graph.add_node(name);
     let output = node.add_data_output(draw_calls_hdl);
 
-    node.build(move |pt, renderer, encoder_or_pass, temps, ready, graph_data| {
+    node.build(move |_pt, renderer, encoder_or_pass, _temps, _ready, graph_data| {
         let jobs = batch_objects::<M>(graph_data.material_manager, graph_data.object_manager);
 
         if jobs.jobs.is_empty() {

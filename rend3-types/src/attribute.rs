@@ -140,5 +140,5 @@ pub static VERTEX_ATTRIBUTE_TEXTURE_COORDINATES_1: VertexAttribute<glam::Vec2> =
     VertexAttribute::new("texture_coords_1");
 pub static VERTEX_ATTRIBUTE_COLOR_0: VertexAttribute<[u8; 4]> = VertexAttribute::new("color_0");
 pub static VERTEX_ATTRIBUTE_COLOR_1: VertexAttribute<[u8; 4]> = VertexAttribute::new("color_1");
-pub static VERTEX_ATTRIBUTE_JOINT_INDICES: VertexAttribute<[u16; 4]> = VertexAttribute::new("joint indices");
-pub static VERTEX_ATTRIBUTE_JOINT_WEIGHTS: VertexAttribute<glam::Vec4> = VertexAttribute::new("joint weights");
+pub static VERTEX_ATTRIBUTE_JOINT_INDICES: VertexAttribute<[u16; 4]> = VertexAttribute::new("joint_indices");
+pub static VERTEX_ATTRIBUTE_JOINT_WEIGHTS: VertexAttribute<glam::Vec4> = VertexAttribute::new("joint_weights");

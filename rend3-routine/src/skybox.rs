@@ -152,7 +152,7 @@ impl SkyboxPipelines {
         let skybox_sm = renderer.device.create_shader_module(ShaderModuleDescriptor {
             label: Some("skybox vert"),
             source: ShaderSource::Wgsl(Cow::Owned(
-                spp.render_shader("rend3-routine/skybox.wgsl", &ShaderConfig::default())
+                spp.render_shader("rend3-routine/skybox.wgsl", &ShaderConfig::default(), None)
                     .unwrap(),
             )),
         });

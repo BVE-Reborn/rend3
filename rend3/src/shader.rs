@@ -1,9 +1,13 @@
 //! Holds the shader processing infrastructure for all shaders.
 
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Write,
+};
 
 use handlebars::{Context, Handlebars, Helper, HelperDef, Output, RenderContext, RenderError};
 use parking_lot::Mutex;
+use rend3_types::{Material, MaterialArray, VertexAttributeId};
 use rust_embed::RustEmbed;
 use serde::Serialize;
 
@@ -16,6 +20,31 @@ struct Rend3ShaderSources;
 #[derive(Debug, Default, Serialize)]
 pub struct ShaderConfig {
     pub profile: Option<RendererProfile>,
+}
+
+pub struct ShaderVertexBufferConfig {
+    specs: Vec<VertexBufferSpec>,
+}
+impl ShaderVertexBufferConfig {
+    pub fn from_material<M: Material>() -> Self {
+        let supported = M::supported_attributes();
+        let required = M::required_attributes();
+
+        let mut specs = Vec::with_capacity(supported.as_ref().len());
+        for attribute in supported.into_iter() {
+            specs.push(VertexBufferSpec {
+                attribute: *attribute,
+                optional: !required.as_ref().contains(&attribute),
+            });
+        }
+
+        Self { specs }
+    }
+}
+
+struct VertexBufferSpec {
+    attribute: VertexAttributeId,
+    optional: bool,
 }
 
 pub struct ShaderPreProcessor {
@@ -48,10 +77,22 @@ impl ShaderPreProcessor {
         self.files.get(name)
     }
 
-    pub fn render_shader<T>(&self, base: &str, config: &T) -> Result<String, RenderError>
+    pub fn render_shader<T>(
+        &self,
+        base: &str,
+        user_config: &T,
+        buffer_config: Option<&ShaderVertexBufferConfig>,
+    ) -> Result<String, RenderError>
     where
         T: Serialize,
     {
+        #[derive(Serialize)]
+        struct BufferConfigWrapper<'a, T> {
+            vertex_array_counts: usize,
+            #[serde(flatten)]
+            user_config: &'a T,
+        }
+
         let mut include_status = Mutex::new(HashSet::new());
         include_status.get_mut().insert(base.to_string());
 
@@ -60,6 +101,9 @@ impl ShaderPreProcessor {
         registry.set_dev_mode(cfg!(debug_assertions));
         registry.register_escape_fn(handlebars::no_escape);
         registry.register_helper("include", Box::new(ShaderIncluder::new(base, &self.files)));
+        if let Some(config) = buffer_config {
+            registry.register_helper("vertex_fetch", Box::new(ShaderVertexBufferHelper::new(config)));
+        }
         let contents = self.files.get(base).ok_or_else(|| {
             RenderError::new(format!(
                 "Base shader {base} is not registered. All registered shaders: {}",
@@ -67,7 +111,19 @@ impl ShaderPreProcessor {
             ))
         })?;
 
-        registry.render_template(contents, config)
+        let vertex_array_counts = if let Some(buffer_config) = buffer_config {
+            buffer_config.specs.len()
+        } else {
+            0
+        };
+
+        registry.render_template(
+            contents,
+            &BufferConfigWrapper {
+                vertex_array_counts,
+                user_config,
+            },
+        )
     }
 }
 
@@ -137,6 +193,150 @@ impl<'a> HelperDef for ShaderIncluder<'a> {
     }
 }
 
+struct ShaderVertexBufferHelper<'a> {
+    config: &'a ShaderVertexBufferConfig,
+}
+
+impl<'a> ShaderVertexBufferHelper<'a> {
+    fn new(config: &'a ShaderVertexBufferConfig) -> Self {
+        Self { config }
+    }
+}
+
+impl<'a> HelperDef for ShaderVertexBufferHelper<'a> {
+    fn call<'reg: 'rc, 'rc>(
+        &self,
+        h: &Helper<'reg, 'rc>,
+        r: &'reg Handlebars<'reg>,
+        ctx: &'rc Context,
+        _rc: &mut RenderContext<'reg, 'rc>,
+        out: &mut dyn Output,
+    ) -> handlebars::HelperResult {
+        let object_buffer_value = h
+            .param(0)
+            .ok_or_else(|| {
+                RenderError::new("Vertex buffer helper must have an argument pointing to the buffer of objects")
+            })?
+            .relative_path();
+        let object_buffer = match object_buffer_value {
+            Some(s) => s,
+            _ => {
+                return Err(RenderError::new(
+                    "Vertex buffer helper's first argument must be a string",
+                ))
+            }
+        };
+        let batch_buffer_value = h
+            .param(1)
+            .ok_or_else(|| {
+                RenderError::new("Vertex buffer helper must have an argument pointing to the buffer of batch data")
+            })?
+            .relative_path();
+        let batch_buffer = match batch_buffer_value {
+            Some(s) => s,
+            _ => {
+                return Err(RenderError::new(
+                    "Vertex buffer helper's second argument must be a string",
+                ))
+            }
+        };
+
+        let template = self
+            .generate_template(h, object_buffer, batch_buffer)
+            .map_err(|_| RenderError::new(format!("Failed to writeln vertex template string")))?;
+
+        out.write(&r.render_template(&template, ctx.data())?)?;
+
+        Ok(())
+    }
+}
+
+impl<'a> ShaderVertexBufferHelper<'a> {
+    fn generate_template(
+        &self,
+        h: &Helper,
+        object_buffer: &str,
+        batch_buffer: &str,
+    ) -> Result<String, std::fmt::Error> {
+        let includes = r#"{{include "rend3/vertex_attributes.wgsl"}}"#;
+
+        let unpack_function = format!(
+            "
+            fn unpack_vertex_index(vertex_index: u32) -> Indices {{
+                 let local_object_id = vertex_index >> 24u;
+                 let vertex_id = vertex_index & 0xFFFFFFu;
+                 let object_id = {batch_buffer}.ranges[local_object_id].object_id;
+                 
+                 return Indices(vertex_id, object_id);
+            }}"
+        );
+
+        let mut input_struct = String::new();
+        writeln!(input_struct, "struct VertexInput {{")?;
+        let mut input_function = String::new();
+        writeln!(input_function, "fn get_vertices(indices: Indices) -> VertexInput {{")?;
+        writeln!(input_function, "    var verts: VertexInput;")?;
+        for requested_attribute in &h.params()[2..] {
+            let (attr_idx, spec) = self
+                .config
+                .specs
+                .iter()
+                .enumerate()
+                .find_map(
+                    |(idx, s)| match s.attribute.name() == requested_attribute.relative_path().unwrap() {
+                        true => Some((idx, s)),
+                        false => None,
+                    },
+                )
+                .unwrap();
+
+            writeln!(
+                input_struct,
+                "    {}: {},",
+                spec.attribute.name(),
+                spec.attribute.metadata().shader_type
+            )?;
+
+            writeln!(
+                input_function,
+                "    let {}_offset = {object_buffer}[indices.object].vertex_attribute_start_offsets[{attr_idx}];",
+                spec.attribute.name(),
+            )?;
+
+            if spec.optional {
+                writeln!(
+                    input_function,
+                    "    if ({}_offset != 0xFFFFFFFFu) {{",
+                    spec.attribute.name()
+                )?;
+
+                writeln!(
+                    input_function,
+                    "        verts.{name} = {}({name}_offset, indices.vertex);",
+                    spec.attribute.metadata().shader_extract_fn,
+                    name = spec.attribute.name(),
+                )?;
+
+                writeln!(input_function, "    }}")?;
+            } else {
+                writeln!(
+                    input_function,
+                    "    verts.{name} = {}({name}_offset, indices.vertex);",
+                    spec.attribute.metadata().shader_extract_fn,
+                    name = spec.attribute.name(),
+                )?;
+            }
+        }
+        writeln!(input_struct, "}}")?;
+        writeln!(input_function, "    return verts;")?;
+        writeln!(input_function, "}}")?;
+
+        let template = format!("{includes}{unpack_function}{input_struct}{input_function}");
+
+        Ok(template)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{ShaderConfig, ShaderPreProcessor};
@@ -147,7 +347,7 @@ mod tests {
         pp.add_shader("simple", "{{include \"other\"}} simple");
         pp.add_shader("other", "other");
         let config = ShaderConfig { profile: None };
-        let output = pp.render_shader("simple", &config).unwrap();
+        let output = pp.render_shader("simple", &config, None).unwrap();
 
         assert_eq!(output, "other simple");
     }
@@ -158,7 +358,7 @@ mod tests {
         pp.add_shader("simple", "{{include \"other\"}} simple");
         pp.add_shader("other", "{{include \"simple\"}} other");
         let config = ShaderConfig { profile: None };
-        let output = pp.render_shader("simple", &config).unwrap();
+        let output = pp.render_shader("simple", &config, None).unwrap();
 
         assert_eq!(output, " other simple");
     }
@@ -168,7 +368,7 @@ mod tests {
         let mut pp = ShaderPreProcessor::new();
         pp.add_shader("simple", "{{include \"other\"}} simple");
         let config = ShaderConfig { profile: None };
-        let output = pp.render_shader("simple", &config);
+        let output = pp.render_shader("simple", &config, None);
 
         assert!(output.is_err(), "Expected error, got {output:?}");
     }
@@ -178,7 +378,7 @@ mod tests {
         let mut pp = ShaderPreProcessor::new();
         pp.add_shader("simple", "{{include}} simple");
         let config = ShaderConfig { profile: None };
-        let output = pp.render_shader("simple", &config);
+        let output = pp.render_shader("simple", &config, None);
 
         assert!(output.is_err(), "Expected error, got {output:?}");
     }

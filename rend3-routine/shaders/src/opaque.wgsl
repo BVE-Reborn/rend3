@@ -59,50 +59,6 @@ var ambient_occlusion_tex: texture_2d<f32>;
 {{/if}}
 
 
-fn extract_attribute_vec2_f32(byte_base_offset: u32, vertex_index: u32) -> vec2<f32> {
-    let first_element_idx = byte_base_offset / 4u + vertex_index * 2u;
-    return vec2<f32>(
-        bitcast<f32>(vertex_buffer[first_element_idx]),
-        bitcast<f32>(vertex_buffer[first_element_idx + 1u]),
-    );
-}
-
-fn extract_attribute_vec3_f32(byte_base_offset: u32, vertex_index: u32) -> vec3<f32> {
-    let first_element_idx = byte_base_offset / 4u + vertex_index * 3u;
-    return vec3<f32>(
-        bitcast<f32>(vertex_buffer[first_element_idx]),
-        bitcast<f32>(vertex_buffer[first_element_idx + 1u]),
-        bitcast<f32>(vertex_buffer[first_element_idx + 2u]),
-    );
-}
-
-fn extract_attribute_vec4_f32(byte_base_offset: u32, vertex_index: u32) -> vec4<f32> {
-    let first_element_idx = byte_base_offset / 4u + vertex_index * 4u;
-    return vec4<f32>(
-        bitcast<f32>(vertex_buffer[first_element_idx]),
-        bitcast<f32>(vertex_buffer[first_element_idx + 1u]),
-        bitcast<f32>(vertex_buffer[first_element_idx + 2u]),
-        bitcast<f32>(vertex_buffer[first_element_idx + 3u]),
-    );
-}
-
-fn extract_attribute_vec4_u16(byte_base_offset: u32, vertex_index: u32) -> vec4<u32> {
-    let first_element_idx = byte_base_offset / 4u + vertex_index * 2u;
-    let value_0 = vertex_buffer[first_element_idx];
-    let value_1 = vertex_buffer[first_element_idx + 1u];
-    return vec4<u32>(
-        value_0 & 0xFFFFu,
-        (value_0 >> 16u) & 0xFFFFu,
-        value_1 & 0xFFFFu,
-        (value_1 >> 16u) & 0xFFFFu,
-    );
-}
-
-fn extract_attribute_vec4_u8_unorm(byte_base_offset: u32, vertex_index: u32) -> vec4<f32> {
-    let first_element_idx = byte_base_offset / 4u + vertex_index;
-    return unpack4x8unorm(vertex_buffer[first_element_idx]);
-}
-
 struct VertexInput {
     position: vec3<f32>,
     normal: vec3<f32>,
@@ -112,61 +68,19 @@ struct VertexInput {
     color: vec4<f32>,
 }
 
-struct Indices {
-    vertex: u32,
-    object: u32,
-}
+{{
+    vertex_fetch
+    
+    object_buffer
+    batch_data
 
-fn unpack_vertex_index(vertex_index: u32) -> Indices {
-    let local_object_id = vertex_index >> 24u;
-    let vertex_id = vertex_index & 0xFFFFFFu;
-    let object_id = batch_data.ranges[local_object_id].object_id;
-
-    return Indices(vertex_id, object_id);
-}
-
-fn get_vertices(indices: Indices) -> VertexInput {
-    var verts: VertexInput;
-
-    let position_offset = object_buffer[indices.object].vertex_attribute_start_offsets[0];
-    verts.position = extract_attribute_vec3_f32(position_offset, indices.vertex);
-
-    let normal_offset = object_buffer[indices.object].vertex_attribute_start_offsets[1];
-    if (normal_offset != 0xFFFFFFFFu) {
-        verts.normal = extract_attribute_vec3_f32(normal_offset, indices.vertex);
-    } else {
-        verts.normal = vec3<f32>(0.0);
-    }
-
-    let tangent_offset = object_buffer[indices.object].vertex_attribute_start_offsets[2];
-    if (tangent_offset != 0xFFFFFFFFu) {
-        verts.tangent = extract_attribute_vec3_f32(tangent_offset, indices.vertex);
-    } else {
-        verts.tangent = vec3<f32>(0.0);
-    }
-
-    let coords0_offset = object_buffer[indices.object].vertex_attribute_start_offsets[3];
-    if (coords0_offset != 0xFFFFFFFFu) {
-        verts.coords0 = extract_attribute_vec2_f32(coords0_offset, indices.vertex);
-    } else {
-        verts.coords0 = vec2<f32>(0.0);
-    }
-
-    let coords1_offset = object_buffer[indices.object].vertex_attribute_start_offsets[4];
-    if (coords1_offset != 0xFFFFFFFFu) {
-        verts.coords1 = extract_attribute_vec2_f32(coords1_offset, indices.vertex);
-    } else {
-        verts.coords1 = vec2<f32>(0.0);
-    }
-
-    let color_offset = object_buffer[indices.object].vertex_attribute_start_offsets[5];
-    if (color_offset != 0xFFFFFFFFu) {
-        verts.color = extract_attribute_vec4_u8_unorm(color_offset, indices.vertex);
-    } else {
-        verts.color = vec4<f32>(0.0);
-    }
-    return verts;
-}
+    position
+    normal
+    tangent
+    texture_coords_0
+    texture_coords_1
+    color_0
+}}
 
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
@@ -201,9 +115,9 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
     vs_out.view_position = model_view * position_vec4;
     vs_out.normal = normalize(mv_mat3 * (inv_scale_sq * vs_in.normal));
     vs_out.tangent = normalize(mv_mat3 * (inv_scale_sq * vs_in.tangent));
-    vs_out.color = vs_in.color;
-    vs_out.coords0 = vs_in.coords0;
-    vs_out.coords1 = vs_in.coords1;
+    vs_out.color = vs_in.color_0;
+    vs_out.coords0 = vs_in.texture_coords_0;
+    vs_out.coords1 = vs_in.texture_coords_1;
     vs_out.position = model_view_proj * position_vec4;
 
     return vs_out;

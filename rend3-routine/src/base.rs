@@ -13,7 +13,6 @@
 //! to, or muck with any of the data in there, you are free to, and the
 //! following routines will behave as you configure.
 
-use arrayvec::ArrayVec;
 use glam::{UVec2, Vec4};
 use rend3::{
     format_sso,
@@ -28,15 +27,6 @@ use crate::{
     skinning::{self, GpuSkinner, SkinningOutput},
     skybox, tonemapping,
 };
-
-/// Handles and information for a single type of transparency in the PBR
-/// pipeline.
-pub struct PerTransparencyInfo {
-    ty: pbr::TransparencyType,
-    pre_cull: DataHandle<Buffer>,
-    shadow_cull: Vec<DataHandle<culling::DrawCallSet>>,
-    cull: DataHandle<culling::DrawCallSet>,
-}
 
 /// Starter RenderGraph.
 ///
@@ -95,15 +85,14 @@ impl BaseRenderGraph {
         state.skinning(graph, self);
 
         // Culling
-        state.pbr_shadow_culling(graph, self, pbr);
-        state.pbr_culling(graph, self, pbr);
+        state.pbr_shadow_culling(graph, self);
+        state.pbr_culling(graph, self);
 
         // Clear targets
         state.clear(graph, clear_color);
 
         // Depth-only rendering
         state.pbr_shadow_rendering(graph, pbr);
-        state.pbr_prepass_rendering(graph, pbr, samples);
 
         // Skybox
         state.skybox(graph, skybox, samples);
@@ -122,7 +111,10 @@ impl BaseRenderGraph {
 /// This is intentionally public so all this can be changed by the user if they
 /// so desire.
 pub struct BaseRenderGraphIntermediateState {
-    pub per_transparency: ArrayVec<PerTransparencyInfo, 3>,
+    pub pre_cull: DataHandle<Buffer>,
+    pub shadow_cull: Vec<DataHandle<culling::DrawCallSet>>,
+    pub cull: DataHandle<culling::DrawCallSet>,
+
     pub shadow_uniform_bg: DataHandle<BindGroup>,
     pub forward_uniform_bg: DataHandle<BindGroup>,
     pub color: RenderTargetHandle,
@@ -137,25 +129,6 @@ impl BaseRenderGraphIntermediateState {
         // We need to know how many shadows we need to render
         // TODO
         let shadow_count = 1;
-
-        // Setup all of our per-transparency data
-        let mut per_transparency = ArrayVec::new();
-        for ty in [
-            pbr::TransparencyType::Opaque,
-            pbr::TransparencyType::Cutout,
-            pbr::TransparencyType::Blend,
-        ] {
-            per_transparency.push(PerTransparencyInfo {
-                ty,
-                pre_cull: graph.add_data(),
-                shadow_cull: {
-                    let mut shadows = Vec::with_capacity(shadow_count);
-                    shadows.resize_with(shadow_count, || graph.add_data());
-                    shadows
-                },
-                cull: graph.add_data(),
-            })
-        }
 
         // Create global bind group information
         let shadow_uniform_bg = graph.add_data::<BindGroup>();
@@ -190,7 +163,14 @@ impl BaseRenderGraphIntermediateState {
         let skinned_data = graph.add_data::<SkinningOutput>();
 
         Self {
-            per_transparency,
+            pre_cull: graph.add_data(),
+            shadow_cull: {
+                let mut shadows = Vec::with_capacity(shadow_count);
+                shadows.resize_with(shadow_count, || graph.add_data());
+                shadows
+            },
+            cull: graph.add_data(),
+
             shadow_uniform_bg,
             forward_uniform_bg,
             color,
@@ -230,17 +210,14 @@ impl BaseRenderGraphIntermediateState {
         &self,
         graph: &mut RenderGraph<'node>,
         base: &'node BaseRenderGraph,
-        pbr: &'node pbr::PbrRoutine,
     ) {
-        for trans in &self.per_transparency[0..2] {
-            for (shadow_index, &shadow_culled) in trans.shadow_cull.iter().enumerate() {
-                crate::culling::add_culling_to_graph::<pbr::PbrMaterial>(
-                    graph,
-                    shadow_culled,
-                    &base.gpu_culler,
-                    &format_sso!("Shadow Culling S{} {:?}", shadow_index, trans.ty),
-                );
-            }
+        for (shadow_index, &shadow_culled) in self.shadow_cull.iter().enumerate() {
+            crate::culling::add_culling_to_graph::<pbr::PbrMaterial>(
+                graph,
+                shadow_culled,
+                &base.gpu_culler,
+                &format_sso!("Shadow Culling S{}", shadow_index),
+            );
         }
     }
 
@@ -253,16 +230,8 @@ impl BaseRenderGraphIntermediateState {
         &self,
         graph: &mut RenderGraph<'node>,
         base: &'node BaseRenderGraph,
-        pbr: &'node pbr::PbrRoutine,
     ) {
-        for trans in &self.per_transparency {
-            crate::culling::add_culling_to_graph::<pbr::PbrMaterial>(
-                graph,
-                trans.cull,
-                &base.gpu_culler,
-                &format_sso!("Primary Culling {:?}", trans.ty),
-            );
-        }
+        crate::culling::add_culling_to_graph::<pbr::PbrMaterial>(graph, self.cull, &base.gpu_culler, "Primary Culling");
     }
 
     /// Clear all the targets to their needed values
@@ -272,36 +241,13 @@ impl BaseRenderGraphIntermediateState {
 
     /// Render all shadows for the PBR materials.
     pub fn pbr_shadow_rendering<'node>(&self, graph: &mut RenderGraph<'node>, pbr: &'node pbr::PbrRoutine) {
-        for trans in &self.per_transparency[0..2] {
-            for (shadow_index, &shadow_culled) in trans.shadow_cull.iter().enumerate() {
-                // pbr.depth_pipelines.add_shadow_rendering_to_graph(
-                //     graph,
-                //     matches!(trans.ty, pbr::TransparencyType::Cutout),
-                //     shadow_index,
-                //     self.shadow_uniform_bg,
-                //     shadow_culled,
-                // );
-            }
-        }
-    }
-
-    /// Render the depth prepass for all PBR materials,
-    pub fn pbr_prepass_rendering<'node>(
-        &self,
-        graph: &mut RenderGraph<'node>,
-        pbr: &'node pbr::PbrRoutine,
-        samples: SampleCount,
-    ) {
-        for trans in &self.per_transparency[0..2] {
-            // pbr.depth_pipelines.add_prepass_to_graph(
+        for (shadow_index, &shadow_culled) in self.shadow_cull.iter().enumerate() {
+            // pbr.depth_pipelines.add_shadow_rendering_to_graph(
             //     graph,
-            //     self.forward_uniform_bg,
-            //     trans.cull,
-            //     samples,
             //     matches!(trans.ty, pbr::TransparencyType::Cutout),
-            //     self.color,
-            //     self.resolve,
-            //     self.depth,
+            //     shadow_index,
+            //     self.shadow_uniform_bg,
+            //     shadow_culled,
             // );
         }
     }
@@ -332,26 +278,18 @@ impl BaseRenderGraphIntermediateState {
         pbr: &'node pbr::PbrRoutine,
         samples: SampleCount,
     ) {
-        for trans in &self.per_transparency {
-            let inner = match trans.ty {
-                pbr::TransparencyType::Opaque => &pbr.opaque_routine,
-                pbr::TransparencyType::Cutout => &pbr.cutout_routine,
-                pbr::TransparencyType::Blend => &pbr.blend_routine,
-            };
-
-            inner.add_forward_to_graph(
-                graph,
-                self.forward_uniform_bg,
-                trans.cull,
-                &pbr.per_material,
-                None,
-                &format_sso!("PBR Forward {:?}", trans.ty),
-                samples,
-                self.color,
-                self.resolve,
-                self.depth,
-            );
-        }
+        pbr.opaque_routine.add_forward_to_graph(
+            graph,
+            self.forward_uniform_bg,
+            self.cull,
+            &pbr.per_material,
+            None,
+            "PBR Forward",
+            samples,
+            self.color,
+            self.resolve,
+            self.depth,
+        );
     }
 
     /// Tonemap onto the given render target.
