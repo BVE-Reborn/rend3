@@ -53,7 +53,10 @@ fn cs_main(
     let object_range = workgroup_object_range.range;
     let local_object_index = workgroup_object_range.index;
 
-    if (gid.x > object_range.invocation_end) {
+    if (gid.x >= object_range.invocation_end) {
+        output_buffer[(culling_job.base_output_invocation + gid.x) * 3u + 0u] = 0x00FFFFFFu;
+        output_buffer[(culling_job.base_output_invocation + gid.x) * 3u + 1u] = 0x00FFFFFFu;
+        output_buffer[(culling_job.base_output_invocation + gid.x) * 3u + 2u] = 0x00FFFFFFu;
         return;
     }
 
@@ -63,12 +66,11 @@ fn cs_main(
 
     let object = object_buffer[object_range.object_id];
 
-    let first_index = object.first_index / 4u;
-    let index0 = vertex_buffer[first_index + index_0_index];
-    let index1 = vertex_buffer[first_index + index_1_index];
-    let index2 = vertex_buffer[first_index + index_2_index];
+    let index0 = vertex_buffer[object.first_index + index_0_index];
+    let index1 = vertex_buffer[object.first_index + index_1_index];
+    let index2 = vertex_buffer[object.first_index + index_2_index];
 
-    output_buffer[culling_job.base_output_invocation + gid.x * 3u + 0u] = local_object_index << 24u | index0 & ((1u << 24u) - 1u);
-    output_buffer[culling_job.base_output_invocation + gid.x * 3u + 1u] = local_object_index << 24u | index1 & ((1u << 24u) - 1u);
-    output_buffer[culling_job.base_output_invocation + gid.x * 3u + 2u] = local_object_index << 24u | index2 & ((1u << 24u) - 1u);
+    output_buffer[(culling_job.base_output_invocation + gid.x) * 3u + 0u] = local_object_index << 24u | index0 & ((1u << 24u) - 1u);
+    output_buffer[(culling_job.base_output_invocation + gid.x) * 3u + 1u] = local_object_index << 24u | index1 & ((1u << 24u) - 1u);
+    output_buffer[(culling_job.base_output_invocation + gid.x) * 3u + 2u] = local_object_index << 24u | index2 & ((1u << 24u) - 1u);
 }

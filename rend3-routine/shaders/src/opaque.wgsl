@@ -58,16 +58,6 @@ var anisotropy_tex: texture_2d<f32>;
 var ambient_occlusion_tex: texture_2d<f32>;
 {{/if}}
 
-
-struct VertexInput {
-    position: vec3<f32>,
-    normal: vec3<f32>,
-    tangent: vec3<f32>,
-    coords0: vec2<f32>,
-    coords1: vec2<f32>,
-    color: vec4<f32>,
-}
-
 {{
     vertex_fetch
     
@@ -96,6 +86,11 @@ struct VertexOutput {
 
 @vertex
 fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
+    if vertex_index == 0x00FFFFFFu {
+        var vs_out: VertexOutput;
+        vs_out.position = vec4<f32>(0.0);
+        return vs_out;
+    }
     let indices = unpack_vertex_index(vertex_index);
 
     let vs_in = get_vertices(indices);

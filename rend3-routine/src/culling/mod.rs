@@ -98,7 +98,7 @@ fn batch_objects<M: Material>(material_manager: &MaterialManager, object_manager
         let mut current_key = sorted_objects.first().unwrap().0;
 
         for (key, handle, object) in sorted_objects {
-            if key != current_key {
+            if key != current_key || current_object_index == 256 {
                 jobs.jobs.push(ShaderBatchData {
                     ranges: current_ranges,
                     total_objects: current_object_index,
@@ -331,7 +331,7 @@ impl GpuCuller {
             cpass.dispatch_workgroups(round_up_div(job.total_invocations, WORKGROUP_SIZE), 1, 1);
 
             draw_calls.push(DrawCall {
-                index_range: job.base_output_invocation..job.base_output_invocation + job.total_invocations,
+                index_range: (job.base_output_invocation * 3)..(job.base_output_invocation + job.total_invocations) * 3,
                 material_key: key.material_key,
                 bind_group_index: key.bind_group_index,
             });
