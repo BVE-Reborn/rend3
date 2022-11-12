@@ -107,6 +107,7 @@ impl rend3_framework::App for ImguiExample {
             // Direction will be normalized
             direction: glam::Vec3::new(-1.0, -4.0, 2.0),
             distance: 400.0,
+            resolution: 2048,
         });
 
         let frame_start = instant::Instant::now();

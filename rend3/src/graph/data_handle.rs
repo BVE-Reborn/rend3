@@ -1,4 +1,7 @@
-use std::{sync::atomic::{AtomicUsize, Ordering}, ops::Deref};
+use std::{
+    ops::Deref,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
 use once_cell::sync::Lazy;
 

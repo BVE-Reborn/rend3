@@ -6,7 +6,7 @@ use crate::{
 use range_alloc::RangeAllocator;
 use rend3_types::{RawMeshHandle, VertexAttributeId, VERTEX_ATTRIBUTE_JOINT_INDICES, VERTEX_ATTRIBUTE_POSITION};
 use std::ops::Range;
-use wgpu::{BufferAddress, BufferDescriptor, BufferUsages, CommandEncoder, Device, Queue, Buffer};
+use wgpu::{Buffer, BufferAddress, BufferDescriptor, BufferUsages, CommandEncoder, Device, Queue};
 
 /// Vertex buffer slot for object indices
 /// Note that this slot is only used in the GpuDriven profile.
@@ -118,7 +118,6 @@ impl MeshManager {
             let range = self.allocate_range(device, encoder, attribute.bytes());
             vertex_attribute_ranges.push((*attribute.id(), range));
         }
-
 
         for (attribute_data, (_, range)) in mesh.attributes.iter().zip(&vertex_attribute_ranges) {
             queue.write_buffer(&self.buffer, range.start as u64, attribute_data.untyped_data());

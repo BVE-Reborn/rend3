@@ -11,11 +11,10 @@ use rend3::{
     format_sso,
     graph::{DataHandle, RenderGraph},
     managers::{MaterialManager, ObjectManager, ShaderObject, TextureBindGroupIndex},
-    types::{Material, MaterialArray, VertexAttributeId},
+    types::Material,
     util::math::{round_up_div, round_up_pot},
-    Renderer, ShaderPreProcessor,
+    Renderer, ShaderPreProcessor, ShaderVertexBufferConfig,
 };
-use serde::Serialize;
 use wgpu::{
     BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType,
     Buffer, BufferBinding, BufferBindingType, BufferDescriptor, BufferUsages, CommandEncoder, ComputePassDescriptor,
@@ -149,11 +148,6 @@ pub struct DrawCall {
     pub index_range: Range<u32>,
 }
 
-#[derive(Serialize)]
-struct CullingPreprocessingArguments {
-    vertex_array_counts: u32,
-}
-
 pub struct GpuCuller {
     bgl: BindGroupLayout,
     pipeline: ComputePipeline,
@@ -170,12 +164,8 @@ impl GpuCuller {
         let source = spp
             .render_shader(
                 "rend3-routine/cull.wgsl",
-                &CullingPreprocessingArguments {
-                    vertex_array_counts: <M::SupportedAttributeArrayType as MaterialArray<
-                        &'static VertexAttributeId,
-                    >>::COUNT,
-                },
-                None,
+                &(),
+                Some(&ShaderVertexBufferConfig::from_material::<M>()),
             )
             .unwrap();
 

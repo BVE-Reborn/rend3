@@ -12,7 +12,7 @@ use crate::{
 use parking_lot::Mutex;
 use rend3_types::{Camera, Handedness, TextureFormat};
 use std::sync::Arc;
-use wgpu::{TextureViewDimension};
+use wgpu::TextureViewDimension;
 
 pub fn create_renderer(
     iad: InstanceAdapterDevice,

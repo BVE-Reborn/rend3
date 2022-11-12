@@ -1,12 +1,7 @@
 use std::{marker::PhantomData, mem, num::NonZeroU64};
 
 use glam::{Mat4, Vec3};
-use rend3::{
-    managers::{DirectionalLightManager},
-    types::Material,
-    util::bind_merge::BindGroupLayoutBuilder,
-    RendererProfile,
-};
+use rend3::{managers::DirectionalLightManager, types::Material, util::bind_merge::BindGroupLayoutBuilder};
 use wgpu::{BindGroupLayout, BindingType, BufferBindingType, Device, ShaderStages};
 
 use crate::{common::samplers::Samplers, uniforms::FrameUniforms};
@@ -77,7 +72,7 @@ pub struct PerMaterialArchetypeInterface<M> {
     _phantom: PhantomData<M>,
 }
 impl<M: Material> PerMaterialArchetypeInterface<M> {
-    pub fn new(device: &Device, profile: RendererProfile) -> Self {
+    pub fn new(device: &Device) -> Self {
         let bgl = BindGroupLayoutBuilder::new()
             .append(
                 ShaderStages::VERTEX_FRAGMENT,
@@ -111,7 +106,7 @@ impl<M: Material> PerMaterialArchetypeInterface<M> {
                 BindingType::Buffer {
                     ty: BufferBindingType::Storage { read_only: true },
                     has_dynamic_offset: false,
-                    min_binding_size: None ,
+                    min_binding_size: None,
                 },
                 None,
             )

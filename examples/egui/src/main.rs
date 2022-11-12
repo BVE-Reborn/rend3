@@ -97,6 +97,7 @@ impl rend3_framework::App for EguiExample {
             // Direction will be normalized
             direction: glam::Vec3::new(-1.0, -4.0, 2.0),
             distance: 400.0,
+            resolution: 2048,
         });
 
         // Create the winit/egui integration, which manages our egui context for us.

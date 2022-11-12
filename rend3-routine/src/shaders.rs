@@ -25,7 +25,7 @@ mod tests {
     use naga::WithSpan;
     use rend3::{RendererProfile, ShaderConfig, ShaderPreProcessor, ShaderVertexBufferConfig};
 
-    use crate::{shaders::Rend3RoutineShaderSources, pbr::PbrMaterial};
+    use crate::{pbr::PbrMaterial, shaders::Rend3RoutineShaderSources};
 
     fn print_err(error: &dyn Error) {
         eprint!("{}", error);
@@ -90,7 +90,11 @@ mod tests {
                 let serialized_config = serde_json::to_value(config).unwrap();
                 println!("Testing shader {shader} with config {serialized_config:?}");
 
-                let output = pp.render_shader(&shader, config, Some(&ShaderVertexBufferConfig::from_material::<PbrMaterial>()));
+                let output = pp.render_shader(
+                    &shader,
+                    config,
+                    Some(&ShaderVertexBufferConfig::from_material::<PbrMaterial>()),
+                );
 
                 assert!(output.is_ok(), "Expected preprocessing success, got {output:?}");
                 let output = output.unwrap_or_else(|e| panic!("Expected preprocessing success, got {e:?}"));

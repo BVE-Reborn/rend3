@@ -23,7 +23,9 @@ use rend3::{
 use wgpu::{BindGroup, Buffer};
 
 use crate::{
-    common, culling, pbr,
+    common, culling,
+    forward::RoutineAddToGraphArgs,
+    pbr,
     skinning::{self, GpuSkinner, SkinningOutput},
     skybox, tonemapping,
 };
@@ -206,11 +208,7 @@ impl BaseRenderGraphIntermediateState {
     }
 
     /// Does all shadow culling for the PBR materials.
-    pub fn pbr_shadow_culling<'node>(
-        &self,
-        graph: &mut RenderGraph<'node>,
-        base: &'node BaseRenderGraph,
-    ) {
+    pub fn pbr_shadow_culling<'node>(&self, graph: &mut RenderGraph<'node>, base: &'node BaseRenderGraph) {
         for (shadow_index, &shadow_culled) in self.shadow_cull.iter().enumerate() {
             crate::culling::add_culling_to_graph::<pbr::PbrMaterial>(
                 graph,
@@ -226,11 +224,7 @@ impl BaseRenderGraphIntermediateState {
     }
 
     /// Does all culling for the forward PBR materials.
-    pub fn pbr_culling<'node>(
-        &self,
-        graph: &mut RenderGraph<'node>,
-        base: &'node BaseRenderGraph,
-    ) {
+    pub fn pbr_culling<'node>(&self, graph: &mut RenderGraph<'node>, base: &'node BaseRenderGraph) {
         crate::culling::add_culling_to_graph::<pbr::PbrMaterial>(graph, self.cull, &base.gpu_culler, "Primary Culling");
     }
 
@@ -242,13 +236,18 @@ impl BaseRenderGraphIntermediateState {
     /// Render all shadows for the PBR materials.
     pub fn pbr_shadow_rendering<'node>(&self, graph: &mut RenderGraph<'node>, pbr: &'node pbr::PbrRoutine) {
         for (shadow_index, &shadow_culled) in self.shadow_cull.iter().enumerate() {
-            // pbr.depth_pipelines.add_shadow_rendering_to_graph(
-            //     graph,
-            //     matches!(trans.ty, pbr::TransparencyType::Cutout),
-            //     shadow_index,
-            //     self.shadow_uniform_bg,
-            //     shadow_culled,
-            // );
+            pbr.opaque_depth.add_forward_to_graph(RoutineAddToGraphArgs {
+                graph,
+                whole_frame_uniform_bg: self.shadow_uniform_bg,
+                culled: shadow_culled,
+                per_material: &pbr.per_material,
+                extra_bgs: None,
+                label: &format!("pbr shadow renderering S{shadow_index}"),
+                samples: SampleCount::One,
+                color: self.color,
+                resolve: self.resolve,
+                depth: self.depth,
+            });
         }
     }
 
@@ -278,18 +277,18 @@ impl BaseRenderGraphIntermediateState {
         pbr: &'node pbr::PbrRoutine,
         samples: SampleCount,
     ) {
-        pbr.opaque_routine.add_forward_to_graph(
+        pbr.opaque_routine.add_forward_to_graph(RoutineAddToGraphArgs {
             graph,
-            self.forward_uniform_bg,
-            self.cull,
-            &pbr.per_material,
-            None,
-            "PBR Forward",
+            whole_frame_uniform_bg: self.forward_uniform_bg,
+            culled: self.cull,
+            per_material: &pbr.per_material,
+            extra_bgs: None,
+            label: "PBR Forward",
             samples,
-            self.color,
-            self.resolve,
-            self.depth,
-        );
+            color: self.color,
+            resolve: self.resolve,
+            depth: self.depth,
+        });
     }
 
     /// Tonemap onto the given render target.

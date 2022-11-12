@@ -85,7 +85,7 @@ impl FreelistDerivedBuffer {
             self.inner = new_buffer;
             self.current_count = self.reserved_count;
         }
-        
+
         if self.stale.is_empty() {
             return;
         }
@@ -93,7 +93,7 @@ impl FreelistDerivedBuffer {
         let data = self.stale.drain(..).map(|idx| {
             let data = get_value(idx);
             ScatterData {
-                word_offset: u32::try_from((idx as u64 * self.rounded_size) / 4).unwrap() ,
+                word_offset: u32::try_from((idx as u64 * self.rounded_size) / 4).unwrap(),
                 data,
             }
         });

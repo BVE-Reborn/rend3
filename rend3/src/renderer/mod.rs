@@ -15,8 +15,8 @@ use crate::{
 use glam::Mat4;
 use parking_lot::Mutex;
 use rend3_types::{
-    Handedness, Material, MaterialTag, MipmapCount, MipmapSource, ObjectChange, Skeleton, SkeletonHandle,
-    TextureCubeTag, TextureFormat, TextureFromTexture, TextureUsages, TextureCubeHandle, Texture2DTag,
+    Handedness, Material, MaterialTag, MipmapCount, MipmapSource, ObjectChange, Skeleton, SkeletonHandle, Texture2DTag,
+    TextureCubeHandle, TextureCubeTag, TextureFormat, TextureFromTexture, TextureUsages,
 };
 use std::{num::NonZeroU32, panic::Location, sync::Arc};
 use wgpu::{

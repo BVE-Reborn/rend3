@@ -287,6 +287,9 @@ mod test {
             ],
         );
 
-        assert_eq!(&ctx.readback::<[f32; 2]>(encoder, &buffer, 32), &[[1.0, 2.0], [9.0, 9.0], [5.0, 6.0], [9.0, 9.0]]);
+        assert_eq!(
+            &ctx.readback::<[f32; 2]>(encoder, &buffer, 32),
+            &[[1.0, 2.0], [9.0, 9.0], [5.0, 6.0], [9.0, 9.0]]
+        );
     }
 }

@@ -79,6 +79,7 @@ impl rend3_framework::App for AnimationExample {
             // Direction will be normalized
             direction: glam::Vec3::new(-1.0, -4.0, 2.0),
             distance: 400.0,
+            resolution: 2048,
         });
 
         self._directional_light_handle = Some(directional_light_handle);

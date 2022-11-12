@@ -83,10 +83,5 @@ fn albedo_texture(material: ptr<function, Material>, samp: sampler, coords: vec2
 {{/if}}
 
 @fragment
-fn fs_main(vs_out: VertexOutput) -> @location(0) vec4<f32> {
-    {{#if (eq profile "GpuDriven")}}
-    let material = materials[vs_out.material];
-    {{/if}}
-
-    return vec4<f32>(0.0);
+fn fs_main(vs_out: VertexOutput) {
 }
