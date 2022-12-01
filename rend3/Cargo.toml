@@ -58,7 +58,7 @@ wgpu = "0.13"
 wgpu-profiler = "0.9.0"
 
 # Hard dependencies on new versions of transitive deps
-wgpu-core = "0.13.2"
+wgpu-core = "0.14.2"
 wgpu-hal = "0.13.2"
 naga = "0.9.0"
 
