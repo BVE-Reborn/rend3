@@ -13,7 +13,7 @@ path = "src/main.rs"
 
 [dependencies]
 # The egui immediate mode gui library
-egui = "0.18.0"
+egui = "0.20.1"
 # Winit integration with egui
 egui_winit_platform = "0.15.0"
 # logging
