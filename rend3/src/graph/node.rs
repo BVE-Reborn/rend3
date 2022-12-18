@@ -2,7 +2,7 @@ use std::{cell::RefCell, sync::Arc};
 
 use crate::{
     graph::{
-        DataHandle, GraphResource, PassthroughDataContainer, PassthroughDataRef, PassthroughDataRefMut, ReadyData,
+        DataHandle, GraphSubResource, PassthroughDataContainer, PassthroughDataRef, PassthroughDataRefMut, ReadyData,
         RenderGraph, RenderGraphDataStore, RenderGraphEncoderOrPass, RenderPassHandle, RenderPassTargets,
         RenderTargetHandle, RpassTemporaryPool,
     },
@@ -18,8 +18,8 @@ pub struct DeclaredDependency<Handle> {
 
 #[allow(clippy::type_complexity)]
 pub(super) struct RenderGraphNode<'node> {
-    pub inputs: Vec<GraphResource>,
-    pub outputs: Vec<GraphResource>,
+    pub inputs: Vec<GraphSubResource>,
+    pub outputs: Vec<GraphSubResource>,
     pub label: SsoString,
     pub rpass: Option<RenderPassTargets>,
     pub passthrough: PassthroughDataContainer<'node>,
@@ -41,8 +41,8 @@ pub(super) struct RenderGraphNode<'node> {
 pub struct RenderGraphNodeBuilder<'a, 'node> {
     pub(super) graph: &'a mut RenderGraph<'node>,
     pub(super) label: SsoString,
-    pub(super) inputs: Vec<GraphResource>,
-    pub(super) outputs: Vec<GraphResource>,
+    pub(super) inputs: Vec<GraphSubResource>,
+    pub(super) outputs: Vec<GraphSubResource>,
     pub(super) passthrough: PassthroughDataContainer<'node>,
     pub(super) rpass: Option<RenderPassTargets>,
 }
@@ -100,6 +100,34 @@ impl<'a, 'node> RenderGraphNodeBuilder<'a, 'node> {
         self.add_data(handle, true)
     }
 
+    /// Declares a data handle as having the given render targets
+    pub fn add_dependencies_to_render_targets<T>(
+        &mut self,
+        handle: DataHandle<T>,
+        render_targets: impl IntoIterator<Item = RenderTargetHandle>,
+    ) {
+        self.graph
+            .data
+            .get_mut(handle.idx)
+            .expect("internal rendergraph error: cannot find data handle")
+            .dependencies
+            .extend(render_targets.into_iter().map(|rt| rt.resource));
+    }
+
+    /// Declares a data handle as having the given data handles
+    pub fn add_dependencies_to_data<T, U>(
+        &mut self,
+        handle: DataHandle<T>,
+        render_targets: impl IntoIterator<Item = DataHandle<U>>,
+    ) {
+        self.graph
+            .data
+            .get_mut(handle.idx)
+            .expect("internal rendergraph error: cannot find data handle")
+            .dependencies
+            .extend(render_targets.into_iter().map(|hdl| GraphSubResource::Data(hdl.idx)));
+    }
+
     fn add_data<T>(&mut self, handle: DataHandle<T>, output: bool) -> DeclaredDependency<DataHandle<T>>
     where
         T: 'static,
@@ -110,12 +138,13 @@ impl<'a, 'node> RenderGraphNodeBuilder<'a, 'node> {
             .data
             .get(handle.idx)
             .expect("internal rendergraph error: cannot find data handle")
+            .inner
             .downcast_ref::<RefCell<Option<T>>>()
             .expect("used custom data that was previously declared with a different type");
 
-        self.inputs.push(GraphResource::Data(handle.idx));
+        self.inputs.push(GraphSubResource::Data(handle.idx));
         if output {
-            self.outputs.push(GraphResource::Data(handle.idx));
+            self.outputs.push(GraphSubResource::Data(handle.idx));
         }
         DeclaredDependency { handle }
     }
@@ -123,8 +152,8 @@ impl<'a, 'node> RenderGraphNodeBuilder<'a, 'node> {
     /// Declares that this node has an "external" output, meaning it can never
     /// be culled.
     pub fn add_external_output(&mut self) {
-        self.inputs.push(GraphResource::External);
-        self.outputs.push(GraphResource::External);
+        self.inputs.push(GraphSubResource::External);
+        self.outputs.push(GraphSubResource::External);
     }
 
     /// Passthrough a bit of immutable external data with lifetime 'node so you

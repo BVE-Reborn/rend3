@@ -13,12 +13,15 @@
 //! to, or muck with any of the data in there, you are free to, and the
 //! following routines will behave as you configure.
 
+use std::iter::zip;
+
 use glam::{UVec2, Vec4};
 use rend3::{
     format_sso,
-    graph::{DataHandle, ReadyData, RenderGraph, RenderTargetDescriptor, RenderTargetHandle},
+    graph::{DataHandle, ReadyData, RenderGraph, RenderTargetDescriptor, RenderTargetHandle, ViewportRect},
+    managers::ShadowDesc,
     types::{SampleCount, TextureFormat, TextureUsages},
-    Renderer, ShaderPreProcessor,
+    Renderer, ShaderPreProcessor, INTERNAL_SHADOW_DEPTH_FORMAT,
 };
 use wgpu::{BindGroup, Buffer};
 
@@ -71,6 +74,7 @@ impl BaseRenderGraph {
         pbr: &'node crate::pbr::PbrRoutine,
         skybox: Option<&'node crate::skybox::SkyboxRoutine>,
         tonemapping: &'node crate::tonemapping::TonemappingRoutine,
+        target_texture: RenderTargetHandle,
         resolution: UVec2,
         samples: SampleCount,
         ambient: Vec4,
@@ -90,21 +94,20 @@ impl BaseRenderGraph {
         state.pbr_shadow_culling(graph, self);
         state.pbr_culling(graph, self);
 
+        // Depth-only rendering
+        state.pbr_shadow_rendering(graph, pbr, &ready.shadows);
+
         // Clear targets
         state.clear(graph, clear_color);
-
-        // Depth-only rendering
-        state.pbr_shadow_rendering(graph, pbr);
-
-        // Skybox
-        state.skybox(graph, skybox, samples);
 
         // Forward rendering
         state.pbr_forward_rendering(graph, pbr, samples);
 
+        // Skybox
+        state.skybox(graph, skybox, samples);
+
         // Make the reference to the surface
-        let surface = graph.add_surface_texture();
-        state.tonemapping(graph, tonemapping, surface);
+        state.tonemapping(graph, tonemapping, target_texture);
     }
 }
 
@@ -119,6 +122,7 @@ pub struct BaseRenderGraphIntermediateState {
 
     pub shadow_uniform_bg: DataHandle<BindGroup>,
     pub forward_uniform_bg: DataHandle<BindGroup>,
+    pub shadow: RenderTargetHandle,
     pub color: RenderTargetHandle,
     pub resolve: Option<RenderTargetHandle>,
     pub depth: RenderTargetHandle,
@@ -129,17 +133,27 @@ impl BaseRenderGraphIntermediateState {
     /// Create the default setting for all state.
     pub fn new(graph: &mut RenderGraph<'_>, ready: &ReadyData, resolution: UVec2, samples: SampleCount) -> Self {
         // We need to know how many shadows we need to render
-        // TODO
-        let shadow_count = 1;
+        let shadow_count = ready.shadows.len();
 
         // Create global bind group information
         let shadow_uniform_bg = graph.add_data::<BindGroup>();
         let forward_uniform_bg = graph.add_data::<BindGroup>();
 
+        // Shadow render target
+        let shadow = graph.add_render_target(RenderTargetDescriptor {
+            label: Some("shadow target".into()),
+            resolution: ready.shadow_target_size,
+            depth: 1,
+            samples: SampleCount::One,
+            format: INTERNAL_SHADOW_DEPTH_FORMAT,
+            usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
+        });
+
         // Make the actual render targets we want to render to.
         let color = graph.add_render_target(RenderTargetDescriptor {
             label: Some("hdr color".into()),
             resolution,
+            depth: 1,
             samples,
             format: TextureFormat::Rgba16Float,
             usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
@@ -148,6 +162,7 @@ impl BaseRenderGraphIntermediateState {
             graph.add_render_target(RenderTargetDescriptor {
                 label: Some("hdr resolve".into()),
                 resolution,
+                depth: 1,
                 samples: SampleCount::One,
                 format: TextureFormat::Rgba16Float,
                 usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
@@ -156,6 +171,7 @@ impl BaseRenderGraphIntermediateState {
         let depth = graph.add_render_target(RenderTargetDescriptor {
             label: Some("hdr depth".into()),
             resolution,
+            depth: 1,
             samples,
             format: TextureFormat::Depth32Float,
             usage: TextureUsages::RENDER_ATTACHMENT,
@@ -175,6 +191,7 @@ impl BaseRenderGraphIntermediateState {
 
             shadow_uniform_bg,
             forward_uniform_bg,
+            shadow,
             color,
             resolve,
             depth,
@@ -200,6 +217,7 @@ impl BaseRenderGraphIntermediateState {
             graph,
             self.shadow_uniform_bg,
             self.forward_uniform_bg,
+            self.shadow,
             &base.interfaces,
             &base.samplers,
             ambient,
@@ -234,19 +252,28 @@ impl BaseRenderGraphIntermediateState {
     }
 
     /// Render all shadows for the PBR materials.
-    pub fn pbr_shadow_rendering<'node>(&self, graph: &mut RenderGraph<'node>, pbr: &'node pbr::PbrRoutine) {
-        for (shadow_index, &shadow_culled) in self.shadow_cull.iter().enumerate() {
+    pub fn pbr_shadow_rendering<'node>(
+        &self,
+        graph: &mut RenderGraph<'node>,
+        pbr: &'node pbr::PbrRoutine,
+        shadows: &[ShadowDesc],
+    ) {
+        let iter = zip(&self.shadow_cull, shadows);
+        for (shadow_index, (shadow_cull, desc)) in iter.enumerate() {
             pbr.opaque_depth.add_forward_to_graph(RoutineAddToGraphArgs {
                 graph,
                 whole_frame_uniform_bg: self.shadow_uniform_bg,
-                culled: shadow_culled,
+                culled: *shadow_cull,
                 per_material: &pbr.per_material,
                 extra_bgs: None,
                 label: &format!("pbr shadow renderering S{shadow_index}"),
                 samples: SampleCount::One,
-                color: self.color,
-                resolve: self.resolve,
-                depth: self.depth,
+                color: None,
+                resolve: None,
+                depth: self
+                    .shadow
+                    .restrict(0..1, ViewportRect::new(desc.map.offset, UVec2::splat(desc.map.size))),
+                data: shadow_index as u32
             });
         }
     }
@@ -285,9 +312,10 @@ impl BaseRenderGraphIntermediateState {
             extra_bgs: None,
             label: "PBR Forward",
             samples,
-            color: self.color,
+            color: Some(self.color),
             resolve: self.resolve,
             depth: self.depth,
+            data: 0,
         });
     }
 

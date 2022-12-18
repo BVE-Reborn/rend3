@@ -2,7 +2,9 @@ use std::{marker::PhantomData, mem, num::NonZeroU64};
 
 use glam::{Mat4, Vec3};
 use rend3::{managers::DirectionalLightManager, types::Material, util::bind_merge::BindGroupLayoutBuilder};
-use wgpu::{BindGroupLayout, BindingType, BufferBindingType, Device, ShaderStages};
+use wgpu::{
+    BindGroupLayout, BindingType, BufferBindingType, Device, ShaderStages, TextureSampleType, TextureViewDimension,
+};
 
 use crate::{common::samplers::Samplers, uniforms::FrameUniforms};
 
@@ -36,9 +38,20 @@ impl WholeFrameInterfaces {
             None,
         );
 
+        DirectionalLightManager::add_to_bgl(&mut uniform_bglb);
+
         let shadow_uniform_bgl = uniform_bglb.build(device, Some("shadow uniform bgl"));
 
-        DirectionalLightManager::add_to_bgl(&mut uniform_bglb);
+        // Shadow texture
+        uniform_bglb.append(
+            ShaderStages::FRAGMENT,
+            BindingType::Texture {
+                sample_type: TextureSampleType::Depth,
+                view_dimension: TextureViewDimension::D2,
+                multisampled: false,
+            },
+            None,
+        );
 
         let forward_uniform_bgl = uniform_bglb.build(device, Some("forward uniform bgl"));
 

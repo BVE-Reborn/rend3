@@ -554,9 +554,7 @@ impl rend3_framework::App for SceneViewer {
                 });
 
                 // Get a frame
-                let frame = rend3::util::output::OutputFrame::Surface {
-                    surface: Arc::clone(surface.unwrap()),
-                };
+                let frame = surface.unwrap().get_current_texture().unwrap();
                 // Lock all the routines
                 let pbr_routine = lock(&routines.pbr);
                 let mut skybox_routine = lock(&routines.skybox);
@@ -570,6 +568,8 @@ impl rend3_framework::App for SceneViewer {
                 // Build a rendergraph
                 let mut graph = rend3::graph::RenderGraph::new();
 
+                let frame_handle =
+                    graph.add_imported_render_target(&frame, 0..1, rend3::graph::ViewportRect::from_size(resolution));
                 // Add the default rendergraph
                 base_rendergraph.add_to_graph(
                     &mut graph,
@@ -577,6 +577,7 @@ impl rend3_framework::App for SceneViewer {
                     &pbr_routine,
                     Some(&skybox_routine),
                     &tonemapping_routine,
+                    frame_handle,
                     resolution,
                     self.samples,
                     Vec3::splat(self.ambient_light_level).extend(1.0),
@@ -584,7 +585,9 @@ impl rend3_framework::App for SceneViewer {
                 );
 
                 // Dispatch a render using the built up rendergraph!
-                self.previous_profiling_stats = graph.execute(renderer, frame, cmd_bufs, &ready);
+                self.previous_profiling_stats = graph.execute(renderer, cmd_bufs, &ready);
+
+                frame.present();
                 // mark the end of the frame for tracy/other profilers
                 profiling::finish_frame!();
             }

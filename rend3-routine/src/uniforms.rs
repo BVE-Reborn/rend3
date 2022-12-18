@@ -1,10 +1,12 @@
 //! Helpers for building the per-camera uniform data used for cameras and
 //! shadows.
 
+use std::iter::once;
+
 use glam::{Mat4, UVec2, Vec4};
 use rend3::{
-    graph::{DataHandle, RenderGraph},
-    managers::CameraManager,
+    graph::{DataHandle, RenderGraph, RenderTargetHandle},
+    managers::{CameraManager},
     util::{bind_merge::BindGroupBuilder, frustum::ShaderFrustum},
 };
 use wgpu::{
@@ -59,6 +61,7 @@ pub fn add_to_graph<'node>(
     graph: &mut RenderGraph<'node>,
     shadow_uniform_bg: DataHandle<BindGroup>,
     forward_uniform_bg: DataHandle<BindGroup>,
+    shadow_target: RenderTargetHandle,
     interfaces: &'node WholeFrameInterfaces,
     samplers: &'node Samplers,
     ambient: Vec4,
@@ -67,7 +70,14 @@ pub fn add_to_graph<'node>(
     let mut builder = graph.add_node("build uniform data");
     let shadow_handle = builder.add_data_output(shadow_uniform_bg);
     let forward_handle = builder.add_data_output(forward_uniform_bg);
+
+    // Get the shadow target and declare it a dependency of the forward_uniform_bg
+    let shadow_target_handle = builder.add_render_target_output(shadow_target);
+    builder.add_dependencies_to_render_targets(forward_uniform_bg, once(shadow_target));
+
     builder.build(move |_pt, renderer, _encoder_or_pass, _temps, _ready, graph_data| {
+        let shadow_target = graph_data.get_render_target(shadow_target_handle);
+
         let mut bgb = BindGroupBuilder::new();
 
         samplers.add_to_bg(&mut bgb);
@@ -81,13 +91,15 @@ pub fn add_to_graph<'node>(
 
         bgb.append_buffer(&uniform_buffer);
 
+        graph_data.directional_light_manager.add_to_bg(&mut bgb);
+
         let shadow_uniform_bg = bgb.build(
             &renderer.device,
             Some("shadow uniform bg"),
             &interfaces.depth_uniform_bgl,
         );
 
-        graph_data.directional_light_manager.add_to_bg(&mut bgb);
+        bgb.append_texture_view(shadow_target);
 
         let forward_uniform_bg = bgb.build(
             &renderer.device,

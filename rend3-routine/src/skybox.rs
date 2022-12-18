@@ -4,7 +4,7 @@ use std::borrow::Cow;
 
 use rend3::{
     graph::{
-        DataHandle, DepthHandle, RenderGraph, RenderPassDepthTarget, RenderPassTarget, RenderPassTargets,
+        DataHandle, RenderGraph, RenderPassDepthTarget, RenderPassTarget, RenderPassTargets,
         RenderTargetHandle,
     },
     types::{SampleCount, TextureCubeHandle},
@@ -106,7 +106,7 @@ impl SkyboxRoutine {
                 resolve: hdr_resolve,
             }],
             depth_stencil: Some(RenderPassDepthTarget {
-                target: DepthHandle::RenderTarget(hdr_depth_handle),
+                target: hdr_depth_handle,
                 depth_clear: Some(0.0),
                 stencil_clear: None,
             }),

@@ -1,7 +1,5 @@
 use glam::Vec4;
-use rend3::graph::{
-    DepthHandle, RenderGraph, RenderPassDepthTarget, RenderPassTarget, RenderPassTargets, RenderTargetHandle,
-};
+use rend3::graph::{RenderGraph, RenderPassDepthTarget, RenderPassTarget, RenderPassTargets, RenderTargetHandle};
 
 /// Uses the given targets to create a node which merely sets the clear color to what we want.
 ///
@@ -33,7 +31,7 @@ pub fn add_clear_to_graph(
             resolve: hdr_resolve,
         }],
         depth_stencil: Some(RenderPassDepthTarget {
-            target: DepthHandle::RenderTarget(hdr_depth_handle),
+            target: hdr_depth_handle,
             depth_clear: Some(depth_clear),
             stencil_clear: None,
         }),

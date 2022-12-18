@@ -4,6 +4,8 @@
 
 @group(0) @binding(3)
 var<uniform> uniforms: UniformData;
+@group(0) @binding(4)
+var<storage> directional_lights: DirectionalLightData;
 
 @group(1) @binding(0)
 var<storage> object_buffer: array<Object>;
@@ -43,7 +45,7 @@ struct VertexOutput {
 }
 
 @vertex
-fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
+fn vs_main(@builtin(instance_index) shadow_number: u32, @builtin(vertex_index) vertex_index: u32) -> VertexOutput {
     if vertex_index == 0x00FFFFFFu {
         var vs_out: VertexOutput;
         vs_out.position = vec4<f32>(0.0);
@@ -55,8 +57,7 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
     let data = object_buffer[indices.object];
 
     // TODO: Store these in uniforms
-    let model_view = uniforms.view * data.transform;
-    let model_view_proj = uniforms.view_proj * data.transform;
+    let model_view_proj = directional_lights.data[shadow_number].view_proj * data.transform;
 
     let position_vec4 = vec4<f32>(vs_in.position, 1.0);
 

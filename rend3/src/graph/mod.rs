@@ -50,6 +50,8 @@
 //! automatically have lifetime `'rpass`. The temporary is destroyed right after
 //! the renderpass is.
 
+use std::ops::Range;
+
 use glam::UVec2;
 use rend3_types::{SampleCount, TextureFormat, TextureUsages};
 use wgpu::{Color, TextureView};
@@ -80,6 +82,7 @@ pub(crate) use texture_store::*;
 pub struct RenderTargetDescriptor {
     pub label: Option<SsoString>,
     pub resolution: UVec2,
+    pub depth: u32,
     pub samples: SampleCount,
     pub format: TextureFormat,
     pub usage: TextureUsages,
@@ -88,6 +91,7 @@ impl RenderTargetDescriptor {
     fn to_core(&self) -> RenderTargetCore {
         RenderTargetCore {
             resolution: self.resolution,
+            depth: self.depth,
             samples: self.samples,
             format: self.format,
             usage: self.usage,
@@ -98,6 +102,7 @@ impl RenderTargetDescriptor {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub(crate) struct RenderTargetCore {
     pub resolution: UVec2,
+    pub depth: u32,
     pub samples: SampleCount,
     pub format: TextureFormat,
     pub usage: TextureUsages,
@@ -114,32 +119,92 @@ pub struct ShadowTarget<'a> {
     /// Size in both dimentions of the viewport
     pub size: u32,
 }
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+
+enum GraphResource {
+    ImportedTexture(usize),
+    Texture(usize),
+    External,
+    Data(usize),
+}
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-enum GraphResource {
-    OutputTexture,
+pub(super) struct TextureRegion {
+    idx: usize,
+    layer_start: u32,
+    layer_end: u32,
+    viewport: ViewportRect,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+enum GraphSubResource {
+    ImportedTexture(TextureRegion),
+    Texture(TextureRegion),
     External,
-    Texture(usize),
-    Shadow(usize),
     Data(usize),
+}
+
+impl GraphSubResource {
+    pub(super) fn to_resource(&self) -> GraphResource {
+        match *self {
+            GraphSubResource::ImportedTexture(r) => GraphResource::ImportedTexture(r.idx),
+            GraphSubResource::Texture(r) => GraphResource::Texture(r.idx),
+            GraphSubResource::External => GraphResource::External,
+            GraphSubResource::Data(idx) => GraphResource::Data(idx),
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub struct ViewportRect {
+    pub offset: UVec2,
+    pub size: UVec2,
+}
+
+impl ViewportRect {
+    pub fn new(offset: UVec2, size: UVec2) -> Self {
+        Self { offset, size }
+    }
+
+    pub fn from_size(size: UVec2) -> Self {
+        Self::new(UVec2::ZERO, size)
+    }
 }
 
 /// Handle to a graph-stored render target.
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct RenderTargetHandle {
     // Must only be OutputTexture or Texture
-    resource: GraphResource,
+    resource: GraphSubResource,
 }
 
-/// Handle to a single shadow map.
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub struct ShadowTargetHandle {
-    idx: usize,
-}
+impl RenderTargetHandle {
+    pub fn compatible(&self, other: &Self) -> bool {
+        let left = self.to_region();
+        let right = other.to_region();
 
-/// Handle to the entire shadow atlas.
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub struct ShadowArrayHandle;
+        left.idx == right.idx && left.layer_start == right.layer_start && left.layer_end == right.layer_end
+    }
+
+    pub(super) fn to_region(&self) -> TextureRegion {
+        match self.resource {
+            GraphSubResource::ImportedTexture(region) | GraphSubResource::Texture(region) => region,
+            GraphSubResource::External | GraphSubResource::Data(_) => unreachable!(),
+        }
+    }
+
+    pub fn restrict(mut self, layers: Range<u32>, viewport: ViewportRect) -> Self {
+        match &mut self.resource {
+            GraphSubResource::ImportedTexture(region) | GraphSubResource::Texture(region) => {
+                region.layer_start = layers.start;
+                region.layer_end = layers.end;
+                region.viewport = viewport;
+            }
+            _ => unreachable!(),
+        }
+        self
+    }
+}
 
 /// Targets that make up a renderpass.
 #[derive(Debug, PartialEq)]
@@ -160,14 +225,20 @@ impl RenderPassTargets {
         match (this, other) {
             (Some(this), Some(other)) => {
                 let targets_compatible = this.targets.len() == other.targets.len()
-                    && this
-                        .targets
-                        .iter()
-                        .zip(other.targets.iter())
-                        .all(|(me, you)| me.color == you.color && me.resolve == you.resolve);
+                    && this.targets.iter().zip(other.targets.iter()).all(|(me, you)| {
+                        let color_compat = me.color.handle.compatible(&you.color.handle);
+                        let resolve_compat = match (me.resolve, you.resolve) {
+                            (Some(me_dep), Some(you_dep)) => me_dep.handle.compatible(&you_dep.handle),
+                            (None, None) => true,
+                            _ => false,
+                        };
+                        color_compat && resolve_compat
+                    });
 
                 let depth_compatible = match (&this.depth_stencil, &other.depth_stencil) {
-                    (Some(this_depth), Some(other_depth)) => this_depth == other_depth,
+                    (Some(this_depth), Some(other_depth)) => {
+                        this_depth.target.handle.compatible(&other_depth.target.handle)
+                    }
                     (None, None) => true,
                     _ => false,
                 };
@@ -197,18 +268,11 @@ pub struct RenderPassTarget {
 #[derive(Debug, PartialEq)]
 pub struct RenderPassDepthTarget {
     /// The target to use as depth.
-    pub target: DepthHandle,
+    pub target: DeclaredDependency<RenderTargetHandle>,
     /// Depth value the attachment will be cleared with if this is the first
     /// use.
     pub depth_clear: Option<f32>,
     /// Stencil value the attachment will be cleared with if this is the first
     /// use.
     pub stencil_clear: Option<u32>,
-}
-
-/// Handle to something that can be used as depth.
-#[derive(Debug, PartialEq)]
-pub enum DepthHandle {
-    RenderTarget(DeclaredDependency<RenderTargetHandle>),
-    Shadow(DeclaredDependency<ShadowTargetHandle>),
 }

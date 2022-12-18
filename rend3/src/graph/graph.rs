@@ -2,46 +2,83 @@ use std::{
     any::Any,
     cell::{RefCell, UnsafeCell},
     marker::PhantomData,
-    mem,
+    num::NonZeroU32,
+    ops::Range,
     sync::Arc,
 };
 
+use glam::UVec2;
 use wgpu::{
     CommandBuffer, CommandEncoder, CommandEncoderDescriptor, LoadOp, Operations, RenderPass, RenderPassColorAttachment,
-    RenderPassDepthStencilAttachment, RenderPassDescriptor, TextureView, TextureViewDescriptor,
+    RenderPassDepthStencilAttachment, RenderPassDescriptor, SurfaceTexture, Texture, TextureView,
+    TextureViewDescriptor,
 };
 
 use crate::{
     graph::{
-        DataHandle, DepthHandle, GraphResource, PassthroughDataContainer, RenderGraphDataStore,
+        DataHandle, GraphResource, GraphSubResource, PassthroughDataContainer, RenderGraphDataStore,
         RenderGraphEncoderOrPass, RenderGraphEncoderOrPassInner, RenderGraphNode, RenderGraphNodeBuilder,
-        RenderPassTargets, RenderTargetDescriptor, RenderTargetHandle, RpassTemporaryPool,
+        RenderPassTargets, RenderTargetDescriptor, RenderTargetHandle, RpassTemporaryPool, TextureRegion,
     },
-    managers::TextureManagerReadyOutput,
-    util::{
-        output::OutputFrame,
-        typedefs::{FastHashMap, FastHashSet, RendererStatistics, SsoString},
-    },
+    managers::{ShadowDesc, TextureManagerReadyOutput},
+    util::typedefs::{FastHashMap, FastHashSet, RendererStatistics, SsoString},
     Renderer,
 };
+
+use super::ViewportRect;
 
 /// Output of calling ready on various managers.
 #[derive(Clone)]
 pub struct ReadyData {
     pub d2_texture: TextureManagerReadyOutput,
     pub d2c_texture: TextureManagerReadyOutput,
+    pub shadow_target_size: UVec2,
+    pub shadows: Vec<ShadowDesc>,
+}
+
+pub trait AsTextureReference {
+    fn as_texture_ref(&self) -> &Texture;
+}
+
+impl AsTextureReference for Texture {
+    fn as_texture_ref(&self) -> &Texture {
+        self
+    }
+}
+
+impl AsTextureReference for SurfaceTexture {
+    fn as_texture_ref(&self) -> &Texture {
+        &self.texture
+    }
+}
+
+pub(super) struct DataContents {
+    // Any is RefCell<Option<T>> where T is the stored data
+    pub(super) inner: Box<dyn Any>,
+    pub(super) dependencies: Vec<GraphSubResource>,
+}
+
+impl DataContents {
+    pub(super) fn new<T: 'static>() -> Self {
+        Self {
+            inner: Box::new(RefCell::new(None::<T>)),
+            dependencies: Vec::new(),
+        }
+    }
 }
 
 /// Implementation of a rendergraph. See module docs for details.
 pub struct RenderGraph<'node> {
     pub(super) targets: Vec<RenderTargetDescriptor>,
-    pub(super) data: Vec<Box<dyn Any>>, // Any is RefCell<Option<T>> where T is the stored data
+    pub(super) imported_targets: Vec<&'node dyn AsTextureReference>,
+    pub(super) data: Vec<DataContents>,
     pub(super) nodes: Vec<RenderGraphNode<'node>>,
 }
 impl<'node> RenderGraph<'node> {
     pub fn new() -> Self {
         Self {
             targets: Vec::with_capacity(32),
+            imported_targets: Vec::with_capacity(32),
             data: Vec::with_capacity(32),
             nodes: Vec::with_capacity(64),
         }
@@ -63,39 +100,85 @@ impl<'node> RenderGraph<'node> {
 
     pub fn add_render_target(&mut self, desc: RenderTargetDescriptor) -> RenderTargetHandle {
         let idx = self.targets.len();
+        let handle = RenderTargetHandle {
+            resource: GraphSubResource::Texture(TextureRegion {
+                idx,
+                layer_start: 0,
+                layer_end: desc.depth,
+                viewport: ViewportRect {
+                    offset: UVec2::ZERO,
+                    size: desc.resolution,
+                },
+            }),
+        };
         self.targets.push(desc);
-        RenderTargetHandle {
-            resource: GraphResource::Texture(idx),
-        }
+        handle
     }
 
-    pub fn add_surface_texture(&mut self) -> RenderTargetHandle {
+    pub fn add_imported_render_target(
+        &mut self,
+        texture: &'node dyn AsTextureReference,
+        layers: Range<u32>,
+        viewport: ViewportRect,
+    ) -> RenderTargetHandle {
+        let idx = self.imported_targets.len();
+        self.imported_targets.push(texture);
         RenderTargetHandle {
-            resource: GraphResource::OutputTexture,
+            resource: GraphSubResource::ImportedTexture(TextureRegion {
+                idx,
+                layer_start: layers.start,
+                layer_end: layers.end,
+                viewport,
+            }),
         }
     }
 
     pub fn add_data<T: 'static>(&mut self) -> DataHandle<T> {
         let idx = self.data.len();
-        self.data.push(Box::new(RefCell::new(None::<T>)));
+        self.data.push(DataContents::new::<T>());
         DataHandle {
             idx,
             _phantom: PhantomData,
         }
     }
 
+    fn flatten_dependencies(data: &[DataContents], resource_list: &mut Vec<GraphSubResource>) {
+        let mut idx = 0;
+        // We use a while loop so we can walk the dependency tree recursively.
+        while idx < resource_list.len() {
+            if let GraphSubResource::Data(idx) = resource_list[idx] {
+                resource_list.extend_from_slice(&data[idx].dependencies);
+
+                // We can fall victim to cycles with this, so we assert on the length not being redonkulously large.
+                assert!(
+                    resource_list.len() < (1 << 20),
+                    "Rendergraph has dependencies of data that form a cycle"
+                );
+            }
+            idx += 1;
+        }
+    }
+
     pub fn execute(
-        self,
+        mut self,
         renderer: &Arc<Renderer>,
-        output: OutputFrame,
         mut cmd_bufs: Vec<CommandBuffer>,
         ready_output: &ReadyData,
     ) -> Option<RendererStatistics> {
         profiling::scope!("RenderGraph::execute");
 
+        // Because data handles have dependencies, we flatten the inputs and outputs ahead of time to simplify things.
+        // We do it in place to save a bunch of allocations.
+        for node in &mut self.nodes {
+            Self::flatten_dependencies(&self.data, &mut node.inputs);
+            Self::flatten_dependencies(&self.data, &mut node.outputs);
+        }
+
         let mut awaiting_inputs = FastHashSet::default();
-        // The surface is used externally
-        awaiting_inputs.insert(GraphResource::OutputTexture);
+        // Imported textures are always used
+        for idx in 0..self.imported_targets.len() {
+            awaiting_inputs.insert(GraphResource::ImportedTexture(idx));
+        }
         // External deps are used externally
         awaiting_inputs.insert(GraphResource::External);
 
@@ -105,11 +188,11 @@ impl<'node> RenderGraph<'node> {
             // Iterate the nodes backwards to track dependencies
             for node in self.nodes.into_iter().rev() {
                 // If any of our outputs are used by a previous node, we have reason to exist
-                let outputs_used = node.outputs.iter().any(|o| awaiting_inputs.remove(o));
+                let outputs_used = node.outputs.iter().any(|o| awaiting_inputs.remove(&o.to_resource()));
 
                 if outputs_used {
                     // Add our inputs to be matched up with outputs.
-                    awaiting_inputs.extend(node.inputs.iter().cloned());
+                    awaiting_inputs.extend(node.inputs.iter().map(GraphSubResource::to_resource));
                     // Push our node on the new list
                     pruned_node_list.push(node)
                 }
@@ -131,21 +214,23 @@ impl<'node> RenderGraph<'node> {
                         .and_modify(|range| range.1 = Some(idx))
                         .or_insert((idx, Some(idx)));
                 }
-                // And the outputs
+                // All the outputs
                 for &output in &node.outputs {
+                    // All output textures we need treat them as if them has no end, as they will be
+                    // "used" after the graph is done.
+                    let end = match output {
+                        GraphSubResource::ImportedTexture { .. } => None,
+                        _ => Some(idx),
+                    };
                     resource_spans
                         .entry(output)
-                        .and_modify(|range| range.1 = Some(idx))
-                        .or_insert((idx, Some(idx)));
+                        .and_modify(|range| range.1 = end)
+                        .or_insert((idx, end));
                 }
             }
         }
 
-        // If the surface is used, we need treat it as if it has no end, as it will be
-        // "used" after the graph is done.
-        if let Some((_, surface_end)) = resource_spans.get_mut(&GraphResource::OutputTexture) {
-            *surface_end = None;
-        }
+        dbg!(&resource_spans);
 
         // For each node, record the list of textures whose spans start and the list of
         // textures whose spans end.
@@ -176,47 +261,62 @@ impl<'node> RenderGraph<'node> {
         let mut active_textures = FastHashMap::default();
         // Maps a name to its actual texture view.
         let mut active_views = FastHashMap::default();
-        // Which node index needs acquire to happen.
-        let mut acquire_idx = None;
+        // Views for imported textures
+        let mut imported_views = FastHashMap::default();
         {
             profiling::scope!("Render Target Allocation");
-            for (idx, (starting, ending)) in resource_changes.into_iter().enumerate() {
+            for (starting, ending) in resource_changes {
                 for start in starting {
                     match start {
-                        GraphResource::Texture(idx) => {
-                            let desc = &self.targets[idx];
+                        GraphSubResource::Texture(region) => {
+                            let desc = &self.targets[region.idx];
                             let tex = graph_texture_store.get_texture(&renderer.device, desc.to_core());
                             let view = tex.create_view(&TextureViewDescriptor {
                                 label: desc.label.as_deref(),
+                                base_array_layer: region.layer_start,
+                                array_layer_count: Some(
+                                    NonZeroU32::new(region.layer_end - region.layer_start).unwrap(),
+                                ),
                                 ..TextureViewDescriptor::default()
                             });
-                            active_textures.insert(idx, tex);
-                            active_views.insert(idx, view);
+                            // the whole texture is active
+                            active_textures.insert(region.idx, tex);
+                            // the view is for the region
+                            active_views.insert(region, view);
                         }
-                        GraphResource::Shadow(..) => {}
-                        GraphResource::Data(..) => {}
-                        GraphResource::OutputTexture => {
-                            acquire_idx = Some(idx);
-                            continue;
+                        GraphSubResource::Data(..) => {}
+                        GraphSubResource::ImportedTexture(region) => {
+                            // We don't actually care about start/end of imported views,
+                            // we just need to make sure we create all the views needed.
+                            imported_views.entry(region).or_insert_with(|| {
+                                self.imported_targets[region.idx]
+                                    .as_texture_ref()
+                                    .create_view(&TextureViewDescriptor {
+                                        base_array_layer: region.layer_start,
+                                        array_layer_count: Some(
+                                            NonZeroU32::new(region.layer_end - region.layer_start).unwrap(),
+                                        ),
+                                        ..TextureViewDescriptor::default()
+                                    })
+                            });
                         }
-                        GraphResource::External => {}
+                        GraphSubResource::External => {}
                     };
                 }
 
                 for end in ending {
                     match end {
-                        GraphResource::Texture(idx) => {
+                        GraphSubResource::Texture(region) => {
                             let tex = active_textures
-                                .remove(&idx)
+                                .remove(&region.idx)
                                 .expect("internal rendergraph error: texture end with no start");
 
-                            let desc = self.targets[idx].clone();
+                            let desc = self.targets[region.idx].clone();
                             graph_texture_store.return_texture(desc.to_core(), tex);
                         }
-                        GraphResource::Shadow(..) => {}
-                        GraphResource::Data(..) => {}
-                        GraphResource::OutputTexture => {}
-                        GraphResource::External => {}
+                        GraphSubResource::Data(..) => {}
+                        GraphSubResource::ImportedTexture(_) => {}
+                        GraphSubResource::External => {}
                     };
                 }
             }
@@ -257,7 +357,6 @@ impl<'node> RenderGraph<'node> {
 
         profiling::scope!("Run Nodes");
 
-        let output_cell = UnsafeCell::new(output);
         let encoder_cell = UnsafeCell::new(
             renderer
                 .device
@@ -270,35 +369,14 @@ impl<'node> RenderGraph<'node> {
 
         // Iterate through all the nodes and actually execute them.
         for (idx, mut node) in pruned_node_list.into_iter().enumerate() {
-            if acquire_idx == Some(idx) {
-                // SAFETY: this drops the renderpass, letting us into everything it was
-                // borrowing.
-                rpass = None;
-
-                // SAFETY: the renderpass has died, so there are no outstanding immutible
-                // borrows of the structure, and all uses of the temporaries have died.
-                unsafe { (*rpass_temps_cell.get()).clear() };
-
-                cmd_bufs.push(
-                    mem::replace(
-                        // SAFETY: There are two things which borrow this encoder: the renderpass and the node's
-                        // encoder reference. Both of these have died by this point.
-                        unsafe { &mut *encoder_cell.get() },
-                        renderer
-                            .device
-                            .create_command_encoder(&CommandEncoderDescriptor::default()),
-                    )
-                    .finish(),
-                );
-
-                // Early submit before acquire
-                renderer.queue.submit(cmd_bufs.drain(..));
-
-                // TODO: error
-                // SAFETY: Same context as the above unsafe.
-                unsafe { &mut *output_cell.get() }.acquire().unwrap();
-            }
-
+            println!(
+                "{} {} {} {} {}",
+                idx,
+                &node.label,
+                node.rpass.is_some(),
+                compatible[idx],
+                renderpass_ends[next_rpass_idx],
+            );
             if !compatible[idx] {
                 // SAFETY: this drops the renderpass, letting us into everything it was
                 // borrowing when we make the new renderpass.
@@ -313,9 +391,9 @@ impl<'node> RenderGraph<'node> {
                         idx,
                         renderpass_ends[next_rpass_idx],
                         // SAFETY: Same context as above.
-                        unsafe { &mut *output_cell.get() },
                         &resource_spans,
                         &active_views,
+                        &imported_views,
                     ));
                 }
                 next_rpass_idx += 1;
@@ -324,9 +402,8 @@ impl<'node> RenderGraph<'node> {
             {
                 let store = RenderGraphDataStore {
                     texture_mapping: &active_views,
+                    external_texture_mapping: &imported_views,
                     data: &self.data,
-                    // SAFETY: This is only viewed mutably when no renderpass exists
-                    output: unsafe { &*output_cell.get() }.as_view(),
 
                     camera_manager: &data_core.camera_manager,
                     directional_light_manager: &data_core.directional_light_manager,
@@ -339,7 +416,29 @@ impl<'node> RenderGraph<'node> {
                 };
 
                 let mut encoder_or_rpass = match rpass {
-                    Some(ref mut rpass) => RenderGraphEncoderOrPassInner::RenderPass(rpass),
+                    Some(ref mut rpass) => {
+                        let rpass_desc = node.rpass.unwrap();
+
+                        let viewport = rpass_desc
+                            .targets
+                            .first()
+                            .map_or_else(
+                                || rpass_desc.depth_stencil.as_ref().unwrap().target.handle.to_region(),
+                                |t| t.color.handle.to_region(),
+                            )
+                            .viewport;
+
+                        rpass.set_viewport(
+                            viewport.offset.x as f32,
+                            viewport.offset.y as f32,
+                            viewport.size.x as f32,
+                            viewport.size.y as f32,
+                            0.0,
+                            1.0,
+                        );
+
+                        RenderGraphEncoderOrPassInner::RenderPass(rpass)
+                    }
                     // SAFETY: There is no active renderpass to borrow this. This reference lasts for the duration of
                     // the call to exec.
                     None => RenderGraphEncoderOrPassInner::Encoder(unsafe { &mut *encoder_cell.get() }),
@@ -394,10 +493,6 @@ impl<'node> RenderGraph<'node> {
 
         renderer.queue.submit(cmd_bufs);
 
-        // SAFETY: this is safe as we've dropped all renderpasses that possibly borrowed
-        // it
-        output_cell.into_inner().present();
-
         data_core.profiler.end_frame().unwrap();
         data_core.profiler.process_finished_frame()
     }
@@ -408,9 +503,9 @@ impl<'node> RenderGraph<'node> {
         encoder: &'rpass mut CommandEncoder,
         node_idx: usize,
         pass_end_idx: usize,
-        output: &'rpass OutputFrame,
-        resource_spans: &'rpass FastHashMap<GraphResource, (usize, Option<usize>)>,
-        active_views: &'rpass FastHashMap<usize, TextureView>,
+        resource_spans: &'rpass FastHashMap<GraphSubResource, (usize, Option<usize>)>,
+        active_views: &'rpass FastHashMap<TextureRegion, TextureView>,
+        active_imported_views: &'rpass FastHashMap<TextureRegion, TextureView>,
     ) -> RenderPass<'rpass> {
         let color_attachments: Vec<_> = desc
             .targets
@@ -427,20 +522,16 @@ impl<'node> RenderGraph<'node> {
                 let store = view_span.1 != Some(pass_end_idx);
 
                 RenderPassColorAttachment {
-                    view: match &target.color.handle.resource {
-                        GraphResource::OutputTexture => output
-                            .as_view()
-                            .expect("internal rendergraph error: tried to use output texture before acquire"),
-                        GraphResource::Texture(t) => &active_views[t],
+                    view: match target.color.handle.resource {
+                        GraphSubResource::ImportedTexture(region) => &active_imported_views[&region],
+                        GraphSubResource::Texture(region) => &active_views[&region],
                         _ => {
                             panic!("internal rendergraph error: using a non-texture as a renderpass attachment")
                         }
                     },
-                    resolve_target: target.resolve.as_ref().map(|dep| match &dep.handle.resource {
-                        GraphResource::OutputTexture => output
-                            .as_view()
-                            .expect("internal rendergraph error: tried to use output texture before acquire"),
-                        GraphResource::Texture(t) => &active_views[t],
+                    resolve_target: target.resolve.as_ref().map(|dep| match dep.handle.resource {
+                        GraphSubResource::ImportedTexture(region) => &active_imported_views[&region],
+                        GraphSubResource::Texture(region) => &active_views[&region],
                         _ => {
                             panic!("internal rendergraph error: using a non-texture as a renderpass attachment")
                         }
@@ -451,10 +542,7 @@ impl<'node> RenderGraph<'node> {
             .map(Option::Some)
             .collect();
         let depth_stencil_attachment = desc.depth_stencil.as_ref().map(|ds_target| {
-            let resource = match ds_target.target {
-                DepthHandle::RenderTarget(ref dep) => dep.handle.resource,
-                DepthHandle::Shadow(ref s) => GraphResource::Shadow(s.handle.idx),
-            };
+            let resource = ds_target.target.handle.resource;
 
             let view_span = resource_spans[&resource];
 
@@ -481,11 +569,9 @@ impl<'node> RenderGraph<'node> {
             });
 
             RenderPassDepthStencilAttachment {
-                view: match &resource {
-                    GraphResource::OutputTexture => output
-                        .as_view()
-                        .expect("internal rendergraph error: tried to use output texture before acquire"),
-                    GraphResource::Texture(t) => &active_views[t],
+                view: match resource {
+                    GraphSubResource::ImportedTexture(region) => &active_imported_views[&region],
+                    GraphSubResource::Texture(region) => &active_views[&region],
                     _ => {
                         panic!("internal rendergraph error: using a non-texture as a renderpass attachment")
                     }

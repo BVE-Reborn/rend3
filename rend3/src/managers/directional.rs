@@ -13,7 +13,7 @@ use glam::{Mat4, UVec2, Vec2, Vec3};
 use rend3_types::{DirectionalLightChange, RawDirectionalLightHandle};
 use wgpu::{
     BindingType, BufferBindingType, BufferUsages, Device, Extent3d, ShaderStages, TextureDescriptor, TextureDimension,
-    TextureSampleType, TextureUsages, TextureView, TextureViewDescriptor, TextureViewDimension,
+    TextureUsages, TextureView, TextureViewDescriptor,
 };
 
 mod shadow_alloc;
@@ -46,6 +46,12 @@ struct ShaderDirectionalLight {
     pub atlas_size: Vec2,
 }
 
+#[derive(Debug, Clone)]
+pub struct ShadowDesc {
+    pub map: ShadowMap,
+    pub camera: CameraManager,
+}
+
 /// Manages directional lights and their associated shadow maps.
 pub struct DirectionalLightManager {
     data: Vec<Option<InternalDirectionalLight>>,
@@ -53,8 +59,6 @@ pub struct DirectionalLightManager {
 
     texture_size: UVec2,
     texture_view: TextureView,
-
-    shadow_data: Option<Vec<(ShadowMap, CameraManager)>>,
 }
 impl DirectionalLightManager {
     pub fn new(device: &Device) -> Self {
@@ -68,7 +72,6 @@ impl DirectionalLightManager {
             data_buffer: WrappedPotBuffer::new(device, BufferUsages::STORAGE, "shadow data buffer"),
             texture_size,
             texture_view,
-            shadow_data: None,
         }
     }
 
@@ -91,7 +94,7 @@ impl DirectionalLightManager {
         self.data[handle.idx].take().unwrap();
     }
 
-    pub fn ready(&mut self, renderer: &Renderer, user_camera: &CameraManager) {
+    pub fn ready(&mut self, renderer: &Renderer, user_camera: &CameraManager) -> (UVec2, Vec<ShadowDesc>) {
         profiling::scope!("Directional Light Ready");
 
         let shadow_maps: Vec<_> = self
@@ -115,36 +118,31 @@ impl DirectionalLightManager {
 
         let coordinates = match shadow_atlas {
             Some(m) => m.maps,
-            None => return,
+            None => return (new_shadow_map_size, Vec::new()),
         };
 
-        self.shadow_data = Some(
-            coordinates
-                .into_iter()
-                .map(|map| {
-                    let camera = shadow_camera::shadow_camera(self.data[map.handle.idx].as_ref().unwrap(), user_camera);
+        let shadow_data: Vec<_> = coordinates
+            .into_iter()
+            .map(|map| {
+                let camera = shadow_camera::shadow_camera(self.data[map.handle.idx].as_ref().unwrap(), user_camera);
 
-                    (map, camera)
-                })
-                .collect(),
-        );
+                ShadowDesc { map, camera }
+            })
+            .collect();
 
         let buffer = ShaderDirectionalLightBuffer {
             count: ArrayLength,
-            array: self
-                .shadow_data
-                .as_ref()
-                .unwrap()
+            array: shadow_data
                 .iter()
-                .map(|(map, camera)| {
-                    let light = &self.data[map.handle.idx].as_ref().unwrap().inner;
+                .map(|desc| {
+                    let light = &self.data[desc.map.handle.idx].as_ref().unwrap().inner;
 
                     ShaderDirectionalLight {
-                        view_proj: camera.view_proj(),
+                        view_proj: desc.camera.view_proj(),
                         color: light.color,
                         direction: light.direction,
-                        atlas_offset: map.offset.as_vec2() / new_shadow_map_size_f32,
-                        atlas_size: Vec2::splat(map.size as f32) / new_shadow_map_size_f32,
+                        atlas_offset: desc.map.offset.as_vec2() / new_shadow_map_size_f32,
+                        atlas_size: Vec2::splat(desc.map.size as f32) / new_shadow_map_size_f32,
                     }
                 })
                 .collect(),
@@ -152,11 +150,13 @@ impl DirectionalLightManager {
 
         self.data_buffer
             .write_to_buffer(&renderer.device, &renderer.queue, &buffer);
+
+        (new_shadow_map_size, shadow_data)
     }
 
     pub fn add_to_bgl(bglb: &mut BindGroupLayoutBuilder) {
         bglb.append(
-            ShaderStages::FRAGMENT,
+            ShaderStages::VERTEX_FRAGMENT,
             BindingType::Buffer {
                 ty: BufferBindingType::Storage { read_only: true },
                 has_dynamic_offset: false,
@@ -164,20 +164,10 @@ impl DirectionalLightManager {
             },
             None,
         );
-        bglb.append(
-            ShaderStages::FRAGMENT,
-            BindingType::Texture {
-                sample_type: TextureSampleType::Depth,
-                view_dimension: TextureViewDimension::D2,
-                multisampled: false,
-            },
-            None,
-        );
     }
 
-    pub fn add_to_bg<'a>(&'a self, bgb: &mut BindGroupBuilder<'a>) {
+    pub fn add_to_bg<'a>(&'a self, bgb: &mut BindGroupBuilder<'a>,) {
         bgb.append_buffer(&self.data_buffer);
-        bgb.append_texture_view(&self.texture_view);
     }
 }
 

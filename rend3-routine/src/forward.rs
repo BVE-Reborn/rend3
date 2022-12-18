@@ -7,10 +7,7 @@ use std::marker::PhantomData;
 use arrayvec::ArrayVec;
 use encase::ShaderSize;
 use rend3::{
-    graph::{
-        DataHandle, DepthHandle, RenderGraph, RenderPassDepthTarget, RenderPassTarget, RenderPassTargets,
-        RenderTargetHandle,
-    },
+    graph::{DataHandle, RenderGraph, RenderPassDepthTarget, RenderPassTarget, RenderPassTargets, RenderTargetHandle},
     types::{Handedness, Material, SampleCount},
     util::bind_merge::BindGroupBuilder,
     ProfileData, Renderer, RendererDataCore, RendererProfile, ShaderPreProcessor,
@@ -69,12 +66,17 @@ pub struct RoutineAddToGraphArgs<'a, 'node, M> {
     pub whole_frame_uniform_bg: DataHandle<BindGroup>,
     pub culled: DataHandle<culling::DrawCallSet>,
     pub per_material: &'node PerMaterialArchetypeInterface<M>,
+    /// I understand the requirement that extra_bgs is explicitly a Vec is
+    /// weird, but due to my lifetime passthrough logic I can't pass through anything
+    /// that is !Sized
     pub extra_bgs: Option<&'node Vec<BindGroup>>,
     pub label: &'a str,
     pub samples: SampleCount,
-    pub color: RenderTargetHandle,
+    pub color: Option<RenderTargetHandle>,
     pub resolve: Option<RenderTargetHandle>,
     pub depth: RenderTargetHandle,
+    /// Passed to the shader through the instance index.
+    pub data: u32,
 }
 
 /// A set of pipelines for rendering a specific combination of a material.
@@ -129,28 +131,27 @@ impl<M: Material> ForwardRoutine<M> {
     }
 
     /// Add the given routine to the graph with the given settings.
-    ///
-    /// I understand the requirement that extra_bgs is explicitly a Vec is
-    /// weird, but due to my lifetime passthrough logic I can't pass through a
-    /// slice.
     #[allow(clippy::too_many_arguments)]
     pub fn add_forward_to_graph<'node>(&'node self, args: RoutineAddToGraphArgs<'_, 'node, M>) {
         let mut builder = args.graph.add_node(args.label);
 
-        let hdr_color_handle = builder.add_render_target_output(args.color);
-        let hdr_resolve = builder.add_optional_render_target_output(args.resolve);
-        let hdr_depth_handle = builder.add_render_target_output(args.depth);
+        let color_handle = builder.add_optional_render_target_output(args.color);
+        let resolve_handle = builder.add_optional_render_target_output(args.resolve);
+        let depth_handle = builder.add_render_target_output(args.depth);
 
         builder.add_external_output();
 
         let rpass_handle = builder.add_renderpass(RenderPassTargets {
-            targets: vec![RenderPassTarget {
-                color: hdr_color_handle,
-                clear: Color::BLACK,
-                resolve: hdr_resolve,
-            }],
+            targets: match color_handle {
+                Some(color) => vec![RenderPassTarget {
+                    color,
+                    clear: Color::BLACK,
+                    resolve: resolve_handle,
+                }],
+                None => vec![],
+            },
             depth_stencil: Some(RenderPassDepthTarget {
-                target: DepthHandle::RenderTarget(hdr_depth_handle),
+                target: depth_handle,
                 depth_clear: Some(0.0),
                 stencil_clear: None,
             }),
@@ -216,23 +217,25 @@ impl<M: Material> ForwardRoutine<M> {
                     per_material_bg,
                     &[idx as u32 * culling::ShaderBatchData::SHADER_SIZE.get() as u32],
                 );
-                rpass.draw_indexed(call.index_range.clone(), 0, 0..1);
+                rpass.draw_indexed(call.index_range.clone(), 0, args.data..args.data + 1);
             }
         });
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 fn build_forward_pipeline_inner<M: Material>(
     pll: &wgpu::PipelineLayout,
     args: &RoutineArgs<'_, M>,
     samples: SampleCount,
 ) -> RenderPipeline {
-    let mut render_targets = [Some(ColorTargetState {
-        format: TextureFormat::Rgba16Float,
-        blend: None,
-        write_mask: ColorWrites::all(),
-    })];
+    let mut render_targets: ArrayVec<_, 1> = ArrayVec::new();
+    if matches!(args.routine_type, RoutineType::Forward) {
+        render_targets.push(Some(ColorTargetState {
+            format: TextureFormat::Rgba16Float,
+            blend: None,
+            write_mask: ColorWrites::all(),
+        }));
+    }
     let mut desc = RenderPipelineDescriptor {
         label: Some(args.name),
         layout: Some(pll),

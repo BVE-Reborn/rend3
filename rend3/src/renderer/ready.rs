@@ -185,7 +185,7 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
 
     // Level 0
     let d2c_texture = data_core.d2c_texture_manager.ready(&renderer.device);
-    data_core
+    let (shadow_target_size, shadows) = data_core
         .directional_light_manager
         .ready(renderer, &data_core.camera_manager);
 
@@ -196,6 +196,8 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
         ReadyData {
             d2_texture,
             d2c_texture,
+            shadow_target_size,
+            shadows,
         },
     )
 }

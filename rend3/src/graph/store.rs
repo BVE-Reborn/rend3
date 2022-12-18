@@ -1,9 +1,9 @@
-use std::{any::Any, cell::RefCell, marker::PhantomData};
+use std::{cell::RefCell, marker::PhantomData};
 
 use wgpu::TextureView;
 
 use crate::{
-    graph::{DeclaredDependency, GraphResource, RenderTargetHandle, RpassTemporaryPool},
+    graph::{DeclaredDependency, GraphSubResource, RenderTargetHandle, RpassTemporaryPool, TextureRegion, DataContents},
     managers::{
         CameraManager, DirectionalLightManager, MaterialManager, MeshManager, ObjectManager, SkeletonManager,
         TextureManager,
@@ -44,9 +44,9 @@ impl<T> PartialEq for DataHandle<T> {
 ///
 /// This is how you turn [DeclaredDependency] into actual wgpu resources.
 pub struct RenderGraphDataStore<'a> {
-    pub(super) texture_mapping: &'a FastHashMap<usize, TextureView>,
-    pub(super) data: &'a [Box<dyn Any>], // Any is RefCell<Option<T>> where T is the stored data
-    pub(super) output: Option<&'a TextureView>,
+    pub(super) texture_mapping: &'a FastHashMap<TextureRegion, TextureView>,
+    pub(super) external_texture_mapping: &'a FastHashMap<TextureRegion, TextureView>,
+    pub(super) data: &'a [DataContents], // Any is RefCell<Option<T>> where T is the stored data
 
     pub camera_manager: &'a CameraManager,
     pub directional_light_manager: &'a DirectionalLightManager,
@@ -62,13 +62,14 @@ impl<'a> RenderGraphDataStore<'a> {
     /// Get a rendertarget from the handle to one.
     pub fn get_render_target(&self, dep: DeclaredDependency<RenderTargetHandle>) -> &'a TextureView {
         match dep.handle.resource {
-            GraphResource::Texture(name) => self
+            GraphSubResource::Texture(name) => self
                 .texture_mapping
                 .get(&name)
                 .expect("internal rendergraph error: failed to get named texture"),
-            GraphResource::OutputTexture => self
-                .output
-                .expect("internal rendergraph error: tried to get unacquired surface image"),
+            GraphSubResource::ImportedTexture(name) => self
+                .external_texture_mapping
+                .get(&name)
+                .expect("internal rendergraph error: failed to get named texture"),
             r => {
                 panic!("internal rendergraph error: tried to get a {:?} as a render target", r)
             }
@@ -85,6 +86,7 @@ impl<'a> RenderGraphDataStore<'a> {
             .data
             .get(dep.handle.idx)
             .expect("internal rendergraph error: failed to get buffer")
+            .inner
             .downcast_ref::<RefCell<Option<T>>>()
             .expect("internal rendergraph error: downcasting failed")
             .try_borrow_mut()
@@ -102,6 +104,7 @@ impl<'a> RenderGraphDataStore<'a> {
             .data
             .get(dep.handle.idx)
             .expect("internal rendergraph error: failed to get buffer")
+            .inner
             .downcast_ref::<RefCell<Option<T>>>()
             .expect("internal rendergraph error: downcasting failed")
             .try_borrow()
