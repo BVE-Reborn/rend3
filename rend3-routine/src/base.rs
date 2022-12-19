@@ -273,7 +273,7 @@ impl BaseRenderGraphIntermediateState {
                 depth: self
                     .shadow
                     .restrict(0..1, ViewportRect::new(desc.map.offset, UVec2::splat(desc.map.size))),
-                data: shadow_index as u32
+                data: shadow_index as u32,
             });
         }
     }

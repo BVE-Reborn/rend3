@@ -67,6 +67,13 @@ impl DataContents {
     }
 }
 
+#[derive(Debug, Copy, Clone)]
+struct ResourceSpan {
+    first_reference: usize,
+    first_usage: Option<usize>,
+    last_reference: Option<usize>,
+}
+
 /// Implementation of a rendergraph. See module docs for details.
 pub struct RenderGraph<'node> {
     pub(super) targets: Vec<RenderTargetDescriptor>,
@@ -93,6 +100,7 @@ impl<'node> RenderGraph<'node> {
             graph: self,
             inputs: Vec::with_capacity(16),
             outputs: Vec::with_capacity(16),
+            references: Vec::with_capacity(16),
             passthrough: PassthroughDataContainer::new(),
             rpass: None,
         }
@@ -172,6 +180,7 @@ impl<'node> RenderGraph<'node> {
         for node in &mut self.nodes {
             Self::flatten_dependencies(&self.data, &mut node.inputs);
             Self::flatten_dependencies(&self.data, &mut node.outputs);
+            Self::flatten_dependencies(&self.data, &mut node.references);
         }
 
         let mut awaiting_inputs = FastHashSet::default();
@@ -201,18 +210,39 @@ impl<'node> RenderGraph<'node> {
             pruned_node_list.reverse();
         }
 
-        let mut resource_spans = FastHashMap::<_, (usize, Option<usize>)>::default();
+        let mut resource_spans = FastHashMap::<_, ResourceSpan>::default();
         {
             profiling::scope!("Resource Span Analysis");
             // Iterate through all the nodes, tracking the index where they are first used,
             // and the index where they are last used.
             for (idx, node) in pruned_node_list.iter().enumerate() {
+                // Add or update the range for all references
+                for &reference in &node.references {
+                    resource_spans
+                        .entry(reference)
+                        .and_modify(|span| {
+                            span.first_usage.get_or_insert(idx);
+                            span.last_reference = Some(idx);
+                        })
+                        .or_insert(ResourceSpan {
+                            first_reference: idx,
+                            first_usage: None,
+                            last_reference: Some(idx),
+                        });
+                }
                 // Add or update the range for all inputs
                 for &input in &node.inputs {
                     resource_spans
                         .entry(input)
-                        .and_modify(|range| range.1 = Some(idx))
-                        .or_insert((idx, Some(idx)));
+                        .and_modify(|span| {
+                            span.first_usage.get_or_insert(idx);
+                            span.last_reference = Some(idx)
+                        })
+                        .or_insert(ResourceSpan {
+                            first_reference: idx,
+                            first_usage: Some(idx),
+                            last_reference: Some(idx),
+                        });
                 }
                 // All the outputs
                 for &output in &node.outputs {
@@ -224,22 +254,24 @@ impl<'node> RenderGraph<'node> {
                     };
                     resource_spans
                         .entry(output)
-                        .and_modify(|range| range.1 = end)
-                        .or_insert((idx, end));
+                        .and_modify(|span| span.last_reference = end)
+                        .or_insert(ResourceSpan {
+                            first_reference: idx,
+                            first_usage: Some(idx),
+                            last_reference: end,
+                        });
                 }
             }
         }
 
-        dbg!(&resource_spans);
-
-        // For each node, record the list of textures whose spans start and the list of
-        // textures whose spans end.
+        // For each node, record the list of textures whose references start and the list of
+        // textures whose references end.
         let mut resource_changes = vec![(Vec::new(), Vec::new()); pruned_node_list.len()];
         {
             profiling::scope!("Compute Resource Span Deltas");
             for (&resource, span) in &resource_spans {
-                resource_changes[span.0].0.push(resource);
-                if let Some(end) = span.1 {
+                resource_changes[span.first_reference].0.push(resource);
+                if let Some(end) = span.last_reference {
                     resource_changes[end].1.push(resource);
                 }
             }
@@ -369,14 +401,6 @@ impl<'node> RenderGraph<'node> {
 
         // Iterate through all the nodes and actually execute them.
         for (idx, mut node) in pruned_node_list.into_iter().enumerate() {
-            println!(
-                "{} {} {} {} {}",
-                idx,
-                &node.label,
-                node.rpass.is_some(),
-                compatible[idx],
-                renderpass_ends[next_rpass_idx],
-            );
             if !compatible[idx] {
                 // SAFETY: this drops the renderpass, letting us into everything it was
                 // borrowing when we make the new renderpass.
@@ -503,7 +527,7 @@ impl<'node> RenderGraph<'node> {
         encoder: &'rpass mut CommandEncoder,
         node_idx: usize,
         pass_end_idx: usize,
-        resource_spans: &'rpass FastHashMap<GraphSubResource, (usize, Option<usize>)>,
+        resource_spans: &'rpass FastHashMap<GraphSubResource, ResourceSpan>,
         active_views: &'rpass FastHashMap<TextureRegion, TextureView>,
         active_imported_views: &'rpass FastHashMap<TextureRegion, TextureView>,
     ) -> RenderPass<'rpass> {
@@ -513,13 +537,15 @@ impl<'node> RenderGraph<'node> {
             .map(|target| {
                 let view_span = resource_spans[&target.color.handle.resource];
 
-                let load = if view_span.0 == node_idx {
+                let first_usage = view_span.first_usage.expect("internal rendergraph error: renderpass attachment counts as a usage, but no first usage registered on texture");
+
+                let load = if first_usage == node_idx {
                     LoadOp::Clear(target.clear)
                 } else {
                     LoadOp::Load
                 };
 
-                let store = view_span.1 != Some(pass_end_idx);
+                let store = view_span.last_reference != Some(pass_end_idx);
 
                 RenderPassColorAttachment {
                     view: match target.color.handle.resource {
@@ -546,10 +572,12 @@ impl<'node> RenderGraph<'node> {
 
             let view_span = resource_spans[&resource];
 
-            let store = view_span.1 != Some(pass_end_idx);
+            let first_usage = view_span.first_usage.expect("internal rendergraph error: renderpass attachment counts as a usage, but no first usage registered on texture");
+
+            let store = view_span.last_reference != Some(pass_end_idx);
 
             let depth_ops = ds_target.depth_clear.map(|clear| {
-                let load = if view_span.0 == node_idx {
+                let load = if first_usage == node_idx {
                     LoadOp::Clear(clear)
                 } else {
                     LoadOp::Load
@@ -559,7 +587,7 @@ impl<'node> RenderGraph<'node> {
             });
 
             let stencil_load = ds_target.stencil_clear.map(|clear| {
-                let load = if view_span.0 == node_idx {
+                let load = if first_usage == node_idx {
                     LoadOp::Clear(clear)
                 } else {
                     LoadOp::Load

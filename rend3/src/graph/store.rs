@@ -3,7 +3,9 @@ use std::{cell::RefCell, marker::PhantomData};
 use wgpu::TextureView;
 
 use crate::{
-    graph::{DeclaredDependency, GraphSubResource, RenderTargetHandle, RpassTemporaryPool, TextureRegion, DataContents},
+    graph::{
+        DataContents, DeclaredDependency, GraphSubResource, RenderTargetHandle, RpassTemporaryPool, TextureRegion,
+    },
     managers::{
         CameraManager, DirectionalLightManager, MaterialManager, MeshManager, ObjectManager, SkeletonManager,
         TextureManager,

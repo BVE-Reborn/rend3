@@ -12,7 +12,7 @@
 use std::borrow::Cow;
 
 use rend3::{
-    graph::{DataHandle, RenderGraph, RenderPassTarget, RenderPassTargets, RenderTargetHandle},
+    graph::{DataHandle, NodeResourceUsage, RenderGraph, RenderPassTarget, RenderPassTargets, RenderTargetHandle},
     util::bind_merge::{BindGroupBuilder, BindGroupLayoutBuilder},
     Renderer, ShaderConfig, ShaderPreProcessor,
 };
@@ -126,8 +126,8 @@ impl TonemappingRoutine {
     ) {
         let mut builder = graph.add_node("Tonemapping");
 
-        let input_handle = builder.add_render_target_input(src);
-        let output_handle = builder.add_render_target_output(dst);
+        let input_handle = builder.add_render_target(src, NodeResourceUsage::Input);
+        let output_handle = builder.add_render_target(dst, NodeResourceUsage::Output);
 
         let rpass_handle = builder.add_renderpass(RenderPassTargets {
             targets: vec![RenderPassTarget {
@@ -138,7 +138,7 @@ impl TonemappingRoutine {
             depth_stencil: None,
         });
 
-        let forward_uniform_handle = builder.add_data_input(forward_uniform_bg);
+        let forward_uniform_handle = builder.add_data(forward_uniform_bg, NodeResourceUsage::Input);
 
         let pt_handle = builder.passthrough_ref(self);
 

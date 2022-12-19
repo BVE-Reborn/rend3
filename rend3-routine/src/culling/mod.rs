@@ -9,7 +9,7 @@ use std::{
 use encase::{ShaderSize, ShaderType, StorageBuffer};
 use rend3::{
     format_sso,
-    graph::{DataHandle, RenderGraph},
+    graph::{DataHandle, NodeResourceUsage, RenderGraph},
     managers::{MaterialManager, ObjectManager, ShaderObject, TextureBindGroupIndex},
     types::Material,
     util::math::{round_up_div, round_up_pot},
@@ -343,7 +343,7 @@ pub fn add_culling_to_graph<'node, M: Material>(
     name: &str,
 ) {
     let mut node = graph.add_node(name);
-    let output = node.add_data_output(draw_calls_hdl);
+    let output = node.add_data(draw_calls_hdl, NodeResourceUsage::Output);
 
     node.build(move |_pt, renderer, encoder_or_pass, _temps, _ready, graph_data| {
         let jobs = batch_objects::<M>(graph_data.material_manager, graph_data.object_manager);

@@ -20,6 +20,7 @@ pub struct DeclaredDependency<Handle> {
 pub(super) struct RenderGraphNode<'node> {
     pub inputs: Vec<GraphSubResource>,
     pub outputs: Vec<GraphSubResource>,
+    pub references: Vec<GraphSubResource>,
     pub label: SsoString,
     pub rpass: Option<RenderPassTargets>,
     pub passthrough: PassthroughDataContainer<'node>,
@@ -35,6 +36,17 @@ pub(super) struct RenderGraphNode<'node> {
     >,
 }
 
+pub enum NodeResourceUsage {
+    /// Doesn't access the resource at all, just need access to the resource.
+    Reference,
+    /// Only reads the resource.
+    Input,
+    /// Only writes to the resource
+    Output,
+    /// Reads and writes to the resource.
+    InputOutput,
+}
+
 /// Builder for a graph node.
 ///
 /// Calling build will automatically add the node to the rendergraph.
@@ -43,32 +55,39 @@ pub struct RenderGraphNodeBuilder<'a, 'node> {
     pub(super) label: SsoString,
     pub(super) inputs: Vec<GraphSubResource>,
     pub(super) outputs: Vec<GraphSubResource>,
+    pub(super) references: Vec<GraphSubResource>,
     pub(super) passthrough: PassthroughDataContainer<'node>,
     pub(super) rpass: Option<RenderPassTargets>,
 }
 impl<'a, 'node> RenderGraphNodeBuilder<'a, 'node> {
     /// Declares a rendertarget to be read from but not writen to.
-    pub fn add_render_target_input(&mut self, handle: RenderTargetHandle) -> DeclaredDependency<RenderTargetHandle> {
-        self.inputs.push(handle.resource);
+    pub fn add_render_target(
+        &mut self,
+        handle: RenderTargetHandle,
+        usage: NodeResourceUsage,
+    ) -> DeclaredDependency<RenderTargetHandle> {
+        match usage {
+            NodeResourceUsage::Reference => self.references.push(handle.resource),
+            NodeResourceUsage::Input => self.inputs.push(handle.resource),
+            NodeResourceUsage::Output => self.outputs.push(handle.resource),
+            NodeResourceUsage::InputOutput => {
+                self.inputs.push(handle.resource);
+                self.outputs.push(handle.resource)
+            }
+        }
         DeclaredDependency { handle }
     }
 
-    /// Declares a rendertarget to be read or written to.
-    pub fn add_render_target_output(&mut self, handle: RenderTargetHandle) -> DeclaredDependency<RenderTargetHandle> {
-        self.inputs.push(handle.resource);
-        self.outputs.push(handle.resource);
-        DeclaredDependency { handle }
-    }
-
-    /// Sugar over [add_render_target_output][arto] which makes it easy to
-    /// declare resolve textures, which are often Option<RenderTargetHandle>
+    /// Sugar over [add_render_target] which makes it easy to
+    /// declare optional textures.
     ///
-    /// [arto]: RenderGraphNodeBuilder::add_render_target_output
-    pub fn add_optional_render_target_output(
+    /// [add_render_target]: RenderGraphNodeBuilder::add_render_target
+    pub fn add_optional_render_target(
         &mut self,
         handle: Option<RenderTargetHandle>,
+        usage: NodeResourceUsage,
     ) -> Option<DeclaredDependency<RenderTargetHandle>> {
-        Some(self.add_render_target_output(handle?))
+        Some(self.add_render_target(handle?, usage))
     }
 
     /// Declares a renderpass that will be written to. Declaring a renderpass
@@ -85,19 +104,32 @@ impl<'a, 'node> RenderGraphNodeBuilder<'a, 'node> {
     }
 
     /// Declares use of a data handle for reading.
-    pub fn add_data_input<T>(&mut self, handle: DataHandle<T>) -> DeclaredDependency<DataHandle<T>>
+    pub fn add_data<T>(&mut self, handle: DataHandle<T>, usage: NodeResourceUsage) -> DeclaredDependency<DataHandle<T>>
     where
         T: 'static,
     {
-        self.add_data(handle, false)
-    }
+        // TODO: error handling
+        // TODO: move this validation to all types
+        self.graph
+            .data
+            .get(handle.idx)
+            .expect("internal rendergraph error: cannot find data handle")
+            .inner
+            .downcast_ref::<RefCell<Option<T>>>()
+            .expect("used custom data that was previously declared with a different type");
 
-    /// Declares use of a data handle for reading and writing.
-    pub fn add_data_output<T>(&mut self, handle: DataHandle<T>) -> DeclaredDependency<DataHandle<T>>
-    where
-        T: 'static,
-    {
-        self.add_data(handle, true)
+        let subresource = GraphSubResource::Data(handle.idx);
+        match usage {
+            NodeResourceUsage::Reference => self.references.push(subresource),
+            NodeResourceUsage::Input => self.inputs.push(subresource),
+            NodeResourceUsage::Output => self.outputs.push(subresource),
+            NodeResourceUsage::InputOutput => {
+                self.inputs.push(subresource);
+                self.outputs.push(subresource)
+            }
+        }
+
+        DeclaredDependency { handle }
     }
 
     /// Declares a data handle as having the given render targets
@@ -126,27 +158,6 @@ impl<'a, 'node> RenderGraphNodeBuilder<'a, 'node> {
             .expect("internal rendergraph error: cannot find data handle")
             .dependencies
             .extend(render_targets.into_iter().map(|hdl| GraphSubResource::Data(hdl.idx)));
-    }
-
-    fn add_data<T>(&mut self, handle: DataHandle<T>, output: bool) -> DeclaredDependency<DataHandle<T>>
-    where
-        T: 'static,
-    {
-        // TODO: error handling
-        // TODO: move this validation to all types
-        self.graph
-            .data
-            .get(handle.idx)
-            .expect("internal rendergraph error: cannot find data handle")
-            .inner
-            .downcast_ref::<RefCell<Option<T>>>()
-            .expect("used custom data that was previously declared with a different type");
-
-        self.inputs.push(GraphSubResource::Data(handle.idx));
-        if output {
-            self.outputs.push(GraphSubResource::Data(handle.idx));
-        }
-        DeclaredDependency { handle }
     }
 
     /// Declares that this node has an "external" output, meaning it can never
@@ -208,6 +219,7 @@ impl<'a, 'node> RenderGraphNodeBuilder<'a, 'node> {
             label: self.label,
             inputs: self.inputs,
             outputs: self.outputs,
+            references: self.references,
             rpass: self.rpass,
             passthrough: self.passthrough,
             exec: Box::new(exec),

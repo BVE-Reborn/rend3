@@ -5,8 +5,8 @@ use std::iter::once;
 
 use glam::{Mat4, UVec2, Vec4};
 use rend3::{
-    graph::{DataHandle, RenderGraph, RenderTargetHandle},
-    managers::{CameraManager},
+    graph::{DataHandle, NodeResourceUsage, RenderGraph, RenderTargetHandle},
+    managers::CameraManager,
     util::{bind_merge::BindGroupBuilder, frustum::ShaderFrustum},
 };
 use wgpu::{
@@ -68,11 +68,11 @@ pub fn add_to_graph<'node>(
     resolution: UVec2,
 ) {
     let mut builder = graph.add_node("build uniform data");
-    let shadow_handle = builder.add_data_output(shadow_uniform_bg);
-    let forward_handle = builder.add_data_output(forward_uniform_bg);
+    let shadow_handle = builder.add_data(shadow_uniform_bg, NodeResourceUsage::Output);
+    let forward_handle = builder.add_data(forward_uniform_bg, NodeResourceUsage::Output);
 
     // Get the shadow target and declare it a dependency of the forward_uniform_bg
-    let shadow_target_handle = builder.add_render_target_output(shadow_target);
+    let shadow_target_handle = builder.add_render_target(shadow_target, NodeResourceUsage::Reference);
     builder.add_dependencies_to_render_targets(forward_uniform_bg, once(shadow_target));
 
     builder.build(move |_pt, renderer, _encoder_or_pass, _temps, _ready, graph_data| {

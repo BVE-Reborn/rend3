@@ -7,7 +7,10 @@ use std::marker::PhantomData;
 use arrayvec::ArrayVec;
 use encase::ShaderSize;
 use rend3::{
-    graph::{DataHandle, RenderGraph, RenderPassDepthTarget, RenderPassTarget, RenderPassTargets, RenderTargetHandle},
+    graph::{
+        DataHandle, NodeResourceUsage, RenderGraph, RenderPassDepthTarget, RenderPassTarget, RenderPassTargets,
+        RenderTargetHandle,
+    },
     types::{Handedness, Material, SampleCount},
     util::bind_merge::BindGroupBuilder,
     ProfileData, Renderer, RendererDataCore, RendererProfile, ShaderPreProcessor,
@@ -135,9 +138,9 @@ impl<M: Material> ForwardRoutine<M> {
     pub fn add_forward_to_graph<'node>(&'node self, args: RoutineAddToGraphArgs<'_, 'node, M>) {
         let mut builder = args.graph.add_node(args.label);
 
-        let color_handle = builder.add_optional_render_target_output(args.color);
-        let resolve_handle = builder.add_optional_render_target_output(args.resolve);
-        let depth_handle = builder.add_render_target_output(args.depth);
+        let color_handle = builder.add_optional_render_target(args.color, NodeResourceUsage::InputOutput);
+        let resolve_handle = builder.add_optional_render_target(args.resolve, NodeResourceUsage::InputOutput);
+        let depth_handle = builder.add_render_target(args.depth, NodeResourceUsage::InputOutput);
 
         builder.add_external_output();
 
@@ -157,8 +160,8 @@ impl<M: Material> ForwardRoutine<M> {
             }),
         });
 
-        let whole_frame_uniform_handle = builder.add_data_input(args.whole_frame_uniform_bg);
-        let cull_handle = builder.add_data_input(args.culled);
+        let whole_frame_uniform_handle = builder.add_data(args.whole_frame_uniform_bg, NodeResourceUsage::Input);
+        let cull_handle = builder.add_data(args.culled, NodeResourceUsage::Input);
 
         let this_pt_handle = builder.passthrough_ref(self);
         let extra_bg_pt_handle = args.extra_bgs.map(|v| builder.passthrough_ref(v));

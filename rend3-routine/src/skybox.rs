@@ -4,7 +4,7 @@ use std::borrow::Cow;
 
 use rend3::{
     graph::{
-        DataHandle, RenderGraph, RenderPassDepthTarget, RenderPassTarget, RenderPassTargets,
+        DataHandle, NodeResourceUsage, RenderGraph, RenderPassDepthTarget, RenderPassTarget, RenderPassTargets,
         RenderTargetHandle,
     },
     types::{SampleCount, TextureCubeHandle},
@@ -95,9 +95,9 @@ impl SkyboxRoutine {
     ) {
         let mut builder = graph.add_node("Skybox");
 
-        let hdr_color_handle = builder.add_render_target_output(color);
-        let hdr_resolve = builder.add_optional_render_target_output(resolve);
-        let hdr_depth_handle = builder.add_render_target_input(depth);
+        let hdr_color_handle = builder.add_render_target(color, NodeResourceUsage::InputOutput);
+        let hdr_resolve = builder.add_optional_render_target(resolve, NodeResourceUsage::InputOutput);
+        let hdr_depth_handle = builder.add_render_target(depth, NodeResourceUsage::Input);
 
         let rpass_handle = builder.add_renderpass(RenderPassTargets {
             targets: vec![RenderPassTarget {
@@ -112,7 +112,7 @@ impl SkyboxRoutine {
             }),
         });
 
-        let forward_uniform_handle = builder.add_data_input(forward_uniform_bg);
+        let forward_uniform_handle = builder.add_data(forward_uniform_bg, NodeResourceUsage::Input);
         let pt_handle = builder.passthrough_ref(self);
 
         builder.build(move |pt, _renderer, encoder_or_pass, temps, _ready, graph_data| {

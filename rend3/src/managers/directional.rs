@@ -166,7 +166,7 @@ impl DirectionalLightManager {
         );
     }
 
-    pub fn add_to_bg<'a>(&'a self, bgb: &mut BindGroupBuilder<'a>,) {
+    pub fn add_to_bg<'a>(&'a self, bgb: &mut BindGroupBuilder<'a>) {
         bgb.append_buffer(&self.data_buffer);
     }
 }
