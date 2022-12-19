@@ -318,6 +318,14 @@ impl<'a> ShaderVertexBufferHelper<'a> {
                 )?;
 
                 writeln!(input_function, "    }}")?;
+
+                if let Some(default_value) = spec.attribute.default_value() {
+                    writeln!(
+                        input_function,
+                        "else {{ verts.{name} = {default_value}; }}",
+                        name = spec.attribute.name(),
+                    )?;
+                }
             } else {
                 writeln!(
                     input_function,

@@ -143,9 +143,8 @@ impl rend3_framework::App for SkinningExample {
             // Render!
             rend3_framework::Event::RedrawRequested(_) => {
                 // Get a frame
-                let frame = rend3::util::output::OutputFrame::Surface {
-                    surface: Arc::clone(surface.unwrap()),
-                };
+                let frame = surface.unwrap().get_current_texture().unwrap();
+
                 // Ready up the renderer
                 let (cmd_bufs, ready) = renderer.ready();
 
@@ -156,6 +155,8 @@ impl rend3_framework::App for SkinningExample {
                 // Build a rendergraph
                 let mut graph = rend3::graph::RenderGraph::new();
 
+                let frame_handle =
+                    graph.add_imported_render_target(&frame, 0..1, rend3::graph::ViewportRect::from_size(resolution));
                 // Add the default rendergraph without a skybox
                 base_rendergraph.add_to_graph(
                     &mut graph,
@@ -163,6 +164,7 @@ impl rend3_framework::App for SkinningExample {
                     &pbr_routine,
                     None,
                     &tonemapping_routine,
+                    frame_handle,
                     resolution,
                     SAMPLE_COUNT,
                     glam::Vec4::splat(0.15),
@@ -170,7 +172,9 @@ impl rend3_framework::App for SkinningExample {
                 );
 
                 // Dispatch a render using the built up rendergraph!
-                graph.execute(renderer, frame, cmd_bufs, &ready);
+                graph.execute(renderer, cmd_bufs, &ready);
+
+                frame.present();
             }
             // Other events we don't care about
             _ => {}

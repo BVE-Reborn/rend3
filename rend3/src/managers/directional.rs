@@ -139,7 +139,7 @@ impl DirectionalLightManager {
 
                     ShaderDirectionalLight {
                         view_proj: desc.camera.view_proj(),
-                        color: light.color,
+                        color: light.color * light.intensity,
                         direction: light.direction,
                         atlas_offset: desc.map.offset.as_vec2() / new_shadow_map_size_f32,
                         atlas_size: Vec2::splat(desc.map.size as f32) / new_shadow_map_size_f32,

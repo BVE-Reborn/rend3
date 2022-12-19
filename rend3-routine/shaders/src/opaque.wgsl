@@ -471,7 +471,13 @@ fn fs_main(vs_out: VertexOutput) -> @location(0) vec4<f32> {
         let shadow_coords = vec2<f32>(shadow_flipped.x, 1.0 - shadow_flipped.y);
 
         var shadow_value = 1.0;
-        if (any(shadow_flipped >= vec2<f32>(0.0)) || any(shadow_flipped <= vec2<f32>(1.0))) {
+        if (
+            // TODO: check off-by-one on the borders here
+            any(shadow_flipped >= light.offset) && // XY lower
+            any(shadow_flipped <= (light.offset + light.size)) && // XY upper
+            shadow_ndc.z >= 0.0 && // Z lower
+            shadow_ndc.z <= 1.0 // Z upper
+        ) {
             shadow_value = shadow_sample_pcf5(shadows, comparison_sampler, shadow_coords, shadow_ndc.z);
         }
 

@@ -10,6 +10,7 @@ use once_cell::sync::OnceCell;
 #[derive(Debug, Copy, Clone)]
 pub struct VertexAttributeId {
     inner: usize,
+    default_value: Option<&'static str>,
     name: &'static str,
     metadata: &'static VertexFormatMetadata,
 }
@@ -30,6 +31,10 @@ impl VertexAttributeId {
     pub fn metadata(&self) -> &'static VertexFormatMetadata {
         self.metadata
     }
+
+    pub fn default_value(&self) -> Option<&'static str> {
+        self.default_value
+    }
 }
 
 static VERTEX_ATTRIBUTE_INDEX_ALLOCATOR: AtomicUsize = AtomicUsize::new(0);
@@ -39,6 +44,7 @@ where
     T: VertexFormat,
 {
     name: &'static str,
+    default_value: Option<&'static str>,
     id: OnceCell<VertexAttributeId>,
     _phantom: PhantomData<T>,
 }
@@ -46,9 +52,10 @@ impl<T> VertexAttribute<T>
 where
     T: VertexFormat,
 {
-    pub const fn new(name: &'static str) -> Self {
+    pub const fn new(name: &'static str, default_value: Option<&'static str>) -> Self {
         Self {
             name,
+            default_value,
             id: OnceCell::new(),
             _phantom: PhantomData,
         }
@@ -61,6 +68,7 @@ where
     pub fn id(&self) -> &VertexAttributeId {
         self.id.get_or_init(|| VertexAttributeId {
             name: self.name,
+            default_value: self.default_value,
             inner: VERTEX_ATTRIBUTE_INDEX_ALLOCATOR.fetch_add(1, Ordering::Relaxed),
             metadata: &T::METADATA,
         })
@@ -131,14 +139,14 @@ impl VertexFormat for [u8; 4] {
     };
 }
 
-pub static VERTEX_ATTRIBUTE_POSITION: VertexAttribute<glam::Vec3> = VertexAttribute::new("position");
-pub static VERTEX_ATTRIBUTE_NORMAL: VertexAttribute<glam::Vec3> = VertexAttribute::new("normal");
-pub static VERTEX_ATTRIBUTE_TANGENT: VertexAttribute<glam::Vec3> = VertexAttribute::new("tangent");
+pub static VERTEX_ATTRIBUTE_POSITION: VertexAttribute<glam::Vec3> = VertexAttribute::new("position", None);
+pub static VERTEX_ATTRIBUTE_NORMAL: VertexAttribute<glam::Vec3> = VertexAttribute::new("normal", None);
+pub static VERTEX_ATTRIBUTE_TANGENT: VertexAttribute<glam::Vec3> = VertexAttribute::new("tangent", None);
 pub static VERTEX_ATTRIBUTE_TEXTURE_COORDINATES_0: VertexAttribute<glam::Vec2> =
-    VertexAttribute::new("texture_coords_0");
+    VertexAttribute::new("texture_coords_0", None);
 pub static VERTEX_ATTRIBUTE_TEXTURE_COORDINATES_1: VertexAttribute<glam::Vec2> =
-    VertexAttribute::new("texture_coords_1");
-pub static VERTEX_ATTRIBUTE_COLOR_0: VertexAttribute<[u8; 4]> = VertexAttribute::new("color_0");
-pub static VERTEX_ATTRIBUTE_COLOR_1: VertexAttribute<[u8; 4]> = VertexAttribute::new("color_1");
-pub static VERTEX_ATTRIBUTE_JOINT_INDICES: VertexAttribute<[u16; 4]> = VertexAttribute::new("joint_indices");
-pub static VERTEX_ATTRIBUTE_JOINT_WEIGHTS: VertexAttribute<glam::Vec4> = VertexAttribute::new("joint_weights");
+    VertexAttribute::new("texture_coords_1", None);
+pub static VERTEX_ATTRIBUTE_COLOR_0: VertexAttribute<[u8; 4]> = VertexAttribute::new("color_0", Some("vec4<f32>(1.0)"));
+pub static VERTEX_ATTRIBUTE_COLOR_1: VertexAttribute<[u8; 4]> = VertexAttribute::new("color_1", Some("vec4<f32>(1.0)"));
+pub static VERTEX_ATTRIBUTE_JOINT_INDICES: VertexAttribute<[u16; 4]> = VertexAttribute::new("joint_indices", None);
+pub static VERTEX_ATTRIBUTE_JOINT_WEIGHTS: VertexAttribute<glam::Vec4> = VertexAttribute::new("joint_weights", None);

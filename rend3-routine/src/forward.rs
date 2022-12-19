@@ -264,7 +264,14 @@ fn build_forward_pipeline_inner<M: Material>(
             depth_write_enabled: true,
             depth_compare: CompareFunction::GreaterEqual,
             stencil: StencilState::default(),
-            bias: DepthBiasState::default(),
+            bias: match args.routine_type {
+                RoutineType::Depth => DepthBiasState {
+                    constant: -2,
+                    slope_scale: -2.0,
+                    clamp: 0.0,
+                },
+                RoutineType::Forward => DepthBiasState::default(),
+            },
         }),
         multisample: MultisampleState {
             count: samples as u32,
