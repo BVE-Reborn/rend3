@@ -39,7 +39,7 @@ console_log = "0.2"
 console_error_panic_hook = "0.1"
 js-sys = "0.3"
 web-sys = "0.3"
-wasm-bindgen = "=0.2.81"
+wasm-bindgen = "=0.2.83"
 wasm-bindgen-futures = "0.4"
 
 [target.'cfg(target_os = "android")'.dependencies]

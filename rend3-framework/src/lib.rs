@@ -10,7 +10,7 @@ use wgpu::Instance;
 use winit::{
     dpi::PhysicalSize,
     event::WindowEvent,
-    event_loop::{ControlFlow, EventLoop, EventLoopWindowTarget},
+    event_loop::{ControlFlow, EventLoop, EventLoopBuilder, EventLoopWindowTarget},
     window::{Window, WindowBuilder, WindowId},
 };
 
@@ -57,7 +57,7 @@ pub trait App<T: 'static = ()> {
     fn create_window(&mut self, builder: WindowBuilder) -> (EventLoop<UserResizeEvent<T>>, Window) {
         profiling::scope!("creating window");
 
-        let event_loop = EventLoop::with_user_event();
+        let event_loop = EventLoopBuilder::with_user_event().build();
         let window = builder.build(&event_loop).expect("Could not build window");
 
         #[cfg(target_arch = "wasm32")]

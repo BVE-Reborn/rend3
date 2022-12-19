@@ -1,7 +1,7 @@
 use crate::types::{PresentMode, Surface};
 use glam::UVec2;
 use rend3_types::{TextureFormat, TextureUsages};
-use wgpu::{Device, SurfaceConfiguration};
+use wgpu::{CompositeAlphaMode, Device, SurfaceConfiguration};
 
 /// Convinence function that re-configures the surface with the expected usages.
 pub fn configure_surface(
@@ -19,6 +19,7 @@ pub fn configure_surface(
             width: size.x,
             height: size.y,
             present_mode,
+            alpha_mode: CompositeAlphaMode::Auto,
         },
     )
 }
