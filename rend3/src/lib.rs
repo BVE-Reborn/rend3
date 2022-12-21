@@ -179,6 +179,7 @@ pub mod util {
         pub use vec::*;
     }
     pub mod math;
+    pub(crate) mod iter;
     pub mod mipmap;
     pub mod output;
     pub mod scatter_copy;

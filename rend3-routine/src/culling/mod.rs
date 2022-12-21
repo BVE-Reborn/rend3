@@ -63,11 +63,9 @@ fn batch_objects<M: Material>(material_manager: &MaterialManager, object_manager
         None => return jobs,
     };
 
-    let predicted_count = objects.size_hint().1.unwrap_or(0);
-
     let material_archetype = material_manager.archetype_view::<M>();
 
-    let mut sorted_objects = Vec::with_capacity(predicted_count);
+    let mut sorted_objects = Vec::with_capacity(objects.len());
     for (handle, object) in objects {
         let material = material_archetype.material(*object.material_handle);
         let bind_group_index = material

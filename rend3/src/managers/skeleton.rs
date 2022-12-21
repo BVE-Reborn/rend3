@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use crate::managers::MeshManager;
+use crate::{managers::MeshManager, util::iter::ExactSizerIterator};
 
 use arrayvec::ArrayVec;
 use glam::Mat4;
@@ -32,6 +32,7 @@ pub struct InternalSkeleton {
 /// hierarchy is stored.
 pub struct SkeletonManager {
     data: Vec<Option<InternalSkeleton>>,
+    skeleton_count: usize,
     /// The number of joints of all the skeletons in this manager
     global_joint_count: usize,
 }
@@ -41,6 +42,7 @@ impl SkeletonManager {
 
         Self {
             data: Vec::new(),
+            skeleton_count: 0,
             global_joint_count: 0,
         }
     }
@@ -120,6 +122,8 @@ impl SkeletonManager {
             self.data.resize_with(handle.idx + 1, || None);
         }
         self.data[handle.idx] = Some(internal);
+
+        self.skeleton_count += 1;
     }
 
     pub fn remove(&mut self, mesh_manager: &mut MeshManager, handle: RawSkeletonHandle) {
@@ -130,6 +134,8 @@ impl SkeletonManager {
         for (_, range) in skeleton.overridden_attribute_ranges {
             mesh_manager.free_range(range);
         }
+
+        self.skeleton_count -= 1;
     }
 
     pub fn set_joint_matrices(&mut self, handle: RawSkeletonHandle, mut joint_matrices: Vec<Mat4>) {
@@ -150,9 +156,9 @@ impl SkeletonManager {
         self.data[handle.idx].as_ref().unwrap()
     }
 
-    // pub fn skeletons(&self) -> impl ExactSizeIterator<Item = &InternalSkeleton> {
-    //     self.data.iter()
-    // }
+    pub fn skeletons(&self) -> impl ExactSizeIterator<Item = &InternalSkeleton> {
+        ExactSizerIterator::new(self.data.iter().filter_map(Option::as_ref), self.skeleton_count)
+    }
 
     /// Get the skeleton manager's global joint count.
     pub fn global_joint_count(&self) -> usize {

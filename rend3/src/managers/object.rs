@@ -4,7 +4,8 @@ use crate::{
     managers::{InternalMesh, MaterialManager, MeshManager},
     types::{Object, ObjectHandle},
     util::{
-        freelist::FreelistDerivedBuffer, frustum::BoundingSphere, scatter_copy::ScatterCopy, typedefs::FastHashMap,
+        freelist::FreelistDerivedBuffer, frustum::BoundingSphere, iter::ExactSizerIterator, scatter_copy::ScatterCopy,
+        typedefs::FastHashMap,
     },
 };
 use encase::ShaderType;
@@ -75,6 +76,7 @@ impl<M: Material> InternalObject<M> {
 struct ObjectArchetype {
     /// Inner type is Option<InternalObject<M>>
     data_vec: VecAny,
+    object_count: usize,
     buffer: FreelistDerivedBuffer,
     set_object_transform: fn(&mut VecAny, &mut FreelistDerivedBuffer, usize, Mat4),
     duplicate_object: fn(&VecAny, usize, ObjectChange) -> Object,
@@ -101,6 +103,7 @@ impl ObjectManager {
         let type_id = TypeId::of::<M>();
         self.archetype.entry(type_id).or_insert_with(|| ObjectArchetype {
             data_vec: VecAny::new::<Option<InternalObject<M>>>(),
+            object_count: 0,
             buffer: FreelistDerivedBuffer::new::<ShaderObject<M>>(device),
             set_object_transform: set_object_transform::<M>,
             duplicate_object: duplicate_object::<M>,
@@ -157,6 +160,8 @@ impl ObjectManager {
         let archetype = self.archetype.get_mut(&type_id).unwrap();
 
         (archetype.remove)(&mut archetype.data_vec, handle.idx);
+
+        archetype.object_count -= 1;
     }
 
     pub fn ready(&mut self, device: &Device, encoder: &mut CommandEncoder, scatter: &ScatterCopy) {
@@ -171,19 +176,20 @@ impl ObjectManager {
 
     pub fn enumerated_objects<M: Material>(
         &self,
-    ) -> Option<impl Iterator<Item = (RawObjectHandle, &InternalObject<M>)> + '_> {
+    ) -> Option<impl ExactSizeIterator<Item = (RawObjectHandle, &InternalObject<M>)> + '_> {
         let type_id = TypeId::of::<M>();
 
-        Some(
-            self.archetype
-                .get(&type_id)?
-                .data_vec
-                .downcast_slice::<Option<InternalObject<M>>>()
-                .unwrap()
-                .into_iter()
-                .enumerate()
-                .filter_map(|(idx, o)| o.as_ref().map(|o| (RawObjectHandle::new(idx), o))),
-        )
+        let archetype = self.archetype.get(&type_id)?;
+
+        let iter = archetype
+            .data_vec
+            .downcast_slice::<Option<InternalObject<M>>>()
+            .unwrap()
+            .into_iter()
+            .enumerate()
+            .filter_map(|(idx, o)| o.as_ref().map(|o| (RawObjectHandle::new(idx), o)));
+
+        Some(ExactSizerIterator::new(iter, archetype.object_count))
     }
 
     pub fn duplicate_object(
@@ -295,6 +301,7 @@ pub(super) fn object_add_callback<M: Material>(_material: &M, args: ObjectAddCal
         data_vec.resize_with((args.handle.idx + 1).next_power_of_two(), || None);
     }
     data_vec[args.handle.idx] = Some(internal_object);
+    archetype.object_count += 1;
     archetype.buffer.use_index(args.handle.idx);
 }
 

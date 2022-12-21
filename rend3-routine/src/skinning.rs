@@ -1,14 +1,15 @@
 use std::{borrow::Cow, mem, num::NonZeroU64};
 
+use encase::{ShaderType, ShaderSize};
 use glam::{Mat4, UVec2};
 use rend3::{
     graph::{DataHandle, RenderGraph},
-    managers::SkeletonManager,
+    managers::{SkeletonManager, MeshManager},
     util::{
         bind_merge::{BindGroupBuilder, BindGroupLayoutBuilder},
         math::round_up_div,
     },
-    ShaderConfig, ShaderPreProcessor,
+    ShaderConfig, ShaderPreProcessor, types::{VERTEX_ATTRIBUTE_POSITION, VERTEX_ATTRIBUTE_NORMAL, VERTEX_ATTRIBUTE_TANGENT, VERTEX_ATTRIBUTE_JOINT_INDICES, VERTEX_ATTRIBUTE_JOINT_WEIGHTS},
 };
 use wgpu::{
     BindGroupLayout, BindingType, Buffer, BufferBindingType, BufferDescriptor, BufferUsages, CommandEncoder,
@@ -17,27 +18,29 @@ use wgpu::{
 };
 
 /// The per-skeleton data, as uploaded to the GPU compute shader.
-#[repr(C, align(16))]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, ShaderType)]
 pub struct GpuSkinningInput {
-    /// See [rend3::managers::GpuVertexRanges].
-    pub mesh_range: UVec2,
-    /// See [rend3::managers::GpuVertexRanges].
-    pub skeleton_range: UVec2,
-    /// The index of this skeleton's first joint in the global joint matrix
-    /// buffer.
-    pub joint_idx: u32,
-}
+    /// Byte offset into vertex buffer of position attribute of unskinned mesh.
+    base_position_offset: u32,
+    /// Byte offset into vertex buffer of normal attribute of unskinned mesh.
+    base_normal_offset: u32,
+    /// Byte offset into vertex buffer of tangent attribute of unskinned mesh.
+    base_tangent_offset: u32,
+    /// Byte offset into vertex buffer of joint indices of mesh.
+    joint_indices_offset: u32,
+    /// Byte offset into vertex buffer of joint weights of mesh.
+    joint_weight_offset: u32,
+    /// Byte offset into vertex buffer of position attribute of skinned mesh.
+    updated_position_offset: u32,
+    /// Byte offset into vertex buffer of normal attribute of skinned mesh.
+    updated_normal_offset: u32,
+    /// Byte offset into vertex buffer of tangent attribute of skinned mesh.
+    updated_tangent_offset: u32,
 
-/// Uploads the data for the GPU skinning compute pass to the GPU
-pub fn add_pre_skin_to_graph(graph: &mut RenderGraph, pre_skin_data: DataHandle<PreSkinningBuffers>) {
-    // let mut builder = graph.add_node("pre-skinning");
-    // let pre_skin_handle = builder.add_data_output(pre_skin_data);
-
-    // builder.build(move |_pt, renderer, _encoder_or_pass, _temps, _ready, graph_data| {
-    //     let buffers = build_gpu_skinning_input_buffers(&renderer.device, graph_data.skeleton_manager);
-    //     graph_data.set_data::<PreSkinningBuffers>(pre_skin_handle, Some(buffers));
-    // });
+    /// Index into the matrix buffer that joint_indices is relative to.
+    joint_matrix_base_offset: u32,
+    /// Count of vertices in this mesh.
+    vertex_count: u32,
 }
 
 /// The two buffers uploaded to the GPU during pre-skinning.
@@ -46,70 +49,97 @@ pub struct PreSkinningBuffers {
     joint_matrices: Buffer,
 }
 
-fn build_gpu_skinning_input_buffers(device: &Device, skeleton_manager: &SkeletonManager) -> PreSkinningBuffers {
-    // profiling::scope!("Building GPU Skinning Input Data");
+fn build_gpu_skinning_input_buffers(device: &Device, skeleton_manager: &SkeletonManager, mesh_manager: &MeshManager) -> PreSkinningBuffers {
+    profiling::scope!("Building GPU Skinning Input Data");
 
-    // let skinning_inputs_size = skeleton_manager.skeletons().len() * mem::size_of::<GpuSkinningInput>();
-    // let gpu_skinning_inputs = device.create_buffer(&BufferDescriptor {
-    //     label: Some("skinning inputs"),
-    //     size: skinning_inputs_size as u64,
-    //     usage: BufferUsages::STORAGE,
-    //     mapped_at_creation: true,
-    // });
+    let skinning_inputs_size = skeleton_manager.skeletons().len() as u64 * GpuSkinningInput::SHADER_SIZE.get();
+    let gpu_skinning_inputs = device.create_buffer(&BufferDescriptor {
+        label: Some("skinning inputs"),
+        size: skinning_inputs_size,
+        usage: BufferUsages::STORAGE,
+        mapped_at_creation: true,
+    });
 
-    // let joint_matrices = device.create_buffer(&BufferDescriptor {
-    //     label: Some("joint matrices"),
-    //     size: (skeleton_manager.global_joint_count() * mem::size_of::<Mat4>()) as u64,
-    //     usage: BufferUsages::STORAGE,
-    //     mapped_at_creation: true,
-    // });
+    let joint_matrices = device.create_buffer(&BufferDescriptor {
+        label: Some("joint matrices"),
+        size: (skeleton_manager.global_joint_count() * mem::size_of::<Mat4>()) as u64,
+        usage: BufferUsages::STORAGE,
+        mapped_at_creation: true,
+    });
 
-    // let mut skinning_input_data = gpu_skinning_inputs.slice(..).get_mapped_range_mut();
-    // let mut joint_matrices_data = joint_matrices.slice(..).get_mapped_range_mut();
+    let mut skinning_input_range = gpu_skinning_inputs.slice(..).get_mapped_range_mut();
+    let mut skinning_input_data = encase::DynamicStorageBuffer::new(&mut *skinning_input_range);
+    let mut joint_matrices_data = joint_matrices.slice(..).get_mapped_range_mut();
 
-    // // Skeletons have a variable number of joints, so we need to keep track of
-    // // the global index here.
-    // let mut joint_matrix_idx = 0;
+    // Skeletons have a variable number of joints, so we need to keep track of
+    // the global index here.
+    let mut joint_matrix_idx = 0;
 
-    // // Iterate over the skeletons, fill the buffers
-    // for (idx, skeleton) in skeleton_manager.skeletons().enumerate() {
-    //     // SAFETY: We are always accessing elements in bounds and all accesses are
-    //     // aligned
-    //     unsafe {
-    //         let input = GpuSkinningInput {
-    //             skeleton_range: skeleton.ranges.skeleton_range,
-    //             mesh_range: skeleton.ranges.mesh_range,
-    //             joint_idx: joint_matrix_idx,
-    //         };
+    // Iterate over the skeletons, fill the buffers
+    for (idx, skeleton) in skeleton_manager.skeletons().enumerate() {
+        // SAFETY: We are always accessing elements in bounds and all accesses are
+        // aligned
+        unsafe {
+            let mesh = mesh_manager.internal_data(*skeleton.mesh_handle);
 
-    //         // The skinning inputs buffer has as many elements as skeletons, so
-    //         // using the same index as the current skeleton will never access OOB
-    //         let skin_input_ptr = skinning_input_data.as_mut_ptr() as *mut GpuSkinningInput;
-    //         skin_input_ptr.add(idx).write_unaligned(input);
+            let input = GpuSkinningInput {
+                base_position_offset: 0xFFFFFFFF,
+                base_normal_offset: 0xFFFFFFFF,
+                base_tangent_offset: 0xFFFFFFFF,
+                joint_indices_offset: 0xFFFFFFFF,
+                joint_weight_offset: 0xFFFFFFFF,
+                updated_position_offset: 0xFFFFFFFF,
+                updated_normal_offset: 0xFFFFFFFF,
+                updated_tangent_offset: 0xFFFFFFFF,
+                joint_matrix_base_offset: joint_matrix_idx,
+                vertex_count: mesh.vertex_count,
+            };
 
-    //         let joint_matrices_ptr = joint_matrices_data.as_mut_ptr() as *mut [[f32; 4]; 4];
-    //         for joint_matrix in &skeleton.joint_matrices {
-    //             // Here, the access can't be OOB either: The joint_matrix_idx
-    //             // will get incremented once for every joint matrix, and the
-    //             // length of the buffer is exactly the sum of all joint matrix
-    //             // vector lengths.
-    //             joint_matrices_ptr
-    //                 .add(joint_matrix_idx as usize)
-    //                 .write_unaligned(joint_matrix.to_cols_array_2d());
-    //             joint_matrix_idx += 1;
-    //         }
-    //     }
-    // }
+            for (attribute, range) in &skeleton.source_attribute_ranges {
+                match attribute {
+                    a if *a == *VERTEX_ATTRIBUTE_POSITION => input.base_position_offset = range.start as u32,
+                    a if *a == *VERTEX_ATTRIBUTE_NORMAL => input.base_normal_offset = range.start as u32,
+                    a if *a == *VERTEX_ATTRIBUTE_TANGENT => input.base_tangent_offset = range.start as u32,
+                    a if *a == *VERTEX_ATTRIBUTE_JOINT_INDICES => input.joint_indices_offset = range.start as u32,
+                    a if *a == *VERTEX_ATTRIBUTE_JOINT_WEIGHTS => input.joint_weight_offset = range.start as u32,
+                    a => unreachable!("Unknown skinning input attribute {a:?}"),
+                } 
+            }
 
-    // drop(skinning_input_data);
-    // drop(joint_matrices_data);
-    // gpu_skinning_inputs.unmap();
-    // joint_matrices.unmap();
+            for (attribute, range) in &skeleton.overridden_attribute_ranges {
+                match attribute {
+                    a if *a == *VERTEX_ATTRIBUTE_POSITION => input.updated_position_offset = range.start as u32,
+                    a if *a == *VERTEX_ATTRIBUTE_NORMAL => input.updated_normal_offset = range.start as u32,
+                    a if *a == *VERTEX_ATTRIBUTE_TANGENT => input.updated_tangent_offset = range.start as u32,
+                    a => unreachable!("Unknown skinning output attribute {a:?}"),
+                } 
+            }
 
-    // PreSkinningBuffers {
-    //     gpu_skinning_inputs,
-    //     joint_matrices,
-    // }
+            skinning_input_data.write(&input);
+
+            let joint_matrices_ptr = joint_matrices_data.as_mut_ptr() as *mut [[f32; 4]; 4];
+            for joint_matrix in &skeleton.joint_matrices {
+                // Here, the access can't be OOB either: The joint_matrix_idx
+                // will get incremented once for every joint matrix, and the
+                // length of the buffer is exactly the sum of all joint matrix
+                // vector lengths.
+                joint_matrices_ptr
+                    .add(joint_matrix_idx as usize)
+                    .write_unaligned(joint_matrix.to_cols_array_2d());
+                joint_matrix_idx += 1;
+            }
+        }
+    }
+
+    drop(skinning_input_data);
+    drop(joint_matrices_data);
+    gpu_skinning_inputs.unmap();
+    joint_matrices.unmap();
+
+    PreSkinningBuffers {
+        gpu_skinning_inputs,
+        joint_matrices,
+    };
 
     todo!()
 }
