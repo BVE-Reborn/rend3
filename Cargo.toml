@@ -36,18 +36,19 @@ debug = true
 lto = "thin"
 
 [patch.crates-io]
-# wgpu = { git = "https://github.com/gfx-rs/wgpu.git", rev = "f42342bbbfd9d7ebd61745acccc0669fc0e064d2" }
-# wgpu-core = { git = "https://github.com/gfx-rs/wgpu.git", rev = "f42342bbbfd9d7ebd61745acccc0669fc0e064d2" }
-# wgpu-hal = { git = "https://github.com/gfx-rs/wgpu.git", rev = "f42342bbbfd9d7ebd61745acccc0669fc0e064d2" }
-# wgpu-types = { git = "https://github.com/gfx-rs/wgpu.git", rev = "f42342bbbfd9d7ebd61745acccc0669fc0e064d2" }
+# wgpu = { git = "https://github.com/gfx-rs/wgpu.git", rev = "6f4ec4fbab2e6209e59e563402db5f11e0b2a16e" }
+# wgpu-core = { git = "https://github.com/gfx-rs/wgpu.git", rev = "6f4ec4fbab2e6209e59e563402db5f11e0b2a16e" }
+# wgpu-hal = { git = "https://github.com/gfx-rs/wgpu.git", rev = "6f4ec4fbab2e6209e59e563402db5f11e0b2a16e" }
+# wgpu-types = { git = "https://github.com/gfx-rs/wgpu.git", rev = "6f4ec4fbab2e6209e59e563402db5f11e0b2a16e" }
 # wgpu = { git = "https://github.com/cwfitzgerald/wgpu.git", rev = "bda861f77e0ca0b97697850ad19d19a8b8f1cc9c" }
 # wgpu-core = { git = "https://github.com/cwfitzgerald/wgpu.git", rev = "bda861f77e0ca0b97697850ad19d19a8b8f1cc9c" }
 # wgpu-hal = { git = "https://github.com/cwfitzgerald/wgpu.git", rev = "bda861f77e0ca0b97697850ad19d19a8b8f1cc9c" }
 # wgpu-types = { git = "https://github.com/cwfitzgerald/wgpu.git", rev = "bda861f77e0ca0b97697850ad19d19a8b8f1cc9c" }
-# wgpu = { path = "../wgpu/wgpu" }
-# wgpu-core = { path = "../wgpu/wgpu-core" }
-# wgpu-hal = { path = "../wgpu/wgpu-hal" }
-# wgpu-types = { path = "../wgpu/wgpu-types" }
+wgpu = { path = "../wgpu/wgpu" }
+wgpu-core = { path = "../wgpu/wgpu-core" }
+wgpu-hal = { path = "../wgpu/wgpu-hal" }
+wgpu-types = { path = "../wgpu/wgpu-types" }
+naga = { git = "https://github.com/gfx-rs/naga.git", rev = "e7fc8e6" }
 range-alloc = { git = "https://github.com/expenses/gfx.git", rev = "6afbeb6d9733e295404f4fe0ac936591e277a26e" }
 
 gltf = { git = "https://github.com/gltf-rs/gltf.git", rev = "7031e7a8ec7c991b1b1d29eaf7c531c6f4842083" }

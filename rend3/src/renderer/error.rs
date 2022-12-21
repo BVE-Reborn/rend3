@@ -5,6 +5,7 @@ use wgpu::Features;
 #[derive(Debug)]
 pub enum LimitType {
     BindGroups,
+    MaxBindingsPerBindGroup,
     DynamicUniformBuffersPerPipelineLayout,
     DynamicStorageBuffersPerPipelineLayout,
     SampledTexturesPerShaderStages,

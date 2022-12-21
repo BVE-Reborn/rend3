@@ -212,7 +212,7 @@ pub async fn async_start<A: App<T> + 'static, T: 'static>(mut app: A, window_bui
     let mut surface = if cfg!(target_os = "android") {
         None
     } else {
-        Some(Arc::new(unsafe { iad.instance.create_surface(&window) }))
+        Some(Arc::new(unsafe { iad.instance.create_surface(&window) }.unwrap()))
     };
 
     // Make us a renderer.
@@ -227,8 +227,8 @@ pub async fn async_start<A: App<T> + 'static, T: 'static>(mut app: A, window_bui
     //
     // Assume android supports Rgba8Srgb, as it has 100% device coverage
     let format = surface.as_ref().map_or(TextureFormat::Rgba8UnormSrgb, |s| {
-        let formats = s.get_supported_formats(&iad.adapter);
-        let format = formats[0];
+        let caps = s.get_capabilities(&iad.adapter);
+        let format = caps.formats[0];
 
         // Configure the surface to be ready for rendering.
         rend3::configure_surface(
@@ -359,7 +359,7 @@ fn handle_surface<A: App<T>, T: 'static>(
 ) -> Option<bool> {
     match *event {
         Event::Resumed => {
-            *surface = Some(Arc::new(unsafe { instance.create_surface(window) }));
+            *surface = Some(Arc::new(unsafe { instance.create_surface(window) }.unwrap()));
             Some(false)
         }
         Event::Suspended => {
