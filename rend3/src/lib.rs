@@ -178,8 +178,8 @@ pub mod util {
         pub use buffer::*;
         pub use vec::*;
     }
-    pub mod math;
     pub(crate) mod iter;
+    pub mod math;
     pub mod mipmap;
     pub mod output;
     pub mod scatter_copy;

@@ -16,9 +16,9 @@ path = "src/main.rs"
 
 [dependencies]
 # logging
-env_logger = { version = "0.9", default-features = false, features = ["termcolor", "atty"] }
+env_logger = { version = "0.10", default-features = false, features = ["auto-color", "humantime"] }
 # Linear algebra library
-glam = "0.21.2"
+glam = "0.22"
 # std::time::Instant that works on wasm
 instant = "0.1"
 # block on async functions
@@ -34,7 +34,7 @@ rend3-anim = { version = "^0.3.0", path = "../../rend3-anim" }
 # Import gltf models
 rend3-gltf = { version = "^0.3.0", path = "../../rend3-gltf" }
 # windowing
-winit = "0.26"
+winit = "0.27"
 image = { version = "0.24", default-features = false, features = ["jpeg"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
@@ -46,7 +46,7 @@ wasm-bindgen = "=0.2.83"
 wasm-bindgen-futures = "0.4"
 
 [target.'cfg(target_os = "android")'.dependencies]
-ndk-glue = { version = "0.5", features = ["logger"] }
+ndk-glue = { version = "0.7", features = ["logger"] }
 
 [package.metadata.android]
 build_targets = ["aarch64-linux-android"]

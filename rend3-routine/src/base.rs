@@ -25,13 +25,7 @@ use rend3::{
 };
 use wgpu::{BindGroup, Buffer};
 
-use crate::{
-    common, culling,
-    forward::RoutineAddToGraphArgs,
-    pbr,
-    skinning::{self, GpuSkinner, SkinningOutput},
-    skybox, tonemapping,
-};
+use crate::{common, culling, forward::RoutineAddToGraphArgs, pbr, skinning, skybox, tonemapping};
 
 /// Starter RenderGraph.
 ///
@@ -40,7 +34,7 @@ pub struct BaseRenderGraph {
     pub interfaces: common::WholeFrameInterfaces,
     pub samplers: common::Samplers,
     pub gpu_culler: culling::GpuCuller,
-    pub gpu_skinner: GpuSkinner,
+    pub gpu_skinner: skinning::GpuSkinner,
 }
 
 impl BaseRenderGraph {
@@ -54,7 +48,7 @@ impl BaseRenderGraph {
         // TODO: Support more materials
         let gpu_culler = culling::GpuCuller::new::<pbr::PbrMaterial>(&renderer, spp);
 
-        let gpu_skinner = GpuSkinner::new(&renderer.device, spp);
+        let gpu_skinner = skinning::GpuSkinner::new(&renderer.device, spp);
 
         Self {
             interfaces,
@@ -84,7 +78,6 @@ impl BaseRenderGraph {
         let state = BaseRenderGraphIntermediateState::new(graph, ready, resolution, samples);
 
         // Preparing and uploading data
-        state.pre_skinning(graph);
         state.create_frame_uniforms(graph, self, ambient, resolution);
 
         // Skinning
@@ -127,7 +120,6 @@ pub struct BaseRenderGraphIntermediateState {
     pub resolve: Option<RenderTargetHandle>,
     pub depth: RenderTargetHandle,
     pub pre_skinning_buffers: DataHandle<skinning::PreSkinningBuffers>,
-    pub skinned_data: DataHandle<skinning::SkinningOutput>,
 }
 impl BaseRenderGraphIntermediateState {
     /// Create the default setting for all state.
@@ -178,7 +170,6 @@ impl BaseRenderGraphIntermediateState {
         });
 
         let pre_skinning_buffers = graph.add_data::<skinning::PreSkinningBuffers>();
-        let skinned_data = graph.add_data::<SkinningOutput>();
 
         Self {
             pre_cull: graph.add_data(),
@@ -196,13 +187,7 @@ impl BaseRenderGraphIntermediateState {
             resolve,
             depth,
             pre_skinning_buffers,
-            skinned_data,
         }
-    }
-
-    /// Upload skinning input data to the GPU.
-    pub fn pre_skinning(&self, graph: &mut RenderGraph<'_>) {
-        crate::skinning::add_pre_skin_to_graph(graph, self.pre_skinning_buffers);
     }
 
     /// Create all the uniforms all the shaders in this graph need.
@@ -238,7 +223,7 @@ impl BaseRenderGraphIntermediateState {
     }
 
     pub fn skinning<'node>(&self, graph: &mut RenderGraph<'node>, base: &'node BaseRenderGraph) {
-        crate::skinning::add_skinning_to_graph(graph, &base.gpu_skinner, self.pre_skinning_buffers, self.skinned_data);
+        crate::skinning::add_skinning_to_graph(graph, &base.gpu_skinner);
     }
 
     /// Does all culling for the forward PBR materials.

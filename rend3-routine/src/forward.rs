@@ -142,7 +142,7 @@ impl<M: Material> ForwardRoutine<M> {
         let resolve_handle = builder.add_optional_render_target(args.resolve, NodeResourceUsage::InputOutput);
         let depth_handle = builder.add_render_target(args.depth, NodeResourceUsage::InputOutput);
 
-        builder.add_external_output();
+        builder.add_side_effect();
 
         let rpass_handle = builder.add_renderpass(RenderPassTargets {
             targets: match color_handle {

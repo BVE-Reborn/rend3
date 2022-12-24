@@ -1,6 +1,4 @@
 {{include "rend3-routine/math/matrix.wgsl"}}
-{{include "rend3-routine/structures.wgsl"}}
-{{include "rend3-routine/structures_object.wgsl"}}
 
 struct SkinningInput {
     /// Byte offset into vertex buffer of position attribute of unskinned mesh.

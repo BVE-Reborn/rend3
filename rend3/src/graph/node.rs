@@ -160,9 +160,8 @@ impl<'a, 'node> RenderGraphNodeBuilder<'a, 'node> {
             .extend(render_targets.into_iter().map(|hdl| GraphSubResource::Data(hdl.idx)));
     }
 
-    /// Declares that this node has an "external" output, meaning it can never
-    /// be culled.
-    pub fn add_external_output(&mut self) {
+    /// Declares that this node has some unknowable side effect, so can't be removed.
+    pub fn add_side_effect(&mut self) {
         self.inputs.push(GraphSubResource::External);
         self.outputs.push(GraphSubResource::External);
     }

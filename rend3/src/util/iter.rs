@@ -7,17 +7,17 @@ pub struct ExactSizerIterator<I> {
     size: usize,
 }
 
-impl<I> ExactSizerIterator<I> where I: Iterator + Clone {
+impl<I> ExactSizerIterator<I>
+where
+    I: Iterator + Clone,
+{
     /// Creates a new iterator adapter. In debug validates
     /// that the iterator is the same length as it says it is.
     pub fn new(inner: I, size: usize) -> Self {
         debug_assert_eq!(inner.clone().count(), size);
-        Self {
-            inner,
-            size,
-        }
+        Self { inner, size }
     }
- }
+}
 
 impl<I> Iterator for ExactSizerIterator<I>
 where
