@@ -88,7 +88,7 @@ fn main() {
         &iad.device,
         preferred_format,
         glam::UVec2::new(window_size.width, window_size.height),
-        rend3::types::PresentMode::Mailbox,
+        rend3::types::PresentMode::Fifo,
     );
 
     // Make us a renderer.
@@ -189,7 +189,7 @@ fn main() {
                 &renderer.device,
                 preferred_format,
                 glam::UVec2::new(resolution.x, resolution.y),
-                rend3::types::PresentMode::Mailbox,
+                rend3::types::PresentMode::Fifo,
             );
             // Tell the renderer about the new aspect ratio.
             renderer.set_aspect_ratio(resolution.x as f32 / resolution.y as f32);
