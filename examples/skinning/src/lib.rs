@@ -86,7 +86,7 @@ impl rend3_framework::App for SkinningExample {
 
         // Load a gltf model with animation data
         let path = Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/RiggedSimple.glb"));
-        let gltf_data = std::fs::read(&path).unwrap();
+        let gltf_data = std::fs::read(path).unwrap();
         let parent_directory = path.parent().unwrap();
         let (loaded_scene, loaded_instance) = pollster::block_on(rend3_gltf::load_gltf(
             renderer,

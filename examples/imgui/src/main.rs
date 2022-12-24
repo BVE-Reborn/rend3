@@ -154,7 +154,7 @@ impl rend3_framework::App for ImguiExample {
                 ui.show_demo_window(&mut data.demo_window_open);
 
                 // Prepare for rendering
-                data.platform.prepare_render(&ui, window);
+                data.platform.prepare_render(ui, window);
 
                 // Get a frame
                 let frame = surface.unwrap().get_current_texture().unwrap();

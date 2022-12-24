@@ -359,7 +359,7 @@ impl<T> PotentialAdapter<T> {
 }
 
 /// Set of common GPU vendors.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Vendor {
     Nv,
     Amd,
@@ -373,7 +373,7 @@ pub enum Vendor {
 }
 
 /// Information about an adapter. Includes named PCI IDs for vendors.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ExtendedAdapterInfo {
     /// Adapter name
     pub name: String,

@@ -37,7 +37,7 @@ where
         let maybe_idx = self.freelist.lock().pop();
         let idx = maybe_idx.unwrap_or_else(|| self.max_allocated.fetch_add(1, Ordering::Relaxed));
 
-        let renderer = Arc::clone(&renderer);
+        let renderer = Arc::clone(renderer);
         let destroy_fn = move |handle: RawResourceHandle<T>| {
             renderer
                 .instructions

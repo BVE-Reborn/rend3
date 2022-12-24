@@ -243,7 +243,7 @@ impl<'a> HelperDef for ShaderVertexBufferHelper<'a> {
 
         let template = self
             .generate_template(h, object_buffer, batch_buffer)
-            .map_err(|_| RenderError::new(format!("Failed to writeln vertex template string")))?;
+            .map_err(|_| RenderError::new("Failed to writeln vertex template string"))?;
 
         out.write(&r.render_template(&template, ctx.data())?)?;
 

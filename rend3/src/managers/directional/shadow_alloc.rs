@@ -51,7 +51,7 @@ pub(super) struct ShadowAtlas {
     pub maps: Vec<ShadowMap>,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct ShadowMap {
     pub offset: UVec2,
     pub size: u32,

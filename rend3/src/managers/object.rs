@@ -37,12 +37,12 @@ impl<M: Material> Copy for ShaderObject<M> {}
 impl<M: Material> Clone for ShaderObject<M> {
     fn clone(&self) -> Self {
         Self {
-            transform: self.transform.clone(),
-            bounding_sphere: self.bounding_sphere.clone(),
-            first_index: self.first_index.clone(),
-            index_count: self.index_count.clone(),
-            material_index: self.material_index.clone(),
-            vertex_attribute_start_offsets: self.vertex_attribute_start_offsets.clone(),
+            transform: self.transform,
+            bounding_sphere: self.bounding_sphere,
+            first_index: self.first_index,
+            index_count: self.index_count,
+            material_index: self.material_index,
+            vertex_attribute_start_offsets: self.vertex_attribute_start_offsets,
         }
     }
 }
@@ -61,8 +61,8 @@ impl<M: Material> Clone for InternalObject<M> {
         Self {
             mesh_kind: self.mesh_kind.clone(),
             material_handle: self.material_handle.clone(),
-            location: self.location.clone(),
-            inner: self.inner.clone(),
+            location: self.location,
+            inner: self.inner,
         }
     }
 }
@@ -185,7 +185,7 @@ impl ObjectManager {
             .data_vec
             .downcast_slice::<Option<InternalObject<M>>>()
             .unwrap()
-            .into_iter()
+            .iter()
             .enumerate()
             .filter_map(|(idx, o)| o.as_ref().map(|o| (RawObjectHandle::new(idx), o)));
 
@@ -350,6 +350,6 @@ fn ready<M: Material>(
         .unwrap();
 
     archetype.buffer.apply(device, encoder, scatter, |idx| {
-        data_vec[idx].as_ref().unwrap().inner.clone()
+        data_vec[idx].as_ref().unwrap().inner
     })
 }

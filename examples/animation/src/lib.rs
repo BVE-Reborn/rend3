@@ -61,7 +61,7 @@ impl rend3_framework::App for AnimationExample {
         // Load a gltf model with animation data
         // Needs to be stored somewhere, otherwise all the data gets freed.
         let path = Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/resources/scene.gltf"));
-        let gltf_data = std::fs::read(&path).unwrap();
+        let gltf_data = std::fs::read(path).unwrap();
         let parent_directory = path.parent().unwrap();
         let (loaded_scene, loaded_instance) = pollster::block_on(rend3_gltf::load_gltf(
             renderer,
@@ -94,7 +94,7 @@ impl rend3_framework::App for AnimationExample {
         };
 
         let path = Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/resources/cube_3.gltf"));
-        let gltf_data = std::fs::read(&path).unwrap();
+        let gltf_data = std::fs::read(path).unwrap();
         let parent_directory = path.parent().unwrap();
         let (loaded_scene, loaded_instance) = pollster::block_on(rend3_gltf::load_gltf(
             renderer,

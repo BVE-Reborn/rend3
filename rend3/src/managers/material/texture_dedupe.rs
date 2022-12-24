@@ -112,7 +112,7 @@ impl TextureDeduplicator {
         let index = self.storage.push(StoredBindGroup { refcount: 1, inner: bg });
         let index = TextureBindGroupIndex(index);
 
-        self.deduplication_map.insert(array.iter().cloned().collect(), index);
+        self.deduplication_map.insert(array.to_vec(), index);
 
         index
     }

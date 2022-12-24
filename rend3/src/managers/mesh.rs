@@ -128,7 +128,7 @@ impl MeshManager {
 
         // We can cheat here as we know vertex positions are always the first attribute as they must exist.
         let bounding_sphere = BoundingSphere::from_mesh(
-            &mesh
+            mesh
                 .attributes
                 .first()
                 .unwrap()

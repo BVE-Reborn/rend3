@@ -321,7 +321,7 @@ fn apply_buffer_cpu<M: Material>(
             data: material.to_data(),
             texture_enable: {
                 let mut bits = 0x0;
-                for t in material.to_textures().as_ref().into_iter().rev() {
+                for t in material.to_textures().as_ref().iter().rev() {
                     bits |= t.is_some() as u32;
                     bits <<= 1;
                 }

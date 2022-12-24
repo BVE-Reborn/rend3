@@ -118,7 +118,7 @@ impl<M: Material> ForwardRoutine<M> {
         } else {
             bgls.push(args.data_core.material_manager.get_bind_group_layout_cpu::<M>());
         }
-        bgls.extend(args.extra_bgls.into_iter().copied());
+        bgls.extend(args.extra_bgls.iter().copied());
 
         let pll = args.renderer.device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: Some(args.name),
@@ -243,8 +243,8 @@ fn build_forward_pipeline_inner<M: Material>(
         label: Some(args.name),
         layout: Some(pll),
         vertex: VertexState {
-            module: &args.shaders.vs_module,
-            entry_point: &args.shaders.vs_entry,
+            module: args.shaders.vs_module,
+            entry_point: args.shaders.vs_entry,
             buffers: &[],
         },
         primitive: PrimitiveState {

@@ -580,7 +580,7 @@ impl Mesh {
             || {
                 let idx = self.attributes.len();
                 self.attributes.push(StoredVertexAttributeData::new(
-                    &desired_attribute,
+                    desired_attribute,
                     vec![T::zeroed(); self.vertex_count],
                 ));
                 // There were no normals, and our created normals are already zeroed.

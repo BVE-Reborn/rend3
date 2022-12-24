@@ -32,6 +32,6 @@ impl Deref for RenderGraphConnection {
     type Target = usize;
 
     fn deref(&self) -> &Self::Target {
-        &*self.index
+        &self.index
     }
 }

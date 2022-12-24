@@ -68,7 +68,7 @@ mod tests {
                 continue;
             }
 
-            let source = pp.get(&*shader).unwrap();
+            let source = pp.get(shader).unwrap();
             let configs = if source.contains("#if") {
                 &[
                     ShaderConfig {
@@ -91,7 +91,7 @@ mod tests {
                 println!("Testing shader {shader} with config {serialized_config:?}");
 
                 let output = pp.render_shader(
-                    &shader,
+                    shader,
                     config,
                     Some(&ShaderVertexBufferConfig::from_material::<PbrMaterial>()),
                 );
@@ -102,7 +102,7 @@ mod tests {
                 let sm = match naga::front::wgsl::parse_str(&output) {
                     Ok(m) => m,
                     Err(e) => {
-                        e.emit_to_stderr_with_path(&output, &shader);
+                        e.emit_to_stderr_with_path(&output, shader);
                         panic!();
                     }
                 };
@@ -113,7 +113,7 @@ mod tests {
                 match validator.validate(&sm) {
                     Ok(_) => {}
                     Err(err) => {
-                        emit_annotated_error(&err, &shader, &output);
+                        emit_annotated_error(&err, shader, &output);
                         print_err(&err);
                         panic!()
                     }

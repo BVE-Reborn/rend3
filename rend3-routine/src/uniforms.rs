@@ -57,6 +57,7 @@ unsafe impl bytemuck::Zeroable for FrameUniforms {}
 unsafe impl bytemuck::Pod for FrameUniforms {}
 
 /// Add the creation of these uniforms to the graph.
+#[allow(clippy::too_many_arguments)]
 pub fn add_to_graph<'node>(
     graph: &mut RenderGraph<'node>,
     shadow_uniform_bg: DataHandle<BindGroup>,

@@ -46,7 +46,7 @@ impl BaseRenderGraph {
         let samplers = common::Samplers::new(&renderer.device);
 
         // TODO: Support more materials
-        let gpu_culler = culling::GpuCuller::new::<pbr::PbrMaterial>(&renderer, spp);
+        let gpu_culler = culling::GpuCuller::new::<pbr::PbrMaterial>(renderer, spp);
 
         let gpu_skinner = skinning::GpuSkinner::new(&renderer.device, spp);
 

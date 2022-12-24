@@ -51,7 +51,7 @@ impl ScatterCopy {
                 },
                 None,
             )
-            .build(&device, Some("ScatterCopy bgl"));
+            .build(device, Some("ScatterCopy bgl"));
 
         let pll = device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: Some("ScatterCopy pll"),
@@ -173,7 +173,7 @@ mod test {
         fn buffer<T: bytemuck::Pod>(&self, data: &[T]) -> wgpu::Buffer {
             self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some("target buffer"),
-                contents: bytemuck::cast_slice(&data),
+                contents: bytemuck::cast_slice(data),
                 usage: wgpu::BufferUsages::all() - wgpu::BufferUsages::MAP_READ - wgpu::BufferUsages::MAP_WRITE,
             })
         }
@@ -196,14 +196,14 @@ mod test {
                 mapped_at_creation: false,
             });
 
-            encoder.copy_buffer_to_buffer(&buffer, 0, &staging, 0, bytes);
+            encoder.copy_buffer_to_buffer(buffer, 0, &staging, 0, bytes);
 
             self.queue.submit(Some(encoder.finish()));
 
-            let _ = staging.slice(..).map_async(wgpu::MapMode::Read, |_| ());
+            staging.slice(..).map_async(wgpu::MapMode::Read, |_| ());
             self.device.poll(wgpu::Maintain::Wait);
 
-            let res = bytemuck::cast_slice(&*staging.slice(..).get_mapped_range()).to_vec();
+            let res = bytemuck::cast_slice(&staging.slice(..).get_mapped_range()).to_vec();
 
             res
         }

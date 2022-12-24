@@ -420,7 +420,7 @@ impl Default for SampleType {
 
 /// The type of transparency in a material.
 #[repr(u8)]
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum TransparencyType {
     /// Alpha is completely ignored.
     Opaque,
@@ -538,7 +538,7 @@ impl Material for PbrMaterial {
         TransparencyType::from(self.transparency) as u64
     }
 
-    fn to_textures<'a>(&'a self) -> Self::TextureArrayType {
+    fn to_textures(&self) -> Self::TextureArrayType {
         [
             self.albedo.to_texture(),
             self.normal.to_texture(),
@@ -585,8 +585,8 @@ unsafe impl bytemuck::Pod for ShaderMaterial {}
 impl ShaderMaterial {
     fn from_material(material: &PbrMaterial) -> Self {
         Self {
-            uv_transform0: material.uv_transform0.into(),
-            uv_transform1: material.uv_transform1.into(),
+            uv_transform0: material.uv_transform0,
+            uv_transform1: material.uv_transform1,
             albedo: material.albedo.to_value(),
             roughness: material.roughness_factor.unwrap_or(0.0),
             metallic: material.metallic_factor.unwrap_or(0.0),

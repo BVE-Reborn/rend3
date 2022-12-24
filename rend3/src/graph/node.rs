@@ -11,7 +11,7 @@ use crate::{
 };
 
 /// Wraps a handle proving you have declared it as a dependency.
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct DeclaredDependency<Handle> {
     pub(super) handle: Handle,
 }

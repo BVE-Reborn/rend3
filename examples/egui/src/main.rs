@@ -104,7 +104,7 @@ impl rend3_framework::App for EguiExample {
         // Create the egui context
         let context = egui::Context::default();
         // Create the winit/egui integration.
-        let mut platform = egui_winit::State::new(&event_loop);
+        let mut platform = egui_winit::State::new(event_loop);
         platform.set_pixels_per_point(window.scale_factor() as f32);
 
         //Images
@@ -159,7 +159,7 @@ impl rend3_framework::App for EguiExample {
 
                 // Insert egui commands here
                 let ctx = &data.context;
-                egui::Window::new("Change color").resizable(true).show(&ctx, |ui| {
+                egui::Window::new("Change color").resizable(true).show(ctx, |ui| {
                     ui.label("Change the color of the cube");
                     if ui.color_edit_button_rgba_unmultiplied(&mut data.color).changed() {
                         renderer.update_material(
