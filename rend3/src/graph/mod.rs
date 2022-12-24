@@ -145,8 +145,8 @@ enum GraphSubResource {
 }
 
 impl GraphSubResource {
-    pub(super) fn to_resource(&self) -> GraphResource {
-        match *self {
+    pub(super) fn to_resource(self) -> GraphResource {
+        match self {
             GraphSubResource::ImportedTexture(r) => GraphResource::ImportedTexture(r.idx),
             GraphSubResource::Texture(r) => GraphResource::Texture(r.idx),
             GraphSubResource::External => GraphResource::External,
@@ -186,7 +186,7 @@ impl RenderTargetHandle {
         left.idx == right.idx && left.layer_start == right.layer_start && left.layer_end == right.layer_end
     }
 
-    pub(super) fn to_region(&self) -> TextureRegion {
+    pub(super) fn to_region(self) -> TextureRegion {
         match self.resource {
             GraphSubResource::ImportedTexture(region) | GraphSubResource::Texture(region) => region,
             GraphSubResource::External | GraphSubResource::Data(_) => unreachable!(),

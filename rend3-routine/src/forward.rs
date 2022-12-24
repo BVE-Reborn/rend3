@@ -61,6 +61,7 @@ pub struct RoutineArgs<'a, M> {
     pub shaders: ShaderModulePair<'a>,
 
     pub extra_bgls: &'a [&'a BindGroupLayout],
+    #[allow(clippy::type_complexity)]
     pub descriptor_callback: Option<&'a dyn Fn(&mut RenderPipelineDescriptor<'_>, &mut [Option<ColorTargetState>])>,
 }
 

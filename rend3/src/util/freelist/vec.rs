@@ -35,6 +35,12 @@ impl<T> FreelistVec<T> {
     }
 }
 
+impl<T> Default for FreelistVec<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T> Index<FreelistIndex> for FreelistVec<T> {
     type Output = T;
 

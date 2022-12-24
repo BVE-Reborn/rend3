@@ -192,6 +192,7 @@ impl ObjectManager {
         Some(ExactSizerIterator::new(iter, archetype.object_count))
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn duplicate_object(
         &mut self,
         device: &Device,

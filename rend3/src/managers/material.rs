@@ -55,6 +55,7 @@ struct MaterialArchetype {
         &mut VecAny,
         &TextureManager<crate::types::Texture2DTag>,
     ),
+    #[allow(clippy::type_complexity)]
     get_attributes: fn(&mut dyn FnMut(&[&'static VertexAttributeId], &[&'static VertexAttributeId])),
     object_add_callback_wrapper: fn(&VecAny, usize, ObjectAddCallbackArgs<'_>),
 }
@@ -139,17 +140,16 @@ impl MaterialManager {
         handle: &MaterialHandle,
         material: M,
     ) {
-        let bind_group_index;
-        if profile == RendererProfile::CpuDriven {
+        let bind_group_index = if profile == RendererProfile::CpuDriven {
             let textures = material.to_textures();
 
             let texture_bg_index =
                 self.texture_deduplicator
                     .get_or_insert(device, texture_manager_2d, textures.as_ref());
 
-            bind_group_index = ProfileData::Cpu(texture_bg_index);
+            ProfileData::Cpu(texture_bg_index)
         } else {
-            bind_group_index = ProfileData::Gpu(());
+            ProfileData::Gpu(())
         };
 
         let archetype = self.ensure_archetype_inner::<M>(device, profile);

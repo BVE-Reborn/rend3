@@ -201,7 +201,7 @@ impl<'node> RenderGraph<'node> {
 
                 if outputs_used {
                     // Add our inputs to be matched up with outputs.
-                    awaiting_inputs.extend(node.inputs.iter().map(GraphSubResource::to_resource));
+                    awaiting_inputs.extend(node.inputs.iter().map(|i| i.to_resource()));
                     // Push our node on the new list
                     pruned_node_list.push(node)
                 }
