@@ -65,6 +65,7 @@ impl rend3_framework::App for SkinningExample {
 
     fn setup(
         &mut self,
+        _event_loop: &winit::event_loop::EventLoop<rend3_framework::UserResizeEvent<()>>,
         _window: &winit::window::Window,
         renderer: &Arc<rend3::Renderer>,
         _routines: &Arc<rend3_framework::DefaultRoutines>,

@@ -26,7 +26,7 @@ wgpu = "0.14"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 # logging
-env_logger = { version = "0.9", default-features = false, features = ["termcolor", "atty"] }
+env_logger = { version = "0.10", default-features = false, features = ["auto-color", "humantime"] }
 pollster = "0.2"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]

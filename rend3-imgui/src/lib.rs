@@ -4,7 +4,7 @@
 
 use imgui_wgpu::RendererConfig;
 use rend3::{
-    graph::{RenderGraph, RenderPassTarget, RenderPassTargets, RenderTargetHandle},
+    graph::{NodeResourceUsage, RenderGraph, RenderPassTarget, RenderPassTargets, RenderTargetHandle},
     types::{Color, TextureFormat},
     Renderer,
 };
@@ -45,7 +45,7 @@ impl ImguiRenderRoutine {
     ) {
         let mut builder = graph.add_node("imgui");
 
-        let output_handle = builder.add_render_target_output(output);
+        let output_handle = builder.add_render_target(output, NodeResourceUsage::InputOutput);
 
         let rpass_handle = builder.add_renderpass(RenderPassTargets {
             targets: vec![RenderPassTarget {

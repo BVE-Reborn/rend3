@@ -13,13 +13,13 @@ path = "src/main.rs"
 
 [dependencies]
 # The egui immediate mode gui library
-egui = "0.18.0"
+egui = "0.20.0"
 # Winit integration with egui
-egui_winit_platform = "0.15.0"
+egui-winit = "0.20"
 # logging
-env_logger = { version = "0.9", default-features = false, features = ["termcolor", "atty"] }
+env_logger = { version = "0.10", default-features = false, features = ["auto-color", "humantime"] }
 # Linear algebra library
-glam = "0.21.2"
+glam = "0.22"
 # Importing png's
 image = { version = "0.24.3", default-features = false, features = ["png"] }
 # Portable implementation of Instant.
@@ -33,8 +33,8 @@ rend3-framework = { version = "^0.3.0", path = "../../rend3-framework" }
 # Programmable render list that dictates how the scene renders
 rend3-routine = { version = "^0.3.0",path = "../../rend3-routine" }
 # Windowing
-winit = "0.26"
+winit = "0.27"
 # Opening URL's
-webbrowser = "0.5.5"
+webbrowser = "0.8.2"
 # Creating textures
-wgpu = "0.13"
+wgpu = "0.14"

@@ -410,6 +410,7 @@ impl rend3_framework::App for SceneViewer {
 
     fn setup<'a>(
         &'a mut self,
+        _event_loop: &winit::event_loop::EventLoop<rend3_framework::UserResizeEvent<()>>,
         window: &'a winit::window::Window,
         renderer: &'a Arc<Renderer>,
         routines: &'a Arc<rend3_framework::DefaultRoutines>,

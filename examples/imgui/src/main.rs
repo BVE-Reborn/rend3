@@ -27,6 +27,7 @@ impl rend3_framework::App for ImguiExample {
 
     fn setup(
         &mut self,
+        _event_loop: &winit::event_loop::EventLoop<rend3_framework::UserResizeEvent<()>>,
         window: &winit::window::Window,
         renderer: &Arc<rend3::Renderer>,
         _routines: &Arc<rend3_framework::DefaultRoutines>,
@@ -156,9 +157,7 @@ impl rend3_framework::App for ImguiExample {
                 data.platform.prepare_render(&ui, window);
 
                 // Get a frame
-                let frame = rend3::util::output::OutputFrame::Surface {
-                    surface: Arc::clone(surface.unwrap()),
-                };
+                let frame = surface.unwrap().get_current_texture().unwrap();
 
                 // Ready up the renderer
                 let (cmd_bufs, ready) = renderer.ready();
@@ -170,6 +169,9 @@ impl rend3_framework::App for ImguiExample {
                 // Build a rendergraph
                 let mut graph = rend3::graph::RenderGraph::new();
 
+                // Import the surface texture into the render graph.
+                let frame_handle =
+                    graph.add_imported_render_target(&frame, 0..1, rend3::graph::ViewportRect::from_size(resolution));
                 // Add the default rendergraph without a skybox
                 base_rendergraph.add_to_graph(
                     &mut graph,
@@ -177,6 +179,7 @@ impl rend3_framework::App for ImguiExample {
                     &pbr_routine,
                     None,
                     &tonemapping_routine,
+                    frame_handle,
                     resolution,
                     SAMPLE_COUNT,
                     glam::Vec4::ZERO,
@@ -184,11 +187,11 @@ impl rend3_framework::App for ImguiExample {
                 );
 
                 // Add imgui on top of all the other passes
-                let surface = graph.add_surface_texture();
-                data.imgui_routine.add_to_graph(&mut graph, ui.render(), surface);
+                data.imgui_routine
+                    .add_to_graph(&mut graph, data.imgui.render(), frame_handle);
 
                 // Dispatch a render using the built up rendergraph!
-                graph.execute(renderer, frame, cmd_bufs, &ready);
+                graph.execute(renderer, cmd_bufs, &ready);
 
                 control_flow(winit::event_loop::ControlFlow::Poll);
             }

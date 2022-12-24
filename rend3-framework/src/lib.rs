@@ -102,12 +102,13 @@ pub trait App<T: 'static = ()> {
 
     fn setup(
         &mut self,
+        event_loop: &EventLoop<UserResizeEvent<T>>,
         window: &Window,
         renderer: &Arc<Renderer>,
         routines: &Arc<DefaultRoutines>,
         surface_format: rend3::types::TextureFormat,
     ) {
-        let _ = (window, renderer, routines, surface_format);
+        let _ = (event_loop, window, renderer, routines, surface_format);
     }
 
     /// RedrawRequested/RedrawEventsCleared will only be fired if the window
@@ -268,7 +269,7 @@ pub async fn async_start<A: App<T> + 'static, T: 'static>(mut app: A, window_bui
     });
     drop(data_core);
 
-    app.setup(&window, &renderer, &routines, format);
+    app.setup(&event_loop, &window, &renderer, &routines, format);
 
     #[cfg(target_arch = "wasm32")]
     let _observer = resize_observer::ResizeObserver::new(&window, event_loop.create_proxy());

@@ -6,8 +6,8 @@ struct EguiExampleData {
     _directional_handle: rend3::types::DirectionalLightHandle,
 
     egui_routine: rend3_egui::EguiRenderRoutine,
-    platform: egui_winit_platform::Platform,
-    start_time: instant::Instant,
+    context: egui::Context,
+    platform: egui_winit::State,
     color: [f32; 4],
 }
 
@@ -27,6 +27,7 @@ impl rend3_framework::App for EguiExample {
 
     fn setup(
         &mut self,
+        event_loop: &winit::event_loop::EventLoop<rend3_framework::UserResizeEvent<()>>,
         window: &winit::window::Window,
         renderer: &Arc<rend3::Renderer>,
         _routines: &Arc<rend3_framework::DefaultRoutines>,
@@ -100,14 +101,11 @@ impl rend3_framework::App for EguiExample {
             resolution: 2048,
         });
 
-        // Create the winit/egui integration, which manages our egui context for us.
-        let platform = egui_winit_platform::Platform::new(egui_winit_platform::PlatformDescriptor {
-            physical_width: window_size.width as u32,
-            physical_height: window_size.height as u32,
-            scale_factor: window.scale_factor(),
-            font_definitions: egui::FontDefinitions::default(),
-            style: Default::default(),
-        });
+        // Create the egui context
+        let context = egui::Context::default();
+        // Create the winit/egui integration.
+        let mut platform = egui_winit::State::new(&event_loop);
+        platform.set_pixels_per_point(window.scale_factor() as f32);
 
         //Images
         let image_bytes = include_bytes!("images/rust-logo-128x128-blk.png");
@@ -128,7 +126,6 @@ impl rend3_framework::App for EguiExample {
             Some("rust_logo_texture"),
         );
 
-        let start_time = instant::Instant::now();
         let color: [f32; 4] = [0.0, 0.5, 0.5, 1.0];
 
         self.data = Some(EguiExampleData {
@@ -137,8 +134,8 @@ impl rend3_framework::App for EguiExample {
             _directional_handle,
 
             egui_routine,
+            context,
             platform,
-            start_time,
             color,
         });
     }
@@ -156,16 +153,12 @@ impl rend3_framework::App for EguiExample {
     ) {
         let data = self.data.as_mut().unwrap();
 
-        // Pass the winit events to the platform integration.
-        data.platform.handle_event(&event);
-
         match event {
             rend3_framework::Event::RedrawRequested(..) => {
-                data.platform.update_time(data.start_time.elapsed().as_secs_f64());
-                data.platform.begin_frame();
+                data.context.begin_frame(data.platform.take_egui_input(window));
 
                 // Insert egui commands here
-                let ctx = data.platform.context();
+                let ctx = &data.context;
                 egui::Window::new("Change color").resizable(true).show(&ctx, |ui| {
                     ui.label("Change the color of the cube");
                     if ui.color_edit_button_rgba_unmultiplied(&mut data.color).changed() {
@@ -191,19 +184,17 @@ impl rend3_framework::App for EguiExample {
                 // handle the output here
                 let egui::FullOutput {
                     shapes, textures_delta, ..
-                } = data.platform.end_frame(Some(window));
-                let paint_jobs = data.platform.context().tessellate(shapes);
+                } = data.context.end_frame();
+                let paint_jobs = data.context.tessellate(shapes);
 
                 let input = rend3_egui::Input {
                     clipped_meshes: &paint_jobs,
                     textures_delta,
-                    context: data.platform.context(),
+                    context: data.context.clone(),
                 };
 
                 // Get a frame
-                let frame = rend3::util::output::OutputFrame::Surface {
-                    surface: Arc::clone(surface.unwrap()),
-                };
+                let frame = surface.unwrap().get_current_texture().unwrap();
 
                 // Ready up the renderer
                 let (cmd_bufs, ready) = renderer.ready();
@@ -215,6 +206,9 @@ impl rend3_framework::App for EguiExample {
                 // Build a rendergraph
                 let mut graph = rend3::graph::RenderGraph::new();
 
+                // Import the surface texture into the render graph.
+                let frame_handle =
+                    graph.add_imported_render_target(&frame, 0..1, rend3::graph::ViewportRect::from_size(resolution));
                 // Add the default rendergraph without a skybox
                 base_rendergraph.add_to_graph(
                     &mut graph,
@@ -222,6 +216,7 @@ impl rend3_framework::App for EguiExample {
                     &pbr_routine,
                     None,
                     &tonemapping_routine,
+                    frame_handle,
                     resolution,
                     SAMPLE_COUNT,
                     glam::Vec4::ZERO,
@@ -229,27 +224,36 @@ impl rend3_framework::App for EguiExample {
                 );
 
                 // Add egui on top of all the other passes
-                let surface = graph.add_surface_texture();
-                data.egui_routine.add_to_graph(&mut graph, input, surface);
+                data.egui_routine.add_to_graph(&mut graph, input, frame_handle);
 
                 // Dispatch a render using the built up rendergraph!
-                graph.execute(renderer, frame, cmd_bufs, &ready);
+                graph.execute(renderer, cmd_bufs, &ready);
+
+                // Present the frame
+                frame.present();
 
                 control_flow(winit::event_loop::ControlFlow::Poll);
             }
             rend3_framework::Event::MainEventsCleared => {
                 window.request_redraw();
             }
-            rend3_framework::Event::WindowEvent { event, .. } => match event {
-                winit::event::WindowEvent::Resized(size) => {
-                    data.egui_routine
-                        .resize(size.width, size.height, window.scale_factor() as f32);
+            rend3_framework::Event::WindowEvent { event, .. } => {
+                // Pass the window events to the egui integration.
+                if data.platform.on_event(&data.context, &event).consumed {
+                    return;
                 }
-                winit::event::WindowEvent::CloseRequested => {
-                    control_flow(winit::event_loop::ControlFlow::Exit);
+
+                match event {
+                    winit::event::WindowEvent::Resized(size) => {
+                        data.egui_routine
+                            .resize(size.width, size.height, window.scale_factor() as f32);
+                    }
+                    winit::event::WindowEvent::CloseRequested => {
+                        control_flow(winit::event_loop::ControlFlow::Exit);
+                    }
+                    _ => {}
                 }
-                _ => {}
-            },
+            }
             _ => {}
         }
     }

@@ -4,7 +4,7 @@
 
 use egui::TexturesDelta;
 use rend3::{
-    graph::{RenderGraph, RenderPassTarget, RenderPassTargets, RenderTargetHandle},
+    graph::{NodeResourceUsage, RenderGraph, RenderPassTarget, RenderPassTargets, RenderTargetHandle},
     types::SampleCount,
     Renderer,
 };
@@ -12,8 +12,8 @@ use std::{mem, sync::Arc};
 use wgpu::{Color, TextureFormat};
 
 pub struct EguiRenderRoutine {
-    pub internal: egui_wgpu_backend::RenderPass,
-    screen_descriptor: egui_wgpu_backend::ScreenDescriptor,
+    pub internal: egui_wgpu::Renderer,
+    screen_descriptor: egui_wgpu::renderer::ScreenDescriptor,
     textures_to_free: Vec<egui::TextureId>,
 }
 
@@ -30,24 +30,22 @@ impl EguiRenderRoutine {
         height: u32,
         scale_factor: f32,
     ) -> Self {
-        let rpass = egui_wgpu_backend::RenderPass::new(&renderer.device, surface_format, samples as _);
+        let rpass = egui_wgpu::Renderer::new(&renderer.device, surface_format, None, samples as _);
 
         Self {
             internal: rpass,
-            screen_descriptor: egui_wgpu_backend::ScreenDescriptor {
-                physical_height: height,
-                physical_width: width,
-                scale_factor,
+            screen_descriptor: egui_wgpu::renderer::ScreenDescriptor {
+                size_in_pixels: [width, height],
+                pixels_per_point: scale_factor,
             },
             textures_to_free: Vec::new(),
         }
     }
 
     pub fn resize(&mut self, new_width: u32, new_height: u32, new_scale_factor: f32) {
-        self.screen_descriptor = egui_wgpu_backend::ScreenDescriptor {
-            physical_height: new_height,
-            physical_width: new_width,
-            scale_factor: new_scale_factor,
+        self.screen_descriptor = egui_wgpu::renderer::ScreenDescriptor {
+            size_in_pixels: [new_width, new_height],
+            pixels_per_point: new_scale_factor,
         };
     }
 
@@ -59,7 +57,7 @@ impl EguiRenderRoutine {
     ) {
         let mut builder = graph.add_node("egui");
 
-        let output_handle = builder.add_render_target_output(output);
+        let output_handle = builder.add_render_target(output, NodeResourceUsage::InputOutput);
 
         let rpass_handle = builder.add_renderpass(RenderPassTargets {
             targets: vec![RenderPassTarget {
@@ -80,29 +78,33 @@ impl EguiRenderRoutine {
             let this = pt.get_mut(pt_handle);
             let rpass = encoder_or_pass.get_rpass(rpass_handle);
 
-            let _ = this.internal.remove_textures(TexturesDelta {
-                set: Default::default(),
-                free: textures_to_free,
-            });
-            let _ = this
-                .internal
-                .add_textures(&renderer.device, &renderer.queue, &input.textures_delta);
+            for texture in textures_to_free {
+                this.internal.free_texture(&texture);
+            }
+            for (id, image_delta) in input.textures_delta.set {
+                this.internal
+                    .update_texture(&renderer.device, &renderer.queue, id, &image_delta);
+            }
+            let mut cmd_buffer = renderer
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
             this.internal.update_buffers(
                 &renderer.device,
                 &renderer.queue,
+                &mut cmd_buffer,
                 input.clipped_meshes,
                 &this.screen_descriptor,
             );
+            drop(cmd_buffer);
 
             this.internal
-                .execute_with_renderpass(rpass, input.clipped_meshes, &this.screen_descriptor)
-                .unwrap();
+                .render(rpass, input.clipped_meshes, &this.screen_descriptor);
         });
     }
 
     /// Creates an egui texture from the given image data, format, and dimensions.
     pub fn create_egui_texture(
-        internal: &mut egui_wgpu_backend::RenderPass,
+        internal: &mut egui_wgpu::Renderer,
         renderer: &Arc<rend3::Renderer>,
         format: wgpu::TextureFormat,
         image_rgba: &[u8],
@@ -137,7 +139,7 @@ impl EguiRenderRoutine {
 
     /// Creates egui::TextureId with wgpu backend with existing wgpu::Texture
     pub fn wgpu_texture_to_egui(
-        internal: &mut egui_wgpu_backend::RenderPass,
+        internal: &mut egui_wgpu::Renderer,
         renderer: &Arc<rend3::Renderer>,
         image_texture: wgpu::Texture,
         image_rgba: &[u8],
@@ -171,8 +173,7 @@ impl EguiRenderRoutine {
             texture_size,
         );
 
-        egui_wgpu_backend::RenderPass::egui_texture_from_wgpu_texture(
-            internal,
+        internal.register_native_texture(
             device,
             &image_texture.create_view(&wgpu::TextureViewDescriptor {
                 dimension: Some(wgpu::TextureViewDimension::D2),

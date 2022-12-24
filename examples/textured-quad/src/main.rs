@@ -49,6 +49,7 @@ impl rend3_framework::App for TexturedQuadExample {
 
     fn setup(
         &mut self,
+        _event_loop: &winit::event_loop::EventLoop<rend3_framework::UserResizeEvent<()>>,
         window: &winit::window::Window,
         renderer: &Arc<rend3::Renderer>,
         _routines: &Arc<rend3_framework::DefaultRoutines>,
@@ -158,9 +159,7 @@ impl rend3_framework::App for TexturedQuadExample {
             // Render!
             winit::event::Event::MainEventsCleared => {
                 // Get a frame
-                let frame = rend3::util::output::OutputFrame::Surface {
-                    surface: Arc::clone(surface.unwrap()),
-                };
+                let frame = surface.unwrap().get_current_texture().unwrap();
 
                 // Ready up the renderer
                 let (cmd_bufs, ready) = renderer.ready();
@@ -172,6 +171,9 @@ impl rend3_framework::App for TexturedQuadExample {
                 // Build a rendergraph
                 let mut graph = rend3::graph::RenderGraph::new();
 
+                // Import the surface texture into the render graph.
+                let frame_handle =
+                    graph.add_imported_render_target(&frame, 0..1, rend3::graph::ViewportRect::from_size(resolution));
                 // Add the default rendergraph
                 base_rendergraph.add_to_graph(
                     &mut graph,
@@ -179,6 +181,7 @@ impl rend3_framework::App for TexturedQuadExample {
                     &pbr_routine,
                     None,
                     &tonemapping_routine,
+                    frame_handle,
                     resolution,
                     SAMPLE_COUNT,
                     glam::Vec4::ZERO,
@@ -186,7 +189,10 @@ impl rend3_framework::App for TexturedQuadExample {
                 );
 
                 // Dispatch a render using the built up rendergraph!
-                graph.execute(renderer, frame, cmd_bufs, &ready);
+                graph.execute(renderer, cmd_bufs, &ready);
+
+                // Present the frame
+                frame.present();
             }
             // Other events we don't care about
             _ => {}
