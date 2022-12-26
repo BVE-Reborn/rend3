@@ -322,8 +322,9 @@ fn apply_buffer_cpu<M: Material>(
             texture_enable: {
                 let mut bits = 0x0;
                 for t in material.to_textures().as_ref().iter().rev() {
-                    bits |= t.is_some() as u32;
+                    // Shift must happen first, if it happens second, the last bit will also be shifted
                     bits <<= 1;
+                    bits |= t.is_some() as u32;
                 }
                 bits
             },
