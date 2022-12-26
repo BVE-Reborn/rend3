@@ -35,7 +35,7 @@ var textures: binding_array<texture_2d<f32>>;
 
 {{#if (eq profile "CpuDriven")}}
 @group(1) @binding(3)
-var<storage> material: CpuMaterialData;
+var<storage> materials: array<CpuMaterialData>;
 @group(2) @binding(0)
 var albedo_tex: texture_2d<f32>;
 @group(2) @binding(1)
@@ -450,9 +450,7 @@ fn surface_shading(light: DirectionalLight, pixel: PixelData, view_pos: vec3<f32
 
 @fragment
 fn fs_main(vs_out: VertexOutput) -> @location(0) vec4<f32> {
-    {{#if (eq profile "GpuDriven")}}
     let material = materials[vs_out.material];
-    {{/if}}
 
     let pixel = get_pixel_data(material, vs_out);
 
