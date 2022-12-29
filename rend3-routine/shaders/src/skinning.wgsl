@@ -46,13 +46,22 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let joint_weights = extract_attribute_vec4_f32(input.joint_weight_offset, idx);
 
     // Compute the skinned position
-    var pos_acc = vec3<f32>(0.0, 0.0, 0.0);
-    var norm_acc = vec3<f32>(0.0, 0.0, 0.0);
-    var tang_acc = vec3<f32>(0.0, 0.0, 0.0);
+    var pos_acc = vec3<f32>(0.0);
+    var norm_acc = vec3<f32>(0.0);
+    var tang_acc = vec3<f32>(0.0);
 
-    let pos = extract_attribute_vec3_f32(input.base_position_offset, idx);
-    let normal = extract_attribute_vec3_f32(input.base_normal_offset, idx);
-    let tangent = extract_attribute_vec3_f32(input.base_tangent_offset, idx);
+    var pos = vec3<f32>(0.0);
+    var normal = vec3<f32>(0.0);
+    var tangent = vec3<f32>(0.0);
+    if (input.base_position_offset != 0xFFFFFFFFu) {
+        pos = extract_attribute_vec3_f32(input.base_position_offset, idx);
+    }
+    if (input.base_normal_offset != 0xFFFFFFFFu) {
+        normal = extract_attribute_vec3_f32(input.base_normal_offset, idx);
+    }
+    if (input.base_tangent_offset != 0xFFFFFFFFu) {
+        tangent = extract_attribute_vec3_f32(input.base_tangent_offset, idx);
+    }
     
     for (var i = 0; i < 4; i++) {
         let weight = joint_weights[i];
@@ -69,12 +78,17 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
         }
     }
 
-    pos_acc = normalize(pos_acc);
     norm_acc = normalize(norm_acc);
     tang_acc = normalize(tang_acc);
     
     // Write to output region of buffer
-    store_attribute_vec3_f32(input.updated_position_offset, idx, pos_acc);
-    store_attribute_vec3_f32(input.updated_normal_offset, idx, norm_acc);
-    store_attribute_vec3_f32(input.updated_tangent_offset, idx, tang_acc);
+    if (input.updated_position_offset != 0xFFFFFFFFu) {
+        store_attribute_vec3_f32(input.updated_position_offset, idx, pos_acc);
+    }
+    if (input.updated_normal_offset != 0xFFFFFFFFu) {
+        store_attribute_vec3_f32(input.updated_normal_offset, idx, norm_acc);
+    }
+    if (input.updated_tangent_offset != 0xFFFFFFFFu) {
+        store_attribute_vec3_f32(input.updated_tangent_offset, idx, tang_acc);
+    }
 }
