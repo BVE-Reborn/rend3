@@ -360,7 +360,9 @@ fn handle_surface<A: App<T>, T: 'static>(
 ) -> Option<bool> {
     match *event {
         Event::Resumed => {
-            *surface = Some(Arc::new(unsafe { instance.create_surface(window) }.unwrap()));
+            if surface.is_none() {
+                *surface = Some(Arc::new(unsafe { instance.create_surface(window) }.unwrap()));
+            }
             Some(false)
         }
         Event::Suspended => {
@@ -387,7 +389,7 @@ fn handle_surface<A: App<T>, T: 'static>(
                 surface.as_ref().unwrap(),
                 &renderer.device,
                 format,
-                glam::UVec2::new(size.x, size.y),
+                size,
                 rend3::types::PresentMode::Fifo,
             );
             // Tell the renderer about the new aspect ratio.
