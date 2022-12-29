@@ -3,8 +3,8 @@ use crate::{
     profile::ProfileData,
     types::MaterialHandle,
     util::{
-        bind_merge::BindGroupLayoutBuilder, freelist::FreelistDerivedBuffer, math::round_up_pot,
-        scatter_copy::ScatterCopy, typedefs::FastHashMap,
+        bind_merge::BindGroupLayoutBuilder, freelist::FreelistDerivedBuffer, math::round_up, scatter_copy::ScatterCopy,
+        typedefs::FastHashMap,
     },
     RendererProfile,
 };
@@ -261,8 +261,8 @@ impl MaterialManager {
                 ty: BufferBindingType::Storage { read_only: true },
                 has_dynamic_offset: false,
                 min_binding_size: NonZeroU64::new(
-                    (round_up_pot(M::TextureArrayType::COUNT * 4, 16)
-                        + round_up_pot(M::DataType::SHADER_SIZE.get() as u32, 16)) as _,
+                    (round_up(M::TextureArrayType::COUNT * 4, 16) + round_up(M::DataType::SHADER_SIZE.get() as u32, 16))
+                        as _,
                 ),
             },
             None,

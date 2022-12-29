@@ -350,7 +350,7 @@ fn ready<M: Material>(
         .downcast_slice::<Option<InternalObject<M>>>()
         .unwrap();
 
-    archetype.buffer.apply(device, encoder, scatter, |idx| {
-        data_vec[idx].as_ref().unwrap().inner
-    })
+    archetype
+        .buffer
+        .apply(device, encoder, scatter, |idx| data_vec[idx].as_ref().unwrap().inner)
 }

@@ -12,7 +12,7 @@ use rend3::{
     graph::{DataHandle, NodeResourceUsage, RenderGraph},
     managers::{MaterialManager, ObjectManager, ShaderObject, TextureBindGroupIndex},
     types::Material,
-    util::math::{round_up_div, round_up_pot},
+    util::math::{round_up, round_up_div},
     Renderer, ShaderPreProcessor, ShaderVertexBufferConfig,
 };
 use wgpu::{
@@ -119,7 +119,7 @@ fn batch_objects<M: Material>(material_manager: &MaterialManager, object_manager
 
             current_ranges[current_object_index as usize] = range;
             current_object_index += 1;
-            current_invocation += round_up_pot(invocation_count, WORKGROUP_SIZE);
+            current_invocation += round_up(invocation_count, WORKGROUP_SIZE);
         }
 
         jobs.jobs.push(ShaderBatchData {

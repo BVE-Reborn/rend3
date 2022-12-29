@@ -9,7 +9,7 @@ use crate::{
         Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, MaterialHandle, Mesh, MeshHandle,
         Object, ObjectHandle, Texture, Texture2DHandle,
     },
-    util::{mipmap::MipmapGenerator, scatter_copy::ScatterCopy},
+    util::{math::round_up, mipmap::MipmapGenerator, scatter_copy::ScatterCopy},
     ExtendedAdapterInfo, InstanceAdapterDevice, RendererInitializationError, RendererProfile,
 };
 use glam::Mat4;
@@ -168,9 +168,10 @@ impl Renderer {
         Self::validation_texture_format(texture.format);
 
         let handle = self.resource_handle_allocators.d2_texture.allocate(self);
+        let (block_x, block_y) = texture.format.describe().block_dimensions;
         let size = Extent3d {
-            width: texture.size.x,
-            height: texture.size.y,
+            width: round_up(texture.size.x, block_x as u32),
+            height: round_up(texture.size.y, block_y as u32),
             depth_or_array_layers: 1,
         };
 
