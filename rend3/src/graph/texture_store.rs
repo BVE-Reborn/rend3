@@ -1,5 +1,7 @@
 //! Rendergraph
 
+use std::sync::Arc;
+
 use wgpu::{Device, Extent3d, Texture, TextureDescriptor, TextureDimension};
 
 use crate::{
@@ -8,7 +10,7 @@ use crate::{
 };
 
 struct StoredTexture {
-    inner: Texture,
+    inner: Arc<Texture>,
     used: bool,
 }
 
@@ -22,13 +24,13 @@ impl GraphTextureStore {
         }
     }
 
-    pub fn get_texture(&mut self, device: &Device, desc: RenderTargetCore) -> Texture {
+    pub fn get_texture(&mut self, device: &Device, desc: RenderTargetCore) -> Arc<Texture> {
         let vec = self.textures.entry(desc).or_insert_with(|| Vec::with_capacity(16));
         if let Some(tex) = vec.pop() {
-            return tex.inner;
+            return Arc::clone(&tex.inner);
         }
 
-        device.create_texture(&TextureDescriptor {
+        Arc::new(device.create_texture(&TextureDescriptor {
             label: None,
             size: Extent3d {
                 width: desc.resolution.x,
@@ -40,10 +42,10 @@ impl GraphTextureStore {
             dimension: TextureDimension::D2,
             format: desc.format,
             usage: desc.usage,
-        })
+        }))
     }
 
-    pub fn return_texture(&mut self, desc: RenderTargetCore, tex: Texture) {
+    pub fn return_texture(&mut self, desc: RenderTargetCore, tex: Arc<Texture>) {
         let vec = self.textures.entry(desc).or_insert_with(|| Vec::with_capacity(16));
 
         vec.push(StoredTexture { inner: tex, used: true });

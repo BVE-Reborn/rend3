@@ -1,6 +1,7 @@
 use std::{
     any::Any,
     cell::{RefCell, UnsafeCell},
+    collections::hash_map::Entry,
     marker::PhantomData,
     num::NonZeroU32,
     ops::Range,
@@ -219,7 +220,7 @@ impl<'node> RenderGraph<'node> {
                 // Add or update the range for all references
                 for &reference in &node.references {
                     resource_spans
-                        .entry(reference)
+                        .entry(reference.to_resource())
                         .and_modify(|span| {
                             span.first_usage.get_or_insert(idx);
                             span.last_reference = Some(idx);
@@ -233,7 +234,7 @@ impl<'node> RenderGraph<'node> {
                 // Add or update the range for all inputs
                 for &input in &node.inputs {
                     resource_spans
-                        .entry(input)
+                        .entry(input.to_resource())
                         .and_modify(|span| {
                             span.first_usage.get_or_insert(idx);
                             span.last_reference = Some(idx)
@@ -253,7 +254,7 @@ impl<'node> RenderGraph<'node> {
                         _ => Some(idx),
                     };
                     resource_spans
-                        .entry(output)
+                        .entry(output.to_resource())
                         .and_modify(|span| span.last_reference = end)
                         .or_insert(ResourceSpan {
                             first_reference: idx,
@@ -289,68 +290,82 @@ impl<'node> RenderGraph<'node> {
         // this pass.
         graph_texture_store.mark_unused();
 
-        // Stores the Texture while a texture is using it
+        // Stores the Texture while a node is using it
         let mut active_textures = FastHashMap::default();
-        // Maps a name to its actual texture view.
-        let mut active_views = FastHashMap::default();
-        // Views for imported textures
-        let mut imported_views = FastHashMap::default();
         {
             profiling::scope!("Render Target Allocation");
             for (starting, ending) in resource_changes {
                 for start in starting {
                     match start {
-                        GraphSubResource::Texture(region) => {
-                            let desc = &self.targets[region.idx];
+                        GraphResource::Texture(idx) => {
+                            let desc = &self.targets[idx];
                             let tex = graph_texture_store.get_texture(&renderer.device, desc.to_core());
-                            let view = tex.create_view(&TextureViewDescriptor {
-                                label: desc.label.as_deref(),
-                                base_array_layer: region.layer_start,
-                                array_layer_count: Some(
-                                    NonZeroU32::new(region.layer_end - region.layer_start).unwrap(),
-                                ),
-                                ..TextureViewDescriptor::default()
-                            });
                             // the whole texture is active
-                            active_textures.insert(region.idx, tex);
-                            // the view is for the region
-                            active_views.insert(region, view);
+                            assert!(active_textures.insert(idx, tex).is_none());
                         }
-                        GraphSubResource::Data(..) => {}
-                        GraphSubResource::ImportedTexture(region) => {
-                            // We don't actually care about start/end of imported views,
-                            // we just need to make sure we create all the views needed.
-                            imported_views.entry(region).or_insert_with(|| {
-                                self.imported_targets[region.idx]
-                                    .as_texture_ref()
-                                    .create_view(&TextureViewDescriptor {
-                                        base_array_layer: region.layer_start,
-                                        array_layer_count: Some(
-                                            NonZeroU32::new(region.layer_end - region.layer_start).unwrap(),
-                                        ),
-                                        ..TextureViewDescriptor::default()
-                                    })
-                            });
-                        }
-                        GraphSubResource::External => {}
+                        GraphResource::Data(..) => {}
+                        GraphResource::ImportedTexture(_) => {}
+                        GraphResource::External => {}
                     };
                 }
 
                 for end in ending {
                     match end {
-                        GraphSubResource::Texture(region) => {
+                        GraphResource::Texture(idx) => {
                             let tex = active_textures
-                                .remove(&region.idx)
+                                .get(&idx)
                                 .expect("internal rendergraph error: texture end with no start");
 
-                            let desc = self.targets[region.idx].clone();
-                            graph_texture_store.return_texture(desc.to_core(), tex);
+                            let desc = self.targets[idx].clone();
+                            graph_texture_store.return_texture(desc.to_core(), Arc::clone(tex));
                         }
-                        GraphSubResource::Data(..) => {}
-                        GraphSubResource::ImportedTexture(_) => {}
-                        GraphSubResource::External => {}
+                        GraphResource::Data(..) => {}
+                        GraphResource::ImportedTexture(_) => {}
+                        GraphResource::External => {}
                     };
                 }
+            }
+        }
+
+        // Look through all touched resources, creating texture views for each region.
+        let iter = pruned_node_list
+            .iter()
+            .flat_map(|node| [node.inputs.iter(), node.outputs.iter(), node.references.iter()])
+            .flatten();
+
+        // Map of region to texture view.
+        let mut active_views = FastHashMap::default();
+        // Map of region to imported texture view.
+        let mut imported_views = FastHashMap::default();
+        for sub_resource in iter {
+            match *sub_resource {
+                GraphSubResource::Texture(region) => {
+                    if let Entry::Vacant(vacant) = active_views.entry(region) {
+                        let view = active_textures[&region.idx].create_view(&TextureViewDescriptor {
+                            base_array_layer: region.layer_start,
+                            array_layer_count: Some(NonZeroU32::new(region.layer_end - region.layer_start).unwrap()),
+                            ..TextureViewDescriptor::default()
+                        });
+                        vacant.insert(view);
+                    }
+                }
+                GraphSubResource::ImportedTexture(region) => {
+                    if let Entry::Vacant(vacant) = imported_views.entry(region) {
+                        let view =
+                            self.imported_targets[region.idx]
+                                .as_texture_ref()
+                                .create_view(&TextureViewDescriptor {
+                                    base_array_layer: region.layer_start,
+                                    array_layer_count: Some(
+                                        NonZeroU32::new(region.layer_end - region.layer_start).unwrap(),
+                                    ),
+                                    ..TextureViewDescriptor::default()
+                                });
+                        vacant.insert(view);
+                    }
+                }
+                GraphSubResource::External => {}
+                GraphSubResource::Data(_) => {}
             }
         }
 
@@ -527,7 +542,7 @@ impl<'node> RenderGraph<'node> {
         encoder: &'rpass mut CommandEncoder,
         node_idx: usize,
         pass_end_idx: usize,
-        resource_spans: &'rpass FastHashMap<GraphSubResource, ResourceSpan>,
+        resource_spans: &'rpass FastHashMap<GraphResource, ResourceSpan>,
         active_views: &'rpass FastHashMap<TextureRegion, TextureView>,
         active_imported_views: &'rpass FastHashMap<TextureRegion, TextureView>,
     ) -> RenderPass<'rpass> {
@@ -535,7 +550,7 @@ impl<'node> RenderGraph<'node> {
             .targets
             .iter()
             .map(|target| {
-                let view_span = resource_spans[&target.color.handle.resource];
+                let view_span = resource_spans[&target.color.handle.resource.to_resource()];
 
                 let first_usage = view_span.first_usage.expect("internal rendergraph error: renderpass attachment counts as a usage, but no first usage registered on texture");
 
@@ -570,7 +585,7 @@ impl<'node> RenderGraph<'node> {
         let depth_stencil_attachment = desc.depth_stencil.as_ref().map(|ds_target| {
             let resource = ds_target.target.handle.resource;
 
-            let view_span = resource_spans[&resource];
+            let view_span = resource_spans[&resource.to_resource()];
 
             let first_usage = view_span.first_usage.expect("internal rendergraph error: renderpass attachment counts as a usage, but no first usage registered on texture");
 
