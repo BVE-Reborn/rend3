@@ -2,6 +2,8 @@
 {{include "rend3-routine/structures_object.wgsl"}}
 {{include "rend3-routine/material.wgsl"}}
 
+@group(0) @binding(0)
+var primary_sampler: sampler;
 @group(0) @binding(3)
 var<uniform> uniforms: UniformData;
 @group(0) @binding(4)
@@ -23,7 +25,7 @@ var textures: binding_array<texture_2d<f32>>;
 
 {{#if (eq profile "CpuDriven")}}
 @group(1) @binding(3)
-var<storage> material: CpuMaterialData;
+var<storage> materials: array<CpuMaterialData>;
 @group(2) @binding(0)
 var albedo_tex: texture_2d<f32>;
 {{/if}}
@@ -36,12 +38,14 @@ var albedo_tex: texture_2d<f32>;
 
     position
     texture_coords_0
+    color_0
 }}
 
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
     @location(0) coords0: vec2<f32>,
-    @location(1) @interpolate(flat) material: u32,
+    @location(1) alpha: f32,
+    @location(2) @interpolate(flat) material: u32,
 }
 
 @vertex
@@ -64,6 +68,7 @@ fn vs_main(@builtin(instance_index) shadow_number: u32, @builtin(vertex_index) v
     var vs_out: VertexOutput;
     vs_out.material = data.material_index;
     vs_out.coords0 = vs_in.texture_coords_0;
+    vs_out.alpha = vs_in.color_0.a;
     vs_out.position = model_view_proj * position_vec4;
 
     return vs_out;
@@ -85,4 +90,26 @@ fn albedo_texture(material: ptr<function, Material>, samp: sampler, coords: vec2
 
 @fragment
 fn fs_main(vs_out: VertexOutput) {
+    {{#if discard}}
+    var material = materials[vs_out.material];
+
+    let coords = vs_out.coords0;
+    let uvdx = dpdx(coords);
+    let uvdy = dpdx(coords);
+
+    var alpha = 1.0;
+    if (extract_material_flag(material.flags, FLAGS_ALBEDO_ACTIVE)) {
+        if (has_albedo_texture(&material)) {
+            alpha = albedo_texture(&material, primary_sampler, coords, uvdx, uvdy).a;
+        }
+        if (extract_material_flag(material.flags, FLAGS_ALBEDO_BLEND)) {
+            alpha *= vs_out.alpha;
+        }
+    }
+    alpha *= material.albedo.a;
+
+    if (alpha < material.alpha_cutout) {
+        discard;
+    }
+    {{/if}}
 }

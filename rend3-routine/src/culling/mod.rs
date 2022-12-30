@@ -1,6 +1,7 @@
 use std::{
     any::{type_name, TypeId},
     borrow::Cow,
+    collections::HashMap,
     iter::zip,
     num::NonZeroU64,
     ops::Range,
@@ -53,6 +54,8 @@ struct ShaderObjectRange {
 }
 
 fn batch_objects<M: Material>(material_manager: &MaterialManager, object_manager: &ObjectManager) -> ShaderBatchDatas {
+    profiling::scope!("Batch Objects");
+
     let mut jobs = ShaderBatchDatas {
         jobs: Vec::new(),
         keys: Vec::new(),
@@ -66,28 +69,35 @@ fn batch_objects<M: Material>(material_manager: &MaterialManager, object_manager
     let material_archetype = material_manager.archetype_view::<M>();
 
     let mut sorted_objects = Vec::with_capacity(objects.len());
-    for (handle, object) in objects {
-        let material = material_archetype.material(*object.material_handle);
-        let bind_group_index = material
-            .bind_group_index
-            .map_gpu(|_| TextureBindGroupIndex::DUMMY)
-            .into_common();
+    {
+        profiling::scope!("Sort Key Creation");
+        for (handle, object) in objects {
+            let material = material_archetype.material(*object.material_handle);
+            let bind_group_index = material
+                .bind_group_index
+                .map_gpu(|_| TextureBindGroupIndex::DUMMY)
+                .into_common();
 
-        let material_key = material.inner.key();
+            let material_key = material.inner.key();
 
-        sorted_objects.push((
-            ShaderJobKey {
-                material_key,
-                bind_group_index,
-            },
-            handle,
-            object,
-        ))
+            sorted_objects.push((
+                ShaderJobKey {
+                    material_key,
+                    bind_group_index,
+                },
+                handle,
+                object,
+            ))
+        }
     }
 
-    sorted_objects.sort_unstable_by_key(|(k, _, _)| *k);
+    {
+        profiling::scope!("Sorting");
+        sorted_objects.sort_unstable_by_key(|(k, _, _)| *k);
+    }
 
     if !sorted_objects.is_empty() {
+        profiling::scope!("Batch Data Creation");
         let mut current_base_invocation = 0_u32;
         let mut current_invocation = 0_u32;
         let mut current_object_index = 0_u32;
@@ -134,14 +144,17 @@ fn batch_objects<M: Material>(material_manager: &MaterialManager, object_manager
     jobs
 }
 
+#[derive(Debug)]
 pub struct DrawCallSet {
     pub object_reference_buffer: Buffer,
     pub index_buffer: Buffer,
     pub draw_calls: Vec<DrawCall>,
+    /// Range of draw calls in the draw call array corresponding to a given material key.
+    pub material_key_ranges: HashMap<u64, Range<usize>>,
 }
 
+#[derive(Debug)]
 pub struct DrawCall {
-    pub material_key: u64,
     pub bind_group_index: TextureBindGroupIndex,
     pub index_range: Range<u32>,
 }
@@ -249,6 +262,8 @@ impl GpuCuller {
     where
         M: Material,
     {
+        profiling::scope!("GpuCuller::cull");
+
         assert_eq!(TypeId::of::<M>(), self.type_id);
 
         let type_name = type_name::<M>();
@@ -259,9 +274,12 @@ impl GpuCuller {
             usage: BufferUsages::STORAGE,
             mapped_at_creation: true,
         });
-        StorageBuffer::new(&mut *object_reference_buffer.slice(..).get_mapped_range_mut())
-            .write(&jobs.jobs)
-            .unwrap();
+        {
+            profiling::scope!("Culling Job Data Upload");
+            StorageBuffer::new(&mut *object_reference_buffer.slice(..).get_mapped_range_mut())
+                .write(&jobs.jobs)
+                .unwrap();
+        }
         object_reference_buffer.unmap();
 
         let total_invocations: u32 = jobs
@@ -306,7 +324,13 @@ impl GpuCuller {
             ],
         });
 
+        profiling::scope!("Command Encoding");
         let mut draw_calls = Vec::with_capacity(jobs.jobs.len());
+        let mut material_key_ranges = HashMap::new();
+
+        let mut current_material_key_range_start = 0;
+        let mut current_material_key = jobs.keys.first().map(|k| k.material_key).unwrap_or(0);
+
         let mut cpass = encoder.begin_compute_pass(&ComputePassDescriptor {
             label: Some(&format_sso!("GpuCuller {type_name} Culling")),
         });
@@ -315,21 +339,30 @@ impl GpuCuller {
             // RA is having a lot of trouble with into_iter.
             let (key, job): (ShaderJobKey, ShaderBatchData) = (key, job);
 
+            if current_material_key != key.material_key {
+                let range_end = draw_calls.len();
+                material_key_ranges.insert(current_material_key, current_material_key_range_start..range_end);
+                current_material_key = key.material_key;
+                current_material_key_range_start = range_end;
+            }
+
             cpass.set_bind_group(0, &bg, &[idx as u32 * ShaderBatchData::SHADER_SIZE.get() as u32]);
             cpass.dispatch_workgroups(round_up_div(job.total_invocations, WORKGROUP_SIZE), 1, 1);
 
             draw_calls.push(DrawCall {
                 index_range: (job.base_output_invocation * 3)..(job.base_output_invocation + job.total_invocations) * 3,
-                material_key: key.material_key,
                 bind_group_index: key.bind_group_index,
             });
         }
         drop(cpass);
 
+        material_key_ranges.insert(current_material_key, current_material_key_range_start..draw_calls.len());
+
         DrawCallSet {
             object_reference_buffer,
             index_buffer: output_buffer,
             draw_calls,
+            material_key_ranges,
         }
     }
 }

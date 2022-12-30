@@ -468,7 +468,7 @@ impl<'node> RenderGraph<'node> {
                     None => RenderGraphEncoderOrPassInner::Encoder(unsafe { &mut *encoder_cell.get() }),
                 };
 
-                profiling::scope!("Execute Node");
+                profiling::scope!(&format!("Node: {}", node.label));
 
                 data_core
                     .profiler

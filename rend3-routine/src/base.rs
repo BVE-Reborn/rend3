@@ -245,21 +245,24 @@ impl BaseRenderGraphIntermediateState {
     ) {
         let iter = zip(&self.shadow_cull, shadows);
         for (shadow_index, (shadow_cull, desc)) in iter.enumerate() {
-            pbr.opaque_depth.add_forward_to_graph(RoutineAddToGraphArgs {
-                graph,
-                whole_frame_uniform_bg: self.shadow_uniform_bg,
-                culled: *shadow_cull,
-                per_material: &pbr.per_material,
-                extra_bgs: None,
-                label: &format!("pbr shadow renderering S{shadow_index}"),
-                samples: SampleCount::One,
-                color: None,
-                resolve: None,
-                depth: self
-                    .shadow
-                    .restrict(0..1, ViewportRect::new(desc.map.offset, UVec2::splat(desc.map.size))),
-                data: shadow_index as u32,
-            });
+            let routines = [&pbr.opaque_depth, &pbr.cutout_depth];
+            for routine in routines {
+                routine.add_forward_to_graph(RoutineAddToGraphArgs {
+                    graph,
+                    whole_frame_uniform_bg: self.shadow_uniform_bg,
+                    culled: *shadow_cull,
+                    per_material: &pbr.per_material,
+                    extra_bgs: None,
+                    label: &format!("pbr shadow renderering S{shadow_index}"),
+                    samples: SampleCount::One,
+                    color: None,
+                    resolve: None,
+                    depth: self
+                        .shadow
+                        .restrict(0..1, ViewportRect::new(desc.map.offset, UVec2::splat(desc.map.size))),
+                    data: shadow_index as u32,
+                });
+            }
         }
     }
 
@@ -289,19 +292,22 @@ impl BaseRenderGraphIntermediateState {
         pbr: &'node pbr::PbrRoutine,
         samples: SampleCount,
     ) {
-        pbr.opaque_routine.add_forward_to_graph(RoutineAddToGraphArgs {
-            graph,
-            whole_frame_uniform_bg: self.forward_uniform_bg,
-            culled: self.cull,
-            per_material: &pbr.per_material,
-            extra_bgs: None,
-            label: "PBR Forward",
-            samples,
-            color: Some(self.color),
-            resolve: self.resolve,
-            depth: self.depth,
-            data: 0,
-        });
+        let routines = [&pbr.opaque_routine, &pbr.cutout_routine, &pbr.blend_routine];
+        for routine in routines {
+            routine.add_forward_to_graph(RoutineAddToGraphArgs {
+                graph,
+                whole_frame_uniform_bg: self.forward_uniform_bg,
+                culled: self.cull,
+                per_material: &pbr.per_material,
+                extra_bgs: None,
+                label: "PBR Forward",
+                samples,
+                color: Some(self.color),
+                resolve: self.resolve,
+                depth: self.depth,
+                data: 0,
+            });
+        }
     }
 
     /// Tonemap onto the given render target.

@@ -212,6 +212,12 @@ fn get_pixel_data_inner(material_arg: Material, s: sampler, vs_out: VertexOutput
     }
     pixel.albedo *= material.albedo;
 
+    {{#if discard}}
+    if (pixel.albedo.a < material.alpha_cutout) {
+        discard;
+    }
+    {{/if}}
+
     // --- STOP IF UNLIT ---
 
     if (extract_material_flag(material.flags, FLAGS_UNLIT)) {

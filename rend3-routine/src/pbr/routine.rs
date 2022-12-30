@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 
-use rend3::{Renderer, RendererDataCore, ShaderConfig, ShaderPreProcessor, ShaderVertexBufferConfig};
+use rend3::{Renderer, RendererDataCore, RendererProfile, ShaderPreProcessor, ShaderVertexBufferConfig};
+use serde::Serialize;
 use wgpu::{BlendState, ShaderModuleDescriptor, ShaderSource};
 
 use crate::{
@@ -8,6 +9,12 @@ use crate::{
     forward::{ForwardRoutine, RoutineArgs, RoutineType, ShaderModulePair},
     pbr::{PbrMaterial, TransparencyType},
 };
+
+#[derive(Serialize)]
+struct BlendModeWrapper {
+    profile: RendererProfile,
+    discard: bool,
+}
 
 /// Render routine that renders the using PBR materials
 pub struct PbrRoutine {
@@ -35,13 +42,44 @@ impl PbrRoutine {
 
         let per_material = PerMaterialArchetypeInterface::<PbrMaterial>::new(&renderer.device);
 
+        let pbr_depth_cutout = renderer.device.create_shader_module(ShaderModuleDescriptor {
+            label: Some("pbr depth cutout sm"),
+            source: ShaderSource::Wgsl(Cow::Owned(
+                spp.render_shader(
+                    "rend3-routine/depth.wgsl",
+                    &BlendModeWrapper {
+                        profile: renderer.profile,
+                        discard: true,
+                    },
+                    Some(&ShaderVertexBufferConfig::from_material::<PbrMaterial>()),
+                )
+                .unwrap(),
+            )),
+        });
+
         let pbr_depth = renderer.device.create_shader_module(ShaderModuleDescriptor {
             label: Some("pbr depth sm"),
             source: ShaderSource::Wgsl(Cow::Owned(
                 spp.render_shader(
                     "rend3-routine/depth.wgsl",
-                    &ShaderConfig {
-                        profile: Some(renderer.profile),
+                    &BlendModeWrapper {
+                        profile: renderer.profile,
+                        discard: false,
+                    },
+                    Some(&ShaderVertexBufferConfig::from_material::<PbrMaterial>()),
+                )
+                .unwrap(),
+            )),
+        });
+
+        let pbr_cutout = renderer.device.create_shader_module(ShaderModuleDescriptor {
+            label: Some("pbr opaque cutout sm"),
+            source: ShaderSource::Wgsl(Cow::Owned(
+                spp.render_shader(
+                    "rend3-routine/opaque.wgsl",
+                    &BlendModeWrapper {
+                        profile: renderer.profile,
+                        discard: true,
                     },
                     Some(&ShaderVertexBufferConfig::from_material::<PbrMaterial>()),
                 )
@@ -54,8 +92,9 @@ impl PbrRoutine {
             source: ShaderSource::Wgsl(Cow::Owned(
                 spp.render_shader(
                     "rend3-routine/opaque.wgsl",
-                    &ShaderConfig {
-                        profile: Some(renderer.profile),
+                    &BlendModeWrapper {
+                        profile: renderer.profile,
+                        discard: false,
                     },
                     Some(&ShaderVertexBufferConfig::from_material::<PbrMaterial>()),
                 )
@@ -71,6 +110,7 @@ impl PbrRoutine {
                 spp,
                 interfaces,
                 per_material: &per_material,
+                material_key: transparency as u64,
                 routine_type,
                 shaders: ShaderModulePair {
                     vs_entry: "vs_main",
@@ -90,9 +130,9 @@ impl PbrRoutine {
 
         Self {
             opaque_depth: inner(RoutineType::Depth, &pbr_depth, TransparencyType::Opaque),
-            cutout_depth: inner(RoutineType::Depth, &pbr_depth, TransparencyType::Cutout),
+            cutout_depth: inner(RoutineType::Depth, &pbr_depth_cutout, TransparencyType::Cutout),
             opaque_routine: inner(RoutineType::Forward, &pbr_forward, TransparencyType::Opaque),
-            cutout_routine: inner(RoutineType::Forward, &pbr_forward, TransparencyType::Cutout),
+            cutout_routine: inner(RoutineType::Forward, &pbr_cutout, TransparencyType::Cutout),
             blend_routine: inner(RoutineType::Forward, &pbr_forward, TransparencyType::Blend),
             per_material,
         }

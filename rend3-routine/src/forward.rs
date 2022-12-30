@@ -56,6 +56,7 @@ pub struct RoutineArgs<'a, M> {
 
     pub interfaces: &'a WholeFrameInterfaces,
     pub per_material: &'a PerMaterialArchetypeInterface<M>,
+    pub material_key: u64,
 
     pub routine_type: RoutineType,
     pub shaders: ShaderModulePair<'a>,
@@ -87,6 +88,7 @@ pub struct RoutineAddToGraphArgs<'a, 'node, M> {
 pub struct ForwardRoutine<M: Material> {
     pub pipeline_s1: RenderPipeline,
     pub pipeline_s4: RenderPipeline,
+    pub material_key: u64,
     pub _phantom: PhantomData<M>,
 }
 impl<M: Material> ForwardRoutine<M> {
@@ -130,6 +132,7 @@ impl<M: Material> ForwardRoutine<M> {
         Self {
             pipeline_s1: build_forward_pipeline_inner(&pll, &args, SampleCount::One),
             pipeline_s4: build_forward_pipeline_inner(&pll, &args, SampleCount::Four),
+            material_key: args.material_key,
             _phantom: PhantomData,
         }
     }
@@ -206,7 +209,11 @@ impl<M: Material> ForwardRoutine<M> {
                 rpass.set_bind_group(2, bg, &[]);
             }
 
-            for (idx, call) in culled.draw_calls.iter().enumerate() {
+            let Some(range) = culled.material_key_ranges.get(&this.material_key) else {
+                return;
+            };
+            for (idx, call) in culled.draw_calls[range.clone()].iter().enumerate() {
+                let idx = idx + range.start;
                 let call: &DrawCall = call;
 
                 if renderer.profile.is_cpu_driven() {
