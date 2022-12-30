@@ -238,6 +238,7 @@ Assets:
   --ambient <value>                      Set the value of the minimum ambient light. This will be treated as white light of this intensity. Defaults to 0.1.
   --scale <scale>                        Scale all objects loaded by this factor. Defaults to 1.0.
   --shadow-distance <value>              Distance from the camera there will be directional shadows. Lower values means higher quality shadows. Defaults to 100.
+  --shadow-resolution <value>            Resolution of the shadow map. Higher values mean higher quality shadows with high performance cost. Defaults to 2048.
 
 Controls:
   --walk <speed>               Walk speed (speed without holding shift) in units/second (typically meters). Default 10.
@@ -305,6 +306,7 @@ impl SceneViewer {
         let ambient_light_level: f32 = option_arg(args.opt_value_from_str("--ambient")).unwrap_or(0.10);
         let scale: Option<f32> = option_arg(args.opt_value_from_str("--scale"));
         let shadow_distance: Option<f32> = option_arg(args.opt_value_from_str("--shadow-distance"));
+        let shadow_resolution: Option<u16> = option_arg(args.opt_value_from_str("--shadow-resolution"));
         let gltf_disable_directional_light: bool = args.contains("--gltf-disable-directional-lights");
 
         // Controls
@@ -342,6 +344,9 @@ impl SceneViewer {
         }
         if let Some(shadow_distance) = shadow_distance {
             gltf_settings.directional_light_shadow_distance = shadow_distance;
+        }
+        if let Some(shadow_resolution) = shadow_resolution {
+            gltf_settings.directional_light_resolution = shadow_resolution;
         }
 
         Self {

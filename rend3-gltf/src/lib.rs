@@ -286,6 +286,8 @@ pub struct GltfLoadSettings {
     pub scale: f32,
     /// Size of the shadow map in world space (default: 100)
     pub directional_light_shadow_distance: f32,
+    /// Resolution of the shadow map (default: 2048)
+    pub directional_light_resolution: u16,
     /// Coordinate space normal maps should use (default Up)
     pub normal_direction: pbr::NormalTextureYDirection,
     /// Enable built-in directional lights (default true)
@@ -297,6 +299,7 @@ impl Default for GltfLoadSettings {
         Self {
             scale: 1.0,
             directional_light_shadow_distance: 100.0,
+            directional_light_resolution: 2048,
             normal_direction: pbr::NormalTextureYDirection::Up,
             enable_directional: true,
         }
@@ -562,7 +565,7 @@ pub fn instance_loaded_scene<'a, E: std::error::Error + 'static>(
                         intensity: light.intensity(),
                         direction,
                         distance: settings.directional_light_shadow_distance,
-                        resolution: 2048,
+                        resolution: settings.directional_light_resolution,
                     }))
                 }
                 _ => None,
