@@ -1,13 +1,12 @@
-use std::{cell::RefCell, sync::Arc};
+use std::{cell::RefCell, marker::PhantomData};
 
 use crate::{
     graph::{
-        DataHandle, GraphSubResource, PassthroughDataContainer, PassthroughDataRef, PassthroughDataRefMut, ReadyData,
-        RenderGraph, RenderGraphDataStore, RenderGraphEncoderOrPass, RenderPassHandle, RenderPassTargets,
-        RenderTargetHandle, RpassTemporaryPool,
+        DataHandle, GraphSubResource, ReadyData, RenderGraph, RenderGraphDataStore, RenderGraphEncoderOrPass,
+        RenderPassHandle, RenderPassTargets, RenderTargetHandle, RpassTemporaryPool,
     },
     util::typedefs::SsoString,
-    Renderer,
+    Renderer, RendererDataCore,
 };
 
 /// Wraps a handle proving you have declared it as a dependency.
@@ -16,24 +15,62 @@ pub struct DeclaredDependency<Handle> {
     pub(super) handle: Handle,
 }
 
-#[allow(clippy::type_complexity)]
+pub struct NodeExecutionContext<'a, 'pass, 'node: 'pass> {
+    /// Reference to the renderer the graph is runningon .
+    pub renderer: &'a Renderer,
+    /// Reference to the renderer data behind a lock.
+    pub data_core: &'pass RendererDataCore,
+    /// Either the asked-for renderpass or a command encoder.
+    pub encoder_or_pass: RenderGraphEncoderOrPass<'a, 'pass>,
+    /// Storage for any temporary data that needs to live as long
+    /// as the renderpass.
+    pub temps: &'pass RpassTemporaryPool<'pass>,
+    /// The result of calling ready on the renderer.
+    pub ready: &'pass ReadyData,
+    /// Store to get data from
+    pub graph_data: RenderGraphDataStore<'pass>,
+    pub _phantom: PhantomData<&'node ()>,
+}
+
 pub(super) struct RenderGraphNode<'node> {
     pub inputs: Vec<GraphSubResource>,
     pub outputs: Vec<GraphSubResource>,
     pub references: Vec<GraphSubResource>,
     pub label: SsoString,
     pub rpass: Option<RenderPassTargets>,
-    pub passthrough: PassthroughDataContainer<'node>,
-    pub exec: Box<
-        dyn for<'b, 'pass> FnOnce(
-                &mut PassthroughDataContainer<'pass>,
-                &Arc<Renderer>,
-                RenderGraphEncoderOrPass<'b, 'pass>,
-                &'pass RpassTemporaryPool<'pass>,
-                &'pass ReadyData,
-                RenderGraphDataStore<'pass>,
-            ) + 'node,
-    >,
+    pub exec: RenderGraphFunction<'node>,
+}
+
+pub(super) struct RenderGraphFunction<'node>(
+    Box<dyn for<'a, 'pass> FnOnce(NodeExecutionContext<'a, 'pass, 'pass>) + 'node>,
+);
+
+impl<'node> RenderGraphFunction<'node> {
+    pub fn new<F>(func: F) -> Self
+    where
+        F: for<'b, 'pass> FnOnce(NodeExecutionContext<'b, 'pass, 'node>) + 'node,
+    {
+        let boxed: Box<dyn for<'b, 'pass> FnOnce(NodeExecutionContext<'b, 'pass, 'node>) + 'node> = Box::new(func);
+
+        // Safety, it is the responsibility of the caller of `call` to ensure that `'node: 'pass` such that
+        // transmute is at least logically sound.
+        //
+        // Note the last lifetime in the execution context is now 'pass
+        let shortened: Box<dyn for<'b, 'pass> FnOnce(NodeExecutionContext<'b, 'pass, 'pass>) + 'node> =
+            unsafe { std::mem::transmute(boxed) };
+        Self(shortened)
+    }
+
+    /// # Safety
+    ///
+    /// When this function is called, 'node: 'pass must hold. There doesn't seem
+    /// to be a good way of convincing the compiler of this. If I make this
+    /// `NodeExecutionContext<'a, 'pass, 'node>` then the compiler starts trying to
+    /// make borrows of length 'pass live for length 'node, despite the relationship
+    /// being inverted.
+    pub unsafe fn call<'a, 'pass>(self, ctx: NodeExecutionContext<'a, 'pass, 'pass>) {
+        (self.0)(ctx);
+    }
 }
 
 pub enum NodeResourceUsage {
@@ -56,7 +93,6 @@ pub struct RenderGraphNodeBuilder<'a, 'node> {
     pub(super) inputs: Vec<GraphSubResource>,
     pub(super) outputs: Vec<GraphSubResource>,
     pub(super) references: Vec<GraphSubResource>,
-    pub(super) passthrough: PassthroughDataContainer<'node>,
     pub(super) rpass: Option<RenderPassTargets>,
 }
 impl<'a, 'node> RenderGraphNodeBuilder<'a, 'node> {
@@ -166,53 +202,14 @@ impl<'a, 'node> RenderGraphNodeBuilder<'a, 'node> {
         self.outputs.push(GraphSubResource::External);
     }
 
-    /// Passthrough a bit of immutable external data with lifetime 'node so you
-    /// can receieve it inside with lifetime 'rpass.
-    ///
-    /// Use [PassthroughDataContainer::get][g] to get the value on the inside.
-    ///
-    /// [g]: super::PassthroughDataContainer::get
-    pub fn passthrough_ref<T: 'node>(&mut self, data: &'node T) -> PassthroughDataRef<T> {
-        self.passthrough.add_ref(data)
-    }
-
-    /// Passthrough a bit of mutable external data with lifetime 'node so you
-    /// can receieve it inside with lifetime 'rpass.
-    ///
-    /// Use [PassthroughDataContainer::get_mut][g] to get the value on the
-    /// inside.
-    ///
-    /// [g]: super::PassthroughDataContainer::get_mut
-    pub fn passthrough_ref_mut<T: 'node>(&mut self, data: &'node mut T) -> PassthroughDataRefMut<T> {
-        self.passthrough.add_ref_mut(data)
-    }
-
     /// Builds the rendergraph node and adds it into the rendergraph.
     ///
     /// Takes a function that is the body of the node. Nodes will only run if a
     /// following node consumes the output. See module level docs for more
     /// details.
-    ///
-    /// The function takes the following arguments (which I will give names):
-    ///  - `pt`: a container which you can get all the passthrough data out of
-    ///  - `renderer`: a reference to the renderer.
-    ///  - `encoder_or_pass`: either the asked-for renderpass, or a command
-    ///    encoder.
-    ///  - `temps`: storage for temporary data that lasts the length of the
-    ///    renderpass.
-    ///  - `ready`: result from calling ready on various managers.
-    ///  - `graph_data`: read-only access to various managers and access to
-    ///    in-graph data.
     pub fn build<F>(self, exec: F)
     where
-        F: for<'b, 'pass> FnOnce(
-                &mut PassthroughDataContainer<'pass>,
-                &Arc<Renderer>,
-                RenderGraphEncoderOrPass<'b, 'pass>,
-                &'pass RpassTemporaryPool<'pass>,
-                &'pass ReadyData,
-                RenderGraphDataStore<'pass>,
-            ) + 'node,
+        F: for<'b, 'pass> FnOnce(NodeExecutionContext<'b, 'pass, 'node>) + 'node,
     {
         self.graph.nodes.push(RenderGraphNode {
             label: self.label,
@@ -220,8 +217,7 @@ impl<'a, 'node> RenderGraphNodeBuilder<'a, 'node> {
             outputs: self.outputs,
             references: self.references,
             rpass: self.rpass,
-            passthrough: self.passthrough,
-            exec: Box::new(exec),
+            exec: RenderGraphFunction::new(exec),
         });
     }
 }

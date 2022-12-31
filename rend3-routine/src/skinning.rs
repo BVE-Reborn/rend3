@@ -233,24 +233,24 @@ pub fn add_skinning_to_graph<'node>(graph: &mut RenderGraph<'node>, gpu_skinner:
     let mut builder = graph.add_node("skinning");
     builder.add_side_effect();
 
-    let skinner_pt = builder.passthrough_ref(gpu_skinner);
+    builder.build(move |ctx| {
+        let encoder = ctx.encoder_or_pass.get_encoder();
 
-    builder.build(move |pt, renderer, encoder_or_pass, _temps, _ready, graph_data| {
-        let skinner = pt.get(skinner_pt);
-        let encoder = encoder_or_pass.get_encoder();
-
-        let skinning_input =
-            build_gpu_skinning_input_buffers(&renderer.device, graph_data.skeleton_manager, graph_data.mesh_manager);
+        let skinning_input = build_gpu_skinning_input_buffers(
+            &ctx.renderer.device,
+            &ctx.data_core.skeleton_manager,
+            &ctx.data_core.mesh_manager,
+        );
 
         // Avoid running the compute pass if there are no skeletons. This
         // prevents binding an empty buffer
-        if graph_data.skeleton_manager.skeletons().len() > 0 {
-            skinner.execute_pass(
-                &renderer.device,
+        if ctx.data_core.skeleton_manager.skeletons().len() > 0 {
+            gpu_skinner.execute_pass(
+                &ctx.renderer.device,
                 encoder,
                 &skinning_input,
-                graph_data.mesh_manager,
-                graph_data.skeleton_manager,
+                &ctx.data_core.mesh_manager,
+                &ctx.data_core.skeleton_manager,
             );
         }
     });

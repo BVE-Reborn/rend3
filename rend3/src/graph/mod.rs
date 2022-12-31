@@ -63,7 +63,6 @@ mod encpass;
 #[allow(clippy::module_inception)] // lmao
 mod graph;
 mod node;
-mod passthrough;
 mod store;
 mod temp;
 mod texture_store;
@@ -72,7 +71,6 @@ pub use data_handle::*;
 pub use encpass::*;
 pub use graph::*;
 pub use node::*;
-pub use passthrough::*;
 pub use store::*;
 pub use temp::*;
 pub(crate) use texture_store::*;

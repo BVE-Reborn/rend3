@@ -96,7 +96,7 @@ pub struct RendererDataCore {
     pub skeleton_manager: SkeletonManager,
 
     /// Stores gpu timing and debug scopes.
-    pub profiler: GpuProfiler,
+    pub profiler: Mutex<GpuProfiler>,
 
     /// Stores a cache of render targets between graph invocations.
     pub(crate) graph_texture_store: GraphTextureStore,

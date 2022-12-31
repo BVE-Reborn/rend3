@@ -6,10 +6,6 @@ use crate::{
     graph::{
         DataContents, DeclaredDependency, GraphSubResource, RenderTargetHandle, RpassTemporaryPool, TextureRegion,
     },
-    managers::{
-        CameraManager, DirectionalLightManager, MaterialManager, MeshManager, ObjectManager, SkeletonManager,
-        TextureManager,
-    },
     util::typedefs::FastHashMap,
 };
 
@@ -49,15 +45,6 @@ pub struct RenderGraphDataStore<'a> {
     pub(super) texture_mapping: &'a FastHashMap<TextureRegion, TextureView>,
     pub(super) external_texture_mapping: &'a FastHashMap<TextureRegion, TextureView>,
     pub(super) data: &'a [DataContents], // Any is RefCell<Option<T>> where T is the stored data
-
-    pub camera_manager: &'a CameraManager,
-    pub directional_light_manager: &'a DirectionalLightManager,
-    pub material_manager: &'a MaterialManager,
-    pub mesh_manager: &'a MeshManager,
-    pub skeleton_manager: &'a SkeletonManager,
-    pub object_manager: &'a ObjectManager,
-    pub d2_texture_manager: &'a TextureManager<crate::types::Texture2DTag>,
-    pub d2c_texture_manager: &'a TextureManager<crate::types::TextureCubeTag>,
 }
 
 impl<'a> RenderGraphDataStore<'a> {

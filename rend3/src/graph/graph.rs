@@ -17,7 +17,7 @@ use wgpu::{
 
 use crate::{
     graph::{
-        DataHandle, GraphResource, GraphSubResource, PassthroughDataContainer, RenderGraphDataStore,
+        DataHandle, GraphResource, GraphSubResource, NodeExecutionContext, RenderGraphDataStore,
         RenderGraphEncoderOrPass, RenderGraphEncoderOrPassInner, RenderGraphNode, RenderGraphNodeBuilder,
         RenderPassTargets, RenderTargetDescriptor, RenderTargetHandle, RpassTemporaryPool, TextureRegion,
     },
@@ -102,7 +102,6 @@ impl<'node> RenderGraph<'node> {
             inputs: Vec::with_capacity(16),
             outputs: Vec::with_capacity(16),
             references: Vec::with_capacity(16),
-            passthrough: PassthroughDataContainer::new(),
             rpass: None,
         }
     }
@@ -170,9 +169,9 @@ impl<'node> RenderGraph<'node> {
 
     pub fn execute(
         mut self,
-        renderer: &Arc<Renderer>,
+        renderer: &'node Arc<Renderer>,
         mut cmd_bufs: Vec<CommandBuffer>,
-        ready_output: &ReadyData,
+        ready_output: &'node ReadyData,
     ) -> Option<RendererStatistics> {
         profiling::scope!("RenderGraph::execute");
 
@@ -415,7 +414,7 @@ impl<'node> RenderGraph<'node> {
         let mut rpass = None;
 
         // Iterate through all the nodes and actually execute them.
-        for (idx, mut node) in pruned_node_list.into_iter().enumerate() {
+        for (idx, node) in pruned_node_list.into_iter().enumerate() {
             if !compatible[idx] {
                 // SAFETY: this drops the renderpass, letting us into everything it was
                 // borrowing when we make the new renderpass.
@@ -443,15 +442,6 @@ impl<'node> RenderGraph<'node> {
                     texture_mapping: &active_views,
                     external_texture_mapping: &imported_views,
                     data: &self.data,
-
-                    camera_manager: &data_core.camera_manager,
-                    directional_light_manager: &data_core.directional_light_manager,
-                    material_manager: &data_core.material_manager,
-                    mesh_manager: &data_core.mesh_manager,
-                    skeleton_manager: &data_core.skeleton_manager,
-                    object_manager: &data_core.object_manager,
-                    d2_texture_manager: &data_core.d2_texture_manager,
-                    d2c_texture_manager: &data_core.d2c_texture_manager,
                 };
 
                 let mut encoder_or_rpass = match rpass {
@@ -485,20 +475,27 @@ impl<'node> RenderGraph<'node> {
 
                 profiling::scope!(&format!("Node: {}", node.label));
 
-                data_core
-                    .profiler
-                    .begin_scope(&node.label, &mut encoder_or_rpass, &renderer.device);
+                data_core.profiler.try_lock().unwrap().begin_scope(
+                    &node.label,
+                    &mut encoder_or_rpass,
+                    &renderer.device,
+                );
 
-                (node.exec)(
-                    &mut node.passthrough,
+                let ctx = NodeExecutionContext {
                     renderer,
-                    RenderGraphEncoderOrPass(encoder_or_rpass),
+                    data_core,
+                    encoder_or_pass: RenderGraphEncoderOrPass(encoder_or_rpass),
                     // SAFETY: This borrow, and all the objects allocated from it, lasts as long as the renderpass, and
                     // isn't used mutably until after the rpass dies
-                    unsafe { &*rpass_temps_cell.get() },
-                    ready_output,
-                    store,
-                );
+                    temps: unsafe { &*rpass_temps_cell.get() },
+                    ready: ready_output,
+                    graph_data: store,
+                    _phantom: PhantomData,
+                };
+
+                // At this point, 'node lasts until after this function call, but 'pass
+                // ends within this function, so 'node: 'pass
+                unsafe { node.exec.call(ctx) };
 
                 let mut encoder_or_rpass = match rpass {
                     Some(ref mut rpass) => RenderGraphEncoderOrPassInner::RenderPass(rpass),
@@ -507,7 +504,7 @@ impl<'node> RenderGraph<'node> {
                     None => RenderGraphEncoderOrPassInner::Encoder(unsafe { &mut *encoder_cell.get() }),
                 };
 
-                data_core.profiler.end_scope(&mut encoder_or_rpass);
+                data_core.profiler.try_lock().unwrap().end_scope(&mut encoder_or_rpass);
             }
         }
 
@@ -527,13 +524,21 @@ impl<'node> RenderGraph<'node> {
         let mut resolve_encoder = renderer.device.create_command_encoder(&CommandEncoderDescriptor {
             label: Some("profile resolve encoder"),
         });
-        data_core.profiler.resolve_queries(&mut resolve_encoder);
+        data_core
+            .profiler
+            .try_lock()
+            .unwrap()
+            .resolve_queries(&mut resolve_encoder);
         cmd_bufs.push(resolve_encoder.finish());
 
         renderer.queue.submit(cmd_bufs);
 
-        data_core.profiler.end_frame().unwrap();
-        data_core.profiler.process_finished_frame()
+        data_core.profiler.try_lock().unwrap().end_frame().unwrap();
+
+        // This variable seems superfluous, but solves borrow checker issues with the borrow of data_core.
+        let timers = data_core.profiler.try_lock().unwrap().process_finished_frame();
+
+        timers
     }
 
     #[allow(clippy::too_many_arguments)]

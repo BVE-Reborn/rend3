@@ -669,10 +669,10 @@ impl rend3_framework::App for SceneViewer {
                 } else if self.camera_yaw >= TAU {
                     self.camera_yaw -= TAU;
                 }
-                self.camera_pitch = self
-                    .camera_pitch
-                    .max(-std::f32::consts::FRAC_PI_2 + 0.0001)
-                    .min(std::f32::consts::FRAC_PI_2 - 0.0001);
+                self.camera_pitch = self.camera_pitch.clamp(
+                    -std::f32::consts::FRAC_PI_2 + 0.0001,
+                    std::f32::consts::FRAC_PI_2 - 0.0001,
+                )
             }
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,

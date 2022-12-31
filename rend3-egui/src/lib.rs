@@ -72,33 +72,32 @@ impl EguiRenderRoutine {
         // the lifetime of `self` for the remainder of the closure. so we instead buffer the textures
         // to free for a frame so we can clean them up before the next call.
         let textures_to_free = mem::replace(&mut self.textures_to_free, mem::take(&mut input.textures_delta.free));
-        let pt_handle = builder.passthrough_ref_mut(self);
 
-        builder.build(move |pt, renderer, encoder_or_pass, _temps, _ready, _graph_data| {
-            let this = pt.get_mut(pt_handle);
-            let rpass = encoder_or_pass.get_rpass(rpass_handle);
+        builder.build(move |ctx| {
+            let rpass = ctx.encoder_or_pass.get_rpass(rpass_handle);
 
             for texture in textures_to_free {
-                this.internal.free_texture(&texture);
+                self.internal.free_texture(&texture);
             }
             for (id, image_delta) in input.textures_delta.set {
-                this.internal
-                    .update_texture(&renderer.device, &renderer.queue, id, &image_delta);
+                self.internal
+                    .update_texture(&ctx.renderer.device, &ctx.renderer.queue, id, &image_delta);
             }
-            let mut cmd_buffer = renderer
+            let mut cmd_buffer = ctx
+                .renderer
                 .device
                 .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
-            this.internal.update_buffers(
-                &renderer.device,
-                &renderer.queue,
+            self.internal.update_buffers(
+                &ctx.renderer.device,
+                &ctx.renderer.queue,
                 &mut cmd_buffer,
                 input.clipped_meshes,
-                &this.screen_descriptor,
+                &self.screen_descriptor,
             );
             drop(cmd_buffer);
 
-            this.internal
-                .render(rpass, input.clipped_meshes, &this.screen_descriptor);
+            self.internal
+                .render(rpass, input.clipped_meshes, &self.screen_descriptor);
         });
     }
 

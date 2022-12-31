@@ -30,16 +30,20 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
                     profiling::scope!("Add Mesh");
                     data_core
                         .profiler
+                        .try_lock()
+                        .unwrap()
                         .begin_scope("Add Mesh", &mut encoder, &renderer.device);
                     data_core
                         .mesh_manager
                         .add(&renderer.device, &renderer.queue, &mut encoder, &handle, mesh);
-                    data_core.profiler.end_scope(&mut encoder);
+                    data_core.profiler.try_lock().unwrap().end_scope(&mut encoder);
                 }
                 InstructionKind::AddSkeleton { handle, skeleton } => {
                     profiling::scope!("Add Skeleton");
                     data_core
                         .profiler
+                        .try_lock()
+                        .unwrap()
                         .begin_scope("Add Skeleton", &mut encoder, &renderer.device);
                     data_core.skeleton_manager.add(
                         &renderer.device,
@@ -48,7 +52,7 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
                         &handle,
                         skeleton,
                     );
-                    data_core.profiler.end_scope(&mut encoder);
+                    data_core.profiler.try_lock().unwrap().end_scope(&mut encoder);
                 }
                 InstructionKind::AddTexture2D {
                     handle,

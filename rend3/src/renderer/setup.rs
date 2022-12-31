@@ -56,7 +56,11 @@ pub fn create_renderer(
         ],
     );
 
-    let profiler = wgpu_profiler::GpuProfiler::new(4, iad.queue.get_timestamp_period(), iad.device.features());
+    let profiler = Mutex::new(wgpu_profiler::GpuProfiler::new(
+        4,
+        iad.queue.get_timestamp_period(),
+        iad.device.features(),
+    ));
 
     let scatter = ScatterCopy::new(&iad.device);
 

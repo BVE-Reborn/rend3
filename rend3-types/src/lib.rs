@@ -527,11 +527,11 @@ impl Mesh {
 
         for attribute in &self.attributes {
             let attribute_len = attribute.data.len();
-            if attribute_len != position_length as usize {
+            if attribute_len != position_length {
                 return Err(MeshValidationError::MismatchedVertexCount {
                     attribute_id: attribute.id(),
                     actual: attribute_len,
-                    expected: position_length as usize,
+                    expected: position_length,
                 });
             }
         }
@@ -563,7 +563,7 @@ impl Mesh {
         self.attributes
             .iter()
             .enumerate()
-            .find_map(|(idx, attribute)| (attribute.id == desired_attribute).then(|| idx))
+            .find_map(|(idx, attribute)| (attribute.id == desired_attribute).then_some(idx))
     }
 
     /// Returns the index in to the attribute array for a given attribute. Creates the attribute

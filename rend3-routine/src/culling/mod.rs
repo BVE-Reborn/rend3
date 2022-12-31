@@ -376,22 +376,22 @@ pub fn add_culling_to_graph<'node, M: Material>(
     let mut node = graph.add_node(name);
     let output = node.add_data(draw_calls_hdl, NodeResourceUsage::Output);
 
-    node.build(move |_pt, renderer, encoder_or_pass, _temps, _ready, graph_data| {
-        let jobs = batch_objects::<M>(graph_data.material_manager, graph_data.object_manager);
+    node.build(move |ctx| {
+        let jobs = batch_objects::<M>(&ctx.data_core.material_manager, &ctx.data_core.object_manager);
 
         if jobs.jobs.is_empty() {
             return;
         }
 
-        let encoder = encoder_or_pass.get_encoder();
+        let encoder = ctx.encoder_or_pass.get_encoder();
         let draw_calls = culler.cull::<M>(
-            renderer,
+            ctx.renderer,
             encoder,
             jobs,
-            graph_data.mesh_manager.buffer(),
-            graph_data.object_manager.buffer::<M>().unwrap(),
+            ctx.data_core.mesh_manager.buffer(),
+            ctx.data_core.object_manager.buffer::<M>().unwrap(),
         );
 
-        graph_data.set_data(output, Some(draw_calls));
+        ctx.graph_data.set_data(output, Some(draw_calls));
     });
 }

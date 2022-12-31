@@ -56,14 +56,11 @@ impl ImguiRenderRoutine {
             depth_stencil: None,
         });
 
-        let pt_handle = builder.passthrough_ref_mut(self);
+        builder.build(move |ctx| {
+            let rpass = ctx.encoder_or_pass.get_rpass(rpass_handle);
 
-        builder.build(move |pt, renderer, encoder_or_pass, _temps, _ready, _graph_data| {
-            let this = pt.get_mut(pt_handle);
-            let rpass = encoder_or_pass.get_rpass(rpass_handle);
-
-            this.renderer
-                .render(draw_data, &renderer.queue, &renderer.device, rpass)
+            self.renderer
+                .render(draw_data, &ctx.renderer.queue, &ctx.renderer.device, rpass)
                 .unwrap();
         })
     }

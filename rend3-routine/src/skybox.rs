@@ -113,18 +113,16 @@ impl SkyboxRoutine {
         });
 
         let forward_uniform_handle = builder.add_data(forward_uniform_bg, NodeResourceUsage::Input);
-        let pt_handle = builder.passthrough_ref(self);
 
-        builder.build(move |pt, _renderer, encoder_or_pass, temps, _ready, graph_data| {
-            let this = pt.get(pt_handle);
-            let rpass = encoder_or_pass.get_rpass(rpass_handle);
+        builder.build(move |ctx| {
+            let rpass = ctx.encoder_or_pass.get_rpass(rpass_handle);
 
-            let forward_uniform_bg = graph_data.get_data(temps, forward_uniform_handle).unwrap();
+            let forward_uniform_bg = ctx.graph_data.get_data(ctx.temps, forward_uniform_handle).unwrap();
 
-            if let Some(ref bg) = this.current_skybox.bg {
+            if let Some(ref bg) = self.current_skybox.bg {
                 let pipeline = match samples {
-                    SampleCount::One => &this.pipelines.pipeline_s1,
-                    SampleCount::Four => &this.pipelines.pipeline_s4,
+                    SampleCount::One => &self.pipelines.pipeline_s1,
+                    SampleCount::Four => &self.pipelines.pipeline_s4,
                 };
 
                 rpass.set_pipeline(pipeline);

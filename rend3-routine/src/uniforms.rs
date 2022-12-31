@@ -76,15 +76,15 @@ pub fn add_to_graph<'node>(
     let shadow_target_handle = builder.add_render_target(shadow_target, NodeResourceUsage::Reference);
     builder.add_dependencies_to_render_targets(forward_uniform_bg, once(shadow_target));
 
-    builder.build(move |_pt, renderer, _encoder_or_pass, _temps, _ready, graph_data| {
-        let shadow_target = graph_data.get_render_target(shadow_target_handle);
+    builder.build(move |ctx| {
+        let shadow_target = ctx.graph_data.get_render_target(shadow_target_handle);
 
         let mut bgb = BindGroupBuilder::new();
 
         samplers.add_to_bg(&mut bgb);
 
-        let uniforms = FrameUniforms::new(graph_data.camera_manager, ambient, resolution);
-        let uniform_buffer = renderer.device.create_buffer_init(&BufferInitDescriptor {
+        let uniforms = FrameUniforms::new(&ctx.data_core.camera_manager, ambient, resolution);
+        let uniform_buffer = ctx.renderer.device.create_buffer_init(&BufferInitDescriptor {
             label: Some("frame uniform"),
             contents: bytemuck::bytes_of(&uniforms),
             usage: BufferUsages::UNIFORM,
@@ -92,10 +92,10 @@ pub fn add_to_graph<'node>(
 
         bgb.append_buffer(&uniform_buffer);
 
-        graph_data.directional_light_manager.add_to_bg(&mut bgb);
+        ctx.data_core.directional_light_manager.add_to_bg(&mut bgb);
 
         let shadow_uniform_bg = bgb.build(
-            &renderer.device,
+            &ctx.renderer.device,
             Some("shadow uniform bg"),
             &interfaces.depth_uniform_bgl,
         );
@@ -103,12 +103,12 @@ pub fn add_to_graph<'node>(
         bgb.append_texture_view(shadow_target);
 
         let forward_uniform_bg = bgb.build(
-            &renderer.device,
+            &ctx.renderer.device,
             Some("forward uniform bg"),
             &interfaces.forward_uniform_bgl,
         );
 
-        graph_data.set_data(shadow_handle, Some(shadow_uniform_bg));
-        graph_data.set_data(forward_handle, Some(forward_uniform_bg));
+        ctx.graph_data.set_data(shadow_handle, Some(shadow_uniform_bg));
+        ctx.graph_data.set_data(forward_handle, Some(forward_uniform_bg));
     })
 }

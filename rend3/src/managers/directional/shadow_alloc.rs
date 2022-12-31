@@ -107,10 +107,7 @@ pub(super) fn allocate_shadow_atlas(
         .into_iter()
         .enumerate()
         .map(|(root_idx, node_idx)| {
-            let offset = UVec2::new(
-                root_idx as u32 % columns_needed as u32,
-                root_idx as u32 / columns_needed as u32,
-            ) * root_size;
+            let offset = UVec2::new(root_idx as u32 % columns_needed, root_idx as u32 / columns_needed) * root_size;
 
             (1_u32, offset, node_idx)
         })

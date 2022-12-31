@@ -39,5 +39,5 @@ pub fn add_clear_to_graph(
         }),
     });
 
-    builder.build(|_, _, _, _, _, _| ())
+    builder.build(|_| ())
 }

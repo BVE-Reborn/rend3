@@ -120,7 +120,7 @@ impl MeshManager {
         }
 
         for (attribute_data, (_, range)) in mesh.attributes.iter().zip(&vertex_attribute_ranges) {
-            queue.write_buffer(&self.buffer, range.start as u64, attribute_data.untyped_data());
+            queue.write_buffer(&self.buffer, range.start, attribute_data.untyped_data());
         }
 
         let index_range = self.allocate_range(device, encoder, index_count as u64 * 4);

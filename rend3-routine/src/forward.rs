@@ -71,10 +71,7 @@ pub struct RoutineAddToGraphArgs<'a, 'node, M> {
     pub whole_frame_uniform_bg: DataHandle<BindGroup>,
     pub culled: DataHandle<culling::DrawCallSet>,
     pub per_material: &'node PerMaterialArchetypeInterface<M>,
-    /// I understand the requirement that extra_bgs is explicitly a Vec is
-    /// weird, but due to my lifetime passthrough logic I can't pass through anything
-    /// that is !Sized
-    pub extra_bgs: Option<&'node Vec<BindGroup>>,
+    pub extra_bgs: Option<&'node [BindGroup]>,
     pub label: &'a str,
     pub samples: SampleCount,
     pub color: Option<RenderTargetHandle>,
@@ -167,59 +164,54 @@ impl<M: Material> ForwardRoutine<M> {
         let whole_frame_uniform_handle = builder.add_data(args.whole_frame_uniform_bg, NodeResourceUsage::Input);
         let cull_handle = builder.add_data(args.culled, NodeResourceUsage::Input);
 
-        let this_pt_handle = builder.passthrough_ref(self);
-        let extra_bg_pt_handle = args.extra_bgs.map(|v| builder.passthrough_ref(v));
-
-        builder.build(move |pt, renderer, encoder_or_pass, temps, ready, graph_data| {
-            let this = pt.get(this_pt_handle);
-            let extra_bgs = extra_bg_pt_handle.map(|h| pt.get(h));
-            let rpass = encoder_or_pass.get_rpass(rpass_handle);
-            let whole_frame_uniform_bg = graph_data.get_data(temps, whole_frame_uniform_handle).unwrap();
-            let culled = match graph_data.get_data(temps, cull_handle) {
+        builder.build(move |ctx| {
+            let rpass = ctx.encoder_or_pass.get_rpass(rpass_handle);
+            let whole_frame_uniform_bg = ctx.graph_data.get_data(ctx.temps, whole_frame_uniform_handle).unwrap();
+            let culled = match ctx.graph_data.get_data(ctx.temps, cull_handle) {
                 Some(c) => c,
                 None => return,
             };
 
-            let per_material_bg = temps.add(
+            let per_material_bg = ctx.temps.add(
                 BindGroupBuilder::new()
-                    .append_buffer(graph_data.object_manager.buffer::<M>().unwrap())
+                    .append_buffer(ctx.data_core.object_manager.buffer::<M>().unwrap())
                     .append_buffer_with_size(
                         &culled.object_reference_buffer,
                         culling::ShaderBatchData::SHADER_SIZE.get(),
                     )
-                    .append_buffer(graph_data.mesh_manager.buffer())
-                    .append_buffer(graph_data.material_manager.archetype_view::<M>().buffer())
-                    .build(&renderer.device, Some("Per-Material BG"), &args.per_material.bgl),
+                    .append_buffer(ctx.data_core.mesh_manager.buffer())
+                    .append_buffer(ctx.data_core.material_manager.archetype_view::<M>().buffer())
+                    .build(&ctx.renderer.device, Some("Per-Material BG"), &args.per_material.bgl),
             );
 
             let pipeline = match args.samples {
-                SampleCount::One => &this.pipeline_s1,
-                SampleCount::Four => &this.pipeline_s4,
+                SampleCount::One => &self.pipeline_s1,
+                SampleCount::Four => &self.pipeline_s4,
             };
 
             rpass.set_index_buffer(culled.index_buffer.slice(..), IndexFormat::Uint32);
             rpass.set_pipeline(pipeline);
             rpass.set_bind_group(0, whole_frame_uniform_bg, &[]);
-            if let Some(v) = extra_bgs {
+            if let Some(v) = args.extra_bgs {
                 for (idx, bg) in v.iter().enumerate() {
                     rpass.set_bind_group((idx + 3) as _, bg, &[])
                 }
             }
-            if let ProfileData::Gpu(ref bg) = ready.d2_texture.bg {
+            if let ProfileData::Gpu(ref bg) = ctx.ready.d2_texture.bg {
                 rpass.set_bind_group(2, bg, &[]);
             }
 
-            let Some(range) = culled.material_key_ranges.get(&this.material_key) else {
+            let Some(range) = culled.material_key_ranges.get(&self.material_key) else {
                 return;
             };
             for (idx, call) in culled.draw_calls[range.clone()].iter().enumerate() {
                 let idx = idx + range.start;
                 let call: &DrawCall = call;
 
-                if renderer.profile.is_cpu_driven() {
+                if ctx.renderer.profile.is_cpu_driven() {
                     rpass.set_bind_group(
                         2,
-                        graph_data.material_manager.texture_bind_group(call.bind_group_index),
+                        ctx.data_core.material_manager.texture_bind_group(call.bind_group_index),
                         &[],
                     );
                 }
