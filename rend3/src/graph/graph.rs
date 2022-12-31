@@ -493,9 +493,7 @@ impl<'node> RenderGraph<'node> {
                     _phantom: PhantomData,
                 };
 
-                // At this point, 'node lasts until after this function call, but 'pass
-                // ends within this function, so 'node: 'pass
-                unsafe { node.exec.call(ctx) };
+                (node.exec)(ctx);
 
                 let mut encoder_or_rpass = match rpass {
                     Some(ref mut rpass) => RenderGraphEncoderOrPassInner::RenderPass(rpass),

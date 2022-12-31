@@ -38,39 +38,7 @@ pub(super) struct RenderGraphNode<'node> {
     pub references: Vec<GraphSubResource>,
     pub label: SsoString,
     pub rpass: Option<RenderPassTargets>,
-    pub exec: RenderGraphFunction<'node>,
-}
-
-pub(super) struct RenderGraphFunction<'node>(
-    Box<dyn for<'a, 'pass> FnOnce(NodeExecutionContext<'a, 'pass, 'pass>) + 'node>,
-);
-
-impl<'node> RenderGraphFunction<'node> {
-    pub fn new<F>(func: F) -> Self
-    where
-        F: for<'b, 'pass> FnOnce(NodeExecutionContext<'b, 'pass, 'node>) + 'node,
-    {
-        let boxed: Box<dyn for<'b, 'pass> FnOnce(NodeExecutionContext<'b, 'pass, 'node>) + 'node> = Box::new(func);
-
-        // Safety, it is the responsibility of the caller of `call` to ensure that `'node: 'pass` such that
-        // transmute is at least logically sound.
-        //
-        // Note the last lifetime in the execution context is now 'pass
-        let shortened: Box<dyn for<'b, 'pass> FnOnce(NodeExecutionContext<'b, 'pass, 'pass>) + 'node> =
-            unsafe { std::mem::transmute(boxed) };
-        Self(shortened)
-    }
-
-    /// # Safety
-    ///
-    /// When this function is called, 'node: 'pass must hold. There doesn't seem
-    /// to be a good way of convincing the compiler of this. If I make this
-    /// `NodeExecutionContext<'a, 'pass, 'node>` then the compiler starts trying to
-    /// make borrows of length 'pass live for length 'node, despite the relationship
-    /// being inverted.
-    pub unsafe fn call<'a, 'pass>(self, ctx: NodeExecutionContext<'a, 'pass, 'pass>) {
-        (self.0)(ctx);
-    }
+    pub exec: Box<dyn for<'a, 'pass> FnOnce(NodeExecutionContext<'a, 'pass, 'node>) + 'node>,
 }
 
 pub enum NodeResourceUsage {
@@ -217,7 +185,7 @@ impl<'a, 'node> RenderGraphNodeBuilder<'a, 'node> {
             outputs: self.outputs,
             references: self.references,
             rpass: self.rpass,
-            exec: RenderGraphFunction::new(exec),
+            exec: Box::new(exec),
         });
     }
 }
