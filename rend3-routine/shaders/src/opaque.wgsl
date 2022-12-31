@@ -470,15 +470,28 @@ fn fs_main(vs_out: VertexOutput) -> @location(0) vec4<f32> {
     for (var i = 0; i < i32(directional_lights.count); i += 1) {
         let light = directional_lights.data[i];
 
+        // Get the shadow ndc coordinates, then convert to texture sample coordinates
         let shadow_ndc = (light.view_proj * uniforms.inv_view * vs_out.view_position).xyz;
         let shadow_flipped = (shadow_ndc.xy * 0.5) + 0.5;
-        let shadow_coords = vec2<f32>(shadow_flipped.x, 1.0 - shadow_flipped.y);
+        let shadow_local_coords = vec2<f32>(shadow_flipped.x, 1.0 - shadow_flipped.y);
+
+        // Texture sample coordinates of 
+        var top_left = light.offset;
+        var top_right = top_left + light.size;
+        let shadow_coords = mix(top_left, top_right, shadow_local_coords);
+
+        // The shadow is stored in an atlas, so we need to make sure we don't linear blend
+        // across atlasses. We move our conditional borders in a half a pixel for standard
+        // linear blending (so we're hitting texel centers on the edge). We move it an additional
+        // pixel in so that our pcf5 offsets don't move off the edge of the atlasses.
+        let shadow_border = light.inv_resolution * 1.5;
+        top_left += shadow_border;
+        top_right -= shadow_border;
 
         var shadow_value = 1.0;
         if (
-            // TODO: check off-by-one on the borders here
-            any(shadow_flipped >= light.offset) && // XY lower
-            any(shadow_flipped <= (light.offset + light.size)) && // XY upper
+            any(shadow_flipped >= top_left) && // XY lower
+            any(shadow_flipped <= top_right) && // XY upper
             shadow_ndc.z >= 0.0 && // Z lower
             shadow_ndc.z <= 1.0 // Z upper
         ) {

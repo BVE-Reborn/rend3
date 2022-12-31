@@ -37,12 +37,18 @@ struct ShaderDirectionalLightBuffer {
 
 #[derive(Debug, Copy, Clone, ShaderType)]
 struct ShaderDirectionalLight {
+    /// View/Projection of directional light. Shadow rendering uses viewports
+    /// so this always outputs [-1, 1] no matter where in the atlast the shadow is.
     pub view_proj: Mat4,
+    /// Color/intensity of the light
     pub color: Vec3,
+    /// Direction of the light
     pub direction: Vec3,
-    /// [0, 1]
+    /// 1 / resolution of whole shadow map
+    pub inv_resolution: Vec2,
+    /// [0, 1] offset of the shadow map in the atlas.
     pub atlas_offset: Vec2,
-    /// [0, 1]
+    /// [0, 1] size of the shadow map in the atlas.
     pub atlas_size: Vec2,
 }
 
@@ -141,8 +147,9 @@ impl DirectionalLightManager {
                         view_proj: desc.camera.view_proj(),
                         color: light.color * light.intensity,
                         direction: light.direction,
+                        inv_resolution: 1.0 / new_shadow_map_size_f32,
                         atlas_offset: desc.map.offset.as_vec2() / new_shadow_map_size_f32,
-                        atlas_size: Vec2::splat(desc.map.size as f32) / new_shadow_map_size_f32,
+                        atlas_size: desc.map.size as f32 / new_shadow_map_size_f32,
                     }
                 })
                 .collect(),
