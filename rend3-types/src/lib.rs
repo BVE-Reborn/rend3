@@ -938,6 +938,45 @@ pub struct TextureCubeTag;
 #[doc(hidden)]
 pub struct MaterialTag;
 
+/// Description of how this object should be sorted.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub struct Sorting {
+    pub reason: SortingReason,
+    pub order: SortingOrder,
+}
+
+impl Sorting {
+    /// Default sorting for opaque and cutout objects
+    pub const OPAQUE: Self = Self {
+        reason: SortingReason::Optimization,
+        order: SortingOrder::FrontToBack,
+    };
+
+    /// Default sorting for any objects using blending
+    pub const BLENDING: Self = Self {
+        reason: SortingReason::Requirement,
+        order: SortingOrder::BackToFront,
+    };
+}
+
+/// Reason why object need sorting
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum SortingReason {
+    /// Objects should be sorted for optimization purposes.
+    Optimization,
+    /// If objects aren't sorted, things will render incorrectly.
+    Requirement,
+}
+
+/// An object sorting order.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum SortingOrder {
+    /// Sort with the nearest objects first.
+    FrontToBack,
+    /// Sort with the furthest objects first.
+    BackToFront,
+}
+
 /// Trait that abstracts over all possible arrays of optional raw texture handles.
 ///
 /// The IntoIterator stuff in this trait is because rust-analyzer gets totally
@@ -1003,14 +1042,17 @@ impl<const C: usize, T> MaterialArray<T> for [T; C] {
 pub trait Material: Send + Sync + 'static {
     type DataType: encase::ShaderSize + encase::internal::WriteInto;
     type TextureArrayType: MaterialArray<Option<RawTexture2DHandle>>;
-    type RequredAttributeArrayType: MaterialArray<&'static VertexAttributeId>;
+    type RequiredAttributeArrayType: MaterialArray<&'static VertexAttributeId>;
     type SupportedAttributeArrayType: MaterialArray<&'static VertexAttributeId>;
 
-    fn required_attributes() -> Self::RequredAttributeArrayType;
+    fn required_attributes() -> Self::RequiredAttributeArrayType;
     fn supported_attributes() -> Self::SupportedAttributeArrayType;
 
     /// u64 key that allows different materials to be somehow categorized.
     fn key(&self) -> u64;
+
+    /// How objects with this material should be sorted.
+    fn sorting(&self) -> Sorting;
 
     /// The array of textures that should be bound. Rend3 supports up to 32.
     fn to_textures(&self) -> Self::TextureArrayType;

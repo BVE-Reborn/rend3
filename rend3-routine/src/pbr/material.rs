@@ -3,12 +3,10 @@
 use encase::ShaderType;
 use glam::{Mat3, Vec3, Vec4};
 use rend3::types::{
-    Material, RawTexture2DHandle, Texture2DHandle, VertexAttributeId, VERTEX_ATTRIBUTE_COLOR_0,
+    Material, RawTexture2DHandle, Sorting, Texture2DHandle, VertexAttributeId, VERTEX_ATTRIBUTE_COLOR_0,
     VERTEX_ATTRIBUTE_NORMAL, VERTEX_ATTRIBUTE_POSITION, VERTEX_ATTRIBUTE_TANGENT,
     VERTEX_ATTRIBUTE_TEXTURE_COORDINATES_0, VERTEX_ATTRIBUTE_TEXTURE_COORDINATES_1,
 };
-
-use crate::common::Sorting;
 
 bitflags::bitflags! {
     /// Flags which shaders use to determine properties of a material
@@ -447,11 +445,10 @@ impl TransparencyType {
         }
     }
 
-    pub fn to_sorting(self) -> Option<Sorting> {
+    pub fn to_sorting(self) -> Sorting {
         match self {
-            Self::Opaque => None,
-            Self::Cutout => None,
-            Self::Blend => Some(Sorting::BackToFront),
+            Self::Opaque | Self::Cutout => Sorting::OPAQUE,
+            Self::Blend => Sorting::BLENDING,
         }
     }
 }
@@ -516,10 +513,10 @@ pub struct PbrMaterial {
 impl Material for PbrMaterial {
     type DataType = ShaderMaterial;
     type TextureArrayType = [Option<RawTexture2DHandle>; 10];
-    type RequredAttributeArrayType = [&'static VertexAttributeId; 1];
+    type RequiredAttributeArrayType = [&'static VertexAttributeId; 1];
     type SupportedAttributeArrayType = [&'static VertexAttributeId; 6];
 
-    fn required_attributes() -> Self::RequredAttributeArrayType {
+    fn required_attributes() -> Self::RequiredAttributeArrayType {
         [&VERTEX_ATTRIBUTE_POSITION]
     }
 
@@ -536,6 +533,10 @@ impl Material for PbrMaterial {
 
     fn key(&self) -> u64 {
         TransparencyType::from(self.transparency) as u64
+    }
+
+    fn sorting(&self) -> Sorting {
+        TransparencyType::from(self.transparency).to_sorting()
     }
 
     fn to_textures(&self) -> Self::TextureArrayType {

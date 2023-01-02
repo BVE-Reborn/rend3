@@ -1,6 +1,7 @@
 use std::{
     any::{type_name, TypeId},
     borrow::Cow,
+    cmp::Ordering,
     collections::HashMap,
     iter::zip,
     num::NonZeroU64,
@@ -8,11 +9,12 @@ use std::{
 };
 
 use encase::{ShaderSize, ShaderType, StorageBuffer};
+use ordered_float::OrderedFloat;
 use rend3::{
     format_sso,
     graph::{DataHandle, NodeResourceUsage, RenderGraph},
-    managers::{MaterialManager, ObjectManager, ShaderObject, TextureBindGroupIndex},
-    types::Material,
+    managers::{CameraManager, MaterialManager, ObjectManager, ShaderObject, TextureBindGroupIndex},
+    types::{Material, Sorting, SortingOrder, SortingReason},
     util::math::{round_up, round_up_div},
     Renderer, ShaderPreProcessor, ShaderVertexBufferConfig,
 };
@@ -37,6 +39,51 @@ struct ShaderJobKey {
     bind_group_index: TextureBindGroupIndex,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ShaderJobSortingKey {
+    job_key: ShaderJobKey,
+    distance: OrderedFloat<f32>,
+    sorting: Sorting,
+}
+
+impl PartialOrd for ShaderJobSortingKey {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for ShaderJobSortingKey {
+    fn cmp(&self, other: &Self) -> Ordering {
+        // material key always first
+        match self.job_key.material_key.cmp(&other.job_key.material_key) {
+            Ordering::Equal => {}
+            ord => return ord,
+        }
+        if self.sorting.reason == SortingReason::Requirement || other.sorting.reason == SortingReason::Requirement {
+            match self.distance.cmp(&other.distance) {
+                Ordering::Equal => {}
+                ord => {
+                    return match self.sorting.order {
+                        SortingOrder::FrontToBack => ord,
+                        SortingOrder::BackToFront => ord.reverse(),
+                    }
+                }
+            }
+            return self.job_key.bind_group_index.cmp(&other.job_key.bind_group_index);
+        }
+
+        match self.job_key.bind_group_index.cmp(&other.job_key.bind_group_index) {
+            Ordering::Equal => {}
+            ord => return ord,
+        }
+        let dist_cmp = self.distance.cmp(&other.distance);
+        match self.sorting.order {
+            SortingOrder::FrontToBack => dist_cmp,
+            SortingOrder::BackToFront => dist_cmp.reverse(),
+        }
+    }
+}
+
 #[derive(Debug, ShaderType)]
 pub struct ShaderBatchData {
     #[align(256)]
@@ -53,7 +100,11 @@ struct ShaderObjectRange {
     object_id: u32,
 }
 
-fn batch_objects<M: Material>(material_manager: &MaterialManager, object_manager: &ObjectManager) -> ShaderBatchDatas {
+fn batch_objects<M: Material>(
+    material_manager: &MaterialManager,
+    object_manager: &ObjectManager,
+    camera_manager: &CameraManager,
+) -> ShaderBatchDatas {
     profiling::scope!("Batch Objects");
 
     let mut jobs = ShaderBatchDatas {
@@ -79,11 +130,16 @@ fn batch_objects<M: Material>(material_manager: &MaterialManager, object_manager
                 .into_common();
 
             let material_key = material.inner.key();
+            let sorting = material.inner.sorting();
 
             sorted_objects.push((
-                ShaderJobKey {
-                    material_key,
-                    bind_group_index,
+                ShaderJobSortingKey {
+                    job_key: ShaderJobKey {
+                        material_key,
+                        bind_group_index,
+                    },
+                    distance: OrderedFloat(camera_manager.location().distance_squared(object.location.into())),
+                    sorting,
                 },
                 handle,
                 object,
@@ -102,9 +158,9 @@ fn batch_objects<M: Material>(material_manager: &MaterialManager, object_manager
         let mut current_invocation = 0_u32;
         let mut current_object_index = 0_u32;
         let mut current_ranges = [ShaderObjectRange::default(); BATCH_SIZE];
-        let mut current_key = sorted_objects.first().unwrap().0;
+        let mut current_key = sorted_objects.first().unwrap().0.job_key;
 
-        for (key, handle, object) in sorted_objects {
+        for (ShaderJobSortingKey { job_key: key, .. }, handle, object) in sorted_objects {
             if key != current_key || current_object_index == 256 {
                 jobs.jobs.push(ShaderBatchData {
                     ranges: current_ranges,
@@ -377,7 +433,12 @@ pub fn add_culling_to_graph<'node, M: Material>(
     let output = node.add_data(draw_calls_hdl, NodeResourceUsage::Output);
 
     node.build(move |ctx| {
-        let jobs = batch_objects::<M>(&ctx.data_core.material_manager, &ctx.data_core.object_manager);
+        // TODO: Actual camera
+        let jobs = batch_objects::<M>(
+            &ctx.data_core.material_manager,
+            &ctx.data_core.object_manager,
+            &ctx.data_core.camera_manager,
+        );
 
         if jobs.jobs.is_empty() {
             return;
