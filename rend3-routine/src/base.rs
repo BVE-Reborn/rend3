@@ -93,11 +93,14 @@ impl BaseRenderGraph {
         // Clear targets
         state.clear(graph, clear_color);
 
-        // Forward rendering
-        state.pbr_forward_rendering(graph, pbr, samples);
+        // Forward rendering opaque
+        state.pbr_forward_rendering_opaque(graph, pbr, samples);
 
         // Skybox
         state.skybox(graph, skybox, samples);
+
+        // Forward rendering transparent
+        state.pbr_forward_rendering_transparent(graph, pbr, samples);
 
         // Make the reference to the surface
         state.tonemapping(graph, tonemapping, target_texture);
@@ -286,13 +289,13 @@ impl BaseRenderGraphIntermediateState {
     }
 
     /// Render the PBR materials.
-    pub fn pbr_forward_rendering<'node>(
+    pub fn pbr_forward_rendering_opaque<'node>(
         &self,
         graph: &mut RenderGraph<'node>,
         pbr: &'node pbr::PbrRoutine,
         samples: SampleCount,
     ) {
-        let routines = [&pbr.opaque_routine, &pbr.cutout_routine, &pbr.blend_routine];
+        let routines = [&pbr.opaque_routine, &pbr.cutout_routine];
         for routine in routines {
             routine.add_forward_to_graph(RoutineAddToGraphArgs {
                 graph,
@@ -308,6 +311,28 @@ impl BaseRenderGraphIntermediateState {
                 data: 0,
             });
         }
+    }
+
+    /// Render the PBR materials.
+    pub fn pbr_forward_rendering_transparent<'node>(
+        &self,
+        graph: &mut RenderGraph<'node>,
+        pbr: &'node pbr::PbrRoutine,
+        samples: SampleCount,
+    ) {
+        pbr.blend_routine.add_forward_to_graph(RoutineAddToGraphArgs {
+            graph,
+            whole_frame_uniform_bg: self.forward_uniform_bg,
+            culled: self.cull,
+            per_material: &pbr.per_material,
+            extra_bgs: None,
+            label: "PBR Forward",
+            samples,
+            color: Some(self.color),
+            resolve: self.resolve,
+            depth: self.depth,
+            data: 0,
+        });
     }
 
     /// Tonemap onto the given render target.

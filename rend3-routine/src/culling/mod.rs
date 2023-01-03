@@ -39,11 +39,17 @@ struct ShaderJobKey {
     bind_group_index: TextureBindGroupIndex,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Eq)]
 struct ShaderJobSortingKey {
     job_key: ShaderJobKey,
     distance: OrderedFloat<f32>,
-    sorting: Sorting,
+    sorting_reason: SortingReason,
+}
+
+impl PartialEq for ShaderJobSortingKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.cmp(other).is_eq()
+    }
 }
 
 impl PartialOrd for ShaderJobSortingKey {
@@ -59,27 +65,23 @@ impl Ord for ShaderJobSortingKey {
             Ordering::Equal => {}
             ord => return ord,
         }
-        if self.sorting.reason == SortingReason::Requirement || other.sorting.reason == SortingReason::Requirement {
-            match self.distance.cmp(&other.distance) {
-                Ordering::Equal => {}
-                ord => {
-                    return match self.sorting.order {
-                        SortingOrder::FrontToBack => ord,
-                        SortingOrder::BackToFront => ord.reverse(),
-                    }
-                }
-            }
-            return self.job_key.bind_group_index.cmp(&other.job_key.bind_group_index);
-        }
-
-        match self.job_key.bind_group_index.cmp(&other.job_key.bind_group_index) {
+        match self.sorting_reason.cmp(&other.sorting_reason) {
             Ordering::Equal => {}
             ord => return ord,
         }
-        let dist_cmp = self.distance.cmp(&other.distance);
-        match self.sorting.order {
-            SortingOrder::FrontToBack => dist_cmp,
-            SortingOrder::BackToFront => dist_cmp.reverse(),
+        // The above comparison means that both sides are equal
+        if self.sorting_reason == SortingReason::Requirement {
+            match self.distance.cmp(&other.distance) {
+                Ordering::Equal => {}
+                ord => return ord,
+            }
+            self.job_key.bind_group_index.cmp(&other.job_key.bind_group_index)
+        } else {
+            match self.job_key.bind_group_index.cmp(&other.job_key.bind_group_index) {
+                Ordering::Equal => {}
+                ord => return ord,
+            }
+            self.distance.cmp(&other.distance)
         }
     }
 }
@@ -132,14 +134,18 @@ fn batch_objects<M: Material>(
             let material_key = material.inner.key();
             let sorting = material.inner.sorting();
 
+            let mut distance_sq = camera_manager.location().distance_squared(object.location.into());
+            if sorting.order == SortingOrder::BackToFront {
+                distance_sq = -distance_sq;
+            }
             sorted_objects.push((
                 ShaderJobSortingKey {
                     job_key: ShaderJobKey {
                         material_key,
                         bind_group_index,
                     },
-                    distance: OrderedFloat(camera_manager.location().distance_squared(object.location.into())),
-                    sorting,
+                    distance: OrderedFloat(distance_sq),
+                    sorting_reason: sorting.reason,
                 },
                 handle,
                 object,

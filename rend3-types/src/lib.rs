@@ -960,7 +960,7 @@ impl Sorting {
 }
 
 /// Reason why object need sorting
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum SortingReason {
     /// Objects should be sorted for optimization purposes.
     Optimization,

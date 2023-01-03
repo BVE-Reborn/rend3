@@ -279,7 +279,7 @@ pub(super) fn object_add_callback<M: Material>(_material: &M, args: ObjectAddCal
     let index_range = args.internal_mesh.index_range.clone();
 
     let internal_object = InternalObject::<M> {
-        location: args.object.transform.transform_point3a(Vec3A::ZERO),
+        location: args.object.transform.transform_point3a(bounding_sphere.center.into()),
         inner: ShaderObject {
             material_index: args.object.material.idx as u32,
             transform: args.object.transform,
