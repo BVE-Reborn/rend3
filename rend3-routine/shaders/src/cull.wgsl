@@ -35,7 +35,7 @@ fn cs_main(
 
             let probe = culling_job.ranges[mid];
 
-            if probe.invocation_end < target_invocation {
+            if probe.invocation_end <= target_invocation {
                 left = mid + 1u;
             } else if probe.invocation_start > target_invocation {
                 right = mid;
