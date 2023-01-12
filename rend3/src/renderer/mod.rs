@@ -2,8 +2,8 @@ use crate::{
     graph::{GraphTextureStore, ReadyData},
     instruction::{InstructionKind, InstructionStreamPair},
     managers::{
-        CameraManager, DirectionalLightManager, HandleAllocator, InternalTexture, MaterialManager, MeshManager,
-        ObjectManager, SkeletonManager, TextureManager,
+        CameraManager, DirectionalLightManager, GraphStorage, HandleAllocator, InternalTexture, MaterialManager,
+        MeshManager, ObjectManager, SkeletonManager, TextureManager,
     },
     types::{
         Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, MaterialHandle, Mesh, MeshHandle,
@@ -15,10 +15,11 @@ use crate::{
 use glam::Mat4;
 use parking_lot::Mutex;
 use rend3_types::{
-    Handedness, Material, MaterialTag, MipmapCount, MipmapSource, ObjectChange, Skeleton, SkeletonHandle, Texture2DTag,
-    TextureCubeHandle, TextureCubeTag, TextureFormat, TextureFromTexture, TextureUsages,
+    GraphDataHandle, GraphDataTag, Handedness, Material, MaterialTag, MipmapCount, MipmapSource, ObjectChange,
+    Skeleton, SkeletonHandle, Texture2DTag, TextureCubeHandle, TextureCubeTag, TextureFormat, TextureFromTexture,
+    TextureUsages,
 };
-use std::{num::NonZeroU32, panic::Location, sync::Arc};
+use std::{marker::PhantomData, num::NonZeroU32, panic::Location, sync::Arc};
 use wgpu::{
     util::DeviceExt, CommandBuffer, CommandEncoderDescriptor, Device, DownlevelCapabilities, Extent3d, Features,
     ImageCopyTexture, ImageDataLayout, Limits, Origin3d, Queue, TextureAspect, TextureDescriptor, TextureDimension,
@@ -74,6 +75,7 @@ struct HandleAllocators {
     pub material: HandleAllocator<MaterialTag>,
     pub object: HandleAllocator<Object>,
     pub directional_light: HandleAllocator<DirectionalLight>,
+    pub graph_storage: HandleAllocator<GraphDataTag>,
 }
 
 /// All the mutex protected data within the renderer
@@ -94,6 +96,8 @@ pub struct RendererDataCore {
     pub directional_light_manager: DirectionalLightManager,
     /// Manages skeletons, and their owned portion of the MeshManager's buffers
     pub skeleton_manager: SkeletonManager,
+    /// Managed long term storage of data for the graph and it's routines
+    pub graph_storage: GraphStorage,
 
     /// Stores gpu timing and debug scopes.
     pub profiler: Mutex<GpuProfiler>,
@@ -538,6 +542,22 @@ impl Renderer {
             },
             *Location::caller(),
         )
+    }
+
+    /// Adds a piece of data for long term storage and convienient use in the RenderGraph
+    ///
+    /// The handle will keep the data alive.
+    #[track_caller]
+    pub fn add_graph_data<T: Send + 'static>(self: &Arc<Renderer>, data: T) -> GraphDataHandle<T> {
+        let handle = self.resource_handle_allocators.graph_storage.allocate(self);
+        let handle2 = handle.clone();
+        self.instructions.push(
+            InstructionKind::AddGraphData {
+                add_invoke: Box::new(move |storage| storage.add(&handle2, data)),
+            },
+            *Location::caller(),
+        );
+        GraphDataHandle(handle, PhantomData)
     }
 
     /// Sets the aspect ratio of the camera. This should correspond with the

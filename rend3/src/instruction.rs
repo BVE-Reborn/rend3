@@ -1,14 +1,14 @@
 use crate::{
-    managers::{MaterialManager, TextureManager},
+    managers::{GraphStorage, MaterialManager, TextureManager},
     types::{Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Mesh, Object, RawObjectHandle},
     RendererProfile,
 };
 use glam::Mat4;
 use parking_lot::Mutex;
 use rend3_types::{
-    MaterialHandle, MeshHandle, ObjectChange, ObjectHandle, RawDirectionalLightHandle, RawMaterialHandle,
-    RawMeshHandle, RawSkeletonHandle, RawTexture2DHandle, RawTextureCubeHandle, Skeleton, SkeletonHandle,
-    Texture2DHandle, TextureCubeHandle,
+    MaterialHandle, MeshHandle, ObjectChange, ObjectHandle, RawDirectionalLightHandle, RawGraphDataHandleUntyped,
+    RawMaterialHandle, RawMeshHandle, RawSkeletonHandle, RawTexture2DHandle, RawTextureCubeHandle, Skeleton,
+    SkeletonHandle, Texture2DHandle, TextureCubeHandle,
 };
 use std::{mem, panic::Location};
 use wgpu::{CommandBuffer, Device, Texture, TextureDescriptor, TextureView};
@@ -63,6 +63,9 @@ pub enum InstructionKind {
         handle: DirectionalLightHandle,
         light: DirectionalLight,
     },
+    AddGraphData {
+        add_invoke: Box<dyn FnOnce(&mut GraphStorage) + Send>,
+    },
     ChangeMaterial {
         handle: MaterialHandle,
         change_invoke: Box<
@@ -95,6 +98,9 @@ pub enum InstructionKind {
     },
     DeleteDirectionalLight {
         handle: RawDirectionalLightHandle,
+    },
+    DeleteGraphData {
+        handle: RawGraphDataHandleUntyped,
     },
     SetObjectTransform {
         handle: RawObjectHandle,
@@ -185,5 +191,11 @@ impl DeletableRawResourceHandle for RawObjectHandle {
 impl DeletableRawResourceHandle for RawDirectionalLightHandle {
     fn into_delete_instruction_kind(self) -> InstructionKind {
         InstructionKind::DeleteDirectionalLight { handle: self }
+    }
+}
+
+impl DeletableRawResourceHandle for RawGraphDataHandleUntyped {
+    fn into_delete_instruction_kind(self) -> InstructionKind {
+        InstructionKind::DeleteGraphData { handle: self }
     }
 }

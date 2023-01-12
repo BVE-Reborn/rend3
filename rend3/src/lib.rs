@@ -143,6 +143,7 @@ mod renderer;
 pub mod managers {
     mod camera;
     mod directional;
+    mod graph_storage;
     mod handle_alloc;
     mod material;
     mod mesh;
@@ -152,6 +153,7 @@ pub mod managers {
 
     pub use camera::*;
     pub use directional::*;
+    pub use graph_storage::*;
     pub(crate) use handle_alloc::*;
     pub use material::*;
     pub use mesh::*;

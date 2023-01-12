@@ -161,43 +161,56 @@ impl<T> Deref for ResourceHandle<T> {
     }
 }
 
-#[macro_export]
+/// Tag type for differentiating Texture2Ds on the type level.
 #[doc(hidden)]
-macro_rules! declare_handle {
-    ($($name:ident<$ty:ty>),*) => {$(
-        #[doc = concat!("Refcounted handle to a ", stringify!($ty) ,".")]
-        pub type $name = ResourceHandle<$ty>;
-    )*};
-}
-
-declare_handle!(
-    MeshHandle<Mesh>,
-    Texture2DHandle<Texture2DTag>,
-    TextureCubeHandle<TextureCubeTag>,
-    MaterialHandle<MaterialTag>,
-    ObjectHandle<Object>,
-    DirectionalLightHandle<DirectionalLight>,
-    SkeletonHandle<Skeleton>
-);
-
-#[macro_export]
+pub struct Texture2DTag;
+/// Tag type for differentiating TextureCubes on the type level.
 #[doc(hidden)]
-macro_rules! declare_raw_handle {
-    ($($name:ident<$ty:ty>),*) => {$(
-        #[doc = concat!("Internal non-owning handle to a ", stringify!($ty) ,".")]
-        pub type $name = RawResourceHandle<$ty>;
-    )*};
-}
+pub struct TextureCubeTag;
+/// Tag type for differentiating Materials on the type level.
+#[doc(hidden)]
+pub struct MaterialTag;
+/// Tag type for differentiating GraphData on the type level.
+#[doc(hidden)]
+pub struct GraphDataTag;
 
-declare_raw_handle!(
-    RawMeshHandle<Mesh>,
-    RawTexture2DHandle<Texture2DTag>,
-    RawTextureCubeHandle<TextureCubeTag>,
-    RawMaterialHandle<MaterialTag>,
-    RawObjectHandle<Object>,
-    RawDirectionalLightHandle<DirectionalLight>,
-    RawSkeletonHandle<Skeleton>
-);
+/// Refcounted handle to a Mesh
+pub type MeshHandle = ResourceHandle<Mesh>;
+/// Refcounted handle to a Texture2D
+pub type Texture2DHandle = ResourceHandle<Texture2DTag>;
+/// Refcounted handle to a TextureCube
+pub type TextureCubeHandle = ResourceHandle<TextureCubeTag>;
+/// Refcounted handle to a Material
+pub type MaterialHandle = ResourceHandle<MaterialTag>;
+/// Refcounted handle to an Object
+pub type ObjectHandle = ResourceHandle<Object>;
+/// Refcounted handle to a DirectionalLight
+pub type DirectionalLightHandle = ResourceHandle<DirectionalLight>;
+/// Refcounted handle to a Skeleton
+pub type SkeletonHandle = ResourceHandle<Skeleton>;
+/// Refcounted handle to an instance of GraphData with the type erased
+pub type GraphDataHandleUntyped = ResourceHandle<GraphDataTag>;
+/// Refcounted handle to an instance of GraphData
+pub struct GraphDataHandle<T>(pub GraphDataHandleUntyped, pub PhantomData<T>);
+
+/// Internal non-owning handle to a Mesh
+pub type RawMeshHandle = RawResourceHandle<Mesh>;
+/// Internal non-owning handle to a Texture2D
+pub type RawTexture2DHandle = RawResourceHandle<Texture2DTag>;
+/// Internal non-owning handle to a TextureCube
+pub type RawTextureCubeHandle = RawResourceHandle<TextureCubeTag>;
+/// Internal non-owning handle to a Material
+pub type RawMaterialHandle = RawResourceHandle<MaterialTag>;
+/// Internal non-owning handle to an Object
+pub type RawObjectHandle = RawResourceHandle<Object>;
+/// Internal non-owning handle to a DirectionalLight
+pub type RawDirectionalLightHandle = RawResourceHandle<DirectionalLight>;
+/// Internal non-owning handle to a Skeleton
+pub type RawSkeletonHandle = RawResourceHandle<Skeleton>;
+/// Internal non-owning handle to an instance of GraphData with the type erased
+pub type RawGraphDataHandleUntyped = RawResourceHandle<GraphDataTag>;
+/// Internal non-owning handle to an instance of GraphData
+pub struct RawGraphDataHandle<T>(pub RawGraphDataHandleUntyped, pub PhantomData<T>);
 
 macro_rules! changeable_struct {
     ($(#[$outer:meta])* pub struct $name:ident <- $name_change:ident { $($(#[$inner:meta])* $field_vis:vis $field_name:ident : $field_type:ty),* $(,)? } ) => {
@@ -930,13 +943,6 @@ pub struct TextureFromTexture {
     pub start_mip: u32,
     pub mip_count: Option<NonZeroU32>,
 }
-
-#[doc(hidden)]
-pub struct Texture2DTag;
-#[doc(hidden)]
-pub struct TextureCubeTag;
-#[doc(hidden)]
-pub struct MaterialTag;
 
 /// Description of how this object should be sorted.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

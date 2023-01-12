@@ -84,6 +84,9 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
                         &handle,
                     );
                 }
+                InstructionKind::AddGraphData { add_invoke } => {
+                    add_invoke(&mut data_core.graph_storage);
+                }
                 InstructionKind::ChangeMaterial { handle, change_invoke } => {
                     profiling::scope!("Change Material");
 
@@ -92,7 +95,7 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
                         &renderer.device,
                         &mut data_core.d2_texture_manager,
                         &handle,
-                    )
+                    );
                 }
                 InstructionKind::AddObject { handle, object } => {
                     data_core.object_manager.add(
@@ -162,6 +165,10 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
                 InstructionKind::DeleteDirectionalLight { handle } => {
                     renderer.resource_handle_allocators.directional_light.deallocate(handle);
                     data_core.directional_light_manager.remove(handle)
+                }
+                InstructionKind::DeleteGraphData { handle } => {
+                    renderer.resource_handle_allocators.graph_storage.deallocate(handle);
+                    data_core.graph_storage.remove(&handle);
                 }
             }
         }

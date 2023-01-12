@@ -2,8 +2,8 @@ use crate::{
     graph::GraphTextureStore,
     instruction::InstructionStreamPair,
     managers::{
-        CameraManager, DirectionalLightManager, MaterialManager, MeshManager, ObjectManager, SkeletonManager,
-        TextureManager,
+        CameraManager, DirectionalLightManager, GraphStorage, MaterialManager, MeshManager, ObjectManager,
+        SkeletonManager, TextureManager,
     },
     renderer::{HandleAllocators, RendererDataCore},
     util::{mipmap::MipmapGenerator, scatter_copy::ScatterCopy},
@@ -44,6 +44,7 @@ pub fn create_renderer(
     let object_manager = ObjectManager::new();
     let directional_light_manager = DirectionalLightManager::new(&iad.device);
     let skeleton_manager = SkeletonManager::new();
+    let graph_storage = GraphStorage::new();
 
     let mipmap_generator = MipmapGenerator::new(
         &iad.device,
@@ -87,6 +88,7 @@ pub fn create_renderer(
             object_manager,
             directional_light_manager,
             skeleton_manager,
+            graph_storage,
             profiler,
             graph_texture_store: GraphTextureStore::new(),
         }),
