@@ -15,6 +15,7 @@ use wgpu::{
     TextureViewDescriptor,
 };
 
+use super::ViewportRect;
 use crate::{
     graph::{
         DataHandle, GraphResource, GraphSubResource, NodeExecutionContext, RenderGraphDataStore,
@@ -25,8 +26,6 @@ use crate::{
     util::typedefs::{FastHashMap, FastHashSet, RendererStatistics, SsoString},
     Renderer,
 };
-
-use super::ViewportRect;
 
 /// Output of calling ready on various managers.
 #[derive(Clone)]

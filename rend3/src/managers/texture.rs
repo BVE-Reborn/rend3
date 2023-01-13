@@ -1,11 +1,13 @@
-use crate::{profile::ProfileData, RendererProfile};
-use rend3_types::{RawResourceHandle, TextureFormat, TextureUsages};
 use std::{marker::PhantomData, num::NonZeroU32, sync::Arc};
+
+use rend3_types::{RawResourceHandle, TextureFormat, TextureUsages};
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
     BindingResource, BindingType, Device, Extent3d, ShaderStages, Texture, TextureDescriptor, TextureDimension,
     TextureSampleType, TextureView, TextureViewDescriptor, TextureViewDimension,
 };
+
+use crate::{profile::ProfileData, RendererProfile};
 
 /// When using the GpuDriven profile, we start the 2D texture manager with a bind group with
 /// this many textures.

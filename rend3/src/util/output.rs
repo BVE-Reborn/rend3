@@ -1,6 +1,7 @@
 //! Output frame and surface acquisition.
 
 use std::sync::Arc;
+
 use wgpu::{SurfaceTexture, TextureView};
 
 /// Anything that resembles a surface to render to.

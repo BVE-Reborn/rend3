@@ -1,5 +1,6 @@
-use rend3::types::DirectionalLightHandle;
 use std::{path::Path, sync::Arc};
+
+use rend3::types::DirectionalLightHandle;
 
 const SAMPLE_COUNT: rend3::types::SampleCount = rend3::types::SampleCount::Four;
 

@@ -13,7 +13,7 @@
 //! to, or muck with any of the data in there, you are free to, and the
 //! following routines will behave as you configure.
 
-use std::iter::zip;
+use std::{iter::zip, sync::Arc};
 
 use glam::{UVec2, Vec4};
 use rend3::{
@@ -38,7 +38,7 @@ pub struct BaseRenderGraph {
 }
 
 impl BaseRenderGraph {
-    pub fn new(renderer: &Renderer, spp: &ShaderPreProcessor) -> Self {
+    pub fn new(renderer: &Arc<Renderer>, spp: &ShaderPreProcessor) -> Self {
         profiling::scope!("DefaultRenderGraphData::new");
 
         let interfaces = common::WholeFrameInterfaces::new(&renderer.device);
@@ -216,10 +216,9 @@ impl BaseRenderGraphIntermediateState {
     /// Does all shadow culling for the PBR materials.
     pub fn pbr_shadow_culling<'node>(&self, graph: &mut RenderGraph<'node>, base: &'node BaseRenderGraph) {
         for (shadow_index, &shadow_culled) in self.shadow_cull.iter().enumerate() {
-            crate::culling::add_culling_to_graph::<pbr::PbrMaterial>(
+            base.gpu_culler.add_culling_to_graph::<pbr::PbrMaterial>(
                 graph,
                 shadow_culled,
-                &base.gpu_culler,
                 &format_sso!("Shadow Culling S{}", shadow_index),
             );
         }
@@ -231,7 +230,8 @@ impl BaseRenderGraphIntermediateState {
 
     /// Does all culling for the forward PBR materials.
     pub fn pbr_culling<'node>(&self, graph: &mut RenderGraph<'node>, base: &'node BaseRenderGraph) {
-        crate::culling::add_culling_to_graph::<pbr::PbrMaterial>(graph, self.cull, &base.gpu_culler, "Primary Culling");
+        base.gpu_culler
+            .add_culling_to_graph::<pbr::PbrMaterial>(graph, self.cull, "Primary Culling");
     }
 
     /// Clear all the targets to their needed values

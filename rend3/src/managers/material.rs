@@ -1,3 +1,14 @@
+use std::{
+    any::TypeId,
+    mem,
+    num::{NonZeroU32, NonZeroU64},
+};
+
+use encase::{ShaderSize, ShaderType};
+use list_any::VecAny;
+use rend3_types::{Material, MaterialArray, RawMaterialHandle, RawTexture2DHandle, VertexAttributeId};
+use wgpu::{BindGroup, BindGroupLayout, BindingType, Buffer, BufferBindingType, CommandEncoder, Device, ShaderStages};
+
 use crate::{
     managers::{object_add_callback, ObjectAddCallbackArgs, TextureManager},
     profile::ProfileData,
@@ -8,15 +19,6 @@ use crate::{
     },
     RendererProfile,
 };
-use encase::{ShaderSize, ShaderType};
-use list_any::VecAny;
-use rend3_types::{Material, MaterialArray, RawMaterialHandle, RawTexture2DHandle, VertexAttributeId};
-use std::{
-    any::TypeId,
-    mem,
-    num::{NonZeroU32, NonZeroU64},
-};
-use wgpu::{BindGroup, BindGroupLayout, BindingType, Buffer, BufferBindingType, CommandEncoder, Device, ShaderStages};
 
 mod texture_dedupe;
 

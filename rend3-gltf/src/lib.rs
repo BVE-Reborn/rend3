@@ -20,6 +20,14 @@
 //!   used.
 //! - Double sided materials are currently unsupported.
 
+use std::{
+    borrow::Cow,
+    collections::{hash_map::Entry, BTreeMap, HashMap, VecDeque},
+    future::Future,
+    path::Path,
+    sync::Arc,
+};
+
 use glam::{Mat3, Mat4, Quat, UVec2, Vec2, Vec3, Vec4};
 use gltf::buffer::Source;
 use rend3::{
@@ -28,13 +36,6 @@ use rend3::{
     Renderer,
 };
 use rend3_routine::pbr;
-use std::{
-    borrow::Cow,
-    collections::{hash_map::Entry, BTreeMap, HashMap, VecDeque},
-    future::Future,
-    path::Path,
-    sync::Arc,
-};
 use thiserror::Error;
 
 /// Wrapper around a T that stores an optional label.

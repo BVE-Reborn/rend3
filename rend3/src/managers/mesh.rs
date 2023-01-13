@@ -1,12 +1,13 @@
+use std::ops::Range;
+
+use range_alloc::RangeAllocator;
+use rend3_types::{RawMeshHandle, VertexAttributeId, VERTEX_ATTRIBUTE_JOINT_INDICES, VERTEX_ATTRIBUTE_POSITION};
+use wgpu::{Buffer, BufferAddress, BufferDescriptor, BufferUsages, CommandEncoder, Device, Queue};
+
 use crate::{
     types::{Mesh, MeshHandle},
     util::frustum::BoundingSphere,
 };
-
-use range_alloc::RangeAllocator;
-use rend3_types::{RawMeshHandle, VertexAttributeId, VERTEX_ATTRIBUTE_JOINT_INDICES, VERTEX_ATTRIBUTE_POSITION};
-use std::ops::Range;
-use wgpu::{Buffer, BufferAddress, BufferDescriptor, BufferUsages, CommandEncoder, Device, Queue};
 
 /// Vertex buffer slot for object indices
 /// Note that this slot is only used in the GpuDriven profile.

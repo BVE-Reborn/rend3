@@ -1,9 +1,11 @@
 //! Automatic management of Power-of-Two sized buffers.
 
-use crate::util::typedefs::SsoString;
-use encase::{private::WriteInto, ShaderType};
 use std::{marker::PhantomData, ops::Deref};
+
+use encase::{private::WriteInto, ShaderType};
 use wgpu::{Buffer, BufferAddress, BufferDescriptor, BufferUsages, Device, Queue};
+
+use crate::util::typedefs::SsoString;
 
 /// Creates, fills, and automatically resizes a power-of-two sized buffer.
 pub struct WrappedPotBuffer<T> {

@@ -1,3 +1,9 @@
+use std::sync::Arc;
+
+use parking_lot::Mutex;
+use rend3_types::{Camera, Handedness, TextureFormat};
+use wgpu::TextureViewDimension;
+
 use crate::{
     graph::GraphTextureStore,
     instruction::InstructionStreamPair,
@@ -9,10 +15,6 @@ use crate::{
     util::{mipmap::MipmapGenerator, scatter_copy::ScatterCopy},
     InstanceAdapterDevice, Renderer, RendererInitializationError,
 };
-use parking_lot::Mutex;
-use rend3_types::{Camera, Handedness, TextureFormat};
-use std::sync::Arc;
-use wgpu::TextureViewDimension;
 
 pub fn create_renderer(
     iad: InstanceAdapterDevice,

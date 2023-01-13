@@ -233,8 +233,8 @@ pub fn add_skinning_to_graph<'node>(graph: &mut RenderGraph<'node>, gpu_skinner:
     let mut builder = graph.add_node("skinning");
     builder.add_side_effect();
 
-    builder.build(move |ctx| {
-        let encoder = ctx.encoder_or_pass.get_encoder();
+    builder.build(move |mut ctx| {
+        let encoder = ctx.encoder_or_pass.take_encoder();
 
         let skinning_input = build_gpu_skinning_input_buffers(
             &ctx.renderer.device,

@@ -164,8 +164,8 @@ impl<M: Material> ForwardRoutine<M> {
         let whole_frame_uniform_handle = builder.add_data(args.whole_frame_uniform_bg, NodeResourceUsage::Input);
         let cull_handle = builder.add_data(args.culled, NodeResourceUsage::Input);
 
-        builder.build(move |ctx| {
-            let rpass = ctx.encoder_or_pass.get_rpass(rpass_handle);
+        builder.build(move |mut ctx| {
+            let rpass = ctx.encoder_or_pass.take_rpass(rpass_handle);
             let whole_frame_uniform_bg = ctx.graph_data.get_data(ctx.temps, whole_frame_uniform_handle).unwrap();
             let culled = match ctx.graph_data.get_data(ctx.temps, cull_handle) {
                 Some(c) => c,
@@ -176,7 +176,7 @@ impl<M: Material> ForwardRoutine<M> {
                 BindGroupBuilder::new()
                     .append_buffer(ctx.data_core.object_manager.buffer::<M>().unwrap())
                     .append_buffer_with_size(
-                        &culled.object_reference_buffer,
+                        &culled.buffers.object_reference,
                         culling::ShaderBatchData::SHADER_SIZE.get(),
                     )
                     .append_buffer(ctx.data_core.mesh_manager.buffer())
@@ -189,7 +189,7 @@ impl<M: Material> ForwardRoutine<M> {
                 SampleCount::Four => &self.pipeline_s4,
             };
 
-            rpass.set_index_buffer(culled.index_buffer.slice(..), IndexFormat::Uint32);
+            rpass.set_index_buffer(culled.buffers.index.slice(..), IndexFormat::Uint32);
             rpass.set_pipeline(pipeline);
             rpass.set_bind_group(0, whole_frame_uniform_bg, &[]);
             if let Some(v) = args.extra_bgs {

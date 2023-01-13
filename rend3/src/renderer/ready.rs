@@ -1,9 +1,10 @@
+use wgpu::{CommandBuffer, CommandEncoderDescriptor};
+
 use crate::{
     graph::ReadyData,
     instruction::{Instruction, InstructionKind},
     Renderer,
 };
-use wgpu::{CommandBuffer, CommandEncoderDescriptor};
 
 pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
     profiling::scope!("Renderer::ready");

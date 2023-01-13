@@ -2,13 +2,14 @@
 //!
 //! Call [`EguiRenderRoutine::add_to_graph`] to add it to the graph.
 
+use std::{mem, sync::Arc};
+
 use egui::TexturesDelta;
 use rend3::{
     graph::{NodeResourceUsage, RenderGraph, RenderPassTarget, RenderPassTargets, RenderTargetHandle},
     types::SampleCount,
     Renderer,
 };
-use std::{mem, sync::Arc};
 use wgpu::{Color, TextureFormat};
 
 pub struct EguiRenderRoutine {
@@ -73,8 +74,8 @@ impl EguiRenderRoutine {
         // to free for a frame so we can clean them up before the next call.
         let textures_to_free = mem::replace(&mut self.textures_to_free, mem::take(&mut input.textures_delta.free));
 
-        builder.build(move |ctx| {
-            let rpass = ctx.encoder_or_pass.get_rpass(rpass_handle);
+        builder.build(move |mut ctx| {
+            let rpass = ctx.encoder_or_pass.take_rpass(rpass_handle);
 
             for texture in textures_to_free {
                 self.internal.free_texture(&texture);

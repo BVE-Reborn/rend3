@@ -1,7 +1,5 @@
 use std::ops::Range;
 
-use crate::{managers::MeshManager, util::iter::ExactSizerIterator};
-
 use arrayvec::ArrayVec;
 use glam::Mat4;
 use rend3_types::{
@@ -9,6 +7,8 @@ use rend3_types::{
     VERTEX_ATTRIBUTE_JOINT_WEIGHTS, VERTEX_ATTRIBUTE_NORMAL, VERTEX_ATTRIBUTE_POSITION, VERTEX_ATTRIBUTE_TANGENT,
 };
 use wgpu::{CommandEncoder, Device};
+
+use crate::{managers::MeshManager, util::iter::ExactSizerIterator};
 
 /// Internal representation of a Skeleton
 #[derive(Debug)]

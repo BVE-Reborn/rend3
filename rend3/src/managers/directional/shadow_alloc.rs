@@ -145,9 +145,8 @@ mod tests {
     use glam::UVec2;
     use rend3_types::RawDirectionalLightHandle as RDLH;
 
-    use crate::managers::directional::shadow_alloc::{allocate_shadow_atlas, ShadowMap};
-
     use super::ShadowNode;
+    use crate::managers::directional::shadow_alloc::{allocate_shadow_atlas, ShadowMap};
 
     #[test]
     fn chunk_subdivision_single() {

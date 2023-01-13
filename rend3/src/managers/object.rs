@@ -1,13 +1,5 @@
 use std::{any::TypeId, ops::Range};
 
-use crate::{
-    managers::{InternalMesh, MaterialManager, MeshManager},
-    types::{Object, ObjectHandle},
-    util::{
-        freelist::FreelistDerivedBuffer, frustum::BoundingSphere, iter::ExactSizerIterator, scatter_copy::ScatterCopy,
-        typedefs::FastHashMap,
-    },
-};
 use encase::ShaderType;
 use glam::{Mat4, Vec3A};
 use list_any::VecAny;
@@ -17,6 +9,14 @@ use rend3_types::{
 use wgpu::{Buffer, CommandEncoder, Device};
 
 use super::SkeletonManager;
+use crate::{
+    managers::{InternalMesh, MaterialManager, MeshManager},
+    types::{Object, ObjectHandle},
+    util::{
+        freelist::FreelistDerivedBuffer, frustum::BoundingSphere, iter::ExactSizerIterator, scatter_copy::ScatterCopy,
+        typedefs::FastHashMap,
+    },
+};
 
 /// Cpu side input to gpu-based culling
 #[derive(ShaderType)]

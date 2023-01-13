@@ -1,3 +1,11 @@
+use encase::{ArrayLength, ShaderType};
+use glam::{Mat4, UVec2, Vec2, Vec3};
+use rend3_types::{DirectionalLightChange, RawDirectionalLightHandle};
+use wgpu::{
+    BindingType, BufferBindingType, BufferUsages, Device, Extent3d, ShaderStages, TextureDescriptor, TextureDimension,
+    TextureUsages, TextureView, TextureViewDescriptor,
+};
+
 use crate::{
     managers::CameraManager,
     types::{DirectionalLight, DirectionalLightHandle},
@@ -6,14 +14,6 @@ use crate::{
         buffer::WrappedPotBuffer,
     },
     Renderer, INTERNAL_SHADOW_DEPTH_FORMAT,
-};
-
-use encase::{ArrayLength, ShaderType};
-use glam::{Mat4, UVec2, Vec2, Vec3};
-use rend3_types::{DirectionalLightChange, RawDirectionalLightHandle};
-use wgpu::{
-    BindingType, BufferBindingType, BufferUsages, Device, Extent3d, ShaderStages, TextureDescriptor, TextureDimension,
-    TextureUsages, TextureView, TextureViewDescriptor,
 };
 
 mod shadow_alloc;

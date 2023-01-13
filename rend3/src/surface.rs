@@ -1,7 +1,8 @@
-use crate::types::{PresentMode, Surface};
 use glam::UVec2;
 use rend3_types::{TextureFormat, TextureUsages};
 use wgpu::{CompositeAlphaMode, Device, SurfaceConfiguration};
+
+use crate::types::{PresentMode, Surface};
 
 /// Convinence function that re-configures the surface with the expected usages.
 pub fn configure_surface(

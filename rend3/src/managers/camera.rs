@@ -1,6 +1,7 @@
-use crate::types::{Camera, CameraProjection};
 use glam::{Mat4, Vec3};
 use rend3_types::Handedness;
+
+use crate::types::{Camera, CameraProjection};
 
 /// Manages the camera's location and projection settings.
 #[derive(Debug, Clone)]

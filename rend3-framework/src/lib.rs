@@ -21,7 +21,6 @@ mod resize_observer;
 
 pub use assets::*;
 pub use grab::*;
-
 pub use parking_lot::{Mutex, MutexGuard};
 pub type Event<'a, T> = winit::event::Event<'a, UserResizeEvent<T>>;
 

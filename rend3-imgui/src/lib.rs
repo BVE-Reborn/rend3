@@ -56,8 +56,8 @@ impl ImguiRenderRoutine {
             depth_stencil: None,
         });
 
-        builder.build(move |ctx| {
-            let rpass = ctx.encoder_or_pass.get_rpass(rpass_handle);
+        builder.build(move |mut ctx| {
+            let rpass = ctx.encoder_or_pass.take_rpass(rpass_handle);
 
             self.renderer
                 .render(draw_data, &ctx.renderer.queue, &ctx.renderer.device, rpass)

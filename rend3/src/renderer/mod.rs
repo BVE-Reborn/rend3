@@ -1,3 +1,19 @@
+use std::{marker::PhantomData, num::NonZeroU32, panic::Location, sync::Arc};
+
+use glam::Mat4;
+use parking_lot::Mutex;
+use rend3_types::{
+    GraphDataHandle, GraphDataTag, Handedness, Material, MaterialTag, MipmapCount, MipmapSource, ObjectChange,
+    Skeleton, SkeletonHandle, Texture2DTag, TextureCubeHandle, TextureCubeTag, TextureFormat, TextureFromTexture,
+    TextureUsages,
+};
+use wgpu::{
+    util::DeviceExt, CommandBuffer, CommandEncoderDescriptor, Device, DownlevelCapabilities, Extent3d, Features,
+    ImageCopyTexture, ImageDataLayout, Limits, Origin3d, Queue, TextureAspect, TextureDescriptor, TextureDimension,
+    TextureSampleType, TextureViewDescriptor, TextureViewDimension,
+};
+use wgpu_profiler::GpuProfiler;
+
 use crate::{
     graph::{GraphTextureStore, ReadyData},
     instruction::{InstructionKind, InstructionStreamPair},
@@ -12,20 +28,6 @@ use crate::{
     util::{math::round_up, mipmap::MipmapGenerator, scatter_copy::ScatterCopy},
     ExtendedAdapterInfo, InstanceAdapterDevice, RendererInitializationError, RendererProfile,
 };
-use glam::Mat4;
-use parking_lot::Mutex;
-use rend3_types::{
-    GraphDataHandle, GraphDataTag, Handedness, Material, MaterialTag, MipmapCount, MipmapSource, ObjectChange,
-    Skeleton, SkeletonHandle, Texture2DTag, TextureCubeHandle, TextureCubeTag, TextureFormat, TextureFromTexture,
-    TextureUsages,
-};
-use std::{marker::PhantomData, num::NonZeroU32, panic::Location, sync::Arc};
-use wgpu::{
-    util::DeviceExt, CommandBuffer, CommandEncoderDescriptor, Device, DownlevelCapabilities, Extent3d, Features,
-    ImageCopyTexture, ImageDataLayout, Limits, Origin3d, Queue, TextureAspect, TextureDescriptor, TextureDimension,
-    TextureSampleType, TextureViewDescriptor, TextureViewDimension,
-};
-use wgpu_profiler::GpuProfiler;
 
 pub mod error;
 mod ready;

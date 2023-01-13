@@ -5,8 +5,6 @@
 //! This is reexported in the rend3 crate proper and includes all the "surface"
 //! api arguments.
 
-use glam::{Mat4, UVec2, Vec2, Vec3, Vec3A, Vec4};
-use list_any::VecAny;
 use std::{
     fmt::Debug,
     hash::Hash,
@@ -17,10 +15,12 @@ use std::{
     slice,
     sync::Arc,
 };
-use thiserror::Error;
 
 /// Reexport of the glam version rend3 is using.
 pub use glam;
+use glam::{Mat4, UVec2, Vec2, Vec3, Vec3A, Vec4};
+use list_any::VecAny;
+use thiserror::Error;
 
 mod attribute;
 pub use attribute::*;

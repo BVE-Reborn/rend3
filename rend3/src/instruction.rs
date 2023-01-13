@@ -1,8 +1,5 @@
-use crate::{
-    managers::{GraphStorage, MaterialManager, TextureManager},
-    types::{Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Mesh, Object, RawObjectHandle},
-    RendererProfile,
-};
+use std::{mem, panic::Location};
+
 use glam::Mat4;
 use parking_lot::Mutex;
 use rend3_types::{
@@ -10,8 +7,13 @@ use rend3_types::{
     RawMaterialHandle, RawMeshHandle, RawSkeletonHandle, RawTexture2DHandle, RawTextureCubeHandle, Skeleton,
     SkeletonHandle, Texture2DHandle, TextureCubeHandle,
 };
-use std::{mem, panic::Location};
 use wgpu::{CommandBuffer, Device, Texture, TextureDescriptor, TextureView};
+
+use crate::{
+    managers::{GraphStorage, MaterialManager, TextureManager},
+    types::{Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Mesh, Object, RawObjectHandle},
+    RendererProfile,
+};
 
 pub struct Instruction {
     pub kind: InstructionKind,

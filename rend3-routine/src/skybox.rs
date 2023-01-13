@@ -114,8 +114,8 @@ impl SkyboxRoutine {
 
         let forward_uniform_handle = builder.add_data(forward_uniform_bg, NodeResourceUsage::Input);
 
-        builder.build(move |ctx| {
-            let rpass = ctx.encoder_or_pass.get_rpass(rpass_handle);
+        builder.build(move |mut ctx| {
+            let rpass = ctx.encoder_or_pass.take_rpass(rpass_handle);
 
             let forward_uniform_bg = ctx.graph_data.get_data(ctx.temps, forward_uniform_handle).unwrap();
 
