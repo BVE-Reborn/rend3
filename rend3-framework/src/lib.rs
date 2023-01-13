@@ -82,7 +82,7 @@ pub trait App<T: 'static = ()> {
         Box::pin(async move { Ok(rend3::create_iad(None, None, None, None).await?) })
     }
 
-    fn create_base_rendergraph(&mut self, renderer: &Renderer, spp: &ShaderPreProcessor) -> BaseRenderGraph {
+    fn create_base_rendergraph(&mut self, renderer: &Arc<Renderer>, spp: &ShaderPreProcessor) -> BaseRenderGraph {
         BaseRenderGraph::new(renderer, spp)
     }
 

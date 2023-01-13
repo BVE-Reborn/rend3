@@ -3,6 +3,7 @@ use std::{any::Any, ops::DerefMut};
 use parking_lot::Mutex;
 use rend3_types::{GraphDataHandle, RawGraphDataHandleUntyped};
 
+#[derive(Default)]
 pub struct GraphStorage {
     // Type under any is Mutex<T>
     data: Vec<Option<Box<dyn Any + Send>>>,
@@ -10,7 +11,7 @@ pub struct GraphStorage {
 
 impl GraphStorage {
     pub fn new() -> Self {
-        Self { data: Vec::new() }
+        Self::default()
     }
 
     pub fn add<T: Send + 'static>(&mut self, handle: &RawGraphDataHandleUntyped, data: T) {

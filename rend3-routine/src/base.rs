@@ -219,6 +219,7 @@ impl BaseRenderGraphIntermediateState {
             base.gpu_culler.add_culling_to_graph::<pbr::PbrMaterial>(
                 graph,
                 shadow_culled,
+                Some(shadow_index),
                 &format_sso!("Shadow Culling S{}", shadow_index),
             );
         }
@@ -231,7 +232,7 @@ impl BaseRenderGraphIntermediateState {
     /// Does all culling for the forward PBR materials.
     pub fn pbr_culling<'node>(&self, graph: &mut RenderGraph<'node>, base: &'node BaseRenderGraph) {
         base.gpu_culler
-            .add_culling_to_graph::<pbr::PbrMaterial>(graph, self.cull, "Primary Culling");
+            .add_culling_to_graph::<pbr::PbrMaterial>(graph, self.cull, None, "Primary Culling");
     }
 
     /// Clear all the targets to their needed values

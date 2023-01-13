@@ -22,14 +22,14 @@ use rend3::{
 };
 use wgpu::{
     self, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
-    BindingType, Buffer, BufferBinding, BufferBindingType, BufferDescriptor, BufferUsages,
-    ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor, Device, PipelineLayoutDescriptor,
-    ShaderModuleDescriptor, ShaderStages,
+    BindingType, Buffer, BufferBinding, BufferBindingType, BufferDescriptor, BufferUsages, ComputePassDescriptor,
+    ComputePipeline, ComputePipelineDescriptor, Device, PipelineLayoutDescriptor, ShaderModuleDescriptor, ShaderStages,
 };
 
-use crate::culling::batching::{batch_objects, ShaderBatchData, ShaderBatchDatas, ShaderJobKey};
-
-use super::WORKGROUP_SIZE;
+use crate::culling::{
+    batching::{batch_objects, ShaderBatchData, ShaderBatchDatas, ShaderJobKey},
+    WORKGROUP_SIZE,
+};
 
 // 16 MB of indices
 const OUTPUT_BUFFER_ROUNDING_SIZE: u64 = 1 << 24;
@@ -94,7 +94,7 @@ impl CullingBuffers<Arc<Buffer>> {
             object_reference: Arc::new(device.create_buffer(&BufferDescriptor {
                 label: None,
                 size: sizes.object_reference,
-                usage: BufferUsages::STORAGE,
+                usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
                 mapped_at_creation: false,
             })),
             index: Arc::new(device.create_buffer(&BufferDescriptor {
@@ -203,7 +203,7 @@ impl GpuCuller {
         }
     }
 
-    pub fn cull<M>(&self, ctx: &mut NodeExecutionContext, jobs: ShaderBatchDatas) -> DrawCallSet
+    pub fn cull<M>(&self, ctx: &mut NodeExecutionContext, jobs: ShaderBatchDatas, camera: Option<usize>) -> DrawCallSet
     where
         M: Material,
     {
@@ -228,7 +228,7 @@ impl GpuCuller {
             .get_mut(&self.culling_buffer_map_handle)
             .get_buffers(
                 &ctx.renderer.device,
-                None,
+                camera,
                 CullingBuffers {
                     object_reference: jobs.jobs.size().get(),
                     index: <u64 as Ord>::max(total_invocations as u64 * 3 * 4, 4),
@@ -321,6 +321,7 @@ impl GpuCuller {
         &'node self,
         graph: &mut RenderGraph<'node>,
         draw_calls_hdl: DataHandle<DrawCallSet>,
+        camera: Option<usize>,
         name: &str,
     ) {
         let mut node = graph.add_node(name);
@@ -338,7 +339,7 @@ impl GpuCuller {
                 return;
             }
 
-            let draw_calls = self.cull::<M>(&mut ctx, jobs);
+            let draw_calls = self.cull::<M>(&mut ctx, jobs, camera);
 
             ctx.graph_data.set_data(output, Some(draw_calls));
         });
