@@ -328,11 +328,15 @@ impl GpuCuller {
         let output = node.add_data(draw_calls_hdl, NodeResourceUsage::Output);
 
         node.build(move |mut ctx| {
-            // TODO: Actual camera
+            let camera_manager = match camera {
+                Some(i) => &ctx.ready.shadows[i].camera,
+                None => &ctx.data_core.camera_manager,
+            };
+
             let jobs = batch_objects::<M>(
                 &ctx.data_core.material_manager,
                 &ctx.data_core.object_manager,
-                &ctx.data_core.camera_manager,
+                camera_manager,
             );
 
             if jobs.jobs.is_empty() {

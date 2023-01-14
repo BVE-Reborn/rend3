@@ -191,7 +191,7 @@ mod test {
         ) -> Vec<T> {
             let staging = self.device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some("staging"),
-                size: bytes as u64,
+                size: bytes,
                 usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
                 mapped_at_creation: false,
             });

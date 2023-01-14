@@ -39,6 +39,8 @@ skip-tree = [
 vulnerability = "warn"
 unmaintained = "warn"
 ignore = [
+    # xml is unmaintained (wayland)
+    "RUSTSEC-2022-0048"
 ]
 
 [sources]
