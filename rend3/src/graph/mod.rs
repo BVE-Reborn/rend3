@@ -39,7 +39,7 @@
 //!
 //! Because renderpasses carry with them a lifetime that can cause problems
 //! there is a solution for dealing with temporaries: the [`RpassTemporaryPool`].
-//! If, inside the node, you need to create a temporary, you can put that temporary on 
+//! If, inside the node, you need to create a temporary, you can put that temporary on
 //! the pool, and it will automatically have lifetime `'rpass`. The temporary is
 //! destroyed right after the renderpass is.
 
