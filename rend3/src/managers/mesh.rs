@@ -89,7 +89,7 @@ impl MeshManager {
 
     #[must_use]
     pub fn add(&self, device: &Device, queue: &Queue, encoder: &mut CommandEncoder, mesh: Mesh) -> InternalMesh {
-        profiling::scope!("MeshManager::fill");
+        profiling::scope!("MeshManager::add");
 
         let index_count = mesh.indices.len();
 
@@ -161,6 +161,8 @@ impl MeshManager {
     }
 
     pub fn fill(&self, handle: &MeshHandle, mesh: InternalMesh) {
+        profiling::scope!("MeshManager::fill");
+
         let mut data_guard = self.data.lock();
         if handle.idx >= data_guard.len() {
             data_guard.resize_with(handle.idx + 1, || None);
