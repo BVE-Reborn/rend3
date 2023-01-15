@@ -117,18 +117,19 @@ impl ObjectManager {
         device: &Device,
         handle: &ObjectHandle,
         object: Object,
-        mesh_manager: &mut MeshManager,
+        mesh_manager: &MeshManager,
         skeleton_manager: &SkeletonManager,
         material_manager: &mut MaterialManager,
     ) {
+        let mesh_manager_guard = mesh_manager.lock_internal_data();
         let (internal_mesh, skeleton_ranges) = match &object.mesh_kind {
             ObjectMeshKind::Animated(skeleton) => {
                 let skeleton = skeleton_manager.internal_data(**skeleton);
-                let mesh = mesh_manager.internal_data(*skeleton.mesh_handle);
+                let mesh = &mesh_manager_guard[*skeleton.mesh_handle];
                 (mesh, &*skeleton.overridden_attribute_ranges)
             }
             ObjectMeshKind::Static(mesh) => {
-                let mesh = mesh_manager.internal_data(**mesh);
+                let mesh = &mesh_manager_guard[**mesh];
                 (mesh, &[][..])
             }
         };
@@ -199,7 +200,7 @@ impl ObjectManager {
         src_handle: ObjectHandle,
         dst_handle: ObjectHandle,
         change: ObjectChange,
-        mesh_manager: &mut MeshManager,
+        mesh_manager: &MeshManager,
         skeleton_manager: &SkeletonManager,
         material_manager: &mut MaterialManager,
     ) {

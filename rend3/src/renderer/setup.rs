@@ -81,9 +81,9 @@ pub fn create_renderer(
         handedness,
 
         resource_handle_allocators: HandleAllocators::default(),
+        mesh_manager,
         data_core: Mutex::new(RendererDataCore {
             camera_manager,
-            mesh_manager,
             d2_texture_manager,
             d2c_texture_manager,
             material_manager,

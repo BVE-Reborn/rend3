@@ -24,6 +24,8 @@ pub struct InternalSkeleton {
     /// There are three attributes that we can possibly override here:
     /// Position, Normals, and Tangent
     pub overridden_attribute_ranges: ArrayVec<(VertexAttributeId, Range<u64>), 3>,
+    /// Amount of vertices in the pointed to mesh
+    pub vertex_count: u32,
 }
 
 /// Manages skeletons.
@@ -52,11 +54,11 @@ impl SkeletonManager {
         &mut self,
         device: &Device,
         encoder: &mut CommandEncoder,
-        mesh_manager: &mut MeshManager,
+        mesh_manager: &MeshManager,
         handle: &SkeletonHandle,
         skeleton: Skeleton,
     ) {
-        let internal_mesh = mesh_manager.internal_data(skeleton.mesh.get_raw());
+        let internal_mesh = &mesh_manager.lock_internal_data()[skeleton.mesh.get_raw()];
         let required_joint_count = internal_mesh
             .required_joint_count
             .expect("Mesh must have joint weights and joint indices to be used in a skeleton");
@@ -116,6 +118,7 @@ impl SkeletonManager {
             mesh_handle: skeleton.mesh,
             source_attribute_ranges,
             overridden_attribute_ranges,
+            vertex_count: internal_mesh.vertex_count,
         };
 
         if handle.idx >= self.data.len() {
@@ -126,7 +129,7 @@ impl SkeletonManager {
         self.skeleton_count += 1;
     }
 
-    pub fn remove(&mut self, mesh_manager: &mut MeshManager, handle: RawSkeletonHandle) {
+    pub fn remove(&mut self, mesh_manager: &MeshManager, handle: RawSkeletonHandle) {
         let skeleton = self.data[handle.idx].take().unwrap();
         self.global_joint_count -= skeleton.joint_matrices.len();
 
