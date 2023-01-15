@@ -150,13 +150,12 @@ mod test {
     }
 
     impl TestContext {
-        fn new() -> Self {
+        fn new() -> Option<Self> {
             let backends = wgpu::util::backend_bits_from_env().unwrap_or(wgpu::Backends::all());
             let instance = wgpu::Instance::new(backends);
             let adapter = pollster::block_on(wgpu::util::initialize_adapter_from_env_or_default(
                 &instance, backends, None,
-            ))
-            .unwrap();
+            ))?;
             let (device, queue) = pollster::block_on(adapter.request_device(
                 &wgpu::DeviceDescriptor {
                     label: None,
@@ -165,9 +164,9 @@ mod test {
                 },
                 None,
             ))
-            .unwrap();
+            .ok()?;
 
-            Self { device, queue }
+            Some(Self { device, queue })
         }
 
         fn buffer<T: bytemuck::Pod>(&self, data: &[T]) -> wgpu::Buffer {
@@ -211,7 +210,9 @@ mod test {
 
     #[test]
     fn single_word() {
-        let ctx = TestContext::new();
+        let Some(ctx) = TestContext::new() else {
+            return;
+        };
 
         let scatter = ScatterCopy::new(&ctx.device);
 
@@ -234,7 +235,9 @@ mod test {
 
     #[test]
     fn sparse_words() {
-        let ctx = TestContext::new();
+        let Some(ctx) = TestContext::new() else {
+            return;
+        };
 
         let scatter = ScatterCopy::new(&ctx.device);
 
@@ -263,7 +266,9 @@ mod test {
 
     #[test]
     fn sparse_multi_words() {
-        let ctx = TestContext::new();
+        let Some(ctx) = TestContext::new() else {
+            return;
+        };
 
         let scatter = ScatterCopy::new(&ctx.device);
 

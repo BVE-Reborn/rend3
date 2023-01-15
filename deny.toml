@@ -30,6 +30,7 @@ skip = [
     { name = "raw-window-handle", version = "0.4.3" },
 ]
 skip-tree = [
+    { name = "windows", version = "0.39" },
     { name = "windows-sys", version = "0.36" },
     # winit transitively included dupes
     { name = "winit", version = "0.27" },
