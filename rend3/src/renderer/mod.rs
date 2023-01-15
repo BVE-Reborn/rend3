@@ -58,6 +58,8 @@ pub struct Renderer {
 
     /// Allocators for resource handles
     resource_handle_allocators: HandleAllocators,
+    /// Manages all vertex and index data.
+    pub mesh_manager: MeshManager,
     /// All the lockable data
     pub data_core: Mutex<RendererDataCore>,
 
@@ -84,8 +86,6 @@ struct HandleAllocators {
 pub struct RendererDataCore {
     /// Position and settings of the camera.
     pub camera_manager: CameraManager,
-    /// Manages all vertex and index data.
-    pub mesh_manager: MeshManager,
     /// Manages all 2D textures, including bindless bind group.
     pub d2_texture_manager: TextureManager<Texture2DTag>,
     /// Manages all Cube textures, including bindless bind groups.
@@ -133,10 +133,16 @@ impl Renderer {
     pub fn add_mesh(self: &Arc<Self>, mesh: Mesh) -> MeshHandle {
         let handle = self.resource_handle_allocators.mesh.allocate(self);
 
+        // todo: move out of data core
+
+        let mut encoder = self.device.create_command_encoder(&CommandEncoderDescriptor::default());
+        let internal_mesh = self.mesh_manager.add(&self.device, &self.queue, &mut encoder, mesh);
+
         self.instructions.push(
             InstructionKind::AddMesh {
                 handle: handle.clone(),
-                mesh,
+                internal_mesh,
+                buffer: encoder.finish(),
             },
             *Location::caller(),
         );

@@ -10,9 +10,9 @@ use std::{
 
 use glam::UVec2;
 use wgpu::{
-    CommandBuffer, CommandEncoder, CommandEncoderDescriptor, LoadOp, Operations, RenderPass, RenderPassColorAttachment,
-    RenderPassDepthStencilAttachment, RenderPassDescriptor, SurfaceTexture, Texture, TextureView,
-    TextureViewDescriptor,
+    Buffer, CommandBuffer, CommandEncoder, CommandEncoderDescriptor, LoadOp, Operations, RenderPass,
+    RenderPassColorAttachment, RenderPassDepthStencilAttachment, RenderPassDescriptor, SurfaceTexture, Texture,
+    TextureView, TextureViewDescriptor,
 };
 
 use super::ViewportRect;
@@ -34,6 +34,7 @@ pub struct ReadyData {
     pub d2c_texture: TextureManagerReadyOutput,
     pub shadow_target_size: UVec2,
     pub shadows: Vec<ShadowDesc>,
+    pub mesh_buffer: Arc<Buffer>,
 }
 
 pub trait AsTextureReference {

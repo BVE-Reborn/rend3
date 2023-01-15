@@ -27,17 +27,14 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
         profiling::scope!("Instruction Processing");
         for Instruction { kind, location: _ } in instructions.drain(..) {
             match kind {
-                InstructionKind::AddMesh { handle, mesh } => {
+                InstructionKind::AddMesh {
+                    handle,
+                    internal_mesh,
+                    buffer,
+                } => {
                     profiling::scope!("Add Mesh");
-                    data_core
-                        .profiler
-                        .try_lock()
-                        .unwrap()
-                        .begin_scope("Add Mesh", &mut encoder, &renderer.device);
-                    data_core
-                        .mesh_manager
-                        .add(&renderer.device, &renderer.queue, &mut encoder, &handle, mesh);
-                    data_core.profiler.try_lock().unwrap().end_scope(&mut encoder);
+                    renderer.mesh_manager.fill(&handle, internal_mesh);
+                    cmd_bufs.push(buffer);
                 }
                 InstructionKind::AddSkeleton { handle, skeleton } => {
                     profiling::scope!("Add Skeleton");
@@ -49,7 +46,7 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
                     data_core.skeleton_manager.add(
                         &renderer.device,
                         &mut encoder,
-                        &mut data_core.mesh_manager,
+                        &renderer.mesh_manager,
                         &handle,
                         skeleton,
                     );
@@ -103,7 +100,7 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
                         &renderer.device,
                         &handle,
                         object,
-                        &mut data_core.mesh_manager,
+                        &renderer.mesh_manager,
                         &data_core.skeleton_manager,
                         &mut data_core.material_manager,
                     );
@@ -134,18 +131,18 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
                         src_handle,
                         dst_handle,
                         change,
-                        &mut data_core.mesh_manager,
+                        &renderer.mesh_manager,
                         &data_core.skeleton_manager,
                         &mut data_core.material_manager,
                     );
                 }
                 InstructionKind::DeleteMesh { handle } => {
                     renderer.resource_handle_allocators.mesh.deallocate(handle);
-                    data_core.mesh_manager.remove(handle)
+                    renderer.mesh_manager.remove(handle)
                 }
                 InstructionKind::DeleteSkeleton { handle } => {
                     renderer.resource_handle_allocators.skeleton.deallocate(handle);
-                    data_core.skeleton_manager.remove(&mut data_core.mesh_manager, handle)
+                    data_core.skeleton_manager.remove(&renderer.mesh_manager, handle)
                 }
                 InstructionKind::DeleteTexture2D { handle } => {
                     renderer.resource_handle_allocators.d2_texture.deallocate(handle);
@@ -200,6 +197,7 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
     let (shadow_target_size, shadows) = data_core
         .directional_light_manager
         .ready(renderer, &data_core.camera_manager);
+    let mesh_buffer = renderer.mesh_manager.ready();
 
     cmd_bufs.push(encoder.finish());
 
@@ -210,6 +208,7 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
             d2c_texture,
             shadow_target_size,
             shadows,
+            mesh_buffer,
         },
     )
 }

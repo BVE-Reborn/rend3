@@ -3,8 +3,7 @@ use std::{borrow::Cow, mem};
 use encase::{ShaderSize, ShaderType};
 use glam::Mat4;
 use rend3::{
-    graph::RenderGraph,
-    managers::{MeshManager, SkeletonManager},
+    graph::{NodeExecutionContext, RenderGraph},
     types::{
         VERTEX_ATTRIBUTE_JOINT_INDICES, VERTEX_ATTRIBUTE_JOINT_WEIGHTS, VERTEX_ATTRIBUTE_NORMAL,
         VERTEX_ATTRIBUTE_POSITION, VERTEX_ATTRIBUTE_TANGENT,
@@ -17,7 +16,7 @@ use rend3::{
 };
 use wgpu::{
     BindGroupLayout, Buffer, BufferBindingType, BufferDescriptor, BufferUsages, CommandEncoder, ComputePassDescriptor,
-    ComputePipeline, ComputePipelineDescriptor, Device, PipelineLayoutDescriptor, ShaderModuleDescriptor, ShaderStages,
+    ComputePipeline, ComputePipelineDescriptor, PipelineLayoutDescriptor, ShaderModuleDescriptor, ShaderStages,
 };
 
 /// The per-skeleton data, as uploaded to the GPU compute shader.
@@ -52,24 +51,21 @@ pub struct PreSkinningBuffers {
     joint_matrices: Buffer,
 }
 
-fn build_gpu_skinning_input_buffers(
-    device: &Device,
-    skeleton_manager: &SkeletonManager,
-    mesh_manager: &MeshManager,
-) -> PreSkinningBuffers {
+fn build_gpu_skinning_input_buffers(ctx: &NodeExecutionContext) -> PreSkinningBuffers {
     profiling::scope!("Building GPU Skinning Input Data");
 
-    let skinning_inputs_size = skeleton_manager.skeletons().len() as u64 * GpuSkinningInput::SHADER_SIZE.get();
-    let gpu_skinning_inputs = device.create_buffer(&BufferDescriptor {
+    let skinning_inputs_size =
+        ctx.data_core.skeleton_manager.skeletons().len() as u64 * GpuSkinningInput::SHADER_SIZE.get();
+    let gpu_skinning_inputs = ctx.renderer.device.create_buffer(&BufferDescriptor {
         label: Some("skinning inputs"),
         size: skinning_inputs_size,
         usage: BufferUsages::STORAGE,
         mapped_at_creation: true,
     });
 
-    let joint_matrices = device.create_buffer(&BufferDescriptor {
+    let joint_matrices = ctx.renderer.device.create_buffer(&BufferDescriptor {
         label: Some("joint matrices"),
-        size: (skeleton_manager.global_joint_count() * mem::size_of::<Mat4>()) as u64,
+        size: (ctx.data_core.skeleton_manager.global_joint_count() * mem::size_of::<Mat4>()) as u64,
         usage: BufferUsages::STORAGE,
         mapped_at_creation: true,
     });
@@ -83,23 +79,21 @@ fn build_gpu_skinning_input_buffers(
     let mut joint_matrix_idx = 0;
 
     // Iterate over the skeletons, fill the buffers
-    for skeleton in skeleton_manager.skeletons() {
+    for skeleton in ctx.data_core.skeleton_manager.skeletons() {
         // SAFETY: We are always accessing elements in bounds and all accesses are
         // aligned
         unsafe {
-            let mesh = mesh_manager.internal_data(*skeleton.mesh_handle);
-
             let mut input = GpuSkinningInput {
-                base_position_offset: 0xFFFFFFFF,
-                base_normal_offset: 0xFFFFFFFF,
-                base_tangent_offset: 0xFFFFFFFF,
-                joint_indices_offset: 0xFFFFFFFF,
-                joint_weight_offset: 0xFFFFFFFF,
-                updated_position_offset: 0xFFFFFFFF,
-                updated_normal_offset: 0xFFFFFFFF,
-                updated_tangent_offset: 0xFFFFFFFF,
+                base_position_offset: u32::MAX,
+                base_normal_offset: u32::MAX,
+                base_tangent_offset: u32::MAX,
+                joint_indices_offset: u32::MAX,
+                joint_weight_offset: u32::MAX,
+                updated_position_offset: u32::MAX,
+                updated_normal_offset: u32::MAX,
+                updated_tangent_offset: u32::MAX,
                 joint_matrix_base_offset: joint_matrix_idx,
-                vertex_count: mesh.vertex_count,
+                vertex_count: skeleton.vertex_count,
             };
 
             for (attribute, range) in &skeleton.source_attribute_ranges {
@@ -189,31 +183,22 @@ impl GpuSkinner {
         Self { bgl, pipeline }
     }
 
-    pub fn execute_pass(
-        &self,
-        device: &Device,
-        encoder: &mut CommandEncoder,
-        buffers: &PreSkinningBuffers,
-        mesh_manager: &MeshManager,
-        // The number of inputs in the skinning_inputs buffer
-        skeleton_manager: &SkeletonManager,
-    ) {
+    pub fn execute_pass(&self, ctx: &NodeExecutionContext, encoder: &mut CommandEncoder, buffers: &PreSkinningBuffers) {
         let bg = BindGroupBuilder::new()
-            .append_buffer(mesh_manager.buffer())
+            .append_buffer(&ctx.ready.mesh_buffer)
             .append_buffer_with_size(&buffers.gpu_skinning_inputs, GpuSkinningInput::SHADER_SIZE.get())
             .append_buffer(&buffers.joint_matrices)
-            .build(device, Some("GPU skinning inputs"), &self.bgl);
+            .build(&ctx.renderer.device, Some("GPU skinning inputs"), &self.bgl);
 
         let mut cpass = encoder.begin_compute_pass(&ComputePassDescriptor {
             label: Some("GPU Skinning"),
         });
         cpass.set_pipeline(&self.pipeline);
-        for (i, skel) in skeleton_manager.skeletons().enumerate() {
+        for (i, skel) in ctx.data_core.skeleton_manager.skeletons().enumerate() {
             let offset = (i as u64 * GpuSkinningInput::SHADER_SIZE.get()) as u32;
             cpass.set_bind_group(0, &bg, &[offset]);
 
-            let num_verts = mesh_manager.internal_data(*skel.mesh_handle).vertex_count;
-            let num_workgroups = round_up_div(num_verts, Self::WORKGROUP_SIZE);
+            let num_workgroups = round_up_div(skel.vertex_count, Self::WORKGROUP_SIZE);
             cpass.dispatch_workgroups(num_workgroups, 1, 1);
         }
     }
@@ -236,22 +221,12 @@ pub fn add_skinning_to_graph<'node>(graph: &mut RenderGraph<'node>, gpu_skinner:
     builder.build(move |mut ctx| {
         let encoder = ctx.encoder_or_pass.take_encoder();
 
-        let skinning_input = build_gpu_skinning_input_buffers(
-            &ctx.renderer.device,
-            &ctx.data_core.skeleton_manager,
-            &ctx.data_core.mesh_manager,
-        );
+        let skinning_input = build_gpu_skinning_input_buffers(&ctx);
 
         // Avoid running the compute pass if there are no skeletons. This
         // prevents binding an empty buffer
         if ctx.data_core.skeleton_manager.skeletons().len() > 0 {
-            gpu_skinner.execute_pass(
-                &ctx.renderer.device,
-                encoder,
-                &skinning_input,
-                &ctx.data_core.mesh_manager,
-                &ctx.data_core.skeleton_manager,
-            );
+            gpu_skinner.execute_pass(&ctx, encoder, &skinning_input);
         }
     });
 }

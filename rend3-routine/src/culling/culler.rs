@@ -252,7 +252,7 @@ impl GpuCuller {
             entries: &[
                 BindGroupEntry {
                     binding: 0,
-                    resource: ctx.data_core.mesh_manager.buffer().as_entire_binding(),
+                    resource: ctx.ready.mesh_buffer.as_entire_binding(),
                 },
                 BindGroupEntry {
                     binding: 1,

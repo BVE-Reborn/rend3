@@ -10,8 +10,8 @@ use rend3_types::{
 use wgpu::{CommandBuffer, Device, Texture, TextureDescriptor, TextureView};
 
 use crate::{
-    managers::{GraphStorage, MaterialManager, TextureManager},
-    types::{Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Mesh, Object, RawObjectHandle},
+    managers::{GraphStorage, InternalMesh, MaterialManager, TextureManager},
+    types::{Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Object, RawObjectHandle},
     RendererProfile,
 };
 
@@ -24,7 +24,8 @@ pub struct Instruction {
 pub enum InstructionKind {
     AddMesh {
         handle: MeshHandle,
-        mesh: Mesh,
+        internal_mesh: InternalMesh,
+        buffer: CommandBuffer,
     },
     AddSkeleton {
         handle: SkeletonHandle,
