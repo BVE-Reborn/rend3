@@ -1,16 +1,19 @@
-use crate::{
-    managers::{MaterialManager, ObjectManager, TextureManager},
-    types::{Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Mesh, Object, RawObjectHandle},
-    RendererProfile,
-};
+use std::{mem, panic::Location};
+
 use glam::Mat4;
 use parking_lot::Mutex;
 use rend3_types::{
-    MaterialHandle, MeshHandle, ObjectChange, ObjectHandle, RawDirectionalLightHandle, RawSkeletonHandle, Skeleton,
-    SkeletonHandle, TextureHandle,
+    MaterialHandle, MeshHandle, ObjectChange, ObjectHandle, RawDirectionalLightHandle, RawGraphDataHandleUntyped,
+    RawMaterialHandle, RawMeshHandle, RawSkeletonHandle, RawTexture2DHandle, RawTextureCubeHandle, Skeleton,
+    SkeletonHandle, Texture2DHandle, TextureCubeHandle,
 };
-use std::{mem, panic::Location};
 use wgpu::{CommandBuffer, Device, Texture, TextureDescriptor, TextureView};
+
+use crate::{
+    managers::{GraphStorage, MaterialManager, TextureManager},
+    types::{Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Mesh, Object, RawObjectHandle},
+    RendererProfile,
+};
 
 pub struct Instruction {
     pub kind: InstructionKind,
@@ -27,31 +30,28 @@ pub enum InstructionKind {
         handle: SkeletonHandle,
         skeleton: Skeleton,
     },
-    AddTexture {
-        handle: TextureHandle,
+    AddTexture2D {
+        handle: Texture2DHandle,
         desc: TextureDescriptor<'static>,
         texture: Texture,
         view: TextureView,
         buffer: Option<CommandBuffer>,
-        cube: bool,
+    },
+    AddTextureCube {
+        handle: TextureCubeHandle,
+        desc: TextureDescriptor<'static>,
+        texture: Texture,
+        view: TextureView,
+        buffer: Option<CommandBuffer>,
     },
     AddMaterial {
         handle: MaterialHandle,
         fill_invoke: Box<
-            dyn FnOnce(&mut MaterialManager, &Device, RendererProfile, &mut TextureManager, &MaterialHandle)
-                + Send
-                + Sync,
-        >,
-    },
-    ChangeMaterial {
-        handle: MaterialHandle,
-        change_invoke: Box<
             dyn FnOnce(
                     &mut MaterialManager,
                     &Device,
                     RendererProfile,
-                    &mut TextureManager,
-                    &mut ObjectManager,
+                    &mut TextureManager<crate::types::Texture2DTag>,
                     &MaterialHandle,
                 ) + Send
                 + Sync,
@@ -61,6 +61,49 @@ pub enum InstructionKind {
         handle: ObjectHandle,
         object: Object,
     },
+    AddDirectionalLight {
+        handle: DirectionalLightHandle,
+        light: DirectionalLight,
+    },
+    AddGraphData {
+        add_invoke: Box<dyn FnOnce(&mut GraphStorage) + Send>,
+    },
+    ChangeMaterial {
+        handle: MaterialHandle,
+        change_invoke: Box<
+            dyn FnOnce(&mut MaterialManager, &Device, &TextureManager<crate::types::Texture2DTag>, &MaterialHandle)
+                + Send
+                + Sync,
+        >,
+    },
+    ChangeDirectionalLight {
+        handle: RawDirectionalLightHandle,
+        change: DirectionalLightChange,
+    },
+    DeleteMesh {
+        handle: RawMeshHandle,
+    },
+    DeleteSkeleton {
+        handle: RawSkeletonHandle,
+    },
+    DeleteTexture2D {
+        handle: RawTexture2DHandle,
+    },
+    DeleteTextureCube {
+        handle: RawTextureCubeHandle,
+    },
+    DeleteMaterial {
+        handle: RawMaterialHandle,
+    },
+    DeleteObject {
+        handle: RawObjectHandle,
+    },
+    DeleteDirectionalLight {
+        handle: RawDirectionalLightHandle,
+    },
+    DeleteGraphData {
+        handle: RawGraphDataHandleUntyped,
+    },
     SetObjectTransform {
         handle: RawObjectHandle,
         transform: Mat4,
@@ -68,14 +111,6 @@ pub enum InstructionKind {
     SetSkeletonJointDeltas {
         handle: RawSkeletonHandle,
         joint_matrices: Vec<Mat4>,
-    },
-    AddDirectionalLight {
-        handle: DirectionalLightHandle,
-        light: DirectionalLight,
-    },
-    ChangeDirectionalLight {
-        handle: RawDirectionalLightHandle,
-        change: DirectionalLightChange,
     },
     SetAspectRatio {
         ratio: f32,
@@ -111,5 +146,58 @@ impl InstructionStreamPair {
 
     pub fn push(&self, kind: InstructionKind, location: Location<'static>) {
         self.producer.lock().push(Instruction { kind, location })
+    }
+}
+
+/// Allows RawResourceHandle<T> to be turned into a delete instruction.
+pub(super) trait DeletableRawResourceHandle {
+    fn into_delete_instruction_kind(self) -> InstructionKind;
+}
+
+impl DeletableRawResourceHandle for RawMeshHandle {
+    fn into_delete_instruction_kind(self) -> InstructionKind {
+        InstructionKind::DeleteMesh { handle: self }
+    }
+}
+
+impl DeletableRawResourceHandle for RawSkeletonHandle {
+    fn into_delete_instruction_kind(self) -> InstructionKind {
+        InstructionKind::DeleteSkeleton { handle: self }
+    }
+}
+
+impl DeletableRawResourceHandle for RawTexture2DHandle {
+    fn into_delete_instruction_kind(self) -> InstructionKind {
+        InstructionKind::DeleteTexture2D { handle: self }
+    }
+}
+
+impl DeletableRawResourceHandle for RawTextureCubeHandle {
+    fn into_delete_instruction_kind(self) -> InstructionKind {
+        InstructionKind::DeleteTextureCube { handle: self }
+    }
+}
+
+impl DeletableRawResourceHandle for RawMaterialHandle {
+    fn into_delete_instruction_kind(self) -> InstructionKind {
+        InstructionKind::DeleteMaterial { handle: self }
+    }
+}
+
+impl DeletableRawResourceHandle for RawObjectHandle {
+    fn into_delete_instruction_kind(self) -> InstructionKind {
+        InstructionKind::DeleteObject { handle: self }
+    }
+}
+
+impl DeletableRawResourceHandle for RawDirectionalLightHandle {
+    fn into_delete_instruction_kind(self) -> InstructionKind {
+        InstructionKind::DeleteDirectionalLight { handle: self }
+    }
+}
+
+impl DeletableRawResourceHandle for RawGraphDataHandleUntyped {
+    fn into_delete_instruction_kind(self) -> InstructionKind {
+        InstructionKind::DeleteGraphData { handle: self }
     }
 }

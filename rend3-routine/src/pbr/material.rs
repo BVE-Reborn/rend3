@@ -1,18 +1,16 @@
 //! Types which make up `rend3-routine`'s material [`PbrMaterial`]
 
-use std::mem;
-
-use glam::{Mat3, Mat3A, Vec3, Vec4};
-use rend3::types::{Material, TextureHandle};
-
-use crate::{
-    common::Sorting,
-    depth::{AlphaCutoutSpec, DepthRenderableMaterial},
+use encase::ShaderType;
+use glam::{Mat3, Vec3, Vec4};
+use rend3::types::{
+    Material, RawTexture2DHandle, Sorting, Texture2DHandle, VertexAttributeId, VERTEX_ATTRIBUTE_COLOR_0,
+    VERTEX_ATTRIBUTE_NORMAL, VERTEX_ATTRIBUTE_POSITION, VERTEX_ATTRIBUTE_TANGENT,
+    VERTEX_ATTRIBUTE_TEXTURE_COORDINATES_0, VERTEX_ATTRIBUTE_TEXTURE_COORDINATES_1,
 };
 
 bitflags::bitflags! {
     /// Flags which shaders use to determine properties of a material
-    #[derive(Default)]
+    #[derive(Default, ShaderType)]
     pub struct MaterialFlags : u32 {
         const ALBEDO_ACTIVE =       0b0000_0000_0000_0001;
         const ALBEDO_BLEND =        0b0000_0000_0000_0010;
@@ -53,22 +51,22 @@ pub enum AlbedoComponent {
         srgb: bool,
     },
     /// Albedo color is loaded from the given texture.
-    Texture(TextureHandle),
+    Texture(Texture2DHandle),
     /// Albedo color is loaded from the given texture, then multiplied
     /// by the vertex color.
     TextureVertex {
-        texture: TextureHandle,
+        texture: Texture2DHandle,
         /// Vertex should be converted from srgb -> linear before
         /// multiplication.
         srgb: bool,
     },
     /// Albedo color is loaded from given texture, then multiplied
     /// by the given value.
-    TextureValue { texture: TextureHandle, value: Vec4 },
+    TextureValue { texture: Texture2DHandle, value: Vec4 },
     /// Albedo color is loaded from the given texture, then multiplied
     /// by the vertex color and the given value.
     TextureVertexValue {
-        texture: TextureHandle,
+        texture: Texture2DHandle,
         /// Vertex should be converted from srgb -> linear before
         /// multiplication.
         srgb: bool,
@@ -121,7 +119,7 @@ impl AlbedoComponent {
         )
     }
 
-    pub fn to_texture(&self) -> Option<&TextureHandle> {
+    pub fn to_texture(&self) -> Option<&Texture2DHandle> {
         match *self {
             Self::None | Self::Vertex { .. } | Self::Value(_) | Self::ValueVertex { .. } => None,
             Self::Texture(ref texture)
@@ -138,8 +136,8 @@ impl AlbedoComponent {
 pub enum MaterialComponent<T> {
     None,
     Value(T),
-    Texture(TextureHandle),
-    TextureValue { texture: TextureHandle, value: T },
+    Texture(Texture2DHandle),
+    TextureValue { texture: Texture2DHandle, value: T },
 }
 
 impl<T> Default for MaterialComponent<T> {
@@ -160,7 +158,7 @@ impl<T: Copy> MaterialComponent<T> {
         matches!(*self, Self::Texture(..) | Self::TextureValue { .. })
     }
 
-    pub fn to_texture(&self) -> Option<&TextureHandle> {
+    pub fn to_texture(&self) -> Option<&Texture2DHandle> {
         match *self {
             Self::None | Self::Value(_) => None,
             Self::Texture(ref texture) | Self::TextureValue { ref texture, .. } => Some(texture),
@@ -189,13 +187,13 @@ pub enum NormalTexture {
     /// No normal texture.
     None,
     /// Normal stored in RGB values.
-    Tricomponent(TextureHandle, NormalTextureYDirection),
+    Tricomponent(Texture2DHandle, NormalTextureYDirection),
     /// Normal stored in RG values, third value should be reconstructed.
-    Bicomponent(TextureHandle, NormalTextureYDirection),
+    Bicomponent(Texture2DHandle, NormalTextureYDirection),
     /// Normal stored in Green and Alpha values, third value should be
     /// reconstructed. This is useful for storing in BC3 or BC7 compressed
     /// textures.
-    BicomponentSwizzled(TextureHandle, NormalTextureYDirection),
+    BicomponentSwizzled(Texture2DHandle, NormalTextureYDirection),
 }
 impl Default for NormalTexture {
     fn default() -> Self {
@@ -204,7 +202,7 @@ impl Default for NormalTexture {
 }
 
 impl NormalTexture {
-    pub fn to_texture(&self) -> Option<&TextureHandle> {
+    pub fn to_texture(&self) -> Option<&Texture2DHandle> {
         match *self {
             Self::None => None,
             Self::Tricomponent(ref texture, _)
@@ -240,32 +238,32 @@ pub enum AoMRTextures {
     Combined {
         /// Texture with Ambient Occlusion in R, Roughness in G, and Metallic in
         /// B
-        texture: Option<TextureHandle>,
+        texture: Option<Texture2DHandle>,
     },
     SwizzledSplit {
         /// Texture with Ambient Occlusion in R
-        ao_texture: Option<TextureHandle>,
+        ao_texture: Option<Texture2DHandle>,
         /// Texture with Roughness in G and Metallic in B
-        mr_texture: Option<TextureHandle>,
+        mr_texture: Option<Texture2DHandle>,
     },
     Split {
         /// Texture with Ambient Occlusion in R
-        ao_texture: Option<TextureHandle>,
+        ao_texture: Option<Texture2DHandle>,
         /// Texture with Roughness in R and Metallic in G
-        mr_texture: Option<TextureHandle>,
+        mr_texture: Option<Texture2DHandle>,
     },
     BWSplit {
         /// Texture with Ambient Occlusion in R
-        ao_texture: Option<TextureHandle>,
+        ao_texture: Option<Texture2DHandle>,
         /// Texture with Metallic in R
-        m_texture: Option<TextureHandle>,
+        m_texture: Option<Texture2DHandle>,
         /// Texture with Roughness in R
-        r_texture: Option<TextureHandle>,
+        r_texture: Option<Texture2DHandle>,
     },
 }
 
 impl AoMRTextures {
-    pub fn to_roughness_texture(&self) -> Option<&TextureHandle> {
+    pub fn to_roughness_texture(&self) -> Option<&Texture2DHandle> {
         match *self {
             Self::Combined {
                 texture: Some(ref texture),
@@ -286,7 +284,7 @@ impl AoMRTextures {
         }
     }
 
-    pub fn to_metallic_texture(&self) -> Option<&TextureHandle> {
+    pub fn to_metallic_texture(&self) -> Option<&Texture2DHandle> {
         match *self {
             Self::Combined { .. } => None,
             Self::SwizzledSplit { .. } => None,
@@ -299,7 +297,7 @@ impl AoMRTextures {
         }
     }
 
-    pub fn to_ao_texture(&self) -> Option<&TextureHandle> {
+    pub fn to_ao_texture(&self) -> Option<&Texture2DHandle> {
         match *self {
             Self::Combined { .. } => None,
             Self::SwizzledSplit {
@@ -340,25 +338,25 @@ impl Default for AoMRTextures {
 pub enum ClearcoatTextures {
     GltfCombined {
         /// Texture with Clearcoat in R, and Clearcoat Roughness in G
-        texture: Option<TextureHandle>,
+        texture: Option<Texture2DHandle>,
     },
     GltfSplit {
         /// Texture with Clearcoat in R
-        clearcoat_texture: Option<TextureHandle>,
+        clearcoat_texture: Option<Texture2DHandle>,
         /// Texture with Clearcoat Roughness in G
-        clearcoat_roughness_texture: Option<TextureHandle>,
+        clearcoat_roughness_texture: Option<Texture2DHandle>,
     },
     BWSplit {
         /// Texture with Clearcoat in R
-        clearcoat_texture: Option<TextureHandle>,
+        clearcoat_texture: Option<Texture2DHandle>,
         /// Texture with Clearcoat Roughness in R
-        clearcoat_roughness_texture: Option<TextureHandle>,
+        clearcoat_roughness_texture: Option<Texture2DHandle>,
     },
     None,
 }
 
 impl ClearcoatTextures {
-    pub fn to_clearcoat_texture(&self) -> Option<&TextureHandle> {
+    pub fn to_clearcoat_texture(&self) -> Option<&Texture2DHandle> {
         match *self {
             Self::GltfCombined {
                 texture: Some(ref texture),
@@ -375,7 +373,7 @@ impl ClearcoatTextures {
         }
     }
 
-    pub fn to_clearcoat_roughness_texture(&self) -> Option<&TextureHandle> {
+    pub fn to_clearcoat_roughness_texture(&self) -> Option<&Texture2DHandle> {
         match *self {
             Self::GltfCombined { .. } => None,
             Self::GltfSplit {
@@ -420,7 +418,7 @@ impl Default for SampleType {
 
 /// The type of transparency in a material.
 #[repr(u8)]
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum TransparencyType {
     /// Alpha is completely ignored.
     Opaque,
@@ -447,11 +445,10 @@ impl TransparencyType {
         }
     }
 
-    pub fn to_sorting(self) -> Option<Sorting> {
+    pub fn to_sorting(self) -> Sorting {
         match self {
-            Self::Opaque => None,
-            Self::Cutout => None,
-            Self::Blend => Some(Sorting::BackToFront),
+            Self::Opaque | Self::Cutout => Sorting::OPAQUE,
+            Self::Blend => Sorting::BLENDING,
         }
     }
 }
@@ -508,56 +505,66 @@ pub struct PbrMaterial {
     pub anisotropy: MaterialComponent<f32>,
     pub uv_transform0: Mat3,
     pub uv_transform1: Mat3,
-    // TODO: Determine how to make this a clearer part of the type system, esp. with the changable_struct macro.
+    // TODO: Make unlit a different shader entirely.
     pub unlit: bool,
     pub sample_type: SampleType,
 }
 
 impl Material for PbrMaterial {
-    const TEXTURE_COUNT: u32 = 10;
-    const DATA_SIZE: u32 = mem::size_of::<ShaderMaterial>() as _;
+    type DataType = ShaderMaterial;
+    type TextureArrayType = [Option<RawTexture2DHandle>; 10];
+    type RequiredAttributeArrayType = [&'static VertexAttributeId; 1];
+    type SupportedAttributeArrayType = [&'static VertexAttributeId; 6];
 
-    fn object_key(&self) -> u64 {
+    fn required_attributes() -> Self::RequiredAttributeArrayType {
+        [&VERTEX_ATTRIBUTE_POSITION]
+    }
+
+    fn supported_attributes() -> Self::SupportedAttributeArrayType {
+        [
+            &VERTEX_ATTRIBUTE_POSITION,
+            &VERTEX_ATTRIBUTE_NORMAL,
+            &VERTEX_ATTRIBUTE_TANGENT,
+            &VERTEX_ATTRIBUTE_TEXTURE_COORDINATES_0,
+            &VERTEX_ATTRIBUTE_TEXTURE_COORDINATES_1,
+            &VERTEX_ATTRIBUTE_COLOR_0,
+        ]
+    }
+
+    fn key(&self) -> u64 {
         TransparencyType::from(self.transparency) as u64
     }
 
-    fn to_textures<'a>(&'a self, slice: &mut [Option<&'a TextureHandle>]) {
-        slice[0] = self.albedo.to_texture();
-        slice[1] = self.normal.to_texture();
-        slice[2] = self.aomr_textures.to_roughness_texture();
-        slice[3] = self.aomr_textures.to_metallic_texture();
-        slice[4] = self.reflectance.to_texture();
-        slice[5] = self.clearcoat_textures.to_clearcoat_texture();
-        slice[6] = self.clearcoat_textures.to_clearcoat_roughness_texture();
-        slice[7] = self.emissive.to_texture();
-        slice[8] = self.anisotropy.to_texture();
-        slice[9] = self.aomr_textures.to_ao_texture();
+    fn sorting(&self) -> Sorting {
+        TransparencyType::from(self.transparency).to_sorting()
     }
 
-    fn to_data(&self, slice: &mut [u8]) {
-        slice.copy_from_slice(bytemuck::bytes_of(&ShaderMaterial::from_material(self)));
+    fn to_textures(&self) -> Self::TextureArrayType {
+        [
+            self.albedo.to_texture(),
+            self.normal.to_texture(),
+            self.aomr_textures.to_roughness_texture(),
+            self.aomr_textures.to_metallic_texture(),
+            self.reflectance.to_texture(),
+            self.clearcoat_textures.to_clearcoat_texture(),
+            self.clearcoat_textures.to_clearcoat_roughness_texture(),
+            self.emissive.to_texture(),
+            self.anisotropy.to_texture(),
+            self.aomr_textures.to_ao_texture(),
+        ]
+        .map(|opt| opt.map(|r| r.get_raw()))
     }
-}
 
-impl DepthRenderableMaterial for PbrMaterial {
-    const ALPHA_CUTOUT: Option<AlphaCutoutSpec> = Some(AlphaCutoutSpec {
-        index: 0,
-        cutoff_offset: 152,
-        uv_transform_offset: Some(0),
-    });
-}
-
-#[test]
-fn cutout_offset() {
-    assert_eq!(bytemuck::offset_of!(ShaderMaterial, alpha_cutout), 152);
-    assert_eq!(bytemuck::offset_of!(ShaderMaterial, uv_transform0), 0);
+    fn to_data(&self) -> Self::DataType {
+        ShaderMaterial::from_material(self)
+    }
 }
 
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone)]
-struct ShaderMaterial {
-    uv_transform0: Mat3A,
-    uv_transform1: Mat3A,
+#[derive(Debug, Default, Copy, Clone, ShaderType)]
+pub struct ShaderMaterial {
+    uv_transform0: Mat3,
+    uv_transform1: Mat3,
 
     albedo: Vec4,
     emissive: Vec3,
@@ -579,8 +586,8 @@ unsafe impl bytemuck::Pod for ShaderMaterial {}
 impl ShaderMaterial {
     fn from_material(material: &PbrMaterial) -> Self {
         Self {
-            uv_transform0: material.uv_transform0.into(),
-            uv_transform1: material.uv_transform1.into(),
+            uv_transform0: material.uv_transform0,
+            uv_transform1: material.uv_transform1,
             albedo: material.albedo.to_value(),
             roughness: material.roughness_factor.unwrap_or(0.0),
             metallic: material.metallic_factor.unwrap_or(0.0),

@@ -20,6 +20,14 @@
 //!   used.
 //! - Double sided materials are currently unsupported.
 
+use std::{
+    borrow::Cow,
+    collections::{hash_map::Entry, BTreeMap, HashMap, VecDeque},
+    future::Future,
+    path::Path,
+    sync::Arc,
+};
+
 use glam::{Mat3, Mat4, Quat, UVec2, Vec2, Vec3, Vec4};
 use gltf::buffer::Source;
 use rend3::{
@@ -28,12 +36,6 @@ use rend3::{
     Renderer,
 };
 use rend3_routine::pbr;
-use std::{
-    borrow::Cow,
-    collections::{hash_map::Entry, BTreeMap, HashMap, VecDeque},
-    future::Future,
-    path::Path,
-};
 use thiserror::Error;
 
 /// Wrapper around a T that stores an optional label.
@@ -121,7 +123,7 @@ pub struct ImageKey {
 /// A uploaded texture and its format.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Texture {
-    pub handle: types::TextureHandle,
+    pub handle: types::Texture2DHandle,
     pub format: types::TextureFormat,
 }
 
@@ -270,7 +272,7 @@ pub async fn filesystem_io_func(parent_directory: impl AsRef<Path>, uri: &str) -
         return Ok(data);
     }
 
-    let path_resolved = parent_directory.as_ref().join(&*uri);
+    let path_resolved = parent_directory.as_ref().join(uri);
     let display = path_resolved.as_os_str().to_string_lossy();
     // profiling::scope!("loading file", &display);
     log::info!("loading file '{}' from disk", &display);
@@ -285,6 +287,8 @@ pub struct GltfLoadSettings {
     pub scale: f32,
     /// Size of the shadow map in world space (default: 100)
     pub directional_light_shadow_distance: f32,
+    /// Resolution of the shadow map (default: 2048)
+    pub directional_light_resolution: u16,
     /// Coordinate space normal maps should use (default Up)
     pub normal_direction: pbr::NormalTextureYDirection,
     /// Enable built-in directional lights (default true)
@@ -296,6 +300,7 @@ impl Default for GltfLoadSettings {
         Self {
             scale: 1.0,
             directional_light_shadow_distance: 100.0,
+            directional_light_resolution: 2048,
             normal_direction: pbr::NormalTextureYDirection::Up,
             enable_directional: true,
         }
@@ -326,7 +331,7 @@ impl Default for GltfLoadSettings {
 /// ));
 /// ```
 pub async fn load_gltf<F, Fut, E>(
-    renderer: &Renderer,
+    renderer: &Arc<Renderer>,
     data: &[u8],
     settings: &GltfLoadSettings,
     io_func: F,
@@ -376,7 +381,7 @@ where
 ///
 /// **Must** keep the [`LoadedGltfScene`] alive for the meshes and materials
 pub async fn load_gltf_data<F, Fut, E>(
-    renderer: &Renderer,
+    renderer: &Arc<Renderer>,
     file: &mut gltf::Gltf,
     settings: &GltfLoadSettings,
     mut io_func: F,
@@ -413,7 +418,7 @@ where
 /// Adds a single mesh from the [`LoadedGltfScene`] found by its index,
 /// as an object to the scene.
 pub fn add_mesh_by_index<E: std::error::Error + 'static>(
-    renderer: &Renderer,
+    renderer: &Arc<Renderer>,
     loaded: &LoadedGltfScene,
     mesh_index: usize,
     name: Option<&str>,
@@ -513,7 +518,7 @@ fn node_indices_topological_sort(nodes: &[gltf::Node]) -> (Vec<usize>, BTreeMap<
 /// You need to hold onto the returned value from this function to make sure the
 /// objects don't get deleted.
 pub fn instance_loaded_scene<'a, E: std::error::Error + 'static>(
-    renderer: &Renderer,
+    renderer: &Arc<Renderer>,
     loaded: &LoadedGltfScene,
     nodes: Vec<gltf::Node<'a>>,
     settings: &GltfLoadSettings,
@@ -561,6 +566,7 @@ pub fn instance_loaded_scene<'a, E: std::error::Error + 'static>(
                         intensity: light.intensity(),
                         direction,
                         distance: settings.directional_light_shadow_distance,
+                        resolution: settings.directional_light_resolution,
                     }))
                 }
                 _ => None,
@@ -632,7 +638,7 @@ where
 /// All binary data buffers must be provided. Call this with
 /// [`gltf::Document::meshes`] as the mesh argument.
 pub fn load_meshes<'a, E: std::error::Error + 'static>(
-    renderer: &Renderer,
+    renderer: &Arc<Renderer>,
     meshes: impl Iterator<Item = gltf::Mesh<'a>>,
     buffers: &[Vec<u8>],
 ) -> Result<Vec<Labeled<Mesh>>, GltfLoadError<E>> {
@@ -674,15 +680,15 @@ pub fn load_meshes<'a, E: std::error::Error + 'static>(
                 }
 
                 if let Some(uvs) = reader.read_tex_coords(0) {
-                    builder = builder.with_vertex_uv0(uvs.into_f32().map(Vec2::from).collect())
+                    builder = builder.with_vertex_texture_coordinates_0(uvs.into_f32().map(Vec2::from).collect())
                 }
 
                 if let Some(uvs) = reader.read_tex_coords(1) {
-                    builder = builder.with_vertex_uv1(uvs.into_f32().map(Vec2::from).collect())
+                    builder = builder.with_vertex_texture_coordinates_1(uvs.into_f32().map(Vec2::from).collect())
                 }
 
                 if let Some(colors) = reader.read_colors(0) {
-                    builder = builder.with_vertex_colors(colors.into_rgba_u8().collect())
+                    builder = builder.with_vertex_color_0(colors.into_rgba_u8().collect())
                 }
 
                 if let Some(indices) = reader.read_indices() {
@@ -842,7 +848,7 @@ fn load_animations<E: std::error::Error + 'static>(
 }
 
 /// Creates a gltf default material.
-pub fn load_default_material(renderer: &Renderer) -> types::MaterialHandle {
+pub fn load_default_material(renderer: &Arc<Renderer>) -> types::MaterialHandle {
     profiling::scope!("creating default material");
     renderer.add_material(pbr::PbrMaterial {
         albedo: pbr::AlbedoComponent::Value(Vec4::splat(1.0)),
@@ -872,7 +878,7 @@ pub fn load_default_material(renderer: &Renderer) -> types::MaterialHandle {
 ///
 /// io_func determines how URIs are resolved into their underlying data.
 pub async fn load_materials_and_textures<F, Fut, E>(
-    renderer: &Renderer,
+    renderer: &Arc<Renderer>,
     materials: impl ExactSizeIterator<Item = gltf::Material<'_>>,
     buffers: &[Vec<u8>],
     settings: &GltfLoadSettings,
@@ -1023,7 +1029,7 @@ where
 ///
 /// io_func determines how URIs are resolved into their underlying data.
 pub async fn load_image_cached<F, Fut, E>(
-    renderer: &Renderer,
+    renderer: &Arc<Renderer>,
     images: &mut ImageMap,
     image: gltf::Image<'_>,
     srgb: bool,
@@ -1059,7 +1065,7 @@ where
 ///
 /// io_func determines how URIs are resolved into their underlying data.
 pub async fn load_image<F, Fut, E>(
-    renderer: &Renderer,
+    renderer: &Arc<Renderer>,
     image: gltf::Image<'_>,
     srgb: bool,
     buffers: &[Vec<u8>],
@@ -1233,7 +1239,7 @@ pub mod util {
     use crate::{Labeled, Texture};
 
     /// Turns an `Option<Texture>` into `Option<types::TextureHandle>`
-    pub fn extract_handle(texture: Option<Texture>) -> Option<types::TextureHandle> {
+    pub fn extract_handle(texture: Option<Texture>) -> Option<types::Texture2DHandle> {
         texture.map(|t| t.handle)
     }
 

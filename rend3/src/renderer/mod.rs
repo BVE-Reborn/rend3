@@ -1,27 +1,11 @@
-use crate::{
-    graph::{GraphTextureStore, ReadyData},
-    instruction::{InstructionKind, InstructionStreamPair},
-    managers::{
-        CameraManager, DirectionalLightManager, InternalTexture, MaterialManager, MeshManager, ObjectManager,
-        SkeletonManager, TextureManager,
-    },
-    types::{
-        Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, MaterialHandle, Mesh, MeshHandle,
-        Object, ObjectHandle, Texture, TextureHandle,
-    },
-    util::mipmap::MipmapGenerator,
-    ExtendedAdapterInfo, InstanceAdapterDevice, RendererInitializationError, RendererProfile,
-};
+use std::{marker::PhantomData, num::NonZeroU32, panic::Location, sync::Arc};
+
 use glam::Mat4;
 use parking_lot::Mutex;
 use rend3_types::{
-    Handedness, Material, MipmapCount, MipmapSource, ObjectChange, Skeleton, SkeletonHandle, TextureFormat,
-    TextureFromTexture, TextureUsages,
-};
-use std::{
-    num::NonZeroU32,
-    panic::Location,
-    sync::{atomic::AtomicUsize, Arc},
+    GraphDataHandle, GraphDataTag, Handedness, Material, MaterialTag, MipmapCount, MipmapSource, ObjectChange,
+    Skeleton, SkeletonHandle, Texture2DTag, TextureCubeHandle, TextureCubeTag, TextureFormat, TextureFromTexture,
+    TextureUsages,
 };
 use wgpu::{
     util::DeviceExt, CommandBuffer, CommandEncoderDescriptor, Device, DownlevelCapabilities, Extent3d, Features,
@@ -30,6 +14,21 @@ use wgpu::{
 };
 use wgpu_profiler::GpuProfiler;
 
+use crate::{
+    graph::{GraphTextureStore, ReadyData},
+    instruction::{InstructionKind, InstructionStreamPair},
+    managers::{
+        CameraManager, DirectionalLightManager, GraphStorage, HandleAllocator, InternalTexture, MaterialManager,
+        MeshManager, ObjectManager, SkeletonManager, TextureManager,
+    },
+    types::{
+        Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, MaterialHandle, Mesh, MeshHandle,
+        Object, ObjectHandle, Texture, Texture2DHandle,
+    },
+    util::{math::round_up, mipmap::MipmapGenerator, scatter_copy::ScatterCopy},
+    ExtendedAdapterInfo, InstanceAdapterDevice, RendererInitializationError, RendererProfile,
+};
+
 pub mod error;
 mod ready;
 mod setup;
@@ -37,7 +36,7 @@ mod setup;
 /// Core struct which contains the renderer world. Primary way to interact with
 /// the world.
 pub struct Renderer {
-    instructions: InstructionStreamPair,
+    pub(crate) instructions: InstructionStreamPair,
 
     /// The rendering profile used.
     pub profile: RendererProfile,
@@ -57,13 +56,28 @@ pub struct Renderer {
     /// Handedness of all parts of this renderer.
     pub handedness: Handedness,
 
-    /// Identifier allocator.
-    current_ident: AtomicUsize,
+    /// Allocators for resource handles
+    resource_handle_allocators: HandleAllocators,
     /// All the lockable data
     pub data_core: Mutex<RendererDataCore>,
 
     /// Tool which generates mipmaps from a texture.
     pub mipmap_generator: MipmapGenerator,
+    /// Tool which allows scatter uploads to happen.
+    pub scatter: ScatterCopy,
+}
+
+/// Handle allocators
+#[derive(Default)]
+struct HandleAllocators {
+    pub mesh: HandleAllocator<Mesh>,
+    pub skeleton: HandleAllocator<Skeleton>,
+    pub d2_texture: HandleAllocator<Texture2DTag>,
+    pub d2c_texture: HandleAllocator<TextureCubeTag>,
+    pub material: HandleAllocator<MaterialTag>,
+    pub object: HandleAllocator<Object>,
+    pub directional_light: HandleAllocator<DirectionalLight>,
+    pub graph_storage: HandleAllocator<GraphDataTag>,
 }
 
 /// All the mutex protected data within the renderer
@@ -73,9 +87,9 @@ pub struct RendererDataCore {
     /// Manages all vertex and index data.
     pub mesh_manager: MeshManager,
     /// Manages all 2D textures, including bindless bind group.
-    pub d2_texture_manager: TextureManager,
+    pub d2_texture_manager: TextureManager<Texture2DTag>,
     /// Manages all Cube textures, including bindless bind groups.
-    pub d2c_texture_manager: TextureManager,
+    pub d2c_texture_manager: TextureManager<TextureCubeTag>,
     /// Manages all materials, including material bind groups when CpuDriven.
     pub material_manager: MaterialManager,
     /// Manages all objects.
@@ -84,9 +98,11 @@ pub struct RendererDataCore {
     pub directional_light_manager: DirectionalLightManager,
     /// Manages skeletons, and their owned portion of the MeshManager's buffers
     pub skeleton_manager: SkeletonManager,
+    /// Managed long term storage of data for the graph and it's routines
+    pub graph_storage: GraphStorage,
 
     /// Stores gpu timing and debug scopes.
-    pub profiler: GpuProfiler,
+    pub profiler: Mutex<GpuProfiler>,
 
     /// Stores a cache of render targets between graph invocations.
     pub(crate) graph_texture_store: GraphTextureStore,
@@ -114,8 +130,8 @@ impl Renderer {
     /// The handle will keep the mesh alive. All objects created will also keep
     /// the mesh alive.
     #[track_caller]
-    pub fn add_mesh(&self, mesh: Mesh) -> MeshHandle {
-        let handle = MeshManager::allocate(&self.current_ident);
+    pub fn add_mesh(self: &Arc<Self>, mesh: Mesh) -> MeshHandle {
+        let handle = self.resource_handle_allocators.mesh.allocate(self);
 
         self.instructions.push(
             InstructionKind::AddMesh {
@@ -135,8 +151,8 @@ impl Renderer {
     /// keep the skeleton alive. The skeleton will also keep the mesh it
     /// references alive.
     #[track_caller]
-    pub fn add_skeleton(&self, skeleton: Skeleton) -> SkeletonHandle {
-        let handle = SkeletonManager::allocate(&self.current_ident);
+    pub fn add_skeleton(self: &Arc<Self>, skeleton: Skeleton) -> SkeletonHandle {
+        let handle = self.resource_handle_allocators.skeleton.allocate(self);
         self.instructions.push(
             InstructionKind::AddSkeleton {
                 handle: handle.clone(),
@@ -152,15 +168,16 @@ impl Renderer {
     /// The handle will keep the texture alive. All materials created with this
     /// texture will also keep the texture alive.
     #[track_caller]
-    pub fn add_texture_2d(&self, texture: Texture) -> TextureHandle {
+    pub fn add_texture_2d(self: &Arc<Self>, texture: Texture) -> Texture2DHandle {
         profiling::scope!("Add Texture 2D");
 
         Self::validation_texture_format(texture.format);
 
-        let handle = TextureManager::allocate(&self.current_ident);
+        let handle = self.resource_handle_allocators.d2_texture.allocate(self);
+        let (block_x, block_y) = texture.format.describe().block_dimensions;
         let size = Extent3d {
-            width: texture.size.x,
-            height: texture.size.y,
+            width: round_up(texture.size.x, block_x as u32),
+            height: round_up(texture.size.y, block_y as u32),
             depth_or_array_layers: 1,
         };
 
@@ -224,13 +241,12 @@ impl Renderer {
 
         let view = tex.create_view(&TextureViewDescriptor::default());
         self.instructions.push(
-            InstructionKind::AddTexture {
+            InstructionKind::AddTexture2D {
                 handle: handle.clone(),
                 desc,
                 texture: tex,
                 view,
                 buffer,
-                cube: false,
             },
             *Location::caller(),
         );
@@ -243,18 +259,19 @@ impl Renderer {
     /// The handle will keep the texture alive. All materials created with this
     /// texture will also keep the texture alive.
     #[track_caller]
-    pub fn add_texture_2d_from_texture(&self, texture: TextureFromTexture) -> TextureHandle {
+    pub fn add_texture_2d_from_texture(self: &Arc<Self>, texture: TextureFromTexture) -> Texture2DHandle {
         profiling::scope!("Add Texture 2D From Texture");
 
         let mut encoder = self.device.create_command_encoder(&CommandEncoderDescriptor::default());
 
-        let handle = TextureManager::allocate(&self.current_ident);
+        let handle = self.resource_handle_allocators.d2_texture.allocate(self);
 
         let data_core = self.data_core.lock();
 
         let InternalTexture {
             texture: old_texture,
             desc: old_texture_desc,
+            ..
         } = data_core.d2_texture_manager.get_internal(texture.src.get_raw());
 
         let new_size = old_texture_desc.mip_level_size(texture.start_mip).unwrap();
@@ -295,13 +312,12 @@ impl Renderer {
             );
         }
         self.instructions.push(
-            InstructionKind::AddTexture {
+            InstructionKind::AddTexture2D {
                 handle: handle.clone(),
                 texture: tex,
                 desc,
                 view,
                 buffer: Some(encoder.finish()),
-                cube: false,
             },
             *Location::caller(),
         );
@@ -313,12 +329,12 @@ impl Renderer {
     ///
     /// The handle will keep the texture alive.
     #[track_caller]
-    pub fn add_texture_cube(&self, texture: Texture) -> TextureHandle {
+    pub fn add_texture_cube(self: &Arc<Self>, texture: Texture) -> TextureCubeHandle {
         profiling::scope!("Add Texture Cube");
 
         Self::validation_texture_format(texture.format);
 
-        let handle = TextureManager::allocate(&self.current_ident);
+        let handle = self.resource_handle_allocators.d2c_texture.allocate(self);
         let size = Extent3d {
             width: texture.size.x,
             height: texture.size.y,
@@ -347,13 +363,12 @@ impl Renderer {
             ..TextureViewDescriptor::default()
         });
         self.instructions.push(
-            InstructionKind::AddTexture {
+            InstructionKind::AddTextureCube {
                 handle: handle.clone(),
                 texture: tex,
                 desc,
                 view,
                 buffer: None,
-                cube: true,
             },
             *Location::caller(),
         );
@@ -384,13 +399,13 @@ impl Renderer {
     ///
     /// The material will keep the inside textures alive.
     #[track_caller]
-    pub fn add_material<M: Material>(&self, material: M) -> MaterialHandle {
-        let handle = MaterialManager::allocate(&self.current_ident);
+    pub fn add_material<M: Material>(self: &Arc<Self>, material: M) -> MaterialHandle {
+        let handle = self.resource_handle_allocators.material.allocate(self);
         self.instructions.push(
             InstructionKind::AddMaterial {
                 handle: handle.clone(),
                 fill_invoke: Box::new(move |material_manager, device, profile, d2_manager, mat_handle| {
-                    material_manager.fill(device, profile, d2_manager, mat_handle, material)
+                    material_manager.add(device, profile, d2_manager, mat_handle, material)
                 }),
             },
             *Location::caller(),
@@ -404,11 +419,9 @@ impl Renderer {
         self.instructions.push(
             InstructionKind::ChangeMaterial {
                 handle: handle.clone(),
-                change_invoke: Box::new(
-                    move |material_manager, device, profile, d2_manager, object_manager, mat_handle| {
-                        material_manager.update(device, profile, d2_manager, object_manager, mat_handle, material)
-                    },
-                ),
+                change_invoke: Box::new(move |material_manager, device, d2_manager, mat_handle| {
+                    material_manager.update(device, d2_manager, mat_handle, material)
+                }),
             },
             *Location::caller(),
         )
@@ -421,8 +434,8 @@ impl Renderer {
     ///
     /// The object will keep all materials, textures, and meshes alive.
     #[track_caller]
-    pub fn add_object(&self, object: Object) -> ObjectHandle {
-        let handle = ObjectManager::allocate(&self.current_ident);
+    pub fn add_object(self: &Arc<Self>, object: Object) -> ObjectHandle {
+        let handle = self.resource_handle_allocators.object.allocate(self);
         self.instructions.push(
             InstructionKind::AddObject {
                 handle: handle.clone(),
@@ -438,8 +451,8 @@ impl Renderer {
     /// applied to the duplicated object, and the same mesh, material and
     /// transform as the original object will be used otherwise.
     #[track_caller]
-    pub fn duplicate_object(&self, object_handle: &ObjectHandle, change: ObjectChange) -> ObjectHandle {
-        let dst_handle = ObjectManager::allocate(&self.current_ident);
+    pub fn duplicate_object(self: &Arc<Self>, object_handle: &ObjectHandle, change: ObjectChange) -> ObjectHandle {
+        let dst_handle = self.resource_handle_allocators.object.allocate(self);
         self.instructions.push(
             InstructionKind::DuplicateObject {
                 src_handle: object_handle.clone(),
@@ -507,8 +520,8 @@ impl Renderer {
     ///
     /// The handle will keep the light alive.
     #[track_caller]
-    pub fn add_directional_light(&self, light: DirectionalLight) -> DirectionalLightHandle {
-        let handle = DirectionalLightManager::allocate(&self.current_ident);
+    pub fn add_directional_light(self: &Arc<Self>, light: DirectionalLight) -> DirectionalLightHandle {
+        let handle = self.resource_handle_allocators.directional_light.allocate(self);
 
         self.instructions.push(
             InstructionKind::AddDirectionalLight {
@@ -531,6 +544,22 @@ impl Renderer {
             },
             *Location::caller(),
         )
+    }
+
+    /// Adds a piece of data for long term storage and convienient use in the RenderGraph
+    ///
+    /// The handle will keep the data alive.
+    #[track_caller]
+    pub fn add_graph_data<T: Send + 'static>(self: &Arc<Renderer>, data: T) -> GraphDataHandle<T> {
+        let handle = self.resource_handle_allocators.graph_storage.allocate(self);
+        let handle2 = handle.clone();
+        self.instructions.push(
+            InstructionKind::AddGraphData {
+                add_invoke: Box::new(move |storage| storage.add(&handle2, data)),
+            },
+            *Location::caller(),
+        );
+        GraphDataHandle(handle, PhantomData)
     }
 
     /// Sets the aspect ratio of the camera. This should correspond with the

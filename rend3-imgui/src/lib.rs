@@ -4,7 +4,7 @@
 
 use imgui_wgpu::RendererConfig;
 use rend3::{
-    graph::{RenderGraph, RenderPassTarget, RenderPassTargets, RenderTargetHandle},
+    graph::{NodeResourceUsage, RenderGraph, RenderPassTarget, RenderPassTargets, RenderTargetHandle},
     types::{Color, TextureFormat},
     Renderer,
 };
@@ -45,7 +45,7 @@ impl ImguiRenderRoutine {
     ) {
         let mut builder = graph.add_node("imgui");
 
-        let output_handle = builder.add_render_target_output(output);
+        let output_handle = builder.add_render_target(output, NodeResourceUsage::InputOutput);
 
         let rpass_handle = builder.add_renderpass(RenderPassTargets {
             targets: vec![RenderPassTarget {
@@ -56,14 +56,11 @@ impl ImguiRenderRoutine {
             depth_stencil: None,
         });
 
-        let pt_handle = builder.passthrough_ref_mut(self);
+        builder.build(move |mut ctx| {
+            let rpass = ctx.encoder_or_pass.take_rpass(rpass_handle);
 
-        builder.build(move |pt, renderer, encoder_or_pass, _temps, _ready, _graph_data| {
-            let this = pt.get_mut(pt_handle);
-            let rpass = encoder_or_pass.get_rpass(rpass_handle);
-
-            this.renderer
-                .render(draw_data, &renderer.queue, &renderer.device, rpass)
+            self.renderer
+                .render(draw_data, &ctx.renderer.queue, &ctx.renderer.device, rpass)
                 .unwrap();
         })
     }

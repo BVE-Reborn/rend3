@@ -5,7 +5,7 @@ version = "0.3.0"
 authors = ["The rend3 Developers"]
 edition = "2021"
 publish = false
-rust-version = "1.57"
+rust-version = "1.65"
 
 [[bin]]
 name = "cube-no-framework"
@@ -15,9 +15,9 @@ path = "src/main.rs"
 
 [dependencies]
 # logging
-env_logger = { version = "0.9", default-features = false, features = ["termcolor", "atty"] }
+env_logger = { version = "0.10", default-features = false, features = ["auto-color", "humantime"] }
 # Linear algebra library
-glam = "0.21.2"
+glam = "0.22"
 # Renderer core
 rend3 = { version = "^0.3.0", path = "../../rend3" }
 # Programmable render list that dictates how the scene renders
@@ -25,12 +25,12 @@ rend3-routine = { version = "^0.3.0", path = "../../rend3-routine" }
 # Provides `block_on` to wait for futures from sync code
 pollster = "0.2"
 # windowing
-winit = "0.26"
+winit = "0.27"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_log = "0.2"
 console_error_panic_hook = "0.1"
 js-sys = "0.3"
 web-sys = "0.3"
-wasm-bindgen = "=0.2.81"
+wasm-bindgen = "=0.2.83"
 wasm-bindgen-futures = "0.4"

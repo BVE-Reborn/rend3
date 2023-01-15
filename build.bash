@@ -41,6 +41,5 @@ case $1 in
         echo "Subcommands:"
         echo "help                         This message."
         echo "web-bin [release] <BINARY>   Builds BINARY as wasm, and runs wasm-bindgen on the result."
-        echo "shaders                      Calls glslc to build all glsl to spirv, and calls naga to create wgsl from it."
         echo "serve                        Serve a web server from target/generated using simple-http-server."
 esac

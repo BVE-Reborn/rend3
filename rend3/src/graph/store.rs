@@ -1,14 +1,10 @@
-use std::{any::Any, cell::RefCell, marker::PhantomData};
+use std::{cell::RefCell, marker::PhantomData};
 
 use wgpu::TextureView;
 
 use crate::{
     graph::{
-        DeclaredDependency, GraphResource, RenderTargetHandle, RpassTemporaryPool, ShadowTarget, ShadowTargetHandle,
-    },
-    managers::{
-        CameraManager, DirectionalLightManager, MaterialManager, MeshManager, ObjectManager, ShadowCoordinates,
-        SkeletonManager, TextureManager,
+        DataContents, DeclaredDependency, GraphSubResource, RenderTargetHandle, RpassTemporaryPool, TextureRegion,
     },
     util::typedefs::FastHashMap,
 };
@@ -46,52 +42,26 @@ impl<T> PartialEq for DataHandle<T> {
 ///
 /// This is how you turn [DeclaredDependency] into actual wgpu resources.
 pub struct RenderGraphDataStore<'a> {
-    pub(super) texture_mapping: &'a FastHashMap<usize, TextureView>,
-    pub(super) shadow_coordinates: &'a [ShadowCoordinates],
-    pub(super) shadow_views: &'a [TextureView],
-    pub(super) data: &'a [Box<dyn Any>], // Any is RefCell<Option<T>> where T is the stored data
-    pub(super) output: Option<&'a TextureView>,
-
-    pub camera_manager: &'a CameraManager,
-    pub directional_light_manager: &'a DirectionalLightManager,
-    pub material_manager: &'a MaterialManager,
-    pub mesh_manager: &'a MeshManager,
-    pub skeleton_manager: &'a SkeletonManager,
-    pub object_manager: &'a ObjectManager,
-    pub d2_texture_manager: &'a TextureManager,
-    pub d2c_texture_manager: &'a TextureManager,
+    pub(super) texture_mapping: &'a FastHashMap<TextureRegion, TextureView>,
+    pub(super) external_texture_mapping: &'a FastHashMap<TextureRegion, TextureView>,
+    pub(super) data: &'a [DataContents], // Any is RefCell<Option<T>> where T is the stored data
 }
 
 impl<'a> RenderGraphDataStore<'a> {
     /// Get a rendertarget from the handle to one.
     pub fn get_render_target(&self, dep: DeclaredDependency<RenderTargetHandle>) -> &'a TextureView {
         match dep.handle.resource {
-            GraphResource::Texture(name) => self
+            GraphSubResource::Texture(name) => self
                 .texture_mapping
                 .get(&name)
                 .expect("internal rendergraph error: failed to get named texture"),
-            GraphResource::OutputTexture => self
-                .output
-                .expect("internal rendergraph error: tried to get unacquired surface image"),
+            GraphSubResource::ImportedTexture(name) => self
+                .external_texture_mapping
+                .get(&name)
+                .expect("internal rendergraph error: failed to get named texture"),
             r => {
                 panic!("internal rendergraph error: tried to get a {:?} as a render target", r)
             }
-        }
-    }
-
-    /// Get a shadow description from a handle to one.
-    pub fn get_shadow(&self, handle: DeclaredDependency<ShadowTargetHandle>) -> ShadowTarget<'_> {
-        let coords = self
-            .shadow_coordinates
-            .get(handle.handle.idx)
-            .expect("internal rendergraph error: failed to get shadow mapping");
-        ShadowTarget {
-            view: self
-                .shadow_views
-                .get(coords.layer)
-                .expect("internal rendergraph error: failed to get shadow layer"),
-            offset: coords.offset,
-            size: coords.size,
         }
     }
 
@@ -105,6 +75,7 @@ impl<'a> RenderGraphDataStore<'a> {
             .data
             .get(dep.handle.idx)
             .expect("internal rendergraph error: failed to get buffer")
+            .inner
             .downcast_ref::<RefCell<Option<T>>>()
             .expect("internal rendergraph error: downcasting failed")
             .try_borrow_mut()
@@ -122,6 +93,7 @@ impl<'a> RenderGraphDataStore<'a> {
             .data
             .get(dep.handle.idx)
             .expect("internal rendergraph error: failed to get buffer")
+            .inner
             .downcast_ref::<RefCell<Option<T>>>()
             .expect("internal rendergraph error: downcasting failed")
             .try_borrow()

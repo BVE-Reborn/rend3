@@ -1,6 +1,6 @@
 use glam::Vec4;
 use rend3::graph::{
-    DepthHandle, RenderGraph, RenderPassDepthTarget, RenderPassTarget, RenderPassTargets, RenderTargetHandle,
+    NodeResourceUsage, RenderGraph, RenderPassDepthTarget, RenderPassTarget, RenderPassTargets, RenderTargetHandle,
 };
 
 /// Uses the given targets to create a node which merely sets the clear color to what we want.
@@ -17,9 +17,9 @@ pub fn add_clear_to_graph(
 ) {
     let mut builder = graph.add_node("Clear");
 
-    let hdr_color_handle = builder.add_render_target_output(color);
-    let hdr_resolve = builder.add_optional_render_target_output(resolve);
-    let hdr_depth_handle = builder.add_render_target_output(depth);
+    let hdr_color_handle = builder.add_render_target(color, NodeResourceUsage::Output);
+    let hdr_resolve = builder.add_optional_render_target(resolve, NodeResourceUsage::Output);
+    let hdr_depth_handle = builder.add_render_target(depth, NodeResourceUsage::Output);
 
     let _rpass_handle = builder.add_renderpass(RenderPassTargets {
         targets: vec![RenderPassTarget {
@@ -33,11 +33,11 @@ pub fn add_clear_to_graph(
             resolve: hdr_resolve,
         }],
         depth_stencil: Some(RenderPassDepthTarget {
-            target: DepthHandle::RenderTarget(hdr_depth_handle),
+            target: hdr_depth_handle,
             depth_clear: Some(depth_clear),
             stencil_clear: None,
         }),
     });
 
-    builder.build(|_, _, _, _, _, _| ())
+    builder.build(|_| ())
 }

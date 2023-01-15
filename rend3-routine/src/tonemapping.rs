@@ -12,7 +12,7 @@
 use std::borrow::Cow;
 
 use rend3::{
-    graph::{DataHandle, RenderGraph, RenderPassTarget, RenderPassTargets, RenderTargetHandle},
+    graph::{DataHandle, NodeResourceUsage, RenderGraph, RenderPassTarget, RenderPassTargets, RenderTargetHandle},
     util::bind_merge::{BindGroupBuilder, BindGroupLayoutBuilder},
     Renderer, ShaderConfig, ShaderPreProcessor,
 };
@@ -36,7 +36,7 @@ fn create_pipeline(
     let module = device.create_shader_module(ShaderModuleDescriptor {
         label: Some("tonemapping"),
         source: ShaderSource::Wgsl(Cow::Owned(
-            spp.render_shader("rend3-routine/blit.wgsl", &ShaderConfig::default())
+            spp.render_shader("rend3-routine/blit.wgsl", &ShaderConfig::default(), None)
                 .unwrap(),
         )),
     });
@@ -126,8 +126,8 @@ impl TonemappingRoutine {
     ) {
         let mut builder = graph.add_node("Tonemapping");
 
-        let input_handle = builder.add_render_target_input(src);
-        let output_handle = builder.add_render_target_output(dst);
+        let input_handle = builder.add_render_target(src, NodeResourceUsage::Input);
+        let output_handle = builder.add_render_target(dst, NodeResourceUsage::Output);
 
         let rpass_handle = builder.add_renderpass(RenderPassTargets {
             targets: vec![RenderPassTarget {
@@ -138,25 +138,24 @@ impl TonemappingRoutine {
             depth_stencil: None,
         });
 
-        let forward_uniform_handle = builder.add_data_input(forward_uniform_bg);
+        let forward_uniform_handle = builder.add_data(forward_uniform_bg, NodeResourceUsage::Input);
 
-        let pt_handle = builder.passthrough_ref(self);
-
-        builder.build(move |pt, renderer, encoder_or_pass, temps, _ready, graph_data| {
-            let this = pt.get(pt_handle);
-            let rpass = encoder_or_pass.get_rpass(rpass_handle);
-            let forward_uniform_bg = graph_data.get_data(temps, forward_uniform_handle).unwrap();
-            let hdr_color = graph_data.get_render_target(input_handle);
+        builder.build(move |mut ctx| {
+            let rpass = ctx.encoder_or_pass.take_rpass(rpass_handle);
+            let forward_uniform_bg = ctx.graph_data.get_data(ctx.temps, forward_uniform_handle).unwrap();
+            let hdr_color = ctx.graph_data.get_render_target(input_handle);
 
             profiling::scope!("tonemapping");
 
-            let blit_src_bg = temps.add(BindGroupBuilder::new().append_texture_view(hdr_color).build(
-                &renderer.device,
-                Some("blit src bg"),
-                &this.bgl,
-            ));
+            let blit_src_bg = ctx
+                .temps
+                .add(BindGroupBuilder::new().append_texture_view(hdr_color).build(
+                    &ctx.renderer.device,
+                    Some("blit src bg"),
+                    &self.bgl,
+                ));
 
-            rpass.set_pipeline(&this.pipeline);
+            rpass.set_pipeline(&self.pipeline);
             rpass.set_bind_group(0, forward_uniform_bg, &[]);
             rpass.set_bind_group(1, blit_src_bg, &[]);
             rpass.draw(0..3, 0..1);

@@ -1,394 +1,193 @@
+use encase::{ArrayLength, ShaderType};
+use glam::{Mat4, UVec2, Vec2, Vec3};
+use rend3_types::{DirectionalLightChange, RawDirectionalLightHandle};
+use wgpu::{
+    BindingType, BufferBindingType, BufferUsages, Device, Extent3d, ShaderStages, TextureDescriptor, TextureDimension,
+    TextureUsages, TextureView, TextureViewDescriptor,
+};
+
 use crate::{
     managers::CameraManager,
-    types::{Camera, CameraProjection, DirectionalLight, DirectionalLightHandle},
+    types::{DirectionalLight, DirectionalLightHandle},
     util::{
         bind_merge::{BindGroupBuilder, BindGroupLayoutBuilder},
         buffer::WrappedPotBuffer,
-        registry::ResourceRegistry,
-        typedefs::FastHashMap,
     },
-    INTERNAL_SHADOW_DEPTH_FORMAT, SHADOW_DIMENSIONS,
+    Renderer, INTERNAL_SHADOW_DEPTH_FORMAT,
 };
-use arrayvec::ArrayVec;
-use glam::{Mat4, UVec2, Vec2, Vec3, Vec3A};
-use rend3_types::{DirectionalLightChange, Handedness, RawDirectionalLightHandle};
-use std::{
-    mem::{self, size_of},
-    num::{NonZeroU32, NonZeroU64},
-    sync::atomic::{AtomicUsize, Ordering},
-};
-use wgpu::{
-    BindGroup, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, Buffer,
-    BufferBindingType, BufferUsages, Device, Extent3d, Queue, ShaderStages, TextureAspect, TextureDescriptor,
-    TextureDimension, TextureSampleType, TextureUsages, TextureView, TextureViewDescriptor, TextureViewDimension,
-};
+
+mod shadow_alloc;
+mod shadow_camera;
+
+pub use shadow_alloc::ShadowMap;
+
+const MINIMUM_SHADOW_MAP_SIZE: UVec2 = UVec2::splat(32);
 
 /// Internal representation of a directional light.
 pub struct InternalDirectionalLight {
     pub inner: DirectionalLight,
 }
 
-#[derive(Debug, Copy, Clone)]
-#[repr(C, align(16))]
-struct ShaderDirectionalLightBufferHeader {
-    total_lights: u32,
+#[derive(Debug, Clone, ShaderType)]
+struct ShaderDirectionalLightBuffer {
+    count: ArrayLength,
+    #[size(runtime)]
+    array: Vec<ShaderDirectionalLight>,
 }
 
-unsafe impl bytemuck::Zeroable for ShaderDirectionalLightBufferHeader {}
-unsafe impl bytemuck::Pod for ShaderDirectionalLightBufferHeader {}
-
-#[derive(Debug, Copy, Clone)]
-#[repr(C, align(16))]
+#[derive(Debug, Copy, Clone, ShaderType)]
 struct ShaderDirectionalLight {
+    /// View/Projection of directional light. Shadow rendering uses viewports
+    /// so this always outputs [-1, 1] no matter where in the atlast the shadow is.
     pub view_proj: Mat4,
-    pub color: Vec3A,
-    pub direction: Vec3A,
-    pub offset: Vec2,
-    pub size: f32,
+    /// Color/intensity of the light
+    pub color: Vec3,
+    /// Direction of the light
+    pub direction: Vec3,
+    /// 1 / resolution of whole shadow map
+    pub inv_resolution: Vec2,
+    /// [0, 1] offset of the shadow map in the atlas.
+    pub atlas_offset: Vec2,
+    /// [0, 1] size of the shadow map in the atlas.
+    pub atlas_size: Vec2,
 }
 
-unsafe impl bytemuck::Zeroable for ShaderDirectionalLight {}
-unsafe impl bytemuck::Pod for ShaderDirectionalLight {}
+#[derive(Debug, Clone)]
+pub struct ShadowDesc {
+    pub map: ShadowMap,
+    pub camera: CameraManager,
+}
 
 /// Manages directional lights and their associated shadow maps.
 pub struct DirectionalLightManager {
-    buffer: WrappedPotBuffer,
+    data: Vec<Option<InternalDirectionalLight>>,
+    data_buffer: WrappedPotBuffer<ShaderDirectionalLightBuffer>,
 
-    view: TextureView,
-    layer_views: Vec<TextureView>,
-    coords: Vec<ShadowCoordinates>,
-    extent: Extent3d,
-
-    bgl: BindGroupLayout,
-    bg: BindGroup,
-
-    registry: ResourceRegistry<InternalDirectionalLight, DirectionalLight>,
+    texture_size: UVec2,
+    texture_view: TextureView,
 }
 impl DirectionalLightManager {
     pub fn new(device: &Device) -> Self {
         profiling::scope!("DirectionalLightManager::new");
 
-        let registry = ResourceRegistry::new();
-
-        let buffer = WrappedPotBuffer::new(
-            device,
-            0,
-            mem::size_of::<ShaderDirectionalLight>() as _,
-            BufferUsages::STORAGE,
-            Some("directional lights"),
-        );
-
-        let (view, layer_views) = create_shadow_texture(device, Extent3d::default());
-
-        let bgl = create_shadow_bgl(device);
-        let bg = create_shadow_bg(device, &bgl, &buffer, &view);
+        let texture_size = MINIMUM_SHADOW_MAP_SIZE;
+        let texture_view = create_shadow_texture(device, texture_size);
 
         Self {
-            buffer,
-            view,
-            layer_views,
-            coords: Vec::default(),
-            extent: Extent3d::default(),
-
-            bgl,
-            bg,
-
-            registry,
+            data: Vec::new(),
+            data_buffer: WrappedPotBuffer::new(device, BufferUsages::STORAGE, "shadow data buffer"),
+            texture_size,
+            texture_view,
         }
     }
 
-    pub fn allocate(counter: &AtomicUsize) -> DirectionalLightHandle {
-        let idx = counter.fetch_add(1, Ordering::Relaxed);
-
-        DirectionalLightHandle::new(idx)
+    pub fn add(&mut self, handle: &DirectionalLightHandle, light: DirectionalLight) {
+        if handle.idx >= self.data.len() {
+            self.data.resize_with(handle.idx + 1, || None);
+        }
+        self.data[handle.idx] = Some(InternalDirectionalLight { inner: light })
     }
 
-    pub fn fill(&mut self, handle: &DirectionalLightHandle, light: DirectionalLight) {
-        self.registry.insert(handle, InternalDirectionalLight { inner: light });
+    pub fn update(&mut self, handle: RawDirectionalLightHandle, change: DirectionalLightChange) {
+        self.data[handle.idx]
+            .as_mut()
+            .unwrap()
+            .inner
+            .update_from_changes(change);
     }
 
-    pub fn get_mut(&mut self, handle: RawDirectionalLightHandle) -> &mut InternalDirectionalLight {
-        self.registry.get_mut(handle)
+    pub fn remove(&mut self, handle: RawDirectionalLightHandle) {
+        self.data[handle.idx].take().unwrap();
     }
 
-    pub fn get_layer_views(&self) -> &[TextureView] {
-        &self.layer_views
-    }
+    pub fn ready(&mut self, renderer: &Renderer, user_camera: &CameraManager) -> (UVec2, Vec<ShadowDesc>) {
+        profiling::scope!("Directional Light Ready");
 
-    pub fn update_directional_light(&mut self, handle: RawDirectionalLightHandle, change: DirectionalLightChange) {
-        let internal = self.registry.get_mut(handle);
-        internal.inner.update_from_changes(change);
+        let shadow_maps: Vec<_> = self
+            .data
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, light)| Some((RawDirectionalLightHandle::new(idx), light.as_ref()?.inner.resolution)))
+            .collect();
+        let shadow_atlas = shadow_alloc::allocate_shadow_atlas(shadow_maps, renderer.limits.max_texture_dimension_2d);
+
+        let new_shadow_map_size = match shadow_atlas {
+            Some(ref m) => m.texture_dimensions.max(MINIMUM_SHADOW_MAP_SIZE),
+            None => MINIMUM_SHADOW_MAP_SIZE,
+        };
+        let new_shadow_map_size_f32 = new_shadow_map_size.as_vec2();
+
+        if new_shadow_map_size != self.texture_size {
+            self.texture_size = new_shadow_map_size;
+            self.texture_view = create_shadow_texture(&renderer.device, self.texture_size);
+        }
+
+        let coordinates = match shadow_atlas {
+            Some(m) => m.maps,
+            None => return (new_shadow_map_size, Vec::new()),
+        };
+
+        let shadow_data: Vec<_> = coordinates
+            .into_iter()
+            .map(|map| {
+                let camera = shadow_camera::shadow_camera(self.data[map.handle.idx].as_ref().unwrap(), user_camera);
+
+                ShadowDesc { map, camera }
+            })
+            .collect();
+
+        let buffer = ShaderDirectionalLightBuffer {
+            count: ArrayLength,
+            array: shadow_data
+                .iter()
+                .map(|desc| {
+                    let light = &self.data[desc.map.handle.idx].as_ref().unwrap().inner;
+
+                    ShaderDirectionalLight {
+                        view_proj: desc.camera.view_proj(),
+                        color: light.color * light.intensity,
+                        direction: light.direction,
+                        inv_resolution: 1.0 / new_shadow_map_size_f32,
+                        atlas_offset: desc.map.offset.as_vec2() / new_shadow_map_size_f32,
+                        atlas_size: desc.map.size as f32 / new_shadow_map_size_f32,
+                    }
+                })
+                .collect(),
+        };
+
+        self.data_buffer
+            .write_to_buffer(&renderer.device, &renderer.queue, &buffer);
+
+        (new_shadow_map_size, shadow_data)
     }
 
     pub fn add_to_bgl(bglb: &mut BindGroupLayoutBuilder) {
         bglb.append(
-            ShaderStages::FRAGMENT,
+            ShaderStages::VERTEX_FRAGMENT,
             BindingType::Buffer {
                 ty: BufferBindingType::Storage { read_only: true },
                 has_dynamic_offset: false,
-                min_binding_size: NonZeroU64::new(
-                    (mem::size_of::<ShaderDirectionalLightBufferHeader>() + mem::size_of::<ShaderDirectionalLight>())
-                        as _,
-                ),
-            },
-            None,
-        )
-        .append(
-            ShaderStages::FRAGMENT,
-            BindingType::Texture {
-                sample_type: TextureSampleType::Depth,
-                view_dimension: TextureViewDimension::D2Array,
-                multisampled: false,
+                min_binding_size: Some(ShaderDirectionalLightBuffer::min_size()),
             },
             None,
         );
     }
 
     pub fn add_to_bg<'a>(&'a self, bgb: &mut BindGroupBuilder<'a>) {
-        bgb.append_buffer(&self.buffer).append_texture_view(&self.view);
-    }
-
-    pub fn get_coords(&self) -> &[ShadowCoordinates] {
-        &self.coords
-    }
-
-    pub fn ready(&mut self, device: &Device, queue: &Queue, user_camera: &CameraManager) -> Vec<CameraManager> {
-        profiling::scope!("Directional Light Ready");
-
-        self.registry.remove_all_dead(|_, _, _, _| ());
-
-        let registered_count: usize = self.registry.values().len();
-        let recreate_view = registered_count != self.coords.len() && registered_count != 0;
-        if recreate_view {
-            let (extent, coords) = allocate_shadows(self.registry.values().map(|_i| SHADOW_DIMENSIONS as usize));
-            let (view, layer_views) = create_shadow_texture(device, extent);
-            self.view = view;
-            self.layer_views = layer_views;
-            self.coords = coords;
-            self.extent = extent;
-        }
-
-        let registry = &self.registry;
-
-        let size =
-            registered_count * size_of::<ShaderDirectionalLight>() + size_of::<ShaderDirectionalLightBufferHeader>();
-
-        let mut cameras = Vec::with_capacity(registered_count);
-
-        let mut buffer = Vec::with_capacity(size);
-        buffer.extend_from_slice(bytemuck::bytes_of(&ShaderDirectionalLightBufferHeader {
-            total_lights: registry.count() as u32,
-        }));
-        for (coords, light) in self.coords.iter().zip(registry.values()) {
-            let cs = shadow(light, user_camera);
-            for camera in &cs {
-                buffer.extend_from_slice(bytemuck::bytes_of(&ShaderDirectionalLight {
-                    view_proj: camera.view_proj(),
-                    color: (light.inner.color * light.inner.intensity).into(),
-                    direction: light.inner.direction.into(),
-                    offset: coords.offset.as_vec2() / Vec2::splat(self.extent.width as f32),
-                    size: coords.size as f32 / self.extent.width as f32,
-                }));
-            }
-            cameras.extend_from_slice(&cs);
-        }
-
-        let reallocated_buffer = self.buffer.write_to_buffer(device, queue, &buffer);
-
-        if reallocated_buffer || recreate_view {
-            self.bg = create_shadow_bg(device, &self.bgl, &self.buffer, &self.view);
-        }
-
-        cameras
-    }
-
-    pub fn values(&self) -> impl Iterator<Item = &InternalDirectionalLight> {
-        self.registry.values()
+        bgb.append_buffer(&self.data_buffer);
     }
 }
 
-/// The location of a shadow map in the shadow atlas.
-#[derive(Debug, Default, Clone, Copy)]
-pub struct ShadowCoordinates {
-    pub layer: usize,
-    pub offset: UVec2,
-    pub size: usize,
-}
-
-// TODO: re-enable cascades
-fn shadow(l: &InternalDirectionalLight, user_camera: &CameraManager) -> ArrayVec<CameraManager, 4> {
-    let mut cascades = ArrayVec::new();
-
-    let camera_location = user_camera.location();
-
-    let shadow_texel_size = l.inner.distance / SHADOW_DIMENSIONS as f32;
-
-    let look_at = match user_camera.handedness() {
-        Handedness::Left => Mat4::look_at_lh,
-        Handedness::Right => Mat4::look_at_rh,
-    };
-
-    let origin_view = look_at(Vec3::ZERO, l.inner.direction, Vec3::Y);
-    let camera_origin_view = origin_view.transform_point3(camera_location);
-
-    let offset = camera_origin_view.truncate() % shadow_texel_size;
-    let shadow_location = camera_origin_view - Vec3::from((offset, 0.0));
-
-    let inv_origin_view = origin_view.inverse();
-    let new_shadow_location = inv_origin_view.transform_point3(shadow_location);
-
-    cascades.push(CameraManager::new(
-        Camera {
-            projection: CameraProjection::Orthographic {
-                size: Vec3A::splat(l.inner.distance),
-            },
-            view: look_at(new_shadow_location, new_shadow_location + l.inner.direction, Vec3::Y),
-        },
-        user_camera.handedness(),
-        None,
-    ));
-
-    cascades
-}
-
-/*
-fn shadow_cascades(l: &InternalDirectionalLight, user_camera: &CameraManager) -> ArrayVec<CameraManager, 4> {
-    let mut cascades = ArrayVec::new();
-
-    let view = Mat4::look_at_lh(Vec3::ZERO, l.inner.direction, Vec3::Y);
-    let user_camera_proj = user_camera.proj();
-    let user_camera_inv_view_proj = user_camera.view_proj().inverse();
-    for window in l.inner.distances.windows(2) {
-        let start = window[0];
-        let end = window[1];
-
-        let start_projected = user_camera_proj.project_point3(Vec3::new(0.0, 0.0, start.max(0.1))).z;
-        let end_projected = user_camera_proj.project_point3(Vec3::new(0.0, 0.0, end)).z;
-
-        let frustum_points = [
-            Vec3::new(-1.0, -1.0, start_projected),
-            Vec3::new(1.0, -1.0, start_projected),
-            Vec3::new(-1.0, 1.0, start_projected),
-            Vec3::new(1.0, 1.0, start_projected),
-            Vec3::new(-1.0, -1.0, end_projected),
-            Vec3::new(1.0, -1.0, end_projected),
-            Vec3::new(-1.0, 1.0, end_projected),
-            Vec3::new(1.0, 1.0, end_projected),
-        ];
-
-        let mat = view * user_camera_inv_view_proj;
-
-        let (sview_min, sview_max) =
-            vec_min_max(IntoIterator::into_iter(frustum_points).map(|p| Vec3A::from(mat.project_point3(p))));
-        let (world_min, world_max) = vec_min_max(
-            IntoIterator::into_iter(frustum_points).map(|p| Vec3A::from(user_camera_inv_view_proj.project_point3(p))),
-        );
-
-        // TODO: intermediate bounding sphere
-        cascades.push(CameraManager::new(
-            Camera {
-                projection: CameraProjection::Orthographic {
-                    size: sview_max - sview_min,
-                    direction: l.inner.direction.into(),
-                },
-                location: ((world_min + world_max) * 0.5).into(),
-            },
-            None,
-        ));
-    }
-
-    cascades
-}
-*/
-
-#[allow(unused)]
-fn vec_min_max(iter: impl IntoIterator<Item = Vec3A>) -> (Vec3A, Vec3A) {
-    let mut iter = iter.into_iter();
-    let mut min = iter.next().unwrap();
-    let mut max = min;
-    for point in iter {
-        min = min.min(point);
-        max = max.max(point);
-    }
-
-    (min, max)
-}
-
-fn allocate_shadows(shadow_sizes: impl Iterator<Item = usize>) -> (Extent3d, Vec<ShadowCoordinates>) {
-    let mut sorted = shadow_sizes
-        .enumerate()
-        .map(|(id, size)| (id, size))
-        .collect::<Vec<_>>();
-    sorted.sort_unstable_by_key(|(_, size)| usize::MAX - size);
-
-    let mut shadow_coordinates = FastHashMap::with_capacity_and_hasher(sorted.len(), Default::default());
-    let mut sorted_iter = sorted.into_iter();
-    let (id, max_size) = sorted_iter.next().unwrap();
-    shadow_coordinates.insert(
-        id,
-        ShadowCoordinates {
-            layer: 0,
-            offset: UVec2::splat(0),
-            size: max_size,
-        },
-    );
-
-    let mut current_layer = 0usize;
-    let mut current_size = 0usize;
-    let mut current_count = 0usize;
-
-    for (id, size) in sorted_iter {
-        if size != current_size {
-            current_layer += 1;
-            current_size = size;
-            current_count = 0;
-        }
-
-        let maps_per_dim = max_size / current_size;
-        let total_maps_per_layer = maps_per_dim * maps_per_dim;
-
-        if current_count >= total_maps_per_layer {
-            current_layer += 1;
-            current_count = 0;
-        }
-
-        let offset = UVec2::new(
-            (current_count % maps_per_dim) as u32,
-            (current_count / maps_per_dim) as u32,
-        ) * current_size as u32;
-
-        shadow_coordinates.insert(
-            id,
-            ShadowCoordinates {
-                layer: current_layer,
-                offset,
-                size,
-            },
-        );
-    }
-
-    let mut shadow_coord_vec = vec![ShadowCoordinates::default(); shadow_coordinates.len()];
-
-    for (idx, value) in shadow_coordinates {
-        shadow_coord_vec[idx] = value;
-    }
-
-    (
-        Extent3d {
-            width: max_size as u32,
-            height: max_size as u32,
-            depth_or_array_layers: (current_layer + 1) as u32,
-        },
-        shadow_coord_vec,
-    )
-}
-
-fn create_shadow_texture(device: &Device, size: Extent3d) -> (TextureView, Vec<TextureView>) {
+fn create_shadow_texture(device: &Device, size: UVec2) -> TextureView {
     profiling::scope!("shadow texture creation");
 
     let texture = device.create_texture(&TextureDescriptor {
-        label: Some("shadow texture"),
-        size,
+        label: Some("rend3 shadow texture"),
+        size: Extent3d {
+            width: size.x,
+            height: size.y,
+            depth_or_array_layers: 1,
+        },
         mip_level_count: 1,
         sample_count: 1,
         dimension: TextureDimension::D2,
@@ -396,71 +195,8 @@ fn create_shadow_texture(device: &Device, size: Extent3d) -> (TextureView, Vec<T
         usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
     });
 
-    let primary_view = texture.create_view(&TextureViewDescriptor {
-        label: Some("shadow texture view"),
-        format: None,
-        dimension: Some(TextureViewDimension::D2Array),
-        aspect: TextureAspect::All,
-        base_mip_level: 0,
-        mip_level_count: None,
-        base_array_layer: 0,
-        array_layer_count: None,
-    });
-
-    let layer_views: Vec<_> = (0..size.depth_or_array_layers)
-        .map(|idx| {
-            texture.create_view(&TextureViewDescriptor {
-                label: Some(&format!("shadow texture layer {}", idx)),
-                format: None,
-                dimension: Some(TextureViewDimension::D2),
-                aspect: TextureAspect::All,
-                base_mip_level: 0,
-                mip_level_count: None,
-                base_array_layer: idx,
-                array_layer_count: NonZeroU32::new(1),
-            })
-        })
-        .collect();
-
-    (primary_view, layer_views)
-}
-
-fn create_shadow_bgl(device: &Device) -> BindGroupLayout {
-    profiling::scope!("shadow bgl creation");
-    device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-        label: Some("shadow bgl"),
-        entries: &[
-            BindGroupLayoutEntry {
-                binding: 0,
-                visibility: ShaderStages::FRAGMENT,
-                ty: BindingType::Buffer {
-                    ty: BufferBindingType::Storage { read_only: true },
-                    has_dynamic_offset: false,
-                    min_binding_size: NonZeroU64::new(
-                        (mem::size_of::<ShaderDirectionalLightBufferHeader>()
-                            + mem::size_of::<ShaderDirectionalLight>()) as _,
-                    ),
-                },
-                count: None,
-            },
-            BindGroupLayoutEntry {
-                binding: 1,
-                visibility: ShaderStages::FRAGMENT,
-                ty: BindingType::Texture {
-                    sample_type: TextureSampleType::Depth,
-                    view_dimension: TextureViewDimension::D2Array,
-                    multisampled: false,
-                },
-                count: None,
-            },
-        ],
+    texture.create_view(&TextureViewDescriptor {
+        label: Some("rend3 shadow texture view"),
+        ..TextureViewDescriptor::default()
     })
-}
-
-fn create_shadow_bg(device: &Device, bgl: &BindGroupLayout, buffer: &Buffer, view: &TextureView) -> BindGroup {
-    profiling::scope!("shadow bg creation");
-    BindGroupBuilder::new()
-        .append_buffer(buffer)
-        .append_texture_view(view)
-        .build(device, Some("shadow bg"), bgl)
 }

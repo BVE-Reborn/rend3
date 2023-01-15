@@ -77,10 +77,10 @@ fn main() {
     // SAFETY: this surface _must_ not be used after the `window` dies. Both the
     // event loop and the renderer are owned by the `run` closure passed to winit,
     // so rendering work will stop after the window dies.
-    let surface = Arc::new(unsafe { iad.instance.create_surface(&window) });
+    let surface = Arc::new(unsafe { iad.instance.create_surface(&window) }.unwrap());
     // Get the preferred format for the surface.
-    let formats = surface.get_supported_formats(&iad.adapter);
-    let preferred_format = formats[0];
+    let caps = surface.get_capabilities(&iad.adapter);
+    let preferred_format = caps.formats[0];
 
     // Configure the surface to be ready for rendering.
     rend3::configure_surface(
@@ -164,6 +164,7 @@ fn main() {
         // Direction will be normalized
         direction: glam::Vec3::new(-1.0, -4.0, 2.0),
         distance: 400.0,
+        resolution: 2048,
     });
 
     let mut resolution = glam::UVec2::new(window_size.width, window_size.height);
@@ -188,7 +189,7 @@ fn main() {
                 &renderer.device,
                 preferred_format,
                 glam::UVec2::new(resolution.x, resolution.y),
-                rend3::types::PresentMode::Mailbox,
+                rend3::types::PresentMode::Fifo,
             );
             // Tell the renderer about the new aspect ratio.
             renderer.set_aspect_ratio(resolution.x as f32 / resolution.y as f32);
@@ -196,15 +197,16 @@ fn main() {
         // Render!
         winit::event::Event::MainEventsCleared => {
             // Get a frame
-            let frame = rend3::util::output::OutputFrame::Surface {
-                surface: Arc::clone(&surface),
-            };
+            let frame = surface.get_current_texture().unwrap();
             // Ready up the renderer
             let (cmd_bufs, ready) = renderer.ready();
 
             // Build a rendergraph
             let mut graph = rend3::graph::RenderGraph::new();
 
+            // Import the surface texture into the render graph.
+            let frame_handle =
+                graph.add_imported_render_target(&frame, 0..1, rend3::graph::ViewportRect::from_size(resolution));
             // Add the default rendergraph without a skybox
             base_rendergraph.add_to_graph(
                 &mut graph,
@@ -212,6 +214,7 @@ fn main() {
                 &pbr_routine,
                 None,
                 &tonemapping_routine,
+                frame_handle,
                 resolution,
                 rend3::types::SampleCount::One,
                 glam::Vec4::ZERO,
@@ -219,7 +222,10 @@ fn main() {
             );
 
             // Dispatch a render using the built up rendergraph!
-            graph.execute(&renderer, frame, cmd_bufs, &ready);
+            graph.execute(&renderer, cmd_bufs, &ready);
+
+            // Present the frame
+            frame.present();
         }
         // Other events we don't care about
         _ => {}

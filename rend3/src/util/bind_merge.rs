@@ -5,7 +5,7 @@ use std::num::{NonZeroU32, NonZeroU64};
 
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
-    BindingResource, BindingType, Buffer, BufferBinding, Device, Sampler, ShaderStages, TextureView,
+    BindingResource, BindingType, Buffer, BufferBinding, BufferBindingType, Device, Sampler, ShaderStages, TextureView,
 };
 
 /// Builder for BindGroupLayouts.
@@ -28,6 +28,24 @@ impl BindGroupLayoutBuilder {
             count,
         });
         self
+    }
+
+    pub fn append_buffer(
+        &mut self,
+        visibility: ShaderStages,
+        ty: BufferBindingType,
+        has_dynamic_offset: bool,
+        min_binding_size: u64,
+    ) -> &mut Self {
+        self.append(
+            visibility,
+            BindingType::Buffer {
+                ty,
+                has_dynamic_offset,
+                min_binding_size: Some(NonZeroU64::new(min_binding_size).unwrap()),
+            },
+            None,
+        )
     }
 
     pub fn build(&self, device: &Device, label: Option<&str>) -> BindGroupLayout {

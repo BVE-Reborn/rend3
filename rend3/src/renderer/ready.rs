@@ -1,9 +1,10 @@
+use wgpu::{CommandBuffer, CommandEncoderDescriptor};
+
 use crate::{
     graph::ReadyData,
     instruction::{Instruction, InstructionKind},
     Renderer,
 };
-use wgpu::{CommandBuffer, CommandEncoderDescriptor};
 
 pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
     profiling::scope!("Renderer::ready");
@@ -30,47 +31,49 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
                     profiling::scope!("Add Mesh");
                     data_core
                         .profiler
+                        .try_lock()
+                        .unwrap()
                         .begin_scope("Add Mesh", &mut encoder, &renderer.device);
-                    data_core.mesh_manager.fill(
-                        &renderer.device,
-                        &renderer.queue,
-                        &mut encoder,
-                        &mut data_core.object_manager,
-                        &mut data_core.skeleton_manager,
-                        &handle,
-                        mesh,
-                    );
-                    data_core.profiler.end_scope(&mut encoder);
+                    data_core
+                        .mesh_manager
+                        .add(&renderer.device, &renderer.queue, &mut encoder, &handle, mesh);
+                    data_core.profiler.try_lock().unwrap().end_scope(&mut encoder);
                 }
                 InstructionKind::AddSkeleton { handle, skeleton } => {
                     profiling::scope!("Add Skeleton");
                     data_core
                         .profiler
+                        .try_lock()
+                        .unwrap()
                         .begin_scope("Add Skeleton", &mut encoder, &renderer.device);
-                    data_core.skeleton_manager.fill(
+                    data_core.skeleton_manager.add(
                         &renderer.device,
                         &mut encoder,
                         &mut data_core.mesh_manager,
-                        &mut data_core.object_manager,
                         &handle,
                         skeleton,
                     );
-                    data_core.profiler.end_scope(&mut encoder);
+                    data_core.profiler.try_lock().unwrap().end_scope(&mut encoder);
                 }
-                InstructionKind::AddTexture {
+                InstructionKind::AddTexture2D {
                     handle,
                     desc,
                     texture,
                     view,
                     buffer,
-                    cube,
                 } => {
                     cmd_bufs.extend(buffer);
-                    if cube {
-                        data_core.d2c_texture_manager.fill(&handle, desc, texture, view);
-                    } else {
-                        data_core.d2_texture_manager.fill(&handle, desc, texture, view);
-                    }
+                    data_core.d2_texture_manager.add(*handle, desc, texture, view);
+                }
+                InstructionKind::AddTextureCube {
+                    handle,
+                    desc,
+                    texture,
+                    view,
+                    buffer,
+                } => {
+                    cmd_bufs.extend(buffer);
+                    data_core.d2c_texture_manager.add(*handle, desc, texture, view);
                 }
                 InstructionKind::AddMaterial { handle, fill_invoke } => {
                     profiling::scope!("Add Material");
@@ -82,20 +85,22 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
                         &handle,
                     );
                 }
+                InstructionKind::AddGraphData { add_invoke } => {
+                    add_invoke(&mut data_core.graph_storage);
+                }
                 InstructionKind::ChangeMaterial { handle, change_invoke } => {
                     profiling::scope!("Change Material");
 
                     change_invoke(
                         &mut data_core.material_manager,
                         &renderer.device,
-                        renderer.profile,
                         &mut data_core.d2_texture_manager,
-                        &mut data_core.object_manager,
                         &handle,
-                    )
+                    );
                 }
                 InstructionKind::AddObject { handle, object } => {
-                    data_core.object_manager.fill(
+                    data_core.object_manager.add(
+                        &renderer.device,
                         &handle,
                         object,
                         &mut data_core.mesh_manager,
@@ -110,12 +115,10 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
                     data_core.skeleton_manager.set_joint_matrices(handle, joint_matrices);
                 }
                 InstructionKind::AddDirectionalLight { handle, light } => {
-                    data_core.directional_light_manager.fill(&handle, light);
+                    data_core.directional_light_manager.add(&handle, light);
                 }
                 InstructionKind::ChangeDirectionalLight { handle, change } => {
-                    data_core
-                        .directional_light_manager
-                        .update_directional_light(handle, change);
+                    data_core.directional_light_manager.update(handle, change);
                 }
                 InstructionKind::SetAspectRatio { ratio } => data_core.camera_manager.set_aspect_ratio(Some(ratio)),
                 InstructionKind::SetCameraData { data } => {
@@ -127,6 +130,7 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
                     change,
                 } => {
                     data_core.object_manager.duplicate_object(
+                        &renderer.device,
                         src_handle,
                         dst_handle,
                         change,
@@ -135,13 +139,47 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
                         &mut data_core.material_manager,
                     );
                 }
+                InstructionKind::DeleteMesh { handle } => {
+                    renderer.resource_handle_allocators.mesh.deallocate(handle);
+                    data_core.mesh_manager.remove(handle)
+                }
+                InstructionKind::DeleteSkeleton { handle } => {
+                    renderer.resource_handle_allocators.skeleton.deallocate(handle);
+                    data_core.skeleton_manager.remove(&mut data_core.mesh_manager, handle)
+                }
+                InstructionKind::DeleteTexture2D { handle } => {
+                    renderer.resource_handle_allocators.d2_texture.deallocate(handle);
+                    data_core.d2_texture_manager.remove(handle)
+                }
+                InstructionKind::DeleteTextureCube { handle } => {
+                    renderer.resource_handle_allocators.d2c_texture.deallocate(handle);
+                    data_core.d2c_texture_manager.remove(handle)
+                }
+                InstructionKind::DeleteMaterial { handle } => {
+                    renderer.resource_handle_allocators.material.deallocate(handle);
+                    data_core.material_manager.remove(handle)
+                }
+                InstructionKind::DeleteObject { handle } => {
+                    renderer.resource_handle_allocators.object.deallocate(handle);
+                    data_core.object_manager.remove(handle)
+                }
+                InstructionKind::DeleteDirectionalLight { handle } => {
+                    renderer.resource_handle_allocators.directional_light.deallocate(handle);
+                    data_core.directional_light_manager.remove(handle)
+                }
+                InstructionKind::DeleteGraphData { handle } => {
+                    renderer.resource_handle_allocators.graph_storage.deallocate(handle);
+                    data_core.graph_storage.remove(&handle);
+                }
             }
         }
     }
 
     // Do these in dependency order
     // Level 3
-    data_core.object_manager.ready(&mut data_core.material_manager);
+    data_core
+        .object_manager
+        .ready(&renderer.device, &mut encoder, &renderer.scatter);
 
     // Level 2
     let d2_texture = data_core.d2_texture_manager.ready(&renderer.device);
@@ -151,19 +189,17 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
     // the d2 texture manager, so it has to go first.
     data_core.material_manager.ready(
         &renderer.device,
-        &renderer.queue,
-        &mut data_core.object_manager,
+        &mut encoder,
+        &renderer.scatter,
+        renderer.profile,
         &data_core.d2_texture_manager,
     );
 
     // Level 0
     let d2c_texture = data_core.d2c_texture_manager.ready(&renderer.device);
-    let directional_light_cameras =
-        data_core
-            .directional_light_manager
-            .ready(&renderer.device, &renderer.queue, &data_core.camera_manager);
-    data_core.mesh_manager.ready();
-    data_core.skeleton_manager.ready(&mut data_core.mesh_manager);
+    let (shadow_target_size, shadows) = data_core
+        .directional_light_manager
+        .ready(renderer, &data_core.camera_manager);
 
     cmd_bufs.push(encoder.finish());
 
@@ -172,7 +208,8 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
         ReadyData {
             d2_texture,
             d2c_texture,
-            directional_light_cameras,
+            shadow_target_size,
+            shadows,
         },
     )
 }

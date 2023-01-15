@@ -23,9 +23,9 @@ mod tests {
         },
     };
     use naga::WithSpan;
-    use rend3::{RendererProfile, ShaderConfig, ShaderPreProcessor};
+    use rend3::{RendererProfile, ShaderConfig, ShaderPreProcessor, ShaderVertexBufferConfig};
 
-    use crate::shaders::Rend3RoutineShaderSources;
+    use crate::{pbr::PbrMaterial, shaders::Rend3RoutineShaderSources};
 
     fn print_err(error: &dyn Error) {
         eprint!("{}", error);
@@ -68,7 +68,8 @@ mod tests {
                 continue;
             }
 
-            let configs = if pp.get(&*shader).unwrap().contains("#if") {
+            let source = pp.get(shader).unwrap();
+            let configs = if source.contains("#if") {
                 &[
                     ShaderConfig {
                         profile: Some(RendererProfile::CpuDriven),
@@ -81,11 +82,19 @@ mod tests {
                 &[ShaderConfig { profile: None }][..]
             };
 
+            if source.contains("DO NOT VALIDATE") {
+                continue;
+            }
+
             for config in configs {
                 let serialized_config = serde_json::to_value(config).unwrap();
                 println!("Testing shader {shader} with config {serialized_config:?}");
 
-                let output = pp.render_shader(&shader, config);
+                let output = pp.render_shader(
+                    shader,
+                    config,
+                    Some(&ShaderVertexBufferConfig::from_material::<PbrMaterial>()),
+                );
 
                 assert!(output.is_ok(), "Expected preprocessing success, got {output:?}");
                 let output = output.unwrap_or_else(|e| panic!("Expected preprocessing success, got {e:?}"));
@@ -93,7 +102,7 @@ mod tests {
                 let sm = match naga::front::wgsl::parse_str(&output) {
                     Ok(m) => m,
                     Err(e) => {
-                        e.emit_to_stderr_with_path(&output, &shader);
+                        e.emit_to_stderr_with_path(&output, shader);
                         panic!();
                     }
                 };
@@ -104,7 +113,7 @@ mod tests {
                 match validator.validate(&sm) {
                     Ok(_) => {}
                     Err(err) => {
-                        emit_annotated_error(&err, &shader, &output);
+                        emit_annotated_error(&err, shader, &output);
                         print_err(&err);
                         panic!()
                     }

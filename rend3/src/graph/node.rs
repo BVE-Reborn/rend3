@@ -1,38 +1,55 @@
-use std::{cell::RefCell, sync::Arc};
+use std::{cell::RefCell, marker::PhantomData};
 
 use crate::{
     graph::{
-        DataHandle, GraphResource, PassthroughDataContainer, PassthroughDataRef, PassthroughDataRefMut, ReadyData,
-        RenderGraph, RenderGraphDataStore, RenderGraphEncoderOrPass, RenderPassHandle, RenderPassTargets,
-        RenderTargetHandle, RpassTemporaryPool, ShadowArrayHandle, ShadowTargetHandle,
+        DataHandle, GraphSubResource, ReadyData, RenderGraph, RenderGraphDataStore, RenderGraphEncoderOrPass,
+        RenderPassHandle, RenderPassTargets, RenderTargetHandle, RpassTemporaryPool,
     },
     util::typedefs::SsoString,
-    Renderer,
+    Renderer, RendererDataCore,
 };
 
 /// Wraps a handle proving you have declared it as a dependency.
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct DeclaredDependency<Handle> {
     pub(super) handle: Handle,
 }
 
-#[allow(clippy::type_complexity)]
+pub struct NodeExecutionContext<'a, 'pass, 'node: 'pass> {
+    /// Reference to the renderer the graph is runningon .
+    pub renderer: &'a Renderer,
+    /// Reference to the renderer data behind a lock.
+    pub data_core: &'pass RendererDataCore,
+    /// Either the asked-for renderpass or a command encoder.
+    pub encoder_or_pass: RenderGraphEncoderOrPass<'a, 'pass>,
+    /// Storage for any temporary data that needs to live as long
+    /// as the renderpass.
+    pub temps: &'pass RpassTemporaryPool<'pass>,
+    /// The result of calling ready on the renderer.
+    pub ready: &'pass ReadyData,
+    /// Store to get data from
+    pub graph_data: RenderGraphDataStore<'pass>,
+    pub _phantom: PhantomData<&'node ()>,
+}
+
 pub(super) struct RenderGraphNode<'node> {
-    pub inputs: Vec<GraphResource>,
-    pub outputs: Vec<GraphResource>,
+    pub inputs: Vec<GraphSubResource>,
+    pub outputs: Vec<GraphSubResource>,
+    pub references: Vec<GraphSubResource>,
     pub label: SsoString,
     pub rpass: Option<RenderPassTargets>,
-    pub passthrough: PassthroughDataContainer<'node>,
-    pub exec: Box<
-        dyn for<'b, 'pass> FnOnce(
-                &mut PassthroughDataContainer<'pass>,
-                &Arc<Renderer>,
-                RenderGraphEncoderOrPass<'b, 'pass>,
-                &'pass RpassTemporaryPool<'pass>,
-                &'pass ReadyData,
-                RenderGraphDataStore<'pass>,
-            ) + 'node,
-    >,
+    pub exec: Box<dyn for<'a, 'pass> FnOnce(NodeExecutionContext<'a, 'pass, 'node>) + 'node>,
+}
+
+pub enum NodeResourceUsage {
+    /// Doesn't access the resource at all, just need access to the resource.
+    Reference,
+    /// Only reads the resource.
+    Input,
+    /// Only writes to the resource
+    Output,
+    /// Reads and writes to the resource.
+    InputOutput,
 }
 
 /// Builder for a graph node.
@@ -41,34 +58,40 @@ pub(super) struct RenderGraphNode<'node> {
 pub struct RenderGraphNodeBuilder<'a, 'node> {
     pub(super) graph: &'a mut RenderGraph<'node>,
     pub(super) label: SsoString,
-    pub(super) inputs: Vec<GraphResource>,
-    pub(super) outputs: Vec<GraphResource>,
-    pub(super) passthrough: PassthroughDataContainer<'node>,
+    pub(super) inputs: Vec<GraphSubResource>,
+    pub(super) outputs: Vec<GraphSubResource>,
+    pub(super) references: Vec<GraphSubResource>,
     pub(super) rpass: Option<RenderPassTargets>,
 }
 impl<'a, 'node> RenderGraphNodeBuilder<'a, 'node> {
     /// Declares a rendertarget to be read from but not writen to.
-    pub fn add_render_target_input(&mut self, handle: RenderTargetHandle) -> DeclaredDependency<RenderTargetHandle> {
-        self.inputs.push(handle.resource);
+    pub fn add_render_target(
+        &mut self,
+        handle: RenderTargetHandle,
+        usage: NodeResourceUsage,
+    ) -> DeclaredDependency<RenderTargetHandle> {
+        match usage {
+            NodeResourceUsage::Reference => self.references.push(handle.resource),
+            NodeResourceUsage::Input => self.inputs.push(handle.resource),
+            NodeResourceUsage::Output => self.outputs.push(handle.resource),
+            NodeResourceUsage::InputOutput => {
+                self.inputs.push(handle.resource);
+                self.outputs.push(handle.resource)
+            }
+        }
         DeclaredDependency { handle }
     }
 
-    /// Declares a rendertarget to be read or written to.
-    pub fn add_render_target_output(&mut self, handle: RenderTargetHandle) -> DeclaredDependency<RenderTargetHandle> {
-        self.inputs.push(handle.resource);
-        self.outputs.push(handle.resource);
-        DeclaredDependency { handle }
-    }
-
-    /// Sugar over [add_render_target_output][arto] which makes it easy to
-    /// declare resolve textures, which are often Option<RenderTargetHandle>
+    /// Sugar over [add_render_target] which makes it easy to
+    /// declare optional textures.
     ///
-    /// [arto]: RenderGraphNodeBuilder::add_render_target_output
-    pub fn add_optional_render_target_output(
+    /// [add_render_target]: RenderGraphNodeBuilder::add_render_target
+    pub fn add_optional_render_target(
         &mut self,
         handle: Option<RenderTargetHandle>,
+        usage: NodeResourceUsage,
     ) -> Option<DeclaredDependency<RenderTargetHandle>> {
-        Some(self.add_render_target_output(handle?))
+        Some(self.add_render_target(handle?, usage))
     }
 
     /// Declares a renderpass that will be written to. Declaring a renderpass
@@ -84,45 +107,8 @@ impl<'a, 'node> RenderGraphNodeBuilder<'a, 'node> {
         }
     }
 
-    /// Declares use of the entire shadow atlas for reading.
-    pub fn add_shadow_array_input(&mut self) -> DeclaredDependency<ShadowArrayHandle> {
-        for i in &self.graph.shadows {
-            let resource = GraphResource::Shadow(*i);
-            self.inputs.push(resource);
-        }
-        DeclaredDependency {
-            handle: ShadowArrayHandle,
-        }
-    }
-
-    /// Declares use of a particular shadow map for both reading and writing.
-    pub fn add_shadow_output(&mut self, idx: usize) -> DeclaredDependency<ShadowTargetHandle> {
-        let resource = GraphResource::Shadow(idx);
-        self.graph.shadows.insert(idx);
-        self.inputs.push(resource);
-        self.outputs.push(resource);
-        DeclaredDependency {
-            handle: ShadowTargetHandle { idx },
-        }
-    }
-
     /// Declares use of a data handle for reading.
-    pub fn add_data_input<T>(&mut self, handle: DataHandle<T>) -> DeclaredDependency<DataHandle<T>>
-    where
-        T: 'static,
-    {
-        self.add_data(handle, false)
-    }
-
-    /// Declares use of a data handle for reading and writing.
-    pub fn add_data_output<T>(&mut self, handle: DataHandle<T>) -> DeclaredDependency<DataHandle<T>>
-    where
-        T: 'static,
-    {
-        self.add_data(handle, true)
-    }
-
-    fn add_data<T>(&mut self, handle: DataHandle<T>, output: bool) -> DeclaredDependency<DataHandle<T>>
+    pub fn add_data<T>(&mut self, handle: DataHandle<T>, usage: NodeResourceUsage) -> DeclaredDependency<DataHandle<T>>
     where
         T: 'static,
     {
@@ -132,42 +118,56 @@ impl<'a, 'node> RenderGraphNodeBuilder<'a, 'node> {
             .data
             .get(handle.idx)
             .expect("internal rendergraph error: cannot find data handle")
+            .inner
             .downcast_ref::<RefCell<Option<T>>>()
             .expect("used custom data that was previously declared with a different type");
 
-        self.inputs.push(GraphResource::Data(handle.idx));
-        if output {
-            self.outputs.push(GraphResource::Data(handle.idx));
+        let subresource = GraphSubResource::Data(handle.idx);
+        match usage {
+            NodeResourceUsage::Reference => self.references.push(subresource),
+            NodeResourceUsage::Input => self.inputs.push(subresource),
+            NodeResourceUsage::Output => self.outputs.push(subresource),
+            NodeResourceUsage::InputOutput => {
+                self.inputs.push(subresource);
+                self.outputs.push(subresource)
+            }
         }
+
         DeclaredDependency { handle }
     }
 
-    /// Declares that this node has an "external" output, meaning it can never
-    /// be culled.
-    pub fn add_external_output(&mut self) {
-        self.inputs.push(GraphResource::External);
-        self.outputs.push(GraphResource::External);
+    /// Declares a data handle as having the given render targets
+    pub fn add_dependencies_to_render_targets<T>(
+        &mut self,
+        handle: DataHandle<T>,
+        render_targets: impl IntoIterator<Item = RenderTargetHandle>,
+    ) {
+        self.graph
+            .data
+            .get_mut(handle.idx)
+            .expect("internal rendergraph error: cannot find data handle")
+            .dependencies
+            .extend(render_targets.into_iter().map(|rt| rt.resource));
     }
 
-    /// Passthrough a bit of immutable external data with lifetime 'node so you
-    /// can receieve it inside with lifetime 'rpass.
-    ///
-    /// Use [PassthroughDataContainer::get][g] to get the value on the inside.
-    ///
-    /// [g]: super::PassthroughDataContainer::get
-    pub fn passthrough_ref<T: 'node>(&mut self, data: &'node T) -> PassthroughDataRef<T> {
-        self.passthrough.add_ref(data)
+    /// Declares a data handle as having the given data handles
+    pub fn add_dependencies_to_data<T, U>(
+        &mut self,
+        handle: DataHandle<T>,
+        render_targets: impl IntoIterator<Item = DataHandle<U>>,
+    ) {
+        self.graph
+            .data
+            .get_mut(handle.idx)
+            .expect("internal rendergraph error: cannot find data handle")
+            .dependencies
+            .extend(render_targets.into_iter().map(|hdl| GraphSubResource::Data(hdl.idx)));
     }
 
-    /// Passthrough a bit of mutable external data with lifetime 'node so you
-    /// can receieve it inside with lifetime 'rpass.
-    ///
-    /// Use [PassthroughDataContainer::get_mut][g] to get the value on the
-    /// inside.
-    ///
-    /// [g]: super::PassthroughDataContainer::get_mut
-    pub fn passthrough_ref_mut<T: 'node>(&mut self, data: &'node mut T) -> PassthroughDataRefMut<T> {
-        self.passthrough.add_ref_mut(data)
+    /// Declares that this node has some unknowable side effect, so can't be removed.
+    pub fn add_side_effect(&mut self) {
+        self.inputs.push(GraphSubResource::External);
+        self.outputs.push(GraphSubResource::External);
     }
 
     /// Builds the rendergraph node and adds it into the rendergraph.
@@ -175,34 +175,16 @@ impl<'a, 'node> RenderGraphNodeBuilder<'a, 'node> {
     /// Takes a function that is the body of the node. Nodes will only run if a
     /// following node consumes the output. See module level docs for more
     /// details.
-    ///
-    /// The function takes the following arguments (which I will give names):
-    ///  - `pt`: a container which you can get all the passthrough data out of
-    ///  - `renderer`: a reference to the renderer.
-    ///  - `encoder_or_pass`: either the asked-for renderpass, or a command
-    ///    encoder.
-    ///  - `temps`: storage for temporary data that lasts the length of the
-    ///    renderpass.
-    ///  - `ready`: result from calling ready on various managers.
-    ///  - `graph_data`: read-only access to various managers and access to
-    ///    in-graph data.
     pub fn build<F>(self, exec: F)
     where
-        F: for<'b, 'pass> FnOnce(
-                &mut PassthroughDataContainer<'pass>,
-                &Arc<Renderer>,
-                RenderGraphEncoderOrPass<'b, 'pass>,
-                &'pass RpassTemporaryPool<'pass>,
-                &'pass ReadyData,
-                RenderGraphDataStore<'pass>,
-            ) + 'node,
+        F: for<'b, 'pass> FnOnce(NodeExecutionContext<'b, 'pass, 'node>) + 'node,
     {
         self.graph.nodes.push(RenderGraphNode {
             label: self.label,
             inputs: self.inputs,
             outputs: self.outputs,
+            references: self.references,
             rpass: self.rpass,
-            passthrough: self.passthrough,
             exec: Box::new(exec),
         });
     }

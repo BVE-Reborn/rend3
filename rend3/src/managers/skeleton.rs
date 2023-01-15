@@ -1,16 +1,14 @@
-use std::{
-    ops::Range,
-    sync::atomic::{AtomicUsize, Ordering},
-};
+use std::ops::Range;
 
-use crate::{
-    managers::{MeshManager, ObjectManager},
-    util::registry::ResourceRegistry,
+use arrayvec::ArrayVec;
+use glam::Mat4;
+use rend3_types::{
+    MeshHandle, RawSkeletonHandle, Skeleton, SkeletonHandle, VertexAttributeId, VERTEX_ATTRIBUTE_JOINT_INDICES,
+    VERTEX_ATTRIBUTE_JOINT_WEIGHTS, VERTEX_ATTRIBUTE_NORMAL, VERTEX_ATTRIBUTE_POSITION, VERTEX_ATTRIBUTE_TANGENT,
 };
-
-use glam::{Mat4, UVec2};
-use rend3_types::{MeshHandle, RawSkeletonHandle, Skeleton, SkeletonHandle};
 use wgpu::{CommandEncoder, Device};
+
+use crate::{managers::MeshManager, util::iter::ExactSizerIterator};
 
 /// Internal representation of a Skeleton
 #[derive(Debug)]
@@ -20,25 +18,12 @@ pub struct InternalSkeleton {
     /// The list of per-joint transformation matrices that will be applied to
     /// vertices.
     pub joint_matrices: Vec<Mat4>,
-    /// The portion of the vertex buffer data owned by this skeleton
-    pub skeleton_vertex_range: Range<usize>,
-    /// The vertex ranges that is sent to the GPU Skinning compute shader,
-    /// cached here for improved performance.
-    pub ranges: GpuVertexRanges,
-}
-
-/// The skeleton and mes vertex ranges, in a format that's suitable to be sent
-/// to the GPU.
-///
-/// Note that there's no need for this struct to be `#[repr(C)]`
-/// because this is not the actual data that gets uploaded for GPU skinning.
-#[derive(Debug, Copy, Clone)]
-pub struct GpuVertexRanges {
-    /// The range of the vertex buffer that holds the original mesh.
-    pub mesh_range: glam::UVec2,
-    /// The range of the vertex buffer that holds the duplicate mesh data, owned
-    /// by the Skeleton
-    pub skeleton_range: glam::UVec2,
+    /// There are 5 different ranges we need to store here:
+    /// Position, Normals, Tangent, Joint Index, Joint Weight
+    pub source_attribute_ranges: ArrayVec<(VertexAttributeId, Range<u64>), 5>,
+    /// There are three attributes that we can possibly override here:
+    /// Position, Normals, and Tangent
+    pub overridden_attribute_ranges: ArrayVec<(VertexAttributeId, Range<u64>), 3>,
 }
 
 /// Manages skeletons.
@@ -46,7 +31,8 @@ pub struct GpuVertexRanges {
 /// Skeletons only contain the relevant data for vertex skinning. No bone
 /// hierarchy is stored.
 pub struct SkeletonManager {
-    registry: ResourceRegistry<InternalSkeleton, Skeleton>,
+    data: Vec<Option<InternalSkeleton>>,
+    skeleton_count: usize,
     /// The number of joints of all the skeletons in this manager
     global_joint_count: usize,
 }
@@ -54,90 +40,106 @@ impl SkeletonManager {
     pub fn new() -> Self {
         profiling::scope!("SkeletonManager::new");
 
-        let registry = ResourceRegistry::new();
-
         Self {
-            registry,
+            data: Vec::new(),
+            skeleton_count: 0,
             global_joint_count: 0,
         }
     }
 
-    pub fn allocate(counter: &AtomicUsize) -> SkeletonHandle {
-        let idx = counter.fetch_add(1, Ordering::Relaxed);
-
-        SkeletonHandle::new(idx)
-    }
-
     #[allow(clippy::too_many_arguments)]
-    pub fn fill(
+    pub fn add(
         &mut self,
         device: &Device,
         encoder: &mut CommandEncoder,
         mesh_manager: &mut MeshManager,
-        object_manager: &mut ObjectManager,
         handle: &SkeletonHandle,
         skeleton: Skeleton,
     ) {
         let internal_mesh = mesh_manager.internal_data(skeleton.mesh.get_raw());
-        let num_joints = internal_mesh.num_joints as usize;
+        let required_joint_count = internal_mesh
+            .required_joint_count
+            .expect("Mesh must have joint weights and joint indices to be used in a skeleton");
+
+        let joint_weight_range = internal_mesh
+            .get_attribute(&VERTEX_ATTRIBUTE_JOINT_WEIGHTS)
+            .expect("Mesh must have joint weights and joint indices to be used in a skeleton");
+        let joint_indices_range = internal_mesh
+            .get_attribute(&VERTEX_ATTRIBUTE_JOINT_INDICES)
+            .expect("Mesh must have joint weights and joint indices to be used in a skeleton");
 
         assert!(
-            internal_mesh.num_joints as usize <= skeleton.joint_matrices.len(),
+            required_joint_count as usize <= skeleton.joint_matrices.len(),
             "Not enough joints to create this skeleton. The mesh has {} joints, \
              but only {} joint matrices were provided.",
-            num_joints,
+            required_joint_count,
             skeleton.joint_matrices.len(),
         );
 
-        self.global_joint_count += num_joints;
+        self.global_joint_count += required_joint_count as usize;
 
-        let skeleton_range = mesh_manager.allocate_skeleton_mesh(device, encoder, object_manager, self, &skeleton.mesh);
+        let overridden_attributes = [
+            &VERTEX_ATTRIBUTE_POSITION,
+            &VERTEX_ATTRIBUTE_NORMAL,
+            &VERTEX_ATTRIBUTE_TANGENT,
+        ];
 
-        // It is important that we fetch the internal mesh again after calling
-        // `allocate_skeleton_mesh`, because that may trigger a reallocation and
-        // data like the vertex ranges gets invalidated.
+        let mut source_attribute_ranges: ArrayVec<_, 5> = ArrayVec::new();
+        source_attribute_ranges.push((*VERTEX_ATTRIBUTE_JOINT_WEIGHTS.id(), joint_weight_range));
+        source_attribute_ranges.push((*VERTEX_ATTRIBUTE_JOINT_INDICES.id(), joint_indices_range));
+
+        let mut overridden_attribute_ranges: ArrayVec<_, 3> = ArrayVec::new();
+        for attribute in overridden_attributes {
+            let original_range = match internal_mesh.get_attribute(attribute) {
+                Some(a) => a,
+                None => continue,
+            };
+            source_attribute_ranges.push((*attribute.id(), original_range));
+        }
+
+        // We split this for loop into two parts so that because we need &mut on the mesh manager
+        // the original loop needs & on the mesh manager to call get_attribute.
         //
-        // Similarly, we don't want to register the back reference to the
-        // skeleton before allocating, otherwise the mesh manager will try to
-        // reallocate the data for the skeleton we're trying to allocate.
-        let internal_mesh = mesh_manager.internal_data_mut(skeleton.mesh.get_raw());
-        internal_mesh.skeletons.push(handle.get_raw());
-        let mesh_range = internal_mesh.vertex_range.clone();
-        let input = GpuVertexRanges {
-            skeleton_range: UVec2::new(skeleton_range.start as u32, skeleton_range.end as u32),
-            mesh_range: UVec2::new(mesh_range.start as u32, mesh_range.end as u32),
-        };
+        // We skip the first two as those are always the joint* attributes.
+        for (attribute_id, original_range) in &source_attribute_ranges[2..] {
+            let skeleton_range =
+                mesh_manager.allocate_range(device, encoder, original_range.end - original_range.start);
+            overridden_attribute_ranges.push((*attribute_id, skeleton_range));
+        }
 
         // Ensure there will be exactly `num_joints` matrices.
         let mut joint_matrices = skeleton.joint_matrices;
-        joint_matrices.truncate(num_joints);
+        joint_matrices.truncate(required_joint_count as _);
 
         let internal = InternalSkeleton {
             joint_matrices,
             mesh_handle: skeleton.mesh,
-            skeleton_vertex_range: skeleton_range,
-            ranges: input,
+            source_attribute_ranges,
+            overridden_attribute_ranges,
         };
-        self.registry.insert(handle, internal);
+
+        if handle.idx >= self.data.len() {
+            self.data.resize_with(handle.idx + 1, || None);
+        }
+        self.data[handle.idx] = Some(internal);
+
+        self.skeleton_count += 1;
     }
 
-    pub fn ready(&mut self, mesh_manager: &mut MeshManager) {
-        profiling::scope!("Skeleton Manager Ready");
-        self.registry.remove_all_dead(|_, _, handle_idx, skeleton| {
-            self.global_joint_count -= skeleton.joint_matrices.len();
+    pub fn remove(&mut self, mesh_manager: &mut MeshManager, handle: RawSkeletonHandle) {
+        let skeleton = self.data[handle.idx].take().unwrap();
+        self.global_joint_count -= skeleton.joint_matrices.len();
 
-            // Clean back references in the mesh data
-            let mesh = mesh_manager.internal_data_mut(skeleton.mesh_handle.get_raw());
-            let index = mesh.skeletons.iter().position(|sk| sk.idx == handle_idx).unwrap();
-            mesh.skeletons.swap_remove(index);
+        // Free the owned regions of the mesh data buffer
+        for (_, range) in skeleton.overridden_attribute_ranges {
+            mesh_manager.free_range(range);
+        }
 
-            // Free the owned region of the vertex buffer
-            mesh_manager.free_skeleton_mesh(skeleton.skeleton_vertex_range);
-        });
+        self.skeleton_count -= 1;
     }
 
     pub fn set_joint_matrices(&mut self, handle: RawSkeletonHandle, mut joint_matrices: Vec<Mat4>) {
-        let skeleton = self.registry.get_mut(handle);
+        let skeleton = self.data[handle.idx].as_mut().unwrap();
         assert!(
             skeleton.joint_matrices.len() <= joint_matrices.len(),
             "Not enough joints to update this skeleton. The mesh has {} joints, \
@@ -151,29 +153,16 @@ impl SkeletonManager {
     }
 
     pub fn internal_data(&self, handle: RawSkeletonHandle) -> &InternalSkeleton {
-        self.registry.get(handle)
+        self.data[handle.idx].as_ref().unwrap()
     }
 
     pub fn skeletons(&self) -> impl ExactSizeIterator<Item = &InternalSkeleton> {
-        self.registry.values()
+        ExactSizerIterator::new(self.data.iter().filter_map(Option::as_ref), self.skeleton_count)
     }
 
     /// Get the skeleton manager's global joint count.
     pub fn global_joint_count(&self) -> usize {
         self.global_joint_count
-    }
-
-    pub fn set_skeleton_range(
-        &mut self,
-        handle: RawSkeletonHandle,
-        new_skeleton_vert_range: &Range<usize>,
-        new_mesh_vert_range: &Range<usize>,
-    ) {
-        let skeleton = self.registry.get_mut(handle);
-        skeleton.skeleton_vertex_range = new_skeleton_vert_range.clone();
-        skeleton.ranges.mesh_range = UVec2::new(new_mesh_vert_range.start as u32, new_mesh_vert_range.end as u32);
-        skeleton.ranges.skeleton_range =
-            UVec2::new(new_skeleton_vert_range.start as u32, new_skeleton_vert_range.end as u32);
     }
 }
 

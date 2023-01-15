@@ -9,10 +9,10 @@ license = "MIT OR Apache-2.0 OR Zlib"
 repository = "https://github.com/BVE-Reborn/rend3"
 keywords = ["3d", "graphics",  "rend3", "imgui", "wgpu"]
 categories = ["game-development", "graphics", "rendering", "rendering::engine", "wasm"]
-rust-version = "1.57"
+rust-version = "1.65"
 
 [dependencies]
-imgui = "0.8"
-imgui-wgpu = "0.20"
-glam = "0.21.2"
+imgui = "0.9"
+imgui-wgpu = "0.21"
+glam = "0.22"
 rend3 = { version = "^0.3.0", path = "../rend3" }

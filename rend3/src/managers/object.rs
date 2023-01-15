@@ -1,175 +1,201 @@
-use std::{
-    any::TypeId,
-    sync::atomic::{AtomicUsize, Ordering},
-};
+use std::{any::TypeId, ops::Range};
 
-use crate::{
-    managers::{MaterialKeyPair, MaterialManager, MeshManager},
-    types::{Object, ObjectHandle},
-    util::{frustum::BoundingSphere, registry::ArchetypicalRegistry},
-};
+use encase::ShaderType;
 use glam::{Mat4, Vec3A};
-use rend3_types::{Material, MaterialHandle, ObjectChange, ObjectMeshKind, RawObjectHandle};
+use list_any::VecAny;
+use rend3_types::{
+    Material, MaterialArray, MaterialHandle, ObjectChange, ObjectMeshKind, RawObjectHandle, VertexAttributeId,
+};
+use wgpu::{Buffer, CommandEncoder, Device};
 
 use super::SkeletonManager;
+use crate::{
+    managers::{InternalMesh, MaterialManager, MeshManager},
+    types::{Object, ObjectHandle},
+    util::{
+        freelist::FreelistDerivedBuffer, frustum::BoundingSphere, iter::ExactSizerIterator, scatter_copy::ScatterCopy,
+        typedefs::FastHashMap,
+    },
+};
 
 /// Cpu side input to gpu-based culling
-#[repr(C, align(16))]
-#[derive(Debug, Copy, Clone)]
-pub struct GpuCullingInput {
-    pub start_idx: u32,
-    pub count: u32,
-    pub vertex_offset: i32,
-    pub material_index: u32,
+#[derive(ShaderType)]
+pub struct ShaderObject<M: Material> {
     pub transform: Mat4,
-    // xyz position; w radius
     pub bounding_sphere: BoundingSphere,
+    pub first_index: u32,
+    pub index_count: u32,
+    pub material_index: u32,
+    pub vertex_attribute_start_offsets:
+        <M::SupportedAttributeArrayType as MaterialArray<&'static VertexAttributeId>>::U32Array,
 }
 
-unsafe impl bytemuck::Pod for GpuCullingInput {}
-unsafe impl bytemuck::Zeroable for GpuCullingInput {}
+// Manual impl so that M: !Copy
+impl<M: Material> Copy for ShaderObject<M> {}
+
+// Manual impl so that M: !Clone
+impl<M: Material> Clone for ShaderObject<M> {
+    fn clone(&self) -> Self {
+        Self {
+            transform: self.transform,
+            bounding_sphere: self.bounding_sphere,
+            first_index: self.first_index,
+            index_count: self.index_count,
+            material_index: self.material_index,
+            vertex_attribute_start_offsets: self.vertex_attribute_start_offsets,
+        }
+    }
+}
 
 /// Internal representation of a Object.
-#[repr(C, align(16))]
-#[derive(Debug, Clone)]
-pub struct InternalObject {
+pub struct InternalObject<M: Material> {
     pub mesh_kind: ObjectMeshKind,
     pub material_handle: MaterialHandle,
-    // Index into the material archetype array
     pub location: Vec3A,
-    pub input: GpuCullingInput,
+    pub inner: ShaderObject<M>,
 }
 
-impl InternalObject {
-    pub fn mesh_location(&self) -> Vec3A {
-        self.location + Vec3A::from(self.input.bounding_sphere.center)
+// Manual impl so that M: !Clone
+impl<M: Material> Clone for InternalObject<M> {
+    fn clone(&self) -> Self {
+        Self {
+            mesh_kind: self.mesh_kind.clone(),
+            material_handle: self.material_handle.clone(),
+            location: self.location,
+            inner: self.inner,
+        }
     }
+}
+
+impl<M: Material> InternalObject<M> {
+    pub fn mesh_location(&self) -> Vec3A {
+        self.location + Vec3A::from(self.inner.bounding_sphere.center)
+    }
+}
+
+struct ObjectArchetype {
+    /// Inner type is Option<InternalObject<M>>
+    data_vec: VecAny,
+    object_count: usize,
+    buffer: FreelistDerivedBuffer,
+    set_object_transform: fn(&mut VecAny, &mut FreelistDerivedBuffer, usize, Mat4),
+    duplicate_object: fn(&VecAny, usize, ObjectChange) -> Object,
+    remove: fn(&mut VecAny, usize),
+    ready: fn(&mut ObjectArchetype, &Device, &mut CommandEncoder, &ScatterCopy),
 }
 
 /// Manages objects. That's it. ¯\\\_(ツ)\_/¯
 pub struct ObjectManager {
-    registry: ArchetypicalRegistry<MaterialKeyPair, InternalObject, Object>,
+    archetype: FastHashMap<TypeId, ObjectArchetype>,
+    handle_to_typeid: FastHashMap<RawObjectHandle, TypeId>,
 }
 impl ObjectManager {
     pub fn new() -> Self {
         profiling::scope!("ObjectManager::new");
 
-        let registry = ArchetypicalRegistry::new();
-
-        Self { registry }
+        Self {
+            archetype: FastHashMap::default(),
+            handle_to_typeid: FastHashMap::default(),
+        }
     }
 
-    pub fn allocate(counter: &AtomicUsize) -> ObjectHandle {
-        let idx = counter.fetch_add(1, Ordering::Relaxed);
-
-        ObjectHandle::new(idx)
+    fn ensure_archetype<M: Material>(&mut self, device: &Device) -> &mut ObjectArchetype {
+        let type_id = TypeId::of::<M>();
+        self.archetype.entry(type_id).or_insert_with(|| ObjectArchetype {
+            data_vec: VecAny::new::<Option<InternalObject<M>>>(),
+            object_count: 0,
+            buffer: FreelistDerivedBuffer::new::<ShaderObject<M>>(device),
+            set_object_transform: set_object_transform::<M>,
+            duplicate_object: duplicate_object::<M>,
+            remove: remove::<M>,
+            ready: ready::<M>,
+        })
     }
 
-    pub fn fill(
+    pub fn add(
         &mut self,
+        device: &Device,
         handle: &ObjectHandle,
         object: Object,
         mesh_manager: &mut MeshManager,
         skeleton_manager: &SkeletonManager,
         material_manager: &mut MaterialManager,
     ) {
-        let (internal_mesh, vertex_range) = match &object.mesh_kind {
+        let (internal_mesh, skeleton_ranges) = match &object.mesh_kind {
             ObjectMeshKind::Animated(skeleton) => {
-                let skeleton = skeleton_manager.internal_data(skeleton.get_raw());
-                let mesh = mesh_manager.internal_data_mut(skeleton.mesh_handle.get_raw());
-                (mesh, skeleton.skeleton_vertex_range.clone())
+                let skeleton = skeleton_manager.internal_data(**skeleton);
+                let mesh = mesh_manager.internal_data(*skeleton.mesh_handle);
+                (mesh, &*skeleton.overridden_attribute_ranges)
             }
             ObjectMeshKind::Static(mesh) => {
-                let mesh = mesh_manager.internal_data_mut(mesh.get_raw());
-                let vertex_range = mesh.vertex_range.clone();
-                (mesh, vertex_range)
+                let mesh = mesh_manager.internal_data(**mesh);
+                (mesh, &[][..])
             }
         };
-        let bounding_sphere = internal_mesh.bounding_sphere;
-        let index_range = internal_mesh.index_range.clone();
 
-        let (material_key, object_list) = material_manager.get_material_key_and_objects(object.material.get_raw());
-        object_list.push(handle.get_raw());
-
-        let shader_object = InternalObject {
-            location: object.transform.transform_point3a(Vec3A::ZERO),
-            input: GpuCullingInput {
-                material_index: material_manager.get_internal_index(object.material.get_raw()) as u32,
-                transform: object.transform,
-                bounding_sphere,
-                start_idx: index_range.start as u32,
-                count: (index_range.end - index_range.start) as u32,
-                vertex_offset: vertex_range.start as i32,
+        material_manager.call_object_add_callback(
+            *object.material,
+            ObjectAddCallbackArgs {
+                device,
+                manager: self,
+                internal_mesh,
+                skeleton_ranges,
+                handle: **handle,
+                object,
             },
-            material_handle: object.material,
-            mesh_kind: object.mesh_kind,
-        };
-
-        self.registry.insert(handle, shader_object, material_key);
-    }
-
-    pub fn ready(&mut self, material_manager: &mut MaterialManager) {
-        profiling::scope!("Object Manager Ready");
-        self.registry.remove_all_dead(|handle, object| {
-            // Remove from material list
-            {
-                let objects = material_manager.get_objects(object.material_handle.get_raw());
-                let index = objects.iter().position(|v| v.idx == handle).unwrap();
-                objects.swap_remove(index);
-            }
-        });
-    }
-
-    pub fn set_material_index(&mut self, handle: RawObjectHandle, index: usize) {
-        let object = self.registry.get_value_mut(handle);
-        object.input.material_index = index as u32;
-    }
-
-    /// Objects contain cached data that stores vertex ranges for the gpu
-    /// culling calls. When the vertex buffers are reallocated all this data is
-    /// invalidated. This function needs to be called to fix it.
-    pub fn fix_objects_after_realloc(&mut self, mesh_manager: &MeshManager, skeleton_manager: &SkeletonManager) {
-        for object in self.registry.iter_all_values_mut() {
-            match &object.mesh_kind {
-                ObjectMeshKind::Animated(skeleton_handle) => {
-                    let skeleton = skeleton_manager.internal_data(skeleton_handle.get_raw());
-                    let mesh = mesh_manager.internal_data(skeleton.mesh_handle.get_raw());
-                    object.input.start_idx = mesh.index_range.start as u32;
-                    object.input.count = mesh.index_range.len() as u32;
-                    object.input.vertex_offset = skeleton.skeleton_vertex_range.start as i32;
-                }
-                ObjectMeshKind::Static(mesh_handle) => {
-                    let mesh = mesh_manager.internal_data(mesh_handle.get_raw());
-                    object.input.start_idx = mesh.index_range.start as u32;
-                    object.input.count = mesh.index_range.len() as u32;
-                    object.input.vertex_offset = mesh.vertex_range.start as i32;
-                }
-            }
-        }
-    }
-
-    pub fn set_key(&mut self, handle: RawObjectHandle, key: MaterialKeyPair) {
-        self.registry.set_key(handle, key);
+        );
     }
 
     pub fn set_object_transform(&mut self, handle: RawObjectHandle, transform: Mat4) {
-        let object = self.registry.get_value_mut(handle);
-        object.input.transform = transform;
-        object.location = transform.transform_point3a(Vec3A::ZERO)
+        let type_id = self.handle_to_typeid[&handle];
+
+        let archetype = self.archetype.get_mut(&type_id).unwrap();
+
+        (archetype.set_object_transform)(&mut archetype.data_vec, &mut archetype.buffer, handle.idx, transform);
     }
 
-    pub fn get_objects<M: Material>(&self, key: u64) -> &[InternalObject] {
-        self.registry
-            .get_archetype_vector(&MaterialKeyPair {
-                // TODO(material): unify a M -> TypeId method
-                ty: TypeId::of::<M>(),
-                key,
-            })
-            .unwrap_or(&[])
+    pub fn remove(&mut self, handle: RawObjectHandle) {
+        let type_id = self.handle_to_typeid[&handle];
+
+        let archetype = self.archetype.get_mut(&type_id).unwrap();
+
+        (archetype.remove)(&mut archetype.data_vec, handle.idx);
+
+        archetype.object_count -= 1;
     }
 
+    pub fn ready(&mut self, device: &Device, encoder: &mut CommandEncoder, scatter: &ScatterCopy) {
+        for archetype in self.archetype.values_mut() {
+            (archetype.ready)(archetype, device, encoder, scatter);
+        }
+    }
+
+    pub fn buffer<M: Material>(&self) -> Option<&Buffer> {
+        Some(&self.archetype.get(&TypeId::of::<M>())?.buffer)
+    }
+
+    pub fn enumerated_objects<M: Material>(
+        &self,
+    ) -> Option<impl ExactSizeIterator<Item = (RawObjectHandle, &InternalObject<M>)> + '_> {
+        let type_id = TypeId::of::<M>();
+
+        let archetype = self.archetype.get(&type_id)?;
+
+        let iter = archetype
+            .data_vec
+            .downcast_slice::<Option<InternalObject<M>>>()
+            .unwrap()
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, o)| o.as_ref().map(|o| (RawObjectHandle::new(idx), o)));
+
+        Some(ExactSizerIterator::new(iter, archetype.object_count))
+    }
+
+    #[allow(clippy::too_many_arguments)]
     pub fn duplicate_object(
         &mut self,
+        device: &Device,
         src_handle: ObjectHandle,
         dst_handle: ObjectHandle,
         change: ObjectChange,
@@ -177,13 +203,20 @@ impl ObjectManager {
         skeleton_manager: &SkeletonManager,
         material_manager: &mut MaterialManager,
     ) {
-        let src_obj = self.registry.get_value_mut(src_handle.get_raw());
-        let dst_obj = Object {
-            mesh_kind: change.mesh_kind.unwrap_or_else(|| src_obj.mesh_kind.clone()),
-            material: change.material.unwrap_or_else(|| src_obj.material_handle.clone()),
-            transform: change.transform.unwrap_or(src_obj.input.transform),
-        };
-        self.fill(&dst_handle, dst_obj, mesh_manager, skeleton_manager, material_manager);
+        let type_id = self.handle_to_typeid[&*src_handle];
+
+        let archetype = self.archetype.get_mut(&type_id).unwrap();
+
+        let dst_obj = (archetype.duplicate_object)(&mut archetype.data_vec, src_handle.idx, change);
+
+        self.add(
+            device,
+            &dst_handle,
+            dst_obj,
+            mesh_manager,
+            skeleton_manager,
+            material_manager,
+        );
     }
 }
 
@@ -191,4 +224,133 @@ impl Default for ObjectManager {
     fn default() -> Self {
         Self::new()
     }
+}
+
+pub(super) struct ObjectAddCallbackArgs<'a> {
+    device: &'a Device,
+    manager: &'a mut ObjectManager,
+    internal_mesh: &'a InternalMesh,
+    skeleton_ranges: &'a [(VertexAttributeId, Range<u64>)],
+    handle: RawObjectHandle,
+    object: Object,
+}
+
+pub(super) fn object_add_callback<M: Material>(_material: &M, args: ObjectAddCallbackArgs<'_>) {
+    // Make sure all required attributes are in the mesh and the supported attribute list.
+    for &required_attribute in M::required_attributes().into_iter() {
+        // We can just directly use the internal mesh, as every attribute in the skeleton is also in the mesh.
+        let found_in_mesh = args
+            .internal_mesh
+            .vertex_attribute_ranges
+            .iter()
+            .any(|&(id, _)| id == required_attribute);
+
+        // Check that our required attributes are in the supported one.
+        let found_in_supported = args
+            .internal_mesh
+            .vertex_attribute_ranges
+            .iter()
+            .any(|&(id, _)| id == required_attribute);
+
+        assert!(found_in_mesh);
+        assert!(found_in_supported);
+    }
+
+    let vertex_attribute_start_offsets = M::supported_attributes().map_to_u32(|&supported_attribute| {
+        // We first check the skeleton for the attribute's base offset.
+        let found_start_offset = args
+            .skeleton_ranges
+            .iter()
+            .find_map(|(id, range)| (*id == supported_attribute).then_some(range.start));
+
+        if let Some(start_offset) = found_start_offset {
+            return start_offset as u32;
+        }
+
+        // After the skeleton, check the mesh for non-overriden attributes.
+        match args.internal_mesh.get_attribute(&supported_attribute) {
+            Some(range) => range.start as u32,
+            // If the attribute isn't there, push u32::MAX.
+            None => u32::MAX,
+        }
+    });
+
+    let bounding_sphere = args.internal_mesh.bounding_sphere;
+    let index_range = args.internal_mesh.index_range.clone();
+
+    let internal_object = InternalObject::<M> {
+        location: args.object.transform.transform_point3a(bounding_sphere.center.into()),
+        inner: ShaderObject {
+            material_index: args.object.material.idx as u32,
+            transform: args.object.transform,
+            bounding_sphere,
+            first_index: (index_range.start / 4) as u32,
+            index_count: ((index_range.end - index_range.start) / 4) as u32,
+            vertex_attribute_start_offsets,
+        },
+        material_handle: args.object.material,
+        mesh_kind: args.object.mesh_kind,
+    };
+
+    let type_id = TypeId::of::<M>();
+
+    args.manager.handle_to_typeid.insert(args.handle, type_id);
+    let archetype = args.manager.ensure_archetype::<M>(args.device);
+
+    let mut data_vec = archetype.data_vec.downcast_mut::<Option<InternalObject<M>>>().unwrap();
+    if args.handle.idx >= data_vec.len() {
+        data_vec.resize_with((args.handle.idx + 1).next_power_of_two(), || None);
+    }
+    data_vec[args.handle.idx] = Some(internal_object);
+    archetype.object_count += 1;
+    archetype.buffer.use_index(args.handle.idx);
+}
+
+fn set_object_transform<M: Material>(
+    data: &mut VecAny,
+    buffer: &mut FreelistDerivedBuffer,
+    idx: usize,
+    transform: Mat4,
+) {
+    let data_vec = data.downcast_slice_mut::<Option<InternalObject<M>>>().unwrap();
+
+    let object = data_vec[idx].as_mut().unwrap();
+    object.inner.transform = transform;
+    object.location = transform.transform_point3a(Vec3A::ZERO);
+
+    buffer.use_index(idx);
+}
+
+fn duplicate_object<M: Material>(data: &VecAny, idx: usize, change: ObjectChange) -> Object {
+    let data_vec = data.downcast_slice::<Option<InternalObject<M>>>().unwrap();
+
+    let src_obj = data_vec[idx].as_ref().unwrap();
+
+    Object {
+        mesh_kind: change.mesh_kind.unwrap_or_else(|| src_obj.mesh_kind.clone()),
+        material: change.material.unwrap_or_else(|| src_obj.material_handle.clone()),
+        transform: change.transform.unwrap_or(src_obj.inner.transform),
+    }
+}
+
+fn remove<M: Material>(data: &mut VecAny, idx: usize) {
+    let data_vec = data.downcast_slice_mut::<Option<InternalObject<M>>>().unwrap();
+
+    data_vec[idx] = None;
+}
+
+fn ready<M: Material>(
+    archetype: &mut ObjectArchetype,
+    device: &Device,
+    encoder: &mut CommandEncoder,
+    scatter: &ScatterCopy,
+) {
+    let data_vec = archetype
+        .data_vec
+        .downcast_slice::<Option<InternalObject<M>>>()
+        .unwrap();
+
+    archetype
+        .buffer
+        .apply(device, encoder, scatter, |idx| data_vec[idx].as_ref().unwrap().inner)
 }

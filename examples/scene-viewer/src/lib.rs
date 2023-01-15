@@ -1,3 +1,5 @@
+use std::{collections::HashMap, future::Future, hash::BuildHasher, path::Path, sync::Arc, time::Duration};
+
 use glam::{DVec2, Mat3A, Mat4, UVec2, Vec3, Vec3A};
 use instant::Instant;
 use pico_args::Arguments;
@@ -12,7 +14,6 @@ use rend3::{
 use rend3_framework::{lock, AssetPath, Mutex};
 use rend3_gltf::GltfSceneInstance;
 use rend3_routine::{base::BaseRenderGraph, pbr::NormalTextureYDirection, skybox::SkyboxRoutine};
-use std::{collections::HashMap, future::Future, hash::BuildHasher, path::Path, sync::Arc, time::Duration};
 use wgpu_profiler::GpuTimerScopeResult;
 use winit::{
     event::{DeviceEvent, ElementState, Event, KeyboardInput, MouseButton, WindowEvent},
@@ -35,7 +36,7 @@ async fn load_skybox_image(loader: &rend3_framework::AssetLoader, data: &mut Vec
 }
 
 async fn load_skybox(
-    renderer: &Renderer,
+    renderer: &Arc<Renderer>,
     loader: &rend3_framework::AssetLoader,
     skybox_routine: &Mutex<SkyboxRoutine>,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -60,7 +61,7 @@ async fn load_skybox(
 }
 
 async fn load_gltf(
-    renderer: &Renderer,
+    renderer: &Arc<Renderer>,
     loader: &rend3_framework::AssetLoader,
     settings: &rend3_gltf::GltfLoadSettings,
     location: AssetPath<'_>,
@@ -238,6 +239,7 @@ Assets:
   --ambient <value>                      Set the value of the minimum ambient light. This will be treated as white light of this intensity. Defaults to 0.1.
   --scale <scale>                        Scale all objects loaded by this factor. Defaults to 1.0.
   --shadow-distance <value>              Distance from the camera there will be directional shadows. Lower values means higher quality shadows. Defaults to 100.
+  --shadow-resolution <value>            Resolution of the shadow map. Higher values mean higher quality shadows with high performance cost. Defaults to 2048.
 
 Controls:
   --walk <speed>               Walk speed (speed without holding shift) in units/second (typically meters). Default 10.
@@ -305,6 +307,7 @@ impl SceneViewer {
         let ambient_light_level: f32 = option_arg(args.opt_value_from_str("--ambient")).unwrap_or(0.10);
         let scale: Option<f32> = option_arg(args.opt_value_from_str("--scale"));
         let shadow_distance: Option<f32> = option_arg(args.opt_value_from_str("--shadow-distance"));
+        let shadow_resolution: Option<u16> = option_arg(args.opt_value_from_str("--shadow-resolution"));
         let gltf_disable_directional_light: bool = args.contains("--gltf-disable-directional-lights");
 
         // Controls
@@ -342,6 +345,9 @@ impl SceneViewer {
         }
         if let Some(shadow_distance) = shadow_distance {
             gltf_settings.directional_light_shadow_distance = shadow_distance;
+        }
+        if let Some(shadow_resolution) = shadow_resolution {
+            gltf_settings.directional_light_resolution = shadow_resolution;
         }
 
         Self {
@@ -410,6 +416,7 @@ impl rend3_framework::App for SceneViewer {
 
     fn setup<'a>(
         &'a mut self,
+        _event_loop: &winit::event_loop::EventLoop<rend3_framework::UserResizeEvent<()>>,
         window: &'a winit::window::Window,
         renderer: &'a Arc<Renderer>,
         routines: &'a Arc<rend3_framework::DefaultRoutines>,
@@ -423,6 +430,7 @@ impl rend3_framework::App for SceneViewer {
                 intensity: self.directional_light_intensity,
                 direction,
                 distance: self.gltf_settings.directional_light_shadow_distance,
+                resolution: 2048,
             }));
         }
 
@@ -553,9 +561,7 @@ impl rend3_framework::App for SceneViewer {
                 });
 
                 // Get a frame
-                let frame = rend3::util::output::OutputFrame::Surface {
-                    surface: Arc::clone(surface.unwrap()),
-                };
+                let frame = surface.unwrap().get_current_texture().unwrap();
                 // Lock all the routines
                 let pbr_routine = lock(&routines.pbr);
                 let mut skybox_routine = lock(&routines.skybox);
@@ -569,6 +575,8 @@ impl rend3_framework::App for SceneViewer {
                 // Build a rendergraph
                 let mut graph = rend3::graph::RenderGraph::new();
 
+                let frame_handle =
+                    graph.add_imported_render_target(&frame, 0..1, rend3::graph::ViewportRect::from_size(resolution));
                 // Add the default rendergraph
                 base_rendergraph.add_to_graph(
                     &mut graph,
@@ -576,6 +584,7 @@ impl rend3_framework::App for SceneViewer {
                     &pbr_routine,
                     Some(&skybox_routine),
                     &tonemapping_routine,
+                    frame_handle,
                     resolution,
                     self.samples,
                     Vec3::splat(self.ambient_light_level).extend(1.0),
@@ -583,7 +592,9 @@ impl rend3_framework::App for SceneViewer {
                 );
 
                 // Dispatch a render using the built up rendergraph!
-                self.previous_profiling_stats = graph.execute(renderer, frame, cmd_bufs, &ready);
+                self.previous_profiling_stats = graph.execute(renderer, cmd_bufs, &ready);
+
+                frame.present();
                 // mark the end of the frame for tracy/other profilers
                 profiling::finish_frame!();
             }
@@ -659,10 +670,10 @@ impl rend3_framework::App for SceneViewer {
                 } else if self.camera_yaw >= TAU {
                     self.camera_yaw -= TAU;
                 }
-                self.camera_pitch = self
-                    .camera_pitch
-                    .max(-std::f32::consts::FRAC_PI_2 + 0.0001)
-                    .min(std::f32::consts::FRAC_PI_2 - 0.0001);
+                self.camera_pitch = self.camera_pitch.clamp(
+                    -std::f32::consts::FRAC_PI_2 + 0.0001,
+                    std::f32::consts::FRAC_PI_2 - 0.0001,
+                )
             }
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,

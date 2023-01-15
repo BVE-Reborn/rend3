@@ -10,7 +10,7 @@ use wgpu::Instance;
 use winit::{
     dpi::PhysicalSize,
     event::WindowEvent,
-    event_loop::{ControlFlow, EventLoop, EventLoopWindowTarget},
+    event_loop::{ControlFlow, EventLoop, EventLoopBuilder, EventLoopWindowTarget},
     window::{Window, WindowBuilder, WindowId},
 };
 
@@ -21,7 +21,6 @@ mod resize_observer;
 
 pub use assets::*;
 pub use grab::*;
-
 pub use parking_lot::{Mutex, MutexGuard};
 pub type Event<'a, T> = winit::event::Event<'a, UserResizeEvent<T>>;
 
@@ -57,7 +56,7 @@ pub trait App<T: 'static = ()> {
     fn create_window(&mut self, builder: WindowBuilder) -> (EventLoop<UserResizeEvent<T>>, Window) {
         profiling::scope!("creating window");
 
-        let event_loop = EventLoop::with_user_event();
+        let event_loop = EventLoopBuilder::with_user_event().build();
         let window = builder.build(&event_loop).expect("Could not build window");
 
         #[cfg(target_arch = "wasm32")]
@@ -83,7 +82,7 @@ pub trait App<T: 'static = ()> {
         Box::pin(async move { Ok(rend3::create_iad(None, None, None, None).await?) })
     }
 
-    fn create_base_rendergraph(&mut self, renderer: &Renderer, spp: &ShaderPreProcessor) -> BaseRenderGraph {
+    fn create_base_rendergraph(&mut self, renderer: &Arc<Renderer>, spp: &ShaderPreProcessor) -> BaseRenderGraph {
         BaseRenderGraph::new(renderer, spp)
     }
 
@@ -102,12 +101,13 @@ pub trait App<T: 'static = ()> {
 
     fn setup(
         &mut self,
+        event_loop: &EventLoop<UserResizeEvent<T>>,
         window: &Window,
         renderer: &Arc<Renderer>,
         routines: &Arc<DefaultRoutines>,
         surface_format: rend3::types::TextureFormat,
     ) {
-        let _ = (window, renderer, routines, surface_format);
+        let _ = (event_loop, window, renderer, routines, surface_format);
     }
 
     /// RedrawRequested/RedrawEventsCleared will only be fired if the window
@@ -212,7 +212,7 @@ pub async fn async_start<A: App<T> + 'static, T: 'static>(mut app: A, window_bui
     let mut surface = if cfg!(target_os = "android") {
         None
     } else {
-        Some(Arc::new(unsafe { iad.instance.create_surface(&window) }))
+        Some(Arc::new(unsafe { iad.instance.create_surface(&window) }.unwrap()))
     };
 
     // Make us a renderer.
@@ -227,8 +227,8 @@ pub async fn async_start<A: App<T> + 'static, T: 'static>(mut app: A, window_bui
     //
     // Assume android supports Rgba8Srgb, as it has 100% device coverage
     let format = surface.as_ref().map_or(TextureFormat::Rgba8UnormSrgb, |s| {
-        let formats = s.get_supported_formats(&iad.adapter);
-        let format = formats[0];
+        let caps = s.get_capabilities(&iad.adapter);
+        let format = caps.formats[0];
 
         // Configure the surface to be ready for rendering.
         rend3::configure_surface(
@@ -268,7 +268,7 @@ pub async fn async_start<A: App<T> + 'static, T: 'static>(mut app: A, window_bui
     });
     drop(data_core);
 
-    app.setup(&window, &renderer, &routines, format);
+    app.setup(&event_loop, &window, &renderer, &routines, format);
 
     #[cfg(target_arch = "wasm32")]
     let _observer = resize_observer::ResizeObserver::new(&window, event_loop.create_proxy());
@@ -359,7 +359,9 @@ fn handle_surface<A: App<T>, T: 'static>(
 ) -> Option<bool> {
     match *event {
         Event::Resumed => {
-            *surface = Some(Arc::new(unsafe { instance.create_surface(window) }));
+            if surface.is_none() {
+                *surface = Some(Arc::new(unsafe { instance.create_surface(window) }.unwrap()));
+            }
             Some(false)
         }
         Event::Suspended => {
@@ -386,7 +388,7 @@ fn handle_surface<A: App<T>, T: 'static>(
                 surface.as_ref().unwrap(),
                 &renderer.device,
                 format,
-                glam::UVec2::new(size.x, size.y),
+                size,
                 rend3::types::PresentMode::Fifo,
             );
             // Tell the renderer about the new aspect ratio.

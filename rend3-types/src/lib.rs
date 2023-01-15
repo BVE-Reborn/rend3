@@ -1,21 +1,29 @@
+#![warn(unsafe_op_in_unsafe_fn)]
+
 //! Type declarations for the rend3 3D rendering crate.
 //!
 //! This is reexported in the rend3 crate proper and includes all the "surface"
 //! api arguments.
 
-use glam::{Mat4, UVec2, Vec2, Vec3, Vec3A, Vec4};
 use std::{
     fmt::Debug,
     hash::Hash,
     marker::PhantomData,
-    mem,
+    mem::{self, size_of},
     num::NonZeroU32,
-    sync::{Arc, Weak},
+    ops::Deref,
+    slice,
+    sync::Arc,
 };
-use thiserror::Error;
 
 /// Reexport of the glam version rend3 is using.
 pub use glam;
+use glam::{Mat4, UVec2, Vec2, Vec3, Vec3A, Vec4};
+use list_any::VecAny;
+use thiserror::Error;
+
+mod attribute;
+pub use attribute::*;
 
 /// Non-owning resource handle.
 ///
@@ -25,6 +33,16 @@ pub struct RawResourceHandle<T> {
     /// Underlying value of the handle.
     pub idx: usize,
     _phantom: PhantomData<T>,
+}
+
+impl<T> RawResourceHandle<T> {
+    /// Creates a new handle with the given value
+    pub const fn new(idx: usize) -> Self {
+        Self {
+            idx,
+            _phantom: PhantomData,
+        }
+    }
 }
 
 // Need Debug/Copy/Clone impls that don't require T: Trait.
@@ -53,18 +71,37 @@ impl<T> PartialEq for RawResourceHandle<T> {
 
 impl<T> Eq for RawResourceHandle<T> {}
 
+impl<T> Hash for RawResourceHandle<T> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.idx.hash(state);
+    }
+}
+
 /// Owning resource handle. Used as part of rend3's interface.
 pub struct ResourceHandle<T> {
-    refcount: Arc<()>,
-    idx: usize,
+    /// Inside this arc is the function to call when
+    /// this resource handle is destroyed and we
+    /// need to phone home. We're just reusing
+    /// the allocation for both refcount and function
+    /// purposes.
+    refcount: Arc<dyn Fn(RawResourceHandle<T>) + Send + Sync>,
+    raw: RawResourceHandle<T>,
     _phantom: PhantomData<T>,
+}
+
+impl<T> Drop for ResourceHandle<T> {
+    fn drop(&mut self) {
+        if Arc::strong_count(&self.refcount) == 1 {
+            (self.refcount)(self.raw);
+        }
+    }
 }
 
 impl<T> Debug for ResourceHandle<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ResourceHandle")
             .field("refcount", &Arc::strong_count(&self.refcount))
-            .field("idx", &self.idx)
+            .field("idx", &self.raw.idx)
             .finish()
     }
 }
@@ -73,7 +110,7 @@ impl<T> Clone for ResourceHandle<T> {
     fn clone(&self) -> Self {
         Self {
             refcount: self.refcount.clone(),
-            idx: self.idx,
+            raw: self.raw,
             _phantom: self._phantom,
         }
     }
@@ -81,7 +118,7 @@ impl<T> Clone for ResourceHandle<T> {
 
 impl<T> PartialEq for ResourceHandle<T> {
     fn eq(&self, other: &Self) -> bool {
-        self.idx == other.idx
+        self.raw.idx == other.raw.idx
     }
 }
 
@@ -89,7 +126,7 @@ impl<T> Eq for ResourceHandle<T> {}
 
 impl<T> Hash for ResourceHandle<T> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.idx.hash(state);
+        self.raw.idx.hash(state);
     }
 }
 
@@ -97,10 +134,13 @@ impl<T> ResourceHandle<T> {
     /// Create a new resource handle from an index.
     ///
     /// Part of rend3's internal interface, use `Renderer::add_*` instead.
-    pub fn new(idx: usize) -> Self {
+    pub fn new(destroy_fn: impl Fn(RawResourceHandle<T>) + Send + Sync + 'static, idx: usize) -> Self {
         Self {
-            refcount: Arc::new(()),
-            idx,
+            refcount: Arc::new(destroy_fn),
+            raw: RawResourceHandle {
+                idx,
+                _phantom: PhantomData,
+            },
             _phantom: PhantomData,
         }
     }
@@ -109,55 +149,68 @@ impl<T> ResourceHandle<T> {
     ///
     /// Part of rend3's internal interface for accessing internal resrouces
     pub fn get_raw(&self) -> RawResourceHandle<T> {
-        RawResourceHandle {
-            idx: self.idx,
-            _phantom: PhantomData,
-        }
-    }
-
-    /// Get the weak refcount for this owned handle.
-    ///
-    /// Part of rend3's internal interface.
-    pub fn get_weak_refcount(&self) -> Weak<()> {
-        Arc::downgrade(&self.refcount)
+        self.raw
     }
 }
 
-#[macro_export]
-#[doc(hidden)]
-macro_rules! declare_handle {
-    ($($name:ident<$ty:ty>),*) => {$(
-        #[doc = concat!("Refcounted handle to a ", stringify!($ty) ,".")]
-        pub type $name = ResourceHandle<$ty>;
-    )*};
+impl<T> Deref for ResourceHandle<T> {
+    type Target = RawResourceHandle<T>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.raw
+    }
 }
 
-declare_handle!(
-    MeshHandle<Mesh>,
-    TextureHandle<Texture>,
-    MaterialHandle<MaterialTag>,
-    ObjectHandle<Object>,
-    DirectionalLightHandle<DirectionalLight>,
-    SkeletonHandle<Skeleton>
-);
-
-#[macro_export]
+/// Tag type for differentiating Texture2Ds on the type level.
 #[doc(hidden)]
-macro_rules! declare_raw_handle {
-    ($($name:ident<$ty:ty>),*) => {$(
-        #[doc = concat!("Internal non-owning handle to a ", stringify!($ty) ,".")]
-        pub type $name = RawResourceHandle<$ty>;
-    )*};
-}
+pub struct Texture2DTag;
+/// Tag type for differentiating TextureCubes on the type level.
+#[doc(hidden)]
+pub struct TextureCubeTag;
+/// Tag type for differentiating Materials on the type level.
+#[doc(hidden)]
+pub struct MaterialTag;
+/// Tag type for differentiating GraphData on the type level.
+#[doc(hidden)]
+pub struct GraphDataTag;
 
-declare_raw_handle!(
-    RawMeshHandle<Mesh>,
-    RawTextureHandle<Texture>,
-    RawMaterialHandle<MaterialTag>,
-    RawObjectHandle<Object>,
-    RawDirectionalLightHandle<DirectionalLight>,
-    RawSkeletonHandle<Skeleton>
-);
+/// Refcounted handle to a Mesh
+pub type MeshHandle = ResourceHandle<Mesh>;
+/// Refcounted handle to a Texture2D
+pub type Texture2DHandle = ResourceHandle<Texture2DTag>;
+/// Refcounted handle to a TextureCube
+pub type TextureCubeHandle = ResourceHandle<TextureCubeTag>;
+/// Refcounted handle to a Material
+pub type MaterialHandle = ResourceHandle<MaterialTag>;
+/// Refcounted handle to an Object
+pub type ObjectHandle = ResourceHandle<Object>;
+/// Refcounted handle to a DirectionalLight
+pub type DirectionalLightHandle = ResourceHandle<DirectionalLight>;
+/// Refcounted handle to a Skeleton
+pub type SkeletonHandle = ResourceHandle<Skeleton>;
+/// Refcounted handle to an instance of GraphData with the type erased
+pub type GraphDataHandleUntyped = ResourceHandle<GraphDataTag>;
+/// Refcounted handle to an instance of GraphData
+pub struct GraphDataHandle<T>(pub GraphDataHandleUntyped, pub PhantomData<T>);
+
+/// Internal non-owning handle to a Mesh
+pub type RawMeshHandle = RawResourceHandle<Mesh>;
+/// Internal non-owning handle to a Texture2D
+pub type RawTexture2DHandle = RawResourceHandle<Texture2DTag>;
+/// Internal non-owning handle to a TextureCube
+pub type RawTextureCubeHandle = RawResourceHandle<TextureCubeTag>;
+/// Internal non-owning handle to a Material
+pub type RawMaterialHandle = RawResourceHandle<MaterialTag>;
+/// Internal non-owning handle to an Object
+pub type RawObjectHandle = RawResourceHandle<Object>;
+/// Internal non-owning handle to a DirectionalLight
+pub type RawDirectionalLightHandle = RawResourceHandle<DirectionalLight>;
+/// Internal non-owning handle to a Skeleton
+pub type RawSkeletonHandle = RawResourceHandle<Skeleton>;
+/// Internal non-owning handle to an instance of GraphData with the type erased
+pub type RawGraphDataHandleUntyped = RawResourceHandle<GraphDataTag>;
+/// Internal non-owning handle to an instance of GraphData
+pub struct RawGraphDataHandle<T>(pub RawGraphDataHandleUntyped, pub PhantomData<T>);
 
 macro_rules! changeable_struct {
     ($(#[$outer:meta])* pub struct $name:ident <- $name_change:ident { $($(#[$inner:meta])* $field_vis:vis $field_name:ident : $field_type:ty),* $(,)? } ) => {
@@ -198,50 +251,91 @@ pub use wgt::{
 ///
 /// The value allows for 8 bits of information packed in the high 8 bits of the
 /// index for object recombination.
-pub const MAX_VERTEX_COUNT: usize = 1 << 24;
-
-/// Identifies the semantic use of a vertex buffer.
-#[derive(Debug, Copy, Clone)]
-pub enum VertexBufferType {
-    Position,
-    Normal,
-    Tangent,
-    Uv0,
-    Uv1,
-    Colors,
-}
+pub const MAX_VERTEX_COUNT: u32 = 1 << 24;
+/// The maximum amount of indices any one object can have.
+pub const MAX_INDEX_COUNT: u32 = u32::MAX;
 
 /// Error returned from mesh validation.
 #[derive(Debug, Error)]
 pub enum MeshValidationError {
-    #[error("Mesh's {ty:?} buffer has {actual} vertices but the position buffer has {expected}")]
+    #[error("Mesh's {:?} buffer has {actual} vertices but the position buffer has {expected}", .attribute_id.name())]
     MismatchedVertexCount {
-        ty: VertexBufferType,
+        attribute_id: &'static VertexAttributeId,
         expected: usize,
         actual: usize,
     },
-    #[error("Mesh has {count} vertices when the vertex limit is {}", MAX_VERTEX_COUNT)]
+    #[error("Mesh has {count} vertices when the vertex limit is {MAX_VERTEX_COUNT}")]
     ExceededMaxVertexCount { count: usize },
+    #[error("Mesh has {count} indicies when maximum index count is {MAX_INDEX_COUNT}")]
+    ExceededMaxIndexCount { count: usize },
     #[error("Mesh has {count} indices which is not a multiple of three. Meshes are always composed of triangles")]
     IndexCountNotMultipleOfThree { count: usize },
     #[error(
         "Index at position {index} has the value {value} which is out of bounds for vertex buffers of {max} length"
     )]
-    IndexOutOfBounds { index: usize, value: u32, max: usize },
+    IndexOutOfBounds { index: usize, value: u32, max: u32 },
 }
+
+#[derive(Debug)]
+pub struct StoredVertexAttributeData {
+    id: &'static VertexAttributeId,
+    data: VecAny,
+    ptr: *const u8,
+    bytes: u64,
+}
+impl StoredVertexAttributeData {
+    pub fn new<T>(attribute: &'static VertexAttribute<T>, data: Vec<T>) -> Self
+    where
+        T: VertexFormat,
+    {
+        let bytes = (data.len() * size_of::<T>()) as u64;
+        let ptr = data.as_ptr() as *const u8;
+        Self {
+            id: attribute.id(),
+            data: VecAny::from(data),
+            ptr,
+            bytes,
+        }
+    }
+
+    pub fn id(&self) -> &'static VertexAttributeId {
+        self.id
+    }
+
+    pub fn bytes(&self) -> u64 {
+        self.bytes
+    }
+
+    pub fn untyped_data(&self) -> &[u8] {
+        // SAFETY: the pointer is to the vector's allocation which is still live and will be for the length of 'self.
+        //         the length is the exact byte length of the allocation.
+        unsafe { slice::from_raw_parts(self.ptr, self.bytes as usize) }
+    }
+
+    /// Gets the typed data if the attributes match ids and have the same types.
+    pub fn typed_data<T: VertexFormat>(&self, attribute: &'static VertexAttribute<T>) -> Option<&[T]> {
+        if attribute.id() != self.id {
+            return None;
+        }
+        Some(self.data.downcast_slice::<T>().unwrap())
+    }
+
+    pub fn typed_data_mut<T: VertexFormat>(&mut self, attribute: &'static VertexAttribute<T>) -> Option<&mut [T]> {
+        if attribute.id() != self.id {
+            return None;
+        }
+        Some(self.data.downcast_slice_mut::<T>().unwrap())
+    }
+}
+
+unsafe impl Send for StoredVertexAttributeData {}
+unsafe impl Sync for StoredVertexAttributeData {}
 
 /// Easy to use builder for a [`Mesh`] that deals with common operations for
 /// you.
 #[derive(Debug, Default)]
 pub struct MeshBuilder {
-    vertex_positions: Vec<Vec3>,
-    vertex_normals: Option<Vec<Vec3>>,
-    vertex_tangents: Option<Vec<Vec3>>,
-    vertex_uv0: Option<Vec<Vec2>>,
-    vertex_uv1: Option<Vec<Vec2>>,
-    vertex_colors: Option<Vec<[u8; 4]>>,
-    vertex_joint_indices: Option<Vec<[u16; 4]>>,
-    vertex_joint_weights: Option<Vec<Vec4>>,
+    vertex_attributes: Vec<StoredVertexAttributeData>,
     vertex_count: usize,
 
     indices: Option<Vec<u32>>,
@@ -258,10 +352,19 @@ impl MeshBuilder {
     pub fn new(vertex_positions: Vec<Vec3>, handedness: Handedness) -> Self {
         Self {
             vertex_count: vertex_positions.len(),
-            vertex_positions,
+            vertex_attributes: vec![StoredVertexAttributeData::new(
+                &VERTEX_ATTRIBUTE_POSITION,
+                vertex_positions,
+            )],
             handedness,
             ..Self::default()
         }
+    }
+
+    pub fn with_attribute<T: VertexFormat>(mut self, attribute: &'static VertexAttribute<T>, values: Vec<T>) -> Self {
+        self.vertex_attributes
+            .push(StoredVertexAttributeData::new(attribute, values));
+        self
     }
 
     /// Add vertex normals to the given mesh.
@@ -269,9 +372,8 @@ impl MeshBuilder {
     /// # Panic
     ///
     /// Will panic if the length is different from the position buffer length.
-    pub fn with_vertex_normals(mut self, normals: Vec<Vec3>) -> Self {
-        self.vertex_normals = Some(normals);
-        self
+    pub fn with_vertex_normals(self, normals: Vec<Vec3>) -> Self {
+        self.with_attribute(&VERTEX_ATTRIBUTE_NORMAL, normals)
     }
 
     /// Add vertex tangents to the given mesh.
@@ -279,9 +381,8 @@ impl MeshBuilder {
     /// # Panic
     ///
     /// Will panic if the length is different from the position buffer length.
-    pub fn with_vertex_tangents(mut self, tangents: Vec<Vec3>) -> Self {
-        self.vertex_tangents = Some(tangents);
-        self
+    pub fn with_vertex_tangents(self, tangents: Vec<Vec3>) -> Self {
+        self.with_attribute(&VERTEX_ATTRIBUTE_TANGENT, tangents)
     }
 
     /// Add the first set of texture coordinates to the given mesh.
@@ -289,9 +390,8 @@ impl MeshBuilder {
     /// # Panic
     ///
     /// Will panic if the length is different from the position buffer length.
-    pub fn with_vertex_uv0(mut self, uvs: Vec<Vec2>) -> Self {
-        self.vertex_uv0 = Some(uvs);
-        self
+    pub fn with_vertex_texture_coordinates_0(self, coords: Vec<Vec2>) -> Self {
+        self.with_attribute(&VERTEX_ATTRIBUTE_TEXTURE_COORDINATES_0, coords)
     }
 
     /// Add the second set of texture coordinates to the given mesh.
@@ -299,9 +399,8 @@ impl MeshBuilder {
     /// # Panic
     ///
     /// Will panic if the length is different from the position buffer length.
-    pub fn with_vertex_uv1(mut self, uvs: Vec<Vec2>) -> Self {
-        self.vertex_uv1 = Some(uvs);
-        self
+    pub fn with_vertex_texture_coordinates_1(self, coords: Vec<Vec2>) -> Self {
+        self.with_attribute(&VERTEX_ATTRIBUTE_TEXTURE_COORDINATES_1, coords)
     }
 
     /// Add vertex colors to the given mesh.
@@ -309,9 +408,8 @@ impl MeshBuilder {
     /// # Panic
     ///
     /// Will panic if the length is different from the position buffer length.
-    pub fn with_vertex_colors(mut self, colors: Vec<[u8; 4]>) -> Self {
-        self.vertex_colors = Some(colors);
-        self
+    pub fn with_vertex_color_0(self, colors: Vec<[u8; 4]>) -> Self {
+        self.with_attribute(&VERTEX_ATTRIBUTE_COLOR_0, colors)
     }
 
     /// Add vertex joint indices to the given mesh.
@@ -319,9 +417,8 @@ impl MeshBuilder {
     /// # Panic
     ///
     /// Will panic if the length is different from the position buffer length.
-    pub fn with_vertex_joint_indices(mut self, joint_indices: Vec<[u16; 4]>) -> Self {
-        self.vertex_joint_indices = Some(joint_indices);
-        self
+    pub fn with_vertex_joint_indices(self, joint_indices: Vec<[u16; 4]>) -> Self {
+        self.with_attribute(&VERTEX_ATTRIBUTE_JOINT_INDICES, joint_indices)
     }
 
     /// Add vertex joint weights to the given mesh.
@@ -329,9 +426,8 @@ impl MeshBuilder {
     /// # Panic
     ///
     /// Will panic if the length is different from the position buffer length.
-    pub fn with_vertex_joint_weights(mut self, joint_weights: Vec<Vec4>) -> Self {
-        self.vertex_joint_weights = Some(joint_weights);
-        self
+    pub fn with_vertex_joint_weights(self, joint_weights: Vec<Vec4>) -> Self {
+        self.with_attribute(&VERTEX_ATTRIBUTE_JOINT_WEIGHTS, joint_weights)
     }
 
     /// Add indices to the given mesh.
@@ -383,23 +479,14 @@ impl MeshBuilder {
     ///
     /// All others will be filled with defaults.
     pub fn build(self) -> Result<Mesh, MeshValidationError> {
-        let length = self.vertex_count;
-
-        let has_normals = self.vertex_normals.is_some();
-        let has_tangents = self.vertex_tangents.is_some();
-        let has_uvs = self.vertex_uv0.is_some();
-
         let mut mesh = Mesh {
-            vertex_positions: self.vertex_positions,
-            vertex_normals: self.vertex_normals.unwrap_or_else(|| vec![Vec3::ZERO; length]),
-            vertex_tangents: self.vertex_tangents.unwrap_or_else(|| vec![Vec3::ZERO; length]),
-            vertex_uv0: self.vertex_uv0.unwrap_or_else(|| vec![Vec2::ZERO; length]),
-            vertex_uv1: self.vertex_uv1.unwrap_or_else(|| vec![Vec2::ZERO; length]),
-            vertex_colors: self.vertex_colors.unwrap_or_else(|| vec![[255; 4]; length]),
-            vertex_joint_indices: self.vertex_joint_indices.unwrap_or_else(|| vec![[0; 4]; length]),
-            vertex_joint_weights: self.vertex_joint_weights.unwrap_or_else(|| vec![Vec4::ZERO; length]),
-            indices: self.indices.unwrap_or_else(|| (0..length as u32).collect()),
+            attributes: self.vertex_attributes,
+            vertex_count: self.vertex_count,
+            indices: self.indices.unwrap_or_else(|| (0..self.vertex_count as u32).collect()),
         };
+
+        let has_normals = mesh.find_attribute_index(&VERTEX_ATTRIBUTE_NORMAL).is_some();
+        let has_tangents = mesh.find_attribute_index(&VERTEX_ATTRIBUTE_TANGENT).is_some();
 
         if !self.without_validation {
             mesh.validate()?;
@@ -416,8 +503,7 @@ impl MeshBuilder {
             unsafe { mesh.calculate_normals(self.handedness, true) };
         }
 
-        // Don't need to bother with tangents if there are no meaningful UVs
-        if !has_tangents && has_uvs {
+        if !has_tangents {
             // SAFETY: We've validated this mesh or had its validity unsafely asserted.
             unsafe { mesh.calculate_tangents(true) };
         }
@@ -436,83 +522,85 @@ impl MeshBuilder {
 /// easier.
 #[derive(Debug)]
 pub struct Mesh {
-    pub vertex_positions: Vec<Vec3>,
-    pub vertex_normals: Vec<Vec3>,
-    pub vertex_tangents: Vec<Vec3>,
-    pub vertex_uv0: Vec<Vec2>,
-    pub vertex_uv1: Vec<Vec2>,
-    pub vertex_colors: Vec<[u8; 4]>,
-    pub vertex_joint_indices: Vec<[u16; 4]>,
-    pub vertex_joint_weights: Vec<Vec4>,
+    pub attributes: Vec<StoredVertexAttributeData>,
+    pub vertex_count: usize,
 
     pub indices: Vec<u32>,
-}
-
-impl Clone for Mesh {
-    fn clone(&self) -> Self {
-        Self {
-            vertex_positions: self.vertex_positions.clone(),
-            vertex_normals: self.vertex_normals.clone(),
-            vertex_tangents: self.vertex_tangents.clone(),
-            vertex_uv0: self.vertex_uv0.clone(),
-            vertex_uv1: self.vertex_uv1.clone(),
-            vertex_colors: self.vertex_colors.clone(),
-            vertex_joint_indices: self.vertex_joint_indices.clone(),
-            vertex_joint_weights: self.vertex_joint_weights.clone(),
-            indices: self.indices.clone(),
-        }
-    }
 }
 
 impl Mesh {
     /// Validates that all vertex attributes have the same length.
     pub fn validate(&self) -> Result<(), MeshValidationError> {
-        let position_length = self.vertex_positions.len();
+        let position_length = self.vertex_count;
         let indices_length = self.indices.len();
 
-        if position_length > MAX_VERTEX_COUNT {
+        if position_length > MAX_VERTEX_COUNT as usize {
             return Err(MeshValidationError::ExceededMaxVertexCount { count: position_length });
         }
 
-        let first_different_length = [
-            (self.vertex_normals.len(), VertexBufferType::Normal),
-            (self.vertex_tangents.len(), VertexBufferType::Tangent),
-            (self.vertex_uv0.len(), VertexBufferType::Uv0),
-            (self.vertex_uv1.len(), VertexBufferType::Uv1),
-            (self.vertex_colors.len(), VertexBufferType::Colors),
-        ]
-        .iter()
-        .find_map(|&(len, ty)| if len != position_length { Some((len, ty)) } else { None });
-
-        if let Some((len, ty)) = first_different_length {
-            return Err(MeshValidationError::MismatchedVertexCount {
-                ty,
-                actual: len,
-                expected: position_length,
-            });
+        for attribute in &self.attributes {
+            let attribute_len = attribute.data.len();
+            if attribute_len != position_length {
+                return Err(MeshValidationError::MismatchedVertexCount {
+                    attribute_id: attribute.id(),
+                    actual: attribute_len,
+                    expected: position_length,
+                });
+            }
         }
 
         if indices_length % 3 != 0 {
             return Err(MeshValidationError::IndexCountNotMultipleOfThree { count: indices_length });
         }
 
-        let first_oob_index = self.indices.iter().enumerate().find_map(|(idx, &i)| {
-            if (i as usize) >= position_length {
-                Some((idx, i))
-            } else {
-                None
-            }
-        });
+        if indices_length >= MAX_INDEX_COUNT as usize {
+            return Err(MeshValidationError::ExceededMaxIndexCount { count: indices_length });
+        }
 
-        if let Some((index, value)) = first_oob_index {
-            return Err(MeshValidationError::IndexOutOfBounds {
-                index,
-                value,
-                max: position_length,
-            });
+        for (index, &value) in self.indices.iter().enumerate() {
+            if value as usize >= position_length {
+                return Err(MeshValidationError::IndexOutOfBounds {
+                    index,
+                    value,
+                    max: position_length as u32,
+                });
+            }
         }
 
         Ok(())
+    }
+
+    /// Returns the index in to the attribute array for a given attribute. If
+    /// there is no such attribute, returns None.
+    pub fn find_attribute_index(&self, desired_attribute: &'static VertexAttributeId) -> Option<usize> {
+        self.attributes
+            .iter()
+            .enumerate()
+            .find_map(|(idx, attribute)| (attribute.id == desired_attribute).then_some(idx))
+    }
+
+    /// Returns the index in to the attribute array for a given attribute. Creates the attribute
+    /// if the attribute is not found, filling it with zeros.
+    ///
+    /// Returns true if the attribute is newly created.
+    pub fn find_or_create_attribute_index<T: VertexFormat>(
+        &mut self,
+        desired_attribute: &'static VertexAttribute<T>,
+    ) -> (usize, bool) {
+        let index = self.find_attribute_index(desired_attribute.id());
+
+        index.map_or_else(
+            || {
+                let idx = self.attributes.len();
+                self.attributes.push(StoredVertexAttributeData::new(
+                    desired_attribute,
+                    vec![T::zeroed(); self.vertex_count],
+                ));
+                // There were no normals, and our created normals are already zeroed.
+                (idx, true)
+            },
+            |idx| (idx, false),
+        )
     }
 
     /// Calculate normals for the given mesh, assuming smooth shading and
@@ -533,20 +621,32 @@ impl Mesh {
     /// If a mesh has passed a call to validate, it is sound to call this
     /// function.
     pub unsafe fn calculate_normals(&mut self, handedness: Handedness, zeroed: bool) {
+        let (normals_index, normals_created) = self.find_or_create_attribute_index(&VERTEX_ATTRIBUTE_NORMAL);
+
+        let (position_attribute, remaining_attributes) = self.attributes.split_first_mut().unwrap();
+        let positions = position_attribute.typed_data(&VERTEX_ATTRIBUTE_POSITION).unwrap();
+        let normals = remaining_attributes[normals_index - 1]
+            .typed_data_mut(&VERTEX_ATTRIBUTE_NORMAL)
+            .unwrap();
+
         if handedness == Handedness::Left {
-            Self::calculate_normals_for_buffers::<true>(
-                &mut self.vertex_normals,
-                &self.vertex_positions,
-                &self.indices,
-                zeroed,
-            )
+            unsafe {
+                Self::calculate_normals_for_buffers::<true>(
+                    normals,
+                    positions,
+                    &self.indices,
+                    zeroed || normals_created,
+                )
+            }
         } else {
-            Self::calculate_normals_for_buffers::<false>(
-                &mut self.vertex_normals,
-                &self.vertex_positions,
-                &self.indices,
-                zeroed,
-            )
+            unsafe {
+                Self::calculate_normals_for_buffers::<false>(
+                    normals,
+                    positions,
+                    &self.indices,
+                    zeroed || normals_created,
+                )
+            }
         }
     }
 
@@ -585,13 +685,13 @@ impl Mesh {
             let (idx0, idx1, idx2) = match *idx {
                 [idx0, idx1, idx2] => (idx0, idx1, idx2),
                 // SAFETY: This is guaranteed by chunks_exact(3)
-                _ => std::hint::unreachable_unchecked(),
+                _ => unsafe { std::hint::unreachable_unchecked() },
             };
 
             // SAFETY: The conditions of this function assert all thes indices are in-bounds
-            let pos1 = *positions.get_unchecked(idx0 as usize);
-            let pos2 = *positions.get_unchecked(idx1 as usize);
-            let pos3 = *positions.get_unchecked(idx2 as usize);
+            let pos1 = unsafe { *positions.get_unchecked(idx0 as usize) };
+            let pos2 = unsafe { *positions.get_unchecked(idx1 as usize) };
+            let pos3 = unsafe { *positions.get_unchecked(idx2 as usize) };
 
             let edge1 = pos2 - pos1;
             let edge2 = pos3 - pos1;
@@ -603,9 +703,9 @@ impl Mesh {
             };
 
             // SAFETY: The conditions of this function assert all thes indices are in-bounds
-            *normals.get_unchecked_mut(idx0 as usize) += normal;
-            *normals.get_unchecked_mut(idx1 as usize) += normal;
-            *normals.get_unchecked_mut(idx2 as usize) += normal;
+            unsafe { *normals.get_unchecked_mut(idx0 as usize) += normal };
+            unsafe { *normals.get_unchecked_mut(idx1 as usize) += normal };
+            unsafe { *normals.get_unchecked_mut(idx2 as usize) += normal };
         }
 
         for normal in normals.iter_mut() {
@@ -615,6 +715,8 @@ impl Mesh {
 
     /// Calculate tangents for the given mesh, based on normals and texture
     /// coordinates.
+    ///
+    /// If either normals or uv_0 don't exist on the mesh, this will not generate tangents.
     ///
     /// If zeroed is true, the normals will not be zeroed before hand. If this
     /// is falsely set, it is safe, just returns incorrect results.
@@ -628,15 +730,56 @@ impl Mesh {
     /// If a mesh has passed a call to validate, it is sound to call this
     /// function.
     pub unsafe fn calculate_tangents(&mut self, zeroed: bool) {
-        // SAFETY: The mesh unconditionally has a validation token, so it must be valid.
-        Self::calculate_tangents_for_buffers(
-            &mut self.vertex_tangents,
-            &self.vertex_positions,
-            &self.vertex_normals,
-            &self.vertex_uv0,
-            &self.indices,
-            zeroed,
-        )
+        let normal_index = match self.find_attribute_index(&VERTEX_ATTRIBUTE_NORMAL) {
+            Some(i) => i,
+            None => return,
+        };
+        let uv_0_index = match self.find_attribute_index(&VERTEX_ATTRIBUTE_TEXTURE_COORDINATES_0) {
+            Some(i) => i,
+            None => return,
+        };
+        let (tangent_index, tangents_created) = self.find_or_create_attribute_index(&VERTEX_ATTRIBUTE_TANGENT);
+
+        // Assert that all indices are disjoint. This should never
+        // not be the case, but validate in debug to make sure it is the case.
+        debug_assert_ne!(0, tangent_index);
+        debug_assert_ne!(0, normal_index);
+        debug_assert_ne!(0, uv_0_index);
+        debug_assert_ne!(tangent_index, normal_index);
+        debug_assert_ne!(tangent_index, uv_0_index);
+        debug_assert_ne!(normal_index, uv_0_index);
+
+        // Assert that all indices are in bounds.
+        debug_assert!(self.attributes.get(0).is_some());
+        debug_assert!(self.attributes.get(tangent_index).is_some());
+        debug_assert!(self.attributes.get(normal_index).is_some());
+        debug_assert!(self.attributes.get(uv_0_index).is_some());
+
+        // SAFETY: These references never escape this function, the attributes array isn't modified, and all indices are disjoint.
+        //
+        // We only use unsafe because we need to split-borrow different members of the array.
+        let attr_ptr = self.attributes.as_mut_ptr();
+        let positions_ref = unsafe { &*attr_ptr.add(0) };
+        let tangents_mut = unsafe { &mut *attr_ptr.add(tangent_index) };
+        let normals_ref = unsafe { &*attr_ptr.add(normal_index) };
+        let uv_0_ref = unsafe { &*attr_ptr.add(uv_0_index) };
+
+        let positions = positions_ref.typed_data(&VERTEX_ATTRIBUTE_POSITION).unwrap();
+        let tangents = tangents_mut.typed_data_mut(&VERTEX_ATTRIBUTE_TANGENT).unwrap();
+        let normals = normals_ref.typed_data(&VERTEX_ATTRIBUTE_NORMAL).unwrap();
+        let uv_0 = uv_0_ref.typed_data(&VERTEX_ATTRIBUTE_TEXTURE_COORDINATES_0).unwrap();
+
+        // SAFETY: This function's caller has the same requirements as this one.
+        unsafe {
+            Self::calculate_tangents_for_buffers(
+                tangents,
+                positions,
+                normals,
+                uv_0,
+                &self.indices,
+                zeroed || tangents_created,
+            )
+        };
     }
 
     /// Calculate tangents for the given set of buffers, based on normals and
@@ -671,17 +814,17 @@ impl Mesh {
             let (idx0, idx1, idx2) = match *idx {
                 [idx0, idx1, idx2] => (idx0, idx1, idx2),
                 // SAFETY: This is guaranteed by chunks_exact(3)
-                _ => std::hint::unreachable_unchecked(),
+                _ => unsafe { std::hint::unreachable_unchecked() },
             };
 
             // SAFETY: The conditions of this function assert all thes indices are in-bounds
-            let pos1 = *positions.get_unchecked(idx0 as usize);
-            let pos2 = *positions.get_unchecked(idx1 as usize);
-            let pos3 = *positions.get_unchecked(idx2 as usize);
+            let pos1 = unsafe { *positions.get_unchecked(idx0 as usize) };
+            let pos2 = unsafe { *positions.get_unchecked(idx1 as usize) };
+            let pos3 = unsafe { *positions.get_unchecked(idx2 as usize) };
 
-            let tex1 = *uvs.get_unchecked(idx0 as usize);
-            let tex2 = *uvs.get_unchecked(idx1 as usize);
-            let tex3 = *uvs.get_unchecked(idx2 as usize);
+            let tex1 = unsafe { *uvs.get_unchecked(idx0 as usize) };
+            let tex2 = unsafe { *uvs.get_unchecked(idx1 as usize) };
+            let tex3 = unsafe { *uvs.get_unchecked(idx2 as usize) };
 
             let edge1 = pos2 - pos1;
             let edge2 = pos3 - pos1;
@@ -691,16 +834,12 @@ impl Mesh {
 
             let r = 1.0 / (uv1.x * uv2.y - uv1.y * uv2.x);
 
-            let tangent = Vec3::new(
-                ((edge1.x * uv2.y) - (edge2.x * uv1.y)) * r,
-                ((edge1.y * uv2.y) - (edge2.y * uv1.y)) * r,
-                ((edge1.z * uv2.y) - (edge2.z * uv1.y)) * r,
-            );
+            let tangent = (edge1 * Vec3::splat(uv2.y)) - (edge2 * Vec3::splat(uv1.y)) * r;
 
             // SAFETY: The conditions of this function assert all thes indices are in-bounds
-            *tangents.get_unchecked_mut(idx0 as usize) += tangent;
-            *tangents.get_unchecked_mut(idx1 as usize) += tangent;
-            *tangents.get_unchecked_mut(idx2 as usize) += tangent;
+            unsafe { *tangents.get_unchecked_mut(idx0 as usize) += tangent };
+            unsafe { *tangents.get_unchecked_mut(idx1 as usize) += tangent };
+            unsafe { *tangents.get_unchecked_mut(idx2 as usize) += tangent };
         }
 
         for (tan, norm) in tangents.iter_mut().zip(normals) {
@@ -800,13 +939,89 @@ pub struct Texture {
 #[derive(Debug, Clone)]
 pub struct TextureFromTexture {
     pub label: Option<String>,
-    pub src: TextureHandle,
+    pub src: Texture2DHandle,
     pub start_mip: u32,
     pub mip_count: Option<NonZeroU32>,
 }
 
-#[doc(hidden)]
-pub struct MaterialTag;
+/// Description of how this object should be sorted.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub struct Sorting {
+    pub reason: SortingReason,
+    pub order: SortingOrder,
+}
+
+impl Sorting {
+    /// Default sorting for opaque and cutout objects
+    pub const OPAQUE: Self = Self {
+        reason: SortingReason::Optimization,
+        order: SortingOrder::FrontToBack,
+    };
+
+    /// Default sorting for any objects using blending
+    pub const BLENDING: Self = Self {
+        reason: SortingReason::Requirement,
+        order: SortingOrder::BackToFront,
+    };
+}
+
+/// Reason why object need sorting
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum SortingReason {
+    /// Objects should be sorted for optimization purposes.
+    Optimization,
+    /// If objects aren't sorted, things will render incorrectly.
+    Requirement,
+}
+
+/// An object sorting order.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum SortingOrder {
+    /// Sort with the nearest objects first.
+    FrontToBack,
+    /// Sort with the furthest objects first.
+    BackToFront,
+}
+
+/// Trait that abstracts over all possible arrays of optional raw texture handles.
+///
+/// The IntoIterator stuff in this trait is because rust-analyzer gets totally
+/// confused when multiple IntoIterator bounds are involved. If I were to have
+/// `MaterialArray<T>: IntoIterator<Item = T>` like I would want, any into_iter
+/// based iteration of any iterator with a material argument in it
+/// (so `Iterator<Item = ObjectWrapper<M>>` for example) will completely stop being
+/// type deduced by RA. So to work around this, this trait also needs to act as
+/// IntoIterator. See <https://github.com/rust-lang/rust-analyzer/issues/11242>.
+pub trait MaterialArray<T>: AsRef<[T]> {
+    /// An array of the [u32; COUNT]. We need this internally
+    /// for shader layout stuff.
+    type U32Array: encase::ShaderSize + encase::internal::WriteInto + Clone + Copy + Send + Sync + 'static;
+    type IntoIter: Iterator<Item = T>;
+    const COUNT: u32;
+
+    fn map_to_u32<F>(self, func: F) -> Self::U32Array
+    where
+        F: FnMut(T) -> u32;
+
+    fn into_iter(self) -> Self::IntoIter;
+}
+
+impl<const C: usize, T> MaterialArray<T> for [T; C] {
+    type U32Array = [u32; C];
+    type IntoIter = <[T; C] as IntoIterator>::IntoIter;
+    const COUNT: u32 = C as u32;
+
+    fn map_to_u32<F>(self, func: F) -> Self::U32Array
+    where
+        F: FnMut(T) -> u32,
+    {
+        self.map(func)
+    }
+
+    fn into_iter(self) -> Self::IntoIter {
+        <Self as IntoIterator>::into_iter(self)
+    }
+}
 
 /// Interface that all materials must use.
 ///
@@ -831,22 +1046,25 @@ pub struct MaterialTag;
 ///   - Padding to 16 byte alignemnet.
 ///   - The data provided by the material.
 pub trait Material: Send + Sync + 'static {
-    /// The texture count that will be provided to `to_textures`.
-    const TEXTURE_COUNT: u32;
-    /// The amount of data that will be provided to `to_data`.
-    const DATA_SIZE: u32;
+    type DataType: encase::ShaderSize + encase::internal::WriteInto;
+    type TextureArrayType: MaterialArray<Option<RawTexture2DHandle>>;
+    type RequiredAttributeArrayType: MaterialArray<&'static VertexAttributeId>;
+    type SupportedAttributeArrayType: MaterialArray<&'static VertexAttributeId>;
 
-    /// u64 key that determine's an object's archetype. When you query for
-    /// objects from the object manager, you must provide this key to get all
-    /// objects with this key.
-    fn object_key(&self) -> u64;
+    fn required_attributes() -> Self::RequiredAttributeArrayType;
+    fn supported_attributes() -> Self::SupportedAttributeArrayType;
 
-    /// Fill up the given slice with textures.
-    fn to_textures<'a>(&'a self, slice: &mut [Option<&'a TextureHandle>]);
+    /// u64 key that allows different materials to be somehow categorized.
+    fn key(&self) -> u64;
 
-    /// Fill up the given slice with binary material data. This can be whatever
-    /// data a shader expects.
-    fn to_data(&self, slice: &mut [u8]);
+    /// How objects with this material should be sorted.
+    fn sorting(&self) -> Sorting;
+
+    /// The array of textures that should be bound. Rend3 supports up to 32.
+    fn to_textures(&self) -> Self::TextureArrayType;
+
+    /// Fill up the given slice with data. This can be whatever data the shader expects.
+    fn to_data(&self) -> Self::DataType;
 }
 
 /// Source of a mesh for an object.
@@ -900,6 +1118,8 @@ changeable_struct! {
     pub struct DirectionalLight <- DirectionalLightChange {
         /// Color of the light.
         pub color: Vec3,
+        /// Resolution of the shadow map cascades (in pix)
+        pub resolution: u16,
         /// Constant multiplier for the light.
         pub intensity: f32,
         /// Direction of the sun.

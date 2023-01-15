@@ -1,118 +1,115 @@
 {{include "rend3-routine/structures.wgsl"}}
-
-struct VertexInput {
-    @location(0) position: vec3<f32>,
-    @location(1) normal: vec3<f32>,
-    @location(2) tangent: vec3<f32>,
-    @location(3) coords0: vec2<f32>,
-    @location(4) coords1: vec2<f32>,
-    @location(5) color: vec4<f32>,
-{{#if (eq profile "GpuDriven")}}
-    @location(8) object_idx: u32,
-{{else}}
-    @builtin(instance_index) object_idx: u32,
-{{/if}}
-}
-
-struct VertexOutput {
-    @builtin(position) position0: vec4<f32>,
-    @location(0) position1: vec4<f32>,
-    @location(1) coords0: vec2<f32>,
-    @location(2) color: vec4<f32>,
-    @location(3) @interpolate(flat) material: u32,
-}
+{{include "rend3-routine/structures_object.wgsl"}}
+{{include "rend3-routine/material.wgsl"}}
 
 @group(0) @binding(0)
 var primary_sampler: sampler;
+@group(0) @binding(3)
+var<uniform> uniforms: UniformData;
+@group(0) @binding(4)
+var<storage> directional_lights: DirectionalLightData;
 
 @group(1) @binding(0)
-var<storage> object_output: array<ObjectOutputData>;
+var<storage> object_buffer: array<Object>;
+@group(1) @binding(1)
+var<storage> batch_data: BatchData;
+@group(1) @binding(2)
+var<storage> vertex_buffer: array<u32>;
 
 {{#if (eq profile "GpuDriven")}}
-    @group(1) @binding(1)
-    var<storage> material_data: array<f32>;
-    @group(3) @binding(0)
-    var textures: binding_array<texture_2d<f32>>;
-{{else}}
-    @group(3) @binding(0)
-    var<storage> material_data: array<f32>;
-    @group(3) @binding(1)
-    var texture: texture_2d<f32>;
+@group(1) @binding(3)
+var<storage> materials: array<GpuMaterialData>;
+@group(2) @binding(0)
+var textures: binding_array<texture_2d<f32>>;
 {{/if}}
 
-struct DataAbi {
-    stride: u32, // Stride in offset into a float array (i.e. byte index / 4). Unused when GpuDriven.
-    texture_offset: u32, // Must be zero when GpuDriven. When GpuDriven, it's the index into the material data with the texture enable bitflag.
-    cutoff_offset: u32, // Stride in offset into a float array  (i.e. byte index / 4)
-    uv_transform_offset: u32, // Stride in offset into a float array pointing to a mat3 with the uv transform (i.e. byte index / 4). 0xFFFFFFFF represents "no transform"
+{{#if (eq profile "CpuDriven")}}
+@group(1) @binding(3)
+var<storage> materials: array<CpuMaterialData>;
+@group(2) @binding(0)
+var albedo_tex: texture_2d<f32>;
+{{/if}}
+
+{{
+    vertex_fetch
+    
+    object_buffer
+    batch_data
+
+    position
+    texture_coords_0
+    color_0
+}}
+
+struct VertexOutput {
+    @builtin(position) position: vec4<f32>,
+    @location(0) coords0: vec2<f32>,
+    @location(1) alpha: f32,
+    @location(2) @interpolate(flat) material: u32,
 }
 
-@group(2) @binding(0)
-var<uniform> abi: DataAbi;
-
 @vertex
-fn vs_main(vs_in: VertexInput) -> VertexOutput {
-    let data = object_output[vs_in.object_idx];
+fn vs_main(@builtin(instance_index) shadow_number: u32, @builtin(vertex_index) vertex_index: u32) -> VertexOutput {
+    if vertex_index == 0x00FFFFFFu {
+        var vs_out: VertexOutput;
+        vs_out.position = vec4<f32>(0.0);
+        return vs_out;
+    }
+    let indices = unpack_vertex_index(vertex_index);
 
-    let position = data.model_view_proj * vec4<f32>(vs_in.position, 1.0);
+    let vs_in = get_vertices(indices);
+    let data = object_buffer[indices.object];
+
+    // TODO: Store these in uniforms
+    let model_view_proj = directional_lights.data[shadow_number].view_proj * data.transform;
+
+    let position_vec4 = vec4<f32>(vs_in.position, 1.0);
 
     var vs_out: VertexOutput;
-    vs_out.position0 = position;
-    vs_out.position1 = position;
-    vs_out.material = data.material_idx;
-    vs_out.color = vs_in.color;
-    vs_out.coords0 = vs_in.coords0;
+    vs_out.material = data.material_index;
+    vs_out.coords0 = vs_in.texture_coords_0;
+    vs_out.alpha = vs_in.color_0.a;
+    vs_out.position = model_view_proj * position_vec4;
 
     return vs_out;
 }
 
+{{#if (eq profile "GpuDriven")}}
+type Material = GpuMaterialData;
+
+fn has_albedo_texture(material: ptr<function, Material>) -> bool { return (*material).albedo_tex != 0u; }
+
+fn albedo_texture(material: ptr<function, Material>, samp: sampler, coords: vec2<f32>, ddx: vec2<f32>, ddy: vec2<f32>) -> vec4<f32> { return textureSampleGrad(textures[(*material).albedo_tex - 1u], samp, coords, ddx, ddy); }
+{{else}}
+type Material = CpuMaterialData;
+
+fn has_albedo_texture(material: ptr<function, Material>) -> bool { return bool(((*material).texture_enable >> 0u) & 0x1u); }
+
+fn albedo_texture(material: ptr<function, Material>, samp: sampler, coords: vec2<f32>, ddx: vec2<f32>, ddy: vec2<f32>) -> vec4<f32> { return textureSampleGrad(albedo_tex, samp, coords, ddx, ddy); }
+{{/if}}
+
 @fragment
-fn fs_cutout(vs_out: VertexOutput) {
-    let base_material_offset = abi.stride * vs_out.material;
-    let cutoff = material_data[base_material_offset + abi.cutoff_offset];
+fn fs_main(vs_out: VertexOutput) {
+    {{#if discard}}
+    var material = materials[vs_out.material];
 
-    var coords: vec2<f32>;
-    if (abi.uv_transform_offset != 0xFFFFFFFFu) {
-        let base_transform_offset = base_material_offset + abi.uv_transform_offset;
-        let transform = mat3x3<f32>(
-            material_data[base_transform_offset + 0u],
-            material_data[base_transform_offset + 1u],
-            material_data[base_transform_offset + 2u],
-            material_data[base_transform_offset + 4u],
-            material_data[base_transform_offset + 5u],
-            material_data[base_transform_offset + 6u],
-            material_data[base_transform_offset + 8u],
-            material_data[base_transform_offset + 9u],
-            material_data[base_transform_offset + 10u],
-        );
-        coords = (transform * vec3<f32>(vs_out.coords0, 1.0)).xy;
-    } else {
-        coords = vs_out.coords0;
-    }
-
+    let coords = vs_out.coords0;
     let uvdx = dpdx(coords);
-    let uvdy = dpdy(coords);
+    let uvdy = dpdx(coords);
 
-    {{#if (eq profile "GpuDriven")}}
-    let texture_index = bitcast<u32>(material_data[base_material_offset + abi.texture_offset]);
-    if (texture_index != 0u) {
-        let alpha = textureSampleGrad(textures[texture_index - 1u], primary_sampler, coords, uvdx, uvdy).a;
-
-        if (alpha <= cutoff) {
-            discard;
+    var alpha = 1.0;
+    if (extract_material_flag(material.flags, FLAGS_ALBEDO_ACTIVE)) {
+        if (has_albedo_texture(&material)) {
+            alpha = albedo_texture(&material, primary_sampler, coords, uvdx, uvdy).a;
+        }
+        if (extract_material_flag(material.flags, FLAGS_ALBEDO_BLEND)) {
+            alpha *= vs_out.alpha;
         }
     }
-    {{else}}
-    let texture_enable_bitflags = bitcast<u32>(material_data[base_material_offset + abi.texture_offset]);
-    if (bool(texture_enable_bitflags & 0x1u)) {
-        let alpha = textureSampleGrad(texture, primary_sampler, coords, uvdx, uvdy).a;
+    alpha *= material.albedo.a;
 
-        if (alpha <= cutoff) {
-            discard;
-        }
+    if (alpha < material.alpha_cutout) {
+        discard;
     }
     {{/if}}
 }
-
-@fragment
-fn fs_no_cutout(vs_out: VertexOutput) {}

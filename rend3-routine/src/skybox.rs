@@ -4,10 +4,10 @@ use std::borrow::Cow;
 
 use rend3::{
     graph::{
-        DataHandle, DepthHandle, RenderGraph, RenderPassDepthTarget, RenderPassTarget, RenderPassTargets,
+        DataHandle, NodeResourceUsage, RenderGraph, RenderPassDepthTarget, RenderPassTarget, RenderPassTargets,
         RenderTargetHandle,
     },
-    types::{SampleCount, TextureHandle},
+    types::{SampleCount, TextureCubeHandle},
     util::bind_merge::{BindGroupBuilder, BindGroupLayoutBuilder},
     Renderer, ShaderConfig, ShaderPreProcessor,
 };
@@ -22,7 +22,7 @@ use crate::common::WholeFrameInterfaces;
 
 struct StoredSkybox {
     bg: Option<BindGroup>,
-    handle: Option<TextureHandle>,
+    handle: Option<TextureCubeHandle>,
 }
 
 /// Skybox rendering routine.
@@ -60,7 +60,7 @@ impl SkyboxRoutine {
 
     /// Set the current background texture. Bad things will happen if this isn't
     /// a cube texture.
-    pub fn set_background_texture(&mut self, texture: Option<TextureHandle>) {
+    pub fn set_background_texture(&mut self, texture: Option<TextureCubeHandle>) {
         self.current_skybox.handle = texture;
         self.current_skybox.bg = None;
     }
@@ -95,9 +95,9 @@ impl SkyboxRoutine {
     ) {
         let mut builder = graph.add_node("Skybox");
 
-        let hdr_color_handle = builder.add_render_target_output(color);
-        let hdr_resolve = builder.add_optional_render_target_output(resolve);
-        let hdr_depth_handle = builder.add_render_target_input(depth);
+        let hdr_color_handle = builder.add_render_target(color, NodeResourceUsage::InputOutput);
+        let hdr_resolve = builder.add_optional_render_target(resolve, NodeResourceUsage::InputOutput);
+        let hdr_depth_handle = builder.add_render_target(depth, NodeResourceUsage::Input);
 
         let rpass_handle = builder.add_renderpass(RenderPassTargets {
             targets: vec![RenderPassTarget {
@@ -106,25 +106,23 @@ impl SkyboxRoutine {
                 resolve: hdr_resolve,
             }],
             depth_stencil: Some(RenderPassDepthTarget {
-                target: DepthHandle::RenderTarget(hdr_depth_handle),
+                target: hdr_depth_handle,
                 depth_clear: Some(0.0),
                 stencil_clear: None,
             }),
         });
 
-        let forward_uniform_handle = builder.add_data_input(forward_uniform_bg);
-        let pt_handle = builder.passthrough_ref(self);
+        let forward_uniform_handle = builder.add_data(forward_uniform_bg, NodeResourceUsage::Input);
 
-        builder.build(move |pt, _renderer, encoder_or_pass, temps, _ready, graph_data| {
-            let this = pt.get(pt_handle);
-            let rpass = encoder_or_pass.get_rpass(rpass_handle);
+        builder.build(move |mut ctx| {
+            let rpass = ctx.encoder_or_pass.take_rpass(rpass_handle);
 
-            let forward_uniform_bg = graph_data.get_data(temps, forward_uniform_handle).unwrap();
+            let forward_uniform_bg = ctx.graph_data.get_data(ctx.temps, forward_uniform_handle).unwrap();
 
-            if let Some(ref bg) = this.current_skybox.bg {
+            if let Some(ref bg) = self.current_skybox.bg {
                 let pipeline = match samples {
-                    SampleCount::One => &this.pipelines.pipeline_s1,
-                    SampleCount::Four => &this.pipelines.pipeline_s4,
+                    SampleCount::One => &self.pipelines.pipeline_s1,
+                    SampleCount::Four => &self.pipelines.pipeline_s4,
                 };
 
                 rpass.set_pipeline(pipeline);
@@ -152,7 +150,7 @@ impl SkyboxPipelines {
         let skybox_sm = renderer.device.create_shader_module(ShaderModuleDescriptor {
             label: Some("skybox vert"),
             source: ShaderSource::Wgsl(Cow::Owned(
-                spp.render_shader("rend3-routine/skybox.wgsl", &ShaderConfig::default())
+                spp.render_shader("rend3-routine/skybox.wgsl", &ShaderConfig::default(), None)
                     .unwrap(),
             )),
         });

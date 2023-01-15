@@ -2,11 +2,11 @@
 //!
 //! This entire module only exists because of <https://www.gamedevs.org/uploads/fast-extraction-viewing-frustum-planes-from-world-view-projection-matrix.pdf>.
 
+use encase::ShaderType;
 use glam::{Mat4, Vec3, Vec3A, Vec4Swizzles};
 
 /// Represents a point in space and a radius from that point.
-#[derive(Debug, Clone, Copy)]
-#[repr(C, align(16))]
+#[derive(Debug, Clone, Copy, ShaderType)]
 pub struct BoundingSphere {
     pub center: Vec3,
     pub radius: f32,

@@ -5,6 +5,7 @@ allow = [
     "Apache-2.0",
     "MIT",
     "MPL-2.0",
+    "LicenseRef-UFL-1.0",
     "Unlicense",
 ]
 copyleft = "allow"
@@ -20,36 +21,27 @@ license-files = [
 multiple-versions = "deny"
 wildcards = "allow"
 skip = [
-    # everything
-    { name = "cfg-if", version = "0.1.10" },
-    { name = "hashbrown", version = "0.11.2" }, # gpu-descriptor from wgpu-hal uses old version
-    { name = "parking_lot", version = "0.11.2" }, # winit and imgui uses old version
-    { name = "parking_lot_core", version = "0.8.5" }, # winit and imgui uses old version
-    # graphics
-    { name = "core-foundation", version = "0.7.0" }, # winit uses old version
-    { name = "core-foundation-sys", version = "0.7.0" }, # winit uses old version
-    { name = "core-graphics", version = "0.19.2" }, # winit uses old version
-    # windows
-    { name = "windows_aarch64_msvc", version = "0.32.0" },
-    { name = "windows_i686_gnu", version = "0.32.0" },
-    { name = "windows_i686_msvc", version = "0.32.0" },
-    { name = "windows_x86_64_gnu", version = "0.32.0" },
-    { name = "windows_x86_64_msvc", version = "0.32.0" },
+    # hashbrown
+    { name = "ahash", version = "0.7.6" },
+    # gltf / reqwest
+    { name = "base64", version = "0.13.1" },
     # ddsfile
     { name = "num-traits", version = "0.1.43" },
-    # android
-    { name = "env_logger", version = "0.8.4" },
-    # handlebars
-    { name = "block-buffer", version = "0.7.3" },
-    { name = "digest", version = "0.8.1" },
-    { name = "generic-array", version = "0.12.4" },
-    { name = "opaque-debug", version = "0.2.3" },
+    { name = "raw-window-handle", version = "0.4.3" },
+]
+skip-tree = [
+    { name = "windows", version = "0.39" },
+    { name = "windows-sys", version = "0.36" },
+    # winit transitively included dupes
+    { name = "winit", version = "0.27" },
 ]
 
 [advisories]
 vulnerability = "warn"
 unmaintained = "warn"
 ignore = [
+    # xml is unmaintained (wayland)
+    "RUSTSEC-2022-0048"
 ]
 
 [sources]

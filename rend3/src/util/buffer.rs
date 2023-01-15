@@ -1,93 +1,81 @@
 //! Automatic management of Power-of-Two sized buffers.
 
-use crate::util::typedefs::SsoString;
-use std::{ops::Deref, sync::Arc};
+use std::{marker::PhantomData, ops::Deref};
+
+use encase::{private::WriteInto, ShaderType};
 use wgpu::{Buffer, BufferAddress, BufferDescriptor, BufferUsages, Device, Queue};
 
+use crate::util::typedefs::SsoString;
+
 /// Creates, fills, and automatically resizes a power-of-two sized buffer.
-pub struct WrappedPotBuffer {
-    inner: Arc<Buffer>,
+pub struct WrappedPotBuffer<T> {
+    inner: Buffer,
     size: BufferAddress,
     // This field is assumed to be a power of 2.
     minimum: BufferAddress,
     usage: BufferUsages,
-    label: Option<SsoString>,
+    label: SsoString,
+    _phantom: PhantomData<T>,
 }
 
-impl WrappedPotBuffer {
-    pub fn new<T>(
-        device: &Device,
-        size: BufferAddress,
-        minimum: BufferAddress,
-        usage: BufferUsages,
-        label: Option<T>,
-    ) -> Self
-    where
-        SsoString: From<T>,
-        T: Deref<Target = str>,
-    {
+impl<T> WrappedPotBuffer<T>
+where
+    T: ShaderType + WriteInto,
+{
+    pub fn new(device: &Device, usage: BufferUsages, label: &str) -> Self {
         profiling::scope!("WrappedPotBuffer::new");
 
-        let minimum_pot = (minimum - 1).next_power_of_two().max(16);
-        let starting_size = if size <= minimum_pot {
-            minimum_pot
-        } else {
-            (size - 1).next_power_of_two()
-        };
+        let minimum = T::min_size().get().next_power_of_two().max(4);
 
         let usage = usage | BufferUsages::COPY_DST;
 
         Self {
-            inner: Arc::new(device.create_buffer(&BufferDescriptor {
-                label: label.as_deref(),
-                size: starting_size,
+            inner: device.create_buffer(&BufferDescriptor {
+                label: Some(label),
+                size: minimum,
                 usage,
                 mapped_at_creation: false,
-            })),
-            size: starting_size,
-            minimum: minimum_pot,
+            }),
+            size: minimum,
+            minimum,
             usage,
-            label: label.map(SsoString::from),
+            label: SsoString::from(label),
+            _phantom: PhantomData,
         }
     }
 
-    /// Determines if the buffer will resize given the desired size.
-    pub fn will_resize(&self, desired: BufferAddress) -> Option<BufferAddress> {
-        will_resize_inner(self.size, desired, self.minimum)
-    }
-
-    pub fn ensure_size(&mut self, device: &Device, desired: BufferAddress) -> Option<BufferAddress> {
-        let resize = self.will_resize(desired);
+    fn ensure_size(&mut self, device: &Device, desired: BufferAddress) {
+        let resize = resize_po2(self.size, desired, self.minimum);
         if let Some(size) = resize {
             self.size = size;
-            self.inner = Arc::new(device.create_buffer(&BufferDescriptor {
-                label: self.label.as_deref(),
+            self.inner = device.create_buffer(&BufferDescriptor {
+                label: Some(&self.label),
                 size,
                 usage: self.usage,
                 mapped_at_creation: false,
-            }));
+            });
         }
-        resize
     }
 
-    pub fn write_to_buffer(&mut self, device: &Device, queue: &Queue, data: &[u8]) -> bool {
-        let resize = self.ensure_size(device, data.len() as u64);
+    pub fn write_to_buffer(&mut self, device: &Device, queue: &Queue, data: &T) {
+        let size = data.size();
+        self.ensure_size(device, size.get());
 
-        queue.write_buffer(&self.inner, 0, data);
-
-        resize.is_some()
+        let mut mapped = queue.write_buffer_with(&self.inner, 0, size).unwrap();
+        encase::StorageBuffer::new(&mut *mapped).write(data).unwrap();
+        drop(mapped);
     }
 }
 
-impl Deref for WrappedPotBuffer {
-    type Target = Arc<Buffer>;
+impl<T> Deref for WrappedPotBuffer<T> {
+    type Target = Buffer;
 
     fn deref(&self) -> &Self::Target {
         &self.inner
     }
 }
 
-fn will_resize_inner(current: BufferAddress, desired: BufferAddress, minimum: BufferAddress) -> Option<BufferAddress> {
+fn resize_po2(current: BufferAddress, desired: BufferAddress, minimum: BufferAddress) -> Option<BufferAddress> {
     assert!(current.is_power_of_two());
     if current == minimum && desired <= minimum {
         return None;
@@ -102,22 +90,22 @@ fn will_resize_inner(current: BufferAddress, desired: BufferAddress, minimum: Bu
 
 #[cfg(test)]
 mod test {
-    use super::will_resize_inner;
+    use super::resize_po2;
 
     #[test]
     fn automated_buffer_resize() {
-        assert_eq!(will_resize_inner(64, 128, 0), Some(256));
-        assert_eq!(will_resize_inner(128, 128, 0), None);
-        assert_eq!(will_resize_inner(256, 128, 0), None);
+        assert_eq!(resize_po2(64, 128, 0), Some(256));
+        assert_eq!(resize_po2(128, 128, 0), None);
+        assert_eq!(resize_po2(256, 128, 0), None);
 
-        assert_eq!(will_resize_inner(64, 64, 0), None);
-        assert_eq!(will_resize_inner(128, 64, 0), None);
-        assert_eq!(will_resize_inner(256, 65, 0), None);
-        assert_eq!(will_resize_inner(256, 64, 0), Some(128));
-        assert_eq!(will_resize_inner(256, 63, 0), Some(64));
+        assert_eq!(resize_po2(64, 64, 0), None);
+        assert_eq!(resize_po2(128, 64, 0), None);
+        assert_eq!(resize_po2(256, 65, 0), None);
+        assert_eq!(resize_po2(256, 64, 0), Some(128));
+        assert_eq!(resize_po2(256, 63, 0), Some(64));
 
-        assert_eq!(will_resize_inner(16, 16, 0), None);
-        assert_eq!(will_resize_inner(16, 8, 0), None);
-        assert_eq!(will_resize_inner(16, 4, 0), Some(8));
+        assert_eq!(resize_po2(16, 16, 0), None);
+        assert_eq!(resize_po2(16, 8, 0), None);
+        assert_eq!(resize_po2(16, 4, 0), Some(8));
     }
 }

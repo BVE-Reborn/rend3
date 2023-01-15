@@ -9,10 +9,14 @@ repository = "https://github.com/BVE-Reborn/rend3"
 license = "MIT OR Apache-2.0 OR Zlib"
 keywords = ["3d", "graphics", "rend3", "renderer", "wgpu"]
 categories = ["game-development", "graphics", "rendering", "rendering::engine", "wasm"]
-rust-version = "1.57"
+rust-version = "1.65"
 
 [dependencies]
 bitflags = "1"
-glam = "0.21.2"
+bytemuck = "1"
+encase = { version = "0.4", features = ["glam"] }
+glam = { version = "0.22", features = ["bytemuck"] }
+list-any = "0.2"
+once_cell = "1"
 thiserror = "1"
-wgt = { package = "wgpu-types", version = "0.13" }
+wgt = { package = "wgpu-types", version = "0.14" }

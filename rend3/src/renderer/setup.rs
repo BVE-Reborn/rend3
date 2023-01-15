@@ -1,18 +1,20 @@
+use std::sync::Arc;
+
+use parking_lot::Mutex;
+use rend3_types::{Camera, Handedness, TextureFormat};
+use wgpu::TextureViewDimension;
+
 use crate::{
     graph::GraphTextureStore,
     instruction::InstructionStreamPair,
     managers::{
-        CameraManager, DirectionalLightManager, MaterialManager, MeshManager, ObjectManager, SkeletonManager,
-        TextureManager,
+        CameraManager, DirectionalLightManager, GraphStorage, MaterialManager, MeshManager, ObjectManager,
+        SkeletonManager, TextureManager,
     },
-    renderer::RendererDataCore,
-    util::mipmap::MipmapGenerator,
+    renderer::{HandleAllocators, RendererDataCore},
+    util::{mipmap::MipmapGenerator, scatter_copy::ScatterCopy},
     InstanceAdapterDevice, Renderer, RendererInitializationError,
 };
-use parking_lot::Mutex;
-use rend3_types::{Camera, Handedness, TextureFormat};
-use std::sync::{atomic::AtomicUsize, Arc};
-use wgpu::{Features, TextureViewDimension};
 
 pub fn create_renderer(
     iad: InstanceAdapterDevice,
@@ -40,10 +42,11 @@ pub fn create_renderer(
         TextureViewDimension::Cube,
     );
     let mesh_manager = MeshManager::new(&iad.device);
-    let material_manager = MaterialManager::new(&iad.device, iad.profile);
+    let material_manager = MaterialManager::new(&iad.device);
     let object_manager = ObjectManager::new();
     let directional_light_manager = DirectionalLightManager::new(&iad.device);
     let skeleton_manager = SkeletonManager::new();
+    let graph_storage = GraphStorage::new();
 
     let mipmap_generator = MipmapGenerator::new(
         &iad.device,
@@ -56,7 +59,13 @@ pub fn create_renderer(
         ],
     );
 
-    let profiler = wgpu_profiler::GpuProfiler::new(4, iad.queue.get_timestamp_period(), Features::empty());
+    let profiler = Mutex::new(wgpu_profiler::GpuProfiler::new(
+        4,
+        iad.queue.get_timestamp_period(),
+        iad.device.features(),
+    ));
+
+    let scatter = ScatterCopy::new(&iad.device);
 
     Ok(Arc::new(Renderer {
         instructions: InstructionStreamPair::new(),
@@ -71,7 +80,7 @@ pub fn create_renderer(
         downlevel,
         handedness,
 
-        current_ident: AtomicUsize::new(0),
+        resource_handle_allocators: HandleAllocators::default(),
         data_core: Mutex::new(RendererDataCore {
             camera_manager,
             mesh_manager,
@@ -81,10 +90,12 @@ pub fn create_renderer(
             object_manager,
             directional_light_manager,
             skeleton_manager,
+            graph_storage,
             profiler,
             graph_texture_store: GraphTextureStore::new(),
         }),
 
         mipmap_generator,
+        scatter,
     }))
 }

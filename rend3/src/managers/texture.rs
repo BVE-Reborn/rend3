@@ -1,17 +1,13 @@
-use crate::{profile::ProfileData, types::TextureHandle, util::registry::ResourceRegistry, RendererProfile};
-use rend3_types::{RawTextureHandle, TextureFormat, TextureUsages};
-use std::{
-    num::NonZeroU32,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
-};
+use std::{marker::PhantomData, num::NonZeroU32, sync::Arc};
+
+use rend3_types::{RawResourceHandle, TextureFormat, TextureUsages};
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
     BindingResource, BindingType, Device, Extent3d, ShaderStages, Texture, TextureDescriptor, TextureDimension,
     TextureSampleType, TextureView, TextureViewDescriptor, TextureViewDimension,
 };
+
+use crate::{profile::ProfileData, RendererProfile};
 
 /// When using the GpuDriven profile, we start the 2D texture manager with a bind group with
 /// this many textures.
@@ -25,6 +21,7 @@ pub const MAX_TEXTURE_COUNT: u32 = 1 << 17;
 /// Internal representation of a Texture.
 pub struct InternalTexture {
     pub texture: Texture,
+    pub view: TextureView,
     pub desc: TextureDescriptor<'static>,
 }
 
@@ -34,79 +31,70 @@ const TEXTURE_PREALLOCATION: usize = 1024;
 const BGL_DIVISOR: u32 = 4;
 
 /// Manages textures and associated bindless bind groups
-pub struct TextureManager {
+pub struct TextureManager<T> {
     layout: ProfileData<(), Arc<BindGroupLayout>>,
     group: ProfileData<(), Arc<BindGroup>>,
     group_dirty: ProfileData<(), bool>,
 
     null_view: TextureView,
 
-    views: Vec<TextureView>,
-    registry: ResourceRegistry<InternalTexture, rend3_types::Texture>,
+    data: Vec<Option<InternalTexture>>,
 
     dimension: TextureViewDimension,
+
+    _phantom: PhantomData<T>,
 }
-impl TextureManager {
+impl<T: 'static> TextureManager<T> {
     pub fn new(device: &Device, profile: RendererProfile, texture_limit: u32, dimension: TextureViewDimension) -> Self {
         profiling::scope!("TextureManager::new");
-
-        let views = Vec::with_capacity(TEXTURE_PREALLOCATION);
 
         let null_view = create_null_tex_view(device, dimension);
 
         let max_textures = (texture_limit / BGL_DIVISOR).min(MAX_TEXTURE_COUNT);
 
+        let mut data = Vec::with_capacity(TEXTURE_PREALLOCATION);
+        data.resize_with(TEXTURE_PREALLOCATION, || None);
+
         let layout = profile.into_data(|| (), || create_bind_group_layout(device, max_textures, dimension));
         let group = profile.into_data(
             || (),
-            || create_bind_group(device, layout.as_gpu(), &null_view, views.iter(), dimension),
+            || create_bind_group(device, layout.as_gpu(), &null_view, &data, dimension),
         );
-
-        let registry = ResourceRegistry::new();
 
         Self {
             layout,
             group,
             group_dirty: profile.into_data(|| (), || false),
             null_view,
-            views,
-            registry,
+            data,
             dimension,
+            _phantom: PhantomData,
         }
     }
 
-    pub fn allocate(counter: &AtomicUsize) -> TextureHandle {
-        let idx = counter.fetch_add(1, Ordering::Relaxed);
-
-        TextureHandle::new(idx)
-    }
-
-    pub fn fill(
+    pub fn add(
         &mut self,
-        handle: &TextureHandle,
+        handle: RawResourceHandle<T>,
         desc: TextureDescriptor<'static>,
         texture: Texture,
         view: TextureView,
     ) {
         self.group_dirty = self.group_dirty.map_gpu(|_| true);
 
-        self.registry.insert(handle, InternalTexture { texture, desc });
-
-        self.views.push(view);
+        if handle.idx >= self.data.len() {
+            self.data.resize_with(handle.idx + 1, || None);
+        }
+        self.data[handle.idx] = Some(InternalTexture { texture, view, desc });
     }
 
-    pub fn internal_index(&self, handle: RawTextureHandle) -> usize {
-        self.registry.get_index_of(handle)
+    pub fn remove(&mut self, handle: RawResourceHandle<T>) {
+        self.group_dirty = self.group_dirty.map_gpu(|_| true);
+
+        self.data[handle.idx] = None;
     }
 
     pub fn ready(&mut self, device: &Device) -> TextureManagerReadyOutput {
         profiling::scope!("TextureManager::ready");
-
-        let views = &mut self.views;
-        self.registry.remove_all_dead(|_, index, _, _| {
-            // Do the same swap remove move as the registry did
-            views.swap_remove(index);
-        });
 
         if let ProfileData::Gpu(group_dirty) = self.group_dirty {
             profiling::scope!("Update GPU Texture Arrays");
@@ -116,7 +104,7 @@ impl TextureManager {
                     device,
                     self.layout.as_gpu(),
                     &self.null_view,
-                    self.views.iter(),
+                    &self.data,
                     self.dimension,
                 );
                 *self.group_dirty.as_gpu_mut() = false;
@@ -132,16 +120,12 @@ impl TextureManager {
         }
     }
 
-    pub fn get_internal(&self, handle: RawTextureHandle) -> &InternalTexture {
-        self.registry.get(handle)
+    pub fn get_internal(&self, handle: RawResourceHandle<T>) -> &InternalTexture {
+        self.data[handle.idx].as_ref().unwrap()
     }
 
-    pub fn get_view_from_index(&self, idx: NonZeroU32) -> &TextureView {
-        &self.views[(idx.get() - 1) as usize]
-    }
-
-    pub fn get_view(&self, handle: RawTextureHandle) -> &TextureView {
-        &self.views[self.registry.get_index_of(handle)]
+    pub fn get_view(&self, handle: RawResourceHandle<T>) -> &TextureView {
+        &self.data[handle.idx].as_ref().unwrap().view
     }
 
     pub fn get_null_view(&self) -> &TextureView {
@@ -152,8 +136,8 @@ impl TextureManager {
         self.layout.as_gpu()
     }
 
-    pub fn translation_fn(&self) -> impl Fn(&TextureHandle) -> NonZeroU32 + Copy + '_ {
-        move |v: &TextureHandle| NonZeroU32::new(self.internal_index(v.get_raw()) as u32 + 1).unwrap()
+    pub fn translation_fn(&self) -> impl Fn(RawResourceHandle<T>) -> NonZeroU32 + Copy + '_ {
+        move |v: RawResourceHandle<T>| NonZeroU32::new(v.idx as u32 + 1).unwrap()
     }
 }
 
@@ -183,16 +167,15 @@ fn create_bind_group<'a>(
     device: &Device,
     layout: &BindGroupLayout,
     null_view: &'a TextureView,
-    views: impl ExactSizeIterator<Item = &'a TextureView>,
+    data: &[Option<InternalTexture>],
     dimension: TextureViewDimension,
 ) -> Arc<BindGroup> {
-    let mut view_array = Vec::with_capacity(views.len().max(1));
-    let count = views.len();
-    if count == 0 {
-        view_array.push(null_view);
-    } else {
-        view_array.extend(views);
-    }
+    let count = data.len();
+    let mut view_array = Vec::with_capacity(count);
+    view_array.extend(data.iter().map(|tex| match tex {
+        Some(t) => &t.view,
+        None => null_view,
+    }));
     Arc::new(device.create_bind_group(&BindGroupDescriptor {
         label: Some(&*format!("{:?} texture bg count {}", dimension, count)),
         layout,

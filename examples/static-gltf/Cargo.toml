@@ -5,7 +5,7 @@ version = "0.3.0"
 authors = ["The rend3 Developers"]
 edition = "2021"
 publish = false
-rust-version = "1.57"
+rust-version = "1.65"
 
 [[bin]]
 name = "static-gltf"
@@ -15,9 +15,9 @@ path = "src/main.rs"
 
 [dependencies]
 # logging
-env_logger = { version = "0.9", default-features = false, features = ["termcolor", "atty"] }
+env_logger = { version = "0.10", default-features = false, features = ["auto-color", "humantime"] }
 # Linear algebra library
-glam = "0.21.2"
+glam = "0.22"
 # parsing model files
 gltf = { version = "1.0", default-features = false, features = ["import", "utils"] }
 # Renderer core
@@ -27,4 +27,4 @@ rend3-framework = { version = "^0.3.0", path = "../../rend3-framework" }
 # Programmable render list that dictates how the scene renders
 rend3-routine = { version = "^0.3.0", path = "../../rend3-routine" }
 # windowing
-winit = "0.26"
+winit = "0.27"

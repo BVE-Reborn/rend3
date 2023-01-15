@@ -2,33 +2,90 @@
 //!
 //! Will default to the PBR shader code if custom code is not specified.
 
-use std::{borrow::Cow, marker::PhantomData};
+use std::marker::PhantomData;
 
 use arrayvec::ArrayVec;
+use encase::ShaderSize;
 use rend3::{
     graph::{
-        DataHandle, DepthHandle, RenderGraph, RenderPassDepthTarget, RenderPassTarget, RenderPassTargets,
+        DataHandle, NodeResourceUsage, RenderGraph, RenderPassDepthTarget, RenderPassTarget, RenderPassTargets,
         RenderTargetHandle,
     },
     types::{Handedness, Material, SampleCount},
-    ProfileData, Renderer, RendererDataCore, RendererProfile, ShaderConfig, ShaderPreProcessor,
+    util::bind_merge::BindGroupBuilder,
+    ProfileData, Renderer, RendererDataCore, RendererProfile, ShaderPreProcessor,
 };
+use serde::Serialize;
 use wgpu::{
-    BindGroup, BindGroupLayout, BlendState, Color, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState,
-    DepthStencilState, Face, FragmentState, FrontFace, MultisampleState, PipelineLayoutDescriptor, PolygonMode,
-    PrimitiveState, PrimitiveTopology, RenderPipeline, RenderPipelineDescriptor, ShaderModule, ShaderModuleDescriptor,
-    ShaderSource, StencilState, TextureFormat, VertexState,
+    BindGroup, BindGroupLayout, Color, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState,
+    DepthStencilState, Face, FragmentState, FrontFace, IndexFormat, MultisampleState, PipelineLayoutDescriptor,
+    PolygonMode, PrimitiveState, PrimitiveTopology, RenderPipeline, RenderPipelineDescriptor, ShaderModule,
+    StencilState, TextureFormat, VertexState,
 };
 
 use crate::{
-    common::{PerMaterialArchetypeInterface, WholeFrameInterfaces, CPU_VERTEX_BUFFERS, GPU_VERTEX_BUFFERS},
-    culling,
+    common::{PerMaterialArchetypeInterface, WholeFrameInterfaces},
+    culling::{self, DrawCall},
 };
+
+#[derive(Serialize)]
+struct ForwardPreprocessingArguments {
+    profile: Option<RendererProfile>,
+    vertex_array_counts: u32,
+}
+
+#[derive(Debug)]
+pub enum RoutineType {
+    Depth,
+    Forward,
+}
+
+pub struct ShaderModulePair<'a> {
+    pub vs_entry: &'a str,
+    pub vs_module: &'a ShaderModule,
+    pub fs_entry: &'a str,
+    pub fs_module: &'a ShaderModule,
+}
+
+pub struct RoutineArgs<'a, M> {
+    pub name: &'a str,
+
+    pub renderer: &'a Renderer,
+    pub data_core: &'a mut RendererDataCore,
+    pub spp: &'a ShaderPreProcessor,
+
+    pub interfaces: &'a WholeFrameInterfaces,
+    pub per_material: &'a PerMaterialArchetypeInterface<M>,
+    pub material_key: u64,
+
+    pub routine_type: RoutineType,
+    pub shaders: ShaderModulePair<'a>,
+
+    pub extra_bgls: &'a [&'a BindGroupLayout],
+    #[allow(clippy::type_complexity)]
+    pub descriptor_callback: Option<&'a dyn Fn(&mut RenderPipelineDescriptor<'_>, &mut [Option<ColorTargetState>])>,
+}
+
+pub struct RoutineAddToGraphArgs<'a, 'node, M> {
+    pub graph: &'a mut RenderGraph<'node>,
+    pub whole_frame_uniform_bg: DataHandle<BindGroup>,
+    pub culled: DataHandle<culling::DrawCallSet>,
+    pub per_material: &'node PerMaterialArchetypeInterface<M>,
+    pub extra_bgs: Option<&'node [BindGroup]>,
+    pub label: &'a str,
+    pub samples: SampleCount,
+    pub color: Option<RenderTargetHandle>,
+    pub resolve: Option<RenderTargetHandle>,
+    pub depth: RenderTargetHandle,
+    /// Passed to the shader through the instance index.
+    pub data: u32,
+}
 
 /// A set of pipelines for rendering a specific combination of a material.
 pub struct ForwardRoutine<M: Material> {
     pub pipeline_s1: RenderPipeline,
     pub pipeline_s4: RenderPipeline,
+    pub material_key: u64,
     pub _phantom: PhantomData<M>,
 }
 impl<M: Material> ForwardRoutine<M> {
@@ -37,7 +94,7 @@ impl<M: Material> ForwardRoutine<M> {
     /// Specifying vertex or fragment shaders will override the default ones.
     ///
     /// The order of BGLs passed to the shader is:  
-    /// 0: Forward uniforms  
+    /// 0: Forward uniforms
     /// 1: Per material data  
     /// 2: Texture Array (GpuDriven) / Material (CpuDriven)  
     /// 3+: Contents of extra_bgls  
@@ -47,211 +104,153 @@ impl<M: Material> ForwardRoutine<M> {
     /// If use_prepass is true, depth tests/writes are set such that it is
     /// assumed a full depth-prepass has happened before.
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        renderer: &Renderer,
-        data_core: &mut RendererDataCore,
-        spp: &ShaderPreProcessor,
-        interfaces: &WholeFrameInterfaces,
-        per_material: &PerMaterialArchetypeInterface<M>,
-
-        vertex: Option<(&str, &ShaderModule)>,
-        fragment: Option<(&str, &ShaderModule)>,
-        extra_bgls: &[BindGroupLayout],
-
-        blend: Option<BlendState>,
-        use_prepass: bool,
-        primitive_topology: wgpu::PrimitiveTopology,
-        label: &str,
-    ) -> Self {
+    pub fn new(args: RoutineArgs<'_, M>) -> Self {
         profiling::scope!("PrimaryPasses::new");
 
-        let sm_owned = renderer.device.create_shader_module(ShaderModuleDescriptor {
-            label: Some("forward"),
-            source: ShaderSource::Wgsl(Cow::Owned(
-                spp.render_shader(
-                    "rend3-routine/opaque.wgsl",
-                    &ShaderConfig {
-                        profile: Some(renderer.profile),
-                    },
-                )
-                .unwrap(),
-            )),
-        });
-        let forward_pass_vert;
-        let vert_entry_point;
-        match vertex {
-            Some((inner_name, inner)) => {
-                forward_pass_vert = inner;
-                vert_entry_point = inner_name;
-            }
-            None => {
-                vert_entry_point = "vs_main";
-                forward_pass_vert = &sm_owned;
-            }
-        };
-
-        let forward_pass_frag;
-        let frag_entry_point;
-        match fragment {
-            Some((inner_name, inner)) => {
-                forward_pass_frag = inner;
-                frag_entry_point = inner_name;
-            }
-            None => {
-                frag_entry_point = "fs_main";
-                forward_pass_frag = &sm_owned;
-            }
-        };
-
         let mut bgls: ArrayVec<&BindGroupLayout, 8> = ArrayVec::new();
-        bgls.push(&interfaces.forward_uniform_bgl);
-        bgls.push(&per_material.bgl);
-        if renderer.profile == RendererProfile::GpuDriven {
-            bgls.push(data_core.d2_texture_manager.gpu_bgl())
+        bgls.push(match args.routine_type {
+            RoutineType::Depth => &args.interfaces.depth_uniform_bgl,
+            RoutineType::Forward => &args.interfaces.forward_uniform_bgl,
+        });
+        bgls.push(&args.per_material.bgl);
+        if args.renderer.profile == RendererProfile::GpuDriven {
+            bgls.push(args.data_core.d2_texture_manager.gpu_bgl())
         } else {
-            bgls.push(data_core.material_manager.get_bind_group_layout_cpu::<M>());
+            bgls.push(args.data_core.material_manager.get_bind_group_layout_cpu::<M>());
         }
-        bgls.extend(extra_bgls);
+        bgls.extend(args.extra_bgls.iter().copied());
 
-        let pll = renderer.device.create_pipeline_layout(&PipelineLayoutDescriptor {
-            label: Some("opaque pass"),
+        let pll = args.renderer.device.create_pipeline_layout(&PipelineLayoutDescriptor {
+            label: Some(args.name),
             bind_group_layouts: &bgls,
             push_constant_ranges: &[],
         });
 
-        let inner = |samples| {
-            build_forward_pipeline_inner(
-                renderer,
-                &pll,
-                vert_entry_point,
-                forward_pass_vert,
-                frag_entry_point,
-                forward_pass_frag,
-                blend,
-                use_prepass,
-                primitive_topology,
-                label,
-                samples,
-            )
-        };
-
         Self {
-            pipeline_s1: inner(SampleCount::One),
-            pipeline_s4: inner(SampleCount::Four),
+            pipeline_s1: build_forward_pipeline_inner(&pll, &args, SampleCount::One),
+            pipeline_s4: build_forward_pipeline_inner(&pll, &args, SampleCount::Four),
+            material_key: args.material_key,
             _phantom: PhantomData,
         }
     }
 
     /// Add the given routine to the graph with the given settings.
-    ///
-    /// I understand the requirement that extra_bgs is explicitly a Vec is
-    /// weird, but due to my lifetime passthrough logic I can't pass through a
-    /// slice.
     #[allow(clippy::too_many_arguments)]
-    pub fn add_forward_to_graph<'node>(
-        &'node self,
-        graph: &mut RenderGraph<'node>,
-        forward_uniform_bg: DataHandle<BindGroup>,
-        culled: DataHandle<culling::PerMaterialArchetypeData>,
-        extra_bgs: Option<&'node Vec<BindGroup>>,
-        label: &str,
-        samples: SampleCount,
-        color: RenderTargetHandle,
-        resolve: Option<RenderTargetHandle>,
-        depth: RenderTargetHandle,
-    ) {
-        let mut builder = graph.add_node(label);
+    pub fn add_forward_to_graph<'node>(&'node self, args: RoutineAddToGraphArgs<'_, 'node, M>) {
+        let mut builder = args.graph.add_node(args.label);
 
-        let hdr_color_handle = builder.add_render_target_output(color);
-        let hdr_resolve = builder.add_optional_render_target_output(resolve);
-        let hdr_depth_handle = builder.add_render_target_output(depth);
+        let color_handle = builder.add_optional_render_target(args.color, NodeResourceUsage::InputOutput);
+        let resolve_handle = builder.add_optional_render_target(args.resolve, NodeResourceUsage::InputOutput);
+        let depth_handle = builder.add_render_target(args.depth, NodeResourceUsage::InputOutput);
+
+        builder.add_side_effect();
 
         let rpass_handle = builder.add_renderpass(RenderPassTargets {
-            targets: vec![RenderPassTarget {
-                color: hdr_color_handle,
-                clear: Color::BLACK,
-                resolve: hdr_resolve,
-            }],
+            targets: match color_handle {
+                Some(color) => vec![RenderPassTarget {
+                    color,
+                    clear: Color::BLACK,
+                    resolve: resolve_handle,
+                }],
+                None => vec![],
+            },
             depth_stencil: Some(RenderPassDepthTarget {
-                target: DepthHandle::RenderTarget(hdr_depth_handle),
+                target: depth_handle,
                 depth_clear: Some(0.0),
                 stencil_clear: None,
             }),
         });
 
-        let _ = builder.add_shadow_array_input();
+        let whole_frame_uniform_handle = builder.add_data(args.whole_frame_uniform_bg, NodeResourceUsage::Input);
+        let cull_handle = builder.add_data(args.culled, NodeResourceUsage::Input);
 
-        let forward_uniform_handle = builder.add_data_input(forward_uniform_bg);
-        let cull_handle = builder.add_data_input(culled);
-
-        let this_pt_handle = builder.passthrough_ref(self);
-        let extra_bg_pt_handle = extra_bgs.map(|v| builder.passthrough_ref(v));
-
-        builder.build(move |pt, _renderer, encoder_or_pass, temps, ready, graph_data| {
-            let this = pt.get(this_pt_handle);
-            let extra_bgs = extra_bg_pt_handle.map(|h| pt.get(h));
-            let rpass = encoder_or_pass.get_rpass(rpass_handle);
-            let forward_uniform_bg = graph_data.get_data(temps, forward_uniform_handle).unwrap();
-            let culled = graph_data.get_data(temps, cull_handle).unwrap();
-
-            let pipeline = match samples {
-                SampleCount::One => &this.pipeline_s1,
-                SampleCount::Four => &this.pipeline_s4,
+        builder.build(move |mut ctx| {
+            let rpass = ctx.encoder_or_pass.take_rpass(rpass_handle);
+            let whole_frame_uniform_bg = ctx.graph_data.get_data(ctx.temps, whole_frame_uniform_handle).unwrap();
+            let culled = match ctx.graph_data.get_data(ctx.temps, cull_handle) {
+                Some(c) => c,
+                None => return,
             };
 
-            graph_data.mesh_manager.buffers().bind(rpass);
+            let per_material_bg = ctx.temps.add(
+                BindGroupBuilder::new()
+                    .append_buffer(ctx.data_core.object_manager.buffer::<M>().unwrap())
+                    .append_buffer_with_size(
+                        &culled.buffers.object_reference,
+                        culling::ShaderBatchData::SHADER_SIZE.get(),
+                    )
+                    .append_buffer(ctx.data_core.mesh_manager.buffer())
+                    .append_buffer(ctx.data_core.material_manager.archetype_view::<M>().buffer())
+                    .build(&ctx.renderer.device, Some("Per-Material BG"), &args.per_material.bgl),
+            );
 
+            let pipeline = match args.samples {
+                SampleCount::One => &self.pipeline_s1,
+                SampleCount::Four => &self.pipeline_s4,
+            };
+
+            rpass.set_index_buffer(culled.buffers.index.slice(..), IndexFormat::Uint32);
             rpass.set_pipeline(pipeline);
-            rpass.set_bind_group(0, forward_uniform_bg, &[]);
-            rpass.set_bind_group(1, &culled.per_material, &[]);
-            if let Some(v) = extra_bgs {
+            rpass.set_bind_group(0, whole_frame_uniform_bg, &[]);
+            if let Some(v) = args.extra_bgs {
                 for (idx, bg) in v.iter().enumerate() {
                     rpass.set_bind_group((idx + 3) as _, bg, &[])
                 }
             }
+            if let ProfileData::Gpu(ref bg) = ctx.ready.d2_texture.bg {
+                rpass.set_bind_group(2, bg, &[]);
+            }
 
-            match culled.inner.calls {
-                ProfileData::Cpu(ref draws) => {
-                    culling::draw_cpu_powered::<M>(rpass, draws, graph_data.material_manager, 2)
+            let Some(range) = culled.material_key_ranges.get(&self.material_key) else {
+                return;
+            };
+            for (idx, call) in culled.draw_calls[range.clone()].iter().enumerate() {
+                let idx = idx + range.start;
+                let call: &DrawCall = call;
+
+                if ctx.renderer.profile.is_cpu_driven() {
+                    rpass.set_bind_group(
+                        2,
+                        ctx.data_core.material_manager.texture_bind_group(call.bind_group_index),
+                        &[],
+                    );
                 }
-                ProfileData::Gpu(ref data) => {
-                    rpass.set_bind_group(2, ready.d2_texture.bg.as_gpu(), &[]);
-                    culling::draw_gpu_powered(rpass, data);
-                }
+                rpass.set_bind_group(
+                    1,
+                    per_material_bg,
+                    &[idx as u32 * culling::ShaderBatchData::SHADER_SIZE.get() as u32],
+                );
+                rpass.draw_indexed(call.index_range.clone(), 0, args.data..args.data + 1);
             }
         });
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-fn build_forward_pipeline_inner(
-    renderer: &Renderer,
+fn build_forward_pipeline_inner<M: Material>(
     pll: &wgpu::PipelineLayout,
-    vert_entry_point: &str,
-    forward_pass_vert: &wgpu::ShaderModule,
-    frag_entry_point: &str,
-    forward_pass_frag: &wgpu::ShaderModule,
-    blend: Option<BlendState>,
-    use_prepass: bool,
-    primitive_topology: PrimitiveTopology,
-    label: &str,
+    args: &RoutineArgs<'_, M>,
     samples: SampleCount,
 ) -> RenderPipeline {
-    renderer.device.create_render_pipeline(&RenderPipelineDescriptor {
-        label: Some(label),
+    let mut render_targets: ArrayVec<_, 1> = ArrayVec::new();
+    if matches!(args.routine_type, RoutineType::Forward) {
+        render_targets.push(Some(ColorTargetState {
+            format: TextureFormat::Rgba16Float,
+            blend: None,
+            write_mask: ColorWrites::all(),
+        }));
+    }
+    let mut desc = RenderPipelineDescriptor {
+        label: Some(args.name),
         layout: Some(pll),
         vertex: VertexState {
-            module: forward_pass_vert,
-            entry_point: vert_entry_point,
-            buffers: match renderer.profile {
-                RendererProfile::CpuDriven => &CPU_VERTEX_BUFFERS,
-                RendererProfile::GpuDriven => &GPU_VERTEX_BUFFERS,
-            },
+            module: args.shaders.vs_module,
+            entry_point: args.shaders.vs_entry,
+            buffers: &[],
         },
         primitive: PrimitiveState {
-            topology: primitive_topology,
+            topology: PrimitiveTopology::TriangleList,
             strip_index_format: None,
-            front_face: match renderer.handedness {
+            front_face: match args.renderer.handedness {
                 Handedness::Left => FrontFace::Cw,
                 Handedness::Right => FrontFace::Ccw,
             },
@@ -262,27 +261,32 @@ fn build_forward_pipeline_inner(
         },
         depth_stencil: Some(DepthStencilState {
             format: TextureFormat::Depth32Float,
-            depth_write_enabled: blend.is_none() && !use_prepass,
-            depth_compare: match use_prepass {
-                true => CompareFunction::Equal,
-                false => CompareFunction::GreaterEqual,
-            },
+            depth_write_enabled: true,
+            depth_compare: CompareFunction::GreaterEqual,
             stencil: StencilState::default(),
-            bias: DepthBiasState::default(),
+            bias: match args.routine_type {
+                RoutineType::Depth => DepthBiasState {
+                    constant: -2,
+                    slope_scale: -2.0,
+                    clamp: 0.0,
+                },
+                RoutineType::Forward => DepthBiasState::default(),
+            },
         }),
         multisample: MultisampleState {
             count: samples as u32,
             ..Default::default()
         },
         fragment: Some(FragmentState {
-            module: forward_pass_frag,
-            entry_point: frag_entry_point,
-            targets: &[Some(ColorTargetState {
-                format: TextureFormat::Rgba16Float,
-                blend,
-                write_mask: ColorWrites::all(),
-            })],
+            module: args.shaders.fs_module,
+            entry_point: args.shaders.fs_entry,
+            targets: &[],
         }),
         multiview: None,
-    })
+    };
+    if let Some(desc_callback) = args.descriptor_callback {
+        desc_callback(&mut desc, &mut render_targets);
+    }
+    desc.fragment.as_mut().unwrap().targets = &render_targets;
+    args.renderer.device.create_render_pipeline(&desc)
 }

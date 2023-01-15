@@ -143,6 +143,8 @@ mod renderer;
 pub mod managers {
     mod camera;
     mod directional;
+    mod graph_storage;
+    mod handle_alloc;
     mod material;
     mod mesh;
     mod object;
@@ -151,6 +153,8 @@ pub mod managers {
 
     pub use camera::*;
     pub use directional::*;
+    pub use graph_storage::*;
+    pub(crate) use handle_alloc::*;
     pub use material::*;
     pub use mesh::*;
     pub use object::*;
@@ -168,22 +172,19 @@ pub mod types {
 pub mod util {
     pub mod bind_merge;
     pub mod buffer;
-    pub mod buffer_copier;
     pub mod frustum;
+    pub mod freelist {
+        mod buffer;
+        mod vec;
+
+        pub use buffer::*;
+        pub use vec::*;
+    }
+    pub(crate) mod iter;
     pub mod math;
     pub mod mipmap;
     pub mod output;
-    /// Core datastructures that associate handles with data in a gpu-friendly
-    /// format.
-    pub mod registry {
-        mod archetypical;
-        mod basic;
-        mod erased;
-
-        pub use archetypical::*;
-        pub use basic::*;
-        pub use erased::*;
-    }
+    pub mod scatter_copy;
     pub mod typedefs;
 }
 
@@ -202,6 +203,3 @@ pub use surface::*;
 
 /// Format of all shadow maps.
 pub const INTERNAL_SHADOW_DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
-// TODO: This needs to be dynamic
-/// Resolution of all shadow maps.
-pub const SHADOW_DIMENSIONS: u32 = 2048;

@@ -65,6 +65,7 @@ impl rend3_framework::App for SkinningExample {
 
     fn setup(
         &mut self,
+        _event_loop: &winit::event_loop::EventLoop<rend3_framework::UserResizeEvent<()>>,
         _window: &winit::window::Window,
         renderer: &Arc<rend3::Renderer>,
         _routines: &Arc<rend3_framework::DefaultRoutines>,
@@ -85,7 +86,7 @@ impl rend3_framework::App for SkinningExample {
 
         // Load a gltf model with animation data
         let path = Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/RiggedSimple.glb"));
-        let gltf_data = std::fs::read(&path).unwrap();
+        let gltf_data = std::fs::read(path).unwrap();
         let parent_directory = path.parent().unwrap();
         let (loaded_scene, loaded_instance) = pollster::block_on(rend3_gltf::load_gltf(
             renderer,
@@ -113,6 +114,7 @@ impl rend3_framework::App for SkinningExample {
             // Direction will be normalized
             direction: glam::Vec3::new(-1.0, -4.0, 2.0),
             distance: 400.0,
+            resolution: 2048,
         }));
     }
 
@@ -142,9 +144,8 @@ impl rend3_framework::App for SkinningExample {
             // Render!
             rend3_framework::Event::RedrawRequested(_) => {
                 // Get a frame
-                let frame = rend3::util::output::OutputFrame::Surface {
-                    surface: Arc::clone(surface.unwrap()),
-                };
+                let frame = surface.unwrap().get_current_texture().unwrap();
+
                 // Ready up the renderer
                 let (cmd_bufs, ready) = renderer.ready();
 
@@ -155,6 +156,8 @@ impl rend3_framework::App for SkinningExample {
                 // Build a rendergraph
                 let mut graph = rend3::graph::RenderGraph::new();
 
+                let frame_handle =
+                    graph.add_imported_render_target(&frame, 0..1, rend3::graph::ViewportRect::from_size(resolution));
                 // Add the default rendergraph without a skybox
                 base_rendergraph.add_to_graph(
                     &mut graph,
@@ -162,6 +165,7 @@ impl rend3_framework::App for SkinningExample {
                     &pbr_routine,
                     None,
                     &tonemapping_routine,
+                    frame_handle,
                     resolution,
                     SAMPLE_COUNT,
                     glam::Vec4::splat(0.15),
@@ -169,7 +173,9 @@ impl rend3_framework::App for SkinningExample {
                 );
 
                 // Dispatch a render using the built up rendergraph!
-                graph.execute(renderer, frame, cmd_bufs, &ready);
+                graph.execute(renderer, cmd_bufs, &ready);
+
+                frame.present();
             }
             // Other events we don't care about
             _ => {}

@@ -26,7 +26,6 @@ pub const GPU_DRIVEN_REQUIRED_FEATURES: Features = {
             | Features::TEXTURE_BINDING_ARRAY.bits()
             | Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING.bits()
             | Features::PARTIALLY_BOUND_BINDING_ARRAY.bits()
-            // | Features::UNSIZED_BINDING_ARRAY.bits() // TODO: BC in wgpu?
             | Features::MULTI_DRAW_INDIRECT.bits()
             | Features::MULTI_DRAW_INDIRECT_COUNT.bits()
             | Features::SPIRV_SHADER_PASSTHROUGH.bits(),
@@ -42,7 +41,8 @@ pub const OPTIONAL_FEATURES: Features = Features::from_bits_truncate(
         | Features::TEXTURE_COMPRESSION_BC.bits()
         | Features::TEXTURE_COMPRESSION_ETC2.bits()
         | Features::TEXTURE_COMPRESSION_ASTC_LDR.bits()
-        | Features::TIMESTAMP_QUERY.bits(),
+        | Features::TIMESTAMP_QUERY.bits()
+        | Features::WRITE_TIMESTAMP_INSIDE_PASSES.bits(),
 );
 
 /// Check that all required features for a given profile are present in the feature
@@ -60,6 +60,8 @@ pub fn check_features(profile: RendererProfile, device: Features) -> Result<Feat
         Ok(required | optional)
     }
 }
+
+// TODO: this is all relatively antiquated and should be improved.
 
 /// Limits required to run in the GpuDriven profile.
 pub const GPU_REQUIRED_LIMITS: Limits = Limits {
@@ -80,6 +82,7 @@ pub const GPU_REQUIRED_LIMITS: Limits = Limits {
     max_vertex_buffer_array_stride: 128,
     max_vertex_buffers: 7,
     max_vertex_attributes: 7,
+    max_bindings_per_bind_group: 640,
     max_push_constant_size: 128,
     min_uniform_buffer_offset_alignment: 256,
     min_storage_buffer_offset_alignment: 256,
@@ -90,7 +93,7 @@ pub const GPU_REQUIRED_LIMITS: Limits = Limits {
     max_compute_workgroup_size_y: 256,
     max_compute_workgroup_size_z: 64,
     max_compute_workgroups_per_dimension: 65535,
-    max_buffer_size: 8192 * 8 * 18, // TODO: what should this actually be?
+    max_buffer_size: 8192 * 8 * 18,
 };
 
 /// Limits required to run in the CpuDriven profile.
@@ -111,6 +114,7 @@ pub const CPU_REQUIRED_LIMITS: Limits = Limits {
     max_storage_buffer_binding_size: 128 << 20,
     max_vertex_buffers: 6,
     max_vertex_attributes: 6,
+    max_bindings_per_bind_group: 640,
     max_vertex_buffer_array_stride: 128,
     max_push_constant_size: 0,
     min_uniform_buffer_offset_alignment: 256,
@@ -190,6 +194,11 @@ pub fn check_limits(profile: RendererProfile, device_limits: &Limits) -> Result<
             device_limits.max_bind_groups,
             required_limits.max_bind_groups,
             LimitType::BindGroups,
+        )?,
+        max_bindings_per_bind_group: check_limit_unlimited(
+            device_limits.max_bindings_per_bind_group,
+            required_limits.max_bindings_per_bind_group,
+            LimitType::MaxBindingsPerBindGroup,
         )?,
         max_dynamic_uniform_buffers_per_pipeline_layout: check_limit_unlimited(
             device_limits.max_dynamic_uniform_buffers_per_pipeline_layout,
@@ -350,7 +359,7 @@ impl<T> PotentialAdapter<T> {
 }
 
 /// Set of common GPU vendors.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Vendor {
     Nv,
     Amd,
@@ -364,7 +373,7 @@ pub enum Vendor {
 }
 
 /// Information about an adapter. Includes named PCI IDs for vendors.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ExtendedAdapterInfo {
     /// Adapter name
     pub name: String,
