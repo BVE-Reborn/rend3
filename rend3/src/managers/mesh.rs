@@ -18,8 +18,7 @@ pub const STARTING_MESH_DATA: u64 = 1 << 25;
 
 /// Internal representation of a mesh.
 pub struct InternalMesh {
-    /// Range of values from the [`MeshBuffers`] where vertex data for this mesh
-    /// is
+    /// Location in the vertex buffer for each vertex attribute
     pub vertex_attribute_ranges: Vec<(VertexAttributeId, Range<u64>)>,
     /// Vertex count
     pub vertex_count: u32,

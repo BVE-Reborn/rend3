@@ -987,11 +987,11 @@ pub enum SortingOrder {
 ///
 /// The IntoIterator stuff in this trait is because rust-analyzer gets totally
 /// confused when multiple IntoIterator bounds are involved. If I were to have
-/// MaterialArray<T>: IntoIterator<Item = T> like I would want, any into_iter
+/// `MaterialArray<T>: IntoIterator<Item = T>` like I would want, any into_iter
 /// based iteration of any iterator with a material argument in it
-/// (so Iterator<Item = ObjectWrapper<M>> for example) will completely stop being
+/// (so `Iterator<Item = ObjectWrapper<M>>` for example) will completely stop being
 /// type deduced by RA. So to work around this, this trait also needs to act as
-/// IntoIterator. See https://github.com/rust-lang/rust-analyzer/issues/11242.
+/// IntoIterator. See <https://github.com/rust-lang/rust-analyzer/issues/11242>.
 pub trait MaterialArray<T>: AsRef<[T]> {
     /// An array of the [u32; COUNT]. We need this internally
     /// for shader layout stuff.

@@ -36,18 +36,18 @@ debug = true
 lto = "thin"
 
 [patch.crates-io]
-# wgpu = { git = "https://github.com/gfx-rs/wgpu.git", rev = "aa46e82f4087209b6a331220e37dca142d4ffed5" }
-# wgpu-core = { git = "https://github.com/gfx-rs/wgpu.git", rev = "aa46e82f4087209b6a331220e37dca142d4ffed5" }
-# wgpu-hal = { git = "https://github.com/gfx-rs/wgpu.git", rev = "aa46e82f4087209b6a331220e37dca142d4ffed5" }
-# wgpu-types = { git = "https://github.com/gfx-rs/wgpu.git", rev = "aa46e82f4087209b6a331220e37dca142d4ffed5" }
+wgpu = { git = "https://github.com/gfx-rs/wgpu.git", rev = "fac4731288117d951d0944d96cf0b00fa006dd6c" }
+wgpu-core = { git = "https://github.com/gfx-rs/wgpu.git", rev = "fac4731288117d951d0944d96cf0b00fa006dd6c" }
+wgpu-hal = { git = "https://github.com/gfx-rs/wgpu.git", rev = "fac4731288117d951d0944d96cf0b00fa006dd6c" }
+wgpu-types = { git = "https://github.com/gfx-rs/wgpu.git", rev = "fac4731288117d951d0944d96cf0b00fa006dd6c" }
 # wgpu = { git = "https://github.com/cwfitzgerald/wgpu.git", rev = "bda861f77e0ca0b97697850ad19d19a8b8f1cc9c" }
 # wgpu-core = { git = "https://github.com/cwfitzgerald/wgpu.git", rev = "bda861f77e0ca0b97697850ad19d19a8b8f1cc9c" }
 # wgpu-hal = { git = "https://github.com/cwfitzgerald/wgpu.git", rev = "bda861f77e0ca0b97697850ad19d19a8b8f1cc9c" }
 # wgpu-types = { git = "https://github.com/cwfitzgerald/wgpu.git", rev = "bda861f77e0ca0b97697850ad19d19a8b8f1cc9c" }
-wgpu = { path = "../wgpu/wgpu" }
-wgpu-core = { path = "../wgpu/wgpu-core" }
-wgpu-hal = { path = "../wgpu/wgpu-hal" }
-wgpu-types = { path = "../wgpu/wgpu-types" }
+# wgpu = { path = "../wgpu/wgpu" }
+# wgpu-core = { path = "../wgpu/wgpu-core" }
+# wgpu-hal = { path = "../wgpu/wgpu-hal" }
+# wgpu-types = { path = "../wgpu/wgpu-types" }
 naga = { git = "https://github.com/gfx-rs/naga.git", rev = "e7fc8e6" }
 range-alloc = { git = "https://github.com/expenses/gfx.git", rev = "6afbeb6d9733e295404f4fe0ac936591e277a26e" }
 

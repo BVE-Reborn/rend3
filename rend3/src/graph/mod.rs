@@ -37,18 +37,11 @@
 //! you should separate the code that needs a raw encoder from the code that is
 //! using a renderpass.
 //!
-//! Because renderpasses carry with them a lifetime that can cause problems, two
-//! facilities are available.
-//!
-//! First is the [`PassthroughDataContainer`] which
-//! allows you to take lifetimes of length `'node` and turn them into lifetimes
-//! of length `'rpass`. This is commonly used to bring in any state from the
-//! outside.
-//!
-//! Second is the [`RpassTemporaryPool`]. If, inside the node, you need to
-//! create a temporary, you can put that temporary on the pool, and it will
-//! automatically have lifetime `'rpass`. The temporary is destroyed right after
-//! the renderpass is.
+//! Because renderpasses carry with them a lifetime that can cause problems
+//! there is a solution for dealing with temporaries: the [`RpassTemporaryPool`].
+//! If, inside the node, you need to create a temporary, you can put that temporary on 
+//! the pool, and it will automatically have lifetime `'rpass`. The temporary is
+//! destroyed right after the renderpass is.
 
 use std::ops::Range;
 
