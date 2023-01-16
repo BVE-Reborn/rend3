@@ -56,9 +56,15 @@ fn vs_main(@builtin(instance_index) shadow_number: u32, @builtin(vertex_index) v
         return vs_out;
     }
     let indices = unpack_vertex_index(vertex_index);
+    
+    let data = object_buffer[indices.object];
+    if data.enabled == 0u {
+        var vs_out: VertexOutput;
+        vs_out.position = vec4<f32>(0.0);
+        return vs_out;
+    }
 
     let vs_in = get_vertices(indices);
-    let data = object_buffer[indices.object];
 
     // TODO: Store these in uniforms
     let model_view_proj = directional_lights.data[shadow_number].view_proj * data.transform;

@@ -11,6 +11,8 @@ pub fn evaluate_instructions(renderer: &Renderer) -> InstructionEvaluationOutput
 
     let mut instructions = renderer.instructions.consumer.lock();
 
+    let delayed_object_handles = renderer.resource_handle_allocators.object.reclaim_delayed_handles();
+
     // 16 encoders is a reasonable default
     let mut cmd_bufs = Vec::with_capacity(16);
 
@@ -171,9 +173,12 @@ pub fn evaluate_instructions(renderer: &Renderer) -> InstructionEvaluationOutput
 
     // Do these in dependency order
     // Level 3
-    data_core
-        .object_manager
-        .evaluate(&renderer.device, &mut encoder, &renderer.scatter);
+    data_core.object_manager.evaluate(
+        &renderer.device,
+        &mut encoder,
+        &renderer.scatter,
+        &delayed_object_handles,
+    );
 
     // Level 2
     let d2_texture = data_core.d2_texture_manager.evaluate(&renderer.device);
