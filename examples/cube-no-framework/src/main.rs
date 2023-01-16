@@ -198,8 +198,11 @@ fn main() {
         winit::event::Event::MainEventsCleared => {
             // Get a frame
             let frame = surface.get_current_texture().unwrap();
-            // Ready up the renderer
-            let (cmd_bufs, ready) = renderer.ready();
+
+            // Swap the instruction buffers so that our frame's changes can be processed.
+            renderer.swap_instruction_buffers();
+            // Evaluate our frame's world-change instructions
+            let mut eval_output = renderer.evaluate_instructions();
 
             // Build a rendergraph
             let mut graph = rend3::graph::RenderGraph::new();
@@ -210,7 +213,7 @@ fn main() {
             // Add the default rendergraph without a skybox
             base_rendergraph.add_to_graph(
                 &mut graph,
-                &ready,
+                &eval_output,
                 &pbr_routine,
                 None,
                 &tonemapping_routine,
@@ -222,7 +225,7 @@ fn main() {
             );
 
             // Dispatch a render using the built up rendergraph!
-            graph.execute(&renderer, cmd_bufs, &ready);
+            graph.execute(&renderer, &mut eval_output);
 
             // Present the frame
             frame.present();

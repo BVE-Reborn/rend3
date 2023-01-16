@@ -135,8 +135,11 @@ impl rend3_framework::App for GltfExample {
             rend3_framework::Event::RedrawRequested(..) => {
                 // Get a frame
                 let frame = surface.unwrap().get_current_texture().unwrap();
-                // Ready up the renderer
-                let (cmd_bufs, ready) = renderer.ready();
+
+                // Swap the instruction buffers so that our frame's changes can be processed.
+                renderer.swap_instruction_buffers();
+                // Evaluate our frame's world-change instructions
+                let mut eval_output = renderer.evaluate_instructions();
 
                 // Lock the routines
                 let pbr_routine = rend3_framework::lock(&routines.pbr);
@@ -151,7 +154,7 @@ impl rend3_framework::App for GltfExample {
                 // Add the default rendergraph without a skybox
                 base_rendergraph.add_to_graph(
                     &mut graph,
-                    &ready,
+                    &eval_output,
                     &pbr_routine,
                     None,
                     &tonemapping_routine,
@@ -162,7 +165,7 @@ impl rend3_framework::App for GltfExample {
                     glam::Vec4::new(0.10, 0.05, 0.10, 1.0), // Nice scene-referred purple
                 );
                 // Dispatch a render using the built up rendergraph!
-                graph.execute(renderer, cmd_bufs, &ready);
+                graph.execute(renderer, &mut eval_output);
 
                 // Present the frame
                 frame.present();

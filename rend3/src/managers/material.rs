@@ -216,7 +216,7 @@ impl MaterialManager {
         }
     }
 
-    pub fn ready(
+    pub fn evaluate(
         &mut self,
         device: &Device,
         encoder: &mut CommandEncoder,
@@ -224,7 +224,7 @@ impl MaterialManager {
         profile: RendererProfile,
         texture_manager: &TextureManager<crate::types::Texture2DTag>,
     ) {
-        profiling::scope!("Material Ready");
+        profiling::scope!("MaterialManager::evaluate");
 
         for archetype in self.archetypes.values_mut() {
             match profile {

@@ -179,7 +179,7 @@ impl<M: Material> ForwardRoutine<M> {
                         &culled.buffers.object_reference,
                         culling::ShaderBatchData::SHADER_SIZE.get(),
                     )
-                    .append_buffer(&ctx.ready.mesh_buffer)
+                    .append_buffer(&ctx.eval_output.mesh_buffer)
                     .append_buffer(ctx.data_core.material_manager.archetype_view::<M>().buffer())
                     .build(&ctx.renderer.device, Some("Per-Material BG"), &args.per_material.bgl),
             );
@@ -197,7 +197,7 @@ impl<M: Material> ForwardRoutine<M> {
                     rpass.set_bind_group((idx + 3) as _, bg, &[])
                 }
             }
-            if let ProfileData::Gpu(ref bg) = ctx.ready.d2_texture.bg {
+            if let ProfileData::Gpu(ref bg) = ctx.eval_output.d2_texture.bg {
                 rpass.set_bind_group(2, bg, &[]);
             }
 

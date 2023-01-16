@@ -252,7 +252,7 @@ impl GpuCuller {
             entries: &[
                 BindGroupEntry {
                     binding: 0,
-                    resource: ctx.ready.mesh_buffer.as_entire_binding(),
+                    resource: ctx.eval_output.mesh_buffer.as_entire_binding(),
                 },
                 BindGroupEntry {
                     binding: 1,
@@ -329,7 +329,7 @@ impl GpuCuller {
 
         node.build(move |mut ctx| {
             let camera_manager = match camera {
-                Some(i) => &ctx.ready.shadows[i].camera,
+                Some(i) => &ctx.eval_output.shadows[i].camera,
                 None => &ctx.data_core.camera_manager,
             };
 

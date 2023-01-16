@@ -2,8 +2,8 @@ use std::{cell::RefCell, marker::PhantomData};
 
 use crate::{
     graph::{
-        DataHandle, GraphSubResource, ReadyData, RenderGraph, RenderGraphDataStore, RenderGraphEncoderOrPass,
-        RenderPassHandle, RenderPassTargets, RenderTargetHandle, RpassTemporaryPool,
+        DataHandle, GraphSubResource, InstructionEvaluationOutput, RenderGraph, RenderGraphDataStore,
+        RenderGraphEncoderOrPass, RenderPassHandle, RenderPassTargets, RenderTargetHandle, RpassTemporaryPool,
     },
     util::typedefs::SsoString,
     Renderer, RendererDataCore,
@@ -25,8 +25,8 @@ pub struct NodeExecutionContext<'a, 'pass, 'node: 'pass> {
     /// Storage for any temporary data that needs to live as long
     /// as the renderpass.
     pub temps: &'pass RpassTemporaryPool<'pass>,
-    /// The result of calling ready on the renderer.
-    pub ready: &'pass ReadyData,
+    /// The result of calling evaluate_instructions on the renderer.
+    pub eval_output: &'pass InstructionEvaluationOutput,
     /// Store to get data from
     pub graph_data: RenderGraphDataStore<'pass>,
     pub _phantom: PhantomData<&'node ()>,

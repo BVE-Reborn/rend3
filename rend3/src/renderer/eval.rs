@@ -1,15 +1,13 @@
-use wgpu::{CommandBuffer, CommandEncoderDescriptor};
+use wgpu::CommandEncoderDescriptor;
 
 use crate::{
-    graph::ReadyData,
+    graph::InstructionEvaluationOutput,
     instruction::{Instruction, InstructionKind},
     Renderer,
 };
 
-pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
-    profiling::scope!("Renderer::ready");
-
-    renderer.instructions.swap();
+pub fn evaluate_instructions(renderer: &Renderer) -> InstructionEvaluationOutput {
+    profiling::scope!("Renderer::evaluate_instructions");
 
     let mut instructions = renderer.instructions.consumer.lock();
 
@@ -175,15 +173,15 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
     // Level 3
     data_core
         .object_manager
-        .ready(&renderer.device, &mut encoder, &renderer.scatter);
+        .evaluate(&renderer.device, &mut encoder, &renderer.scatter);
 
     // Level 2
-    let d2_texture = data_core.d2_texture_manager.ready(&renderer.device);
+    let d2_texture = data_core.d2_texture_manager.evaluate(&renderer.device);
 
     // Level 1
     // The material manager needs to be able to pull correct internal indices from
     // the d2 texture manager, so it has to go first.
-    data_core.material_manager.ready(
+    data_core.material_manager.evaluate(
         &renderer.device,
         &mut encoder,
         &renderer.scatter,
@@ -192,22 +190,20 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
     );
 
     // Level 0
-    let d2c_texture = data_core.d2c_texture_manager.ready(&renderer.device);
+    let d2c_texture = data_core.d2c_texture_manager.evaluate(&renderer.device);
     let (shadow_target_size, shadows) = data_core
         .directional_light_manager
-        .ready(renderer, &data_core.camera_manager);
-    let mesh_buffer = renderer.mesh_manager.ready();
+        .evaluate(renderer, &data_core.camera_manager);
+    let mesh_buffer = renderer.mesh_manager.evaluate();
 
     cmd_bufs.push(encoder.finish());
 
-    (
+    InstructionEvaluationOutput {
         cmd_bufs,
-        ReadyData {
-            d2_texture,
-            d2c_texture,
-            shadow_target_size,
-            shadows,
-            mesh_buffer,
-        },
-    )
+        d2_texture,
+        d2c_texture,
+        shadow_target_size,
+        shadows,
+        mesh_buffer,
+    }
 }

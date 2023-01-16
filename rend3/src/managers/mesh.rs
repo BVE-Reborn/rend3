@@ -187,7 +187,7 @@ impl MeshManager {
         allocator_guard.free_range(mesh.index_range);
     }
 
-    pub fn ready(&self) -> Arc<Buffer> {
+    pub fn evaluate(&self) -> Arc<Buffer> {
         self.buffer.read().clone()
     }
 

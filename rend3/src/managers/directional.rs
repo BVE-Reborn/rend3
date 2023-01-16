@@ -100,8 +100,8 @@ impl DirectionalLightManager {
         self.data[handle.idx].take().unwrap();
     }
 
-    pub fn ready(&mut self, renderer: &Renderer, user_camera: &CameraManager) -> (UVec2, Vec<ShadowDesc>) {
-        profiling::scope!("Directional Light Ready");
+    pub fn evaluate(&mut self, renderer: &Renderer, user_camera: &CameraManager) -> (UVec2, Vec<ShadowDesc>) {
+        profiling::scope!("DirectionalLightManager::evaluate");
 
         let shadow_maps: Vec<_> = self
             .data
