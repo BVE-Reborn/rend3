@@ -1,31 +1,26 @@
-use std::{marker::PhantomData, num::NonZeroU32, panic::Location, sync::Arc};
+use std::{marker::PhantomData, panic::Location, sync::Arc};
 
 use glam::Mat4;
 use parking_lot::Mutex;
 use rend3_types::{
-    GraphDataHandle, GraphDataTag, Handedness, Material, MaterialTag, MipmapCount, MipmapSource, ObjectChange,
-    Skeleton, SkeletonHandle, Texture2DTag, TextureCubeHandle, TextureCubeTag, TextureFormat, TextureFromTexture,
-    TextureUsages,
+    GraphDataHandle, GraphDataTag, Handedness, Material, MaterialTag, ObjectChange, Skeleton, SkeletonHandle,
+    Texture2DTag, TextureCubeHandle, TextureCubeTag, TextureFromTexture,
 };
-use wgpu::{
-    util::DeviceExt, CommandBuffer, CommandEncoderDescriptor, Device, DownlevelCapabilities, Extent3d, Features,
-    ImageCopyTexture, ImageDataLayout, Limits, Origin3d, Queue, TextureAspect, TextureDescriptor, TextureDimension,
-    TextureSampleType, TextureViewDescriptor, TextureViewDimension,
-};
+use wgpu::{CommandBuffer, CommandEncoderDescriptor, Device, DownlevelCapabilities, Features, Limits, Queue};
 use wgpu_profiler::GpuProfiler;
 
 use crate::{
     graph::{GraphTextureStore, ReadyData},
     instruction::{InstructionKind, InstructionStreamPair},
     managers::{
-        CameraManager, DirectionalLightManager, GraphStorage, HandleAllocator, InternalTexture, MaterialManager,
-        MeshManager, ObjectManager, SkeletonManager, TextureManager,
+        CameraManager, DirectionalLightManager, GraphStorage, HandleAllocator, MaterialManager, MeshManager,
+        ObjectManager, SkeletonManager, TextureManager,
     },
     types::{
         Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, MaterialHandle, Mesh, MeshHandle,
         Object, ObjectHandle, Texture, Texture2DHandle,
     },
-    util::{math::round_up, mipmap::MipmapGenerator, scatter_copy::ScatterCopy},
+    util::{mipmap::MipmapGenerator, scatter_copy::ScatterCopy},
     ExtendedAdapterInfo, InstanceAdapterDevice, RendererInitializationError, RendererProfile,
 };
 
@@ -142,7 +137,7 @@ impl Renderer {
             InstructionKind::AddMesh {
                 handle: handle.clone(),
                 internal_mesh,
-                buffer: encoder.finish(),
+                cmd_buf: encoder.finish(),
             },
             *Location::caller(),
         );
@@ -177,82 +172,14 @@ impl Renderer {
     pub fn add_texture_2d(self: &Arc<Self>, texture: Texture) -> Texture2DHandle {
         profiling::scope!("Add Texture 2D");
 
-        Self::validation_texture_format(texture.format);
-
         let handle = self.resource_handle_allocators.d2_texture.allocate(self);
-        let (block_x, block_y) = texture.format.describe().block_dimensions;
-        let size = Extent3d {
-            width: round_up(texture.size.x, block_x as u32),
-            height: round_up(texture.size.y, block_y as u32),
-            depth_or_array_layers: 1,
-        };
+        let (cmd_buf, internal_texture) = TextureManager::<Texture2DTag>::add(self, texture, false);
 
-        let mip_level_count = match texture.mip_count {
-            MipmapCount::Specific(v) => v.get(),
-            MipmapCount::Maximum => size.max_mips(TextureDimension::D2),
-        };
-
-        let desc = TextureDescriptor {
-            label: None,
-            size,
-            mip_level_count,
-            sample_count: 1,
-            dimension: TextureDimension::D2,
-            format: texture.format,
-            usage: TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_SRC | TextureUsages::COPY_DST,
-        };
-
-        let (buffer, tex) = match texture.mip_source {
-            MipmapSource::Uploaded => (
-                None,
-                self.device.create_texture_with_data(&self.queue, &desc, &texture.data),
-            ),
-            MipmapSource::Generated => {
-                let desc = TextureDescriptor {
-                    usage: desc.usage | TextureUsages::RENDER_ATTACHMENT,
-                    ..desc
-                };
-                let tex = self.device.create_texture(&desc);
-
-                let format_desc = texture.format.describe();
-
-                // write first level
-                self.queue.write_texture(
-                    ImageCopyTexture {
-                        texture: &tex,
-                        mip_level: 0,
-                        origin: Origin3d::ZERO,
-                        aspect: TextureAspect::All,
-                    },
-                    &texture.data,
-                    ImageDataLayout {
-                        offset: 0,
-                        bytes_per_row: NonZeroU32::new(
-                            format_desc.block_size as u32 * (size.width / format_desc.block_dimensions.0 as u32),
-                        ),
-                        rows_per_image: None,
-                    },
-                    size,
-                );
-
-                let mut encoder = self.device.create_command_encoder(&CommandEncoderDescriptor::default());
-
-                // generate mipmaps
-                self.mipmap_generator
-                    .generate_mipmaps(&self.device, &mut encoder, &tex, &desc);
-
-                (Some(encoder.finish()), tex)
-            }
-        };
-
-        let view = tex.create_view(&TextureViewDescriptor::default());
         self.instructions.push(
             InstructionKind::AddTexture2D {
                 handle: handle.clone(),
-                desc,
-                texture: tex,
-                view,
-                buffer,
+                internal_texture,
+                cmd_buf,
             },
             *Location::caller(),
         );
@@ -268,65 +195,16 @@ impl Renderer {
     pub fn add_texture_2d_from_texture(self: &Arc<Self>, texture: TextureFromTexture) -> Texture2DHandle {
         profiling::scope!("Add Texture 2D From Texture");
 
-        let mut encoder = self.device.create_command_encoder(&CommandEncoderDescriptor::default());
-
         let handle = self.resource_handle_allocators.d2_texture.allocate(self);
 
-        let data_core = self.data_core.lock();
-
-        let InternalTexture {
-            texture: old_texture,
-            desc: old_texture_desc,
-            ..
-        } = data_core.d2_texture_manager.get_internal(texture.src.get_raw());
-
-        let new_size = old_texture_desc.mip_level_size(texture.start_mip).unwrap();
-
-        let mip_level_count = texture
-            .mip_count
-            .map_or_else(|| old_texture_desc.mip_level_count - texture.start_mip, |c| c.get());
-
-        let desc = TextureDescriptor {
-            size: new_size,
-            mip_level_count,
-            ..old_texture_desc.clone()
-        };
-
-        let tex = self.device.create_texture(&desc);
-
-        let view = tex.create_view(&TextureViewDescriptor::default());
-
-        for new_mip in 0..mip_level_count {
-            let old_mip = new_mip + texture.start_mip;
-
-            profiling::scope!("mip level generation");
-
-            encoder.copy_texture_to_texture(
-                ImageCopyTexture {
-                    texture: old_texture,
-                    mip_level: old_mip,
-                    origin: Origin3d::ZERO,
-                    aspect: TextureAspect::All,
-                },
-                ImageCopyTexture {
-                    texture: &tex,
-                    mip_level: new_mip,
-                    origin: Origin3d::ZERO,
-                    aspect: TextureAspect::All,
-                },
-                old_texture_desc.mip_level_size(old_mip).unwrap(),
-            );
-        }
         self.instructions.push(
-            InstructionKind::AddTexture2D {
+            InstructionKind::AddTexture2DFromTexture {
                 handle: handle.clone(),
-                texture: tex,
-                desc,
-                view,
-                buffer: Some(encoder.finish()),
+                texture,
             },
             *Location::caller(),
         );
+
         handle
     }
 
@@ -338,64 +216,18 @@ impl Renderer {
     pub fn add_texture_cube(self: &Arc<Self>, texture: Texture) -> TextureCubeHandle {
         profiling::scope!("Add Texture Cube");
 
-        Self::validation_texture_format(texture.format);
-
         let handle = self.resource_handle_allocators.d2c_texture.allocate(self);
-        let size = Extent3d {
-            width: texture.size.x,
-            height: texture.size.y,
-            depth_or_array_layers: 6,
-        };
+        let (cmd_buf, internal_texture) = TextureManager::<TextureCubeTag>::add(self, texture, true);
 
-        let mip_level_count = match texture.mip_count {
-            MipmapCount::Specific(v) => v.get(),
-            MipmapCount::Maximum => size.max_mips(TextureDimension::D3),
-        };
-
-        let desc = TextureDescriptor {
-            label: None,
-            size,
-            mip_level_count,
-            sample_count: 1,
-            dimension: TextureDimension::D2,
-            format: texture.format,
-            usage: TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST,
-        };
-
-        let tex = self.device.create_texture_with_data(&self.queue, &desc, &texture.data);
-
-        let view = tex.create_view(&TextureViewDescriptor {
-            dimension: Some(TextureViewDimension::Cube),
-            ..TextureViewDescriptor::default()
-        });
         self.instructions.push(
             InstructionKind::AddTextureCube {
                 handle: handle.clone(),
-                texture: tex,
-                desc,
-                view,
-                buffer: None,
+                internal_texture,
+                cmd_buf,
             },
             *Location::caller(),
         );
         handle
-    }
-
-    fn validation_texture_format(format: TextureFormat) {
-        let sample_type = format.describe().sample_type;
-        if let TextureSampleType::Float { filterable } = sample_type {
-            if !filterable {
-                panic!(
-                    "Textures formats must allow filtering with a linear filter. {:?} has sample type {:?} which does not.",
-                    format, sample_type
-                )
-            }
-        } else {
-            panic!(
-                "Textures formats must be sample-able as floating point. {:?} has sample type {:?}.",
-                format, sample_type
-            )
-        }
     }
 
     /// Adds a material to the renderer. This can be used in an [`Object`].
