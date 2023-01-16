@@ -6,11 +6,11 @@ use rend3_types::{
     GraphDataHandle, GraphDataTag, Handedness, Material, MaterialTag, ObjectChange, Skeleton, SkeletonHandle,
     Texture2DTag, TextureCubeHandle, TextureCubeTag, TextureFromTexture,
 };
-use wgpu::{CommandBuffer, CommandEncoderDescriptor, Device, DownlevelCapabilities, Features, Limits, Queue};
+use wgpu::{CommandEncoderDescriptor, Device, DownlevelCapabilities, Features, Limits, Queue};
 use wgpu_profiler::GpuProfiler;
 
 use crate::{
-    graph::{GraphTextureStore, ReadyData},
+    graph::{GraphTextureStore, InstructionEvaluationOutput},
     instruction::{InstructionKind, InstructionStreamPair},
     managers::{
         CameraManager, DirectionalLightManager, GraphStorage, HandleAllocator, MaterialManager, MeshManager,
@@ -25,7 +25,7 @@ use crate::{
 };
 
 pub mod error;
-mod ready;
+mod eval;
 mod setup;
 
 /// Core struct which contains the renderer world. Primary way to interact with
@@ -415,12 +415,20 @@ impl Renderer {
             .push(InstructionKind::SetCameraData { data }, *Location::caller())
     }
 
-    /// Render a frame of the scene onto the given output, using the given
-    /// RenderRoutine.
+    /// Swaps the front and back instruction buffer. Any world-modifiying functions
+    /// called after this will be recorded for the next frame.
     ///
-    /// The RendererStatistics may not be the results from this frame, but might
-    /// be the results from multiple frames ago.
-    pub fn ready(&self) -> (Vec<CommandBuffer>, ReadyData) {
-        ready::ready(self)
+    /// Call before [`Self::evaluate_instructions`].
+    pub fn swap_instruction_buffers(&self) {
+        self.instructions.swap()
+    }
+
+    /// Evaluates all instructions in the "front" buffer.
+    ///
+    /// After you've recorded all your instructions from world-modifying functions
+    /// call [`Self::swap_instruction_buffers`] to make swap buffers. Then call
+    /// this function to evaluate all of those instructions.
+    pub fn evaluate_instructions(&self) -> InstructionEvaluationOutput {
+        eval::evaluate_instructions(self)
     }
 }

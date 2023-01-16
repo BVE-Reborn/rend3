@@ -252,8 +252,8 @@ impl<T: 'static> TextureManager<T> {
         self.data[handle.idx] = None;
     }
 
-    pub fn ready(&mut self, device: &Device) -> TextureManagerReadyOutput {
-        profiling::scope!("TextureManager::ready");
+    pub fn evaluate(&mut self, device: &Device) -> TextureManagerEvaluateOutput {
+        profiling::scope!("TextureManager::evaluate");
 
         if let ProfileData::Gpu(group_dirty) = self.group_dirty {
             profiling::scope!("Update GPU Texture Arrays");
@@ -269,11 +269,11 @@ impl<T: 'static> TextureManager<T> {
                 *self.group_dirty.as_gpu_mut() = false;
             }
 
-            TextureManagerReadyOutput {
+            TextureManagerEvaluateOutput {
                 bg: self.group.as_ref().map(|_| (), Arc::clone),
             }
         } else {
-            TextureManagerReadyOutput {
+            TextureManagerEvaluateOutput {
                 bg: ProfileData::Cpu(()),
             }
         }
@@ -300,9 +300,9 @@ impl<T: 'static> TextureManager<T> {
     }
 }
 
-/// Output of readying up a [`TextureManager`].
+/// Output of calling [`TextureManager::evaluate`].
 #[derive(Clone)]
-pub struct TextureManagerReadyOutput {
+pub struct TextureManagerEvaluateOutput {
     pub bg: ProfileData<(), Arc<BindGroup>>,
 }
 

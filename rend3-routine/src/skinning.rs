@@ -185,7 +185,7 @@ impl GpuSkinner {
 
     pub fn execute_pass(&self, ctx: &NodeExecutionContext, encoder: &mut CommandEncoder, buffers: &PreSkinningBuffers) {
         let bg = BindGroupBuilder::new()
-            .append_buffer(&ctx.ready.mesh_buffer)
+            .append_buffer(&ctx.eval_output.mesh_buffer)
             .append_buffer_with_size(&buffers.gpu_skinning_inputs, GpuSkinningInput::SHADER_SIZE.get())
             .append_buffer(&buffers.joint_matrices)
             .build(&ctx.renderer.device, Some("GPU skinning inputs"), &self.bgl);

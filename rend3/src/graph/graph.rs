@@ -22,16 +22,16 @@ use crate::{
         RenderGraphEncoderOrPass, RenderGraphEncoderOrPassInner, RenderGraphNode, RenderGraphNodeBuilder,
         RenderPassTargets, RenderTargetDescriptor, RenderTargetHandle, RpassTemporaryPool, TextureRegion,
     },
-    managers::{ShadowDesc, TextureManagerReadyOutput},
+    managers::{ShadowDesc, TextureManagerEvaluateOutput},
     util::typedefs::{FastHashMap, FastHashSet, RendererStatistics, SsoString},
     Renderer,
 };
 
-/// Output of calling ready on various managers.
-#[derive(Clone)]
-pub struct ReadyData {
-    pub d2_texture: TextureManagerReadyOutput,
-    pub d2c_texture: TextureManagerReadyOutput,
+/// Result of evaluating all instructions.
+pub struct InstructionEvaluationOutput {
+    pub cmd_bufs: Vec<CommandBuffer>,
+    pub d2_texture: TextureManagerEvaluateOutput,
+    pub d2c_texture: TextureManagerEvaluateOutput,
     pub shadow_target_size: UVec2,
     pub shadows: Vec<ShadowDesc>,
     pub mesh_buffer: Arc<Buffer>,
@@ -170,8 +170,7 @@ impl<'node> RenderGraph<'node> {
     pub fn execute(
         mut self,
         renderer: &'node Arc<Renderer>,
-        mut cmd_bufs: Vec<CommandBuffer>,
-        ready_output: &'node ReadyData,
+        eval_output: &'node mut InstructionEvaluationOutput,
     ) -> Option<RendererStatistics> {
         profiling::scope!("RenderGraph::execute");
 
@@ -488,7 +487,7 @@ impl<'node> RenderGraph<'node> {
                     // SAFETY: This borrow, and all the objects allocated from it, lasts as long as the renderpass, and
                     // isn't used mutably until after the rpass dies
                     temps: unsafe { &*rpass_temps_cell.get() },
-                    ready: ready_output,
+                    eval_output,
                     graph_data: store,
                     _phantom: PhantomData,
                 };
@@ -517,7 +516,7 @@ impl<'node> RenderGraph<'node> {
 
         // SAFETY: this is safe as we've dropped all renderpasses that possibly borrowed
         // it
-        cmd_bufs.push(encoder_cell.into_inner().finish());
+        eval_output.cmd_bufs.push(encoder_cell.into_inner().finish());
 
         let mut resolve_encoder = renderer.device.create_command_encoder(&CommandEncoderDescriptor {
             label: Some("profile resolve encoder"),
@@ -527,9 +526,9 @@ impl<'node> RenderGraph<'node> {
             .try_lock()
             .unwrap()
             .resolve_queries(&mut resolve_encoder);
-        cmd_bufs.push(resolve_encoder.finish());
+        eval_output.cmd_bufs.push(resolve_encoder.finish());
 
-        renderer.queue.submit(cmd_bufs);
+        renderer.queue.submit(eval_output.cmd_bufs.drain(..));
 
         data_core.profiler.try_lock().unwrap().end_frame().unwrap();
 

@@ -81,7 +81,7 @@ struct ObjectArchetype {
     set_object_transform: fn(&mut VecAny, &mut FreelistDerivedBuffer, usize, Mat4),
     duplicate_object: fn(&VecAny, usize, ObjectChange) -> Object,
     remove: fn(&mut VecAny, usize),
-    ready: fn(&mut ObjectArchetype, &Device, &mut CommandEncoder, &ScatterCopy),
+    evaluate: fn(&mut ObjectArchetype, &Device, &mut CommandEncoder, &ScatterCopy),
 }
 
 /// Manages objects. That's it. ¯\\\_(ツ)\_/¯
@@ -108,7 +108,7 @@ impl ObjectManager {
             set_object_transform: set_object_transform::<M>,
             duplicate_object: duplicate_object::<M>,
             remove: remove::<M>,
-            ready: ready::<M>,
+            evaluate: evaluate::<M>,
         })
     }
 
@@ -165,9 +165,9 @@ impl ObjectManager {
         archetype.object_count -= 1;
     }
 
-    pub fn ready(&mut self, device: &Device, encoder: &mut CommandEncoder, scatter: &ScatterCopy) {
+    pub fn evaluate(&mut self, device: &Device, encoder: &mut CommandEncoder, scatter: &ScatterCopy) {
         for archetype in self.archetype.values_mut() {
-            (archetype.ready)(archetype, device, encoder, scatter);
+            (archetype.evaluate)(archetype, device, encoder, scatter);
         }
     }
 
@@ -340,7 +340,7 @@ fn remove<M: Material>(data: &mut VecAny, idx: usize) {
     data_vec[idx] = None;
 }
 
-fn ready<M: Material>(
+fn evaluate<M: Material>(
     archetype: &mut ObjectArchetype,
     device: &Device,
     encoder: &mut CommandEncoder,

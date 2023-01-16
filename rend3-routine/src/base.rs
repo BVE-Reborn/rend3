@@ -18,7 +18,9 @@ use std::{iter::zip, sync::Arc};
 use glam::{UVec2, Vec4};
 use rend3::{
     format_sso,
-    graph::{DataHandle, ReadyData, RenderGraph, RenderTargetDescriptor, RenderTargetHandle, ViewportRect},
+    graph::{
+        DataHandle, InstructionEvaluationOutput, RenderGraph, RenderTargetDescriptor, RenderTargetHandle, ViewportRect,
+    },
     managers::ShadowDesc,
     types::{SampleCount, TextureFormat, TextureUsages},
     Renderer, ShaderPreProcessor, INTERNAL_SHADOW_DEPTH_FORMAT,
@@ -64,7 +66,7 @@ impl BaseRenderGraph {
     pub fn add_to_graph<'node>(
         &'node self,
         graph: &mut RenderGraph<'node>,
-        ready: &ReadyData,
+        eval_output: &InstructionEvaluationOutput,
         pbr: &'node crate::pbr::PbrRoutine,
         skybox: Option<&'node crate::skybox::SkyboxRoutine>,
         tonemapping: &'node crate::tonemapping::TonemappingRoutine,
@@ -75,7 +77,7 @@ impl BaseRenderGraph {
         clear_color: Vec4,
     ) {
         // Create intermediate storage
-        let state = BaseRenderGraphIntermediateState::new(graph, ready, resolution, samples);
+        let state = BaseRenderGraphIntermediateState::new(graph, eval_output, resolution, samples);
 
         // Preparing and uploading data
         state.create_frame_uniforms(graph, self, ambient, resolution);
@@ -88,7 +90,7 @@ impl BaseRenderGraph {
         state.pbr_culling(graph, self);
 
         // Depth-only rendering
-        state.pbr_shadow_rendering(graph, pbr, &ready.shadows);
+        state.pbr_shadow_rendering(graph, pbr, &eval_output.shadows);
 
         // Clear targets
         state.clear(graph, clear_color);
@@ -126,9 +128,14 @@ pub struct BaseRenderGraphIntermediateState {
 }
 impl BaseRenderGraphIntermediateState {
     /// Create the default setting for all state.
-    pub fn new(graph: &mut RenderGraph<'_>, ready: &ReadyData, resolution: UVec2, samples: SampleCount) -> Self {
+    pub fn new(
+        graph: &mut RenderGraph<'_>,
+        eval_output: &InstructionEvaluationOutput,
+        resolution: UVec2,
+        samples: SampleCount,
+    ) -> Self {
         // We need to know how many shadows we need to render
-        let shadow_count = ready.shadows.len();
+        let shadow_count = eval_output.shadows.len();
 
         // Create global bind group information
         let shadow_uniform_bg = graph.add_data::<BindGroup>();
@@ -137,7 +144,7 @@ impl BaseRenderGraphIntermediateState {
         // Shadow render target
         let shadow = graph.add_render_target(RenderTargetDescriptor {
             label: Some("shadow target".into()),
-            resolution: ready.shadow_target_size,
+            resolution: eval_output.shadow_target_size,
             depth: 1,
             samples: SampleCount::One,
             format: INTERNAL_SHADOW_DEPTH_FORMAT,

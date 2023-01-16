@@ -65,8 +65,8 @@ impl SkyboxRoutine {
         self.current_skybox.bg = None;
     }
 
-    /// Update data if the background has changed since last frame.
-    pub fn ready(&mut self, renderer: &Renderer) {
+    /// Evaluate any changes that have happened to the skybox routine.
+    pub fn evaluate(&mut self, renderer: &Renderer) {
         let data_core = renderer.data_core.lock();
         let d2c_texture_manager = &data_core.d2c_texture_manager;
 

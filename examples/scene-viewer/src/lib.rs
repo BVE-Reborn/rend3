@@ -585,10 +585,12 @@ impl rend3_framework::App for SceneViewer {
                 let mut skybox_routine = lock(&routines.skybox);
                 let tonemapping_routine = lock(&routines.tonemapping);
 
-                // Ready up the renderer
-                let (cmd_bufs, ready) = renderer.ready();
-                // Ready up the routines
-                skybox_routine.ready(renderer);
+                // Swap the instruction buffers so that our frame's changes can be processed.
+                renderer.swap_instruction_buffers();
+                // Evaluate our frame's world-change instructions
+                let mut eval_output = renderer.evaluate_instructions();
+                // Evaluate changes to routines.
+                skybox_routine.evaluate(renderer);
 
                 // Build a rendergraph
                 let mut graph = rend3::graph::RenderGraph::new();
@@ -598,7 +600,7 @@ impl rend3_framework::App for SceneViewer {
                 // Add the default rendergraph
                 base_rendergraph.add_to_graph(
                     &mut graph,
-                    &ready,
+                    &eval_output,
                     &pbr_routine,
                     Some(&skybox_routine),
                     &tonemapping_routine,
@@ -610,7 +612,7 @@ impl rend3_framework::App for SceneViewer {
                 );
 
                 // Dispatch a render using the built up rendergraph!
-                self.previous_profiling_stats = graph.execute(renderer, cmd_bufs, &ready);
+                self.previous_profiling_stats = graph.execute(renderer, &mut eval_output);
 
                 frame.present();
                 // mark the end of the frame for tracy/other profilers
