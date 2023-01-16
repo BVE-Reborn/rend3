@@ -12,8 +12,16 @@ use super::{BATCH_SIZE, WORKGROUP_SIZE};
 
 #[derive(Debug)]
 pub struct ShaderBatchDatas {
-    pub(super) keys: Vec<ShaderJobKey>,
+    pub(super) regions: Vec<JobSubRegion>,
     pub(super) jobs: Vec<ShaderBatchData>,
+}
+
+#[derive(Debug)]
+pub(super) struct JobSubRegion {
+    pub job_index: u32,
+    pub base_invocation: u32,
+    pub invocation_count: u32,
+    pub key: ShaderJobKey,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -89,12 +97,13 @@ pub(super) fn batch_objects<M: Material>(
     material_manager: &MaterialManager,
     object_manager: &ObjectManager,
     camera_manager: &CameraManager,
+    max_dispatch: u32,
 ) -> ShaderBatchDatas {
     profiling::scope!("Batch Objects");
 
     let mut jobs = ShaderBatchDatas {
         jobs: Vec::new(),
-        keys: Vec::new(),
+        regions: Vec::new(),
     };
 
     let objects = match object_manager.enumerated_objects::<M>() {
@@ -144,28 +153,43 @@ pub(super) fn batch_objects<M: Material>(
     if !sorted_objects.is_empty() {
         profiling::scope!("Batch Data Creation");
         let mut current_base_invocation = 0_u32;
+        let mut current_region_invocation = 0_u32;
         let mut current_invocation = 0_u32;
         let mut current_object_index = 0_u32;
         let mut current_ranges = [ShaderObjectRange::default(); BATCH_SIZE];
         let mut current_key = sorted_objects.first().unwrap().0.job_key;
 
         for (ShaderJobSortingKey { job_key: key, .. }, handle, object) in sorted_objects {
-            if key != current_key || current_object_index == 256 {
+            let invocation_count = object.inner.index_count / 3;
+
+            let key_difference = key != current_key;
+            let object_limit = current_object_index == 256;
+            let dispatch_limit = (current_invocation + invocation_count) >= max_dispatch * WORKGROUP_SIZE;
+
+            if key_difference || object_limit || dispatch_limit {
+                jobs.regions.push(JobSubRegion {
+                    job_index: jobs.jobs.len() as u32,
+                    base_invocation: current_region_invocation,
+                    invocation_count: current_invocation - current_region_invocation,
+                    key: current_key,
+                });
+                current_key = key;
+                current_region_invocation = current_invocation;
+            }
+            if object_limit || dispatch_limit {
                 jobs.jobs.push(ShaderBatchData {
                     ranges: current_ranges,
                     total_objects: current_object_index,
                     total_invocations: current_invocation,
                     base_output_invocation: current_base_invocation,
                 });
-                jobs.keys.push(current_key);
 
                 current_base_invocation += current_invocation;
-                current_key = key;
                 current_invocation = 0;
+                current_region_invocation = 0;
                 current_object_index = 0;
             }
 
-            let invocation_count = object.inner.index_count / 3;
             let range = ShaderObjectRange {
                 invocation_start: current_invocation,
                 invocation_end: current_invocation + invocation_count,
@@ -177,13 +201,18 @@ pub(super) fn batch_objects<M: Material>(
             current_invocation += round_up(invocation_count, WORKGROUP_SIZE);
         }
 
+        jobs.regions.push(JobSubRegion {
+            job_index: jobs.jobs.len() as u32,
+            base_invocation: current_region_invocation,
+            invocation_count: current_invocation - current_region_invocation,
+            key: current_key,
+        });
         jobs.jobs.push(ShaderBatchData {
             ranges: current_ranges,
             total_objects: current_object_index,
             total_invocations: current_invocation,
             base_output_invocation: current_base_invocation,
         });
-        jobs.keys.push(current_key);
     }
 
     jobs

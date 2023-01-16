@@ -2,7 +2,6 @@ use std::{
     any::{type_name, TypeId},
     borrow::Cow,
     collections::{hash_map::Entry, HashMap},
-    iter::zip,
     num::NonZeroU64,
     ops::Range,
     sync::Arc,
@@ -27,7 +26,7 @@ use wgpu::{
 };
 
 use crate::culling::{
-    batching::{batch_objects, ShaderBatchData, ShaderBatchDatas, ShaderJobKey},
+    batching::{batch_objects, JobSubRegion, ShaderBatchData, ShaderBatchDatas},
     WORKGROUP_SIZE,
 };
 
@@ -48,6 +47,7 @@ pub struct DrawCallSet {
 pub struct DrawCall {
     pub bind_group_index: TextureBindGroupIndex,
     pub index_range: Range<u32>,
+    pub batch_index: u32,
 }
 
 #[derive(Default)]
@@ -278,7 +278,28 @@ impl GpuCuller {
         let mut material_key_ranges = HashMap::new();
 
         let mut current_material_key_range_start = 0;
-        let mut current_material_key = jobs.keys.first().map(|k| k.material_key).unwrap_or(0);
+        let mut current_material_key = jobs.regions.first().map(|k| k.key.material_key).unwrap_or(0);
+        for region in jobs.regions {
+            let region: JobSubRegion = region;
+
+            if current_material_key != region.key.material_key {
+                let range_end = draw_calls.len();
+                material_key_ranges.insert(current_material_key, current_material_key_range_start..range_end);
+                current_material_key = region.key.material_key;
+                current_material_key_range_start = range_end;
+            }
+
+            let job = &jobs.jobs[region.job_index as usize];
+            let start = (job.base_output_invocation + region.base_invocation) * 3;
+            let end = start + (region.invocation_count * 3);
+            draw_calls.push(DrawCall {
+                index_range: start..end,
+                bind_group_index: region.key.bind_group_index,
+                batch_index: region.job_index,
+            });
+        }
+
+        material_key_ranges.insert(current_material_key, current_material_key_range_start..draw_calls.len());
 
         let mut cpass = ctx
             .encoder_or_pass
@@ -287,28 +308,11 @@ impl GpuCuller {
                 label: Some(&format_sso!("GpuCuller {type_name} Culling")),
             });
         cpass.set_pipeline(&self.pipeline);
-        for (idx, (key, job)) in zip(jobs.keys, jobs.jobs).enumerate() {
-            // RA is having a lot of trouble with into_iter.
-            let (key, job): (ShaderJobKey, ShaderBatchData) = (key, job);
-
-            if current_material_key != key.material_key {
-                let range_end = draw_calls.len();
-                material_key_ranges.insert(current_material_key, current_material_key_range_start..range_end);
-                current_material_key = key.material_key;
-                current_material_key_range_start = range_end;
-            }
-
+        for (idx, job) in jobs.jobs.iter().enumerate() {
             cpass.set_bind_group(0, &bg, &[idx as u32 * ShaderBatchData::SHADER_SIZE.get() as u32]);
             cpass.dispatch_workgroups(round_up_div(job.total_invocations, WORKGROUP_SIZE), 1, 1);
-
-            draw_calls.push(DrawCall {
-                index_range: (job.base_output_invocation * 3)..(job.base_output_invocation + job.total_invocations) * 3,
-                bind_group_index: key.bind_group_index,
-            });
         }
         drop(cpass);
-
-        material_key_ranges.insert(current_material_key, current_material_key_range_start..draw_calls.len());
 
         DrawCallSet {
             buffers,
@@ -337,6 +341,7 @@ impl GpuCuller {
                 &ctx.data_core.material_manager,
                 &ctx.data_core.object_manager,
                 camera_manager,
+                ctx.renderer.limits.max_compute_workgroups_per_dimension,
             );
 
             if jobs.jobs.is_empty() {

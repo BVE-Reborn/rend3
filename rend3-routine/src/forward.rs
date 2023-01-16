@@ -204,8 +204,7 @@ impl<M: Material> ForwardRoutine<M> {
             let Some(range) = culled.material_key_ranges.get(&self.material_key) else {
                 return;
             };
-            for (idx, call) in culled.draw_calls[range.clone()].iter().enumerate() {
-                let idx = idx + range.start;
+            for call in &culled.draw_calls[range.clone()] {
                 let call: &DrawCall = call;
 
                 if ctx.renderer.profile.is_cpu_driven() {
@@ -218,7 +217,7 @@ impl<M: Material> ForwardRoutine<M> {
                 rpass.set_bind_group(
                     1,
                     per_material_bg,
-                    &[idx as u32 * culling::ShaderBatchData::SHADER_SIZE.get() as u32],
+                    &[call.batch_index * culling::ShaderBatchData::SHADER_SIZE.get() as u32],
                 );
                 rpass.draw_indexed(call.index_range.clone(), 0, args.data..args.data + 1);
             }
