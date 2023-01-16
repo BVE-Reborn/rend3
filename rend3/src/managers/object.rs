@@ -21,7 +21,9 @@ use crate::{
 /// Cpu side input to gpu-based culling
 #[derive(ShaderType)]
 pub struct ShaderObject<M: Material> {
+    /// Model -> World matrix
     pub transform: Mat4,
+    /// Boudning sphere in world space.
     pub bounding_sphere: BoundingSphere,
     pub first_index: u32,
     pub index_count: u32,
@@ -51,6 +53,7 @@ impl<M: Material> Clone for ShaderObject<M> {
 pub struct InternalObject<M: Material> {
     pub mesh_kind: ObjectMeshKind,
     pub material_handle: MaterialHandle,
+    /// World space
     pub location: Vec3A,
     pub inner: ShaderObject<M>,
 }
@@ -64,12 +67,6 @@ impl<M: Material> Clone for InternalObject<M> {
             location: self.location,
             inner: self.inner,
         }
-    }
-}
-
-impl<M: Material> InternalObject<M> {
-    pub fn mesh_location(&self) -> Vec3A {
-        self.location + Vec3A::from(self.inner.bounding_sphere.center)
     }
 }
 
@@ -276,11 +273,15 @@ pub(super) fn object_add_callback<M: Material>(_material: &M, args: ObjectAddCal
         }
     });
 
-    let bounding_sphere = args.internal_mesh.bounding_sphere;
+    // Transform the bounding sphere from model to world space.
+    let bounding_sphere = args
+        .internal_mesh
+        .bounding_sphere
+        .apply_transform(args.object.transform);
     let index_range = args.internal_mesh.index_range.clone();
 
     let internal_object = InternalObject::<M> {
-        location: args.object.transform.transform_point3a(bounding_sphere.center.into()),
+        location: bounding_sphere.center.into(),
         inner: ShaderObject {
             material_index: args.object.material.idx as u32,
             transform: args.object.transform,

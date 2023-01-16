@@ -117,6 +117,14 @@ pub(super) fn batch_objects<M: Material>(
     {
         profiling::scope!("Sort Key Creation");
         for (handle, object) in objects {
+            // Frustum culling
+            if !camera_manager
+                .world_frustum()
+                .contains_sphere(object.inner.bounding_sphere)
+            {
+                continue;
+            }
+
             let material = material_archetype.material(*object.material_handle);
             let bind_group_index = material
                 .bind_group_index
