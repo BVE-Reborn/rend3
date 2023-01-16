@@ -17,7 +17,7 @@ env_logger = { version = "0.10", default-features = false, features = ["auto-col
 # The imgui immediate mode gui library
 imgui = "0.9"
 # Winit integration with imgui
-imgui-winit-support = { version = "0.9" }
+imgui-winit-support = { version = "0.10" }
 # Linear algebra library
 glam = "0.22"
 # Portable implementation of Instant.
