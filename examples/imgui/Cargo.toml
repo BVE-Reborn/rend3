@@ -15,7 +15,7 @@ path = "src/main.rs"
 # logging
 env_logger = { version = "0.10", default-features = false, features = ["auto-color", "humantime"] }
 # The imgui immediate mode gui library
-imgui = "0.9"
+imgui = "0.10"
 # Winit integration with imgui
 imgui-winit-support = { version = "0.9" }
 # Linear algebra library
