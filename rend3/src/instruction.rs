@@ -5,12 +5,12 @@ use parking_lot::Mutex;
 use rend3_types::{
     MaterialHandle, MeshHandle, ObjectChange, ObjectHandle, RawDirectionalLightHandle, RawGraphDataHandleUntyped,
     RawMaterialHandle, RawMeshHandle, RawSkeletonHandle, RawTexture2DHandle, RawTextureCubeHandle, Skeleton,
-    SkeletonHandle, Texture2DHandle, TextureCubeHandle,
+    SkeletonHandle, Texture2DHandle, TextureCubeHandle, TextureFromTexture,
 };
-use wgpu::{CommandBuffer, Device, Texture, TextureDescriptor, TextureView};
+use wgpu::{CommandBuffer, Device};
 
 use crate::{
-    managers::{GraphStorage, InternalMesh, MaterialManager, TextureManager},
+    managers::{GraphStorage, InternalMesh, InternalTexture, MaterialManager, TextureManager},
     types::{Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Object, RawObjectHandle},
     RendererProfile,
 };
@@ -25,7 +25,7 @@ pub enum InstructionKind {
     AddMesh {
         handle: MeshHandle,
         internal_mesh: InternalMesh,
-        buffer: CommandBuffer,
+        cmd_buf: CommandBuffer,
     },
     AddSkeleton {
         handle: SkeletonHandle,
@@ -33,17 +33,17 @@ pub enum InstructionKind {
     },
     AddTexture2D {
         handle: Texture2DHandle,
-        desc: TextureDescriptor<'static>,
-        texture: Texture,
-        view: TextureView,
-        buffer: Option<CommandBuffer>,
+        internal_texture: InternalTexture,
+        cmd_buf: Option<CommandBuffer>,
+    },
+    AddTexture2DFromTexture {
+        handle: Texture2DHandle,
+        texture: TextureFromTexture,
     },
     AddTextureCube {
         handle: TextureCubeHandle,
-        desc: TextureDescriptor<'static>,
-        texture: Texture,
-        view: TextureView,
-        buffer: Option<CommandBuffer>,
+        internal_texture: InternalTexture,
+        cmd_buf: Option<CommandBuffer>,
     },
     AddMaterial {
         handle: MaterialHandle,

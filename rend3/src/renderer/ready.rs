@@ -30,7 +30,7 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
                 InstructionKind::AddMesh {
                     handle,
                     internal_mesh,
-                    buffer,
+                    cmd_buf: buffer,
                 } => {
                     profiling::scope!("Add Mesh");
                     renderer.mesh_manager.fill(&handle, internal_mesh);
@@ -54,23 +54,22 @@ pub fn ready(renderer: &Renderer) -> (Vec<CommandBuffer>, ReadyData) {
                 }
                 InstructionKind::AddTexture2D {
                     handle,
-                    desc,
-                    texture,
-                    view,
-                    buffer,
+                    internal_texture,
+                    cmd_buf,
                 } => {
-                    cmd_bufs.extend(buffer);
-                    data_core.d2_texture_manager.add(*handle, desc, texture, view);
+                    cmd_bufs.extend(cmd_buf);
+                    data_core.d2_texture_manager.fill(*handle, internal_texture);
                 }
+                InstructionKind::AddTexture2DFromTexture { handle, texture } => data_core
+                    .d2_texture_manager
+                    .fill_from_texture(&renderer.device, &mut encoder, *handle, texture),
                 InstructionKind::AddTextureCube {
                     handle,
-                    desc,
-                    texture,
-                    view,
-                    buffer,
+                    internal_texture,
+                    cmd_buf,
                 } => {
-                    cmd_bufs.extend(buffer);
-                    data_core.d2c_texture_manager.add(*handle, desc, texture, view);
+                    cmd_bufs.extend(cmd_buf);
+                    data_core.d2c_texture_manager.fill(*handle, internal_texture);
                 }
                 InstructionKind::AddMaterial { handle, fill_invoke } => {
                     profiling::scope!("Add Material");

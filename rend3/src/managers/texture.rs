@@ -1,13 +1,14 @@
 use std::{marker::PhantomData, num::NonZeroU32, sync::Arc};
 
-use rend3_types::{RawResourceHandle, TextureFormat, TextureUsages};
+use rend3_types::{MipmapCount, MipmapSource, RawResourceHandle, TextureFormat, TextureFromTexture, TextureUsages};
 use wgpu::{
-    BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
-    BindingResource, BindingType, Device, Extent3d, ShaderStages, Texture, TextureDescriptor, TextureDimension,
-    TextureSampleType, TextureView, TextureViewDescriptor, TextureViewDimension,
+    util::DeviceExt, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor,
+    BindGroupLayoutEntry, BindingResource, BindingType, CommandBuffer, CommandEncoder, CommandEncoderDescriptor,
+    Device, Extent3d, ImageCopyTexture, ImageDataLayout, Origin3d, ShaderStages, Texture, TextureAspect,
+    TextureDescriptor, TextureDimension, TextureSampleType, TextureView, TextureViewDescriptor, TextureViewDimension,
 };
 
-use crate::{profile::ProfileData, RendererProfile};
+use crate::{profile::ProfileData, util::math::round_up, Renderer, RendererProfile};
 
 /// When using the GpuDriven profile, we start the 2D texture manager with a bind group with
 /// this many textures.
@@ -73,18 +74,176 @@ impl<T: 'static> TextureManager<T> {
     }
 
     pub fn add(
+        renderer: &Renderer,
+        texture: crate::types::Texture,
+        cube: bool,
+    ) -> (Option<CommandBuffer>, InternalTexture) {
+        validate_texture_format(texture.format);
+
+        let (block_x, block_y) = texture.format.describe().block_dimensions;
+        let size = Extent3d {
+            width: round_up(texture.size.x, block_x as u32),
+            height: round_up(texture.size.y, block_y as u32),
+            depth_or_array_layers: match cube {
+                true => 6,
+                false => 1,
+            },
+        };
+
+        let mip_level_count = match texture.mip_count {
+            MipmapCount::Specific(v) => v.get(),
+            MipmapCount::Maximum => size.max_mips(match cube {
+                true => wgpu::TextureDimension::D3,
+                false => wgpu::TextureDimension::D2,
+            }),
+        };
+
+        let desc = TextureDescriptor {
+            label: None,
+            size,
+            mip_level_count,
+            sample_count: 1,
+            dimension: TextureDimension::D2,
+            format: texture.format,
+            usage: TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_SRC | TextureUsages::COPY_DST,
+        };
+
+        let (buffer, tex) = match texture.mip_source {
+            MipmapSource::Uploaded => (
+                None,
+                renderer
+                    .device
+                    .create_texture_with_data(&renderer.queue, &desc, &texture.data),
+            ),
+            MipmapSource::Generated => {
+                assert!(!cube, "Cannot generate mipmaps from cubemaps currently");
+
+                let desc = TextureDescriptor {
+                    usage: desc.usage | TextureUsages::RENDER_ATTACHMENT,
+                    ..desc
+                };
+                let tex = renderer.device.create_texture(&desc);
+
+                let format_desc = texture.format.describe();
+
+                // write first level
+                renderer.queue.write_texture(
+                    ImageCopyTexture {
+                        texture: &tex,
+                        mip_level: 0,
+                        origin: Origin3d::ZERO,
+                        aspect: TextureAspect::All,
+                    },
+                    &texture.data,
+                    ImageDataLayout {
+                        offset: 0,
+                        bytes_per_row: NonZeroU32::new(
+                            format_desc.block_size as u32 * (size.width / format_desc.block_dimensions.0 as u32),
+                        ),
+                        rows_per_image: None,
+                    },
+                    size,
+                );
+
+                let mut encoder = renderer
+                    .device
+                    .create_command_encoder(&CommandEncoderDescriptor::default());
+
+                // generate mipmaps
+                renderer
+                    .mipmap_generator
+                    .generate_mipmaps(&renderer.device, &mut encoder, &tex, &desc);
+
+                (Some(encoder.finish()), tex)
+            }
+        };
+
+        let view = tex.create_view(&TextureViewDescriptor {
+            dimension: match cube {
+                true => Some(TextureViewDimension::Cube),
+                false => Some(TextureViewDimension::D2),
+            },
+            ..Default::default()
+        });
+
+        (
+            buffer,
+            InternalTexture {
+                texture: tex,
+                view,
+                desc,
+            },
+        )
+    }
+
+    pub fn fill_from_texture(
         &mut self,
-        handle: RawResourceHandle<T>,
-        desc: TextureDescriptor<'static>,
-        texture: Texture,
-        view: TextureView,
+        device: &Device,
+        encoder: &mut CommandEncoder,
+        dst_handle: RawResourceHandle<T>,
+        texture: TextureFromTexture,
     ) {
+        let InternalTexture {
+            texture: old_texture,
+            desc: old_texture_desc,
+            ..
+        } = self.data[texture.src.idx].as_ref().unwrap();
+
+        let new_size = old_texture_desc.mip_level_size(texture.start_mip).unwrap();
+
+        let mip_level_count = texture
+            .mip_count
+            .map_or_else(|| old_texture_desc.mip_level_count - texture.start_mip, |c| c.get());
+
+        let desc = TextureDescriptor {
+            size: new_size,
+            mip_level_count,
+            ..old_texture_desc.clone()
+        };
+
+        let tex = device.create_texture(&desc);
+
+        let view = tex.create_view(&TextureViewDescriptor::default());
+
+        for new_mip in 0..mip_level_count {
+            let old_mip = new_mip + texture.start_mip;
+
+            profiling::scope!("mip level generation");
+
+            encoder.copy_texture_to_texture(
+                ImageCopyTexture {
+                    texture: old_texture,
+                    mip_level: old_mip,
+                    origin: Origin3d::ZERO,
+                    aspect: TextureAspect::All,
+                },
+                ImageCopyTexture {
+                    texture: &tex,
+                    mip_level: new_mip,
+                    origin: Origin3d::ZERO,
+                    aspect: TextureAspect::All,
+                },
+                old_texture_desc.mip_level_size(old_mip).unwrap(),
+            );
+        }
+
+        self.fill(
+            dst_handle,
+            InternalTexture {
+                texture: tex,
+                view,
+                desc,
+            },
+        )
+    }
+
+    pub fn fill(&mut self, handle: RawResourceHandle<T>, internal_texture: InternalTexture) {
         self.group_dirty = self.group_dirty.map_gpu(|_| true);
 
         if handle.idx >= self.data.len() {
             self.data.resize_with(handle.idx + 1, || None);
         }
-        self.data[handle.idx] = Some(InternalTexture { texture, view, desc });
+        self.data[handle.idx] = Some(internal_texture);
     }
 
     pub fn remove(&mut self, handle: RawResourceHandle<T>) {
@@ -215,4 +374,21 @@ fn create_null_tex_view(device: &Device, dimension: TextureViewDimension) -> Tex
             dimension: Some(dimension),
             ..TextureViewDescriptor::default()
         })
+}
+
+fn validate_texture_format(format: TextureFormat) {
+    let sample_type = format.describe().sample_type;
+    if let TextureSampleType::Float { filterable } = sample_type {
+        if !filterable {
+            panic!(
+                "Textures formats must allow filtering with a linear filter. {:?} has sample type {:?} which does not.",
+                format, sample_type
+            )
+        }
+    } else {
+        panic!(
+            "Textures formats must be sample-able as floating point. {:?} has sample type {:?}.",
+            format, sample_type
+        )
+    }
 }
