@@ -7,7 +7,7 @@ use glam::{Mat4, UVec2, Vec4};
 use rend3::{
     graph::{DataHandle, NodeResourceUsage, RenderGraph, RenderTargetHandle},
     managers::CameraManager,
-    util::{bind_merge::BindGroupBuilder, frustum::ShaderFrustum},
+    util::{bind_merge::BindGroupBuilder, frustum::Frustum},
 };
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
@@ -26,7 +26,7 @@ pub struct FrameUniforms {
     pub inv_view: Mat4,
     pub inv_view_proj: Mat4,
     pub inv_origin_view_proj: Mat4,
-    pub frustum: ShaderFrustum,
+    pub frustum: Frustum,
     pub ambient: Vec4,
     pub resolution: UVec2,
 }
@@ -46,7 +46,7 @@ impl FrameUniforms {
             inv_view: view.inverse(),
             inv_view_proj: view_proj.inverse(),
             inv_origin_view_proj: origin_view_proj.inverse(),
-            frustum: ShaderFrustum::from_matrix(camera.proj()),
+            frustum: Frustum::from_matrix(camera.proj()),
             ambient,
             resolution,
         }

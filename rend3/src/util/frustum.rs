@@ -22,20 +22,20 @@ impl BoundingSphere {
         }
     }
 
-    pub fn apply_transform(self, model_view: Mat4) -> Self {
-        let max_scale = model_view
+    pub fn apply_transform(self, matrix: Mat4) -> Self {
+        let max_scale = matrix
             .x_axis
             .xyz()
             .length_squared()
             .max(
-                model_view
+                matrix
                     .y_axis
                     .xyz()
                     .length_squared()
-                    .max(model_view.z_axis.xyz().length_squared()),
+                    .max(matrix.z_axis.xyz().length_squared()),
             )
             .sqrt();
-        let center = model_view * self.center.extend(1.0);
+        let center = matrix * self.center.extend(1.0);
 
         Self {
             center: center.truncate(),
@@ -70,14 +70,13 @@ fn find_mesh_bounding_sphere_radius(mesh_center: Vec3A, mesh: &[Vec3]) -> f32 {
 }
 
 /// Represents a plane as a vec4 (or vec3 + f32)
-#[derive(Debug, Copy, Clone)]
-#[repr(C, align(16))]
-pub struct ShaderPlane {
+#[derive(Debug, Copy, Clone, ShaderType)]
+pub struct Plane {
     pub abc: Vec3,
     pub d: f32,
 }
 
-impl ShaderPlane {
+impl Plane {
     pub fn new(a: f32, b: f32, c: f32, d: f32) -> Self {
         Self {
             abc: Vec3::new(a, b, c),
@@ -101,42 +100,41 @@ impl ShaderPlane {
 
 /// A frustum composed of 5 different planes. Has no far plane as it assumes
 /// infinite.
-#[derive(Debug, Copy, Clone)]
-#[repr(C, align(16))]
-pub struct ShaderFrustum {
-    left: ShaderPlane,
-    right: ShaderPlane,
-    top: ShaderPlane,
-    bottom: ShaderPlane,
-    near: ShaderPlane,
+#[derive(Debug, Copy, Clone, ShaderType)]
+pub struct Frustum {
+    left: Plane,
+    right: Plane,
+    top: Plane,
+    bottom: Plane,
+    near: Plane,
 }
 
-impl ShaderFrustum {
+impl Frustum {
     pub fn from_matrix(matrix: Mat4) -> Self {
         let mat_arr = matrix.to_cols_array_2d();
 
-        let left = ShaderPlane::new(
+        let left = Plane::new(
             mat_arr[0][3] + mat_arr[0][0],
             mat_arr[1][3] + mat_arr[1][0],
             mat_arr[2][3] + mat_arr[2][0],
             mat_arr[3][3] + mat_arr[3][0],
         );
 
-        let right = ShaderPlane::new(
+        let right = Plane::new(
             mat_arr[0][3] - mat_arr[0][0],
             mat_arr[1][3] - mat_arr[1][0],
             mat_arr[2][3] - mat_arr[2][0],
             mat_arr[3][3] - mat_arr[3][0],
         );
 
-        let top = ShaderPlane::new(
+        let top = Plane::new(
             mat_arr[0][3] - mat_arr[0][1],
             mat_arr[1][3] - mat_arr[1][1],
             mat_arr[2][3] - mat_arr[2][1],
             mat_arr[3][3] - mat_arr[3][1],
         );
 
-        let bottom = ShaderPlane::new(
+        let bottom = Plane::new(
             mat_arr[0][3] + mat_arr[0][1],
             mat_arr[1][3] + mat_arr[1][1],
             mat_arr[2][3] + mat_arr[2][1],
@@ -147,7 +145,7 @@ impl ShaderFrustum {
 
         // this is the far plane in the algorithm, but we're using inverse Z, so near
         // and far get flipped.
-        let near = ShaderPlane::new(
+        let near = Plane::new(
             mat_arr[0][3] - mat_arr[0][2],
             mat_arr[1][3] - mat_arr[1][2],
             mat_arr[2][3] - mat_arr[2][2],

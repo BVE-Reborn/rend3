@@ -1,7 +1,10 @@
 use glam::{Mat4, Vec3};
 use rend3_types::Handedness;
 
-use crate::types::{Camera, CameraProjection};
+use crate::{
+    types::{Camera, CameraProjection},
+    util::frustum::Frustum,
+};
 
 /// Manages the camera's location and projection settings.
 #[derive(Debug, Clone)]
@@ -10,6 +13,7 @@ pub struct CameraManager {
     orig_view: Mat4,
     proj: Mat4,
     inv_view: Mat4,
+    world_frustum: Frustum,
     data: Camera,
     aspect_ratio: f32,
 }
@@ -23,11 +27,14 @@ impl CameraManager {
         let proj = compute_projection_matrix(data, handedness, aspect_ratio);
         let orig_view = compute_origin_matrix(data);
 
+        let frustum = Frustum::from_matrix(proj * data.view);
+
         Self {
             handedness,
             orig_view,
             proj,
             inv_view: data.view.inverse(),
+            world_frustum: frustum,
             data,
             aspect_ratio,
         }
@@ -48,6 +55,7 @@ impl CameraManager {
         self.proj = compute_projection_matrix(data, self.handedness, aspect_ratio);
         self.orig_view = compute_origin_matrix(data);
         self.inv_view = data.view.inverse();
+        self.world_frustum = Frustum::from_matrix(self.proj * data.view);
         self.data = data;
         self.aspect_ratio = aspect_ratio;
     }
@@ -74,6 +82,10 @@ impl CameraManager {
 
     pub fn proj(&self) -> Mat4 {
         self.proj
+    }
+
+    pub fn world_frustum(&self) -> Frustum {
+        self.world_frustum
     }
 
     pub fn location(&self) -> Vec3 {
