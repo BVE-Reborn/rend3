@@ -37,6 +37,24 @@ struct UniformData {
     resolution: vec2<u32>,
 }
 
+struct PerCameraUniformObjectData {
+    // TODO: use less space
+    model_view: mat4x4<f32>,
+    // TODO: use less space
+    model_view_proj: mat4x4<f32>,
+}
+
+struct PerCameraUniform {
+    // TODO: use less space
+    view: mat4x4<f32>,
+    // TODO: use less space
+    view_proj: mat4x4<f32>,
+    frustum: Frustum,
+    resolution: vec2<f32>,
+    object_count: u32,
+    objects: array<PerCameraUniformObjectData>,
+}
+
 struct DirectionalLight {
     /// View/Projection of directional light. Shadow rendering uses viewports
     /// so this always outputs [-1, 1] no matter where in the atlast the shadow is.

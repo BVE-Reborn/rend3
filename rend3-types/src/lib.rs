@@ -16,6 +16,7 @@ use std::{
     sync::Arc,
 };
 
+use bytemuck::Zeroable;
 /// Reexport of the glam version rend3 is using.
 pub use glam;
 use glam::{Mat4, UVec2, Vec2, Vec3, Vec3A, Vec4};
@@ -995,7 +996,7 @@ pub enum SortingOrder {
 pub trait MaterialArray<T>: AsRef<[T]> {
     /// An array of the [u32; COUNT]. We need this internally
     /// for shader layout stuff.
-    type U32Array: encase::ShaderSize + encase::internal::WriteInto + Clone + Copy + Send + Sync + 'static;
+    type U32Array: encase::ShaderSize + encase::internal::WriteInto + Clone + Copy + Send + Sync + Zeroable + 'static;
     type IntoIter: Iterator<Item = T>;
     const COUNT: u32;
 

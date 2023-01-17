@@ -180,6 +180,7 @@ impl<M: Material> ForwardRoutine<M> {
                         culling::ShaderBatchData::SHADER_SIZE.get(),
                     )
                     .append_buffer(&ctx.eval_output.mesh_buffer)
+                    .append_buffer(&culled.buffers.per_camera_uniform_buffer)
                     .append_buffer(ctx.data_core.material_manager.archetype_view::<M>().buffer())
                     .build(&ctx.renderer.device, Some("Per-Material BG"), &args.per_material.bgl),
             );

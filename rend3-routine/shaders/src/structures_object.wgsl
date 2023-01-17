@@ -18,6 +18,7 @@ struct ObjectRange {
     region_id: u32,
     region_base_invocation: u32,
     local_region_id: u32,
+    atomic_capable: u32,
 }
 
 struct BatchData {

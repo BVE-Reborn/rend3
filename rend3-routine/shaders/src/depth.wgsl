@@ -15,16 +15,18 @@ var<storage> object_buffer: array<Object>;
 var<storage> batch_data: BatchData;
 @group(1) @binding(2)
 var<storage> vertex_buffer: array<u32>;
+@group(1) @binding(3)
+var<storage> per_camera_uniform: PerCameraUniform;
 
 {{#if (eq profile "GpuDriven")}}
-@group(1) @binding(3)
+@group(1) @binding(4)
 var<storage> materials: array<GpuMaterialData>;
 @group(2) @binding(0)
 var textures: binding_array<texture_2d<f32>>;
 {{/if}}
 
 {{#if (eq profile "CpuDriven")}}
-@group(1) @binding(3)
+@group(1) @binding(4)
 var<storage> materials: array<CpuMaterialData>;
 @group(2) @binding(0)
 var albedo_tex: texture_2d<f32>;
@@ -66,8 +68,7 @@ fn vs_main(@builtin(instance_index) shadow_number: u32, @builtin(vertex_index) v
 
     let vs_in = get_vertices(indices);
 
-    // TODO: Store these in uniforms
-    let model_view_proj = directional_lights.data[shadow_number].view_proj * data.transform;
+    let model_view_proj = per_camera_uniform.objects[indices.object].model_view_proj;
 
     let position_vec4 = vec4<f32>(vs_in.position, 1.0);
 

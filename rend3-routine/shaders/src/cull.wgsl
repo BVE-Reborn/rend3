@@ -19,7 +19,10 @@ var<storage, read_write> secondary_output: array<u32>;
 var<storage> previous_culling_results: array<u32>;
 @group(0) @binding(8)
 var<storage, read_write> current_culling_results: array<u32>;
+@group(0) @binding(9)
+var<storage> per_camera_uniform: PerCameraUniform;
 
+{{include "rend3/vertex_attributes.wgsl"}}
 
 struct ObjectRangeIndex {
     range: ObjectRange,
@@ -69,10 +72,16 @@ fn cs_main(
     let object_range = workgroup_object_range.range;
     let batch_object_index = workgroup_object_range.index;
 
-    if (gid.x >= object_range.invocation_end) {
-        primary_output[(culling_job.base_output_invocation + gid.x) * 3u + 0u] = 0x00FFFFFFu;
-        primary_output[(culling_job.base_output_invocation + gid.x) * 3u + 1u] = 0x00FFFFFFu;
-        primary_output[(culling_job.base_output_invocation + gid.x) * 3u + 2u] = 0x00FFFFFFu;
+    if gid.x >= object_range.invocation_end {
+        if object_range.atomic_capable == 0u {
+            atomicAdd(&primary_draw_calls[object_range.region_id].vertex_count, 3u);
+
+            let global_output_invocation = culling_job.base_output_invocation + gid.x;
+
+            primary_output[global_output_invocation * 3u + 0u] = 0x00FFFFFFu;
+            primary_output[global_output_invocation * 3u + 1u] = 0x00FFFFFFu;
+            primary_output[global_output_invocation * 3u + 2u] = 0x00FFFFFFu;
+        }
         return;
     }
 
@@ -100,15 +109,38 @@ fn cs_main(
     let index1 = vertex_buffer[object.first_index + index_1_index];
     let index2 = vertex_buffer[object.first_index + index_2_index];
 
-    let passes_culling = true;
+    let model_view_proj = per_camera_uniform.objects[object_range.object_id].model_view_proj;
+
+    let position_start_offset = object.vertex_attribute_start_offsets[{{position_attribute_offset}}];
+    let model_position0 = extract_attribute_vec3_f32(position_start_offset, index0);
+    let model_position1 = extract_attribute_vec3_f32(position_start_offset, index1);
+    let model_position2 = extract_attribute_vec3_f32(position_start_offset, index2);
+    
+    let position0 = model_view_proj * vec4<f32>(model_position0, 1.0);
+    let position1 = model_view_proj * vec4<f32>(model_position1, 1.0);
+    let position2 = model_view_proj * vec4<f32>(model_position2, 1.0);
+
+    let det = determinant(mat3x3<f32>(position0.xyw, position1.xyw, position2.xyw));
+
+    let passes_culling = det > 0.0;
+
     if passes_culling {
-        let region_local_output_invocation = atomicAdd(&primary_draw_calls[object_range.region_id].vertex_count, 3u) / 3u;
-        let job_local_output_invocation = region_local_output_invocation + object_range.region_base_invocation;
-        let global_output_invocation = job_local_output_invocation + culling_job.base_output_invocation;
+        var global_output_invocation: u32;
+        if object_range.atomic_capable == 1u {
+            let region_local_output_invocation = atomicAdd(&primary_draw_calls[object_range.region_id].vertex_count, 3u) / 3u;
+            let job_local_output_invocation = region_local_output_invocation + object_range.region_base_invocation;
+            global_output_invocation = job_local_output_invocation + culling_job.base_output_invocation;
+        } else {
+            // TODO: remove this atomic
+            global_output_invocation = culling_job.base_output_invocation + gid.x;
+        }
 
         primary_output[global_output_invocation * 3u + 0u] = batch_object_index << 24u | index0 & ((1u << 24u) - 1u);
         primary_output[global_output_invocation * 3u + 1u] = batch_object_index << 24u | index1 & ((1u << 24u) - 1u);
         primary_output[global_output_invocation * 3u + 2u] = batch_object_index << 24u | index2 & ((1u << 24u) - 1u);
+    }
+    if object_range.atomic_capable == 0u {
+        atomicAdd(&primary_draw_calls[object_range.region_id].vertex_count, 3u);
     }
 
     atomicOr(&culling_results[wid.x / 32u], u32(passes_culling) << (wid.x % 32u));

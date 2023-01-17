@@ -92,6 +92,7 @@ pub(super) struct ShaderObjectRange {
     pub region_id: u32,
     pub base_region_invocation: u32,
     pub local_region_id: u32,
+    pub atomic_capable: u32,
 }
 
 pub(super) fn batch_objects<M: Material>(
@@ -170,7 +171,16 @@ pub(super) fn batch_objects<M: Material>(
         let mut current_ranges = [ShaderObjectRange::default(); BATCH_SIZE];
         let mut current_key = sorted_objects.first().unwrap().0.job_key;
 
-        for (ShaderJobSortingKey { job_key: key, .. }, handle, object) in sorted_objects {
+        for (
+            ShaderJobSortingKey {
+                job_key: key,
+                sorting_reason,
+                ..
+            },
+            handle,
+            object,
+        ) in sorted_objects
+        {
             let invocation_count = object.inner.index_count / 3;
 
             let key_difference = key != current_key;
@@ -208,6 +218,7 @@ pub(super) fn batch_objects<M: Material>(
                 object_id: handle.idx as u32,
                 base_region_invocation: current_region_invocation,
                 local_region_id: current_region_object_index,
+                atomic_capable: matches!(sorting_reason, SortingReason::Optimization) as u32,
             };
 
             current_ranges[current_object_index as usize] = range;
