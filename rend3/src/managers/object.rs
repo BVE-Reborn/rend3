@@ -376,7 +376,7 @@ fn evaluate<M: Material>(
         // Only one archetype will have each handle,
         // so if we have it, we can be sure it's ours.
         let removed_obj = data_vec[removal.idx].take();
-        
+
         if removed_obj.is_some() {
             archetype.object_count -= 1;
         }

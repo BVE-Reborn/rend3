@@ -8,7 +8,18 @@ var<storage> object_buffer: array<Object>;
 @group(0) @binding(2)
 var<storage> culling_job: BatchData;
 @group(0) @binding(3)
-var<storage, read_write> output_buffer: array<u32>;
+var<storage, read_write> primary_draw_calls: array<IndirectCall>;
+@group(0) @binding(4)
+var<storage, read_write> secondary_draw_calls: array<IndirectCall>;
+@group(0) @binding(5)
+var<storage, read_write> primary_output: array<u32>;
+@group(0) @binding(6)
+var<storage, read_write> secondary_output: array<u32>;
+@group(0) @binding(7)
+var<storage> previous_culling_results: array<u32>;
+@group(0) @binding(8)
+var<storage, read_write> current_culling_results: array<u32>;
+
 
 struct ObjectRangeIndex {
     range: ObjectRange,
@@ -16,6 +27,7 @@ struct ObjectRangeIndex {
 }
 
 var<workgroup> workgroup_object_range: ObjectRangeIndex;
+var<workgroup> culling_results: array<atomic<u32>, 4>;
 
 @compute @workgroup_size(256)
 fn cs_main(
@@ -41,6 +53,10 @@ fn cs_main(
                 right = mid;
             } else {
                 workgroup_object_range = ObjectRangeIndex(probe, mid);
+                atomicStore(&culling_results[0], 0u);
+                atomicStore(&culling_results[1], 0u);
+                atomicStore(&culling_results[2], 0u);
+                atomicStore(&culling_results[3], 0u);
                 break;
             }
 
@@ -51,18 +67,32 @@ fn cs_main(
     workgroupBarrier();
 
     let object_range = workgroup_object_range.range;
-    let local_object_index = workgroup_object_range.index;
+    let batch_object_index = workgroup_object_range.index;
 
     if (gid.x >= object_range.invocation_end) {
-        output_buffer[(culling_job.base_output_invocation + gid.x) * 3u + 0u] = 0x00FFFFFFu;
-        output_buffer[(culling_job.base_output_invocation + gid.x) * 3u + 1u] = 0x00FFFFFFu;
-        output_buffer[(culling_job.base_output_invocation + gid.x) * 3u + 2u] = 0x00FFFFFFu;
+        primary_output[(culling_job.base_output_invocation + gid.x) * 3u + 0u] = 0x00FFFFFFu;
+        primary_output[(culling_job.base_output_invocation + gid.x) * 3u + 1u] = 0x00FFFFFFu;
+        primary_output[(culling_job.base_output_invocation + gid.x) * 3u + 2u] = 0x00FFFFFFu;
         return;
     }
 
-    let index_0_index = (gid.x - object_range.invocation_start) * 3u + 0u;
-    let index_1_index = (gid.x - object_range.invocation_start) * 3u + 1u;
-    let index_2_index = (gid.x - object_range.invocation_start) * 3u + 2u;
+    let invocation_within_object = gid.x - object_range.invocation_start;
+
+    // If the first invocation in the region, set the region's draw call
+    if object_range.local_region_id == 0u && invocation_within_object == 0u {
+        primary_draw_calls[object_range.region_id].vertex_offset = 0;
+        primary_draw_calls[object_range.region_id].instance_count = 1u;
+        primary_draw_calls[object_range.region_id].base_instance = 0u;
+        primary_draw_calls[object_range.region_id].base_index = (culling_job.base_output_invocation + gid.x) * 3u;
+        secondary_draw_calls[object_range.region_id].vertex_offset = 0;
+        secondary_draw_calls[object_range.region_id].instance_count = 1u;
+        secondary_draw_calls[object_range.region_id].base_instance = 0u;
+        secondary_draw_calls[object_range.region_id].base_index = (culling_job.base_output_invocation + gid.x) * 3u;
+    }
+
+    let index_0_index = invocation_within_object * 3u + 0u;
+    let index_1_index = invocation_within_object * 3u + 1u;
+    let index_2_index = invocation_within_object * 3u + 2u;
 
     let object = object_buffer[object_range.object_id];
 
@@ -70,7 +100,26 @@ fn cs_main(
     let index1 = vertex_buffer[object.first_index + index_1_index];
     let index2 = vertex_buffer[object.first_index + index_2_index];
 
-    output_buffer[(culling_job.base_output_invocation + gid.x) * 3u + 0u] = local_object_index << 24u | index0 & ((1u << 24u) - 1u);
-    output_buffer[(culling_job.base_output_invocation + gid.x) * 3u + 1u] = local_object_index << 24u | index1 & ((1u << 24u) - 1u);
-    output_buffer[(culling_job.base_output_invocation + gid.x) * 3u + 2u] = local_object_index << 24u | index2 & ((1u << 24u) - 1u);
+    let passes_culling = true;
+    if passes_culling {
+        let region_local_output_invocation = atomicAdd(&primary_draw_calls[object_range.region_id].vertex_count, 3u) / 3u;
+        let job_local_output_invocation = region_local_output_invocation + object_range.region_base_invocation;
+        let global_output_invocation = job_local_output_invocation + culling_job.base_output_invocation;
+
+        primary_output[global_output_invocation * 3u + 0u] = batch_object_index << 24u | index0 & ((1u << 24u) - 1u);
+        primary_output[global_output_invocation * 3u + 1u] = batch_object_index << 24u | index1 & ((1u << 24u) - 1u);
+        primary_output[global_output_invocation * 3u + 2u] = batch_object_index << 24u | index2 & ((1u << 24u) - 1u);
+    }
+
+    atomicOr(&culling_results[wid.x / 32u], u32(passes_culling) << (wid.x % 32u));
+
+    workgroupBarrier();
+
+    if wid.x == 0u {
+        let global_invocation = culling_job.base_output_invocation + gid.x;
+        current_culling_results[global_invocation / 32u + 0u] = atomicLoad(&culling_results[0]);
+        current_culling_results[global_invocation / 32u + 1u] = atomicLoad(&culling_results[1]);
+        current_culling_results[global_invocation / 32u + 2u] = atomicLoad(&culling_results[2]);
+        current_culling_results[global_invocation / 32u + 3u] = atomicLoad(&culling_results[3]);
+    }
 }

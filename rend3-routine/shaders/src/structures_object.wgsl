@@ -15,6 +15,9 @@ struct ObjectRange {
     invocation_start: u32,
     invocation_end: u32,
     object_id: u32,
+    region_id: u32,
+    region_base_invocation: u32,
+    local_region_id: u32,
 }
 
 struct BatchData {

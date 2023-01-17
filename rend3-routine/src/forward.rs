@@ -189,7 +189,7 @@ impl<M: Material> ForwardRoutine<M> {
                 SampleCount::Four => &self.pipeline_s4,
             };
 
-            rpass.set_index_buffer(culled.buffers.index.slice(..), IndexFormat::Uint32);
+            rpass.set_index_buffer(culled.buffers.primary_index.slice(..), IndexFormat::Uint32);
             rpass.set_pipeline(pipeline);
             rpass.set_bind_group(0, whole_frame_uniform_bg, &[]);
             if let Some(v) = args.extra_bgs {
@@ -204,8 +204,9 @@ impl<M: Material> ForwardRoutine<M> {
             let Some(range) = culled.material_key_ranges.get(&self.material_key) else {
                 return;
             };
-            for call in &culled.draw_calls[range.clone()] {
+            for (idx, call) in culled.draw_calls[range.clone()].iter().enumerate() {
                 let call: &DrawCall = call;
+                let idx = idx + range.start;
 
                 if ctx.renderer.profile.is_cpu_driven() {
                     rpass.set_bind_group(
@@ -219,7 +220,7 @@ impl<M: Material> ForwardRoutine<M> {
                     per_material_bg,
                     &[call.batch_index * culling::ShaderBatchData::SHADER_SIZE.get() as u32],
                 );
-                rpass.draw_indexed(call.index_range.clone(), 0, args.data..args.data + 1);
+                rpass.draw_indexed_indirect(&culled.buffers.primary_draw_call, idx as u64 * 20);
             }
         });
     }

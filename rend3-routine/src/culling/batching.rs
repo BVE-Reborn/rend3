@@ -19,8 +19,6 @@ pub struct ShaderBatchDatas {
 #[derive(Debug)]
 pub(super) struct JobSubRegion {
     pub job_index: u32,
-    pub base_invocation: u32,
-    pub invocation_count: u32,
     pub key: ShaderJobKey,
 }
 
@@ -91,6 +89,9 @@ pub(super) struct ShaderObjectRange {
     pub invocation_start: u32,
     pub invocation_end: u32,
     pub object_id: u32,
+    pub region_id: u32,
+    pub base_region_invocation: u32,
+    pub local_region_id: u32,
 }
 
 pub(super) fn batch_objects<M: Material>(
@@ -160,6 +161,8 @@ pub(super) fn batch_objects<M: Material>(
 
     if !sorted_objects.is_empty() {
         profiling::scope!("Batch Data Creation");
+        let mut current_region_idx = 0_u32;
+        let mut current_region_object_index = 0_u32;
         let mut current_base_invocation = 0_u32;
         let mut current_region_invocation = 0_u32;
         let mut current_invocation = 0_u32;
@@ -177,11 +180,11 @@ pub(super) fn batch_objects<M: Material>(
             if key_difference || object_limit || dispatch_limit {
                 jobs.regions.push(JobSubRegion {
                     job_index: jobs.jobs.len() as u32,
-                    base_invocation: current_region_invocation,
-                    invocation_count: current_invocation - current_region_invocation,
                     key: current_key,
                 });
+                current_region_idx += 1;
                 current_key = key;
+                current_region_object_index = 0;
                 current_region_invocation = current_invocation;
             }
             if object_limit || dispatch_limit {
@@ -201,18 +204,20 @@ pub(super) fn batch_objects<M: Material>(
             let range = ShaderObjectRange {
                 invocation_start: current_invocation,
                 invocation_end: current_invocation + invocation_count,
+                region_id: current_region_idx,
                 object_id: handle.idx as u32,
+                base_region_invocation: current_region_invocation,
+                local_region_id: current_region_object_index,
             };
 
             current_ranges[current_object_index as usize] = range;
             current_object_index += 1;
+            current_region_object_index += 1;
             current_invocation += round_up(invocation_count, WORKGROUP_SIZE);
         }
 
         jobs.regions.push(JobSubRegion {
             job_index: jobs.jobs.len() as u32,
-            base_invocation: current_region_invocation,
-            invocation_count: current_invocation - current_region_invocation,
             key: current_key,
         });
         jobs.jobs.push(ShaderBatchData {

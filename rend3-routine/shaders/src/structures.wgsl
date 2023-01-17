@@ -18,7 +18,7 @@ struct ObjectOutputData {
 }
 
 struct IndirectCall {
-    vertex_count: u32,
+    vertex_count: atomic<u32>,
     instance_count: u32,
     base_index: u32,
     vertex_offset: i32,
