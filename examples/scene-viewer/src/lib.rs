@@ -166,6 +166,22 @@ fn extract_vsync(value: &str) -> Result<rend3::types::PresentMode, &'static str>
     })
 }
 
+fn extract_array<const N: usize>(value: &str, default: [f32; N]) -> Result<[f32; N], &'static str> {
+    let mut res = default;
+    let split: Vec<_> = value.split(',').enumerate().collect();
+
+    if split.len() != N {
+        return Err("Mismatched argument count");
+    }
+
+    for (idx, inner) in split {
+        let inner = inner.trim();
+
+        res[idx] = inner.parse().map_err(|_| "Cannot parse argument number")?;
+    }
+    Ok(res)
+}
+
 fn extract_vec3(value: &str) -> Result<Vec3, &'static str> {
     let mut res = [0.0_f32, 0.0, 0.0];
     let split: Vec<_> = value.split(',').enumerate().collect();
@@ -254,6 +270,7 @@ Assets:
 Controls:
   --walk <speed>               Walk speed (speed without holding shift) in units/second (typically meters). Default 10.
   --run  <speed>               Run speed (speed while holding shift) in units/second (typically meters). Default 50.
+  --camera x,y,z,pitch,yaw     Spawns the camera at the given position. Press Period to get the current camera position.
 ";
 
 struct SceneViewer {
@@ -326,6 +343,10 @@ impl SceneViewer {
         // Controls
         let walk_speed = args.value_from_str("--walk").unwrap_or(10.0_f32);
         let run_speed = args.value_from_str("--run").unwrap_or(50.0_f32);
+        let camera_default = [3.0, 3.0, 3.0, -std::f32::consts::FRAC_PI_8, std::f32::consts::FRAC_PI_4];
+        let camera_info = args
+            .value_from_str("--camera")
+            .map_or(camera_default, |s: String| extract_array(&s, camera_default).unwrap());
 
         // Free args
         let file_to_load: Option<String> = args.free_from_str().ok();
@@ -382,9 +403,9 @@ impl SceneViewer {
             fullscreen,
 
             scancode_status: FastHashMap::default(),
-            camera_pitch: -std::f32::consts::FRAC_PI_8,
-            camera_yaw: std::f32::consts::FRAC_PI_4,
-            camera_location: Vec3A::new(3.0, 3.0, 3.0),
+            camera_pitch:camera_info[3],
+            camera_yaw: camera_info[4],
+            camera_location: Vec3A::new(camera_info[0], camera_info[1], camera_info[2]),
             previous_profiling_stats: None,
             timestamp_last_second: Instant::now(),
             timestamp_last_frame: Instant::now(),
@@ -549,8 +570,15 @@ impl rend3_framework::App for SceneViewer {
                 if button_pressed(&self.scancode_status, platform::Scancodes::Q) {
                     self.camera_location += up * velocity * delta_time.as_secs_f32();
                 }
-                if button_pressed(&self.scancode_status, platform::Scancodes::Z) {
-                    self.camera_location -= up * velocity * delta_time.as_secs_f32();
+                if button_pressed(&self.scancode_status, platform::Scancodes::PERIOD) {
+                    println!(
+                        "{x},{y},{z},{pitch},{yaw}",
+                        x = self.camera_location.x,
+                        y = self.camera_location.y,
+                        z = self.camera_location.z,
+                        pitch = self.camera_pitch,
+                        yaw = self.camera_yaw
+                    );
                 }
 
                 if button_pressed(&self.scancode_status, platform::Scancodes::ESCAPE) {
