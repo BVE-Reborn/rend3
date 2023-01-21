@@ -1,6 +1,6 @@
-use std::{cell::RefCell, marker::PhantomData};
+use std::{cell::RefCell, marker::PhantomData, sync::Arc};
 
-use wgpu::TextureView;
+use wgpu::{Texture, TextureView};
 
 use crate::{
     graph::{
@@ -42,25 +42,47 @@ impl<T> PartialEq for DataHandle<T> {
 ///
 /// This is how you turn [DeclaredDependency] into actual wgpu resources.
 pub struct RenderGraphDataStore<'a> {
-    pub(super) texture_mapping: &'a FastHashMap<TextureRegion, TextureView>,
+    pub(super) texture_mapping: &'a FastHashMap<TextureRegion, (TextureView, Arc<Texture>)>,
     pub(super) external_texture_mapping: &'a FastHashMap<TextureRegion, TextureView>,
     pub(super) data: &'a [DataContents], // Any is RefCell<Option<T>> where T is the stored data
 }
 
 impl<'a> RenderGraphDataStore<'a> {
-    /// Get a rendertarget from the handle to one.
+    /// Get a rendertarget as a TextureView from the handle to one.
     pub fn get_render_target(&self, dep: DeclaredDependency<RenderTargetHandle>) -> &'a TextureView {
         match dep.handle.resource {
-            GraphSubResource::Texture(name) => self
-                .texture_mapping
-                .get(&name)
-                .expect("internal rendergraph error: failed to get named texture"),
+            GraphSubResource::Texture(name) => {
+                &self
+                    .texture_mapping
+                    .get(&name)
+                    .expect("internal rendergraph error: failed to get named texture")
+                    .0
+            }
             GraphSubResource::ImportedTexture(name) => self
                 .external_texture_mapping
                 .get(&name)
                 .expect("internal rendergraph error: failed to get named texture"),
             r => {
-                panic!("internal rendergraph error: tried to get a {:?} as a render target", r)
+                panic!("internal rendergraph error: tried to get a {r:?} as a render target")
+            }
+        }
+    }
+
+    /// Get a rendertarget as a Texture from the handle to one
+    pub fn get_render_target_texture(&self, dep: DeclaredDependency<RenderTargetHandle>) -> &'a Texture {
+        match dep.handle.resource {
+            GraphSubResource::Texture(name) => {
+                &self
+                    .texture_mapping
+                    .get(&name)
+                    .expect("internal rendergraph error: failed to get named texture")
+                    .1
+            }
+            GraphSubResource::ImportedTexture(_) => {
+                panic!("Getting render target as a texture not supported for imported textures");
+            }
+            r => {
+                panic!("internal rendergraph error: tried to get a {r:?} as a render target")
             }
         }
     }
