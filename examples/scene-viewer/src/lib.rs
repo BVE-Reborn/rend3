@@ -403,7 +403,7 @@ impl SceneViewer {
             fullscreen,
 
             scancode_status: FastHashMap::default(),
-            camera_pitch:camera_info[3],
+            camera_pitch: camera_info[3],
             camera_yaw: camera_info[4],
             camera_location: Vec3A::new(camera_info[0], camera_info[1], camera_info[2]),
             previous_profiling_stats: None,

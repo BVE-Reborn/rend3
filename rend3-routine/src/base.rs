@@ -244,19 +244,9 @@ impl BaseRenderGraphIntermediateState {
     }
 
     /// Does all culling for the forward PBR materials.
-    pub fn pbr_culling<'node>(
-        &self,
-        graph: &mut RenderGraph<'node>,
-        base: &'node BaseRenderGraph,
-        resolution: UVec2,
-    ) {
-        base.gpu_culler.add_culling_to_graph::<pbr::PbrMaterial>(
-            graph,
-            self.cull,
-            None,
-            resolution,
-            "Primary Culling",
-        );
+    pub fn pbr_culling<'node>(&self, graph: &mut RenderGraph<'node>, base: &'node BaseRenderGraph, resolution: UVec2) {
+        base.gpu_culler
+            .add_culling_to_graph::<pbr::PbrMaterial>(graph, self.cull, None, resolution, "Primary Culling");
     }
 
     /// Clear all the targets to their needed values
