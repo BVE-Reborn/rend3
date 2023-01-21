@@ -252,7 +252,9 @@ pub use wgt::{
 ///
 /// The value allows for 8 bits of information packed in the high 8 bits of the
 /// index for object recombination.
-pub const MAX_VERTEX_COUNT: u32 = 1 << 24;
+/// 
+/// We leave exactly one value at the top for the "invalid vertex" value: 0x00_FF_FF_FF;
+pub const MAX_VERTEX_COUNT: u32 = (1 << 24) - 1;
 /// The maximum amount of indices any one object can have.
 pub const MAX_INDEX_COUNT: u32 = u32::MAX;
 

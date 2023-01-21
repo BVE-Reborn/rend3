@@ -1,8 +1,28 @@
 // -- DO NOT VALIDATE --
 
 struct Indices {
-    vertex: u32,
     object: u32,
+    vertex: u32,
+}
+
+struct BatchIndices {
+    /// Index _within_ the batch
+    local_object: u32,
+    /// Vertex index within the object
+    vertex: u32,
+}
+
+let INVALID_VERTEX: u32 = 0x00FFFFFFu;
+
+fn unpack_batch_index(vertex_index: u32) -> BatchIndices {
+    return BatchIndices(
+        vertex_index >> 24u,
+        vertex_index & 0xFFFFFFu,
+    );
+}
+
+fn pack_batch_index(local_object: u32, vertex: u32) -> u32 {
+    return local_object << 24u | vertex & 0xFFFFFFu;
 }
 
 fn extract_attribute_vec2_f32(byte_base_offset: u32, vertex_index: u32) -> vec2<f32> {

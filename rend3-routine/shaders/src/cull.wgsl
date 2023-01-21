@@ -78,9 +78,9 @@ fn cs_main(
 
             let global_output_invocation = culling_job.base_output_invocation + gid.x;
 
-            primary_output[global_output_invocation * 3u + 0u] = 0x00FFFFFFu;
-            primary_output[global_output_invocation * 3u + 1u] = 0x00FFFFFFu;
-            primary_output[global_output_invocation * 3u + 2u] = 0x00FFFFFFu;
+            primary_output[global_output_invocation * 3u + 0u] = INVALID_VERTEX;
+            primary_output[global_output_invocation * 3u + 1u] = INVALID_VERTEX;
+            primary_output[global_output_invocation * 3u + 2u] = INVALID_VERTEX;
         }
         return;
     }
@@ -124,23 +124,34 @@ fn cs_main(
 
     let passes_culling = det > 0.0;
 
-    if passes_culling {
-        var global_output_invocation: u32;
-        if object_range.atomic_capable == 1u {
+    if object_range.atomic_capable == 1u {
+        if passes_culling {
             let region_local_output_invocation = atomicAdd(&primary_draw_calls[object_range.region_id].vertex_count, 3u) / 3u;
             let job_local_output_invocation = region_local_output_invocation + object_range.region_base_invocation;
-            global_output_invocation = job_local_output_invocation + culling_job.base_output_invocation;
-        } else {
-            // TODO: remove this atomic
-            global_output_invocation = culling_job.base_output_invocation + gid.x;
+            let global_output_invocation = job_local_output_invocation + culling_job.base_output_invocation;
+
+            primary_output[global_output_invocation * 3u + 0u] = pack_batch_index(batch_object_index, index0);
+            primary_output[global_output_invocation * 3u + 1u] = pack_batch_index(batch_object_index, index1);
+            primary_output[global_output_invocation * 3u + 2u] = pack_batch_index(batch_object_index, index2);
+        } 
+    } else {
+        // TODO: remove this atomic
+        atomicAdd(&primary_draw_calls[object_range.region_id].vertex_count, 3u);
+
+        var output0 = INVALID_VERTEX;
+        var output1 = INVALID_VERTEX;
+        var output2 = INVALID_VERTEX;
+        if passes_culling {
+            output0 = pack_batch_index(batch_object_index, index0);
+            output1 = pack_batch_index(batch_object_index, index1);
+            output2 = pack_batch_index(batch_object_index, index2);
         }
 
-        primary_output[global_output_invocation * 3u + 0u] = batch_object_index << 24u | index0 & ((1u << 24u) - 1u);
-        primary_output[global_output_invocation * 3u + 1u] = batch_object_index << 24u | index1 & ((1u << 24u) - 1u);
-        primary_output[global_output_invocation * 3u + 2u] = batch_object_index << 24u | index2 & ((1u << 24u) - 1u);
-    }
-    if object_range.atomic_capable == 0u {
-        atomicAdd(&primary_draw_calls[object_range.region_id].vertex_count, 3u);
+        let global_output_invocation = culling_job.base_output_invocation + gid.x;
+
+        primary_output[global_output_invocation * 3u + 0u] = pack_batch_index(batch_object_index, index0);
+        primary_output[global_output_invocation * 3u + 1u] = pack_batch_index(batch_object_index, index1);
+        primary_output[global_output_invocation * 3u + 2u] = pack_batch_index(batch_object_index, index2);
     }
 
     atomicOr(&culling_results[wid.x / 32u], u32(passes_culling) << (wid.x % 32u));

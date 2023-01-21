@@ -88,7 +88,7 @@ struct VertexOutput {
 
 @vertex
 fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
-    if vertex_index == 0x00FFFFFFu {
+    if vertex_index == INVALID_VERTEX {
         var vs_out: VertexOutput;
         vs_out.position = vec4<f32>(0.0);
         return vs_out;
