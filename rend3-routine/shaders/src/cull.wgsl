@@ -32,6 +32,42 @@ struct ObjectRangeIndex {
 var<workgroup> workgroup_object_range: ObjectRangeIndex;
 var<workgroup> culling_results: array<atomic<u32>, 4>;
 
+fn execute_culling(
+    model_view_proj: mat4x4<f32>,
+    model_position0: vec3<f32>,
+    model_position1: vec3<f32>,
+    model_position2: vec3<f32>
+) -> bool {
+    let position0 = model_view_proj * vec4<f32>(model_position0, 1.0);
+    let position1 = model_view_proj * vec4<f32>(model_position1, 1.0);
+    let position2 = model_view_proj * vec4<f32>(model_position2, 1.0);
+
+    let det = determinant(mat3x3<f32>(position0.xyw, position1.xyw, position2.xyw));
+
+    if det <= 0.0 {
+        return false;
+    }
+
+    let ndc0 = position0.xyz / position0.w;
+    let ndc1 = position1.xyz / position1.w;
+    let ndc2 = position2.xyz / position2.w;
+
+    let min_ndc_xy = min(ndc0.xy, min(ndc1.xy, ndc2.xy));
+    let max_ndc_xy = max(ndc0.xy, max(ndc1.xy, ndc2.xy));
+
+    let half_res = per_camera_uniform.resolution * 0.5;
+    let min_screen_xy = (min_ndc_xy + 1.0) * half_res;
+    let max_screen_xy = (max_ndc_xy + 1.0) * half_res;
+
+    let misses_pixel_center = any(round(min_screen_xy) == round(max_screen_xy));
+
+    if misses_pixel_center {
+        return false;
+    }
+
+    return true;
+}
+
 @compute @workgroup_size(256)
 fn cs_main(
     @builtin(workgroup_id) wid: vec3<u32>,
@@ -115,14 +151,8 @@ fn cs_main(
     let model_position0 = extract_attribute_vec3_f32(position_start_offset, index0);
     let model_position1 = extract_attribute_vec3_f32(position_start_offset, index1);
     let model_position2 = extract_attribute_vec3_f32(position_start_offset, index2);
-    
-    let position0 = model_view_proj * vec4<f32>(model_position0, 1.0);
-    let position1 = model_view_proj * vec4<f32>(model_position1, 1.0);
-    let position2 = model_view_proj * vec4<f32>(model_position2, 1.0);
 
-    let det = determinant(mat3x3<f32>(position0.xyw, position1.xyw, position2.xyw));
-
-    let passes_culling = det > 0.0;
+    let passes_culling = execute_culling(model_view_proj, model_position0, model_position1, model_position2);
 
     if object_range.atomic_capable == 1u {
         if passes_culling {

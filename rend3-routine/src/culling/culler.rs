@@ -487,7 +487,12 @@ impl GpuCuller {
                 view: camera.view(),
                 view_proj: camera.view_proj(),
                 frustum: camera.world_frustum(),
-                resolution: resolution.as_vec2(),
+                resolution: if camera_idx.is_some() {
+                    // TODO: Work around some nonsense
+                    Vec2::splat(2048.0)
+                } else {
+                    resolution.as_vec2()
+                },
                 object_count: max_object_count as u32,
                 objects: Vec::new(),
             };
