@@ -30,7 +30,8 @@ struct ObjectRangeIndex {
 }
 
 var<workgroup> workgroup_object_range: ObjectRangeIndex;
-var<workgroup> culling_results: array<atomic<u32>, 4>;
+// 256 workgroup size / 32 bits
+var<workgroup> culling_results: array<atomic<u32>, 8>;
 
 fn execute_culling(
     model_view_proj: mat4x4<f32>,
@@ -96,6 +97,10 @@ fn cs_main(
                 atomicStore(&culling_results[1], 0u);
                 atomicStore(&culling_results[2], 0u);
                 atomicStore(&culling_results[3], 0u);
+                atomicStore(&culling_results[4], 0u);
+                atomicStore(&culling_results[5], 0u);
+                atomicStore(&culling_results[6], 0u);
+                atomicStore(&culling_results[7], 0u);
                 break;
             }
 
@@ -184,15 +189,19 @@ fn cs_main(
         primary_output[global_output_invocation * 3u + 2u] = pack_batch_index(batch_object_index, index2);
     }
 
-    atomicOr(&culling_results[wid.x / 32u], u32(passes_culling) << (wid.x % 32u));
+    atomicOr(&culling_results[lid.x / 32u], u32(passes_culling) << (lid.x % 32u));
 
     workgroupBarrier();
 
-    if wid.x == 0u {
+    if lid.x == 0u {
         let global_invocation = culling_job.base_output_invocation + gid.x;
         current_culling_results[global_invocation / 32u + 0u] = atomicLoad(&culling_results[0]);
         current_culling_results[global_invocation / 32u + 1u] = atomicLoad(&culling_results[1]);
         current_culling_results[global_invocation / 32u + 2u] = atomicLoad(&culling_results[2]);
         current_culling_results[global_invocation / 32u + 3u] = atomicLoad(&culling_results[3]);
+        current_culling_results[global_invocation / 32u + 4u] = atomicLoad(&culling_results[4]);
+        current_culling_results[global_invocation / 32u + 5u] = atomicLoad(&culling_results[5]);
+        current_culling_results[global_invocation / 32u + 6u] = atomicLoad(&culling_results[6]);
+        current_culling_results[global_invocation / 32u + 7u] = atomicLoad(&culling_results[7]);
     }
 }
