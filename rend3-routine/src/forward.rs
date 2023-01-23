@@ -2,7 +2,7 @@
 //!
 //! Will default to the PBR shader code if custom code is not specified.
 
-use std::marker::PhantomData;
+use std::{marker::PhantomData, sync::Arc};
 
 use arrayvec::ArrayVec;
 use encase::ShaderSize;
@@ -11,8 +11,8 @@ use rend3::{
         DataHandle, NodeResourceUsage, RenderGraph, RenderPassDepthTarget, RenderPassTarget, RenderPassTargets,
         RenderTargetHandle,
     },
-    types::{Handedness, Material, SampleCount},
-    util::bind_merge::BindGroupBuilder,
+    types::{Handedness, Material, SampleCount, GraphDataHandle},
+    util::{bind_merge::BindGroupBuilder, typedefs::FastHashMap},
     ProfileData, Renderer, RendererDataCore, RendererProfile, ShaderPreProcessor,
 };
 use serde::Serialize;
@@ -25,7 +25,7 @@ use wgpu::{
 
 use crate::{
     common::{PerMaterialArchetypeInterface, WholeFrameInterfaces},
-    culling::{self, DrawCall},
+    culling::{self, DrawCall, DrawCallSet},
 };
 
 #[derive(Serialize)]
@@ -50,7 +50,7 @@ pub struct ShaderModulePair<'a> {
 pub struct RoutineArgs<'a, M> {
     pub name: &'a str,
 
-    pub renderer: &'a Renderer,
+    pub renderer: &'a Arc<Renderer>,
     pub data_core: &'a mut RendererDataCore,
     pub spp: &'a ShaderPreProcessor,
 
@@ -77,7 +77,7 @@ pub struct RoutineAddToGraphArgs<'a, 'node, M> {
     pub color: Option<RenderTargetHandle>,
     pub resolve: Option<RenderTargetHandle>,
     pub depth: RenderTargetHandle,
-    /// Passed to the shader through the instance index.
+    /// TODO: this no longer works
     pub data: u32,
 }
 
@@ -86,6 +86,7 @@ pub struct ForwardRoutine<M: Material> {
     pub pipeline_s1: RenderPipeline,
     pub pipeline_s4: RenderPipeline,
     pub material_key: u64,
+    pub culling_cache: GraphDataHandle<FastHashMap<Option<usize>, DrawCallSet>>,
     pub _phantom: PhantomData<M>,
 }
 impl<M: Material> ForwardRoutine<M> {
@@ -130,6 +131,7 @@ impl<M: Material> ForwardRoutine<M> {
             pipeline_s1: build_forward_pipeline_inner(&pll, &args, SampleCount::One),
             pipeline_s4: build_forward_pipeline_inner(&pll, &args, SampleCount::Four),
             material_key: args.material_key,
+            culling_cache: args.renderer.add_graph_data(FastHashMap::default()),
             _phantom: PhantomData,
         }
     }

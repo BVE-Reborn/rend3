@@ -39,7 +39,7 @@ const OUTPUT_BUFFER_ROUNDING_SIZE: u64 = 1 << 24;
 // At least 64 batches
 const BATCH_DATA_ROUNDING_SIZE: u64 = ShaderBatchData::SHADER_SIZE.get() * 64;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DrawCallSet {
     pub buffers: CullingBuffers<Arc<Buffer>>,
     pub draw_calls: Vec<DrawCall>,
@@ -47,7 +47,7 @@ pub struct DrawCallSet {
     pub material_key_ranges: HashMap<u64, Range<usize>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DrawCall {
     pub bind_group_index: TextureBindGroupIndex,
     pub batch_index: u32,
