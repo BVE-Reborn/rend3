@@ -181,7 +181,6 @@ impl<M: Material> ForwardRoutine<M> {
             let culled = match base_cull {
                 Some(cull_set) => {
                     culling_storage.insert(args.camera, cull_set.clone());
-                    return;
                     cull_set
                 }
                 None => match culling_storage.get(&args.camera) {
@@ -199,7 +198,7 @@ impl<M: Material> ForwardRoutine<M> {
                         culling::ShaderBatchData::SHADER_SIZE.get(),
                     )
                     .append_buffer(&ctx.eval_output.mesh_buffer)
-                    .append_buffer(&culled.buffers.per_camera_uniform_buffer)
+                    .append_buffer(&culled.per_camera_uniform)
                     .append_buffer(ctx.data_core.material_manager.archetype_view::<M>().buffer())
                     .build(&ctx.renderer.device, Some("Per-Material BG"), &args.per_material.bgl),
             );

@@ -41,6 +41,7 @@ const BATCH_DATA_ROUNDING_SIZE: u64 = ShaderBatchData::SHADER_SIZE.get() * 64;
 
 #[derive(Debug, Clone)]
 pub struct DrawCallSet {
+    pub per_camera_uniform: Arc<Buffer>,
     pub buffers: CullingBuffers<Arc<Buffer>>,
     pub draw_calls: Vec<DrawCall>,
     /// Range of draw calls in the draw call array corresponding to a given material key.
@@ -79,7 +80,6 @@ impl CullingBufferMap {
                 sizes.previous_culling_results = b.previous_culling_results.size();
 
                 let current_size = CullingBuffers {
-                    per_camera_uniform_buffer: b.per_camera_uniform_buffer.size(),
                     object_reference: b.object_reference.size(),
                     primary_index: b.primary_index.size(),
                     secondary_index: b.secondary_index.size(),
@@ -107,7 +107,6 @@ impl CullingBufferMap {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct CullingBuffers<T> {
-    pub per_camera_uniform_buffer: T,
     pub object_reference: T,
     pub primary_index: T,
     pub secondary_index: T,
@@ -120,12 +119,6 @@ pub struct CullingBuffers<T> {
 impl CullingBuffers<Arc<Buffer>> {
     pub fn new(device: &Device, sizes: CullingBuffers<u64>) -> Self {
         CullingBuffers {
-            per_camera_uniform_buffer: Arc::new(device.create_buffer(&BufferDescriptor {
-                label: None,
-                size: sizes.per_camera_uniform_buffer,
-                usage: BufferUsages::STORAGE | BufferUsages::COPY_SRC | BufferUsages::COPY_DST,
-                mapped_at_creation: false,
-            })),
             object_reference: Arc::new(device.create_buffer(&BufferDescriptor {
                 label: None,
                 size: sizes.object_reference,
@@ -199,6 +192,7 @@ pub struct GpuCuller {
     culling_bgl: BindGroupLayout,
     culling_pipeline: ComputePipeline,
     type_id: TypeId,
+    per_material_buffer_handle: GraphDataHandle<HashMap<Option<usize>, Arc<Buffer>>>,
     culling_buffer_map_handle: GraphDataHandle<CullingBufferMap>,
 }
 
@@ -415,6 +409,7 @@ impl GpuCuller {
             entry_point: "cs_main",
         });
 
+        let per_material_buffer_handle = renderer.add_graph_data(HashMap::default());
         let culling_buffer_map_handle = renderer.add_graph_data(CullingBufferMap::default());
 
         Self {
@@ -423,17 +418,99 @@ impl GpuCuller {
             culling_bgl,
             culling_pipeline,
             type_id: TypeId::of::<M>(),
+            per_material_buffer_handle,
             culling_buffer_map_handle,
         }
+    }
+
+    pub fn uniform_bake<M>(
+        &self,
+        ctx: &mut NodeExecutionContext,
+        camera: &CameraManager,
+        camera_idx: Option<usize>,
+        resolution: UVec2,
+    ) where
+        M: Material,
+    {
+        profiling::scope!("GpuCuller::uniform_bake");
+
+        assert_eq!(TypeId::of::<M>(), self.type_id);
+
+        let type_name = type_name::<M>();
+
+        let encoder = ctx.encoder_or_pass.take_encoder();
+
+        // TODO
+        let max_object_count = 128_000;
+        let mut per_mat_buffer_map = ctx.data_core.graph_storage.get_mut(&self.per_material_buffer_handle);
+        let buffer = per_mat_buffer_map.entry(camera_idx).or_insert_with(|| {
+            Arc::new(ctx.renderer.device.create_buffer(&BufferDescriptor {
+                label: None,
+                size: ((max_object_count - 1) * PerCameraUniformObjectData::SHADER_SIZE.get())
+                    + PerCameraUniform::min_size().get(),
+                usage: BufferUsages::STORAGE | BufferUsages::COPY_SRC | BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            }))
+        });
+
+        {
+            profiling::scope!("PerCameraUniform Data Upload");
+            let per_camera_data = PerCameraUniform {
+                view: camera.view(),
+                view_proj: camera.view_proj(),
+                frustum: camera.world_frustum(),
+                resolution: if camera_idx.is_some() {
+                    // TODO: Work around some nonsense
+                    Vec2::splat(2048.0)
+                } else {
+                    resolution.as_vec2()
+                },
+                object_count: max_object_count as u32,
+                objects: Vec::new(),
+            };
+            let mut buffer = ctx
+                .renderer
+                .queue
+                .write_buffer_with(&buffer, 0, per_camera_data.size())
+                .unwrap();
+            StorageBuffer::new(&mut *buffer).write(&per_camera_data).unwrap();
+        }
+
+        let Some(object_manager_buffer) = ctx.data_core.object_manager.buffer::<M>() else {
+            return;
+        };
+        let prep_bg = ctx.renderer.device.create_bind_group(&BindGroupDescriptor {
+            label: Some(&format_sso!("UniformPrep {type_name} BG")),
+            layout: &self.prep_bgl,
+            entries: &[
+                BindGroupEntry {
+                    binding: 0,
+                    resource: object_manager_buffer.as_entire_binding(),
+                },
+                BindGroupEntry {
+                    binding: 1,
+                    resource: buffer.as_entire_binding(),
+                },
+            ],
+        });
+
+        profiling::scope!("Command Encoding");
+
+        // TODO: this is needed to zero out the indirect vertex count, this could be improved.
+        let mut cpass = encoder.begin_compute_pass(&ComputePassDescriptor {
+            label: Some(&format_sso!("GpuCuller {type_name} uniform bake")),
+        });
+        cpass.set_pipeline(&self.prep_pipeline);
+        cpass.set_bind_group(0, &prep_bg, &[]);
+        cpass.dispatch_workgroups(round_up_div(max_object_count as u32, WORKGROUP_SIZE), 1, 1);
+        drop(cpass);
     }
 
     pub fn cull<M>(
         &self,
         ctx: &mut NodeExecutionContext,
         jobs: ShaderBatchDatas,
-        camera: &CameraManager,
         camera_idx: Option<usize>,
-        resolution: UVec2,
     ) -> DrawCallSet
     where
         M: Material,
@@ -466,8 +543,6 @@ impl GpuCuller {
                 encoder,
                 camera_idx,
                 CullingBuffers {
-                    per_camera_uniform_buffer: ((max_object_count - 1) * PerCameraUniformObjectData::SHADER_SIZE.get())
-                        + PerCameraUniform::min_size().get(),
                     object_reference: jobs.jobs.size().get(),
                     // RA is getting totally weird with the call to max, thinking it's a call to Iter::max
                     // this makes the errors go away.
@@ -481,28 +556,23 @@ impl GpuCuller {
             )
             .clone();
 
-        {
-            profiling::scope!("PerCameraUniform Data Upload");
-            let per_camera_data = PerCameraUniform {
-                view: camera.view(),
-                view_proj: camera.view_proj(),
-                frustum: camera.world_frustum(),
-                resolution: if camera_idx.is_some() {
-                    // TODO: Work around some nonsense
-                    Vec2::splat(2048.0)
-                } else {
-                    resolution.as_vec2()
-                },
-                object_count: max_object_count as u32,
-                objects: Vec::new(),
-            };
-            let mut buffer = ctx
-                .renderer
-                .queue
-                .write_buffer_with(&buffers.per_camera_uniform_buffer, 0, per_camera_data.size())
-                .unwrap();
-            StorageBuffer::new(&mut *buffer).write(&per_camera_data).unwrap();
-        }
+        // TODO
+        assert!(max_object_count < 128_000);
+        let per_camera_uniform = Arc::clone(
+            ctx.data_core
+                .graph_storage
+                .get_mut(&self.per_material_buffer_handle)
+                .entry(camera_idx)
+                .or_insert_with(|| {
+                    Arc::new(ctx.renderer.device.create_buffer(&BufferDescriptor {
+                        label: None,
+                        size: ((max_object_count - 1) * PerCameraUniformObjectData::SHADER_SIZE.get())
+                            + PerCameraUniform::min_size().get(),
+                        usage: BufferUsages::STORAGE | BufferUsages::COPY_SRC | BufferUsages::COPY_DST,
+                        mapped_at_creation: false,
+                    }))
+                }),
+        );
 
         {
             profiling::scope!("Culling Job Data Upload");
@@ -513,21 +583,6 @@ impl GpuCuller {
                 .unwrap();
             StorageBuffer::new(&mut *buffer).write(&jobs.jobs).unwrap();
         }
-
-        let prep_bg = ctx.renderer.device.create_bind_group(&BindGroupDescriptor {
-            label: Some(&format_sso!("UniformPrep {type_name} BG")),
-            layout: &self.prep_bgl,
-            entries: &[
-                BindGroupEntry {
-                    binding: 0,
-                    resource: ctx.data_core.object_manager.buffer::<M>().unwrap().as_entire_binding(),
-                },
-                BindGroupEntry {
-                    binding: 1,
-                    resource: buffers.per_camera_uniform_buffer.as_entire_binding(),
-                },
-            ],
-        });
 
         let culling_bg = ctx.renderer.device.create_bind_group(&BindGroupDescriptor {
             label: Some(&format_sso!("GpuCuller {type_name} BG")),
@@ -575,7 +630,7 @@ impl GpuCuller {
                 },
                 BindGroupEntry {
                     binding: 9,
-                    resource: buffers.per_camera_uniform_buffer.as_entire_binding(),
+                    resource: per_camera_uniform.as_entire_binding(),
                 },
             ],
         });
@@ -610,9 +665,6 @@ impl GpuCuller {
         let mut cpass = encoder.begin_compute_pass(&ComputePassDescriptor {
             label: Some(&format_sso!("GpuCuller {type_name} Culling")),
         });
-        cpass.set_pipeline(&self.prep_pipeline);
-        cpass.set_bind_group(0, &prep_bg, &[]);
-        cpass.dispatch_workgroups(round_up_div(max_object_count as u32, WORKGROUP_SIZE), 1, 1);
 
         cpass.set_pipeline(&self.culling_pipeline);
         for (idx, job) in jobs.jobs.iter().enumerate() {
@@ -626,10 +678,31 @@ impl GpuCuller {
         drop(cpass);
 
         DrawCallSet {
+            per_camera_uniform,
             buffers,
             draw_calls,
             material_key_ranges,
         }
+    }
+
+    pub fn add_uniform_bake_to_graph<'node, M: Material>(
+        &'node self,
+        graph: &mut RenderGraph<'node>,
+        camera_idx: Option<usize>,
+        resolution: UVec2,
+        name: &str,
+    ) {
+        let mut node = graph.add_node(name);
+        node.add_side_effect();
+
+        node.build(move |mut ctx| {
+            let camera = match camera_idx {
+                Some(i) => &ctx.eval_output.shadows[i].camera,
+                None => &ctx.data_core.camera_manager,
+            };
+
+            self.uniform_bake::<M>(&mut ctx, camera, camera_idx, resolution);
+        });
     }
 
     pub fn add_culling_to_graph<'node, M: Material>(
@@ -637,7 +710,6 @@ impl GpuCuller {
         graph: &mut RenderGraph<'node>,
         draw_calls_hdl: DataHandle<DrawCallSet>,
         camera_idx: Option<usize>,
-        resolution: UVec2,
         name: &str,
     ) {
         let mut node = graph.add_node(name);
@@ -660,7 +732,7 @@ impl GpuCuller {
                 return;
             }
 
-            let draw_calls = self.cull::<M>(&mut ctx, jobs, camera, camera_idx, resolution);
+            let draw_calls = self.cull::<M>(&mut ctx, jobs, camera_idx);
 
             ctx.graph_data.set_data(output, Some(draw_calls));
         });

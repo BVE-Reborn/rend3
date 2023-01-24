@@ -86,7 +86,8 @@ impl BaseRenderGraph {
         state.skinning(graph, self);
 
         // Culling
-        state.pbr_shadow_culling(graph, self, resolution);
+        state.pbr_uniform_bake(graph, self, resolution);
+        state.pbr_shadow_culling(graph, self);
 
         // Depth-only rendering
         state.pbr_shadow_rendering(graph, pbr, &eval_output.shadows);
@@ -96,9 +97,11 @@ impl BaseRenderGraph {
 
         // Forward rendering opaque
 
+        state.pbr_uniform_bake(graph, self, resolution);
+
         state.pbr_forward_rendering_opaque_pass_1(graph, pbr, samples);
-        
-        state.pbr_culling(graph, self, resolution);
+
+        state.pbr_culling(graph, self);
 
         state.pbr_forward_rendering_opaque_pass_2(graph, pbr, samples);
 
@@ -223,21 +226,29 @@ impl BaseRenderGraphIntermediateState {
             resolution,
         );
     }
-
-    /// Does all shadow culling for the PBR materials.
-    pub fn pbr_shadow_culling<'node>(
+    pub fn pbr_shadow_uniform_prep<'node>(
         &self,
         graph: &mut RenderGraph<'node>,
         base: &'node BaseRenderGraph,
         resolution: UVec2,
     ) {
+        for (shadow_index, _) in self.shadow_cull.iter().enumerate() {
+            base.gpu_culler.add_uniform_bake_to_graph::<pbr::PbrMaterial>(
+                graph,
+                Some(shadow_index),
+                resolution,
+                &format_sso!("Shadow Culling S{}", shadow_index),
+            );
+        }
+    }
+
+    /// Does all shadow culling for the PBR materials.
+    pub fn pbr_shadow_culling<'node>(&self, graph: &mut RenderGraph<'node>, base: &'node BaseRenderGraph) {
         for (shadow_index, &shadow_culled) in self.shadow_cull.iter().enumerate() {
             base.gpu_culler.add_culling_to_graph::<pbr::PbrMaterial>(
                 graph,
                 shadow_culled,
                 Some(shadow_index),
-                // TODO
-                resolution,
                 &format_sso!("Shadow Culling S{}", shadow_index),
             );
         }
@@ -247,10 +258,20 @@ impl BaseRenderGraphIntermediateState {
         crate::skinning::add_skinning_to_graph(graph, &base.gpu_skinner);
     }
 
-    /// Does all culling for the forward PBR materials.
-    pub fn pbr_culling<'node>(&self, graph: &mut RenderGraph<'node>, base: &'node BaseRenderGraph, resolution: UVec2) {
+    pub fn pbr_uniform_bake<'node>(
+        &self,
+        graph: &mut RenderGraph<'node>,
+        base: &'node BaseRenderGraph,
+        resolution: UVec2,
+    ) {
         base.gpu_culler
-            .add_culling_to_graph::<pbr::PbrMaterial>(graph, self.cull, None, resolution, "Primary Culling");
+            .add_uniform_bake_to_graph::<pbr::PbrMaterial>(graph, None, resolution, "Uniform Bake");
+    }
+
+    /// Does all culling for the forward PBR materials.
+    pub fn pbr_culling<'node>(&self, graph: &mut RenderGraph<'node>, base: &'node BaseRenderGraph) {
+        base.gpu_culler
+            .add_culling_to_graph::<pbr::PbrMaterial>(graph, self.cull, None, "Primary Culling");
     }
 
     /// Clear all the targets to their needed values
