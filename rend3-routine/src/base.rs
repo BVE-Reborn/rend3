@@ -87,7 +87,6 @@ impl BaseRenderGraph {
 
         // Culling
         state.pbr_shadow_culling(graph, self, resolution);
-        state.pbr_culling(graph, self, resolution);
 
         // Depth-only rendering
         state.pbr_shadow_rendering(graph, pbr, &eval_output.shadows);
@@ -96,7 +95,12 @@ impl BaseRenderGraph {
         state.clear(graph, clear_color);
 
         // Forward rendering opaque
-        state.pbr_forward_rendering_opaque(graph, pbr, samples);
+
+        state.pbr_forward_rendering_opaque_pass_1(graph, pbr, samples);
+        
+        state.pbr_culling(graph, self, resolution);
+
+        state.pbr_forward_rendering_opaque_pass_2(graph, pbr, samples);
 
         // Skybox
         state.skybox(graph, skybox, samples);
@@ -268,11 +272,12 @@ impl BaseRenderGraphIntermediateState {
                 routine.add_forward_to_graph(RoutineAddToGraphArgs {
                     graph,
                     whole_frame_uniform_bg: self.shadow_uniform_bg,
-                    culled: *shadow_cull,
+                    culled: Some(*shadow_cull),
                     per_material: &pbr.per_material,
                     extra_bgs: None,
                     label: &format!("pbr shadow renderering S{shadow_index}"),
                     samples: SampleCount::One,
+                    camera: Some(shadow_index),
                     color: None,
                     resolve: None,
                     depth: self
@@ -304,7 +309,7 @@ impl BaseRenderGraphIntermediateState {
     }
 
     /// Render the PBR materials.
-    pub fn pbr_forward_rendering_opaque<'node>(
+    pub fn pbr_forward_rendering_opaque_pass_1<'node>(
         &self,
         graph: &mut RenderGraph<'node>,
         pbr: &'node pbr::PbrRoutine,
@@ -315,11 +320,38 @@ impl BaseRenderGraphIntermediateState {
             routine.add_forward_to_graph(RoutineAddToGraphArgs {
                 graph,
                 whole_frame_uniform_bg: self.forward_uniform_bg,
-                culled: self.cull,
+                culled: None,
                 per_material: &pbr.per_material,
                 extra_bgs: None,
-                label: "PBR Forward",
+                label: "PBR Forward Pass 1",
                 samples,
+                camera: None,
+                color: Some(self.color),
+                resolve: self.resolve,
+                depth: self.depth,
+                data: 0,
+            });
+        }
+    }
+
+    /// Render the PBR materials.
+    pub fn pbr_forward_rendering_opaque_pass_2<'node>(
+        &self,
+        graph: &mut RenderGraph<'node>,
+        pbr: &'node pbr::PbrRoutine,
+        samples: SampleCount,
+    ) {
+        let routines = [&pbr.opaque_routine, &pbr.cutout_routine];
+        for routine in routines {
+            routine.add_forward_to_graph(RoutineAddToGraphArgs {
+                graph,
+                whole_frame_uniform_bg: self.forward_uniform_bg,
+                culled: Some(self.cull),
+                per_material: &pbr.per_material,
+                extra_bgs: None,
+                label: "PBR Forward Pass 2",
+                samples,
+                camera: None,
                 color: Some(self.color),
                 resolve: self.resolve,
                 depth: self.depth,
@@ -338,10 +370,11 @@ impl BaseRenderGraphIntermediateState {
         pbr.blend_routine.add_forward_to_graph(RoutineAddToGraphArgs {
             graph,
             whole_frame_uniform_bg: self.forward_uniform_bg,
-            culled: self.cull,
+            culled: Some(self.cull),
             per_material: &pbr.per_material,
             extra_bgs: None,
             label: "PBR Forward",
+            camera: None,
             samples,
             color: Some(self.color),
             resolve: self.resolve,

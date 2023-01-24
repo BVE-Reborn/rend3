@@ -545,6 +545,8 @@ impl rend3_framework::App for SceneViewer {
 
                 self.timestamp_last_frame = now;
 
+                std::thread::sleep(Duration::from_millis(100));
+
                 let rotation =
                     Mat3A::from_euler(glam::EulerRot::XYZ, -self.camera_pitch, -self.camera_yaw, 0.0).transpose();
                 let forward = -rotation.z_axis;

@@ -11,7 +11,7 @@ use rend3::{
         DataHandle, NodeResourceUsage, RenderGraph, RenderPassDepthTarget, RenderPassTarget, RenderPassTargets,
         RenderTargetHandle,
     },
-    types::{Handedness, Material, SampleCount, GraphDataHandle},
+    types::{GraphDataHandle, Handedness, Material, SampleCount},
     util::{bind_merge::BindGroupBuilder, typedefs::FastHashMap},
     ProfileData, Renderer, RendererDataCore, RendererProfile, ShaderPreProcessor,
 };
@@ -69,7 +69,7 @@ pub struct RoutineArgs<'a, M> {
 pub struct RoutineAddToGraphArgs<'a, 'node, M> {
     pub graph: &'a mut RenderGraph<'node>,
     pub whole_frame_uniform_bg: DataHandle<BindGroup>,
-    pub culled: DataHandle<culling::DrawCallSet>,
+    pub culled: Option<DataHandle<culling::DrawCallSet>>,
     pub per_material: &'node PerMaterialArchetypeInterface<M>,
     pub extra_bgs: Option<&'node [BindGroup]>,
     pub label: &'a str,
@@ -77,6 +77,7 @@ pub struct RoutineAddToGraphArgs<'a, 'node, M> {
     pub color: Option<RenderTargetHandle>,
     pub resolve: Option<RenderTargetHandle>,
     pub depth: RenderTargetHandle,
+    pub camera: Option<usize>,
     /// TODO: this no longer works
     pub data: u32,
 }
@@ -164,15 +165,31 @@ impl<M: Material> ForwardRoutine<M> {
         });
 
         let whole_frame_uniform_handle = builder.add_data(args.whole_frame_uniform_bg, NodeResourceUsage::Input);
-        let cull_handle = builder.add_data(args.culled, NodeResourceUsage::Input);
+        let cull_handle = builder.add_optional_data(args.culled, NodeResourceUsage::Input);
 
         builder.build(move |mut ctx| {
             let rpass = ctx.encoder_or_pass.take_rpass(rpass_handle);
             let whole_frame_uniform_bg = ctx.graph_data.get_data(ctx.temps, whole_frame_uniform_handle).unwrap();
-            let culled = match ctx.graph_data.get_data(ctx.temps, cull_handle) {
-                Some(c) => c,
-                None => return,
+            let base_cull = match cull_handle {
+                Some(handle) => match ctx.graph_data.get_data(ctx.temps, handle) {
+                    Some(c) => Some(c),
+                    None => return,
+                },
+                None => None,
             };
+            let mut culling_storage = ctx.data_core.graph_storage.get_mut(&self.culling_cache);
+            let culled = match base_cull {
+                Some(cull_set) => {
+                    culling_storage.insert(args.camera, cull_set.clone());
+                    return;
+                    cull_set
+                }
+                None => match culling_storage.get(&args.camera) {
+                    Some(cull_set) => cull_set,
+                    None => return,
+                },
+            };
+            let culled = ctx.temps.add(culled.clone());
 
             let per_material_bg = ctx.temps.add(
                 BindGroupBuilder::new()

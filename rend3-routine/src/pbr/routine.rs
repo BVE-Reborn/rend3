@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, sync::Arc};
 
 use rend3::{Renderer, RendererDataCore, RendererProfile, ShaderPreProcessor, ShaderVertexBufferConfig};
 use serde::Serialize;
@@ -28,7 +28,7 @@ pub struct PbrRoutine {
 
 impl PbrRoutine {
     pub fn new(
-        renderer: &Renderer,
+        renderer: &Arc<Renderer>,
         data_core: &mut RendererDataCore,
         spp: &ShaderPreProcessor,
         interfaces: &WholeFrameInterfaces,
