@@ -47,7 +47,7 @@ use std::ops::Range;
 
 use glam::UVec2;
 use rend3_types::{SampleCount, TextureFormat, TextureUsages};
-use wgpu::{Color, TextureView};
+use wgpu::{Color, Extent3d, TextureDimension, TextureView};
 
 use crate::util::typedefs::SsoString;
 
@@ -73,6 +73,8 @@ pub struct RenderTargetDescriptor {
     pub resolution: UVec2,
     pub depth: u32,
     pub samples: SampleCount,
+    // None means maximum mip count
+    pub mip_levels: Option<u8>,
     pub format: TextureFormat,
     pub usage: TextureUsages,
 }
@@ -82,6 +84,7 @@ impl RenderTargetDescriptor {
             resolution: self.resolution,
             depth: self.depth,
             samples: self.samples,
+            mip_levels: self.mip_levels,
             format: self.format,
             usage: self.usage,
         }
@@ -93,8 +96,24 @@ pub(crate) struct RenderTargetCore {
     pub resolution: UVec2,
     pub depth: u32,
     pub samples: SampleCount,
+    pub mip_levels: Option<u8>,
     pub format: TextureFormat,
     pub usage: TextureUsages,
+}
+
+impl RenderTargetCore {
+    fn mip_count(&self) -> u8 {
+        match self.mip_levels {
+            Some(count) => count,
+            None => Extent3d {
+                width: self.resolution.x,
+                height: self.resolution.y,
+                // D2 doesn't care about depth
+                depth_or_array_layers: 1,
+            }
+            .max_mips(TextureDimension::D2) as u8,
+        }
+    }
 }
 
 /// Requirements to render to a particular shadow map.
@@ -122,6 +141,8 @@ pub(super) struct TextureRegion {
     idx: usize,
     layer_start: u32,
     layer_end: u32,
+    mip_start: u8,
+    mip_end: u8,
     viewport: ViewportRect,
 }
 
@@ -172,7 +193,11 @@ impl RenderTargetHandle {
         let left = self.to_region();
         let right = other.to_region();
 
-        left.idx == right.idx && left.layer_start == right.layer_start && left.layer_end == right.layer_end
+        left.idx == right.idx
+            && left.layer_start == right.layer_start
+            && left.layer_end == right.layer_end
+            && left.mip_start == right.mip_start
+            && left.mip_end == right.mip_end
     }
 
     pub(super) fn to_region(self) -> TextureRegion {
@@ -182,11 +207,31 @@ impl RenderTargetHandle {
         }
     }
 
-    pub fn restrict(mut self, layers: Range<u32>, viewport: ViewportRect) -> Self {
+    pub fn set_layers(mut self, layers: Range<u32>) -> Self {
         match &mut self.resource {
             GraphSubResource::ImportedTexture(region) | GraphSubResource::Texture(region) => {
                 region.layer_start = layers.start;
                 region.layer_end = layers.end;
+            }
+            _ => unreachable!(),
+        }
+        self
+    }
+
+    pub fn set_mips(mut self, mips: Range<u8>) -> Self {
+        match &mut self.resource {
+            GraphSubResource::ImportedTexture(region) | GraphSubResource::Texture(region) => {
+                region.mip_start = mips.start;
+                region.mip_end = mips.end;
+            }
+            _ => unreachable!(),
+        }
+        self
+    }
+
+    pub fn set_viewport(mut self, viewport: ViewportRect) -> Self {
+        match &mut self.resource {
+            GraphSubResource::ImportedTexture(region) | GraphSubResource::Texture(region) => {
                 region.viewport = viewport;
             }
             _ => unreachable!(),

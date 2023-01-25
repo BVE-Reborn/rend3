@@ -7,6 +7,7 @@ use wgpu::{BlendState, ShaderModuleDescriptor, ShaderSource};
 use crate::{
     common::{PerMaterialArchetypeInterface, WholeFrameInterfaces},
     forward::{ForwardRoutine, RoutineArgs, RoutineType, ShaderModulePair},
+    hi_z::HiZRoutine,
     pbr::{PbrMaterial, TransparencyType},
 };
 
@@ -23,6 +24,7 @@ pub struct PbrRoutine {
     pub opaque_routine: ForwardRoutine<PbrMaterial>,
     pub cutout_routine: ForwardRoutine<PbrMaterial>,
     pub blend_routine: ForwardRoutine<PbrMaterial>,
+    pub hi_z: HiZRoutine,
     pub per_material: PerMaterialArchetypeInterface<PbrMaterial>,
 }
 
@@ -134,6 +136,7 @@ impl PbrRoutine {
             opaque_routine: inner(RoutineType::Forward, &pbr_forward, TransparencyType::Opaque),
             cutout_routine: inner(RoutineType::Forward, &pbr_cutout, TransparencyType::Cutout),
             blend_routine: inner(RoutineType::Forward, &pbr_forward, TransparencyType::Blend),
+            hi_z: HiZRoutine::new(renderer, spp),
             per_material,
         }
     }

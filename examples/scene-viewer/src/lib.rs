@@ -545,7 +545,7 @@ impl rend3_framework::App for SceneViewer {
 
                 self.timestamp_last_frame = now;
 
-                std::thread::sleep(Duration::from_millis(100));
+                // std::thread::sleep(Duration::from_millis(100));
 
                 let rotation =
                     Mat3A::from_euler(glam::EulerRot::XYZ, -self.camera_pitch, -self.camera_yaw, 0.0).transpose();
@@ -625,8 +625,12 @@ impl rend3_framework::App for SceneViewer {
                 // Build a rendergraph
                 let mut graph = rend3::graph::RenderGraph::new();
 
-                let frame_handle =
-                    graph.add_imported_render_target(&frame, 0..1, rend3::graph::ViewportRect::from_size(resolution));
+                let frame_handle = graph.add_imported_render_target(
+                    &frame,
+                    0..1,
+                    0..1,
+                    rend3::graph::ViewportRect::from_size(resolution),
+                );
                 // Add the default rendergraph
                 base_rendergraph.add_to_graph(
                     &mut graph,

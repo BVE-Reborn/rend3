@@ -113,6 +113,8 @@ impl<'node> RenderGraph<'node> {
                 idx,
                 layer_start: 0,
                 layer_end: desc.depth,
+                mip_start: 0,
+                mip_end: desc.to_core().mip_count(),
                 viewport: ViewportRect {
                     offset: UVec2::ZERO,
                     size: desc.resolution,
@@ -127,6 +129,7 @@ impl<'node> RenderGraph<'node> {
         &mut self,
         texture: &'node dyn AsTextureReference,
         layers: Range<u32>,
+        mips: Range<u8>,
         viewport: ViewportRect,
     ) -> RenderTargetHandle {
         let idx = self.imported_targets.len();
@@ -136,6 +139,8 @@ impl<'node> RenderGraph<'node> {
                 idx,
                 layer_start: layers.start,
                 layer_end: layers.end,
+                mip_start: mips.start,
+                mip_end: mips.end,
                 viewport,
             }),
         }
@@ -342,6 +347,8 @@ impl<'node> RenderGraph<'node> {
                         let view = active_textures[&region.idx].create_view(&TextureViewDescriptor {
                             base_array_layer: region.layer_start,
                             array_layer_count: Some(NonZeroU32::new(region.layer_end - region.layer_start).unwrap()),
+                            base_mip_level: region.mip_start as u32,
+                            mip_level_count: Some(NonZeroU32::new((region.mip_end - region.mip_start) as u32).unwrap()),
                             ..TextureViewDescriptor::default()
                         });
                         vacant.insert(view);
@@ -356,6 +363,10 @@ impl<'node> RenderGraph<'node> {
                                     base_array_layer: region.layer_start,
                                     array_layer_count: Some(
                                         NonZeroU32::new(region.layer_end - region.layer_start).unwrap(),
+                                    ),
+                                    base_mip_level: region.mip_start as u32,
+                                    mip_level_count: Some(
+                                        NonZeroU32::new((region.mip_end - region.mip_start) as u32).unwrap(),
                                     ),
                                     ..TextureViewDescriptor::default()
                                 });

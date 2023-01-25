@@ -21,6 +21,7 @@ pub mod clear;
 pub mod common;
 pub mod culling;
 pub mod forward;
+pub mod hi_z;
 pub mod pbr;
 mod shaders;
 pub mod skinning;

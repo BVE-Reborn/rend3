@@ -106,7 +106,9 @@ pub(super) fn batch_objects<M: Material>(
     profiling::scope!("Batch Objects");
 
     let mut current_invocation_map_map = ctx.data_core.graph_storage.get_mut(previous_invocation_map_handle);
-    let current_invocation_map = current_invocation_map_map.entry(camera_idx).or_insert_with(Default::default);
+    let current_invocation_map = current_invocation_map_map
+        .entry(camera_idx)
+        .or_insert_with(Default::default);
     let current_invocation_map_len = current_invocation_map.len();
     let previous_invocation_map = mem::replace(
         current_invocation_map,

@@ -101,6 +101,8 @@ impl BaseRenderGraph {
 
         state.pbr_forward_rendering_opaque_pass_1(graph, pbr, samples);
 
+        state.hi_z(graph, pbr, resolution);
+
         state.pbr_culling(graph, self);
 
         state.pbr_forward_rendering_opaque_pass_2(graph, pbr, samples);
@@ -153,6 +155,7 @@ impl BaseRenderGraphIntermediateState {
             label: Some("shadow target".into()),
             resolution: eval_output.shadow_target_size,
             depth: 1,
+            mip_levels: Some(1),
             samples: SampleCount::One,
             format: INTERNAL_SHADOW_DEPTH_FORMAT,
             usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
@@ -164,6 +167,7 @@ impl BaseRenderGraphIntermediateState {
             resolution,
             depth: 1,
             samples,
+            mip_levels: Some(1),
             format: TextureFormat::Rgba16Float,
             usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
         });
@@ -172,6 +176,7 @@ impl BaseRenderGraphIntermediateState {
                 label: Some("hdr resolve".into()),
                 resolution,
                 depth: 1,
+                mip_levels: Some(1),
                 samples: SampleCount::One,
                 format: TextureFormat::Rgba16Float,
                 usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
@@ -181,9 +186,10 @@ impl BaseRenderGraphIntermediateState {
             label: Some("hdr depth".into()),
             resolution,
             depth: 1,
+            mip_levels: None,
             samples,
             format: TextureFormat::Depth32Float,
-            usage: TextureUsages::RENDER_ATTACHMENT,
+            usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
         });
 
         let pre_skinning_buffers = graph.add_data::<skinning::PreSkinningBuffers>();
@@ -303,7 +309,7 @@ impl BaseRenderGraphIntermediateState {
                     resolve: None,
                     depth: self
                         .shadow
-                        .restrict(0..1, ViewportRect::new(desc.map.offset, UVec2::splat(desc.map.size))),
+                        .set_viewport(ViewportRect::new(desc.map.offset, UVec2::splat(desc.map.size))),
                     data: shadow_index as u32,
                 });
             }
@@ -349,7 +355,7 @@ impl BaseRenderGraphIntermediateState {
                 camera: None,
                 color: Some(self.color),
                 resolve: self.resolve,
-                depth: self.depth,
+                depth: self.depth.set_mips(0..1),
                 data: 0,
             });
         }
@@ -375,7 +381,7 @@ impl BaseRenderGraphIntermediateState {
                 camera: None,
                 color: Some(self.color),
                 resolve: self.resolve,
-                depth: self.depth,
+                depth: self.depth.set_mips(0..1),
                 data: 0,
             });
         }
@@ -402,6 +408,10 @@ impl BaseRenderGraphIntermediateState {
             depth: self.depth,
             data: 0,
         });
+    }
+
+    pub fn hi_z<'node>(&self, graph: &mut RenderGraph<'node>, pbr: &'node pbr::PbrRoutine, resolution: UVec2) {
+        pbr.hi_z.add_hi_z_to_graph(graph, self.depth, resolution);
     }
 
     /// Tonemap onto the given render target.
