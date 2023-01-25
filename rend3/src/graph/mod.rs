@@ -51,7 +51,6 @@ use wgpu::{Color, TextureView};
 
 use crate::util::typedefs::SsoString;
 
-mod data_handle;
 mod encpass;
 #[allow(clippy::module_inception)] // lmao
 mod graph;
@@ -60,7 +59,6 @@ mod store;
 mod temp;
 mod texture_store;
 
-pub use data_handle::*;
 pub use encpass::*;
 pub use graph::*;
 pub use node::*;
