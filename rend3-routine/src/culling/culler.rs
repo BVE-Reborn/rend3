@@ -12,7 +12,7 @@ use encase::{ShaderSize, ShaderType, StorageBuffer};
 use glam::{Mat4, UVec2, Vec2};
 use rend3::{
     format_sso,
-    graph::{DataHandle, NodeExecutionContext, NodeResourceUsage, RenderGraph},
+    graph::{DataHandle, DeclaredDependency, NodeExecutionContext, NodeResourceUsage, RenderGraph, RenderTargetHandle},
     managers::{CameraManager, ShaderObject, TextureBindGroupIndex},
     types::{GraphDataHandle, Material, MaterialArray, RawObjectHandle, VERTEX_ATTRIBUTE_POSITION},
     util::{
@@ -23,10 +23,11 @@ use rend3::{
     Renderer, ShaderPreProcessor, ShaderVertexBufferConfig,
 };
 use wgpu::{
-    self, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
-    BindingType, Buffer, BufferBinding, BufferBindingType, BufferDescriptor, BufferUsages, CommandEncoder,
-    ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor, Device, PipelineLayoutDescriptor,
-    ShaderModuleDescriptor, ShaderStages,
+    self, AddressMode, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor,
+    BindGroupLayoutEntry, BindingResource, BindingType, Buffer, BufferBinding, BufferBindingType, BufferDescriptor,
+    BufferUsages, CommandEncoder, ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor, Device,
+    FilterMode, PipelineLayoutDescriptor, Sampler, SamplerBindingType, SamplerDescriptor, ShaderModuleDescriptor,
+    ShaderStages, TextureSampleType, TextureViewDimension,
 };
 
 use crate::culling::{
@@ -191,6 +192,7 @@ pub struct GpuCuller {
     prep_pipeline: ComputePipeline,
     culling_bgl: BindGroupLayout,
     culling_pipeline: ComputePipeline,
+    sampler: Sampler,
     type_id: TypeId,
     per_material_buffer_handle: GraphDataHandle<HashMap<Option<usize>, Arc<Buffer>>>,
     culling_buffer_map_handle: GraphDataHandle<CullingBufferMap>,
@@ -394,6 +396,24 @@ impl GpuCuller {
                     },
                     count: None,
                 },
+                // hirearchical z buffer
+                BindGroupLayoutEntry {
+                    binding: 10,
+                    visibility: ShaderStages::COMPUTE,
+                    ty: BindingType::Texture {
+                        sample_type: TextureSampleType::Depth,
+                        view_dimension: TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+                // hirearchical z buffer
+                BindGroupLayoutEntry {
+                    binding: 11,
+                    visibility: ShaderStages::COMPUTE,
+                    ty: BindingType::Sampler(SamplerBindingType::NonFiltering),
+                    count: None,
+                },
             ],
         });
 
@@ -410,6 +430,21 @@ impl GpuCuller {
             entry_point: "cs_main",
         });
 
+        let sampler = renderer.device.create_sampler(&SamplerDescriptor {
+            label: Some("HiZ Sampler"),
+            address_mode_u: AddressMode::ClampToEdge,
+            address_mode_v: AddressMode::ClampToEdge,
+            address_mode_w: AddressMode::ClampToEdge,
+            mag_filter: FilterMode::Nearest,
+            min_filter: FilterMode::Nearest,
+            mipmap_filter: FilterMode::Nearest,
+            lod_min_clamp: 0.0,
+            lod_max_clamp: 100.0,
+            compare: None,
+            anisotropy_clamp: None,
+            border_color: None,
+        });
+
         let per_material_buffer_handle = renderer.add_graph_data(HashMap::default());
         let culling_buffer_map_handle = renderer.add_graph_data(CullingBufferMap::default());
         let previous_invocation_map_handle = renderer.add_graph_data(HashMap::default());
@@ -419,6 +454,7 @@ impl GpuCuller {
             prep_pipeline,
             culling_bgl,
             culling_pipeline,
+            sampler,
             type_id: TypeId::of::<M>(),
             per_material_buffer_handle,
             culling_buffer_map_handle,
@@ -513,6 +549,7 @@ impl GpuCuller {
         &self,
         ctx: &mut NodeExecutionContext,
         jobs: ShaderBatchDatas,
+        depth_handle: DeclaredDependency<RenderTargetHandle>,
         camera_idx: Option<usize>,
     ) -> DrawCallSet
     where
@@ -587,6 +624,8 @@ impl GpuCuller {
             StorageBuffer::new(&mut *buffer).write(&jobs.jobs).unwrap();
         }
 
+        let hi_z_buffer = ctx.graph_data.get_render_target(depth_handle);
+
         let culling_bg = ctx.renderer.device.create_bind_group(&BindGroupDescriptor {
             label: Some(&format_sso!("GpuCuller {type_name} BG")),
             layout: &self.culling_bgl,
@@ -601,7 +640,7 @@ impl GpuCuller {
                 },
                 BindGroupEntry {
                     binding: 2,
-                    resource: wgpu::BindingResource::Buffer(BufferBinding {
+                    resource: BindingResource::Buffer(BufferBinding {
                         buffer: &buffers.object_reference,
                         offset: 0,
                         size: Some(ShaderBatchData::SHADER_SIZE),
@@ -634,6 +673,14 @@ impl GpuCuller {
                 BindGroupEntry {
                     binding: 9,
                     resource: per_camera_uniform.as_entire_binding(),
+                },
+                BindGroupEntry {
+                    binding: 10,
+                    resource: BindingResource::TextureView(hi_z_buffer),
+                },
+                BindGroupEntry {
+                    binding: 11,
+                    resource: BindingResource::Sampler(&self.sampler),
                 },
             ],
         });
@@ -712,11 +759,13 @@ impl GpuCuller {
         &'node self,
         graph: &mut RenderGraph<'node>,
         draw_calls_hdl: DataHandle<DrawCallSet>,
+        depth_handle: RenderTargetHandle,
         camera_idx: Option<usize>,
         name: &str,
     ) {
         let mut node = graph.add_node(name);
         let output = node.add_data(draw_calls_hdl, NodeResourceUsage::Output);
+        let shadow_handle = node.add_render_target(depth_handle, NodeResourceUsage::Input);
 
         node.build(move |mut ctx| {
             let camera = match camera_idx {
@@ -730,7 +779,7 @@ impl GpuCuller {
                 return;
             }
 
-            let draw_calls = self.cull::<M>(&mut ctx, jobs, camera_idx);
+            let draw_calls = self.cull::<M>(&mut ctx, jobs, shadow_handle, camera_idx);
 
             ctx.graph_data.set_data(output, Some(draw_calls));
         });

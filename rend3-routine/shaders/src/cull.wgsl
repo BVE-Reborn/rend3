@@ -21,6 +21,10 @@ var<storage> previous_culling_results: array<u32>;
 var<storage, read_write> current_culling_results: array<u32>;
 @group(0) @binding(9)
 var<storage> per_camera_uniform: PerCameraUniform;
+@group(0) @binding(10)
+var hirearchical_z_buffer: texture_depth_2d;
+@group(0) @binding(11)
+var nearest_sampler: sampler;
 
 {{include "rend3/vertex_attributes.wgsl"}}
 
@@ -46,7 +50,7 @@ fn execute_culling(
     let det = determinant(mat3x3<f32>(position0.xyw, position1.xyw, position2.xyw));
 
     if det <= 0.0 {
-        return false;
+        // return true;
     }
 
     let ndc0 = position0.xyz / position0.w;
@@ -56,13 +60,28 @@ fn execute_culling(
     let min_ndc_xy = min(ndc0.xy, min(ndc1.xy, ndc2.xy));
     let max_ndc_xy = max(ndc0.xy, max(ndc1.xy, ndc2.xy));
 
-    let half_res = per_camera_uniform.resolution * 0.5;
+    let half_res = per_camera_uniform.resolution / 2.0;
     let min_screen_xy = (min_ndc_xy + 1.0) * half_res;
     let max_screen_xy = (max_ndc_xy + 1.0) * half_res;
 
     let misses_pixel_center = any(round(min_screen_xy) == round(max_screen_xy));
 
     if misses_pixel_center {
+        // return true;
+    }
+
+    let min_tex_coords = (min_ndc_xy + 1.0) / 2.0;
+    let max_tex_coords = (max_ndc_xy + 1.0) / 2.0;
+
+    let uv = (max_tex_coords + min_tex_coords) / 2.0;
+    let edges = max_screen_xy - min_screen_xy;
+    let longest_edge = max(edges.x, edges.y);
+    let mip = ceil(log2(max(longest_edge, 1.0)));
+
+    let depth = max(max(ndc0.z, ndc1.z), ndc2.z);
+    let occlusion_depth = textureSampleLevel(hirearchical_z_buffer, nearest_sampler, uv, mip);
+
+    if depth < occlusion_depth {
         return false;
     }
 

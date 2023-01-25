@@ -30,7 +30,7 @@ fn fs_main(vout: VertexOutput) -> @builtin(frag_depth) f32 {
     let bottom_left_value = textureLoad(source, vec2<u32>(bottom_left), 0);
     let bottom_right_value = textureLoad(source, vec2<u32>(bottom_right), 0);
 
-    let max = max(max(top_left_value, top_right_value), max(bottom_left_value, bottom_right_value));
+    let min = min(min(top_left_value, top_right_value), min(bottom_left_value, bottom_right_value));
 
-    return max;
+    return min;
 }
