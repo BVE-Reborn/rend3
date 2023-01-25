@@ -168,7 +168,21 @@ fn cs_main(
             primary_output[global_output_invocation * 3u + 0u] = pack_batch_index(batch_object_index, index0);
             primary_output[global_output_invocation * 3u + 1u] = pack_batch_index(batch_object_index, index1);
             primary_output[global_output_invocation * 3u + 2u] = pack_batch_index(batch_object_index, index2);
-        } 
+        
+            let previous_global_invocation = invocation_within_object + object_range.previous_global_invocation;
+
+            let previously_passed_culling = ((previous_culling_results[previous_global_invocation / 32u] >> (previous_global_invocation % 32u)) & 0x1u) == 1u;
+
+            if !previously_passed_culling {
+                let region_local_secondary_invocation = atomicAdd(&secondary_draw_calls[object_range.region_id].vertex_count, 3u) / 3u;
+                let job_local_secondary_invocation = region_local_secondary_invocation + object_range.region_base_invocation;
+                let global_secondary_invocation = job_local_secondary_invocation + culling_job.base_output_invocation;
+
+                secondary_output[global_secondary_invocation * 3u + 0u] = pack_batch_index(batch_object_index, index0);
+                secondary_output[global_secondary_invocation * 3u + 1u] = pack_batch_index(batch_object_index, index1);
+                secondary_output[global_secondary_invocation * 3u + 2u] = pack_batch_index(batch_object_index, index2);
+            }
+        }
     } else {
         // TODO: remove this atomic
         atomicAdd(&primary_draw_calls[object_range.region_id].vertex_count, 3u);

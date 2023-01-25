@@ -178,13 +178,18 @@ impl<M: Material> ForwardRoutine<M> {
                 None => None,
             };
             let mut culling_storage = ctx.data_core.graph_storage.get_mut(&self.culling_cache);
+            let secondary;
             let culled = match base_cull {
                 Some(cull_set) => {
                     culling_storage.insert(args.camera, cull_set.clone());
+                    secondary = true;
                     cull_set
                 }
                 None => match culling_storage.get(&args.camera) {
-                    Some(cull_set) => cull_set,
+                    Some(cull_set) => {
+                        secondary = false;
+                        cull_set
+                    }
                     None => return,
                 },
             };
@@ -208,7 +213,16 @@ impl<M: Material> ForwardRoutine<M> {
                 SampleCount::Four => &self.pipeline_s4,
             };
 
-            rpass.set_index_buffer(culled.buffers.primary_index.slice(..), IndexFormat::Uint32);
+            let index_buffer;
+            let indirect_buffer;
+            if secondary {
+                index_buffer = culled.buffers.secondary_index.slice(..);
+                indirect_buffer = &culled.buffers.secondary_draw_call;
+            } else {
+                index_buffer = culled.buffers.primary_index.slice(..);
+                indirect_buffer = &culled.buffers.primary_draw_call;
+            }
+            rpass.set_index_buffer(index_buffer, IndexFormat::Uint32);
             rpass.set_pipeline(pipeline);
             rpass.set_bind_group(0, whole_frame_uniform_bg, &[]);
             if let Some(v) = args.extra_bgs {
@@ -239,7 +253,7 @@ impl<M: Material> ForwardRoutine<M> {
                     per_material_bg,
                     &[call.batch_index * culling::ShaderBatchData::SHADER_SIZE.get() as u32],
                 );
-                rpass.draw_indexed_indirect(&culled.buffers.primary_draw_call, idx as u64 * 20);
+                rpass.draw_indexed_indirect(indirect_buffer, idx as u64 * 20);
             }
         });
     }

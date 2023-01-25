@@ -14,7 +14,7 @@ use rend3::{
     format_sso,
     graph::{DataHandle, NodeExecutionContext, NodeResourceUsage, RenderGraph},
     managers::{CameraManager, ShaderObject, TextureBindGroupIndex},
-    types::{GraphDataHandle, Material, MaterialArray, VERTEX_ATTRIBUTE_POSITION},
+    types::{GraphDataHandle, Material, MaterialArray, RawObjectHandle, VERTEX_ATTRIBUTE_POSITION},
     util::{
         frustum::Frustum,
         math::{round_up, round_up_div},
@@ -194,6 +194,7 @@ pub struct GpuCuller {
     type_id: TypeId,
     per_material_buffer_handle: GraphDataHandle<HashMap<Option<usize>, Arc<Buffer>>>,
     culling_buffer_map_handle: GraphDataHandle<CullingBufferMap>,
+    previous_invocation_map_handle: GraphDataHandle<HashMap<Option<usize>, HashMap<RawObjectHandle, u32>>>,
 }
 
 impl GpuCuller {
@@ -411,6 +412,7 @@ impl GpuCuller {
 
         let per_material_buffer_handle = renderer.add_graph_data(HashMap::default());
         let culling_buffer_map_handle = renderer.add_graph_data(CullingBufferMap::default());
+        let previous_invocation_map_handle = renderer.add_graph_data(HashMap::default());
 
         Self {
             prep_bgl,
@@ -420,6 +422,7 @@ impl GpuCuller {
             type_id: TypeId::of::<M>(),
             per_material_buffer_handle,
             culling_buffer_map_handle,
+            previous_invocation_map_handle,
         }
     }
 
@@ -721,12 +724,7 @@ impl GpuCuller {
                 None => &ctx.data_core.camera_manager,
             };
 
-            let jobs = batch_objects::<M>(
-                &ctx.data_core.material_manager,
-                &ctx.data_core.object_manager,
-                camera,
-                ctx.renderer.limits.max_compute_workgroups_per_dimension,
-            );
+            let jobs = batch_objects::<M>(&mut ctx, &self.previous_invocation_map_handle, camera, camera_idx);
 
             if jobs.jobs.is_empty() {
                 return;

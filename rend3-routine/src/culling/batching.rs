@@ -1,10 +1,11 @@
-use std::cmp::Ordering;
+use std::{cmp::Ordering, collections::HashMap, mem};
 
 use encase::ShaderType;
 use ordered_float::OrderedFloat;
 use rend3::{
-    managers::{CameraManager, MaterialManager, ObjectManager, TextureBindGroupIndex},
-    types::{Material, SortingOrder, SortingReason},
+    graph::NodeExecutionContext,
+    managers::{CameraManager, TextureBindGroupIndex},
+    types::{GraphDataHandle, Material, RawObjectHandle, SortingOrder, SortingReason},
     util::math::round_up,
 };
 
@@ -92,38 +93,44 @@ pub(super) struct ShaderObjectRange {
     pub region_id: u32,
     pub base_region_invocation: u32,
     pub local_region_id: u32,
+    pub previous_global_invocation: u32,
     pub atomic_capable: u32,
 }
 
 pub(super) fn batch_objects<M: Material>(
-    material_manager: &MaterialManager,
-    object_manager: &ObjectManager,
-    camera_manager: &CameraManager,
-    max_dispatch: u32,
+    ctx: &mut NodeExecutionContext,
+    previous_invocation_map_handle: &GraphDataHandle<HashMap<Option<usize>, HashMap<RawObjectHandle, u32>>>,
+    camera: &CameraManager,
+    camera_idx: Option<usize>,
 ) -> ShaderBatchDatas {
     profiling::scope!("Batch Objects");
+
+    let mut current_invocation_map_map = ctx.data_core.graph_storage.get_mut(previous_invocation_map_handle);
+    let current_invocation_map = current_invocation_map_map.entry(camera_idx).or_insert_with(Default::default);
+    let current_invocation_map_len = current_invocation_map.len();
+    let previous_invocation_map = mem::replace(
+        current_invocation_map,
+        HashMap::with_capacity(current_invocation_map_len),
+    );
 
     let mut jobs = ShaderBatchDatas {
         jobs: Vec::new(),
         regions: Vec::new(),
     };
 
-    let objects = match object_manager.enumerated_objects::<M>() {
+    let objects = match ctx.data_core.object_manager.enumerated_objects::<M>() {
         Some(o) => o,
         None => return jobs,
     };
 
-    let material_archetype = material_manager.archetype_view::<M>();
+    let material_archetype = ctx.data_core.material_manager.archetype_view::<M>();
 
     let mut sorted_objects = Vec::with_capacity(objects.len());
     {
         profiling::scope!("Sort Key Creation");
         for (handle, object) in objects {
             // Frustum culling
-            if !camera_manager
-                .world_frustum()
-                .contains_sphere(object.inner.bounding_sphere)
-            {
+            if !camera.world_frustum().contains_sphere(object.inner.bounding_sphere) {
                 continue;
             }
 
@@ -136,7 +143,11 @@ pub(super) fn batch_objects<M: Material>(
             let material_key = material.inner.key();
             let sorting = material.inner.sorting();
 
-            let mut distance_sq = camera_manager.location().distance_squared(object.location.into());
+            let mut distance_sq = ctx
+                .data_core
+                .camera_manager
+                .location()
+                .distance_squared(object.location.into());
             if sorting.order == SortingOrder::BackToFront {
                 distance_sq = -distance_sq;
             }
@@ -171,6 +182,8 @@ pub(super) fn batch_objects<M: Material>(
         let mut current_ranges = [ShaderObjectRange::default(); BATCH_SIZE];
         let mut current_key = sorted_objects.first().unwrap().0.job_key;
 
+        let max_dispatch_count = ctx.renderer.limits.max_compute_workgroups_per_dimension;
+
         for (
             ShaderJobSortingKey {
                 job_key: key,
@@ -185,7 +198,7 @@ pub(super) fn batch_objects<M: Material>(
 
             let key_difference = key != current_key;
             let object_limit = current_object_index == 256;
-            let dispatch_limit = (current_invocation + invocation_count) >= max_dispatch * WORKGROUP_SIZE;
+            let dispatch_limit = (current_invocation + invocation_count) >= max_dispatch_count * WORKGROUP_SIZE;
 
             if key_difference || object_limit || dispatch_limit {
                 jobs.regions.push(JobSubRegion {
@@ -218,8 +231,11 @@ pub(super) fn batch_objects<M: Material>(
                 object_id: handle.idx as u32,
                 base_region_invocation: current_region_invocation,
                 local_region_id: current_region_object_index,
+                previous_global_invocation: previous_invocation_map.get(&handle).copied().unwrap_or(u32::MAX),
                 atomic_capable: matches!(sorting_reason, SortingReason::Optimization) as u32,
             };
+
+            current_invocation_map.insert(handle, current_invocation + current_base_invocation);
 
             current_ranges[current_object_index as usize] = range;
             current_object_index += 1;
