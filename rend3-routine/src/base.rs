@@ -283,7 +283,7 @@ impl BaseRenderGraphIntermediateState {
 
     /// Clear all the targets to their needed values
     pub fn clear<'node>(&self, graph: &mut RenderGraph<'node>, clear_color: Vec4) {
-        crate::clear::add_clear_to_graph(graph, self.color, self.resolve, self.depth, clear_color, 0.0);
+        crate::clear::add_clear_to_graph(graph, self.color, self.resolve, self.depth.set_mips(0..1), clear_color, 0.0);
     }
 
     /// Render all shadows for the PBR materials.
@@ -329,7 +329,7 @@ impl BaseRenderGraphIntermediateState {
                 graph,
                 self.color,
                 self.resolve,
-                self.depth,
+                self.depth.set_mips(0..1),
                 self.forward_uniform_bg,
                 samples,
             );
@@ -406,7 +406,7 @@ impl BaseRenderGraphIntermediateState {
             samples,
             color: Some(self.color),
             resolve: self.resolve,
-            depth: self.depth,
+            depth: self.depth.set_mips(0..1),
             data: 0,
         });
     }

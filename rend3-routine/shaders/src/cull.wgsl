@@ -50,7 +50,7 @@ fn execute_culling(
     let det = determinant(mat3x3<f32>(position0.xyw, position1.xyw, position2.xyw));
 
     if det <= 0.0 {
-        // return true;
+        return false;
     }
 
     let ndc0 = position0.xyz / position0.w;
@@ -67,11 +67,13 @@ fn execute_culling(
     let misses_pixel_center = any(round(min_screen_xy) == round(max_screen_xy));
 
     if misses_pixel_center {
-        // return true;
+        return false;
     }
 
-    let min_tex_coords = (min_ndc_xy + 1.0) / 2.0;
-    let max_tex_coords = (max_ndc_xy + 1.0) / 2.0;
+    var min_tex_coords = (min_ndc_xy + 1.0) / 2.0;
+    var max_tex_coords = (max_ndc_xy + 1.0) / 2.0;
+    min_tex_coords.y = 1.0 - min_tex_coords.y;
+    max_tex_coords.y = 1.0 - max_tex_coords.y;
 
     let uv = (max_tex_coords + min_tex_coords) / 2.0;
     let edges = max_screen_xy - min_screen_xy;
