@@ -34,7 +34,7 @@ rend3-anim = { version = "^0.3.0", path = "../../rend3-anim" }
 # Import gltf models
 rend3-gltf = { version = "^0.3.0", path = "../../rend3-gltf" }
 # windowing
-winit = "0.27"
+winit = "0.28"
 image = { version = "0.24", default-features = false, features = ["jpeg"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
