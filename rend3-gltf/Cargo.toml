@@ -32,4 +32,4 @@ rustc-hash = "1"
 thiserror = "1"
 
 [dev-dependencies]
-pollster = "0.2"
+pollster = "0.3"

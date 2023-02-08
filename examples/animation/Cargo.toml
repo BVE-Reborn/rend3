@@ -22,7 +22,7 @@ glam = "0.22"
 # std::time::Instant that works on wasm
 instant = "0.1"
 # block on async functions
-pollster = "0.2"
+pollster = "0.3"
 # Renderer core
 rend3 = { version = "^0.3.0", path = "../../rend3" }
 # Programmable render list that dictates how the scene renders
