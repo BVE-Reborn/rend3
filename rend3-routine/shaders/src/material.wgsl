@@ -1,18 +1,18 @@
-let FLAGS_ALBEDO_ACTIVE: u32        = 0x0001u; 
-let FLAGS_ALBEDO_BLEND: u32         = 0x0002u; 
-let FLAGS_ALBEDO_VERTEX_SRGB: u32   = 0x0004u; 
-let FLAGS_BICOMPONENT_NORMAL: u32   = 0x0008u; 
-let FLAGS_SWIZZLED_NORMAL: u32      = 0x0010u; 
-let FLAGS_YDOWN_NORMAL: u32         = 0x0020u; 
-let FLAGS_AOMR_COMBINED: u32        = 0x0040u; 
-let FLAGS_AOMR_SWIZZLED_SPLIT: u32  = 0x0080u; 
-let FLAGS_AOMR_SPLIT: u32           = 0x0100u; 
-let FLAGS_AOMR_BW_SPLIT: u32        = 0x0200u; 
-let FLAGS_CC_GLTF_COMBINED: u32     = 0x0400u; 
-let FLAGS_CC_GLTF_SPLIT: u32        = 0x0800u; 
-let FLAGS_CC_BW_SPLIT: u32          = 0x1000u; 
-let FLAGS_UNLIT: u32                = 0x2000u; 
-let FLAGS_NEAREST: u32              = 0x4000u; 
+const FLAGS_ALBEDO_ACTIVE: u32        = 0x0001u;
+const FLAGS_ALBEDO_BLEND: u32         = 0x0002u;
+const FLAGS_ALBEDO_VERTEX_SRGB: u32   = 0x0004u;
+const FLAGS_BICOMPONENT_NORMAL: u32   = 0x0008u;
+const FLAGS_SWIZZLED_NORMAL: u32      = 0x0010u;
+const FLAGS_YDOWN_NORMAL: u32         = 0x0020u;
+const FLAGS_AOMR_COMBINED: u32        = 0x0040u;
+const FLAGS_AOMR_SWIZZLED_SPLIT: u32  = 0x0080u;
+const FLAGS_AOMR_SPLIT: u32           = 0x0100u;
+const FLAGS_AOMR_BW_SPLIT: u32        = 0x0200u;
+const FLAGS_CC_GLTF_COMBINED: u32     = 0x0400u;
+const FLAGS_CC_GLTF_SPLIT: u32        = 0x0800u;
+const FLAGS_CC_BW_SPLIT: u32          = 0x1000u;
+const FLAGS_UNLIT: u32                = 0x2000u;
+const FLAGS_NEAREST: u32              = 0x4000u;
 
 fn extract_material_flag(data: u32, flag: u32) -> bool {
     return bool(data & flag);

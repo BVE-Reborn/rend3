@@ -193,6 +193,7 @@ fn create_shadow_texture(device: &Device, size: UVec2) -> TextureView {
         dimension: TextureDimension::D2,
         format: INTERNAL_SHADOW_DEPTH_FORMAT,
         usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
+        view_formats: &[],
     });
 
     texture.create_view(&TextureViewDescriptor {

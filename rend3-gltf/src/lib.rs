@@ -28,6 +28,7 @@ use std::{
     sync::Arc,
 };
 
+use base64::Engine;
 use glam::{Mat3, Mat4, Quat, UVec2, Vec2, Vec3, Vec4};
 use gltf::buffer::Source;
 use rend3::{
@@ -259,7 +260,7 @@ pub fn try_load_base64(uri: &str) -> Option<Vec<u8>> {
     log::info!("loading {} bytes of base64 data", data.len());
     profiling::scope!("decoding base64 uri");
     // TODO: errors
-    Some(base64::decode(data).unwrap())
+    Some(base64::prelude::BASE64_STANDARD.decode(data).unwrap())
 }
 
 /// Default implementation of [`load_gltf`]'s `io_func` that loads from the
