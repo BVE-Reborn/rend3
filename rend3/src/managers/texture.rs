@@ -106,7 +106,7 @@ impl<T: 'static> TextureManager<T> {
             dimension: TextureDimension::D2,
             format: texture.format,
             usage: TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_SRC | TextureUsages::COPY_DST,
-            view_formats: &[]
+            view_formats: &[],
         };
 
         let (buffer, tex) = match texture.mip_source {
@@ -370,7 +370,7 @@ fn create_null_tex_view(device: &Device, dimension: TextureViewDimension) -> Tex
             },
             format: TextureFormat::R8Unorm,
             usage: TextureUsages::TEXTURE_BINDING,
-            view_formats: &[]
+            view_formats: &[],
         })
         .create_view(&TextureViewDescriptor {
             dimension: Some(dimension),

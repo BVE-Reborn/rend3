@@ -21,7 +21,7 @@ pub fn configure_surface(
             height: size.y,
             present_mode,
             alpha_mode: CompositeAlphaMode::Auto,
-            view_formats: vec![]
+            view_formats: vec![],
         },
     )
 }
