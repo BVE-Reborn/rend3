@@ -33,7 +33,7 @@ tracy = ["profiling/profile-with-tracy", "tracy-client"]
 anyhow = "1"
 cfg-if = "1"
 glam = "0.22"
-histogram = "0.6"
+histogram = "0.7"
 image = { version = "0.24", default-features = false, features = ["png", "jpeg", "tiff"]}
 indoc = "2"
 instant = { version = "0.1", features = ["wasm-bindgen"] }
