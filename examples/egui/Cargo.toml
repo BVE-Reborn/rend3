@@ -19,7 +19,7 @@ egui-winit = { version = "0.21", default-features = false, features = ["links", 
 # logging
 env_logger = { version = "0.10", default-features = false, features = ["auto-color", "humantime"] }
 # Linear algebra library
-glam = "0.22"
+glam = "0.23"
 # Importing png's
 image = { version = "0.24.3", default-features = false, features = ["png"] }
 # Portable implementation of Instant.

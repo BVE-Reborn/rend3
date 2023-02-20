@@ -18,7 +18,7 @@ path = "src/main.rs"
 # logging
 env_logger = { version = "0.10", default-features = false, features = ["auto-color", "humantime"] }
 # Linear algebra library
-glam = "0.22"
+glam = "0.23"
 # std::time::Instant that works on wasm
 instant = "0.1"
 # block on async functions

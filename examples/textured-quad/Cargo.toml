@@ -17,7 +17,7 @@ path = "src/main.rs"
 # logging
 env_logger = { version = "0.10", default-features = false, features = ["auto-color", "humantime"] }
 # Linear algebra library
-glam = "0.22"
+glam = "0.23"
 # Renderer core
 rend3 = { version = "^0.3.0", path = "../../rend3" }
 # Framework that deals with the event loop, setting up the renderer, and platform differences.

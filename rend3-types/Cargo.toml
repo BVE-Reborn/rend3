@@ -15,7 +15,7 @@ rust-version = "1.65"
 bitflags = "1"
 bytemuck = "1"
 encase = { version = "0.4", features = ["glam"] }
-glam = { version = "0.22", features = ["bytemuck"] }
+glam = { version = "0.23", features = ["bytemuck"] }
 list-any = "0.2"
 once_cell = "1"
 thiserror = "1"
