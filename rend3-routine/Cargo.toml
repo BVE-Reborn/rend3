@@ -15,7 +15,7 @@ rust-version = "1.65"
 arrayvec = "0.7"
 bitflags = "1"
 bytemuck = "1"
-encase = { version = "0.4", features = ["glam"] }
+encase = { version = "0.5", features = ["glam"] }
 flume = "0.10"
 glam = { version = "0.22.0", features = ["bytemuck"] }
 log = "0.4"
