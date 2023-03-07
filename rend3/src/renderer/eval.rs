@@ -154,6 +154,7 @@ pub fn evaluate_instructions(renderer: &Renderer) -> InstructionEvaluationOutput
                     data_core.material_manager.remove(handle)
                 }
                 InstructionKind::DeleteObject { handle } => {
+                    log::info!("Object {idx} deallocated", idx = handle.idx);
                     renderer.resource_handle_allocators.object.deallocate(handle);
                     data_core.object_manager.remove(handle)
                 }

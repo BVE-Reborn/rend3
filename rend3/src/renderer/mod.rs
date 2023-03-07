@@ -274,6 +274,7 @@ impl Renderer {
     #[track_caller]
     pub fn add_object(self: &Arc<Self>, object: Object) -> ObjectHandle {
         let handle = self.resource_handle_allocators.object.allocate(self);
+        log::info!("Object {idx} allocated", idx = handle.idx);
         self.instructions.push(
             InstructionKind::AddObject {
                 handle: handle.clone(),
@@ -305,6 +306,7 @@ impl Renderer {
     /// Move the given object to a new transform location.
     #[track_caller]
     pub fn set_object_transform(&self, handle: &ObjectHandle, transform: Mat4) {
+        log::info!("Object {idx} allocate set transform", idx = handle.idx);
         self.instructions.push(
             InstructionKind::SetObjectTransform {
                 handle: handle.get_raw(),

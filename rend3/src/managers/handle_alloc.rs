@@ -1,4 +1,5 @@
 use std::{
+    any::TypeId,
     marker::PhantomData,
     panic::Location,
     sync::{
@@ -8,7 +9,7 @@ use std::{
 };
 
 use parking_lot::Mutex;
-use rend3_types::{RawResourceHandle, ResourceHandle};
+use rend3_types::{Object, RawResourceHandle, ResourceHandle};
 
 use crate::{instruction::DeletableRawResourceHandle, Renderer};
 
@@ -23,7 +24,7 @@ where
 
 impl<T> HandleAllocator<T>
 where
-    RawResourceHandle<T>: DeletableRawResourceHandle,
+    RawResourceHandle<T>: DeletableRawResourceHandle + 'static,
 {
     pub fn new() -> Self {
         Self {
@@ -39,6 +40,10 @@ where
 
         let renderer = Arc::clone(renderer);
         let destroy_fn = move |handle: RawResourceHandle<T>| {
+            if TypeId::of::<T>() == TypeId::of::<Object>() {
+                log::info!("Object {idx} drop impl", idx = handle.idx);
+            }
+
             renderer
                 .instructions
                 .push(handle.into_delete_instruction_kind(), *Location::caller())
@@ -55,7 +60,7 @@ where
 
 impl<T> Default for HandleAllocator<T>
 where
-    RawResourceHandle<T>: DeletableRawResourceHandle,
+    RawResourceHandle<T>: DeletableRawResourceHandle + 'static,
 {
     fn default() -> Self {
         Self::new()

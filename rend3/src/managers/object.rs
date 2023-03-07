@@ -234,6 +234,8 @@ pub(super) struct ObjectAddCallbackArgs<'a> {
 }
 
 pub(super) fn object_add_callback<M: Material>(_material: &M, args: ObjectAddCallbackArgs<'_>) {
+    log::info!("Object {idx} add", idx = args.handle.idx);
+
     // Make sure all required attributes are in the mesh and the supported attribute list.
     for &required_attribute in M::required_attributes().into_iter() {
         // We can just directly use the internal mesh, as every attribute in the skeleton is also in the mesh.
@@ -314,6 +316,8 @@ fn set_object_transform<M: Material>(
     idx: usize,
     transform: Mat4,
 ) {
+    log::info!("Object {idx} set transform");
+
     let data_vec = data.downcast_slice_mut::<Option<InternalObject<M>>>().unwrap();
 
     let object = data_vec[idx].as_mut().unwrap();
@@ -336,6 +340,8 @@ fn duplicate_object<M: Material>(data: &VecAny, idx: usize, change: ObjectChange
 }
 
 fn remove<M: Material>(data: &mut VecAny, idx: usize) {
+    log::info!("Object {idx} remove");
+
     let data_vec = data.downcast_slice_mut::<Option<InternalObject<M>>>().unwrap();
 
     data_vec[idx] = None;
@@ -352,7 +358,8 @@ fn evaluate<M: Material>(
         .downcast_slice::<Option<InternalObject<M>>>()
         .unwrap();
 
-    archetype
-        .buffer
-        .apply(device, encoder, scatter, |idx| data_vec[idx].as_ref().unwrap().inner)
+    archetype.buffer.apply(device, encoder, scatter, |idx| {
+        log::info!("Object {idx} update gpu buffer");
+        data_vec[idx].as_ref().unwrap().inner
+    })
 }
