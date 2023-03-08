@@ -6,7 +6,7 @@ use encase::ShaderType;
 use glam::{Mat4, Vec3, Vec3A, Vec4Swizzles};
 
 /// Represents a point in space and a radius from that point.
-#[derive(Debug, Clone, Copy, ShaderType)]
+#[derive(Debug, Default, Clone, Copy, ShaderType)]
 pub struct BoundingSphere {
     pub center: Vec3,
     pub radius: f32,
