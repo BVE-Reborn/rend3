@@ -1,5 +1,6 @@
 use std::{any::TypeId, ops::Range};
 
+use bytemuck::Zeroable;
 use encase::ShaderType;
 use glam::{Mat4, Vec3A};
 use list_any::VecAny;
@@ -30,6 +31,19 @@ pub struct ShaderObject<M: Material> {
     pub material_index: u32,
     pub vertex_attribute_start_offsets:
         <M::SupportedAttributeArrayType as MaterialArray<&'static VertexAttributeId>>::U32Array,
+}
+
+impl<M: Material> Default for ShaderObject<M> {
+    fn default() -> Self {
+        Self {
+            transform: Default::default(),
+            bounding_sphere: Default::default(),
+            first_index: Default::default(),
+            index_count: Default::default(),
+            material_index: Default::default(),
+            vertex_attribute_start_offsets: Zeroable::zeroed(),
+        }
+    }
 }
 
 // Manual impl so that M: !Copy
@@ -352,7 +366,7 @@ fn evaluate<M: Material>(
         .downcast_slice::<Option<InternalObject<M>>>()
         .unwrap();
 
-    archetype
-        .buffer
-        .apply(device, encoder, scatter, |idx| data_vec[idx].as_ref().unwrap().inner)
+    archetype.buffer.apply(device, encoder, scatter, |idx| {
+        data_vec[idx].as_ref().map(|o| o.inner).unwrap_or_default()
+    })
 }
