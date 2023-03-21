@@ -11,26 +11,23 @@ fn vs_main(@builtin(vertex_index) id: u32) -> VertexOutput {
     let resolution = vec2<f32>(textureDimensions(source));
     var output: VertexOutput;
     output.position = vec4<f32>(f32(id / 2u) * 4.0 - 1.0, f32(id % 2u) * 4.0 - 1.0, 0.0, 1.0);
-    output.tex_coords = vec2<f32>(f32(id / 2u) * 2.0, 1.0 - (f32(id % 2u) * 2.0)) * resolution - 0.5;
+    output.tex_coords = vec2<f32>(f32(id / 2u) * 2.0, 1.0 - (f32(id % 2u) * 2.0)) * resolution;
     return output;
 }
 
 @fragment
 fn fs_main(vout: VertexOutput) -> @builtin(frag_depth) f32 {
-    let down = floor(vout.tex_coords);
-    let up = ceil(vout.tex_coords);
+    let dir = vec2<f32>(dpdx(vout.tex_coords.x), dpdy(vout.tex_coords.y)) * 0.5;
 
-    let top_left = vec2<f32>(down.x, down.y);
-    let top_right = vec2<f32>(up.x, down.y);
-    let bottom_left = vec2<f32>(down.x, up.y);
-    let bottom_right = vec2<f32>(up.x, up.y);
+    let down = floor(vout.tex_coords - dir);
+    let up = ceil(vout.tex_coords + dir);
 
-    let top_left_value = textureLoad(source, vec2<u32>(top_left), 0);
-    let top_right_value = textureLoad(source, vec2<u32>(top_right), 0);
-    let bottom_left_value = textureLoad(source, vec2<u32>(bottom_left), 0);
-    let bottom_right_value = textureLoad(source, vec2<u32>(bottom_right), 0);
+    var nearest = 1.0;
+    for (var x = down.x; x < up.x; x += 1.0) {
+        for (var y = down.y; y < up.y; y += 1.0) {
+            nearest = min(nearest, textureLoad(source, vec2<u32>(u32(x), u32(y)), 0));
+        }
+    }
 
-    let min = min(min(top_left_value, top_right_value), min(bottom_left_value, bottom_right_value));
-
-    return min;
+    return nearest;
 }
