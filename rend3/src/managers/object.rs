@@ -67,8 +67,10 @@ impl<M: Material> Clone for ShaderObject<M> {
 pub struct InternalObject<M: Material> {
     pub mesh_kind: ObjectMeshKind,
     pub material_handle: MaterialHandle,
+
     /// World space
     pub location: Vec3A,
+    pub mesh_bounding_sphere: BoundingSphere,
     pub inner: ShaderObject<M>,
 }
 
@@ -77,6 +79,7 @@ impl<M: Material> Clone for InternalObject<M> {
     fn clone(&self) -> Self {
         Self {
             mesh_kind: self.mesh_kind.clone(),
+            mesh_bounding_sphere: self.mesh_bounding_sphere.clone(),
             material_handle: self.material_handle.clone(),
             location: self.location,
             inner: self.inner,
@@ -288,14 +291,13 @@ pub(super) fn object_add_callback<M: Material>(_material: &M, args: ObjectAddCal
     });
 
     // Transform the bounding sphere from model to world space.
-    let bounding_sphere = args
-        .internal_mesh
-        .bounding_sphere
-        .apply_transform(args.object.transform);
+    let mesh_bounding_sphere = args.internal_mesh.bounding_sphere;
+    let bounding_sphere = mesh_bounding_sphere.apply_transform(args.object.transform);
     let index_range = args.internal_mesh.index_range.clone();
 
     let internal_object = InternalObject::<M> {
         location: bounding_sphere.center.into(),
+        mesh_bounding_sphere,
         inner: ShaderObject {
             material_index: args.object.material.idx as u32,
             transform: args.object.transform,
@@ -332,6 +334,7 @@ fn set_object_transform<M: Material>(
 
     let object = data_vec[idx].as_mut().unwrap();
     object.inner.transform = transform;
+    object.inner.bounding_sphere = object.mesh_bounding_sphere.apply_transform(transform);
     object.location = transform.transform_point3a(Vec3A::ZERO);
 
     buffer.use_index(idx);
