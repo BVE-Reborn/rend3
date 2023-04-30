@@ -37,6 +37,28 @@ var<workgroup> workgroup_object_range: ObjectRangeIndex;
 // 256 workgroup size / 32 bits
 var<workgroup> culling_results: array<atomic<u32>, 8>;
 
+fn textureSampleMin(texture: texture_depth_2d, uv: vec2<f32>, mipmap: f32) -> f32 {
+    let int_mipmap = i32(mipmap);
+    let mip_resolution = vec2<f32>(textureDimensions(texture, int_mipmap).xy);
+
+    let pixel_coords = uv * mip_resolution - 0.5;
+
+    let low = vec2<u32>(max(floor(pixel_coords), vec2<f32>(0.0)));
+    let high = vec2<u32>(min(ceil(pixel_coords), mip_resolution - 1.0));
+
+    let top_left = vec2<u32>(low.x, low.y);
+    let top_right = vec2<u32>(high.x, low.y);
+    let bottom_left = vec2<u32>(low.x, high.y);
+    let bottom_right = vec2<u32>(high.x, high.y);
+
+    var minval = 1.0;
+    minval = min(minval, textureLoad(texture, top_left, int_mipmap));
+    minval = min(minval, textureLoad(texture, top_right, int_mipmap));
+    minval = min(minval, textureLoad(texture, bottom_left, int_mipmap));
+    minval = min(minval, textureLoad(texture, bottom_right, int_mipmap));
+    return minval;
+}
+
 fn execute_culling(
     model_view_proj: mat4x4<f32>,
     model_position0: vec3<f32>,
@@ -77,11 +99,12 @@ fn execute_culling(
 
     let uv = (max_tex_coords + min_tex_coords) / 2.0;
     let edges = max_screen_xy - min_screen_xy;
+
     let longest_edge = max(edges.x, edges.y);
     let mip = ceil(log2(max(longest_edge, 1.0)));
 
     let depth = max(max(ndc0.z, ndc1.z), ndc2.z);
-    let occlusion_depth = textureSampleLevel(hirearchical_z_buffer, nearest_sampler, uv, mip);
+    let occlusion_depth = textureSampleMin(hirearchical_z_buffer, uv, mip);
 
     if depth < occlusion_depth {
         return false;
