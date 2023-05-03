@@ -233,7 +233,7 @@ impl BaseRenderGraphIntermediateState {
     }
 
     pub fn skinning<'node>(&self, graph: &mut RenderGraph<'node>, base: &'node BaseRenderGraph) {
-        crate::skinning::add_skinning_to_graph(graph, &base.gpu_skinner);
+        skinning::add_skinning_to_graph(graph, &base.gpu_skinner);
     }
 
     /// Does all culling for the forward PBR materials.
@@ -243,7 +243,7 @@ impl BaseRenderGraphIntermediateState {
     }
 
     /// Clear all the targets to their needed values
-    pub fn clear<'node>(&self, graph: &mut RenderGraph<'node>, clear_color: Vec4) {
+    pub fn clear(&self, graph: &mut RenderGraph<'_>, clear_color: Vec4) {
         crate::clear::add_clear_to_graph(graph, self.color, self.resolve, self.depth, clear_color, 0.0);
     }
 

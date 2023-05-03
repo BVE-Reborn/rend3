@@ -24,7 +24,7 @@ use crate::{
 pub struct ShaderObject<M: Material> {
     /// Model -> World matrix
     pub transform: Mat4,
-    /// Boudning sphere in world space.
+    /// Bounding sphere in world space.
     pub bounding_sphere: BoundingSphere,
     pub first_index: u32,
     pub index_count: u32,
