@@ -67,7 +67,7 @@ impl CullingBufferMap {
         camera: Option<usize>,
         mut sizes: CullingBuffers<u64>,
     ) -> &CullingBuffers<Arc<Buffer>> {
-        sizes.object_reference = round_up(sizes.object_reference.max(1), BATCH_DATA_ROUNDING_SIZE);
+        sizes.current_object_reference = round_up(sizes.current_object_reference.max(1), BATCH_DATA_ROUNDING_SIZE);
         sizes.primary_index = round_up(sizes.primary_index.max(1), OUTPUT_BUFFER_ROUNDING_SIZE);
 
         match self.inner.entry(camera) {
@@ -79,9 +79,12 @@ impl CullingBufferMap {
                 // propogate back.
                 mem::swap(&mut b.previous_culling_results, &mut b.current_culling_results);
                 sizes.previous_culling_results = b.previous_culling_results.size();
+                mem::swap(&mut b.previous_object_reference, &mut b.current_object_reference);
+                sizes.previous_object_reference = b.previous_object_reference.size();
 
                 let current_size = CullingBuffers {
-                    object_reference: b.object_reference.size(),
+                    previous_object_reference: b.previous_object_reference.size(),
+                    current_object_reference: b.current_object_reference.size(),
                     primary_index: b.primary_index.size(),
                     secondary_index: b.secondary_index.size(),
                     primary_draw_call: b.primary_draw_call.size(),
@@ -97,7 +100,14 @@ impl CullingBufferMap {
                         &b.previous_culling_results,
                         0,
                         current_size.previous_culling_results,
-                    )
+                    );
+                    encoder.copy_buffer_to_buffer(
+                        &old_bufs.previous_object_reference,
+                        0,
+                        &b.previous_object_reference,
+                        0,
+                        current_size.previous_object_reference,
+                    );
                 }
                 b
             }
@@ -108,7 +118,8 @@ impl CullingBufferMap {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct CullingBuffers<T> {
-    pub object_reference: T,
+    pub previous_object_reference: T,
+    pub current_object_reference: T,
     pub primary_index: T,
     pub secondary_index: T,
     pub primary_draw_call: T,
@@ -120,9 +131,15 @@ pub struct CullingBuffers<T> {
 impl CullingBuffers<Arc<Buffer>> {
     pub fn new(device: &Device, sizes: CullingBuffers<u64>) -> Self {
         CullingBuffers {
-            object_reference: Arc::new(device.create_buffer(&BufferDescriptor {
+            previous_object_reference: Arc::new(device.create_buffer(&BufferDescriptor {
                 label: None,
-                size: sizes.object_reference,
+                size: sizes.previous_object_reference,
+                usage: BufferUsages::STORAGE | BufferUsages::COPY_SRC | BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            })),
+            current_object_reference: Arc::new(device.create_buffer(&BufferDescriptor {
+                label: None,
+                size: sizes.current_object_reference,
                 usage: BufferUsages::STORAGE | BufferUsages::COPY_SRC | BufferUsages::COPY_DST,
                 mapped_at_creation: false,
             })),
@@ -583,7 +600,8 @@ impl GpuCuller {
                 encoder,
                 camera_idx,
                 CullingBuffers {
-                    object_reference: jobs.jobs.size().get(),
+                    previous_object_reference: jobs.jobs.size().get(),
+                    current_object_reference: jobs.jobs.size().get(),
                     // RA is getting totally weird with the call to max, thinking it's a call to Iter::max
                     // this makes the errors go away.
                     primary_index: <u64 as Ord>::max(total_invocations as u64 * 3 * 4, 4),
@@ -619,7 +637,7 @@ impl GpuCuller {
             let mut buffer = ctx
                 .renderer
                 .queue
-                .write_buffer_with(&buffers.object_reference, 0, jobs.jobs.size())
+                .write_buffer_with(&buffers.current_object_reference, 0, jobs.jobs.size())
                 .unwrap();
             StorageBuffer::new(&mut *buffer).write(&jobs.jobs).unwrap();
         }
@@ -641,7 +659,7 @@ impl GpuCuller {
                 BindGroupEntry {
                     binding: 2,
                     resource: BindingResource::Buffer(BufferBinding {
-                        buffer: &buffers.object_reference,
+                        buffer: &buffers.current_object_reference,
                         offset: 0,
                         size: Some(ShaderBatchData::SHADER_SIZE),
                     }),

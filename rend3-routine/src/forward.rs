@@ -195,13 +195,23 @@ impl<M: Material> ForwardRoutine<M> {
             };
             let culled = ctx.temps.add(culled.clone());
 
+            let index_buffer;
+            let indirect_buffer;
+            let object_reference;
+            if secondary {
+                index_buffer = culled.buffers.secondary_index.slice(..);
+                indirect_buffer = &culled.buffers.secondary_draw_call;
+                object_reference = &culled.buffers.current_object_reference;
+            } else {
+                index_buffer = culled.buffers.primary_index.slice(..);
+                indirect_buffer = &culled.buffers.primary_draw_call;
+                object_reference = &culled.buffers.previous_object_reference;
+            }
+
             let per_material_bg = ctx.temps.add(
                 BindGroupBuilder::new()
                     .append_buffer(ctx.data_core.object_manager.buffer::<M>().unwrap())
-                    .append_buffer_with_size(
-                        &culled.buffers.object_reference,
-                        culling::ShaderBatchData::SHADER_SIZE.get(),
-                    )
+                    .append_buffer_with_size(object_reference, culling::ShaderBatchData::SHADER_SIZE.get())
                     .append_buffer(&ctx.eval_output.mesh_buffer)
                     .append_buffer(&culled.per_camera_uniform)
                     .append_buffer(ctx.data_core.material_manager.archetype_view::<M>().buffer())
@@ -212,16 +222,6 @@ impl<M: Material> ForwardRoutine<M> {
                 SampleCount::One => &self.pipeline_s1,
                 SampleCount::Four => &self.pipeline_s4,
             };
-
-            let index_buffer;
-            let indirect_buffer;
-            if secondary {
-                index_buffer = culled.buffers.secondary_index.slice(..);
-                indirect_buffer = &culled.buffers.secondary_draw_call;
-            } else {
-                index_buffer = culled.buffers.primary_index.slice(..);
-                indirect_buffer = &culled.buffers.primary_draw_call;
-            }
             rpass.set_index_buffer(index_buffer, IndexFormat::Uint32);
             rpass.set_pipeline(pipeline);
             rpass.set_bind_group(0, whole_frame_uniform_bg, &[]);
