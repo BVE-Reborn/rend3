@@ -48,3 +48,5 @@ lto = "thin"
 # wgpu-core = { path = "../wgpu/wgpu-core" }
 # wgpu-hal = { path = "../wgpu/wgpu-hal" }
 # wgpu-types = { path = "../wgpu/wgpu-types" }
+
+wasm-bindgen = { git = "https://github.com/Rob2309/wasm-bindgen/", branch = "wasi-abi" }

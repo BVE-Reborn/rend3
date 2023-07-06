@@ -6,7 +6,7 @@ use thiserror::Error;
 #[derive(Debug, Error)]
 pub enum AssetError {
     #[error("Could not read {path} from disk")]
-    #[cfg(not(target_arch = "wasm32"))]
+    #[cfg(any(not(target_arch = "wasm32"), target_os = "wasi"))]
     FileError {
         path: SsoString,
         #[source]
@@ -46,8 +46,10 @@ pub struct AssetLoader {
 impl AssetLoader {
     pub fn new_local(_base_file: &str, _base_asset: &str, _base_url: &str) -> Self {
         cfg_if::cfg_if!(
-            if #[cfg(target_arch = "wasm32")] {
+            if #[cfg(all(target_arch = "wasm32", not(target_os = "wasi")))] {
                 let base = _base_url;
+            } else if #[cfg(target_arch = "wasm32")] {
+                let base = "/";
             } else if #[cfg(target_os = "android")] {
                 let base = _base_asset;
             } else {
@@ -64,7 +66,16 @@ impl AssetLoader {
         path.get_path(&self.base)
     }
 
-    #[cfg(all(not(target_arch = "wasm32"), not(target_os = "android")))]
+    #[cfg(all(not(target_arch = "wasm32"), not(target_os = "android"), not(target_os = "wasi")))]
+    pub async fn get_asset(&self, path: AssetPath<'_>) -> Result<Vec<u8>, AssetError> {
+        let full_path = path.get_path(&self.base);
+        std::fs::read(&*full_path).map_err(|error| AssetError::FileError {
+            path: SsoString::from(full_path),
+            error,
+        })
+    }
+
+    #[cfg(all(target_arch = "wasm32", target_os = "wasi"))]
     pub async fn get_asset(&self, path: AssetPath<'_>) -> Result<Vec<u8>, AssetError> {
         let full_path = path.get_path(&self.base);
         std::fs::read(&*full_path).map_err(|error| AssetError::FileError {
@@ -96,7 +107,7 @@ impl AssetLoader {
             })
     }
 
-    #[cfg(target_arch = "wasm32")]
+    #[cfg(all(target_arch = "wasm32", not(target_os = "wasi")))]
     pub async fn get_asset(&self, path: AssetPath<'_>) -> Result<Vec<u8>, AssetError> {
         let full_path = path.get_path(&self.base);
         let response = reqwest::get(&*full_path)
