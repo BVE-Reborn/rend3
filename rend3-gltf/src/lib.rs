@@ -971,10 +971,10 @@ where
                 gltf::material::AlphaMode::Blend => pbr::Transparency::Blend,
             },
             normal: match normals_tex {
-                Some(tex) if tex.format.describe().components == 2 => {
+                Some(tex) if util::format_components(tex.format) == Some(2) => {
                     pbr::NormalTexture::Bicomponent(tex.handle, settings.normal_direction)
                 }
-                Some(tex) if tex.format.describe().components >= 3 => {
+                Some(tex) if util::format_components(tex.format) >= Some(3) => {
                     pbr::NormalTexture::Tricomponent(tex.handle, settings.normal_direction)
                 }
                 _ => pbr::NormalTexture::None,
@@ -986,7 +986,7 @@ where
                 (mr, ao)
                     if ao
                         .as_ref()
-                        .map(|ao| ao.format.describe().components < 3)
+                        .map(|ao| util::format_components(ao.format).map_or(false, |v| v < 3))
                         .unwrap_or(false) =>
                 {
                     pbr::AoMRTextures::Split {
@@ -1115,8 +1115,7 @@ where
             return Err(GltfLoadError::TextureTooManyLayers(uri.take().unwrap()));
         }
 
-        let describe = format.describe();
-        let guaranteed_format = describe.guaranteed_format_features;
+        let guaranteed_format = format.guaranteed_format_features(Default::default());
         let generate = header.level_count == 1
             && guaranteed_format
                 .flags
@@ -1174,7 +1173,7 @@ where
                 return Err(GltfLoadError::TextureZeroLevels(uri.take().unwrap()));
             }
 
-            let guaranteed_format = format.describe().guaranteed_format_features;
+            let guaranteed_format = format.guaranteed_format_features(Default::default());
             let generate = dds.get_num_mipmap_levels() == 1
                 && guaranteed_format
                     .flags
@@ -1434,7 +1433,7 @@ pub mod util {
             k2F::BC5_UNORM_BLOCK => r3F::Bc5RgUnorm,
             k2F::BC5_SNORM_BLOCK => r3F::Bc5RgSnorm,
             k2F::BC6H_UFLOAT_BLOCK => r3F::Bc6hRgbUfloat,
-            k2F::BC6H_SFLOAT_BLOCK => r3F::Bc6hRgbSfloat,
+            k2F::BC6H_SFLOAT_BLOCK => r3F::Bc6hRgbFloat,
             k2F::BC7_UNORM_BLOCK | k2F::BC7_SRGB_BLOCK => {
                 if srgb {
                     r3F::Bc7RgbaUnormSrgb
@@ -1757,7 +1756,7 @@ pub mod util {
             | d3F::B8G8R8X8_Typeless
             | d3F::B8G8R8X8_UNorm_sRGB => return None,
             d3F::BC6H_Typeless | d3F::BC6H_UF16 => r3F::Bc6hRgbUfloat,
-            d3F::BC6H_SF16 => r3F::Bc6hRgbSfloat,
+            d3F::BC6H_SF16 => r3F::Bc6hRgbFloat,
             d3F::BC7_Typeless | d3F::BC7_UNorm | d3F::BC7_UNorm_sRGB => {
                 if srgb {
                     r3F::Bc7RgbaUnormSrgb
@@ -1786,5 +1785,66 @@ pub mod util {
             | d3F::V408
             | d3F::Force_UInt => return None,
         })
+    }
+
+    pub fn format_components(tex: types::TextureFormat) -> Option<u8> {
+        use types::TextureFormat as r3F;
+
+        match tex {
+            r3F::R8Unorm
+            | r3F::R8Snorm
+            | r3F::R8Uint
+            | r3F::R8Sint
+            | r3F::R16Uint
+            | r3F::R16Sint
+            | r3F::R16Unorm
+            | r3F::R16Snorm
+            | r3F::R16Float => Some(1),
+            r3F::Rg8Unorm | r3F::Rg8Snorm | r3F::Rg8Uint | r3F::Rg8Sint => Some(2),
+            r3F::R32Uint | r3F::R32Sint | r3F::R32Float => Some(1),
+            r3F::Rg16Uint | r3F::Rg16Sint | r3F::Rg16Unorm | r3F::Rg16Snorm | r3F::Rg16Float => Some(2),
+            r3F::Rgba8Unorm
+            | r3F::Rgba8UnormSrgb
+            | r3F::Rgba8Snorm
+            | r3F::Rgba8Uint
+            | r3F::Rgba8Sint
+            | r3F::Bgra8Unorm
+            | r3F::Bgra8UnormSrgb => Some(4),
+            r3F::Rgb9e5Ufloat => Some(4),
+            r3F::Rgb10a2Unorm => Some(4),
+            r3F::Rg11b10Float => Some(3),
+            r3F::Rg32Uint | r3F::Rg32Sint | r3F::Rg32Float => Some(2),
+            r3F::Rgba16Uint
+            | r3F::Rgba16Sint
+            | r3F::Rgba16Unorm
+            | r3F::Rgba16Snorm
+            | r3F::Rgba16Float
+            | r3F::Rgba32Uint
+            | r3F::Rgba32Sint
+            | r3F::Rgba32Float => Some(4),
+            r3F::Stencil8 => Some(1),
+            r3F::Depth16Unorm => Some(1),
+            r3F::Depth24Plus => Some(1),
+            r3F::Depth24PlusStencil8 => Some(2),
+            r3F::Depth32Float => Some(1),
+            r3F::Depth32FloatStencil8 => Some(2),
+            r3F::Bc1RgbaUnorm => Some(4),
+            r3F::Bc1RgbaUnormSrgb => Some(4),
+            r3F::Bc2RgbaUnorm => Some(4),
+            r3F::Bc2RgbaUnormSrgb => Some(4),
+            r3F::Bc3RgbaUnorm => Some(4),
+            r3F::Bc3RgbaUnormSrgb => Some(4),
+            r3F::Bc4RUnorm | r3F::Bc4RSnorm => Some(1),
+            r3F::Bc5RgUnorm | r3F::Bc5RgSnorm => Some(2),
+            r3F::Bc6hRgbUfloat | r3F::Bc6hRgbFloat => Some(3),
+            r3F::Bc7RgbaUnorm | r3F::Bc7RgbaUnormSrgb => Some(4),
+            r3F::Etc2Rgb8Unorm | r3F::Etc2Rgb8UnormSrgb => Some(3),
+            r3F::Etc2Rgb8A1Unorm | r3F::Etc2Rgb8A1UnormSrgb | r3F::Etc2Rgba8Unorm | r3F::Etc2Rgba8UnormSrgb => Some(4),
+            r3F::EacR11Unorm => Some(1),
+            r3F::EacR11Snorm => Some(1),
+            r3F::EacRg11Unorm => Some(2),
+            r3F::EacRg11Snorm => Some(2),
+            r3F::Astc { block: _, channel: _ } => Some(4),
+        }
     }
 }

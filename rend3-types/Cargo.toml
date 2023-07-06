@@ -19,4 +19,4 @@ glam = { version = "0.22", features = ["bytemuck"] }
 list-any = "0.2"
 once_cell = "1"
 thiserror = "1"
-wgt = { package = "wgpu-types", version = "0.15" }
+wgt = { package = "wgpu-types", version = "0.16" }

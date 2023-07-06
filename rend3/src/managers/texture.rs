@@ -80,7 +80,7 @@ impl<T: 'static> TextureManager<T> {
     ) -> (Option<CommandBuffer>, InternalTexture) {
         validate_texture_format(texture.format);
 
-        let (block_x, block_y) = texture.format.describe().block_dimensions;
+        let (block_x, block_y) = texture.format.block_dimensions();
         let size = Extent3d {
             width: round_up(texture.size.x, block_x as u32),
             height: round_up(texture.size.y, block_y as u32),
@@ -125,7 +125,8 @@ impl<T: 'static> TextureManager<T> {
                 };
                 let tex = renderer.device.create_texture(&desc);
 
-                let format_desc = texture.format.describe();
+                let (block_width, _) = texture.format.block_dimensions();
+                let block_size = texture.format.block_size(None).unwrap();
 
                 // write first level
                 renderer.queue.write_texture(
@@ -138,9 +139,7 @@ impl<T: 'static> TextureManager<T> {
                     &texture.data,
                     ImageDataLayout {
                         offset: 0,
-                        bytes_per_row: NonZeroU32::new(
-                            format_desc.block_size as u32 * (size.width / format_desc.block_dimensions.0 as u32),
-                        ),
+                        bytes_per_row: Some(block_size as u32 * (size.width / block_width as u32)),
                         rows_per_image: None,
                     },
                     size,
@@ -379,8 +378,8 @@ fn create_null_tex_view(device: &Device, dimension: TextureViewDimension) -> Tex
 }
 
 fn validate_texture_format(format: TextureFormat) {
-    let sample_type = format.describe().sample_type;
-    if let TextureSampleType::Float { filterable } = sample_type {
+    let sample_type = format.sample_type(None);
+    if let Some(TextureSampleType::Float { filterable }) = sample_type {
         if !filterable {
             panic!(
                 "Textures formats must allow filtering with a linear filter. {:?} has sample type {:?} which does not.",

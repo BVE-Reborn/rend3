@@ -71,7 +71,7 @@ fn create_sampler(device: &Device, filter: FilterMode, compare: Option<CompareFu
         lod_min_clamp: 0.0,
         lod_max_clamp: 100.0,
         compare,
-        anisotropy_clamp: NonZeroU8::new(16),
+        anisotropy_clamp: 16,
         border_color: None,
     })
 }
