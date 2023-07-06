@@ -70,7 +70,7 @@ fn cs_main(
     let index1 = vertex_buffer[object.first_index + index_1_index];
     let index2 = vertex_buffer[object.first_index + index_2_index];
 
-    output_buffer[(culling_job.base_output_invocation + gid.x) * 3u + 0u] = local_object_index << 24u | index0 & ((1u << 24u) - 1u);
-    output_buffer[(culling_job.base_output_invocation + gid.x) * 3u + 1u] = local_object_index << 24u | index1 & ((1u << 24u) - 1u);
-    output_buffer[(culling_job.base_output_invocation + gid.x) * 3u + 2u] = local_object_index << 24u | index2 & ((1u << 24u) - 1u);
+    output_buffer[(culling_job.base_output_invocation + gid.x) * 3u + 0u] = (local_object_index << 24u) | (index0 & ((1u << 24u) - 1u));
+    output_buffer[(culling_job.base_output_invocation + gid.x) * 3u + 1u] = (local_object_index << 24u) | (index1 & ((1u << 24u) - 1u));
+    output_buffer[(culling_job.base_output_invocation + gid.x) * 3u + 2u] = (local_object_index << 24u) | (index2 & ((1u << 24u) - 1u));
 }
