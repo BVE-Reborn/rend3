@@ -193,7 +193,7 @@ pub(super) fn batch_objects<M: Material>(
                 ..
             },
             handle,
-            object,
+            object, 
         ) in sorted_objects
         {
             let invocation_count = object.inner.index_count / 3;

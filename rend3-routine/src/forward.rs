@@ -170,6 +170,9 @@ impl<M: Material> ForwardRoutine<M> {
         builder.build(move |mut ctx| {
             let rpass = ctx.encoder_or_pass.take_rpass(rpass_handle);
             let whole_frame_uniform_bg = ctx.graph_data.get_data(ctx.temps, whole_frame_uniform_handle).unwrap();
+
+            // If there exists data for the culling handle, that means we are running
+            // after culling has run. This means we are in secondary rendering.
             let base_cull = match cull_handle {
                 Some(handle) => match ctx.graph_data.get_data(ctx.temps, handle) {
                     Some(c) => Some(c),
@@ -195,23 +198,25 @@ impl<M: Material> ForwardRoutine<M> {
             };
             let culled = ctx.temps.add(culled.clone());
 
+            // Counter-intuitively, we need to use the current object reference buffer here
+            // because the buffers either:
+            // - (Primary render) haven't been swapped yet and we want last frame's buffer (which is the current one)
+            // - (Secondary render) have already been swapped and we want this frame's buffer (which is the current one)
+            let object_reference_buffer = &culled.buffers.current_object_reference;
             let index_buffer;
             let indirect_buffer;
-            let object_reference;
             if secondary {
                 index_buffer = culled.buffers.secondary_index.slice(..);
                 indirect_buffer = &culled.buffers.secondary_draw_call;
-                object_reference = &culled.buffers.current_object_reference;
             } else {
                 index_buffer = culled.buffers.primary_index.slice(..);
                 indirect_buffer = &culled.buffers.primary_draw_call;
-                object_reference = &culled.buffers.previous_object_reference;
             }
 
             let per_material_bg = ctx.temps.add(
                 BindGroupBuilder::new()
                     .append_buffer(ctx.data_core.object_manager.buffer::<M>().unwrap())
-                    .append_buffer_with_size(object_reference, culling::ShaderBatchData::SHADER_SIZE.get())
+                    .append_buffer_with_size(object_reference_buffer, culling::ShaderBatchData::SHADER_SIZE.get())
                     .append_buffer(&ctx.eval_output.mesh_buffer)
                     .append_buffer(&culled.per_camera_uniform)
                     .append_buffer(ctx.data_core.material_manager.archetype_view::<M>().buffer())

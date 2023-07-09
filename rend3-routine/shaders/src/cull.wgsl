@@ -245,6 +245,8 @@ fn cs_main(
         primary_output[global_output_invocation * 3u + 0u] = pack_batch_index(batch_object_index, index0);
         primary_output[global_output_invocation * 3u + 1u] = pack_batch_index(batch_object_index, index1);
         primary_output[global_output_invocation * 3u + 2u] = pack_batch_index(batch_object_index, index2);
+
+        // TODO: We assume here that all non-atomic capable triangles are rendered _after_ culling.
     }
 
     atomicOr(&culling_results[lid.x / 32u], u32(passes_culling) << (lid.x % 32u));
