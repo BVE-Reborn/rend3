@@ -49,6 +49,10 @@ struct PerCameraUniform {
     view: mat4x4<f32>,
     // TODO: use less space
     view_proj: mat4x4<f32>,
+    // The index of which shadow caster we are rendering for.
+    //
+    // This will be u32::MAX if we're rendering for a camera, not a shadow map.
+    shadow_index: u32,
     frustum: Frustum,
     resolution: vec2<f32>,
     object_count: u32,

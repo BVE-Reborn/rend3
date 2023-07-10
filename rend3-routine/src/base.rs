@@ -86,7 +86,7 @@ impl BaseRenderGraph {
         state.skinning(graph, self);
 
         // Culling
-        state.pbr_uniform_bake(graph, self, resolution);
+        state.pbr_shadow_uniform_prep(graph, self, resolution);
         state.pbr_shadow_culling(graph, self);
 
         // Depth-only rendering

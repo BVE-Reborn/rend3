@@ -20,12 +20,11 @@ fn fs_main(vout: VertexOutput) -> @builtin(frag_depth) f32 {
     let this_tex_coord = vec2<u32>(vout.position.xy);
     let previous_base_tex_coord = 2u * this_tex_coord;
 
-    let x_count_odd = vout.resolution.x & 1u;
-    let y_count_odd = vout.resolution.y & 1u;
+    let count_odd = vout.resolution & vec2<u32>(1u);
 
     var nearest = 1.0;
-    for (var x = 0u; x < 2u + x_count_odd; x += 1u) {
-        for (var y = 0u; y < 2u + y_count_odd; y += 1u) {
+    for (var x = 0u; x < 2u + count_odd.x; x += 1u) {
+        for (var y = 0u; y < 2u + count_odd.y; y += 1u) {
             nearest = min(nearest, textureLoad(source, previous_base_tex_coord + vec2<u32>(x, y), 0));
         }
     }

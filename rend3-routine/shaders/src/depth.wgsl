@@ -51,7 +51,7 @@ struct VertexOutput {
 }
 
 @vertex
-fn vs_main(@builtin(instance_index) shadow_number: u32, @builtin(vertex_index) vertex_index: u32) -> VertexOutput {
+fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
     if vertex_index == INVALID_VERTEX {
         var vs_out: VertexOutput;
         vs_out.position = vec4<f32>(0.0);

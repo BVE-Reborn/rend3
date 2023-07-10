@@ -189,6 +189,10 @@ struct PerCameraUniform {
     view: Mat4,
     // TODO: use less space
     view_proj: Mat4,
+    // The index of which shadow caster we are rendering for.
+    //
+    // This will be u32::MAX if we're rendering for a camera, not a shadow map.
+    shadow_index: u32,
     frustum: Frustum,
     resolution: Vec2,
     object_count: u32,
@@ -514,6 +518,7 @@ impl GpuCuller {
             let per_camera_data = PerCameraUniform {
                 view: camera.view(),
                 view_proj: camera.view_proj(),
+                shadow_index: camera_idx.unwrap_or(u32::MAX as _) as u32,
                 frustum: camera.world_frustum(),
                 resolution: if camera_idx.is_some() {
                     // TODO: Work around some nonsense
@@ -620,16 +625,8 @@ impl GpuCuller {
             ctx.data_core
                 .graph_storage
                 .get_mut(&self.per_material_buffer_handle)
-                .entry(camera_idx)
-                .or_insert_with(|| {
-                    Arc::new(ctx.renderer.device.create_buffer(&BufferDescriptor {
-                        label: None,
-                        size: ((max_object_count - 1) * PerCameraUniformObjectData::SHADER_SIZE.get())
-                            + PerCameraUniform::min_size().get(),
-                        usage: BufferUsages::STORAGE | BufferUsages::COPY_SRC | BufferUsages::COPY_DST,
-                        mapped_at_creation: false,
-                    }))
-                }),
+                .get(&camera_idx)
+                .unwrap_or_else(|| panic!("No per camera uniform for camera {:?}", camera_idx)),
         );
 
         {
