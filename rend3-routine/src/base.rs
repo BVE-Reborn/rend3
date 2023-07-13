@@ -78,7 +78,7 @@ impl BaseRenderGraph {
     ) {
         // Create intermediate storage
         let state = BaseRenderGraphIntermediateState::new(graph, eval_output, resolution, samples);
-        
+
         // Clear shadow
         state.clear_shadow(graph);
 
@@ -326,7 +326,6 @@ impl BaseRenderGraphIntermediateState {
                     depth: self
                         .shadow
                         .set_viewport(ViewportRect::new(desc.map.offset, UVec2::splat(desc.map.size))),
-                    data: shadow_index as u32,
                 });
             }
         }
@@ -372,7 +371,6 @@ impl BaseRenderGraphIntermediateState {
                 color: Some(self.color),
                 resolve: self.resolve,
                 depth: self.depth.set_mips(0..1),
-                data: 0,
             });
         }
     }
@@ -398,7 +396,6 @@ impl BaseRenderGraphIntermediateState {
                 color: Some(self.color),
                 resolve: self.resolve,
                 depth: self.depth.set_mips(0..1),
-                data: 0,
             });
         }
     }
@@ -422,7 +419,6 @@ impl BaseRenderGraphIntermediateState {
             color: Some(self.color),
             resolve: self.resolve,
             depth: self.depth.set_mips(0..1),
-            data: 0,
         });
     }
 

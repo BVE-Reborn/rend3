@@ -78,8 +78,6 @@ pub struct RoutineAddToGraphArgs<'a, 'node, M> {
     pub resolve: Option<RenderTargetHandle>,
     pub depth: RenderTargetHandle,
     pub camera: Option<usize>,
-    /// TODO: this no longer works
-    pub data: u32,
 }
 
 /// A set of pipelines for rendering a specific combination of a material.
