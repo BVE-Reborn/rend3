@@ -14,5 +14,5 @@ rust-version = "1.65"
 [dependencies]
 imgui = "0.10"
 imgui-wgpu = "0.22"
-glam = "0.22"
+glam = "0.24"
 rend3 = { version = "^0.3.0", path = "../rend3" }
