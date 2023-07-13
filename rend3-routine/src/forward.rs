@@ -138,7 +138,6 @@ impl<M: Material> ForwardRoutine<M> {
     }
 
     /// Add the given routine to the graph with the given settings.
-    #[allow(clippy::too_many_arguments)]
     pub fn add_forward_to_graph<'node>(&'node self, args: RoutineAddToGraphArgs<'_, 'node, M>) {
         let mut builder = args.graph.add_node(args.label);
 

@@ -78,6 +78,9 @@ impl BaseRenderGraph {
     ) {
         // Create intermediate storage
         let state = BaseRenderGraphIntermediateState::new(graph, eval_output, resolution, samples);
+        
+        // Clear shadow
+        state.clear_shadow(graph);
 
         // Preparing and uploading data
         state.create_frame_uniforms(graph, self, ambient, resolution);
@@ -86,7 +89,7 @@ impl BaseRenderGraph {
         state.skinning(graph, self);
 
         // Culling
-        state.pbr_shadow_uniform_prep(graph, self, resolution);
+        state.pbr_shadow_uniform_bake(graph, self, resolution);
         state.pbr_shadow_culling(graph, self);
 
         // Depth-only rendering
@@ -232,7 +235,7 @@ impl BaseRenderGraphIntermediateState {
             resolution,
         );
     }
-    pub fn pbr_shadow_uniform_prep<'node>(
+    pub fn pbr_shadow_uniform_bake<'node>(
         &self,
         graph: &mut RenderGraph<'node>,
         base: &'node BaseRenderGraph,
@@ -282,8 +285,20 @@ impl BaseRenderGraphIntermediateState {
     }
 
     /// Clear all the targets to their needed values
+    pub fn clear_shadow<'node>(&self, graph: &mut RenderGraph<'node>) {
+        crate::clear::add_clear_to_graph(graph, None, None, self.shadow, Vec4::ZERO, 0.0);
+    }
+
+    /// Clear all the targets to their needed values
     pub fn clear<'node>(&self, graph: &mut RenderGraph<'node>, clear_color: Vec4) {
-        crate::clear::add_clear_to_graph(graph, self.color, self.resolve, self.depth.set_mips(0..1), clear_color, 0.0);
+        crate::clear::add_clear_to_graph(
+            graph,
+            Some(self.color),
+            self.resolve,
+            self.depth.set_mips(0..1),
+            clear_color,
+            0.0,
+        );
     }
 
     /// Render all shadows for the PBR materials.

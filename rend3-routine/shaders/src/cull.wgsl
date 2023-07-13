@@ -92,6 +92,10 @@ fn execute_culling(
         return false;
     }
 
+    if per_camera_uniform.shadow_index != 0xFFFFFFFFu {
+        return true;
+    }
+
     var min_tex_coords = (min_ndc_xy + 1.0) / 2.0;
     var max_tex_coords = (max_ndc_xy + 1.0) / 2.0;
     min_tex_coords.y = 1.0 - min_tex_coords.y;
@@ -217,7 +221,7 @@ fn cs_main(
 
             let previously_passed_culling = ((previous_culling_results[previous_global_invocation / 32u] >> (previous_global_invocation % 32u)) & 0x1u) == 1u;
 
-            if !previously_passed_culling {
+            if !previously_passed_culling || per_camera_uniform.shadow_index != 0xFFFFFFFFu {
                 let region_local_secondary_invocation = atomicAdd(&secondary_draw_calls[object_range.region_id].vertex_count, 3u) / 3u;
                 let job_local_secondary_invocation = region_local_secondary_invocation + object_range.region_base_invocation;
                 let global_secondary_invocation = job_local_secondary_invocation + culling_job.base_output_invocation;
