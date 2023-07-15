@@ -89,7 +89,7 @@ impl BaseRenderGraph {
         state.skinning(graph, self);
 
         // Culling
-        state.pbr_shadow_uniform_bake(graph, self, resolution);
+        state.pbr_shadow_uniform_bake(graph, self, eval_output);
         state.pbr_shadow_culling(graph, self);
 
         // Depth-only rendering
@@ -239,13 +239,13 @@ impl BaseRenderGraphIntermediateState {
         &self,
         graph: &mut RenderGraph<'node>,
         base: &'node BaseRenderGraph,
-        resolution: UVec2,
+        eval_output: &InstructionEvaluationOutput,
     ) {
-        for (shadow_index, _) in self.shadow_cull.iter().enumerate() {
+        for (shadow_index, shadow) in eval_output.shadows.iter().enumerate() {
             base.gpu_culler.add_uniform_bake_to_graph::<pbr::PbrMaterial>(
                 graph,
                 Some(shadow_index),
-                resolution,
+                UVec2::splat(shadow.map.size),
                 &format_sso!("Shadow Culling S{}", shadow_index),
             );
         }

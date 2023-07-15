@@ -167,9 +167,9 @@ fn cs_main(
 
             let global_output_invocation = culling_job.base_output_invocation + gid.x;
 
-            primary_output[global_output_invocation * 3u + 0u] = INVALID_VERTEX;
-            primary_output[global_output_invocation * 3u + 1u] = INVALID_VERTEX;
-            primary_output[global_output_invocation * 3u + 2u] = INVALID_VERTEX;
+            secondary_output[global_output_invocation * 3u + 0u] = INVALID_VERTEX;
+            secondary_output[global_output_invocation * 3u + 1u] = INVALID_VERTEX;
+            secondary_output[global_output_invocation * 3u + 2u] = INVALID_VERTEX;
         }
         return;
     }
@@ -237,6 +237,8 @@ fn cs_main(
         // TODO: remove this atomic
         atomicAdd(&secondary_draw_calls[object_range.region_id].vertex_count, 3u);
 
+        let global_output_invocation = culling_job.base_output_invocation + gid.x;
+
         var output0 = INVALID_VERTEX;
         var output1 = INVALID_VERTEX;
         var output2 = INVALID_VERTEX;
@@ -246,11 +248,9 @@ fn cs_main(
             output2 = pack_batch_index(batch_object_index, index2);
         }
 
-        let global_output_invocation = culling_job.base_output_invocation + gid.x;
-
-        secondary_output[global_output_invocation * 3u + 0u] = pack_batch_index(batch_object_index, index0);
-        secondary_output[global_output_invocation * 3u + 1u] = pack_batch_index(batch_object_index, index1);
-        secondary_output[global_output_invocation * 3u + 2u] = pack_batch_index(batch_object_index, index2);
+        secondary_output[global_output_invocation * 3u + 0u] = output0;
+        secondary_output[global_output_invocation * 3u + 1u] = output1;
+        secondary_output[global_output_invocation * 3u + 2u] = output2;
 
         // TODO: We assume here that all non-atomic capable triangles are rendered _after_ culling.
     }

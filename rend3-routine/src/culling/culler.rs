@@ -500,8 +500,18 @@ impl GpuCuller {
 
         let encoder = ctx.encoder_or_pass.take_encoder();
 
-        // TODO
-        let max_object_count = 128_000;
+        let max_object_count = ctx
+            .data_core
+            .object_manager
+            .buffer::<M>()
+            .map(wgpu::Buffer::size)
+            .unwrap_or(0)
+            / ShaderObject::<M>::SHADER_SIZE.get();
+
+        if max_object_count == 0 {
+            return;
+        }
+
         let mut per_mat_buffer_map = ctx.data_core.graph_storage.get_mut(&self.per_material_buffer_handle);
         let buffer = per_mat_buffer_map.entry(camera_idx).or_insert_with(|| {
             Arc::new(ctx.renderer.device.create_buffer(&BufferDescriptor {
@@ -520,12 +530,7 @@ impl GpuCuller {
                 view_proj: camera.view_proj(),
                 shadow_index: camera_idx.unwrap_or(u32::MAX as _) as u32,
                 frustum: camera.world_frustum(),
-                resolution: if camera_idx.is_some() {
-                    // TODO: Work around some nonsense
-                    Vec2::splat(2048.0)
-                } else {
-                    resolution.as_vec2()
-                },
+                resolution: resolution.as_vec2(),
                 object_count: max_object_count as u32,
                 objects: Vec::new(),
             };
@@ -557,7 +562,6 @@ impl GpuCuller {
 
         profiling::scope!("Command Encoding");
 
-        // TODO: this is needed to zero out the indirect vertex count, this could be improved.
         let mut cpass = encoder.begin_compute_pass(&ComputePassDescriptor {
             label: Some(&format_sso!("GpuCuller {type_name} uniform bake")),
         });
