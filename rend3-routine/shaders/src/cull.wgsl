@@ -163,7 +163,7 @@ fn cs_main(
 
     if gid.x >= object_range.invocation_end {
         if object_range.atomic_capable == 0u {
-            atomicAdd(&primary_draw_calls[object_range.region_id].vertex_count, 3u);
+            atomicAdd(&secondary_draw_calls[object_range.region_id].vertex_count, 3u);
 
             let global_output_invocation = culling_job.base_output_invocation + gid.x;
 
