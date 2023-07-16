@@ -1,3 +1,5 @@
+#![allow(clippy::extra_unused_type_parameters)] // ShaderType
+
 use std::{
     any::TypeId,
     mem,

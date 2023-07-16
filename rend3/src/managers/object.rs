@@ -1,3 +1,5 @@
+#![allow(clippy::extra_unused_type_parameters)] // ShaderType
+
 use std::{any::TypeId, ops::Range};
 
 use bytemuck::Zeroable;
@@ -79,7 +81,7 @@ impl<M: Material> Clone for InternalObject<M> {
     fn clone(&self) -> Self {
         Self {
             mesh_kind: self.mesh_kind.clone(),
-            mesh_bounding_sphere: self.mesh_bounding_sphere.clone(),
+            mesh_bounding_sphere: self.mesh_bounding_sphere,
             material_handle: self.material_handle.clone(),
             location: self.location,
             inner: self.inner,
