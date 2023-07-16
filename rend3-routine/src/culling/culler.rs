@@ -598,8 +598,6 @@ impl GpuCuller {
 
         let encoder = ctx.encoder_or_pass.take_encoder();
 
-        let max_object_count =
-            ctx.data_core.object_manager.buffer::<M>().unwrap().size() / ShaderObject::<M>::SHADER_SIZE.get();
         let buffers = ctx
             .data_core
             .graph_storage
