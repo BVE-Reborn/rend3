@@ -41,7 +41,7 @@ jobs:
       - name: Set up Rust toolchain
         id: setup-rust
         run: |
-          rustup toolchain install 1.65 -c clippy
+          rustup toolchain install 1.65 -c clippy -t ${{ matrix.target }}
 
       - name: caching
         uses: Swatinem/rust-cache@v2
