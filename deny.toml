@@ -32,7 +32,9 @@ skip-tree = [
     # winit brings in lots of duplicate deps that we can't fix
     { name = "winit", version = "0.28" },
     # reqwest
-    { name = "rustix", version = "0.37.23" }
+    { name = "rustix", version = "0.37.23" },
+    # loom is depended on by tracy-client but under a custom cfg that is never on.
+    { name = "loom", version = "0.5" }
 ]
 
 [advisories]
