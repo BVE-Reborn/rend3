@@ -5,7 +5,7 @@ version = "0.3.0"
 authors = ["The rend3 Developers"]
 edition = "2021"
 publish = false
-rust-version = "1.65"
+rust-version = "1.71"
 
 [[bin]]
 name = "imgui"
@@ -15,11 +15,11 @@ path = "src/main.rs"
 # logging
 env_logger = { version = "0.10", default-features = false, features = ["auto-color", "humantime"] }
 # The imgui immediate mode gui library
-imgui = "0.10"
+imgui = "0.11"
 # Winit integration with imgui
-imgui-winit-support = { version = "0.10" }
+# imgui-winit-support = { version = "0.11" }
 # Linear algebra library
-glam = "0.22"
+glam = "0.24"
 # Portable implementation of Instant.
 instant = { version = "0.1", features = ["wasm-bindgen"] }
 # Renderer core
@@ -31,5 +31,4 @@ rend3-framework = { version = "^0.3.0", path = "../../rend3-framework" }
 # Programmable render list that dictates how the scene renders
 rend3-routine = { version = "^0.3.0", path = "../../rend3-routine" }
 # Windowing
-winit_27 = { package = "winit", version = "0.27" } # we do this so that winit actually fills out the features we need
 winit = "0.28"

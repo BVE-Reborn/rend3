@@ -3,7 +3,6 @@ use std::{
     cell::{RefCell, UnsafeCell},
     collections::hash_map::Entry,
     marker::PhantomData,
-    num::NonZeroU32,
     ops::Range,
     sync::Arc,
 };
@@ -346,9 +345,9 @@ impl<'node> RenderGraph<'node> {
                     if let Entry::Vacant(vacant) = active_views.entry(region) {
                         let view = active_textures[&region.idx].create_view(&TextureViewDescriptor {
                             base_array_layer: region.layer_start,
-                            array_layer_count: Some(NonZeroU32::new(region.layer_end - region.layer_start).unwrap()),
+                            array_layer_count: Some(region.layer_end - region.layer_start),
                             base_mip_level: region.mip_start as u32,
-                            mip_level_count: Some(NonZeroU32::new((region.mip_end - region.mip_start) as u32).unwrap()),
+                            mip_level_count: Some((region.mip_end - region.mip_start) as u32),
                             ..TextureViewDescriptor::default()
                         });
                         vacant.insert(view);
@@ -361,13 +360,9 @@ impl<'node> RenderGraph<'node> {
                                 .as_texture_ref()
                                 .create_view(&TextureViewDescriptor {
                                     base_array_layer: region.layer_start,
-                                    array_layer_count: Some(
-                                        NonZeroU32::new(region.layer_end - region.layer_start).unwrap(),
-                                    ),
+                                    array_layer_count: Some(region.layer_end - region.layer_start),
                                     base_mip_level: region.mip_start as u32,
-                                    mip_level_count: Some(
-                                        NonZeroU32::new((region.mip_end - region.mip_start) as u32).unwrap(),
-                                    ),
+                                    mip_level_count: Some((region.mip_end - region.mip_start) as u32),
                                     ..TextureViewDescriptor::default()
                                 });
                         vacant.insert(view);

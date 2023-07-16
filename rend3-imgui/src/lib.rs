@@ -18,7 +18,7 @@ impl ImguiRenderRoutine {
     /// Imgui will always output gamma-encoded color. It will determine if to do
     /// this in the shader manually based on the output format.
     pub fn new(renderer: &Renderer, imgui: &mut imgui::Context, output_format: TextureFormat) -> Self {
-        let base = if output_format.describe().srgb {
+        let base = if output_format.is_srgb() {
             RendererConfig::new()
         } else {
             RendererConfig::new_srgb()

@@ -5,7 +5,7 @@ version = "0.3.0"
 authors = ["The rend3 Developers"]
 edition = "2021"
 publish = false
-rust-version = "1.65"
+rust-version = "1.71"
 
 [[bin]]
 name = "static-gltf"
@@ -17,7 +17,7 @@ path = "src/main.rs"
 # logging
 env_logger = { version = "0.10", default-features = false, features = ["auto-color", "humantime"] }
 # Linear algebra library
-glam = "0.22"
+glam = "0.24"
 # parsing model files
 gltf = { version = "1.0", default-features = false, features = ["import", "utils"] }
 # Renderer core

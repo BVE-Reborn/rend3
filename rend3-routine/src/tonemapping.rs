@@ -41,7 +41,7 @@ fn create_pipeline(
         )),
     });
 
-    let fs_entry_point = if output_format.describe().srgb {
+    let fs_entry_point = if output_format.is_srgb() {
         "fs_main_scene"
     } else {
         "fs_main_monitor"
