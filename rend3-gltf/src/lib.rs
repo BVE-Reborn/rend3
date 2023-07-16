@@ -518,10 +518,10 @@ fn node_indices_topological_sort(nodes: &[gltf::Node]) -> (Vec<usize>, BTreeMap<
 ///
 /// You need to hold onto the returned value from this function to make sure the
 /// objects don't get deleted.
-pub fn instance_loaded_scene<'a, E: std::error::Error + 'static>(
+pub fn instance_loaded_scene<E: std::error::Error + 'static>(
     renderer: &Arc<Renderer>,
     loaded: &LoadedGltfScene,
-    nodes: Vec<gltf::Node<'a>>,
+    nodes: Vec<gltf::Node<'_>>,
     settings: &GltfLoadSettings,
     parent_transform: Mat4,
 ) -> Result<GltfSceneInstance, GltfLoadError<E>> {

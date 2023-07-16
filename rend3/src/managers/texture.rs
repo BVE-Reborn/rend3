@@ -322,10 +322,10 @@ fn create_bind_group_layout(device: &Device, count: u32, view_dimension: Texture
     }))
 }
 
-fn create_bind_group<'a>(
+fn create_bind_group(
     device: &Device,
     layout: &BindGroupLayout,
-    null_view: &'a TextureView,
+    null_view: &TextureView,
     data: &[Option<InternalTexture>],
     dimension: TextureViewDimension,
 ) -> Arc<BindGroup> {
