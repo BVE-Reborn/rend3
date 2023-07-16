@@ -82,8 +82,8 @@ impl<T: 'static> TextureManager<T> {
 
         let (block_x, block_y) = texture.format.block_dimensions();
         let size = Extent3d {
-            width: round_up(texture.size.x, block_x as u32),
-            height: round_up(texture.size.y, block_y as u32),
+            width: round_up(texture.size.x, block_x),
+            height: round_up(texture.size.y, block_y),
             depth_or_array_layers: match cube {
                 true => 6,
                 false => 1,
