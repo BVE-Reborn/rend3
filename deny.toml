@@ -35,6 +35,8 @@ skip-tree = [
     # we have two winits until imgui updates
     { name = "winit", version = "0.27" },
     { name = "winit", version = "0.28" },
+    # tracy
+    { name = "tracy-client", version = "0.14.2" },
 ]
 
 [advisories]
