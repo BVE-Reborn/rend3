@@ -139,7 +139,7 @@ impl<T: 'static> TextureManager<T> {
                     &texture.data,
                     ImageDataLayout {
                         offset: 0,
-                        bytes_per_row: Some(block_size as u32 * (size.width / block_width as u32)),
+                        bytes_per_row: Some(block_size * (size.width / block_width)),
                         rows_per_image: None,
                     },
                     size,

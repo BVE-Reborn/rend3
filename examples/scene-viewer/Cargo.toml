@@ -32,7 +32,8 @@ tracy = ["profiling/profile-with-tracy", "tracy-client"]
 [dependencies]
 anyhow = "1"
 cfg-if = "1"
-glam = "0.22"
+glam = "0.24"
+# 0.7 is a completely unrelated library
 histogram = "0.6"
 image = { version = "0.24", default-features = false, features = ["png", "jpeg", "tiff"]}
 indoc = "2"
@@ -47,7 +48,7 @@ rend3-gltf = { version = "^0.3.0", default-features = false, path = "../../rend3
 rend3-routine = { version = "^0.3.0", path = "../../rend3-routine" }
 rustc-hash = "1"
 smallvec = "1"
-tracy-client = { version = "0.14", optional = true }
+tracy-client = { version = "0.15", optional = true }
 wgpu-profiler = "0.12.0"
 winit = "0.28"
 

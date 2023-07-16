@@ -13,13 +13,13 @@ path = "src/main.rs"
 
 [dependencies]
 # The egui immediate mode gui library
-egui = "0.21.0"
+egui = "0.22.0"
 # Winit integration with egui (turn off the clipboard feature)
-egui-winit = { version = "0.21", default-features = false, features = ["links", "wayland"] }
+egui-winit = { version = "0.22", default-features = false, features = ["links", "wayland"] }
 # logging
 env_logger = { version = "0.10", default-features = false, features = ["auto-color", "humantime"] }
 # Linear algebra library
-glam = "0.22"
+glam = "0.24"
 # Importing png's
 image = { version = "0.24.3", default-features = false, features = ["png"] }
 # Portable implementation of Instant.
@@ -37,8 +37,8 @@ winit = "0.28"
 # Opening URL's
 webbrowser = "0.8.2"
 # Creating textures
-wgpu = "0.15"
+wgpu = "0.16"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 # Winit integration with egui
-egui-winit = { version = "0.21", default-features = false, features = ["clipboard", "links", "wayland"] }
+egui-winit = { version = "0.22", default-features = false, features = ["clipboard", "links", "wayland"] }

@@ -1,5 +1,3 @@
-use std::num::NonZeroU8;
-
 use rend3::util::bind_merge::{BindGroupBuilder, BindGroupLayoutBuilder};
 use wgpu::{
     AddressMode, BindingType, CompareFunction, Device, FilterMode, Sampler, SamplerBindingType, SamplerDescriptor,
