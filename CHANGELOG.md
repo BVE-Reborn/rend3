@@ -44,6 +44,7 @@ Per Keep a Changelog there are 6 main categories of changes:
 - rend3: Convert all shaders to WGSL using a custom preprocessing solution @cwfitzgerald
 
 ### Fixes
+- Fixed renderpass compatibility checks to avoid issues when RODS is used. @OptimisticPeach
 - Fixed mismatched BGLs when using a custom material with no cutout specification
 - Fixed PbrMaterial instead of generic parameter M being used in forward and depth routines. @setzer22
 - Fixes loading of gltf with embedded base64 binary data.

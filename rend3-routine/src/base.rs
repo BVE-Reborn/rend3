@@ -233,7 +233,7 @@ impl BaseRenderGraphIntermediateState {
     }
 
     pub fn skinning<'node>(&self, graph: &mut RenderGraph<'node>, base: &'node BaseRenderGraph) {
-        crate::skinning::add_skinning_to_graph(graph, &base.gpu_skinner);
+        skinning::add_skinning_to_graph(graph, &base.gpu_skinner);
     }
 
     /// Does all culling for the forward PBR materials.

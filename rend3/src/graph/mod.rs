@@ -229,6 +229,8 @@ impl RenderPassTargets {
                 let depth_compatible = match (&this.depth_stencil, &other.depth_stencil) {
                     (Some(this_depth), Some(other_depth)) => {
                         this_depth.target.handle.compatible(&other_depth.target.handle)
+                            && this_depth.depth_clear == other_depth.depth_clear
+                            && this_depth.stencil_clear == other_depth.stencil_clear
                     }
                     (None, None) => true,
                     _ => false,
