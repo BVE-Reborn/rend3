@@ -10,7 +10,7 @@ use rend3::types::{
 
 bitflags::bitflags! {
     /// Flags which shaders use to determine properties of a material
-    #[derive(Default, ShaderType)]
+    #[derive(Default)]
     pub struct MaterialFlags : u32 {
         const ALBEDO_ACTIVE =       0b0000_0000_0000_0001;
         const ALBEDO_BLEND =        0b0000_0000_0000_0010;
@@ -560,7 +560,6 @@ impl Material for PbrMaterial {
     }
 }
 
-#[repr(C)]
 #[derive(Debug, Default, Copy, Clone, ShaderType)]
 pub struct ShaderMaterial {
     uv_transform0: Mat3,
@@ -577,7 +576,7 @@ pub struct ShaderMaterial {
     ambient_occlusion: f32,
     alpha_cutout: f32,
 
-    material_flags: MaterialFlags,
+    material_flags: u32,
 }
 
 unsafe impl bytemuck::Zeroable for ShaderMaterial {}
@@ -614,7 +613,7 @@ impl ShaderMaterial {
                         SampleType::Linear => false,
                     },
                 );
-                flags
+                flags.bits()
             },
         }
     }

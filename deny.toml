@@ -27,16 +27,14 @@ skip = [
     { name = "base64", version = "0.13.1" },
     # ddsfile
     { name = "num-traits", version = "0.1.43" },
-    { name = "raw-window-handle", version = "0.4.3" },
 ]
 skip-tree = [
-    { name = "windows-sys", version = "0.36" },
-    # winit transitively included dupes
-    # we have two winits until imgui updates
-    { name = "winit", version = "0.27" },
+    # winit brings in lots of duplicate deps that we can't fix
     { name = "winit", version = "0.28" },
-    # tracy
-    { name = "tracy-client", version = "0.14.2" },
+    # reqwest
+    { name = "rustix", version = "0.37.23" },
+    # loom is depended on by tracy-client but under a custom cfg that is never on.
+    { name = "loom", version = "0.5" }
 ]
 
 [advisories]

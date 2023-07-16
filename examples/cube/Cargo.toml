@@ -5,7 +5,7 @@ version = "0.3.0"
 authors = ["The rend3 Developers"]
 edition = "2021"
 publish = false
-rust-version = "1.65"
+rust-version = "1.71"
 
 [lib]
 crate-type = ["lib", "cdylib"]
@@ -20,7 +20,7 @@ path = "src/main.rs"
 # logging
 env_logger = { version = "0.10", default-features = false, features = ["auto-color", "humantime"] }
 # Linear algebra library
-glam = "0.22"
+glam = "0.24"
 # Renderer core
 rend3 = { version = "^0.3.0", path = "../../rend3" }
 # Programmable render list that dictates how the scene renders
@@ -31,7 +31,7 @@ rend3-framework = { version = "^0.3.0", path = "../../rend3-framework" }
 winit = "0.28"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-console_log = "0.2"
+console_log = "1"
 console_error_panic_hook = "0.1"
 js-sys = "0.3"
 web-sys = "0.3"

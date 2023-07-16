@@ -9,7 +9,7 @@ repository = "https://github.com/BVE-Reborn/rend3"
 license = "MIT OR Apache-2.0 OR Zlib"
 keywords = ["3d", "graphics", "rend3", "renderer", "wgpu"]
 categories = ["game-development", "graphics", "rendering", "rendering::engine", "wasm"]
-rust-version = "1.65"
+rust-version = "1.71"
 
 [package.metadata.release]
 tag = true
@@ -35,14 +35,14 @@ replace = "[Unreleased](https://github.com/BVE-Reborn/rend3/compare/v{{version}}
 [dependencies]
 arrayvec = "0.7"
 bimap = "0.6"
-bitflags = "1"
+bitflags = "2"
 bumpalo = "3"
 bytemuck = "1"
-encase = { version = "0.4" }
+encase = { version = "0.6" }
 flume = "0.10"
-glam = { version = "0.22.0", features = ["bytemuck"] }
+glam = { version = "0.24.0", features = ["bytemuck"] }
 handlebars = "4"
-indexmap = "1"
+indexmap = "2"
 list-any = "0.2"
 log = "0.4"
 num-traits = "0.2"
@@ -57,8 +57,8 @@ serde = { version = "1", features = ["derive"] }
 smallvec = "1"
 smartstring = "1.0"
 thiserror = "1"
-wgpu = "0.15"
-wgpu-profiler = "0.11.0"
+wgpu = "0.16.1"
+wgpu-profiler = "0.12.0"
 
 [dev-dependencies]
 pollster = "0.3"

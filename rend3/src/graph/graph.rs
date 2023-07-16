@@ -3,7 +3,6 @@ use std::{
     cell::{RefCell, UnsafeCell},
     collections::hash_map::Entry,
     marker::PhantomData,
-    num::NonZeroU32,
     ops::Range,
     sync::Arc,
 };
@@ -341,7 +340,7 @@ impl<'node> RenderGraph<'node> {
                     if let Entry::Vacant(vacant) = active_views.entry(region) {
                         let view = active_textures[&region.idx].create_view(&TextureViewDescriptor {
                             base_array_layer: region.layer_start,
-                            array_layer_count: Some(NonZeroU32::new(region.layer_end - region.layer_start).unwrap()),
+                            array_layer_count: Some(region.layer_end - region.layer_start),
                             ..TextureViewDescriptor::default()
                         });
                         vacant.insert(view);
@@ -354,9 +353,7 @@ impl<'node> RenderGraph<'node> {
                                 .as_texture_ref()
                                 .create_view(&TextureViewDescriptor {
                                     base_array_layer: region.layer_start,
-                                    array_layer_count: Some(
-                                        NonZeroU32::new(region.layer_end - region.layer_start).unwrap(),
-                                    ),
+                                    array_layer_count: Some(region.layer_end - region.layer_start),
                                     ..TextureViewDescriptor::default()
                                 });
                         vacant.insert(view);

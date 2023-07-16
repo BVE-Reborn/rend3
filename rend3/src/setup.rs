@@ -40,9 +40,9 @@ pub const OPTIONAL_FEATURES: Features = Features::from_bits_truncate(
     Features::DEPTH_CLIP_CONTROL.bits()
         | Features::TEXTURE_COMPRESSION_BC.bits()
         | Features::TEXTURE_COMPRESSION_ETC2.bits()
-        | Features::TEXTURE_COMPRESSION_ASTC_LDR.bits()
+        | Features::TEXTURE_COMPRESSION_ASTC.bits()
         | Features::TIMESTAMP_QUERY.bits()
-        | Features::WRITE_TIMESTAMP_INSIDE_PASSES.bits(),
+        | Features::TIMESTAMP_QUERY_INSIDE_PASSES.bits(),
 );
 
 /// Check that all required features for a given profile are present in the feature

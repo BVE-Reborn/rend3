@@ -6,7 +6,7 @@ struct ImguiExampleData {
 
     imgui: imgui::Context,
     #[allow(unused)] // ADDED UNTIL IMGUI_WINIT_PLATFORM UPDATE
-    platform: imgui_winit_support::WinitPlatform,
+    // platform: imgui_winit_support::WinitPlatform,
     imgui_routine: rend3_imgui::ImguiRenderRoutine,
     frame_start: instant::Instant,
 
@@ -39,7 +39,7 @@ impl rend3_framework::App for ImguiExample {
 
         // Set up imgui
         let mut imgui = imgui::Context::create();
-        let mut platform = imgui_winit_support::WinitPlatform::init(&mut imgui);
+        // let mut platform = imgui_winit_support::WinitPlatform::init(&mut imgui);
         // platform.attach_window(imgui.io_mut(), window, imgui_winit_support::HiDpiMode::Default); REMOVED UNTIL IMGUI_WINIT_PLATFORM UPDATE
         imgui.set_ini_filename(None);
 
@@ -122,7 +122,7 @@ impl rend3_framework::App for ImguiExample {
             _directional_handle,
 
             imgui,
-            platform,
+            // platform,
             imgui_routine,
             frame_start,
 
