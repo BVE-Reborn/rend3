@@ -94,7 +94,7 @@ impl HiZRoutine {
                 layout: &self.texture_bgl,
                 entries: &[BindGroupEntry {
                     binding: 0,
-                    resource: BindingResource::TextureView(&source),
+                    resource: BindingResource::TextureView(source),
                 }],
             }));
 

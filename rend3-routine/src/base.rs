@@ -285,7 +285,7 @@ impl BaseRenderGraphIntermediateState {
     }
 
     /// Clear all the targets to their needed values
-    pub fn clear_shadow<'node>(&self, graph: &mut RenderGraph<'node>) {
+    pub fn clear_shadow(&self, graph: &mut RenderGraph<'_>) {
         crate::clear::add_clear_to_graph(graph, None, None, self.shadow, Vec4::ZERO, 0.0);
     }
 

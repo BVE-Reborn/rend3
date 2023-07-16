@@ -537,7 +537,7 @@ impl GpuCuller {
             let mut buffer = ctx
                 .renderer
                 .queue
-                .write_buffer_with(&buffer, 0, per_camera_data.size())
+                .write_buffer_with(buffer, 0, per_camera_data.size())
                 .unwrap();
             StorageBuffer::new(&mut *buffer).write(&per_camera_data).unwrap();
         }
