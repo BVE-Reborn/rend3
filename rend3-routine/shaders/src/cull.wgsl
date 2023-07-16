@@ -92,6 +92,7 @@ fn execute_culling(
         return false;
     }
 
+    // We skip hi-z calculation if we're doing a shadow pass
     if per_camera_uniform.shadow_index != 0xFFFFFFFFu {
         return true;
     }
