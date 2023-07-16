@@ -623,8 +623,6 @@ impl GpuCuller {
             )
             .clone();
 
-        // TODO
-        assert!(max_object_count < 128_000);
         let per_camera_uniform = Arc::clone(
             ctx.data_core
                 .graph_storage
@@ -728,7 +726,6 @@ impl GpuCuller {
 
         material_key_ranges.insert(current_material_key, current_material_key_range_start..draw_calls.len());
 
-        // TODO: this is needed to zero out the indirect vertex count, this could be improved.
         encoder.clear_buffer(&buffers.primary_draw_call, 0, None);
         encoder.clear_buffer(&buffers.secondary_draw_call, 0, None);
         let mut cpass = encoder.begin_compute_pass(&ComputePassDescriptor {
