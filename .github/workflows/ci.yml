@@ -45,7 +45,7 @@ jobs:
 
       - name: caching
         uses: Swatinem/rust-cache@v2
-        if: matrix.os[0] != 'self-hosted'
+        if: matrix.os[1] != 'gpu'
         with:
           key: ${{ matrix.target }}-b # suffix for cache busting
 
@@ -80,7 +80,7 @@ jobs:
 
       - name: doc
         run: |
-          cargo +1.65 doc --target ${{ matrix.target }} --profile ci
+          cargo +1.65 doc --target ${{ matrix.target }} --profile ci --no-deps
 
   cargo-fmt:
     runs-on: ubuntu-latest
