@@ -38,9 +38,9 @@ bimap = "0.6"
 bitflags = "1"
 bumpalo = "3"
 bytemuck = "1"
-encase = { version = "0.6.1" }
+encase = { version = "0.4" }
 flume = "0.10"
-glam = { version = "0.24.0", features = ["bytemuck"] }
+glam = { version = "0.22.0", features = ["bytemuck"] }
 handlebars = "4"
 indexmap = "1"
 list-any = "0.2"
