@@ -17,20 +17,20 @@ jobs:
       matrix:
         include:
           # wasm
-          - name: 'wasm'
-            os: 'ubuntu-latest'
-            target: 'wasm32-unknown-unknown'
+          - name: "wasm"
+            os: "ubuntu-latest"
+            target: "wasm32-unknown-unknown"
 
           # native
-          - name: 'linux'
-            os: 'ubuntu-latest'
-            target: 'x86_64-unknown-linux-gnu'
-          - name: 'mac'
-            os: 'macos-latest'
-            target: 'x86_64-apple-darwin'
-          - name: 'windows'
-            os: 'windows-latest'
-            target: 'x86_64-pc-windows-msvc'
+          - name: "linux"
+            os: "ubuntu-latest"
+            target: "x86_64-unknown-linux-gnu"
+          - name: "mac"
+            os: ["macOS", "gpu"]
+            target: "aarch64-apple-darwin"
+          - name: "windows"
+            os: "windows-latest"
+            target: "x86_64-pc-windows-msvc"
       fail-fast: false
     runs-on: ${{ matrix.os }}
     name: ${{ matrix.name }}
@@ -40,66 +40,48 @@ jobs:
 
       - name: Set up Rust toolchain
         id: setup-rust
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: '1.65'
-          target: ${{ matrix.target }}
-          components: clippy
-          default: true
-          override: true
+        run: |
+          rustup toolchain install 1.65 -c clippy -t ${{ matrix.target }}
 
       - name: caching
-        uses: Swatinem/rust-cache@v1
+        uses: Swatinem/rust-cache@v2
+        if: matrix.os[1] != 'gpu'
         with:
           key: ${{ matrix.target }}-b # suffix for cache busting
 
       - name: build
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --target ${{ matrix.target }} --profile ci
+        run: |
+          cargo +1.65 build --target ${{ matrix.target }} --profile ci
         if: matrix.target != 'wasm32-unknown-unknown'
 
       - name: build (no imgui)
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --target ${{ matrix.target }} --profile ci --workspace --exclude rend3-imgui --exclude rend3-imgui-example
+        run: |
+          cargo +1.65 build --target ${{ matrix.target }} --profile ci --workspace --exclude rend3-imgui --exclude rend3-imgui-example
         if: matrix.target == 'wasm32-unknown-unknown'
 
       - name: test
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --target ${{ matrix.target }} --profile ci
+        run: |
+          cargo +1.65 test --target ${{ matrix.target }} --profile ci
         if: matrix.target != 'wasm32-unknown-unknown'
 
       - name: clippy (rend3-gltf featureless)
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: --target ${{ matrix.target }} --profile ci -p rend3-gltf --no-default-features
+        run: |
+          cargo +1.65 clippy --target ${{ matrix.target }} --profile ci -p rend3-gltf --no-default-features
 
       - name: clippy
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: --target ${{ matrix.target }} --profile ci
+        run: |
+          cargo +1.65 clippy --target ${{ matrix.target }} --profile ci
         if: matrix.target != 'wasm32-unknown-unknown'
 
       - name: clippy (no imgui)
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: --target ${{ matrix.target }} --profile ci --workspace --exclude rend3-imgui --exclude rend3-imgui-example
+        run: |
+          cargo +1.65 clippy --target ${{ matrix.target }} --profile ci --workspace --exclude rend3-imgui --exclude rend3-imgui-example
         if: matrix.target == 'wasm32-unknown-unknown'
 
       - name: doc
-        uses: actions-rs/cargo@v1
-        with:
-          command: rend3-doc
-          args: --profile ci
+        run: |
+          cargo +1.65 doc --target ${{ matrix.target }} --profile ci --no-deps
+        if: matrix.target != 'wasm32-unknown-unknown'
 
   cargo-fmt:
     runs-on: ubuntu-latest
@@ -108,18 +90,12 @@ jobs:
 
       - name: Set up Rust toolchain
         id: setup-rust
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          components: rustfmt
-          default: true
-          override: true
+        run: |
+          rustup toolchain install 1.65 -c rustfmt
 
-      - uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: -- --check
+      - name: format
+        run: |
+          cargo +1.65 fmt --check
 
   cargo-deny:
     runs-on: ubuntu-latest
