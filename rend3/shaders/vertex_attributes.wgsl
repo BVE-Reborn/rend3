@@ -22,7 +22,7 @@ fn unpack_batch_index(vertex_index: u32) -> BatchIndices {
 }
 
 fn pack_batch_index(local_object: u32, vertex: u32) -> u32 {
-    return local_object << 24u | vertex & 0xFFFFFFu;
+    return (local_object << 24u) | (vertex & 0xFFFFFFu);
 }
 
 fn extract_attribute_vec2_f32(byte_base_offset: u32, vertex_index: u32) -> vec2<f32> {
