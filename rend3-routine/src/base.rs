@@ -290,7 +290,7 @@ impl BaseRenderGraphIntermediateState {
     }
 
     /// Clear all the targets to their needed values
-    pub fn clear<'node>(&self, graph: &mut RenderGraph<'node>, clear_color: Vec4) {
+    pub fn clear(&self, graph: &mut RenderGraph<'_>, clear_color: Vec4) {
         crate::clear::add_clear_to_graph(
             graph,
             Some(self.color),

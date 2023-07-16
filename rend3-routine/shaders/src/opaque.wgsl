@@ -312,22 +312,22 @@ fn get_pixel_data_inner(material_arg: Material, s: sampler, vs_out: VertexOutput
         // Red: AO
         //
         // In roughness texture (FLAGS_AOMR_SPLIT):
-        // Green: Roughness
-        // Blue: Metallic
-        //
-        // In roughness texture (FLAGS_AOMR_SWIZZLED_SPLIT):
         // Red: Roughness
         // Green: Metallic
+        //
+        // In roughness texture (FLAGS_AOMR_SWIZZLED_SPLIT):
+        // Green: Roughness
+        // Blue: Metallic
         if (has_roughness_texture(&material)) {
             let texture_read = roughness_texture(&material, s, coords, uvdx, uvdy);
-            var mr: vec2<f32>;
+            var rm: vec2<f32>;
             if (extract_material_flag(material.flags, FLAGS_AOMR_SWIZZLED_SPLIT)) {
-                mr = texture_read.gb;
+                rm = texture_read.gb;
             } else {
-                mr = texture_read.rg;
+                rm = texture_read.rg;
             }
-            pixel.perceptual_roughness = material.roughness * mr[0];
-            pixel.metallic = material.metallic * mr[1];
+            pixel.perceptual_roughness = material.roughness * rm[0];
+            pixel.metallic = material.metallic * rm[1];
         } else {
             pixel.perceptual_roughness = material.roughness;
             pixel.metallic = material.metallic;

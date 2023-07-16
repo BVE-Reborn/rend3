@@ -12,7 +12,7 @@ struct BatchIndices {
     vertex: u32,
 }
 
-let INVALID_VERTEX: u32 = 0x00FFFFFFu;
+const INVALID_VERTEX: u32 = 0x00FFFFFFu;
 
 fn unpack_batch_index(vertex_index: u32) -> BatchIndices {
     return BatchIndices(

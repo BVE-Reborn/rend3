@@ -28,6 +28,7 @@ use std::{
     sync::Arc,
 };
 
+use base64::Engine;
 use glam::{Mat3, Mat4, Quat, UVec2, Vec2, Vec3, Vec4};
 use gltf::buffer::Source;
 use rend3::{
@@ -259,7 +260,7 @@ pub fn try_load_base64(uri: &str) -> Option<Vec<u8>> {
     log::info!("loading {} bytes of base64 data", data.len());
     profiling::scope!("decoding base64 uri");
     // TODO: errors
-    Some(base64::decode(data).unwrap())
+    Some(base64::prelude::BASE64_STANDARD.decode(data).unwrap())
 }
 
 /// Default implementation of [`load_gltf`]'s `io_func` that loads from the
@@ -517,10 +518,10 @@ fn node_indices_topological_sort(nodes: &[gltf::Node]) -> (Vec<usize>, BTreeMap<
 ///
 /// You need to hold onto the returned value from this function to make sure the
 /// objects don't get deleted.
-pub fn instance_loaded_scene<'a, E: std::error::Error + 'static>(
+pub fn instance_loaded_scene<E: std::error::Error + 'static>(
     renderer: &Arc<Renderer>,
     loaded: &LoadedGltfScene,
-    nodes: Vec<gltf::Node<'a>>,
+    nodes: Vec<gltf::Node<'_>>,
     settings: &GltfLoadSettings,
     parent_transform: Mat4,
 ) -> Result<GltfSceneInstance, GltfLoadError<E>> {

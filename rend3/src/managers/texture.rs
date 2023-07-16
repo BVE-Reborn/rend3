@@ -106,6 +106,7 @@ impl<T: 'static> TextureManager<T> {
             dimension: TextureDimension::D2,
             format: texture.format,
             usage: TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_SRC | TextureUsages::COPY_DST,
+            view_formats: &[],
         };
 
         let (buffer, tex) = match texture.mip_source {
@@ -322,10 +323,10 @@ fn create_bind_group_layout(device: &Device, count: u32, view_dimension: Texture
     }))
 }
 
-fn create_bind_group<'a>(
+fn create_bind_group(
     device: &Device,
     layout: &BindGroupLayout,
-    null_view: &'a TextureView,
+    null_view: &TextureView,
     data: &[Option<InternalTexture>],
     dimension: TextureViewDimension,
 ) -> Arc<BindGroup> {
@@ -369,6 +370,7 @@ fn create_null_tex_view(device: &Device, dimension: TextureViewDimension) -> Tex
             },
             format: TextureFormat::R8Unorm,
             usage: TextureUsages::TEXTURE_BINDING,
+            view_formats: &[],
         })
         .create_view(&TextureViewDescriptor {
             dimension: Some(dimension),

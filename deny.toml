@@ -30,18 +30,19 @@ skip = [
     { name = "raw-window-handle", version = "0.4.3" },
 ]
 skip-tree = [
-    { name = "windows", version = "0.39" },
     { name = "windows-sys", version = "0.36" },
     # winit transitively included dupes
+    # we have two winits until imgui updates
     { name = "winit", version = "0.27" },
+    { name = "winit", version = "0.28" },
+    # tracy
+    { name = "tracy-client", version = "0.14.2" },
 ]
 
 [advisories]
 vulnerability = "warn"
 unmaintained = "warn"
 ignore = [
-    # xml is unmaintained (wayland)
-    "RUSTSEC-2022-0048"
 ]
 
 [sources]

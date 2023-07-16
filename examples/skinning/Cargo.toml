@@ -22,7 +22,7 @@ env_logger = { version = "0.10", default-features = false, features = ["auto-col
 # Linear algebra library
 glam = "0.22"
 # block on async functions
-pollster = "0.2"
+pollster = "0.3"
 # Renderer core
 rend3 = { version = "^0.3.0", path = "../../rend3" }
 # Programmable render list that dictates how the scene renders
@@ -32,14 +32,14 @@ rend3-framework = { version = "^0.3.0", path = "../../rend3-framework" }
 # Import gltf models
 rend3-gltf = { version = "^0.3.0", path = "../../rend3-gltf" }
 # windowing
-winit = "0.27"
+winit = "0.28"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_log = "0.2"
 console_error_panic_hook = "0.1"
 js-sys = "0.3"
 web-sys = "0.3"
-wasm-bindgen = "=0.2.83"
+wasm-bindgen = "0.2.83"
 wasm-bindgen-futures = "0.4"
 
 [target.'cfg(target_os = "android")'.dependencies]

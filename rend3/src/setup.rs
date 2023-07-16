@@ -449,7 +449,10 @@ pub async fn create_iad(
     #[cfg(target_arch = "wasm32")]
     let default_backend_order = [Backend::BrowserWebGpu];
 
-    let instance = Instance::new(backend_bits);
+    let instance = Instance::new(wgpu::InstanceDescriptor {
+        backends: backend_bits,
+        dx12_shader_compiler: wgpu::Dx12Compiler::Fxc,
+    });
 
     let mut valid_adapters = FastHashMap::<Backend, ArrayVec<PotentialAdapter<Adapter>, 4>>::default();
 

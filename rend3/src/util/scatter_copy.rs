@@ -152,7 +152,10 @@ mod test {
     impl TestContext {
         fn new() -> Option<Self> {
             let backends = wgpu::util::backend_bits_from_env().unwrap_or(wgpu::Backends::all());
-            let instance = wgpu::Instance::new(backends);
+            let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+                backends,
+                dx12_shader_compiler: wgpu::Dx12Compiler::Fxc,
+            });
             let adapter = pollster::block_on(wgpu::util::initialize_adapter_from_env_or_default(
                 &instance, backends, None,
             ))?;

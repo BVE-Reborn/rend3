@@ -121,8 +121,8 @@ impl HiZRoutine {
 
             let mut node = graph.add_node(&format!("HiZ Mip {src_mip} -> {dst_mip}"));
 
-            let dst_extent = extent.mip_level_size(dst_mip as u32, false);
-            let src_extent = extent.mip_level_size(src_mip as u32, false);
+            let dst_extent = extent.mip_level_size(dst_mip as u32, TextureDimension::D2);
+            let src_extent = extent.mip_level_size(src_mip as u32, TextureDimension::D2);
 
             let dst_target = node.add_render_target(
                 depth_target

@@ -20,6 +20,7 @@ struct Rend3ShaderSources;
 #[derive(Debug, Default, Serialize)]
 pub struct ShaderConfig {
     pub profile: Option<RendererProfile>,
+    pub position_attribute_offset: usize,
 }
 
 pub struct ShaderVertexBufferConfig {
@@ -353,7 +354,10 @@ mod tests {
         let mut pp = ShaderPreProcessor::new();
         pp.add_shader("simple", "{{include \"other\"}} simple");
         pp.add_shader("other", "other");
-        let config = ShaderConfig { profile: None };
+        let config = ShaderConfig {
+            profile: None,
+            position_attribute_offset: 0,
+        };
         let output = pp.render_shader("simple", &config, None).unwrap();
 
         assert_eq!(output, "other simple");
@@ -364,7 +368,10 @@ mod tests {
         let mut pp = ShaderPreProcessor::new();
         pp.add_shader("simple", "{{include \"other\"}} simple");
         pp.add_shader("other", "{{include \"simple\"}} other");
-        let config = ShaderConfig { profile: None };
+        let config = ShaderConfig {
+            profile: None,
+            position_attribute_offset: 0,
+        };
         let output = pp.render_shader("simple", &config, None).unwrap();
 
         assert_eq!(output, " other simple");
@@ -374,7 +381,10 @@ mod tests {
     fn error_include() {
         let mut pp = ShaderPreProcessor::new();
         pp.add_shader("simple", "{{include \"other\"}} simple");
-        let config = ShaderConfig { profile: None };
+        let config = ShaderConfig {
+            profile: None,
+            position_attribute_offset: 0,
+        };
         let output = pp.render_shader("simple", &config, None);
 
         assert!(output.is_err(), "Expected error, got {output:?}");
@@ -384,7 +394,10 @@ mod tests {
     fn no_arg_include() {
         let mut pp = ShaderPreProcessor::new();
         pp.add_shader("simple", "{{include}} simple");
-        let config = ShaderConfig { profile: None };
+        let config = ShaderConfig {
+            profile: None,
+            position_attribute_offset: 0,
+        };
         let output = pp.render_shader("simple", &config, None);
 
         assert!(output.is_err(), "Expected error, got {output:?}");

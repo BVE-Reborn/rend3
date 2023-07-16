@@ -42,6 +42,7 @@ impl GraphTextureStore {
             dimension: TextureDimension::D2,
             format: desc.format,
             usage: desc.usage,
+            view_formats: &[],
         }))
     }
 

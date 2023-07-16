@@ -73,13 +73,18 @@ mod tests {
                 &[
                     ShaderConfig {
                         profile: Some(RendererProfile::CpuDriven),
+                        position_attribute_offset: 0,
                     },
                     ShaderConfig {
                         profile: Some(RendererProfile::GpuDriven),
+                        position_attribute_offset: 0,
                     },
                 ][..]
             } else {
-                &[ShaderConfig { profile: None }][..]
+                &[ShaderConfig {
+                    profile: None,
+                    position_attribute_offset: 0,
+                }][..]
             };
 
             if source.contains("DO NOT VALIDATE") {

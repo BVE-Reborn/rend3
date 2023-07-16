@@ -125,6 +125,7 @@ impl EguiRenderRoutine {
             format,
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
             label,
+            view_formats: &[],
         });
 
         EguiRenderRoutine::wgpu_texture_to_egui(

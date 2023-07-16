@@ -998,7 +998,7 @@ pub enum SortingOrder {
 pub trait MaterialArray<T>: AsRef<[T]> {
     /// An array of the [u32; COUNT]. We need this internally
     /// for shader layout stuff.
-    type U32Array: encase::ShaderSize + encase::internal::WriteInto + Clone + Copy + Send + Sync + Zeroable + 'static;
+    type U32Array: encase::ShaderSize + encase::internal::WriteInto + Zeroable + Clone + Copy + Send + Sync + 'static;
     type IntoIter: Iterator<Item = T>;
     const COUNT: u32;
 

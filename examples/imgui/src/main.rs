@@ -5,6 +5,7 @@ struct ImguiExampleData {
     _directional_handle: rend3::types::DirectionalLightHandle,
 
     imgui: imgui::Context,
+    #[allow(unused)] // ADDED UNTIL IMGUI_WINIT_PLATFORM UPDATE
     platform: imgui_winit_support::WinitPlatform,
     imgui_routine: rend3_imgui::ImguiRenderRoutine,
     frame_start: instant::Instant,
@@ -25,6 +26,7 @@ impl rend3_framework::App for ImguiExample {
         SAMPLE_COUNT
     }
 
+    #[allow(unused)] // ADDED UNTIL IMGUI_WINIT_PLATFORM UPDATE
     fn setup(
         &mut self,
         _event_loop: &winit::event_loop::EventLoop<rend3_framework::UserResizeEvent<()>>,
@@ -33,10 +35,12 @@ impl rend3_framework::App for ImguiExample {
         _routines: &Arc<rend3_framework::DefaultRoutines>,
         surface_format: rend3::types::TextureFormat,
     ) {
+        panic!("The rend3 imgui example does not run due to imgui_winit_support not being upgraded");
+
         // Set up imgui
         let mut imgui = imgui::Context::create();
         let mut platform = imgui_winit_support::WinitPlatform::init(&mut imgui);
-        platform.attach_window(imgui.io_mut(), window, imgui_winit_support::HiDpiMode::Default);
+        // platform.attach_window(imgui.io_mut(), window, imgui_winit_support::HiDpiMode::Default); REMOVED UNTIL IMGUI_WINIT_PLATFORM UPDATE
         imgui.set_ini_filename(None);
 
         let hidpi_factor = window.scale_factor();
@@ -140,21 +144,21 @@ impl rend3_framework::App for ImguiExample {
         let data = self.data.as_mut().unwrap();
 
         // Pass the winit events to the platform integration.
-        data.platform.handle_event(data.imgui.io_mut(), window, &event);
+        // data.platform.handle_event(data.imgui.io_mut(), window, &event); REMOVED UNTIL IMGUI_WINIT_PLATFORM UPDATE
 
         match event {
             rend3_framework::Event::RedrawRequested(..) => {
                 // Setup an imgui frame
-                data.platform
-                    .prepare_frame(data.imgui.io_mut(), window)
-                    .expect("could not prepare imgui frame");
+                // data.platform
+                //     .prepare_frame(data.imgui.io_mut(), window)
+                //     .expect("could not prepare imgui frame"); REMOVED UNTIL IMGUI_WINIT_PLATFORM UPDATE
                 let ui = data.imgui.frame();
 
                 // Insert imgui commands here
                 ui.show_demo_window(&mut data.demo_window_open);
 
                 // Prepare for rendering
-                data.platform.prepare_render(ui, window);
+                // data.platform.prepare_render(ui, window); REMOVED UNTIL IMGUI_WINIT_PLATFORM UPDATE
 
                 // Get a frame
                 let frame = surface.unwrap().get_current_texture().unwrap();
