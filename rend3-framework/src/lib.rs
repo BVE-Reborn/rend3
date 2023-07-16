@@ -173,7 +173,7 @@ where
     F: FnMut(winit::event::Event<'_, T>, &EventLoopWindowTarget<T>, &mut ControlFlow) + 'static,
     T: 'static,
 {
-    use wasm_bindgen::{prelude::*, JsCast};
+    use wasm_bindgen::prelude::*;
 
     let winit_closure = Closure::once_into_js(move || event_loop.run(event_handler));
 
