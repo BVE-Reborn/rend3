@@ -17,6 +17,7 @@ members = [
     "rend3-gltf",
     "rend3-imgui",
     "rend3-routine",
+    "rend3-test",
     "rend3-types"
 ]
 
