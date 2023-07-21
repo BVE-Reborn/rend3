@@ -16,5 +16,5 @@ egui = "0.22.0"
 egui-wgpu = "0.22"
 glam = "0.24"
 rend3 = { version = "^0.3.0", path = "../rend3" }
-wgpu = "0.16.1"
+wgpu = "0.17.0"
 wgpu-types = "0.16.0"
