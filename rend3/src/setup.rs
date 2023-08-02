@@ -435,7 +435,9 @@ pub async fn create_iad(
 ) -> Result<InstanceAdapterDevice, RendererInitializationError> {
     profiling::scope!("create_iad");
     #[cfg(not(target_arch = "wasm32"))]
-    let backend_bits = Backends::VULKAN | Backends::DX12 | Backends::DX11 | Backends::METAL | Backends::GL;
+    let backend_bits = Backends::VULKAN |
+         // Backends::DX12 | https://github.com/BVE-Reborn/rend3/issues/496
+         Backends::METAL;
     #[cfg(target_arch = "wasm32")]
     let backend_bits = Backends::BROWSER_WEBGPU;
     #[cfg(not(target_arch = "wasm32"))]

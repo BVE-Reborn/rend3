@@ -76,8 +76,7 @@ pub async fn coordinate_space() -> anyhow::Result<()> {
         ("X", Vec3::Z, Vec3::Y, Vec3::X),
     ];
 
-    let iad = rend3::create_iad(None, None, None, None)
-        .await
+    let iad = no_gpu_return!(rend3::create_iad(None, None, None, None).await)
         .context("InstanceAdapterDevice creation failed")?;
 
     let Ok(runner) = TestRunner::builder().iad(iad.clone()).handedness(Handedness::Left).build().await else {
