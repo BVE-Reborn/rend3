@@ -12,3 +12,6 @@ Cargo.lock
 /examples/scene-viewer/resources/default-scene/
 /examples/scene-viewer/resources/rend3-default-scene.tar
 
+*-diff.png
+*-success.png
+*-failure.png
