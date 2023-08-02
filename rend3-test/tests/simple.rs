@@ -1,7 +1,7 @@
 use anyhow::Context;
 use glam::{Mat4, Vec3, Vec4};
 use rend3::types::{Camera, Handedness, MeshBuilder, Object, ObjectMeshKind};
-use rend3_test::{test_attr, TestRunner};
+use rend3_test::{no_gpu_return, test_attr, TestRunner};
 use wgpu::FrontFace;
 
 #[test_attr]
@@ -13,8 +13,7 @@ pub async fn triangle() -> anyhow::Result<()> {
         (Handedness::Right, FrontFace::Ccw, true),
     ];
 
-    let iad = rend3::create_iad(None, None, None, None)
-        .await
+    let iad = no_gpu_return!(rend3::create_iad(None, None, None, None).await)
         .context("InstanceAdapterDevice creation failed")?;
 
     for (handedness, winding, visible) in tests {
