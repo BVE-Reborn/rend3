@@ -18,7 +18,6 @@ anyhow = "1"
 flume = { version = "0.10", features = ["spin"] }
 glam = "0.24"
 image = { version =  "0.24", default-features = false, features = ["png"] }
-nv-flip = "0.1"
 rend3 = { path = "../rend3" }
 rend3-routine = { path = "../rend3-routine" }
 wgpu = "0.16"
@@ -27,3 +26,6 @@ wgpu = "0.16"
 # and not need to have conditional attributes on every single test.
 tokio = { version = "1", features = ["rt", "macros"] }
 wasm-bindgen-test = { version = "0.3" }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+nv-flip = "0.1"

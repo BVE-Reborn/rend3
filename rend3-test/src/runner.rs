@@ -1,3 +1,5 @@
+#![cfg_attr(target_arch = "wasm32", allow(unused))] // While there's no wasm comparisons
+
 use std::{fs::create_dir_all, ops::Deref, path::Path, sync::Arc};
 
 use anyhow::{bail, ensure, Context, Result};
@@ -171,7 +173,7 @@ impl TestRunner {
             .device
             .poll(wgpu::Maintain::WaitForSubmissionIndex(submit_index));
 
-        let () = receiver
+        receiver
             .recv_async()
             .await
             .context("Failed to recieve message from map_async")?;
@@ -182,56 +184,59 @@ impl TestRunner {
     }
 
     pub fn compare_image_to_path(&self, test_rgba: &image::RgbaImage, path: &Path, threshold: f32) -> Result<()> {
-        let parent_path = path.parent().context("Path given had no parent")?;
-        let Ok(expected) = image::open(path) else {
-            create_dir_all(parent_path).context("Could not create parent directory")?;
-            test_rgba.save(path).context("Could not save image")?;
-            return Ok(())
-        };
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let parent_path = path.parent().context("Path given had no parent")?;
+            let Ok(expected) = image::open(path) else {
+                create_dir_all(parent_path).context("Could not create parent directory")?;
+                test_rgba.save(path).context("Could not save image")?;
+                return Ok(())
+            };
 
-        let expected_rgb = expected.into_rgb8();
-        let test_rgb: image::RgbImage = test_rgba.convert();
+            let expected_rgb = expected.into_rgb8();
+            let test_rgb: image::RgbImage = test_rgba.convert();
 
-        let expected_flip =
-            nv_flip::FlipImageRgb8::with_data(expected_rgb.width(), expected_rgb.height(), &expected_rgb);
-        let test_flip = nv_flip::FlipImageRgb8::with_data(test_rgb.width(), test_rgb.height(), &test_rgb);
+            let expected_flip =
+                nv_flip::FlipImageRgb8::with_data(expected_rgb.width(), expected_rgb.height(), &expected_rgb);
+            let test_flip = nv_flip::FlipImageRgb8::with_data(test_rgb.width(), test_rgb.height(), &test_rgb);
 
-        let result_float = nv_flip::flip(expected_flip, test_flip, nv_flip::DEFAULT_PIXELS_PER_DEGREE);
+            let result_float = nv_flip::flip(expected_flip, test_flip, nv_flip::DEFAULT_PIXELS_PER_DEGREE);
 
-        let magma = result_float.apply_color_lut(&nv_flip::magma_lut());
+            let magma = result_float.apply_color_lut(&nv_flip::magma_lut());
 
-        let magma_image = image::RgbImage::from_raw(magma.width(), magma.height(), magma.to_vec())
-            .context("Failed to create image from magma image")?;
+            let magma_image = image::RgbImage::from_raw(magma.width(), magma.height(), magma.to_vec())
+                .context("Failed to create image from magma image")?;
 
-        let mut pool = nv_flip::FlipPool::from_image(&result_float);
+            let mut pool = nv_flip::FlipPool::from_image(&result_float);
 
-        let p99 = pool.get_percentile(0.99, true);
+            let p99 = pool.get_percentile(0.99, true);
 
-        let pass = p99 <= threshold;
+            let pass = p99 <= threshold;
 
-        println!("Image Comparison Results: {}", if pass { "passed" } else { "failed" });
-        println!("    Mean: {}", pool.mean());
-        println!("     Min: {}", pool.min_value());
-        println!("     25%: {}", pool.get_percentile(0.25, true));
-        println!("     50%: {}", pool.get_percentile(0.50, true));
-        println!("     75%: {}", pool.get_percentile(0.75, true));
-        println!("     95%: {}", pool.get_percentile(0.95, true));
-        println!("     99%: {}", p99);
-        println!("     Max: {}", pool.max_value());
+            println!("Image Comparison Results: {}", if pass { "passed" } else { "failed" });
+            println!("    Mean: {}", pool.mean());
+            println!("     Min: {}", pool.min_value());
+            println!("     25%: {}", pool.get_percentile(0.25, true));
+            println!("     50%: {}", pool.get_percentile(0.50, true));
+            println!("     75%: {}", pool.get_percentile(0.75, true));
+            println!("     95%: {}", pool.get_percentile(0.95, true));
+            println!("     99%: {}", p99);
+            println!("     Max: {}", pool.max_value());
 
-        let filename = path.file_stem().unwrap();
+            let filename = path.file_stem().unwrap();
 
-        let diff_path = parent_path.join(format!("{}-diff.png", filename.to_string_lossy()));
-        let success_path = parent_path.join(format!("{}-success.png", filename.to_string_lossy()));
-        let failure_path = parent_path.join(format!("{}-failure.png", filename.to_string_lossy()));
+            let diff_path = parent_path.join(format!("{}-diff.png", filename.to_string_lossy()));
+            let success_path = parent_path.join(format!("{}-success.png", filename.to_string_lossy()));
+            let failure_path = parent_path.join(format!("{}-failure.png", filename.to_string_lossy()));
 
-        magma_image.save(&diff_path).context("Could not save diff image")?;
+            magma_image.save(&diff_path).context("Could not save diff image")?;
 
-        if pass {
-            test_rgba.save(&success_path).context("Could not save success image")?;
-        } else {
-            test_rgba.save(&failure_path).context("Could not save failure image")?;
-            bail!("Image comparison failed");
+            if pass {
+                test_rgba.save(&success_path).context("Could not save success image")?;
+            } else {
+                test_rgba.save(&failure_path).context("Could not save failure image")?;
+                bail!("Image comparison failed");
+            }
         }
 
         Ok(())
