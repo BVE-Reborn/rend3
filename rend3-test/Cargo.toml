@@ -1,0 +1,31 @@
+[package]
+name = "rend3-test"
+version = "0.3.0"
+authors = ["The rend3 Developers"]
+edition = "2021"
+description = "Testing utilities for rend3."
+license = "MIT OR Apache-2.0 OR Zlib"
+rust-version = "1.71"
+publish=false
+autotests = false
+
+[[test]]
+path = "tests/root.rs"
+name = "rend3-tests"
+
+[dependencies]
+anyhow = "1"
+flume = { version = "0.10", features = ["spin"] }
+glam = "0.24"
+image = { version =  "0.24", default-features = false, features = ["png"] }
+rend3 = { path = "../rend3" }
+rend3-routine = { path = "../rend3-routine" }
+wgpu = "0.16"
+
+# These should be dev-deps but doing this allows us to have a single attribute on all tests
+# and not need to have conditional attributes on every single test.
+tokio = { version = "1", features = ["rt", "macros"] }
+wasm-bindgen-test = { version = "0.3" }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+nv-flip = "0.1"
