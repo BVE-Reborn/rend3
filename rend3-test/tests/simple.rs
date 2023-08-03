@@ -17,6 +17,7 @@ pub async fn triangle() -> anyhow::Result<()> {
         .context("InstanceAdapterDevice creation failed")?;
 
     for (handedness, winding, visible) in tests {
+        iad.device.start_capture();
         let Ok(runner) = TestRunner::builder().iad(iad.clone()).handedness(handedness).build().await else {
             return Ok(());
         };
@@ -58,7 +59,11 @@ pub async fn triangle() -> anyhow::Result<()> {
             true => "tests/results/triangle.png",
             false => "tests/results/triangle-backface.png",
         };
-        runner.render_and_compare(64, file_name, 0.0).await?;
+        runner.render_and_compare(64, file_name, 0.0).await.with_context(|| {
+            format!(
+                "Comparison failed on test (Handedness::{handedness:?}, FrontFace::{winding:?}, Visible: {visible})"
+            )
+        })?;
     }
 
     Ok(())
@@ -119,7 +124,10 @@ pub async fn coordinate_space() -> anyhow::Result<()> {
         });
 
         let file_name = format!("tests/results/coordinate-space-{name}.png");
-        runner.render_and_compare(64, file_name, 0.0).await?;
+        runner
+            .render_and_compare(64, file_name, 0.0)
+            .await
+            .with_context(|| format!("Comparison failed on test {name}"))?;
     }
 
     Ok(())

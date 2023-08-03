@@ -79,10 +79,10 @@ impl Ord for ShaderJobSortingKey {
 #[derive(Debug, ShaderType)]
 pub struct ShaderBatchData {
     #[align(256)]
-    pub(super) ranges: [ShaderObjectRange; BATCH_SIZE],
     pub(super) total_objects: u32,
     pub(super) total_invocations: u32,
     pub(super) base_output_invocation: u32,
+    pub(super) ranges: [ShaderObjectRange; BATCH_SIZE],
 }
 
 #[derive(Debug, Copy, Clone, Default, ShaderType)]

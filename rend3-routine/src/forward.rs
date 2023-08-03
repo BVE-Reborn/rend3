@@ -11,14 +11,14 @@ use rend3::{
         DataHandle, NodeResourceUsage, RenderGraph, RenderPassDepthTarget, RenderPassTarget, RenderPassTargets,
         RenderTargetHandle,
     },
-    types::{GraphDataHandle, Handedness, Material, SampleCount},
+    types::{GraphDataHandle, Material, SampleCount},
     util::{bind_merge::BindGroupBuilder, typedefs::FastHashMap},
     ProfileData, Renderer, RendererDataCore, RendererProfile, ShaderPreProcessor,
 };
 use serde::Serialize;
 use wgpu::{
     BindGroup, BindGroupLayout, Color, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState,
-    DepthStencilState, Face, FragmentState, FrontFace, IndexFormat, MultisampleState, PipelineLayoutDescriptor,
+    DepthStencilState, Face, FragmentState, IndexFormat, MultisampleState, PipelineLayoutDescriptor,
     PolygonMode, PrimitiveState, PrimitiveTopology, RenderPipeline, RenderPipelineDescriptor, ShaderModule,
     StencilState, TextureFormat, VertexState,
 };
@@ -285,10 +285,7 @@ fn build_forward_pipeline_inner<M: Material>(
         primitive: PrimitiveState {
             topology: PrimitiveTopology::TriangleList,
             strip_index_format: None,
-            front_face: match args.renderer.handedness {
-                Handedness::Left => FrontFace::Cw,
-                Handedness::Right => FrontFace::Ccw,
-            },
+            front_face: args.renderer.handedness.into(),
             cull_mode: Some(Face::Back),
             unclipped_depth: false,
             polygon_mode: PolygonMode::Fill,

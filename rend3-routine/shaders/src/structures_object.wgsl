@@ -23,8 +23,8 @@ struct ObjectRange {
 }
 
 struct BatchData {
-    ranges: array<ObjectRange, 256>,
     total_objects: u32,
     total_invocations: u32,
     base_output_invocation: u32,
+    ranges: array<ObjectRange, 256>,
 }

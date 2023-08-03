@@ -2,7 +2,7 @@ use std::{path::Path, sync::Arc};
 
 use rend3::types::DirectionalLightHandle;
 
-const SAMPLE_COUNT: rend3::types::SampleCount = rend3::types::SampleCount::Four;
+const SAMPLE_COUNT: rend3::types::SampleCount = rend3::types::SampleCount::One;
 
 /// The application data, can only be obtained at `setup` time, so it's under an
 /// Option in the main struct.

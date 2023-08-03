@@ -71,7 +71,10 @@ fn execute_culling(
 
     let det = determinant(mat3x3<f32>(position0.xyw, position1.xyw, position2.xyw));
 
-    if det <= 0.0 {
+    if per_camera_uniform.triangle_visibility == POSITIVE_AREA_VISIBLE && det <= 0.0 {
+        return false;
+    }
+    if per_camera_uniform.triangle_visibility == NEGATIVE_AREA_VISIBLE && det >= 0.0 {
         return false;
     }
 

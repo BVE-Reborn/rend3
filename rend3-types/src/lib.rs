@@ -1181,6 +1181,15 @@ pub enum Handedness {
     Right,
 }
 
+impl From<Handedness> for wgt::FrontFace {
+    fn from(value: Handedness) -> Self {
+        match value {
+            Handedness::Left => Self::Cw,
+            Handedness::Right => Self::Ccw,
+        }
+    }
+}
+
 impl Default for Handedness {
     fn default() -> Self {
         Self::Left

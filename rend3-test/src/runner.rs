@@ -122,6 +122,7 @@ impl TestRunner {
         let frame_handle = graph.add_imported_render_target(
             &texture,
             0..1,
+            0..1,
             rend3::graph::ViewportRect::from_size(UVec2::splat(size)),
         );
 
@@ -228,6 +229,8 @@ impl TestRunner {
             let diff_path = parent_path.join(format!("{}-diff.png", filename.to_string_lossy()));
             let success_path = parent_path.join(format!("{}-success.png", filename.to_string_lossy()));
             let failure_path = parent_path.join(format!("{}-failure.png", filename.to_string_lossy()));
+
+            self.device.stop_capture();
 
             magma_image.save(&diff_path).context("Could not save diff image")?;
 

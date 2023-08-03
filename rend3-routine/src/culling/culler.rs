@@ -183,6 +183,30 @@ impl CullingBuffers<Arc<Buffer>> {
     }
 }
 
+#[derive(Debug, Copy, Clone)]
+pub enum TriangleVisibility {
+    PositiveAreaVisible,
+    NegativeAreaVisible,
+}
+
+impl TriangleVisibility {
+    fn from_winding_and_face(winding: wgpu::FrontFace, culling: wgpu::Face) -> Self {
+        match (winding, culling) {
+            (wgpu::FrontFace::Ccw, wgpu::Face::Back) => TriangleVisibility::PositiveAreaVisible,
+            (wgpu::FrontFace::Ccw, wgpu::Face::Front) => TriangleVisibility::NegativeAreaVisible,
+            (wgpu::FrontFace::Cw, wgpu::Face::Back) => TriangleVisibility::NegativeAreaVisible,
+            (wgpu::FrontFace::Cw, wgpu::Face::Front) => TriangleVisibility::PositiveAreaVisible,
+        }
+    }
+
+    fn to_u32(self) -> u32 {
+        match self {
+            TriangleVisibility::PositiveAreaVisible => 0,
+            TriangleVisibility::NegativeAreaVisible => 1,
+        }
+    }
+}
+
 #[derive(ShaderType)]
 struct PerCameraUniform {
     // TODO: use less space
@@ -195,6 +219,8 @@ struct PerCameraUniform {
     shadow_index: u32,
     frustum: Frustum,
     resolution: Vec2,
+    // Created from
+    triangle_visibility: u32,
     object_count: u32,
     #[size(runtime)]
     objects: Vec<PerCameraUniformObjectData>,
@@ -214,6 +240,7 @@ pub struct GpuCuller {
     culling_bgl: BindGroupLayout,
     culling_pipeline: ComputePipeline,
     sampler: Sampler,
+    winding: wgpu::FrontFace,
     type_id: TypeId,
     per_material_buffer_handle: GraphDataHandle<HashMap<Option<usize>, Arc<Buffer>>>,
     culling_buffer_map_handle: GraphDataHandle<CullingBufferMap>,
@@ -476,6 +503,7 @@ impl GpuCuller {
             culling_bgl,
             culling_pipeline,
             sampler,
+            winding: renderer.handedness.into(),
             type_id: TypeId::of::<M>(),
             per_material_buffer_handle,
             culling_buffer_map_handle,
@@ -523,6 +551,11 @@ impl GpuCuller {
             }))
         });
 
+        let culling = match camera_idx {
+            Some(_) => wgpu::Face::Front,
+            None => wgpu::Face::Back,
+        };
+
         {
             profiling::scope!("PerCameraUniform Data Upload");
             let per_camera_data = PerCameraUniform {
@@ -531,6 +564,7 @@ impl GpuCuller {
                 shadow_index: camera_idx.unwrap_or(u32::MAX as _) as u32,
                 frustum: camera.world_frustum(),
                 resolution: resolution.as_vec2(),
+                triangle_visibility: TriangleVisibility::from_winding_and_face(self.winding, culling).to_u32(),
                 object_count: max_object_count as u32,
                 objects: Vec::new(),
             };
