@@ -18,9 +18,9 @@ use rend3::{
 use serde::Serialize;
 use wgpu::{
     BindGroup, BindGroupLayout, Color, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState,
-    DepthStencilState, Face, FragmentState, IndexFormat, MultisampleState, PipelineLayoutDescriptor,
-    PolygonMode, PrimitiveState, PrimitiveTopology, RenderPipeline, RenderPipelineDescriptor, ShaderModule,
-    StencilState, TextureFormat, VertexState,
+    DepthStencilState, Face, FragmentState, IndexFormat, MultisampleState, PipelineLayoutDescriptor, PolygonMode,
+    PrimitiveState, PrimitiveTopology, RenderPipeline, RenderPipelineDescriptor, ShaderModule, StencilState,
+    TextureFormat, VertexState,
 };
 
 use crate::{
