@@ -55,8 +55,8 @@ pub async fn triangle() -> anyhow::Result<()> {
         });
 
         let file_name = match visible {
-            true => "tests/results/triangle.png",
-            false => "tests/results/triangle-backface.png",
+            true => "tests/results/simple/triangle.png",
+            false => "tests/results/simple/triangle-backface.png",
         };
         runner.render_and_compare(64, file_name, 0.0).await?;
     }
@@ -118,7 +118,7 @@ pub async fn coordinate_space() -> anyhow::Result<()> {
             view: Mat4::look_at_lh(camera_vector, Vec3::ZERO, up_vector),
         });
 
-        let file_name = format!("tests/results/coordinate-space-{name}.png");
+        let file_name = format!("tests/results/simple/coordinate-space-{name}.png");
         runner.render_and_compare(64, file_name, 0.0).await?;
     }
 
