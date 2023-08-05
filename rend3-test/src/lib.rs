@@ -8,7 +8,10 @@ macro_rules! no_gpu_return {
     ($value:expr) => {
         match $value {
             Ok(value) => Ok(value),
-            Err(rend3::RendererInitializationError::MissingAdapter) => return Ok(()),
+            Err(rend3::RendererInitializationError::MissingAdapter) => {
+                eprintln!("No adapter found, skipping test");
+                return Ok(())
+            },
             Err(err) => Err(err),
         }
     };
