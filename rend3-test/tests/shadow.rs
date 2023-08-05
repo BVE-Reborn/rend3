@@ -1,4 +1,4 @@
-use std::{f32::consts::FRAC_PI_2, time::Duration};
+use std::f32::consts::FRAC_PI_2;
 
 use anyhow::Context;
 use glam::{Mat4, Quat, Vec3, Vec3A, Vec4};
@@ -14,11 +14,15 @@ pub async fn shadows() -> anyhow::Result<()> {
         return Ok(());
     };
 
-    let _plane = runner.plane(Vec4::new(0.25, 0.5, 0.75, 1.0), Mat4::from_rotation_x(FRAC_PI_2));
+    let _light = runner.add_directional_light(Vec3::new(-1.0, -1.0, 1.0));
+
+    let material1 = runner.add_lit_material(Vec4::new(0.25, 0.5, 0.75, 1.0));
+
+    let _plane = runner.plane(material1, Mat4::from_rotation_x(FRAC_PI_2));
 
     runner.set_camera_data(Camera {
         projection: rend3::types::CameraProjection::Orthographic {
-            size: Vec3A::splat(4.0),
+            size: Vec3A::new(2.5, 2.5, 5.0),
         },
         view: Mat4::look_at_lh(Vec3::new(0.0, 1.0, -1.0), Vec3::ZERO, Vec3::Y),
     });
@@ -26,9 +30,11 @@ pub async fn shadows() -> anyhow::Result<()> {
     let file_name = "tests/results/shadow/plane.png";
     runner.render_and_compare(256, file_name, 0.0).await?;
 
+    let material2 = runner.add_lit_material(Vec4::new(0.75, 0.5, 0.25, 1.0));
+
     let _cube = runner.cube(
-        Vec4::new(0.75, 0.5, 0.25, 1.0),
-        Mat4::from_scale_rotation_translation(Vec3::splat(0.25), Quat::IDENTITY, Vec3::new(0.25, 0.75, 0.0)),
+        material2,
+        Mat4::from_scale_rotation_translation(Vec3::splat(0.25), Quat::IDENTITY, Vec3::new(0.25, 0.25, -0.25)),
     );
 
     let file_name = "tests/results/shadow/cube.png";

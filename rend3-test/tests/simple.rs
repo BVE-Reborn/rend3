@@ -41,7 +41,7 @@ pub async fn triangle() -> anyhow::Result<()> {
         .context("Failed to create mesh")?;
 
         let mesh_hdl = runner.add_mesh(mesh);
-        let material_hdl = runner.add_color_material(Vec4::new(0.25, 0.5, 0.75, 1.0));
+        let material_hdl = runner.add_unlit_material(Vec4::new(0.25, 0.5, 0.75, 1.0));
         let object = Object {
             mesh_kind: ObjectMeshKind::Static(mesh_hdl),
             material: material_hdl,
@@ -103,7 +103,7 @@ pub async fn coordinate_space() -> anyhow::Result<()> {
         };
 
         let mesh_hdl = runner.add_mesh(mesh);
-        let material_hdl = runner.add_color_material(color.extend(1.0));
+        let material_hdl = runner.add_unlit_material(color.extend(1.0));
         let object = Object {
             mesh_kind: ObjectMeshKind::Static(mesh_hdl),
             material: material_hdl,

@@ -10,8 +10,8 @@ macro_rules! no_gpu_return {
             Ok(value) => Ok(value),
             Err(rend3::RendererInitializationError::MissingAdapter) => {
                 eprintln!("No adapter found, skipping test");
-                return Ok(())
-            },
+                return Ok(());
+            }
             Err(err) => Err(err),
         }
     };
