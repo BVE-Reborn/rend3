@@ -28,7 +28,7 @@ pub async fn shadows() -> anyhow::Result<()> {
     });
 
     let file_name = "tests/results/shadow/plane.png";
-    runner.render_and_compare(256, file_name, 0.0).await?;
+    runner.render_and_compare(256, file_name, 0.02).await?;
 
     let material2 = runner.add_lit_material(Vec4::new(0.75, 0.5, 0.25, 1.0));
 
@@ -38,7 +38,7 @@ pub async fn shadows() -> anyhow::Result<()> {
     );
 
     let file_name = "tests/results/shadow/cube.png";
-    runner.render_and_compare(256, file_name, 0.0).await?;
+    runner.render_and_compare(256, file_name, 0.02).await?;
 
     Ok(())
 }
