@@ -85,7 +85,7 @@ jobs:
       
       - uses: actions/upload-artifact@v3
         with:
-          name: comparison-images
+          name: comparison-images-${{ matrix.name }}
           path: |
             **/*-success.png
             **/*-failure.png
