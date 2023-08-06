@@ -84,6 +84,8 @@ jobs:
         if: matrix.target != 'wasm32-unknown-unknown'
       
       - uses: actions/upload-artifact@v3
+        # always run
+        if: ${{ !cancelled() }}
         with:
           name: comparison-images-${{ matrix.name }}
           path: |
