@@ -82,6 +82,14 @@ jobs:
         run: |
           cargo +1.71 doc --target ${{ matrix.target }} --profile ci --no-deps
         if: matrix.target != 'wasm32-unknown-unknown'
+      
+      - uses: actions/upload-artifact@v3
+        with:
+          name: comparison-images-${{ matrix.name }}
+          path: |
+            **/*-success.png
+            **/*-failure.png
+            **/*-diff.png
 
   cargo-fmt:
     runs-on: ubuntu-latest
