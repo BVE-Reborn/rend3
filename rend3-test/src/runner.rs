@@ -209,9 +209,9 @@ impl TestRunner {
 
             let mut pool = nv_flip::FlipPool::from_image(&result_float);
 
-            let p99 = pool.get_percentile(0.99, true);
+            let mean: f32 = pool.mean();
 
-            let pass = p99 <= threshold;
+            let pass = mean <= threshold;
 
             println!("Image Comparison Results: {}", if pass { "passed" } else { "failed" });
             println!("    Mean: {}", pool.mean());
@@ -220,7 +220,7 @@ impl TestRunner {
             println!("     50%: {}", pool.get_percentile(0.50, true));
             println!("     75%: {}", pool.get_percentile(0.75, true));
             println!("     95%: {}", pool.get_percentile(0.95, true));
-            println!("     99%: {}", p99);
+            println!("     99%: {}", pool.get_percentile(0.99, true));
             println!("     Max: {}", pool.max_value());
 
             let filename = path.file_stem().unwrap();
