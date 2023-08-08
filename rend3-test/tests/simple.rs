@@ -1,7 +1,7 @@
 use anyhow::Context;
 use glam::{Mat4, Vec3, Vec4};
 use rend3::types::{Camera, Handedness, MeshBuilder, Object, ObjectMeshKind};
-use rend3_test::{no_gpu_return, test_attr, TestRunner};
+use rend3_test::{no_gpu_return, test_attr, TestRunner, Threshold};
 use wgpu::FrontFace;
 
 #[test_attr]
@@ -58,11 +58,14 @@ pub async fn triangle() -> anyhow::Result<()> {
             true => "tests/results/simple/triangle.png",
             false => "tests/results/simple/triangle-backface.png",
         };
-        runner.render_and_compare(64, file_name, 0.0).await.with_context(|| {
-            format!(
+        runner
+            .render_and_compare(64, file_name, Threshold::Mean(0.0))
+            .await
+            .with_context(|| {
+                format!(
                 "Comparison failed on test (Handedness::{handedness:?}, FrontFace::{winding:?}, Visible: {visible})"
             )
-        })?;
+            })?;
     }
 
     Ok(())
@@ -124,7 +127,7 @@ pub async fn coordinate_space() -> anyhow::Result<()> {
 
         let file_name = format!("tests/results/simple/coordinate-space-{name}.png");
         runner
-            .render_and_compare(64, file_name, 0.0)
+            .render_and_compare(64, file_name, Threshold::Mean(0.0))
             .await
             .with_context(|| format!("Comparison failed on test {name}"))?;
     }

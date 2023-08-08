@@ -11,7 +11,7 @@ use wgpu::{
     Extent3d, ImageCopyBuffer, ImageDataLayout, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages,
 };
 
-use crate::helpers::CaptureDropGuard;
+use crate::{helpers::CaptureDropGuard, ThresholdSet};
 
 #[derive(Default)]
 pub struct TestRunnerBuilder {
@@ -190,7 +190,12 @@ impl TestRunner {
         image::RgbaImage::from_raw(size, size, mapping.to_vec()).context("Failed to create image from mapping")
     }
 
-    pub fn compare_image_to_path(&self, test_rgba: &image::RgbaImage, path: &Path, threshold: f32) -> Result<()> {
+    pub fn compare_image_to_path(
+        &self,
+        test_rgba: &image::RgbaImage,
+        path: &Path,
+        threshold: impl Into<ThresholdSet>,
+    ) -> Result<()> {
         #[cfg(not(target_arch = "wasm32"))]
         {
             let parent_path = path.parent().context("Path given had no parent")?;
@@ -216,11 +221,11 @@ impl TestRunner {
 
             let mut pool = nv_flip::FlipPool::from_image(&result_float);
 
-            let mean: f32 = pool.mean();
+            println!("Image Comparison Results");
+            let threshold_set: ThresholdSet = threshold.into();
+            let pass = threshold_set.check(&mut pool);
 
-            let pass = mean <= threshold;
-
-            println!("Image Comparison Results: {}", if pass { "passed" } else { "failed" });
+            println!();
             println!("    Mean: {}", pool.mean());
             println!("     Min: {}", pool.min_value());
             println!("     25%: {}", pool.get_percentile(0.25, true));
@@ -229,6 +234,8 @@ impl TestRunner {
             println!("     95%: {}", pool.get_percentile(0.95, true));
             println!("     99%: {}", pool.get_percentile(0.99, true));
             println!("     Max: {}", pool.max_value());
+            println!("{}", if pass { "Passed!" } else { "Failed!" });
+            println!();
 
             let filename = path.file_stem().unwrap();
 
@@ -249,7 +256,12 @@ impl TestRunner {
         Ok(())
     }
 
-    pub async fn render_and_compare(&self, size: u32, path: impl AsRef<Path>, threshold: f32) -> Result<()> {
+    pub async fn render_and_compare(
+        &self,
+        size: u32,
+        path: impl AsRef<Path>,
+        threshold: impl Into<ThresholdSet>,
+    ) -> Result<()> {
         let test_rgba = self.render_frame(size).await?;
 
         self.compare_image_to_path(&test_rgba, path.as_ref(), threshold)
