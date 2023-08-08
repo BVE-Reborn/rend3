@@ -222,10 +222,12 @@ fn cs_main(
                 primary_output[global_output_invocation * 3u + 1u] = pack_batch_index(batch_object_index, index1);
                 primary_output[global_output_invocation * 3u + 2u] = pack_batch_index(batch_object_index, index2);
             }
-        
-            let previous_global_invocation = invocation_within_object + object_range.previous_global_invocation;
 
-            let previously_passed_culling = ((previous_culling_results[previous_global_invocation / 32u] >> (previous_global_invocation % 32u)) & 0x1u) == 1u;
+            var previously_passed_culling = false;
+            if object_range.previous_global_invocation != 0xFFFFFFFFu {
+                let previous_global_invocation = invocation_within_object + object_range.previous_global_invocation;
+                previously_passed_culling = ((previous_culling_results[previous_global_invocation / 32u] >> (previous_global_invocation % 32u)) & 0x1u) == 1u;
+            }
 
             if !previously_passed_culling || per_camera_uniform.shadow_index != 0xFFFFFFFFu {
                 let region_local_secondary_invocation = atomicAdd(&secondary_draw_calls[object_range.region_id].vertex_count, 3u) / 3u;
