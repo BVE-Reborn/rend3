@@ -1,4 +1,5 @@
 pub struct ThresholdSet {
+    #[cfg_attr(target_arch = "wasm32", allow(unused))]
     thresholds: Vec<Threshold>,
 }
 
