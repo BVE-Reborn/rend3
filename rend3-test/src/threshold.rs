@@ -3,6 +3,7 @@ pub struct ThresholdSet {
 }
 
 impl ThresholdSet {
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn check(self, pool: &mut nv_flip::FlipPool) -> bool {
         // If there are no checks, we want to fail the test.
         let mut all_passed = !self.thresholds.is_empty();
@@ -21,6 +22,7 @@ pub enum Threshold {
 }
 
 impl Threshold {
+    #[cfg(not(target_arch = "wasm32"))]
     fn check(&self, pool: &mut nv_flip::FlipPool) -> bool {
         match *self {
             Self::Mean(v) => {

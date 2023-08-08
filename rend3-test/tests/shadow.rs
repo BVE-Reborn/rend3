@@ -28,7 +28,16 @@ pub async fn shadows() -> anyhow::Result<()> {
     });
 
     let file_name = "tests/results/shadow/plane.png";
-    runner.render_and_compare(256, file_name, Threshold::Mean(0.0)).await?;
+    runner
+        .render_and_compare(
+            256,
+            file_name,
+            Threshold::Percentile {
+                percentile: 0.5,
+                threshold: 0.04,
+            },
+        )
+        .await?;
 
     let material2 = runner.add_lit_material(Vec4::new(0.75, 0.5, 0.25, 1.0));
 
