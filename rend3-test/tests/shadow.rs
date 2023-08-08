@@ -53,7 +53,7 @@ pub async fn shadows() -> anyhow::Result<()> {
             file_name,
             Threshold::Percentile {
                 percentile: 0.5,
-                threshold: 0.021,
+                threshold: 0.04,
             },
         )
         .await?;
