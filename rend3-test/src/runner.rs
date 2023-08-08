@@ -11,6 +11,8 @@ use wgpu::{
     Extent3d, ImageCopyBuffer, ImageDataLayout, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages,
 };
 
+use crate::helpers::CaptureDropGuard;
+
 #[derive(Default)]
 pub struct TestRunnerBuilder {
     handness: Option<Handedness>,
@@ -40,6 +42,8 @@ impl TestRunnerBuilder {
                 .context("InstanceAdapterDevice creation failed")?,
         };
 
+        let capture_guard = CaptureDropGuard::start_capture(Arc::clone(&iad.device));
+
         let renderer = rend3::Renderer::new(iad, self.handness.unwrap_or(Handedness::Left), None)
             .context("Renderer initialization failed")?;
         let mut spp = rend3::ShaderPreProcessor::new();
@@ -65,6 +69,7 @@ impl TestRunnerBuilder {
             pbr,
             tonemapping,
             base_rendergraph,
+            capture_guard,
         })
     }
 }
@@ -74,6 +79,7 @@ pub struct TestRunner {
     pub pbr: PbrRoutine,
     pub tonemapping: TonemappingRoutine,
     pub base_rendergraph: BaseRenderGraph,
+    pub capture_guard: CaptureDropGuard,
 }
 
 impl Deref for TestRunner {
@@ -229,8 +235,6 @@ impl TestRunner {
             let diff_path = parent_path.join(format!("{}-diff.png", filename.to_string_lossy()));
             let success_path = parent_path.join(format!("{}-success.png", filename.to_string_lossy()));
             let failure_path = parent_path.join(format!("{}-failure.png", filename.to_string_lossy()));
-
-            self.device.stop_capture();
 
             magma_image.save(&diff_path).context("Could not save diff image")?;
 

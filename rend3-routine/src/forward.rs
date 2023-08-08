@@ -300,9 +300,10 @@ fn build_forward_pipeline_inner<M: Material>(
             depth_compare: CompareFunction::GreaterEqual,
             stencil: StencilState::default(),
             bias: match args.routine_type {
+                // TODO: figure out what to put here
                 RoutineType::Depth => DepthBiasState {
-                    constant: -2,
-                    slope_scale: -2.0,
+                    constant: 0,
+                    slope_scale: 0.0,
                     clamp: 0.0,
                 },
                 RoutineType::Forward => DepthBiasState::default(),

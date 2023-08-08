@@ -17,7 +17,6 @@ pub async fn triangle() -> anyhow::Result<()> {
         .context("InstanceAdapterDevice creation failed")?;
 
     for (handedness, winding, visible) in tests {
-        iad.device.start_capture();
         let Ok(runner) = TestRunner::builder().iad(iad.clone()).handedness(handedness).build().await else {
             return Ok(());
         };
