@@ -18,8 +18,8 @@ export function __wasm_rend3_framework_register_resize_observer_impl(element, se
         } else {
             console.error("Cannot get borderBoxSize from ResizeObserver entry!");
         }
-        const height = size.blockSize;
-        const width = size.inlineSize;
+        const height = size.blockSize * window.devicePixelRatio;
+        const width = size.inlineSize * window.devicePixelRatio;
         send_msg_resized(width, height);
     });
     resizeObserver.observe(element);
