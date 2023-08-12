@@ -16,6 +16,7 @@ use wgpu::{
 
 use crate::{helpers::CaptureDropGuard, ThresholdSet};
 
+#[derive(Clone)]
 pub struct FrameRenderSettings {
     size: u32,
     samples: SampleCount,
@@ -129,14 +130,7 @@ impl TestRunner {
         TestRunnerBuilder::new()
     }
 
-    pub async fn render_frame(&self, settings: FrameRenderSettings) -> Result<image::RgbaImage> {
-        let buffer = self.renderer.device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Test output buffer"),
-            size: (settings.size * settings.size * 4) as u64,
-            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
-            mapped_at_creation: false,
-        });
-
+    pub fn process_events(&self, settings: FrameRenderSettings) -> wgpu::Texture {
         let texture = self.renderer.device.create_texture(&TextureDescriptor {
             label: Some("Test output image"),
             size: Extent3d {
@@ -178,6 +172,19 @@ impl TestRunner {
         );
 
         graph.execute(&self.renderer, &mut eval_output);
+
+        texture
+    }
+
+    pub async fn render_frame(&self, settings: FrameRenderSettings) -> Result<image::RgbaImage> {
+        let buffer = self.renderer.device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Test output buffer"),
+            size: (settings.size * settings.size * 4) as u64,
+            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+            mapped_at_creation: false,
+        });
+
+        let texture = self.process_events(settings.clone());
 
         let mut encoder = self
             .renderer
