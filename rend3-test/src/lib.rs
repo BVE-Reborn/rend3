@@ -2,7 +2,7 @@ mod helpers;
 mod runner;
 mod threshold;
 
-pub use runner::TestRunner;
+pub use runner::{FrameRenderSettings, TestRunner};
 pub use threshold::{Threshold, ThresholdSet};
 
 #[macro_export]

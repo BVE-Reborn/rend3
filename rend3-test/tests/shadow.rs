@@ -3,7 +3,7 @@ use std::f32::consts::FRAC_PI_2;
 use anyhow::Context;
 use glam::{Mat4, Quat, Vec3, Vec3A, Vec4};
 use rend3::types::{Camera, Handedness};
-use rend3_test::{no_gpu_return, test_attr, TestRunner, Threshold};
+use rend3_test::{no_gpu_return, test_attr, FrameRenderSettings, TestRunner, Threshold};
 
 #[test_attr]
 pub async fn shadows() -> anyhow::Result<()> {
@@ -30,7 +30,7 @@ pub async fn shadows() -> anyhow::Result<()> {
     let file_name = "tests/results/shadow/plane.png";
     runner
         .render_and_compare(
-            256,
+            FrameRenderSettings::new().size(256)?,
             file_name,
             Threshold::Percentile {
                 percentile: 0.5,
@@ -49,7 +49,7 @@ pub async fn shadows() -> anyhow::Result<()> {
     let file_name = "tests/results/shadow/cube.png";
     runner
         .render_and_compare(
-            256,
+            FrameRenderSettings::new().size(256)?,
             file_name,
             Threshold::Percentile {
                 percentile: 0.5,

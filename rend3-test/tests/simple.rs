@@ -1,7 +1,7 @@
 use anyhow::Context;
 use glam::{Mat4, Vec3, Vec4};
 use rend3::types::{Camera, Handedness, MeshBuilder, Object, ObjectMeshKind};
-use rend3_test::{no_gpu_return, test_attr, TestRunner, Threshold};
+use rend3_test::{no_gpu_return, test_attr, FrameRenderSettings, TestRunner, Threshold};
 use wgpu::FrontFace;
 
 #[test_attr]
@@ -35,7 +35,10 @@ pub async fn triangle() -> anyhow::Result<()> {
                     Vec3::new(0.0, 0.5, 0.0),
                 ],
             },
-            Handedness::Left,
+            match winding {
+                FrontFace::Cw => Handedness::Left,
+                FrontFace::Ccw => Handedness::Right,
+            },
         )
         .build()
         .context("Failed to create mesh")?;
@@ -59,7 +62,7 @@ pub async fn triangle() -> anyhow::Result<()> {
             false => "tests/results/simple/triangle-backface.png",
         };
         runner
-            .render_and_compare(64, file_name, Threshold::Mean(0.0))
+            .render_and_compare(FrameRenderSettings::new(), file_name, Threshold::Mean(0.0))
             .await
             .with_context(|| {
                 format!(
@@ -127,7 +130,7 @@ pub async fn coordinate_space() -> anyhow::Result<()> {
 
         let file_name = format!("tests/results/simple/coordinate-space-{name}.png");
         runner
-            .render_and_compare(64, file_name, Threshold::Mean(0.0))
+            .render_and_compare(FrameRenderSettings::new(), file_name, Threshold::Mean(0.0))
             .await
             .with_context(|| format!("Comparison failed on test {name}"))?;
     }
