@@ -1,7 +1,7 @@
 mod helpers;
 mod runner;
 
-pub use runner::TestRunner;
+pub use runner::{FrameRenderSettings, TestRunner};
 
 #[macro_export]
 macro_rules! no_gpu_return {

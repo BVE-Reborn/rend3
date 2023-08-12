@@ -5,11 +5,45 @@ use std::{fs::create_dir_all, ops::Deref, path::Path, sync::Arc};
 use anyhow::{bail, ensure, Context, Result};
 use glam::UVec2;
 use image::buffer::ConvertBuffer;
-use rend3::{types::Handedness, Renderer};
+use rend3::{
+    types::{Handedness, SampleCount},
+    Renderer,
+};
 use rend3_routine::{base::BaseRenderGraph, pbr::PbrRoutine, tonemapping::TonemappingRoutine};
 use wgpu::{
     Extent3d, ImageCopyBuffer, ImageDataLayout, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages,
 };
+
+pub struct FrameRenderSettings {
+    size: u32,
+    samples: SampleCount,
+}
+
+impl FrameRenderSettings {
+    pub fn new() -> Self {
+        Self {
+            size: 64,
+            samples: SampleCount::One,
+        }
+    }
+
+    pub fn size(mut self, size: u32) -> Result<Self> {
+        ensure!(size % 64 == 0, "Size must be a multiple of 64, is {}", size);
+        self.size = size;
+        Ok(self)
+    }
+
+    pub fn samples(mut self, samples: SampleCount) -> Self {
+        self.samples = samples;
+        self
+    }
+}
+
+impl Default for FrameRenderSettings {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 #[derive(Default)]
 pub struct TestRunnerBuilder {
@@ -89,12 +123,10 @@ impl TestRunner {
         TestRunnerBuilder::new()
     }
 
-    pub async fn render_frame(&self, size: u32) -> Result<image::RgbaImage> {
-        ensure!(size % 64 == 0, "Size must be a multiple of 64, is {}", size);
-
+    pub async fn render_frame(&self, settings: FrameRenderSettings) -> Result<image::RgbaImage> {
         let buffer = self.renderer.device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Test output buffer"),
-            size: (size * size * 4) as u64,
+            size: (settings.size * settings.size * 4) as u64,
             usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
             mapped_at_creation: false,
         });
@@ -102,8 +134,8 @@ impl TestRunner {
         let texture = self.renderer.device.create_texture(&TextureDescriptor {
             label: Some("Test output image"),
             size: Extent3d {
-                width: size,
-                height: size,
+                width: settings.size,
+                height: settings.size,
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,
@@ -122,7 +154,7 @@ impl TestRunner {
         let frame_handle = graph.add_imported_render_target(
             &texture,
             0..1,
-            rend3::graph::ViewportRect::from_size(UVec2::splat(size)),
+            rend3::graph::ViewportRect::from_size(UVec2::splat(settings.size)),
         );
 
         self.base_rendergraph.add_to_graph(
@@ -132,8 +164,8 @@ impl TestRunner {
             None,
             &self.tonemapping,
             frame_handle,
-            UVec2::splat(size),
-            rend3::types::SampleCount::One,
+            UVec2::splat(settings.size),
+            settings.samples,
             glam::Vec4::ZERO,
             glam::Vec4::ZERO,
         );
@@ -152,13 +184,13 @@ impl TestRunner {
                 buffer: &buffer,
                 layout: ImageDataLayout {
                     offset: 0,
-                    bytes_per_row: Some(size * 4),
+                    bytes_per_row: Some(settings.size * 4),
                     rows_per_image: None,
                 },
             },
             Extent3d {
-                width: size,
-                height: size,
+                width: settings.size,
+                height: settings.size,
                 depth_or_array_layers: 1,
             },
         );
@@ -180,7 +212,8 @@ impl TestRunner {
 
         let mapping = buffer.slice(..).get_mapped_range();
 
-        image::RgbaImage::from_raw(size, size, mapping.to_vec()).context("Failed to create image from mapping")
+        image::RgbaImage::from_raw(settings.size, settings.size, mapping.to_vec())
+            .context("Failed to create image from mapping")
     }
 
     pub fn compare_image_to_path(&self, test_rgba: &image::RgbaImage, path: &Path, threshold: f32) -> Result<()> {
@@ -242,8 +275,13 @@ impl TestRunner {
         Ok(())
     }
 
-    pub async fn render_and_compare(&self, size: u32, path: impl AsRef<Path>, threshold: f32) -> Result<()> {
-        let test_rgba = self.render_frame(size).await?;
+    pub async fn render_and_compare(
+        &self,
+        settings: FrameRenderSettings,
+        path: impl AsRef<Path>,
+        threshold: f32,
+    ) -> Result<()> {
+        let test_rgba = self.render_frame(settings).await?;
 
         self.compare_image_to_path(&test_rgba, path.as_ref(), threshold)
     }

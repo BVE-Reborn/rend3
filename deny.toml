@@ -1,21 +1,13 @@
 [licenses]
 unlicensed = "deny"
 allow-osi-fsf-free = "either"
-allow = [
-    "Apache-2.0",
-    "MIT",
-    "MPL-2.0",
-    "LicenseRef-UFL-1.0",
-    "Unlicense",
-]
+allow = ["Apache-2.0", "MIT", "MPL-2.0", "LicenseRef-UFL-1.0", "Unlicense"]
 copyleft = "allow"
 
 [[licenses.clarify]]
 name = "encoding_rs"
 expression = "(Apache-2.0 OR MIT) AND BSD-3-Clause"
-license-files = [
-    { path = "COPYRIGHT", hash = 972598577 }
-]
+license-files = [{ path = "COPYRIGHT", hash = 972598577 }]
 
 [bans]
 multiple-versions = "deny"
@@ -27,21 +19,20 @@ skip = [
     { name = "base64", version = "0.13.1" },
     # ddsfile
     { name = "num-traits", version = "0.1.43" },
+    # tokio
+    { name = "socket2", version = "0.4.9" },
 ]
 skip-tree = [
     # winit brings in lots of duplicate deps that we can't fix
     { name = "winit", version = "0.28" },
-    # reqwest
-    { name = "rustix", version = "0.37.23" },
     # loom is depended on by tracy-client but under a custom cfg that is never on.
-    { name = "loom", version = "0.5" }
+    { name = "loom", version = "0.5" },
 ]
 
 [advisories]
 vulnerability = "warn"
 unmaintained = "warn"
-ignore = [
-]
+ignore = []
 
 [sources]
 unknown-registry = "deny"
