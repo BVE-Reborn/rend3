@@ -18,7 +18,7 @@ pub async fn shadows() -> anyhow::Result<()> {
 
     let material1 = runner.add_lit_material(Vec4::new(0.25, 0.5, 0.75, 1.0));
 
-    let _plane = runner.plane(material1, Mat4::from_rotation_x(FRAC_PI_2));
+    let _plane = runner.plane(material1, Mat4::from_rotation_x(-FRAC_PI_2));
 
     runner.set_camera_data(Camera {
         projection: rend3::types::CameraProjection::Orthographic {

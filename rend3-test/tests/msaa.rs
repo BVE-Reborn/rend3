@@ -50,7 +50,7 @@ pub async fn triangle() -> anyhow::Result<()> {
 }
 
 #[test_attr]
-pub async fn pixel_coverage() -> anyhow::Result<()> {
+pub async fn sample_coverage() -> anyhow::Result<()> {
     let iad = no_gpu_return!(rend3::create_iad(None, None, None, None).await)
         .context("InstanceAdapterDevice creation failed")?;
 
@@ -60,14 +60,17 @@ pub async fn pixel_coverage() -> anyhow::Result<()> {
 
     let material = runner.add_unlit_material(Vec4::ONE);
 
-    let base_matrix = Mat4::from_translation(Vec3::new(0.5, 0.5, 1.0)) * Mat4::from_scale(Vec3::new(0.5, 0.5, 1.0));
+    // Make a plane whose (0, 0) is at the top left, and is 1 unit large.
+    let base_matrix = Mat4::from_translation(Vec3::new(0.5, 0.5, 0.0)) * Mat4::from_scale(Vec3::new(0.5, 0.5, 1.0));
     // 64 x 64 grid of planes
     let mut planes = Vec::with_capacity(64 * 64);
     for x in 0..64 {
         for y in 0..64 {
             planes.push(runner.plane(
                 material.clone(),
-                Mat4::from_translation(Vec3::new(x as f32, y as f32, 0.0)) * base_matrix,
+                Mat4::from_translation(Vec3::new(x as f32, y as f32, 0.0))
+                    * Mat4::from_scale(Vec3::new(1.0 - (x as f32 / 63.0), 1.0 - (y as f32 / 63.0), 1.0))
+                    * base_matrix,
             ));
         }
         runner.process_events(FrameRenderSettings::new());
@@ -81,7 +84,7 @@ pub async fn pixel_coverage() -> anyhow::Result<()> {
     runner
         .render_and_compare(
             FrameRenderSettings::new().samples(SampleCount::Four),
-            "tests/results/msaa/plane.png",
+            "tests/results/msaa/sample-coverage.png",
             0.0,
         )
         .await?;
