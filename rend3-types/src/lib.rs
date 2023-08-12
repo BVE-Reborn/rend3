@@ -1165,6 +1165,8 @@ impl TryFrom<u8> for SampleCount {
 }
 
 impl SampleCount {
+    pub const ARRAY: [Self; 2] = [Self::One, Self::Four];
+
     /// Determines if a resolve texture is needed for this texture.
     pub fn needs_resolve(self) -> bool {
         self != Self::One
