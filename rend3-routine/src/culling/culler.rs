@@ -528,6 +528,7 @@ impl GpuCuller {
 
         let encoder = ctx.encoder_or_pass.take_encoder();
 
+        // TODO: Isolate all this into a struct
         let max_object_count = ctx
             .data_core
             .object_manager
@@ -540,16 +541,31 @@ impl GpuCuller {
             return;
         }
 
+        let per_map_buffer_size = ((max_object_count - 1) * PerCameraUniformObjectData::SHADER_SIZE.get())
+            + PerCameraUniform::min_size().get();
+
         let mut per_mat_buffer_map = ctx.data_core.graph_storage.get_mut(&self.per_material_buffer_handle);
-        let buffer = per_mat_buffer_map.entry(camera_idx).or_insert_with(|| {
+
+        let new_per_mat_buffer = || {
             Arc::new(ctx.renderer.device.create_buffer(&BufferDescriptor {
                 label: None,
-                size: ((max_object_count - 1) * PerCameraUniformObjectData::SHADER_SIZE.get())
-                    + PerCameraUniform::min_size().get(),
+                size: per_map_buffer_size,
                 usage: BufferUsages::STORAGE | BufferUsages::COPY_SRC | BufferUsages::COPY_DST,
                 mapped_at_creation: false,
             }))
-        });
+        };
+        let buffer = match per_mat_buffer_map.entry(camera_idx) {
+            Entry::Occupied(o) => {
+                let r = o.into_mut();
+                if r.size() < per_map_buffer_size {
+                    *r = new_per_mat_buffer();
+                }
+                r
+            }
+            Entry::Vacant(o) => {
+                o.insert(new_per_mat_buffer())
+            }
+        };
 
         let culling = match camera_idx {
             Some(_) => wgpu::Face::Front,
@@ -557,6 +573,7 @@ impl GpuCuller {
         };
 
         {
+            // We don't write anything in the objects right now, as this will be filled in by the preparation compute shader
             profiling::scope!("PerCameraUniform Data Upload");
             let per_camera_data = PerCameraUniform {
                 view: camera.view(),
