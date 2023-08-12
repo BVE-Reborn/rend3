@@ -81,13 +81,15 @@ pub async fn sample_coverage() -> anyhow::Result<()> {
         view: Mat4::IDENTITY,
     });
 
-    runner
-        .render_and_compare(
-            FrameRenderSettings::new().samples(SampleCount::Four),
-            "tests/results/msaa/sample-coverage.png",
-            0.0,
-        )
-        .await?;
+    for samples in SampleCount::ARRAY {
+        runner
+            .render_and_compare(
+                FrameRenderSettings::new().samples(samples),
+                &format!("tests/results/msaa/sample-coverage-{}.png", samples as u8),
+                0.0,
+            )
+            .await?;
+    }
 
     Ok(())
 }
