@@ -29,6 +29,47 @@ use wgpu::{BindGroup, Buffer};
 
 use crate::{common, culling, forward::RoutineAddToGraphArgs, pbr, skinning, skybox, tonemapping};
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub struct DepthTargets {
+    pub single_sample_mipped: RenderTargetHandle,
+    pub multi_sample: Option<RenderTargetHandle>,
+}
+
+impl DepthTargets {
+    pub fn new(graph: &mut RenderGraph<'_>, resolution: UVec2, samples: SampleCount) -> Self {
+        let single_sample_mipped = graph.add_render_target(RenderTargetDescriptor {
+            label: Some("hdr depth".into()),
+            resolution,
+            depth: 1,
+            mip_levels: None,
+            samples: SampleCount::One,
+            format: TextureFormat::Depth32Float,
+            usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
+        });
+
+        let multi_sample = samples.needs_resolve().then(|| {
+            graph.add_render_target(RenderTargetDescriptor {
+                label: Some("hdr depth multisampled".into()),
+                resolution,
+                depth: 1,
+                mip_levels: Some(1),
+                samples,
+                format: TextureFormat::Depth32Float,
+                usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
+            })
+        });
+
+        Self {
+            single_sample_mipped,
+            multi_sample,
+        }
+    }
+
+    pub fn rendering_target(&self) -> RenderTargetHandle {
+        self.multi_sample.unwrap_or(self.single_sample_mipped.set_mips(0..1))
+    }
+}
+
 /// Starter RenderGraph.
 ///
 /// See module for documentation.
@@ -135,7 +176,7 @@ pub struct BaseRenderGraphIntermediateState {
     pub shadow: RenderTargetHandle,
     pub color: RenderTargetHandle,
     pub resolve: Option<RenderTargetHandle>,
-    pub depth: RenderTargetHandle,
+    pub depth: DepthTargets,
     pub pre_skinning_buffers: DataHandle<skinning::PreSkinningBuffers>,
 }
 impl BaseRenderGraphIntermediateState {
@@ -185,15 +226,7 @@ impl BaseRenderGraphIntermediateState {
                 usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
             })
         });
-        let depth = graph.add_render_target(RenderTargetDescriptor {
-            label: Some("hdr depth".into()),
-            resolution,
-            depth: 1,
-            mip_levels: None,
-            samples,
-            format: TextureFormat::Depth32Float,
-            usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
-        });
+        let depth = DepthTargets::new(graph, resolution, samples);
 
         let pre_skinning_buffers = graph.add_data::<skinning::PreSkinningBuffers>();
 
@@ -280,8 +313,13 @@ impl BaseRenderGraphIntermediateState {
 
     /// Does all culling for the forward PBR materials.
     pub fn pbr_culling<'node>(&self, graph: &mut RenderGraph<'node>, base: &'node BaseRenderGraph) {
-        base.gpu_culler
-            .add_culling_to_graph::<pbr::PbrMaterial>(graph, self.cull, self.depth, None, "Primary Culling");
+        base.gpu_culler.add_culling_to_graph::<pbr::PbrMaterial>(
+            graph,
+            self.cull,
+            self.depth.single_sample_mipped,
+            None,
+            "Primary Culling",
+        );
     }
 
     /// Clear all the targets to their needed values
@@ -295,7 +333,7 @@ impl BaseRenderGraphIntermediateState {
             graph,
             Some(self.color),
             self.resolve,
-            self.depth.set_mips(0..1),
+            self.depth.rendering_target(),
             clear_color,
             0.0,
         );
@@ -343,7 +381,7 @@ impl BaseRenderGraphIntermediateState {
                 graph,
                 self.color,
                 self.resolve,
-                self.depth.set_mips(0..1),
+                self.depth.rendering_target(),
                 self.forward_uniform_bg,
                 samples,
             );
@@ -370,7 +408,7 @@ impl BaseRenderGraphIntermediateState {
                 camera: None,
                 color: Some(self.color),
                 resolve: self.resolve,
-                depth: self.depth.set_mips(0..1),
+                depth: self.depth.rendering_target(),
             });
         }
     }
@@ -395,7 +433,7 @@ impl BaseRenderGraphIntermediateState {
                 camera: None,
                 color: Some(self.color),
                 resolve: self.resolve,
-                depth: self.depth.set_mips(0..1),
+                depth: self.depth.rendering_target(),
             });
         }
     }
@@ -418,7 +456,7 @@ impl BaseRenderGraphIntermediateState {
             samples,
             color: Some(self.color),
             resolve: self.resolve,
-            depth: self.depth.set_mips(0..1),
+            depth: self.depth.rendering_target(),
         });
     }
 
