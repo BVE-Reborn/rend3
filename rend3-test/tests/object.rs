@@ -1,8 +1,16 @@
 use anyhow::Context;
 use glam::{Mat4, Vec3, Vec4};
-use rend3::types::{Camera, Handedness};
+use rend3::{
+    types::{Camera, Handedness},
+    util::freelist::FreelistDerivedBuffer,
+};
 use rend3_test::{no_gpu_return, test_attr, FrameRenderSettings, TestRunner, Threshold};
 
+/// There was a bug in the culling implementation where the per-material buffer
+/// was never resized to fit the number of objects in the scene once it was initially
+/// created. This manifested as objects above the initial frame count would get all-zero
+/// transforms and be completely hidden. We reproduce those conditions here, and ensure
+/// that the bug is fixed.
 #[test_attr]
 pub async fn multi_frame_add() -> anyhow::Result<()> {
     let iad = no_gpu_return!(rend3::create_iad(None, None, None, None).await)
@@ -22,10 +30,14 @@ pub async fn multi_frame_add() -> anyhow::Result<()> {
         view: Mat4::IDENTITY,
     });
 
-    // 2 side by side planes
+    // We use the starting size amount of objects for each column, ensuring that the buffer
+    // will need to be resized on the second column.
+    let count = FreelistDerivedBuffer::STARTING_SIZE;
+
+    // 2 side by side columns made up of `count` rows
     let mut planes = Vec::with_capacity(2);
     for x in 0..2 {
-        for y in 0..16 {
+        for y in 0..count {
             planes.push(runner.plane(
                 material.clone(),
                 Mat4::from_translation(Vec3::new(x as f32, y as f32, 0.0)) * base_matrix,

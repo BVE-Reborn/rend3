@@ -557,7 +557,7 @@ impl GpuCuller {
         let buffer = match per_mat_buffer_map.entry(camera_idx) {
             Entry::Occupied(o) => {
                 let r = o.into_mut();
-                if r.size() < per_map_buffer_size {
+                if r.size() != per_map_buffer_size {
                     *r = new_per_mat_buffer();
                 }
                 r

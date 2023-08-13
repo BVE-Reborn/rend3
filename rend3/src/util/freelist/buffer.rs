@@ -5,11 +5,6 @@ use wgpu::{Buffer, BufferDescriptor, BufferUsages, CommandEncoder, Device};
 
 use crate::util::scatter_copy::{ScatterCopy, ScatterData};
 
-const STARTING_SIZE: usize = 16;
-const NEEDED_USAGES: BufferUsages = BufferUsages::STORAGE
-    .union(BufferUsages::COPY_DST)
-    .union(BufferUsages::COPY_SRC);
-
 pub struct FreelistDerivedBuffer {
     inner: Buffer,
 
@@ -21,6 +16,11 @@ pub struct FreelistDerivedBuffer {
     stale: Vec<usize>,
 }
 impl FreelistDerivedBuffer {
+    pub const STARTING_SIZE: usize = 16;
+    pub const NEEDED_USAGES: BufferUsages = BufferUsages::STORAGE
+        .union(BufferUsages::COPY_DST)
+        .union(BufferUsages::COPY_SRC);
+
     pub fn new<T>(device: &Device) -> Self
     where
         T: ShaderSize + WriteInto + 'static,
@@ -29,16 +29,16 @@ impl FreelistDerivedBuffer {
 
         let buffer = device.create_buffer(&BufferDescriptor {
             label: Some("freelist buffer"),
-            size: rounded_size * STARTING_SIZE as u64,
-            usage: NEEDED_USAGES,
+            size: rounded_size * Self::STARTING_SIZE as u64,
+            usage: Self::NEEDED_USAGES,
             mapped_at_creation: false,
         });
 
         Self {
             inner: buffer,
 
-            current_count: STARTING_SIZE,
-            reserved_count: STARTING_SIZE,
+            current_count: Self::STARTING_SIZE,
+            reserved_count: Self::STARTING_SIZE,
             rounded_size,
             stored_type: TypeId::of::<T>(),
 
@@ -70,7 +70,7 @@ impl FreelistDerivedBuffer {
             let new_buffer = device.create_buffer(&BufferDescriptor {
                 label: Some("freelist buffer"),
                 size: self.rounded_size * self.reserved_count as u64,
-                usage: NEEDED_USAGES,
+                usage: Self::NEEDED_USAGES,
                 mapped_at_creation: false,
             });
 
