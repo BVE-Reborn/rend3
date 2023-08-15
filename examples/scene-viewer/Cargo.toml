@@ -49,7 +49,7 @@ rend3-routine = { version = "^0.3.0", path = "../../rend3-routine" }
 rustc-hash = "1"
 smallvec = "1"
 tracy-client = { version = "0.15", optional = true }
-wgpu-profiler = "0.12.0"
+wgpu-profiler = "0.14.1"
 winit = "0.28"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
