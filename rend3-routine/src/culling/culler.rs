@@ -14,7 +14,7 @@ use rend3::{
     format_sso,
     graph::{DataHandle, DeclaredDependency, NodeExecutionContext, NodeResourceUsage, RenderGraph, RenderTargetHandle},
     managers::{CameraManager, ShaderObject, TextureBindGroupIndex},
-    types::{GraphDataHandle, Material, MaterialArray, RawObjectHandle, VERTEX_ATTRIBUTE_POSITION},
+    types::{GraphDataHandle, Material, MaterialArray, RawObjectHandle, SampleCount, VERTEX_ATTRIBUTE_POSITION},
     util::{
         frustum::Frustum,
         math::{round_up, round_up_div},
@@ -199,11 +199,18 @@ impl TriangleVisibility {
         }
     }
 
-    fn to_u32(self) -> u32 {
+    fn is_positive(self) -> bool {
         match self {
-            TriangleVisibility::PositiveAreaVisible => 0,
-            TriangleVisibility::NegativeAreaVisible => 1,
+            TriangleVisibility::PositiveAreaVisible => true,
+            TriangleVisibility::NegativeAreaVisible => false,
         }
+    }
+}
+
+bitflags::bitflags! {
+    struct PerCameraUniformFlags: u32 {
+        const POSTIIVE_AREA_VISIBLE = 1 << 0;
+        const MULTISAMPLED = 1 << 1;
     }
 }
 
@@ -219,8 +226,8 @@ struct PerCameraUniform {
     shadow_index: u32,
     frustum: Frustum,
     resolution: Vec2,
-    // Created from
-    triangle_visibility: u32,
+    // Created from PerCameraUniformFlags
+    flags: u32,
     object_count: u32,
     #[size(runtime)]
     objects: Vec<PerCameraUniformObjectData>,
@@ -517,6 +524,7 @@ impl GpuCuller {
         camera: &CameraManager,
         camera_idx: Option<usize>,
         resolution: UVec2,
+        samples: SampleCount,
     ) where
         M: Material,
     {
@@ -562,9 +570,7 @@ impl GpuCuller {
                 }
                 r
             }
-            Entry::Vacant(o) => {
-                o.insert(new_per_mat_buffer())
-            }
+            Entry::Vacant(o) => o.insert(new_per_mat_buffer()),
         };
 
         let culling = match camera_idx {
@@ -581,7 +587,15 @@ impl GpuCuller {
                 shadow_index: camera_idx.unwrap_or(u32::MAX as _) as u32,
                 frustum: camera.world_frustum(),
                 resolution: resolution.as_vec2(),
-                triangle_visibility: TriangleVisibility::from_winding_and_face(self.winding, culling).to_u32(),
+                flags: {
+                    let mut flags = PerCameraUniformFlags::empty();
+                    flags.set(
+                        PerCameraUniformFlags::POSTIIVE_AREA_VISIBLE,
+                        TriangleVisibility::from_winding_and_face(self.winding, culling).is_positive(),
+                    );
+                    flags.set(PerCameraUniformFlags::MULTISAMPLED, samples != SampleCount::One);
+                    flags.bits()
+                },
                 object_count: max_object_count as u32,
                 objects: Vec::new(),
             };
@@ -805,6 +819,7 @@ impl GpuCuller {
         graph: &mut RenderGraph<'node>,
         camera_idx: Option<usize>,
         resolution: UVec2,
+        samples: SampleCount,
         name: &str,
     ) {
         let mut node = graph.add_node(name);
@@ -816,7 +831,7 @@ impl GpuCuller {
                 None => &ctx.data_core.camera_manager,
             };
 
-            self.uniform_bake::<M>(&mut ctx, camera, camera_idx, resolution);
+            self.uniform_bake::<M>(&mut ctx, camera, camera_idx, resolution, samples);
         });
     }
 

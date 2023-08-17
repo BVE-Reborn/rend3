@@ -141,7 +141,7 @@ impl BaseRenderGraph {
 
         // Forward rendering opaque
 
-        state.pbr_uniform_bake(graph, self, resolution);
+        state.pbr_uniform_bake(graph, self, resolution, samples);
 
         state.pbr_forward_rendering_opaque_pass_1(graph, pbr, samples);
 
@@ -279,6 +279,7 @@ impl BaseRenderGraphIntermediateState {
                 graph,
                 Some(shadow_index),
                 UVec2::splat(shadow.map.size),
+                SampleCount::One,
                 &format_sso!("Shadow Culling S{}", shadow_index),
             );
         }
@@ -306,9 +307,10 @@ impl BaseRenderGraphIntermediateState {
         graph: &mut RenderGraph<'node>,
         base: &'node BaseRenderGraph,
         resolution: UVec2,
+        samples: SampleCount,
     ) {
         base.gpu_culler
-            .add_uniform_bake_to_graph::<pbr::PbrMaterial>(graph, None, resolution, "Uniform Bake");
+            .add_uniform_bake_to_graph::<pbr::PbrMaterial>(graph, None, resolution, samples, "Uniform Bake");
     }
 
     /// Does all culling for the forward PBR materials.

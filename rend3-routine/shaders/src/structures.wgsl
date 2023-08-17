@@ -55,14 +55,21 @@ struct PerCameraUniform {
     shadow_index: u32,
     frustum: Frustum,
     resolution: vec2<f32>,
-    // Uses *_AREA_VISIBLE constants
-    triangle_visibility: u32,
+    // Uses PCU_FLAGS_* constants
+    flags: u32,
     object_count: u32,
     objects: array<PerCameraUniformObjectData>,
 }
 
-const POSITIVE_AREA_VISIBLE: u32 = 0u;
-const NEGATIVE_AREA_VISIBLE: u32 = 1u;
+// Area visible
+const PCU_FLAGS_AREA_VISIBLE_MASK: u32 = 0x1u;
+const PCU_FLAGS_NEGATIVE_AREA_VISIBLE: u32 = 0x0u;
+const PCU_FLAGS_POSITIVE_AREA_VISIBLE: u32 = 0x1u;
+
+// Multisampled
+const PCU_FLAGS_MULTISAMPLE_MASK: u32 = 0x3u;
+const PCU_FLAGS_MULTISAMPLE_DISABLED: u32 = 0x0u;
+const PCU_FLAGS_MULTISAMPLE_ENABLED: u32 = 0x3u;
 
 struct DirectionalLight {
     /// View/Projection of directional light. Shadow rendering uses viewports

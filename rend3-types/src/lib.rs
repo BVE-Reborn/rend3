@@ -1170,8 +1170,8 @@ impl SampleCount {
     pub const ARRAY: [Self; 2] = [Self::One, Self::Four];
 
     /// Determines if a resolve texture is needed for this texture.
-    pub fn needs_resolve(self) -> bool {
-        self != Self::One
+    pub const fn needs_resolve(self) -> bool {
+        !matches!(self, Self::One)
     }
 }
 

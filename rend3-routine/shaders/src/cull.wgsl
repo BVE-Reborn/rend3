@@ -71,10 +71,10 @@ fn execute_culling(
 
     let det = determinant(mat3x3<f32>(position0.xyw, position1.xyw, position2.xyw));
 
-    if per_camera_uniform.triangle_visibility == POSITIVE_AREA_VISIBLE && det <= 0.0 {
+    if (per_camera_uniform.flags & PCU_FLAGS_AREA_VISIBLE_MASK) == PCU_FLAGS_POSITIVE_AREA_VISIBLE && det <= 0.0 {
         return false;
     }
-    if per_camera_uniform.triangle_visibility == NEGATIVE_AREA_VISIBLE && det >= 0.0 {
+    if (per_camera_uniform.flags & PCU_FLAGS_AREA_VISIBLE_MASK) == PCU_FLAGS_NEGATIVE_AREA_VISIBLE && det >= 0.0 {
         return false;
     }
 
@@ -89,10 +89,12 @@ fn execute_culling(
     let min_screen_xy = (min_ndc_xy + 1.0) * half_res;
     let max_screen_xy = (max_ndc_xy + 1.0) * half_res;
 
-    let misses_pixel_center = any(round(min_screen_xy) == round(max_screen_xy));
+    if (per_camera_uniform.flags & PCU_FLAGS_MULTISAMPLE_MASK) == PCU_FLAGS_MULTISAMPLE_DISABLED {
+        let misses_pixel_center = any(round(min_screen_xy) == round(max_screen_xy));
 
-    if misses_pixel_center {
-        return false;
+        if misses_pixel_center {
+            return false;
+        }
     }
 
     // We skip hi-z calculation if we're doing a shadow pass
