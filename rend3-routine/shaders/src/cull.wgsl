@@ -5,37 +5,221 @@
 var<storage> vertex_buffer: array<u32>;
 @group(0) @binding(1)
 var<storage> object_buffer: array<Object>;
+
+fn vertex_fetch(
+    object_invocation: u32,
+    object_info: ptr<function, ObjectCullingInformation>,
+) -> Triangle {
+    let index_0_index = object_invocation * 3u + 0u;
+    let index_1_index = object_invocation * 3u + 1u;
+    let index_2_index = object_invocation * 3u + 2u;
+
+    let object = object_buffer[(*object_info).object_id];
+
+    let index0 = vertex_buffer[object.first_index + index_0_index];
+    let index1 = vertex_buffer[object.first_index + index_1_index];
+    let index2 = vertex_buffer[object.first_index + index_2_index];
+
+    let position_start_offset = object.vertex_attribute_start_offsets[{{position_attribute_offset}}];
+    let model_position0 = extract_attribute_vec3_f32(position_start_offset, index0);
+    let model_position1 = extract_attribute_vec3_f32(position_start_offset, index1);
+    let model_position2 = extract_attribute_vec3_f32(position_start_offset, index2);
+
+    return Triangle(
+        TriangleVertices(model_position0, model_position1, model_position2),
+        TriangleIndices(index0, index1, index2)
+    );
+}
+
 @group(0) @binding(2)
 var<storage> culling_job: BatchData;
+
+struct DrawCallBuffer {
+    residual_object_offset: u32,
+    calls: array<IndirectCall>,
+}
+
 @group(0) @binding(3)
-var<storage, read_write> primary_draw_calls: array<IndirectCall>;
+var<storage, read_write> draw_calls: DrawCallBuffer;
+
+fn init_draw_calls(global_invocation: u32, region_id: u32) {
+    // Init the inheritable draw call
+    draw_calls.calls[region_id].vertex_offset = 0;
+    draw_calls.calls[region_id].instance_count = 1u;
+    draw_calls.calls[region_id].base_instance = 0u;
+    draw_calls.calls[region_id].base_index = global_invocation * 3u;
+
+    // Init the residual objects draw call
+    let residual_object_draw_index = draw_calls.residual_object_offset + region_id;
+    draw_calls.calls[residual_object_draw_index].vertex_offset = 0;
+    draw_calls.calls[residual_object_draw_index].instance_count = 1u;
+    draw_calls.calls[residual_object_draw_index].base_instance = 0u;
+    draw_calls.calls[residual_object_draw_index].base_index = global_invocation * 3u;
+}
+
+fn add_predicted_triangle_to_draw_call(region_id: u32) -> u32 {
+    let output_region_index = atomicAdd(&draw_calls.calls[region_id].vertex_count, 3u);
+    let output_region_triangle = output_region_index / 3u;
+    return output_region_triangle;
+}
+
+fn add_residual_triangle_to_draw_call(region_id: u32) -> u32 {
+    let output_region_index = atomicAdd(&draw_calls.calls[draw_calls.residual_object_offset + region_id].vertex_count, 3u);
+    let output_region_triangle = output_region_index / 3u;
+    return output_region_triangle;
+}
+
+struct OutputIndexBuffer {
+    residual_object_offset: u32,
+    indices: array<u32>,
+}
 @group(0) @binding(4)
-var<storage, read_write> secondary_draw_calls: array<IndirectCall>;
+var<storage, read_write> output_indices : OutputIndexBuffer;
+
+fn write_predicted_atomic_triangle(
+    batch_object_index: u32,
+    object_info: ptr<function, ObjectCullingInformation>,
+    indices: TriangleIndices,
+) {
+    let region_invocation = add_predicted_triangle_to_draw_call((*object_info).region_id);
+    let batch_invocation = region_invocation + (*object_info).region_base_invocation;
+    let global_invocation = batch_invocation + culling_job.batch_base_invocation;
+
+    let packed_indices = pack_batch_indices(batch_object_index, indices);
+
+    let predicted_object_indices_index = global_invocation * 3u;
+    output_indices.indices[predicted_object_indices_index] = packed_indices[0];
+    output_indices.indices[predicted_object_indices_index + 1u] = packed_indices[1];
+    output_indices.indices[predicted_object_indices_index + 2u] = packed_indices[2];
+}
+
+fn write_residual_atomic_triangle(
+    batch_object_index: u32,
+    object_info: ptr<function, ObjectCullingInformation>,
+    indices: TriangleIndices,
+) {
+    let region_invocation = add_residual_triangle_to_draw_call((*object_info).region_id);
+    let batch_invocation = region_invocation + (*object_info).region_base_invocation;
+    let global_invocation = batch_invocation + culling_job.batch_base_invocation;
+
+    let packed_indices = pack_batch_indices(batch_object_index, indices);
+
+    let residual_object_indices_index = output_indices.residual_object_offset + global_invocation * 3u;
+    output_indices.indices[residual_object_indices_index] = packed_indices[0];
+    output_indices.indices[residual_object_indices_index + 1u] = packed_indices[1];
+    output_indices.indices[residual_object_indices_index + 2u] = packed_indices[2];
+}
+
+fn write_residual_nonatomic_triangle(
+    invocation: u32,
+    batch_object_index: u32,
+    object_info: ptr<function, ObjectCullingInformation>,
+    indices: TriangleIndices,
+) {
+    add_residual_triangle_to_draw_call((*object_info).region_id);
+
+    let packed_indices = pack_batch_indices(batch_object_index, indices);
+
+    let residual_object_indices_index = output_indices.residual_object_offset + invocation * 3u;
+    output_indices.indices[residual_object_indices_index] = packed_indices[0];
+    output_indices.indices[residual_object_indices_index + 1u] = packed_indices[1];
+    output_indices.indices[residual_object_indices_index + 2u] = packed_indices[2];
+}
+
+fn write_invalid_residual_nonatomic_triangle(invocation: u32, object_info: ptr<function, ObjectCullingInformation>) {
+    add_residual_triangle_to_draw_call((*object_info).region_id);
+
+    let residual_object_indices_index = output_indices.residual_object_offset + invocation * 3u;
+    output_indices.indices[residual_object_indices_index] = INVALID_VERTEX;
+    output_indices.indices[residual_object_indices_index + 1u] = INVALID_VERTEX;
+    output_indices.indices[residual_object_indices_index + 2u] = INVALID_VERTEX;
+}
+
+struct CullingResults {
+    output_offset: u32,
+    bits: array<u32>,
+}
 @group(0) @binding(5)
-var<storage, read_write> primary_output: array<u32>;
+var<storage, read_write> culling_results: CullingResults;
+
+fn get_previous_culling_result(object_info: ptr<function, ObjectCullingInformation>, object_invocation: u32) -> bool {
+    if (*object_info).previous_global_invocation != 0xFFFFFFFFu {
+        return false;
+    }
+
+    let previous_global_invocation = object_invocation + (*object_info).previous_global_invocation;
+    let bitmask = culling_results.bits[previous_global_invocation / 32u];
+    return ((bitmask >> (previous_global_invocation % 32u)) & 0x1u) == 0x1u;
+}
+
 @group(0) @binding(6)
-var<storage, read_write> secondary_output: array<u32>;
-@group(0) @binding(7)
-var<storage> previous_culling_results: array<u32>;
-@group(0) @binding(8)
-var<storage, read_write> current_culling_results: array<u32>;
-@group(0) @binding(9)
 var<storage> per_camera_uniform: PerCameraUniform;
-@group(0) @binding(10)
+
+fn is_shadow_pass() -> bool {
+    return per_camera_uniform.shadow_index != 0xFFFFFFFFu;
+}
+
+@group(0) @binding(7)
 var hirearchical_z_buffer: texture_depth_2d;
-@group(0) @binding(11)
+@group(0) @binding(8)
 var nearest_sampler: sampler;
 
 {{include "rend3/vertex_attributes.wgsl"}}
 
-struct ObjectRangeIndex {
-    range: ObjectRange,
-    index: u32,
+struct ObjectSearchResult {
+    range: ObjectCullingInformation,
+    index_within_region: u32,
 }
 
-var<workgroup> workgroup_object_range: ObjectRangeIndex;
-// 256 workgroup size / 32 bits
-var<workgroup> culling_results: array<atomic<u32>, 8>;
+fn find_object_info(wid: u32) -> ObjectSearchResult {
+    let target_invocation = wid * 64u;
+    // pulled directly from https://doc.rust-lang.org/src/core/slice/mod.rs.html#2412-2438
+
+    var size = culling_job.total_objects;
+    var left = 0u;
+    var right = size;
+    var object_info: ObjectCullingInformation;
+    while left < right {
+        let mid = left + size / 2u;
+
+        let probe = culling_job.object_culling_information[mid];
+
+        if probe.invocation_end <= target_invocation {
+            left = mid + 1u;
+        } else if probe.invocation_start > target_invocation {
+            right = mid;
+        } else {
+            return ObjectSearchResult(probe, mid);
+        }
+
+        size = right - left;
+    }
+    
+    // This is unreachable, but required for the compiler to be happy
+    return ObjectSearchResult(object_info, 0xFFFFFFFFu);
+}
+
+// 64 workgroup size / 32 bits
+var<workgroup> workgroup_culling_results: array<atomic<u32>, 2>;
+
+fn clear_culling_results(lid: u32) {
+    if lid == 0u {
+        atomicStore(&workgroup_culling_results[0], 0u);
+        atomicStore(&workgroup_culling_results[1], 0u);
+    }
+}
+
+fn save_culling_results(global_invocation: u32, lid: u32, passed_culling: bool) {
+    atomicOr(&workgroup_culling_results[lid / 32u], u32(passed_culling) << (lid % 32u));
+
+    workgroupBarrier();
+
+    if lid == 0u {
+        let culling_results_index = culling_results.output_offset + (global_invocation / 32u);
+        culling_results.bits[culling_results_index + 0u] = atomicLoad(&workgroup_culling_results[0]);
+        culling_results.bits[culling_results_index + 1u] = atomicLoad(&workgroup_culling_results[1]);
+    }
+}
 
 fn textureSampleMin(texture: texture_depth_2d, uv: vec2<f32>, mipmap: f32) -> f32 {
     let int_mipmap = i32(mipmap);
@@ -51,8 +235,7 @@ fn textureSampleMin(texture: texture_depth_2d, uv: vec2<f32>, mipmap: f32) -> f3
     let bottom_left = vec2<u32>(low.x, high.y);
     let bottom_right = vec2<u32>(high.x, high.y);
 
-    var minval = 1.0;
-    minval = min(minval, textureLoad(texture, top_left, int_mipmap));
+    var minval = textureLoad(texture, top_left, int_mipmap);
     minval = min(minval, textureLoad(texture, top_right, int_mipmap));
     minval = min(minval, textureLoad(texture, bottom_left, int_mipmap));
     minval = min(minval, textureLoad(texture, bottom_right, int_mipmap));
@@ -61,13 +244,11 @@ fn textureSampleMin(texture: texture_depth_2d, uv: vec2<f32>, mipmap: f32) -> f3
 
 fn execute_culling(
     model_view_proj: mat4x4<f32>,
-    model_position0: vec3<f32>,
-    model_position1: vec3<f32>,
-    model_position2: vec3<f32>
+    vertices: TriangleVertices,
 ) -> bool {
-    let position0 = model_view_proj * vec4<f32>(model_position0, 1.0);
-    let position1 = model_view_proj * vec4<f32>(model_position1, 1.0);
-    let position2 = model_view_proj * vec4<f32>(model_position2, 1.0);
+    let position0 = model_view_proj * vec4<f32>(vertices[0], 1.0);
+    let position1 = model_view_proj * vec4<f32>(vertices[1], 1.0);
+    let position2 = model_view_proj * vec4<f32>(vertices[2], 1.0);
 
     let det = determinant(mat3x3<f32>(position0.xyw, position1.xyw, position2.xyw));
 
@@ -123,159 +304,58 @@ fn execute_culling(
     return true;
 }
 
-@compute @workgroup_size(256)
+@compute @workgroup_size(64)
 fn cs_main(
     @builtin(workgroup_id) wid: vec3<u32>,
     @builtin(global_invocation_id) gid: vec3<u32>,
     @builtin(local_invocation_id) lid: vec3<u32>,
 ) {
-    if (lid.x == 0u) {
-        let target_invocation = wid.x * 256u;
-        // pulled directly from https://doc.rust-lang.org/src/core/slice/mod.rs.html#2412-2438
+    clear_culling_results(lid.x);
 
-        var size = culling_job.total_objects;
-        var left = 0u;
-        var right = size;
-        while left < right {
-            let mid = left + size / 2u;
+    let object_search_results = find_object_info(wid.x);
+    var object_info = object_search_results.range;
+    let batch_object_index = object_search_results.index_within_region;
+    let global_invocation = culling_job.batch_base_invocation + gid.x;
 
-            let probe = culling_job.ranges[mid];
-
-            if probe.invocation_end <= target_invocation {
-                left = mid + 1u;
-            } else if probe.invocation_start > target_invocation {
-                right = mid;
-            } else {
-                workgroup_object_range = ObjectRangeIndex(probe, mid);
-                atomicStore(&culling_results[0], 0u);
-                atomicStore(&culling_results[1], 0u);
-                atomicStore(&culling_results[2], 0u);
-                atomicStore(&culling_results[3], 0u);
-                atomicStore(&culling_results[4], 0u);
-                atomicStore(&culling_results[5], 0u);
-                atomicStore(&culling_results[6], 0u);
-                atomicStore(&culling_results[7], 0u);
-                break;
-            }
-
-            size = right - left;
-        }
-    }
-
-    workgroupBarrier();
-
-    let object_range = workgroup_object_range.range;
-    let batch_object_index = workgroup_object_range.index;
-
-    if gid.x >= object_range.invocation_end {
-        if object_range.atomic_capable == 0u {
-            atomicAdd(&secondary_draw_calls[object_range.region_id].vertex_count, 3u);
-
-            let global_output_invocation = culling_job.base_output_invocation + gid.x;
-
-            secondary_output[global_output_invocation * 3u + 0u] = INVALID_VERTEX;
-            secondary_output[global_output_invocation * 3u + 1u] = INVALID_VERTEX;
-            secondary_output[global_output_invocation * 3u + 2u] = INVALID_VERTEX;
+    if gid.x >= object_info.invocation_end {
+        if object_info.atomic_capable == 0u {
+            write_invalid_residual_nonatomic_triangle(global_invocation, &object_info);
         }
         return;
     }
 
-    let invocation_within_object = gid.x - object_range.invocation_start;
+    let object_invocation = gid.x - object_info.invocation_start;
 
     // If the first invocation in the region, set the region's draw call
-    if object_range.local_region_id == 0u && invocation_within_object == 0u {
-        primary_draw_calls[object_range.region_id].vertex_offset = 0;
-        primary_draw_calls[object_range.region_id].instance_count = 1u;
-        primary_draw_calls[object_range.region_id].base_instance = 0u;
-        primary_draw_calls[object_range.region_id].base_index = (culling_job.base_output_invocation + gid.x) * 3u;
-        secondary_draw_calls[object_range.region_id].vertex_offset = 0;
-        secondary_draw_calls[object_range.region_id].instance_count = 1u;
-        secondary_draw_calls[object_range.region_id].base_instance = 0u;
-        secondary_draw_calls[object_range.region_id].base_index = (culling_job.base_output_invocation + gid.x) * 3u;
+    if object_info.local_region_id == 0u && object_invocation == 0u {
+        init_draw_calls(global_invocation, object_info.region_id);
     }
 
-    let index_0_index = invocation_within_object * 3u + 0u;
-    let index_1_index = invocation_within_object * 3u + 1u;
-    let index_2_index = invocation_within_object * 3u + 2u;
+    let triangle = vertex_fetch(object_invocation, &object_info);
 
-    let object = object_buffer[object_range.object_id];
+    let model_view_proj = per_camera_uniform.objects[object_info.object_id].model_view_proj;
 
-    let index0 = vertex_buffer[object.first_index + index_0_index];
-    let index1 = vertex_buffer[object.first_index + index_1_index];
-    let index2 = vertex_buffer[object.first_index + index_2_index];
+    let passes_culling = execute_culling(model_view_proj, triangle.vertices);
 
-    let model_view_proj = per_camera_uniform.objects[object_range.object_id].model_view_proj;
-
-    let position_start_offset = object.vertex_attribute_start_offsets[{{position_attribute_offset}}];
-    let model_position0 = extract_attribute_vec3_f32(position_start_offset, index0);
-    let model_position1 = extract_attribute_vec3_f32(position_start_offset, index1);
-    let model_position2 = extract_attribute_vec3_f32(position_start_offset, index2);
-
-    let passes_culling = execute_culling(model_view_proj, model_position0, model_position1, model_position2);
-
-    if object_range.atomic_capable == 1u {
+    if object_info.atomic_capable == 1u {
         if passes_culling {
-            if per_camera_uniform.shadow_index == 0xFFFFFFFFu {
-                let region_local_output_invocation = atomicAdd(&primary_draw_calls[object_range.region_id].vertex_count, 3u) / 3u;
-                let job_local_output_invocation = region_local_output_invocation + object_range.region_base_invocation;
-                let global_output_invocation = job_local_output_invocation + culling_job.base_output_invocation;
-
-                primary_output[global_output_invocation * 3u + 0u] = pack_batch_index(batch_object_index, index0);
-                primary_output[global_output_invocation * 3u + 1u] = pack_batch_index(batch_object_index, index1);
-                primary_output[global_output_invocation * 3u + 2u] = pack_batch_index(batch_object_index, index2);
+            if !is_shadow_pass() {
+                write_predicted_atomic_triangle(batch_object_index, &object_info, triangle.indices);
             }
 
-            var previously_passed_culling = false;
-            if object_range.previous_global_invocation != 0xFFFFFFFFu {
-                let previous_global_invocation = invocation_within_object + object_range.previous_global_invocation;
-                previously_passed_culling = ((previous_culling_results[previous_global_invocation / 32u] >> (previous_global_invocation % 32u)) & 0x1u) == 1u;
-            }
+            let previously_passed_culling = get_previous_culling_result(&object_info, object_invocation);
 
-            if !previously_passed_culling || per_camera_uniform.shadow_index != 0xFFFFFFFFu {
-                let region_local_secondary_invocation = atomicAdd(&secondary_draw_calls[object_range.region_id].vertex_count, 3u) / 3u;
-                let job_local_secondary_invocation = region_local_secondary_invocation + object_range.region_base_invocation;
-                let global_secondary_invocation = job_local_secondary_invocation + culling_job.base_output_invocation;
-
-                secondary_output[global_secondary_invocation * 3u + 0u] = pack_batch_index(batch_object_index, index0);
-                secondary_output[global_secondary_invocation * 3u + 1u] = pack_batch_index(batch_object_index, index1);
-                secondary_output[global_secondary_invocation * 3u + 2u] = pack_batch_index(batch_object_index, index2);
+            if !previously_passed_culling || is_shadow_pass() {
+                write_residual_atomic_triangle(batch_object_index, &object_info, triangle.indices);
             }
         }
     } else {
-        // TODO: remove this atomic
-        atomicAdd(&secondary_draw_calls[object_range.region_id].vertex_count, 3u);
-
-        let global_output_invocation = culling_job.base_output_invocation + gid.x;
-
-        var output0 = INVALID_VERTEX;
-        var output1 = INVALID_VERTEX;
-        var output2 = INVALID_VERTEX;
         if passes_culling {
-            output0 = pack_batch_index(batch_object_index, index0);
-            output1 = pack_batch_index(batch_object_index, index1);
-            output2 = pack_batch_index(batch_object_index, index2);
+            write_residual_nonatomic_triangle(global_invocation, batch_object_index, &object_info, triangle.indices);
+        } else {
+            write_invalid_residual_nonatomic_triangle(global_invocation, &object_info);
         }
-
-        secondary_output[global_output_invocation * 3u + 0u] = output0;
-        secondary_output[global_output_invocation * 3u + 1u] = output1;
-        secondary_output[global_output_invocation * 3u + 2u] = output2;
-
-        // TODO: We assume here that all non-atomic capable triangles are rendered _after_ culling.
     }
 
-    atomicOr(&culling_results[lid.x / 32u], u32(passes_culling) << (lid.x % 32u));
-
-    workgroupBarrier();
-
-    if lid.x == 0u {
-        let global_invocation = culling_job.base_output_invocation + gid.x;
-        current_culling_results[global_invocation / 32u + 0u] = atomicLoad(&culling_results[0]);
-        current_culling_results[global_invocation / 32u + 1u] = atomicLoad(&culling_results[1]);
-        current_culling_results[global_invocation / 32u + 2u] = atomicLoad(&culling_results[2]);
-        current_culling_results[global_invocation / 32u + 3u] = atomicLoad(&culling_results[3]);
-        current_culling_results[global_invocation / 32u + 4u] = atomicLoad(&culling_results[4]);
-        current_culling_results[global_invocation / 32u + 5u] = atomicLoad(&culling_results[5]);
-        current_culling_results[global_invocation / 32u + 6u] = atomicLoad(&culling_results[6]);
-        current_culling_results[global_invocation / 32u + 7u] = atomicLoad(&culling_results[7]);
-    }
+    save_culling_results(global_invocation, lid.x, passes_culling);
 }

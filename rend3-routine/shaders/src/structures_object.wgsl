@@ -11,7 +11,7 @@ struct Object {
     enabled: u32,
 }
 
-struct ObjectRange {
+struct ObjectCullingInformation {
     invocation_start: u32,
     invocation_end: u32,
     object_id: u32,
@@ -25,6 +25,6 @@ struct ObjectRange {
 struct BatchData {
     total_objects: u32,
     total_invocations: u32,
-    base_output_invocation: u32,
-    ranges: array<ObjectRange, 256>,
+    batch_base_invocation: u32,
+    object_culling_information: array<ObjectCullingInformation, 256>,
 }

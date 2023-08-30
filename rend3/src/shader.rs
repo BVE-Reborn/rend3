@@ -265,7 +265,7 @@ impl<'a> ShaderVertexBufferHelper<'a> {
             "
             fn unpack_vertex_index(vertex_index: u32) -> Indices {{
                  let batch_indices = unpack_batch_index(vertex_index);
-                 let object_id = {batch_buffer}.ranges[batch_indices.local_object].object_id;
+                 let object_id = {batch_buffer}.object_culling_information[batch_indices.local_object].object_id;
                  
                  return Indices(object_id, batch_indices.vertex);
             }}"

@@ -656,7 +656,7 @@ impl GpuCuller {
             .jobs
             .iter()
             .map(|j: &ShaderBatchData| {
-                debug_assert_eq!(j.total_invocations % 256, 0);
+                debug_assert_eq!(j.total_invocations % WORKGROUP_SIZE, 0);
                 j.total_invocations
             })
             .sum();

@@ -21,8 +21,23 @@ fn unpack_batch_index(vertex_index: u32) -> BatchIndices {
     );
 }
 
-fn pack_batch_index(local_object: u32, vertex: u32) -> u32 {
-    return (local_object << 24u) | (vertex & 0xFFFFFFu);
+fn pack_batch_index(local_object: u32, index: u32) -> u32 {
+    return (local_object << 24u) | (index & 0xFFFFFFu);
+}
+
+alias TriangleVertices = array<vec3f, 3>;
+alias TriangleIndices = array<u32, 3>;
+struct Triangle {
+    vertices: TriangleVertices,
+    indices: TriangleIndices,
+}
+
+fn pack_batch_indices(local_object: u32, indices: TriangleIndices) -> TriangleIndices {
+    return TriangleIndices(
+        pack_batch_index(local_object, indices[0]),
+        pack_batch_index(local_object, indices[1]),
+        pack_batch_index(local_object, indices[2]),
+    );
 }
 
 fn extract_attribute_vec2_f32(byte_base_offset: u32, vertex_index: u32) -> vec2<f32> {

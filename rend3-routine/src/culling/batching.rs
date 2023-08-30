@@ -81,12 +81,12 @@ pub struct ShaderBatchData {
     #[align(256)]
     pub(super) total_objects: u32,
     pub(super) total_invocations: u32,
-    pub(super) base_output_invocation: u32,
-    pub(super) ranges: [ShaderObjectRange; BATCH_SIZE],
+    pub(super) batch_base_invocation: u32,
+    pub(super) object_culling_information: [ShaderObjectCullingInformation; BATCH_SIZE],
 }
 
 #[derive(Debug, Copy, Clone, Default, ShaderType)]
-pub(super) struct ShaderObjectRange {
+pub(super) struct ShaderObjectCullingInformation {
     pub invocation_start: u32,
     pub invocation_end: u32,
     pub object_id: u32,
@@ -181,7 +181,7 @@ pub(super) fn batch_objects<M: Material>(
         let mut current_region_invocation = 0_u32;
         let mut current_invocation = 0_u32;
         let mut current_object_index = 0_u32;
-        let mut current_ranges = [ShaderObjectRange::default(); BATCH_SIZE];
+        let mut current_ranges = [ShaderObjectCullingInformation::default(); BATCH_SIZE];
         let mut current_key = sorted_objects.first().unwrap().0.job_key;
 
         let max_dispatch_count = ctx.renderer.limits.max_compute_workgroups_per_dimension;
@@ -214,10 +214,10 @@ pub(super) fn batch_objects<M: Material>(
             }
             if object_limit || dispatch_limit {
                 jobs.jobs.push(ShaderBatchData {
-                    ranges: current_ranges,
+                    object_culling_information: current_ranges,
                     total_objects: current_object_index,
                     total_invocations: current_invocation,
-                    base_output_invocation: current_base_invocation,
+                    batch_base_invocation: current_base_invocation,
                 });
 
                 current_base_invocation += current_invocation;
@@ -226,7 +226,7 @@ pub(super) fn batch_objects<M: Material>(
                 current_object_index = 0;
             }
 
-            let range = ShaderObjectRange {
+            let range = ShaderObjectCullingInformation {
                 invocation_start: current_invocation,
                 invocation_end: current_invocation + invocation_count,
                 region_id: current_region_idx,
@@ -250,10 +250,10 @@ pub(super) fn batch_objects<M: Material>(
             key: current_key,
         });
         jobs.jobs.push(ShaderBatchData {
-            ranges: current_ranges,
+            object_culling_information: current_ranges,
             total_objects: current_object_index,
             total_invocations: current_invocation,
-            base_output_invocation: current_base_invocation,
+            batch_base_invocation: current_base_invocation,
         });
     }
 
