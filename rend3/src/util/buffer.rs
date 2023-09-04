@@ -8,6 +8,7 @@ use wgpu::{Buffer, BufferAddress, BufferDescriptor, BufferUsages, Device, Queue}
 use crate::util::typedefs::SsoString;
 
 /// Creates, fills, and automatically resizes a power-of-two sized buffer.
+#[derive(Debug)]
 pub struct WrappedPotBuffer<T> {
     inner: Buffer,
     size: BufferAddress,

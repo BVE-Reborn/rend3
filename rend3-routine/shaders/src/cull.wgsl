@@ -35,6 +35,8 @@ fn vertex_fetch(
 var<storage> culling_job: BatchData;
 
 struct DrawCallBuffer {
+    /// We always put the buffer that needs to be present in the next frame first.
+    predicted_object_offset: u32,
     residual_object_offset: u32,
     calls: array<IndirectCall>,
 }
@@ -44,10 +46,11 @@ var<storage, read_write> draw_calls: DrawCallBuffer;
 
 fn init_draw_calls(global_invocation: u32, region_id: u32) {
     // Init the inheritable draw call
-    draw_calls.calls[region_id].vertex_offset = 0;
-    draw_calls.calls[region_id].instance_count = 1u;
-    draw_calls.calls[region_id].base_instance = 0u;
-    draw_calls.calls[region_id].base_index = global_invocation * 3u;
+    let predicted_object_draw_index = draw_calls.predicted_object_offset + region_id;
+    draw_calls.calls[predicted_object_draw_index].vertex_offset = 0;
+    draw_calls.calls[predicted_object_draw_index].instance_count = 1u;
+    draw_calls.calls[predicted_object_draw_index].base_instance = 0u;
+    draw_calls.calls[predicted_object_draw_index].base_index = global_invocation * 3u;
 
     // Init the residual objects draw call
     let residual_object_draw_index = draw_calls.residual_object_offset + region_id;
@@ -58,7 +61,7 @@ fn init_draw_calls(global_invocation: u32, region_id: u32) {
 }
 
 fn add_predicted_triangle_to_draw_call(region_id: u32) -> u32 {
-    let output_region_index = atomicAdd(&draw_calls.calls[region_id].vertex_count, 3u);
+    let output_region_index = atomicAdd(&draw_calls.calls[draw_calls.predicted_object_offset + region_id].vertex_count, 3u);
     let output_region_triangle = output_region_index / 3u;
     return output_region_triangle;
 }
@@ -70,6 +73,8 @@ fn add_residual_triangle_to_draw_call(region_id: u32) -> u32 {
 }
 
 struct OutputIndexBuffer {
+    /// We always put the buffer that needs to be present in the next frame first.
+    predicted_object_offset: u32,
     residual_object_offset: u32,
     indices: array<u32>,
 }
@@ -87,7 +92,7 @@ fn write_predicted_atomic_triangle(
 
     let packed_indices = pack_batch_indices(batch_object_index, indices);
 
-    let predicted_object_indices_index = global_invocation * 3u;
+    let predicted_object_indices_index = output_indices.predicted_object_offset + global_invocation * 3u;
     output_indices.indices[predicted_object_indices_index] = packed_indices[0];
     output_indices.indices[predicted_object_indices_index + 1u] = packed_indices[1];
     output_indices.indices[predicted_object_indices_index + 2u] = packed_indices[2];
@@ -136,7 +141,9 @@ fn write_invalid_residual_nonatomic_triangle(invocation: u32, object_info: ptr<f
 }
 
 struct CullingResults {
+    /// We always put the buffer that needs to be present in the next frame first.
     output_offset: u32,
+    input_offset: u32,
     bits: array<u32>,
 }
 @group(0) @binding(5)
@@ -148,7 +155,7 @@ fn get_previous_culling_result(object_info: ptr<function, ObjectCullingInformati
     }
 
     let previous_global_invocation = object_invocation + (*object_info).previous_global_invocation;
-    let bitmask = culling_results.bits[previous_global_invocation / 32u];
+    let bitmask = culling_results.bits[culling_results.output_offset + (previous_global_invocation / 32u)];
     return ((bitmask >> (previous_global_invocation % 32u)) & 0x1u) == 0x1u;
 }
 

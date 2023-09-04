@@ -10,7 +10,7 @@ use rend3::{
     },
     util::{
         bind_merge::{BindGroupBuilder, BindGroupLayoutBuilder},
-        math::round_up_div,
+        math::div_round_up,
     },
     ShaderPreProcessor,
 };
@@ -198,7 +198,7 @@ impl GpuSkinner {
             let offset = (i as u64 * GpuSkinningInput::SHADER_SIZE.get()) as u32;
             cpass.set_bind_group(0, &bg, &[offset]);
 
-            let num_workgroups = round_up_div(skel.vertex_count, Self::WORKGROUP_SIZE);
+            let num_workgroups = div_round_up(skel.vertex_count, Self::WORKGROUP_SIZE);
             cpass.dispatch_workgroups(num_workgroups, 1, 1);
         }
     }

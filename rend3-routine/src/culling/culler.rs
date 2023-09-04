@@ -2,7 +2,6 @@ use std::{
     any::{type_name, TypeId},
     borrow::Cow,
     collections::{hash_map::Entry, HashMap},
-    mem,
     num::NonZeroU64,
     ops::Range,
     sync::Arc,
@@ -15,35 +14,27 @@ use rend3::{
     graph::{DataHandle, DeclaredDependency, NodeExecutionContext, NodeResourceUsage, RenderGraph, RenderTargetHandle},
     managers::{CameraManager, ShaderObject, TextureBindGroupIndex},
     types::{GraphDataHandle, Material, MaterialArray, RawObjectHandle, SampleCount, VERTEX_ATTRIBUTE_POSITION},
-    util::{
-        frustum::Frustum,
-        math::{round_up, round_up_div},
-        typedefs::FastHashMap,
-    },
+    util::{buffer::WrappedPotBuffer, frustum::Frustum, math::IntegerExt, typedefs::FastHashMap},
     Renderer, ShaderPreProcessor, ShaderVertexBufferConfig,
 };
 use wgpu::{
     self, AddressMode, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor,
     BindGroupLayoutEntry, BindingResource, BindingType, Buffer, BufferBinding, BufferBindingType, BufferDescriptor,
     BufferUsages, CommandEncoder, ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor, Device,
-    FilterMode, PipelineLayoutDescriptor, Sampler, SamplerBindingType, SamplerDescriptor, ShaderModuleDescriptor,
-    ShaderStages, TextureSampleType, TextureViewDimension,
+    FilterMode, PipelineLayoutDescriptor, Queue, Sampler, SamplerBindingType, SamplerDescriptor,
+    ShaderModuleDescriptor, ShaderStages, TextureSampleType, TextureViewDimension,
 };
 
 use crate::culling::{
     batching::{batch_objects, JobSubRegion, ShaderBatchData, ShaderBatchDatas},
+    suballoc::InputOutputBuffer,
     WORKGROUP_SIZE,
 };
 
-// 16 MB of indices
-const OUTPUT_BUFFER_ROUNDING_SIZE: u64 = 1 << 24;
-// At least 64 batches
-const BATCH_DATA_ROUNDING_SIZE: u64 = ShaderBatchData::SHADER_SIZE.get() * 64;
-
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct DrawCallSet {
     pub per_camera_uniform: Arc<Buffer>,
-    pub buffers: CullingBuffers<Arc<Buffer>>,
+    pub buffers: CullingBuffers,
     pub draw_calls: Vec<DrawCall>,
     /// Range of draw calls in the draw call array corresponding to a given material key.
     pub material_key_ranges: HashMap<u64, Range<usize>>,
@@ -57,58 +48,23 @@ pub struct DrawCall {
 
 #[derive(Default)]
 struct CullingBufferMap {
-    inner: FastHashMap<Option<usize>, CullingBuffers<Arc<Buffer>>>,
+    inner: FastHashMap<Option<usize>, CullingBuffers>,
 }
 impl CullingBufferMap {
     fn get_buffers(
         &mut self,
+        queue: &Queue,
         device: &Device,
         encoder: &mut CommandEncoder,
         camera: Option<usize>,
-        mut sizes: CullingBuffers<u64>,
-    ) -> &CullingBuffers<Arc<Buffer>> {
-        sizes.current_object_reference = round_up(sizes.current_object_reference.max(1), BATCH_DATA_ROUNDING_SIZE);
-        sizes.primary_index = round_up(sizes.primary_index.max(1), OUTPUT_BUFFER_ROUNDING_SIZE);
-
+        sizes: CullingBufferSizes,
+    ) -> &CullingBuffers {
         match self.inner.entry(camera) {
             Entry::Occupied(b) => {
                 let b = b.into_mut();
 
-                // We swap previous and current, and make it so that the previous culling results
-                // never need to change size. All size changes "start" with the current and then
-                // propogate back.
-                mem::swap(&mut b.previous_culling_results, &mut b.current_culling_results);
-                sizes.previous_culling_results = b.previous_culling_results.size();
-                mem::swap(&mut b.previous_object_reference, &mut b.current_object_reference);
-                sizes.previous_object_reference = b.previous_object_reference.size();
+                b.update_sizes(queue, device, encoder, sizes);
 
-                let current_size = CullingBuffers {
-                    previous_object_reference: b.previous_object_reference.size(),
-                    current_object_reference: b.current_object_reference.size(),
-                    primary_index: b.primary_index.size(),
-                    secondary_index: b.secondary_index.size(),
-                    primary_draw_call: b.primary_draw_call.size(),
-                    secondary_draw_call: b.secondary_draw_call.size(),
-                    previous_culling_results: b.previous_culling_results.size(),
-                    current_culling_results: b.current_culling_results.size(),
-                };
-                if current_size != sizes {
-                    let old_bufs = mem::replace(&mut *b, CullingBuffers::new(device, sizes));
-                    encoder.copy_buffer_to_buffer(
-                        &old_bufs.previous_culling_results,
-                        0,
-                        &b.previous_culling_results,
-                        0,
-                        current_size.previous_culling_results,
-                    );
-                    encoder.copy_buffer_to_buffer(
-                        &old_bufs.previous_object_reference,
-                        0,
-                        &b.previous_object_reference,
-                        0,
-                        current_size.previous_object_reference,
-                    );
-                }
                 b
             }
             Entry::Vacant(b) => b.insert(CullingBuffers::new(device, sizes)),
@@ -116,70 +72,41 @@ impl CullingBufferMap {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub struct CullingBuffers<T> {
-    pub previous_object_reference: T,
-    pub current_object_reference: T,
-    pub primary_index: T,
-    pub secondary_index: T,
-    pub primary_draw_call: T,
-    pub secondary_draw_call: T,
-    pub previous_culling_results: T,
-    pub current_culling_results: T,
+struct CullingBufferSizes {
+    invocations: u64,
+    draw_calls: u64,
 }
 
-impl CullingBuffers<Arc<Buffer>> {
-    pub fn new(device: &Device, sizes: CullingBuffers<u64>) -> Self {
-        CullingBuffers {
-            previous_object_reference: Arc::new(device.create_buffer(&BufferDescriptor {
-                label: None,
-                size: sizes.previous_object_reference,
-                usage: BufferUsages::STORAGE | BufferUsages::COPY_SRC | BufferUsages::COPY_DST,
-                mapped_at_creation: false,
-            })),
-            current_object_reference: Arc::new(device.create_buffer(&BufferDescriptor {
-                label: None,
-                size: sizes.current_object_reference,
-                usage: BufferUsages::STORAGE | BufferUsages::COPY_SRC | BufferUsages::COPY_DST,
-                mapped_at_creation: false,
-            })),
-            primary_index: Arc::new(device.create_buffer(&BufferDescriptor {
-                label: None,
-                size: sizes.primary_index,
-                usage: BufferUsages::STORAGE | BufferUsages::INDEX,
-                mapped_at_creation: false,
-            })),
-            secondary_index: Arc::new(device.create_buffer(&BufferDescriptor {
-                label: None,
-                size: sizes.secondary_index,
-                usage: BufferUsages::STORAGE | BufferUsages::INDEX,
-                mapped_at_creation: false,
-            })),
-            primary_draw_call: Arc::new(device.create_buffer(&BufferDescriptor {
-                label: None,
-                size: sizes.primary_draw_call,
-                usage: BufferUsages::STORAGE | BufferUsages::INDIRECT | BufferUsages::COPY_DST,
-                mapped_at_creation: false,
-            })),
-            secondary_draw_call: Arc::new(device.create_buffer(&BufferDescriptor {
-                label: None,
-                size: sizes.secondary_draw_call,
-                usage: BufferUsages::STORAGE | BufferUsages::INDIRECT | BufferUsages::COPY_DST,
-                mapped_at_creation: false,
-            })),
-            previous_culling_results: Arc::new(device.create_buffer(&BufferDescriptor {
-                label: None,
-                size: sizes.previous_culling_results,
-                usage: BufferUsages::STORAGE | BufferUsages::COPY_SRC | BufferUsages::COPY_DST,
-                mapped_at_creation: false,
-            })),
-            current_culling_results: Arc::new(device.create_buffer(&BufferDescriptor {
-                label: None,
-                size: sizes.current_culling_results,
-                usage: BufferUsages::STORAGE | BufferUsages::COPY_SRC | BufferUsages::COPY_DST,
-                mapped_at_creation: false,
-            })),
+#[derive(Debug)]
+struct CullingBuffers {
+    culling_data_buffer: WrappedPotBuffer<Vec<ShaderBatchData>>,
+    index_buffer: InputOutputBuffer,
+    draw_call_buffer: InputOutputBuffer,
+    culling_results: InputOutputBuffer,
+}
+
+impl CullingBuffers {
+    pub fn new(device: &Device, sizes: CullingBufferSizes) -> Self {
+        Self {
+            culling_data_buffer: WrappedPotBuffer::new(&device, wgpu::BufferUsages::STORAGE, "culling data buffer"),
+            // One element per triangle/invocation
+            index_buffer: InputOutputBuffer::new(&device, sizes.invocations, 12),
+            draw_call_buffer: InputOutputBuffer::new(&device, sizes.draw_calls, 20),
+            culling_results: InputOutputBuffer::new(&device, sizes.invocations.div_round_up(32), 4),
         }
+    }
+
+    pub fn update_sizes(
+        &mut self,
+        queue: &Queue,
+        device: &Device,
+        encoder: &mut CommandEncoder,
+        sizes: CullingBufferSizes,
+    ) {
+        self.index_buffer.swap(&queue, &device, encoder, sizes.invocations);
+        self.draw_call_buffer.swap(&queue, &device, encoder, sizes.draw_calls);
+        self.culling_results
+            .swap(&queue, &device, encoder, sizes.invocations.div_round_up(32));
     }
 }
 
@@ -632,7 +559,7 @@ impl GpuCuller {
         });
         cpass.set_pipeline(&self.prep_pipeline);
         cpass.set_bind_group(0, &prep_bg, &[]);
-        cpass.dispatch_workgroups(round_up_div(max_object_count as u32, WORKGROUP_SIZE), 1, 1);
+        cpass.dispatch_workgroups((max_object_count as u32).div_round_up(WORKGROUP_SIZE), 1, 1);
         drop(cpass);
     }
 
@@ -668,20 +595,13 @@ impl GpuCuller {
             .graph_storage
             .get_mut(&self.culling_buffer_map_handle)
             .get_buffers(
+                &ctx.renderer.queue,
                 &ctx.renderer.device,
                 encoder,
                 camera_idx,
-                CullingBuffers {
-                    previous_object_reference: jobs.jobs.size().get(),
-                    current_object_reference: jobs.jobs.size().get(),
-                    // RA is getting totally weird with the call to max, thinking it's a call to Iter::max
-                    // this makes the errors go away.
-                    primary_index: <u64 as Ord>::max(total_invocations as u64 * 3 * 4, 4),
-                    secondary_index: <u64 as Ord>::max(total_invocations as u64 * 3 * 4, 4),
-                    primary_draw_call: <u64 as Ord>::max(jobs.regions.len() as u64 * 20, 20),
-                    secondary_draw_call: <u64 as Ord>::max(jobs.regions.len() as u64 * 20, 20),
-                    current_culling_results: <u64 as Ord>::max(total_invocations as u64 / 8, 4),
-                    previous_culling_results: <u64 as Ord>::max(total_invocations as u64 / 8, 4),
+                CullingBufferSizes {
+                    invocations: total_invocations as u64,
+                    draw_calls: jobs.regions.len() as u64,
                 },
             )
             .clone();
@@ -696,12 +616,9 @@ impl GpuCuller {
 
         {
             profiling::scope!("Culling Job Data Upload");
-            let mut buffer = ctx
-                .renderer
-                .queue
-                .write_buffer_with(&buffers.current_object_reference, 0, jobs.jobs.size())
-                .unwrap();
-            StorageBuffer::new(&mut *buffer).write(&jobs.jobs).unwrap();
+            buffers
+                .culling_data_buffer
+                .write_to_buffer(&ctx.renderer.device, &ctx.renderer.queue, &jobs.jobs);
         }
 
         let hi_z_buffer = ctx.graph_data.get_render_target(depth_handle);
