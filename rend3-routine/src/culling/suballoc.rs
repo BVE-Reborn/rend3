@@ -1,6 +1,12 @@
-use std::{num::NonZeroU64, ops::Deref};
+use std::ops::Deref;
 
 use wgpu::CommandEncoder;
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum InputOutputPartition {
+    Input,
+    Output,
+}
 
 #[derive(Debug)]
 pub struct InputOutputBuffer {
@@ -16,6 +22,11 @@ pub struct InputOutputBuffer {
     ///
     /// When true, input partition comes first.
     flipped: bool,
+    /// Clear on swap
+    ///
+    /// When true, the data in both partitions will be cleared when the buffer
+    /// is swapped.
+    clear_on_swap: bool,
     /// The size of each element in the buffer. This allows the user to provide sizes in element counts only.
     element_size: u64,
 }
@@ -42,7 +53,7 @@ impl InputOutputBuffer {
         with_header
     }
 
-    pub fn new(device: &wgpu::Device, partition_elements: u64, element_size: u64) -> Self {
+    pub fn new(device: &wgpu::Device, partition_elements: u64, element_size: u64, clear_on_swap: bool) -> Self {
         let partition_size = partition_elements * element_size as u64;
         let data_capacity = Self::capacity(partition_size, partition_size);
         let buffer_length = Self::buffer_size(data_capacity);
@@ -50,7 +61,11 @@ impl InputOutputBuffer {
         let buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("SuballocatedPingPongBuffer"),
             size: buffer_length,
-            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            usage: wgpu::BufferUsages::STORAGE
+                | wgpu::BufferUsages::COPY_DST
+                | wgpu::BufferUsages::COPY_SRC
+                | wgpu::BufferUsages::INDEX
+                | wgpu::BufferUsages::INDIRECT,
             mapped_at_creation: false,
         });
 
@@ -60,8 +75,32 @@ impl InputOutputBuffer {
             output_partition_size: partition_elements,
             input_partition_size: partition_elements,
             flipped: false,
+            clear_on_swap,
             element_size,
         }
+    }
+
+    /// Returns the offset in bytes for a given element in the given partition
+    pub fn element_offset(&self, partition: InputOutputPartition, element: u64) -> u64 {
+        let partition_offset = match partition {
+            InputOutputPartition::Input => self.input_partition_offset(),
+            InputOutputPartition::Output => self.output_partition_offset(),
+        };
+        Self::HEADER_SIZE + partition_offset + element * self.element_size
+    }
+
+    pub fn partition_slice(&self, partition: InputOutputPartition) -> wgpu::BufferSlice {
+        let partition_offset = match partition {
+            InputOutputPartition::Input => self.input_partition_offset(),
+            InputOutputPartition::Output => self.output_partition_offset(),
+        };
+        let partition_size = match partition {
+            InputOutputPartition::Input => self.input_partition_size,
+            InputOutputPartition::Output => self.output_partition_size,
+        };
+        let slice_start = Self::HEADER_SIZE + partition_offset;
+        let slice_end: u64 = slice_start + partition_size;
+        self.buffer.slice(slice_start..slice_end)
     }
 
     /// Returns the offset in bytes to get to the start of the output partition, not including the header.
@@ -111,19 +150,23 @@ impl InputOutputBuffer {
                 usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
                 mapped_at_creation: false,
             });
-            // We copy the old output partition to the input partition of the new buffer.
-            //
-            // Note that we call output_partition_offset before we change any internal parameters,
-            // as we need the old buffer offsets.
-            encoder.copy_buffer_to_buffer(
-                &self.buffer,
-                old_output_partition_offset,
-                &new_buffer,
-                self.input_partition_offset(),
-                self.input_partition_size,
-            );
+            if !self.clear_on_swap {
+                // We copy the old output partition to the input partition of the new buffer.
+                //
+                // Note that we call output_partition_offset before we change any internal parameters,
+                // as we need the old buffer offsets.
+                encoder.copy_buffer_to_buffer(
+                    &self.buffer,
+                    old_output_partition_offset,
+                    &new_buffer,
+                    self.input_partition_offset(),
+                    self.input_partition_size,
+                );
+            }
             // We now set the new buffer.
             self.buffer = new_buffer;
+        } else if self.clear_on_swap {
+            encoder.clear_buffer(&self.buffer, Self::HEADER_SIZE, None);
         }
 
         self.write_headers(queue)

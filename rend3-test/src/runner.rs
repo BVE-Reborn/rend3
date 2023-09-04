@@ -91,6 +91,7 @@ impl TestRunnerBuilder {
             &mut renderer.data_core.lock(),
             &spp,
             &base_rendergraph.interfaces,
+            &base_rendergraph.gpu_culler.culling_buffer_map_handle,
         );
         let tonemapping = TonemappingRoutine::new(
             &renderer,

@@ -168,8 +168,8 @@ impl BaseRenderGraph {
 /// so desire.
 pub struct BaseRenderGraphIntermediateState {
     pub pre_cull: DataHandle<Buffer>,
-    pub shadow_cull: Vec<DataHandle<culling::DrawCallSet>>,
-    pub cull: DataHandle<culling::DrawCallSet>,
+    pub shadow_cull: Vec<DataHandle<Arc<culling::DrawCallSet>>>,
+    pub cull: DataHandle<Arc<culling::DrawCallSet>>,
 
     pub shadow_uniform_bg: DataHandle<BindGroup>,
     pub forward_uniform_bg: DataHandle<BindGroup>,
@@ -355,7 +355,7 @@ impl BaseRenderGraphIntermediateState {
                 routine.add_forward_to_graph(RoutineAddToGraphArgs {
                     graph,
                     whole_frame_uniform_bg: self.shadow_uniform_bg,
-                    culled: Some(*shadow_cull),
+                    culling_output_handle: Some(*shadow_cull),
                     per_material: &pbr.per_material,
                     extra_bgs: None,
                     label: &format!("pbr shadow renderering S{shadow_index}"),
@@ -402,7 +402,7 @@ impl BaseRenderGraphIntermediateState {
             routine.add_forward_to_graph(RoutineAddToGraphArgs {
                 graph,
                 whole_frame_uniform_bg: self.forward_uniform_bg,
-                culled: None,
+                culling_output_handle: None,
                 per_material: &pbr.per_material,
                 extra_bgs: None,
                 label: "PBR Forward Pass 1",
@@ -427,7 +427,7 @@ impl BaseRenderGraphIntermediateState {
             routine.add_forward_to_graph(RoutineAddToGraphArgs {
                 graph,
                 whole_frame_uniform_bg: self.forward_uniform_bg,
-                culled: Some(self.cull),
+                culling_output_handle: Some(self.cull),
                 per_material: &pbr.per_material,
                 extra_bgs: None,
                 label: "PBR Forward Pass 2",
@@ -450,7 +450,7 @@ impl BaseRenderGraphIntermediateState {
         pbr.blend_routine.add_forward_to_graph(RoutineAddToGraphArgs {
             graph,
             whole_frame_uniform_bg: self.forward_uniform_bg,
-            culled: Some(self.cull),
+            culling_output_handle: Some(self.cull),
             per_material: &pbr.per_material,
             extra_bgs: None,
             label: "PBR Forward",

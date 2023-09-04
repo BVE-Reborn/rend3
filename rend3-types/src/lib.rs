@@ -194,6 +194,12 @@ pub type GraphDataHandleUntyped = ResourceHandle<GraphDataTag>;
 /// Refcounted handle to an instance of GraphData
 pub struct GraphDataHandle<T>(pub GraphDataHandleUntyped, pub PhantomData<T>);
 
+impl<T> Clone for GraphDataHandle<T> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone(), PhantomData)
+    }
+}
+
 /// Internal non-owning handle to a Mesh
 pub type RawMeshHandle = RawResourceHandle<Mesh>;
 /// Internal non-owning handle to a Texture2D

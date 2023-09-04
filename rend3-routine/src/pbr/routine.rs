@@ -1,11 +1,14 @@
 use std::{borrow::Cow, sync::Arc};
 
-use rend3::{Renderer, RendererDataCore, RendererProfile, ShaderPreProcessor, ShaderVertexBufferConfig};
+use rend3::{
+    types::GraphDataHandle, Renderer, RendererDataCore, RendererProfile, ShaderPreProcessor, ShaderVertexBufferConfig,
+};
 use serde::Serialize;
 use wgpu::{BlendState, ShaderModuleDescriptor, ShaderSource};
 
 use crate::{
     common::{PerMaterialArchetypeInterface, WholeFrameInterfaces},
+    culling::CullingBufferMap,
     forward::{ForwardRoutine, RoutineArgs, RoutineType, ShaderModulePair},
     hi_z::HiZRoutine,
     pbr::{PbrMaterial, TransparencyType},
@@ -34,6 +37,7 @@ impl PbrRoutine {
         data_core: &mut RendererDataCore,
         spp: &ShaderPreProcessor,
         interfaces: &WholeFrameInterfaces,
+        culling_buffer_map_handle: &GraphDataHandle<CullingBufferMap>,
     ) -> Self {
         profiling::scope!("PbrRenderRoutine::new");
 
@@ -127,6 +131,7 @@ impl PbrRoutine {
                         targets[0].as_mut().unwrap().blend = Some(BlendState::ALPHA_BLENDING)
                     }
                 }),
+                culling_buffer_map_handle: culling_buffer_map_handle.clone(),
             })
         };
 

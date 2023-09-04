@@ -6,4 +6,5 @@ mod culler;
 mod suballoc;
 
 pub use batching::{ShaderBatchData, ShaderBatchDatas};
-pub use culler::{DrawCall, DrawCallSet, GpuCuller};
+pub use culler::{CullingBufferMap, DrawCall, DrawCallSet, GpuCuller};
+pub use suballoc::{InputOutputBuffer, InputOutputPartition};

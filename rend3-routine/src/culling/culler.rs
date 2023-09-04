@@ -34,7 +34,6 @@ use crate::culling::{
 #[derive(Debug)]
 pub struct DrawCallSet {
     pub per_camera_uniform: Arc<Buffer>,
-    pub buffers: CullingBuffers,
     pub draw_calls: Vec<DrawCall>,
     /// Range of draw calls in the draw call array corresponding to a given material key.
     pub material_key_ranges: HashMap<u64, Range<usize>>,
@@ -47,18 +46,22 @@ pub struct DrawCall {
 }
 
 #[derive(Default)]
-struct CullingBufferMap {
+pub struct CullingBufferMap {
     inner: FastHashMap<Option<usize>, CullingBuffers>,
 }
 impl CullingBufferMap {
-    fn get_buffers(
+    pub fn get_buffers(&self, camera: Option<usize>) -> Option<&CullingBuffers> {
+        self.inner.get(&camera)
+    }
+
+    fn get_or_resize_buffers(
         &mut self,
         queue: &Queue,
         device: &Device,
         encoder: &mut CommandEncoder,
         camera: Option<usize>,
         sizes: CullingBufferSizes,
-    ) -> &CullingBuffers {
+    ) -> &mut CullingBuffers {
         match self.inner.entry(camera) {
             Entry::Occupied(b) => {
                 let b = b.into_mut();
@@ -78,25 +81,25 @@ struct CullingBufferSizes {
 }
 
 #[derive(Debug)]
-struct CullingBuffers {
-    culling_data_buffer: WrappedPotBuffer<Vec<ShaderBatchData>>,
-    index_buffer: InputOutputBuffer,
-    draw_call_buffer: InputOutputBuffer,
-    culling_results: InputOutputBuffer,
+pub struct CullingBuffers {
+    pub culling_data_buffer: WrappedPotBuffer<Vec<ShaderBatchData>>,
+    pub index_buffer: InputOutputBuffer,
+    pub draw_call_buffer: InputOutputBuffer,
+    pub culling_results_buffer: InputOutputBuffer,
 }
 
 impl CullingBuffers {
-    pub fn new(device: &Device, sizes: CullingBufferSizes) -> Self {
+    fn new(device: &Device, sizes: CullingBufferSizes) -> Self {
         Self {
             culling_data_buffer: WrappedPotBuffer::new(&device, wgpu::BufferUsages::STORAGE, "culling data buffer"),
             // One element per triangle/invocation
-            index_buffer: InputOutputBuffer::new(&device, sizes.invocations, 12),
-            draw_call_buffer: InputOutputBuffer::new(&device, sizes.draw_calls, 20),
-            culling_results: InputOutputBuffer::new(&device, sizes.invocations.div_round_up(32), 4),
+            index_buffer: InputOutputBuffer::new(&device, sizes.invocations, 12, false),
+            draw_call_buffer: InputOutputBuffer::new(&device, sizes.draw_calls, 20, true),
+            culling_results_buffer: InputOutputBuffer::new(&device, sizes.invocations.div_round_up(32), 4, false),
         }
     }
 
-    pub fn update_sizes(
+    fn update_sizes(
         &mut self,
         queue: &Queue,
         device: &Device,
@@ -105,7 +108,7 @@ impl CullingBuffers {
     ) {
         self.index_buffer.swap(&queue, &device, encoder, sizes.invocations);
         self.draw_call_buffer.swap(&queue, &device, encoder, sizes.draw_calls);
-        self.culling_results
+        self.culling_results_buffer
             .swap(&queue, &device, encoder, sizes.invocations.div_round_up(32));
     }
 }
@@ -177,7 +180,7 @@ pub struct GpuCuller {
     winding: wgpu::FrontFace,
     type_id: TypeId,
     per_material_buffer_handle: GraphDataHandle<HashMap<Option<usize>, Arc<Buffer>>>,
-    culling_buffer_map_handle: GraphDataHandle<CullingBufferMap>,
+    pub culling_buffer_map_handle: GraphDataHandle<CullingBufferMap>,
     previous_invocation_map_handle: GraphDataHandle<HashMap<Option<usize>, HashMap<RawObjectHandle, u32>>>,
 }
 
@@ -268,7 +271,7 @@ impl GpuCuller {
         let culling_bgl = renderer.device.create_bind_group_layout(&BindGroupLayoutDescriptor {
             label: Some(&format_sso!("GpuCuller {type_name} BGL")),
             entries: &[
-                // Vertex
+                // Vertex Buffer
                 BindGroupLayoutEntry {
                     binding: 0,
                     visibility: ShaderStages::COMPUTE,
@@ -279,7 +282,7 @@ impl GpuCuller {
                     },
                     count: None,
                 },
-                // Object
+                // Object Buffer
                 BindGroupLayoutEntry {
                     binding: 1,
                     visibility: ShaderStages::COMPUTE,
@@ -301,75 +304,42 @@ impl GpuCuller {
                     },
                     count: None,
                 },
-                // Primary draw calls
+                // Draw Calls
                 BindGroupLayoutEntry {
                     binding: 3,
                     visibility: ShaderStages::COMPUTE,
                     ty: BindingType::Buffer {
                         ty: BufferBindingType::Storage { read_only: false },
                         has_dynamic_offset: false,
-                        min_binding_size: Some(NonZeroU64::new(20).unwrap()),
+                        min_binding_size: Some(NonZeroU64::new(20 + 8).unwrap()),
                     },
                     count: None,
                 },
-                // Secondary draw calls
+                // Index buffer
                 BindGroupLayoutEntry {
                     binding: 4,
                     visibility: ShaderStages::COMPUTE,
                     ty: BindingType::Buffer {
                         ty: BufferBindingType::Storage { read_only: false },
                         has_dynamic_offset: false,
-                        min_binding_size: Some(NonZeroU64::new(20).unwrap()),
+                        min_binding_size: Some(NonZeroU64::new(4 + 8).unwrap()),
                     },
                     count: None,
                 },
-                // Primary indices
+                // Culling Results
                 BindGroupLayoutEntry {
                     binding: 5,
                     visibility: ShaderStages::COMPUTE,
                     ty: BindingType::Buffer {
                         ty: BufferBindingType::Storage { read_only: false },
                         has_dynamic_offset: false,
-                        min_binding_size: Some(NonZeroU64::new(4).unwrap()),
+                        min_binding_size: Some(NonZeroU64::new(4 + 8).unwrap()),
                     },
                     count: None,
                 },
-                // secondary indices
+                // per camera uniforms
                 BindGroupLayoutEntry {
                     binding: 6,
-                    visibility: ShaderStages::COMPUTE,
-                    ty: BindingType::Buffer {
-                        ty: BufferBindingType::Storage { read_only: false },
-                        has_dynamic_offset: false,
-                        min_binding_size: Some(NonZeroU64::new(4).unwrap()),
-                    },
-                    count: None,
-                },
-                // previous culling results
-                BindGroupLayoutEntry {
-                    binding: 7,
-                    visibility: ShaderStages::COMPUTE,
-                    ty: BindingType::Buffer {
-                        ty: BufferBindingType::Storage { read_only: true },
-                        has_dynamic_offset: false,
-                        min_binding_size: Some(NonZeroU64::new(4).unwrap()),
-                    },
-                    count: None,
-                },
-                // current culling results
-                BindGroupLayoutEntry {
-                    binding: 8,
-                    visibility: ShaderStages::COMPUTE,
-                    ty: BindingType::Buffer {
-                        ty: BufferBindingType::Storage { read_only: false },
-                        has_dynamic_offset: false,
-                        min_binding_size: Some(NonZeroU64::new(4).unwrap()),
-                    },
-                    count: None,
-                },
-                // per camera object data
-                BindGroupLayoutEntry {
-                    binding: 9,
                     visibility: ShaderStages::COMPUTE,
                     ty: BindingType::Buffer {
                         ty: BufferBindingType::Storage { read_only: true },
@@ -380,7 +350,7 @@ impl GpuCuller {
                 },
                 // hirearchical z buffer
                 BindGroupLayoutEntry {
-                    binding: 10,
+                    binding: 7,
                     visibility: ShaderStages::COMPUTE,
                     ty: BindingType::Texture {
                         sample_type: TextureSampleType::Depth,
@@ -391,7 +361,7 @@ impl GpuCuller {
                 },
                 // hirearchical z buffer
                 BindGroupLayoutEntry {
-                    binding: 11,
+                    binding: 8,
                     visibility: ShaderStages::COMPUTE,
                     ty: BindingType::Sampler(SamplerBindingType::NonFiltering),
                     count: None,
@@ -590,11 +560,9 @@ impl GpuCuller {
 
         let encoder = ctx.encoder_or_pass.take_encoder();
 
-        let buffers = ctx
-            .data_core
-            .graph_storage
-            .get_mut(&self.culling_buffer_map_handle)
-            .get_buffers(
+        let mut culling_buffer_map = ctx.data_core.graph_storage.get_mut(&self.culling_buffer_map_handle);
+        let buffers = culling_buffer_map
+            .get_or_resize_buffers(
                 &ctx.renderer.queue,
                 &ctx.renderer.device,
                 encoder,
@@ -603,8 +571,7 @@ impl GpuCuller {
                     invocations: total_invocations as u64,
                     draw_calls: jobs.regions.len() as u64,
                 },
-            )
-            .clone();
+            );
 
         let per_camera_uniform = Arc::clone(
             ctx.data_core
@@ -638,45 +605,33 @@ impl GpuCuller {
                 BindGroupEntry {
                     binding: 2,
                     resource: BindingResource::Buffer(BufferBinding {
-                        buffer: &buffers.current_object_reference,
+                        buffer: &buffers.culling_data_buffer,
                         offset: 0,
                         size: Some(ShaderBatchData::SHADER_SIZE),
                     }),
                 },
                 BindGroupEntry {
                     binding: 3,
-                    resource: buffers.primary_draw_call.as_entire_binding(),
+                    resource: buffers.draw_call_buffer.as_entire_binding(),
                 },
                 BindGroupEntry {
                     binding: 4,
-                    resource: buffers.secondary_draw_call.as_entire_binding(),
+                    resource: buffers.index_buffer.as_entire_binding(),
                 },
                 BindGroupEntry {
                     binding: 5,
-                    resource: buffers.primary_index.as_entire_binding(),
+                    resource: buffers.culling_results_buffer.as_entire_binding(),
                 },
                 BindGroupEntry {
                     binding: 6,
-                    resource: buffers.secondary_index.as_entire_binding(),
-                },
-                BindGroupEntry {
-                    binding: 7,
-                    resource: buffers.previous_culling_results.as_entire_binding(),
-                },
-                BindGroupEntry {
-                    binding: 8,
-                    resource: buffers.current_culling_results.as_entire_binding(),
-                },
-                BindGroupEntry {
-                    binding: 9,
                     resource: per_camera_uniform.as_entire_binding(),
                 },
                 BindGroupEntry {
-                    binding: 10,
+                    binding: 7,
                     resource: BindingResource::TextureView(hi_z_buffer),
                 },
                 BindGroupEntry {
-                    binding: 11,
+                    binding: 8,
                     resource: BindingResource::Sampler(&self.sampler),
                 },
             ],
@@ -706,26 +661,27 @@ impl GpuCuller {
 
         material_key_ranges.insert(current_material_key, current_material_key_range_start..draw_calls.len());
 
-        encoder.clear_buffer(&buffers.primary_draw_call, 0, None);
-        encoder.clear_buffer(&buffers.secondary_draw_call, 0, None);
+        encoder.clear_buffer(&buffers.draw_call_buffer, 8, None);
         let mut cpass = encoder.begin_compute_pass(&ComputePassDescriptor {
             label: Some(&format_sso!("GpuCuller {type_name} Culling")),
         });
 
         cpass.set_pipeline(&self.culling_pipeline);
         for (idx, job) in jobs.jobs.iter().enumerate() {
+            // RA can't infer this
+            let job: &ShaderBatchData = job;
+
             cpass.set_bind_group(
                 0,
                 &culling_bg,
                 &[idx as u32 * ShaderBatchData::SHADER_SIZE.get() as u32],
             );
-            cpass.dispatch_workgroups(round_up_div(job.total_invocations, WORKGROUP_SIZE), 1, 1);
+            cpass.dispatch_workgroups(job.total_invocations.div_round_up(WORKGROUP_SIZE), 1, 1);
         }
         drop(cpass);
 
         DrawCallSet {
             per_camera_uniform,
-            buffers,
             draw_calls,
             material_key_ranges,
         }
@@ -755,7 +711,7 @@ impl GpuCuller {
     pub fn add_culling_to_graph<'node, M: Material>(
         &'node self,
         graph: &mut RenderGraph<'node>,
-        draw_calls_hdl: DataHandle<DrawCallSet>,
+        draw_calls_hdl: DataHandle<Arc<DrawCallSet>>,
         depth_handle: RenderTargetHandle,
         camera_idx: Option<usize>,
         name: &str,
@@ -778,7 +734,7 @@ impl GpuCuller {
 
             let draw_calls = self.cull::<M>(&mut ctx, jobs, depth_handle, camera_idx);
 
-            ctx.graph_data.set_data(output, Some(draw_calls));
+            ctx.graph_data.set_data(output, Some(Arc::new(draw_calls)));
         });
     }
 }

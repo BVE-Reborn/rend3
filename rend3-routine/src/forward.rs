@@ -25,7 +25,7 @@ use wgpu::{
 
 use crate::{
     common::{PerMaterialArchetypeInterface, WholeFrameInterfaces},
-    culling::{self, DrawCall, DrawCallSet},
+    culling::{self, CullingBufferMap, DrawCall, DrawCallSet, InputOutputPartition},
 };
 
 #[derive(Serialize)]
@@ -61,6 +61,8 @@ pub struct RoutineArgs<'a, M> {
     pub routine_type: RoutineType,
     pub shaders: ShaderModulePair<'a>,
 
+    pub culling_buffer_map_handle: GraphDataHandle<CullingBufferMap>,
+
     pub extra_bgls: &'a [&'a BindGroupLayout],
     #[allow(clippy::type_complexity)]
     pub descriptor_callback: Option<&'a dyn Fn(&mut RenderPipelineDescriptor<'_>, &mut [Option<ColorTargetState>])>,
@@ -69,7 +71,7 @@ pub struct RoutineArgs<'a, M> {
 pub struct RoutineAddToGraphArgs<'a, 'node, M> {
     pub graph: &'a mut RenderGraph<'node>,
     pub whole_frame_uniform_bg: DataHandle<BindGroup>,
-    pub culled: Option<DataHandle<culling::DrawCallSet>>,
+    pub culling_output_handle: Option<DataHandle<Arc<culling::DrawCallSet>>>,
     pub per_material: &'node PerMaterialArchetypeInterface<M>,
     pub extra_bgs: Option<&'node [BindGroup]>,
     pub label: &'a str,
@@ -85,7 +87,8 @@ pub struct ForwardRoutine<M: Material> {
     pub pipeline_s1: RenderPipeline,
     pub pipeline_s4: RenderPipeline,
     pub material_key: u64,
-    pub culling_cache: GraphDataHandle<FastHashMap<Option<usize>, DrawCallSet>>,
+    pub culling_buffer_map_handle: GraphDataHandle<CullingBufferMap>,
+    pub draw_call_set_cache_handle: GraphDataHandle<FastHashMap<Option<usize>, Arc<DrawCallSet>>>,
     pub _phantom: PhantomData<M>,
 }
 impl<M: Material> ForwardRoutine<M> {
@@ -130,7 +133,8 @@ impl<M: Material> ForwardRoutine<M> {
             pipeline_s1: build_forward_pipeline_inner(&pll, &args, SampleCount::One),
             pipeline_s4: build_forward_pipeline_inner(&pll, &args, SampleCount::Four),
             material_key: args.material_key,
-            culling_cache: args.renderer.add_graph_data(FastHashMap::default()),
+            draw_call_set_cache_handle: args.renderer.add_graph_data(FastHashMap::default()),
+            culling_buffer_map_handle: args.culling_buffer_map_handle,
             _phantom: PhantomData,
         }
     }
@@ -162,60 +166,70 @@ impl<M: Material> ForwardRoutine<M> {
         });
 
         let whole_frame_uniform_handle = builder.add_data(args.whole_frame_uniform_bg, NodeResourceUsage::Input);
-        let cull_handle = builder.add_optional_data(args.culled, NodeResourceUsage::Input);
+        let culling_output_handle = builder.add_optional_data(args.culling_output_handle, NodeResourceUsage::Input);
 
         builder.build(move |mut ctx| {
             let rpass = ctx.encoder_or_pass.take_rpass(rpass_handle);
             let whole_frame_uniform_bg = ctx.graph_data.get_data(ctx.temps, whole_frame_uniform_handle).unwrap();
 
-            // If there exists data for the culling handle, that means we are running
-            // after culling has run. This means we are in secondary rendering.
-            let base_cull = match cull_handle {
-                Some(handle) => match ctx.graph_data.get_data(ctx.temps, handle) {
-                    Some(c) => Some(c),
-                    None => return,
-                },
-                None => None,
-            };
-            let mut culling_storage = ctx.data_core.graph_storage.get_mut(&self.culling_cache);
-            let secondary;
-            let culled = match base_cull {
-                Some(cull_set) => {
-                    culling_storage.insert(args.camera, cull_set.clone());
-                    secondary = true;
-                    cull_set
-                }
-                None => match culling_storage.get(&args.camera) {
-                    Some(cull_set) => {
-                        secondary = false;
-                        cull_set
-                    }
-                    None => return,
-                },
-            };
-            let culled = ctx.temps.add(culled.clone());
+            // We need to store the draw call set in a cache so that next frame's predicted pass can use it.
+            let mut draw_call_set_cache = ctx.data_core.graph_storage.get_mut(&self.draw_call_set_cache_handle);
 
-            // Counter-intuitively, we need to use the current object reference buffer here
-            // because the buffers either:
-            // - (Primary render) haven't been swapped yet and we want last frame's buffer (which is the current one)
-            // - (Secondary render) have already been swapped and we want this frame's buffer (which is the current one)
-            let object_reference_buffer = &culled.buffers.current_object_reference;
-            let index_buffer;
-            let indirect_buffer;
-            if secondary {
-                index_buffer = culled.buffers.secondary_index.slice(..);
-                indirect_buffer = &culled.buffers.secondary_draw_call;
+            let draw_call_set = match culling_output_handle {
+                // If we are provided a culling output handle, we are rendering the second pass
+                // with the residual triangles from this frame.
+                Some(handle) => {
+                    let draw_call_set = ctx
+                        .graph_data
+                        .get_data(ctx.temps, handle)
+                        .expect("Expected culling output to be present if a culling output handle is provided");
+
+                    // As we're in the residual, we need to store the draw call set for the next frame.
+                    draw_call_set_cache.insert(args.camera, Arc::clone(&draw_call_set));
+
+                    draw_call_set
+                }
+                // If we are not provided a culling output handle, this mean we are rendering the first pass
+                // with the predicted triangles from last frame.
+                None => {
+                    // If there is no draw call set for this camera in the cache, that means we have yet to actually render anything,
+                    // so either no objects yet exist, or we are in the first frame.
+                    let Some(draw_call_set) = draw_call_set_cache.get(&args.camera) else {
+                        return;
+                    };
+
+                    draw_call_set
+                }
+            };
+            let residual = culling_output_handle.is_some();
+
+            let culling_buffer_storage = ctx
+                .temps
+                .add(ctx.data_core.graph_storage.get(&self.culling_buffer_map_handle));
+
+            // If there are no culling buffers in storage yet, we are in the first frame. We depend on culling
+            // to render anything, so just bail at this point.
+            let Some(culling_buffers) = culling_buffer_storage.get_buffers(args.camera) else {
+                return;
+            };
+
+            // When we're rendering the residual data, we are post buffer flip. We want to be rendering using the
+            // "input" partition, as this is the partition that all same-frame data is in.
+            let partition = if residual {
+                InputOutputPartition::Input
             } else {
-                index_buffer = culled.buffers.primary_index.slice(..);
-                indirect_buffer = &culled.buffers.primary_draw_call;
-            }
+                InputOutputPartition::Output
+            };
 
             let per_material_bg = ctx.temps.add(
                 BindGroupBuilder::new()
                     .append_buffer(ctx.data_core.object_manager.buffer::<M>().unwrap())
-                    .append_buffer_with_size(object_reference_buffer, culling::ShaderBatchData::SHADER_SIZE.get())
+                    .append_buffer_with_size(
+                        &culling_buffers.culling_data_buffer,
+                        culling::ShaderBatchData::SHADER_SIZE.get(),
+                    )
                     .append_buffer(&ctx.eval_output.mesh_buffer)
-                    .append_buffer(&culled.per_camera_uniform)
+                    .append_buffer(&draw_call_set.per_camera_uniform)
                     .append_buffer(ctx.data_core.material_manager.archetype_view::<M>().buffer())
                     .build(&ctx.renderer.device, Some("Per-Material BG"), &args.per_material.bgl),
             );
@@ -224,7 +238,10 @@ impl<M: Material> ForwardRoutine<M> {
                 SampleCount::One => &self.pipeline_s1,
                 SampleCount::Four => &self.pipeline_s4,
             };
-            rpass.set_index_buffer(index_buffer, IndexFormat::Uint32);
+            rpass.set_index_buffer(
+                culling_buffers.index_buffer.partition_slice(partition),
+                IndexFormat::Uint32,
+            );
             rpass.set_pipeline(pipeline);
             rpass.set_bind_group(0, whole_frame_uniform_bg, &[]);
             if let Some(v) = args.extra_bgs {
@@ -236,13 +253,18 @@ impl<M: Material> ForwardRoutine<M> {
                 rpass.set_bind_group(2, bg, &[]);
             }
 
-            let Some(range) = culled.material_key_ranges.get(&self.material_key) else {
+            // If there are no draw calls for this material, just bail.
+            let Some(range) = draw_call_set.material_key_ranges.get(&self.material_key) else {
                 return;
             };
-            for (idx, call) in culled.draw_calls[range.clone()].iter().enumerate() {
-                let call: &DrawCall = call;
-                let idx = idx + range.start;
 
+            for (range_relative_idx, call) in draw_call_set.draw_calls[range.clone()].iter().enumerate() {
+                // Help RA out
+                let call: &DrawCall = call;
+                // Add the base of the range to the index to get the actual index
+                let idx = range_relative_idx + range.start;
+
+                // If we're in cpu driven mode, we need to update the texture bind group.
                 if ctx.renderer.profile.is_cpu_driven() {
                     rpass.set_bind_group(
                         2,
@@ -255,7 +277,10 @@ impl<M: Material> ForwardRoutine<M> {
                     per_material_bg,
                     &[call.batch_index * culling::ShaderBatchData::SHADER_SIZE.get() as u32],
                 );
-                rpass.draw_indexed_indirect(indirect_buffer, idx as u64 * 20);
+                rpass.draw_indexed_indirect(
+                    &culling_buffers.draw_call_buffer,
+                    culling_buffers.draw_call_buffer.element_offset(partition, idx as u64),
+                );
             }
         });
     }
