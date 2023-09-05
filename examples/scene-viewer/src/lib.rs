@@ -1,6 +1,6 @@
 use std::{collections::HashMap, future::Future, hash::BuildHasher, path::Path, sync::Arc, time::Duration};
-use dolly::prelude::*;
 
+use dolly::prelude::*;
 use glam::{DVec2, Mat4, UVec2, Vec3};
 use instant::Instant;
 use pico_args::Arguments;
@@ -363,12 +363,10 @@ impl SceneViewer {
         }
 
         //Note: depends on size of model
-        let dist=2.0;
+        let dist = 2.0;
 
         let camera: CameraRig = CameraRig::builder()
-            .with(YawPitch::new().yaw_degrees(45.0)
-            .pitch_degrees(-22.5)
-            )
+            .with(YawPitch::new().yaw_degrees(45.0).pitch_degrees(-22.5))
             .with(Arm::new(dolly::glam::Vec3::Z * dist))
             .build();
 
@@ -533,18 +531,14 @@ impl rend3_framework::App for SceneViewer {
 
                 self.timestamp_last_frame = now;
 
-                let shift=button_pressed(&self.scancode_status, platform::Scancodes::SHIFT);
+                let shift = button_pressed(&self.scancode_status, platform::Scancodes::SHIFT);
 
-                let velocity = if shift {
-                    self.run_speed
-                } else {
-                    self.walk_speed
-                };
+                let velocity = if shift { self.run_speed } else { self.walk_speed };
 
                 // Note: depends on size of model
-                let velocity_factor=0.001;
+                let velocity_factor = 0.001;
 
-                let angular_velocity_deg=if shift {1.0} else {0.5};
+                let angular_velocity_deg = if shift { 1.0 } else { 0.5 };
 
                 if button_pressed(&self.scancode_status, platform::Scancodes::W) {
                     self.camera.driver_mut::<Arm>().offset -= dolly::glam::Vec3::Z * velocity * velocity_factor;
@@ -553,16 +547,24 @@ impl rend3_framework::App for SceneViewer {
                     self.camera.driver_mut::<Arm>().offset += dolly::glam::Vec3::Z * velocity * velocity_factor;
                 }
                 if button_pressed(&self.scancode_status, platform::Scancodes::A) {
-                    self.camera.driver_mut::<YawPitch>().rotate_yaw_pitch(-angular_velocity_deg, 0.0);
+                    self.camera
+                        .driver_mut::<YawPitch>()
+                        .rotate_yaw_pitch(-angular_velocity_deg, 0.0);
                 }
                 if button_pressed(&self.scancode_status, platform::Scancodes::D) {
-                    self.camera.driver_mut::<YawPitch>().rotate_yaw_pitch(angular_velocity_deg, 0.0);
+                    self.camera
+                        .driver_mut::<YawPitch>()
+                        .rotate_yaw_pitch(angular_velocity_deg, 0.0);
                 }
                 if button_pressed(&self.scancode_status, platform::Scancodes::Q) {
-                    self.camera.driver_mut::<YawPitch>().rotate_yaw_pitch(0.0,-angular_velocity_deg);
+                    self.camera
+                        .driver_mut::<YawPitch>()
+                        .rotate_yaw_pitch(0.0, -angular_velocity_deg);
                 }
                 if button_pressed(&self.scancode_status, platform::Scancodes::Z) {
-                    self.camera.driver_mut::<YawPitch>().rotate_yaw_pitch(0.0, angular_velocity_deg);
+                    self.camera
+                        .driver_mut::<YawPitch>()
+                        .rotate_yaw_pitch(0.0, angular_velocity_deg);
                 }
 
                 if button_pressed(&self.scancode_status, platform::Scancodes::ESCAPE) {
@@ -582,12 +584,10 @@ impl rend3_framework::App for SceneViewer {
                 window.request_redraw()
             }
             Event::RedrawRequested(_) => {
-
                 // let view = Mat4::from_euler(glam::EulerRot::XYZ, -self.camera_pitch, -self.camera_yaw, 0.0);
                 // let view = view * Mat4::from_translation((-self.camera_location).into());
-                let transform=self.camera.final_transform;
-                let view=Mat4::from_rotation_translation(transform.rotation,
-                transform.position).inverse();
+                let transform = self.camera.final_transform;
+                let view = Mat4::from_rotation_translation(transform.rotation, transform.position).inverse();
 
                 renderer.set_camera_data(Camera {
                     projection: CameraProjection::Perspective { vfov: 60.0, near: 0.1 },
@@ -697,11 +697,13 @@ impl rend3_framework::App for SceneViewer {
                     DVec2::new(delta_x, delta_y)
                 };
 
-                let mouse_scale=1.0;
+                let mouse_scale = 1.0;
                 let yaw_vel = (mouse_delta.x * mouse_scale) as f32;
                 let pitch_vel = (mouse_delta.y * mouse_scale) as f32;
 
-                self.camera.driver_mut::<YawPitch>().rotate_yaw_pitch(yaw_vel,pitch_vel);
+                self.camera
+                    .driver_mut::<YawPitch>()
+                    .rotate_yaw_pitch(yaw_vel, pitch_vel);
             }
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
