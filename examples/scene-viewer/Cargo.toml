@@ -32,6 +32,7 @@ tracy = ["profiling/profile-with-tracy", "tracy-client"]
 [dependencies]
 anyhow = "1"
 cfg-if = "1"
+dolly = "0.4.2"
 glam = "0.24"
 # 0.7 is a completely unrelated library
 histogram = "0.6"
