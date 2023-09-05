@@ -1,6 +1,6 @@
 //! Automatic management of Power-of-Two sized buffers.
 
-use std::{marker::PhantomData, ops::Deref};
+use std::{marker::PhantomData, ops::Deref, sync::Arc};
 
 use encase::{private::WriteInto, ShaderType};
 use wgpu::{Buffer, BufferAddress, BufferDescriptor, BufferUsages, Device, Queue};
@@ -10,7 +10,7 @@ use crate::util::typedefs::SsoString;
 /// Creates, fills, and automatically resizes a power-of-two sized buffer.
 #[derive(Debug)]
 pub struct WrappedPotBuffer<T> {
-    inner: Buffer,
+    inner: Arc<Buffer>,
     size: BufferAddress,
     // This field is assumed to be a power of 2.
     minimum: BufferAddress,
@@ -31,12 +31,12 @@ where
         let usage = usage | BufferUsages::COPY_DST;
 
         Self {
-            inner: device.create_buffer(&BufferDescriptor {
+            inner: Arc::new(device.create_buffer(&BufferDescriptor {
                 label: Some(label),
                 size: minimum,
                 usage,
                 mapped_at_creation: false,
-            }),
+            })),
             size: minimum,
             minimum,
             usage,
@@ -49,12 +49,12 @@ where
         let resize = resize_po2(self.size, desired, self.minimum);
         if let Some(size) = resize {
             self.size = size;
-            self.inner = device.create_buffer(&BufferDescriptor {
+            self.inner = Arc::new(device.create_buffer(&BufferDescriptor {
                 label: Some(&self.label),
                 size,
                 usage: self.usage,
                 mapped_at_creation: false,
-            });
+            }));
         }
     }
 

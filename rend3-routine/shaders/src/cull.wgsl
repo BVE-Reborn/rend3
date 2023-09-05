@@ -346,14 +346,14 @@ fn cs_main(
 
     if object_info.atomic_capable == 1u {
         if passes_culling {
+            write_predicted_atomic_triangle(batch_object_index, &object_info, triangle.indices);
+
             if !is_shadow_pass() {
-                write_predicted_atomic_triangle(batch_object_index, &object_info, triangle.indices);
-            }
+                let previously_passed_culling = get_previous_culling_result(&object_info, object_invocation);
 
-            let previously_passed_culling = get_previous_culling_result(&object_info, object_invocation);
-
-            if !previously_passed_culling || is_shadow_pass() {
-                write_residual_atomic_triangle(batch_object_index, &object_info, triangle.indices);
+                if !previously_passed_culling {
+                    write_residual_atomic_triangle(batch_object_index, &object_info, triangle.indices);
+                }
             }
         }
     } else {

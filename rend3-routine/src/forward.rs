@@ -201,17 +201,20 @@ impl<M: Material> ForwardRoutine<M> {
                     draw_call_set
                 }
             };
-            let residual = culling_output_handle.is_some();
+            let residual = culling_output_handle.is_some() && args.camera.is_none();
 
-            let culling_buffer_storage = ctx
-                .temps
-                .add(ctx.data_core.graph_storage.get(&self.culling_buffer_map_handle));
+            let culling_buffer_storage = ctx.data_core.graph_storage.get(&self.culling_buffer_map_handle);
 
             // If there are no culling buffers in storage yet, we are in the first frame. We depend on culling
             // to render anything, so just bail at this point.
             let Some(culling_buffers) = culling_buffer_storage.get_buffers(args.camera) else {
                 return;
             };
+
+            // We need to actually clone ownership of the underlying buffers and add them to renderpass temps,
+            // so we can use them in the renderpass.
+            let index_buffer = ctx.temps.add(Arc::clone(&culling_buffers.index_buffer));
+            let draw_call_buffer = ctx.temps.add(Arc::clone(&culling_buffers.draw_call_buffer));
 
             // When we're rendering the residual data, we are post buffer flip. We want to be rendering using the
             // "input" partition, as this is the partition that all same-frame data is in.
@@ -239,7 +242,7 @@ impl<M: Material> ForwardRoutine<M> {
                 SampleCount::Four => &self.pipeline_s4,
             };
             rpass.set_index_buffer(
-                culling_buffers.index_buffer.partition_slice(partition),
+                index_buffer.slice(culling_buffers.index_buffer.partition_slice(partition)),
                 IndexFormat::Uint32,
             );
             rpass.set_pipeline(pipeline);
@@ -278,7 +281,7 @@ impl<M: Material> ForwardRoutine<M> {
                     &[call.batch_index * culling::ShaderBatchData::SHADER_SIZE.get() as u32],
                 );
                 rpass.draw_indexed_indirect(
-                    &culling_buffers.draw_call_buffer,
+                    draw_call_buffer,
                     culling_buffers.draw_call_buffer.element_offset(partition, idx as u64),
                 );
             }

@@ -194,6 +194,12 @@ pub type GraphDataHandleUntyped = ResourceHandle<GraphDataTag>;
 /// Refcounted handle to an instance of GraphData
 pub struct GraphDataHandle<T>(pub GraphDataHandleUntyped, pub PhantomData<T>);
 
+impl<T> Debug for GraphDataHandle<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
 impl<T> Clone for GraphDataHandle<T> {
     fn clone(&self) -> Self {
         Self(self.0.clone(), PhantomData)

@@ -1,5 +1,9 @@
-use std::ops::Deref;
+use std::{
+    ops::{Deref, Range},
+    sync::Arc,
+};
 
+use rend3::util::typedefs::SsoString;
 use wgpu::CommandEncoder;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -10,14 +14,16 @@ pub enum InputOutputPartition {
 
 #[derive(Debug)]
 pub struct InputOutputBuffer {
+    /// Label for the buffer
+    label: SsoString,
     /// Current active buffer
-    buffer: wgpu::Buffer,
-    /// Amount of space reserved in the buffer for data, not including the header.
-    data_capacity: u64,
+    buffer: Arc<wgpu::Buffer>,
+    /// Amount of elements reserved in the buffer for data, not including the header.
+    capacity_elements: u64,
     /// Size of output partition
-    output_partition_size: u64,
+    output_partition_elements: u64,
     /// Size of input partition
-    input_partition_size: u64,
+    input_partition_elements: u64,
     /// When false, output partition is comes first.
     ///
     /// When true, input partition comes first.
@@ -32,7 +38,7 @@ pub struct InputOutputBuffer {
 }
 
 impl Deref for InputOutputBuffer {
-    type Target = wgpu::Buffer;
+    type Target = Arc<wgpu::Buffer>;
 
     fn deref(&self) -> &Self::Target {
         &self.buffer
@@ -41,43 +47,55 @@ impl Deref for InputOutputBuffer {
 
 impl InputOutputBuffer {
     const HEADER_SIZE: u64 = 8;
+    const USAGES: wgpu::BufferUsages = wgpu::BufferUsages::STORAGE
+        .union(wgpu::BufferUsages::COPY_DST)
+        .union(wgpu::BufferUsages::COPY_SRC)
+        .union(wgpu::BufferUsages::INDEX)
+        .union(wgpu::BufferUsages::INDIRECT);
 
-    fn capacity(input_partition_size: u64, output_partition_size: u64) -> u64 {
-        let max = input_partition_size.max(output_partition_size);
+    fn capacity_elements(input_partition_elements: u64, output_partition_elements: u64) -> u64 {
+        let max = input_partition_elements.max(output_partition_elements);
         let buffer = max.next_power_of_two() * 2;
         buffer
     }
 
-    fn buffer_size(capacity: u64) -> u64 {
-        let with_header = capacity + Self::HEADER_SIZE;
+    fn buffer_size(capacity_elements: u64, element_size: u64) -> u64 {
+        let with_header = capacity_elements * element_size + Self::HEADER_SIZE;
         with_header
     }
 
-    pub fn new(device: &wgpu::Device, partition_elements: u64, element_size: u64, clear_on_swap: bool) -> Self {
-        let partition_size = partition_elements * element_size as u64;
-        let data_capacity = Self::capacity(partition_size, partition_size);
-        let buffer_length = Self::buffer_size(data_capacity);
+    pub fn new(
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        partition_elements: u64,
+        label: &str,
+        element_size: u64,
+        clear_on_swap: bool,
+    ) -> Self {
+        let capacity_elements = Self::capacity_elements(partition_elements, partition_elements);
+        let buffer_length = Self::buffer_size(capacity_elements, element_size as u64);
 
-        let buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("SuballocatedPingPongBuffer"),
+        let buffer = Arc::new(device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some(label),
             size: buffer_length,
-            usage: wgpu::BufferUsages::STORAGE
-                | wgpu::BufferUsages::COPY_DST
-                | wgpu::BufferUsages::COPY_SRC
-                | wgpu::BufferUsages::INDEX
-                | wgpu::BufferUsages::INDIRECT,
+            usage: Self::USAGES,
             mapped_at_creation: false,
-        });
+        }));
 
-        Self {
+        let this = Self {
+            label: SsoString::from(label),
             buffer,
-            data_capacity,
-            output_partition_size: partition_elements,
-            input_partition_size: partition_elements,
+            capacity_elements,
+            output_partition_elements: partition_elements,
+            input_partition_elements: partition_elements,
             flipped: false,
             clear_on_swap,
             element_size,
-        }
+        };
+
+        this.write_headers(&queue);
+
+        this
     }
 
     /// Returns the offset in bytes for a given element in the given partition
@@ -89,24 +107,25 @@ impl InputOutputBuffer {
         Self::HEADER_SIZE + partition_offset + element * self.element_size
     }
 
-    pub fn partition_slice(&self, partition: InputOutputPartition) -> wgpu::BufferSlice {
+    pub fn partition_slice(&self, partition: InputOutputPartition) -> Range<u64> {
         let partition_offset = match partition {
             InputOutputPartition::Input => self.input_partition_offset(),
             InputOutputPartition::Output => self.output_partition_offset(),
         };
-        let partition_size = match partition {
-            InputOutputPartition::Input => self.input_partition_size,
-            InputOutputPartition::Output => self.output_partition_size,
+        let partition_elements = match partition {
+            InputOutputPartition::Input => self.input_partition_elements,
+            InputOutputPartition::Output => self.output_partition_elements,
         };
+        let partition_size = partition_elements * self.element_size;
         let slice_start = Self::HEADER_SIZE + partition_offset;
         let slice_end: u64 = slice_start + partition_size;
-        self.buffer.slice(slice_start..slice_end)
+        slice_start..slice_end
     }
 
     /// Returns the offset in bytes to get to the start of the output partition, not including the header.
     fn output_partition_offset(&self) -> u64 {
         if self.flipped {
-            self.data_capacity / 2
+            (self.capacity_elements * self.element_size) / 2
         } else {
             0
         }
@@ -117,7 +136,7 @@ impl InputOutputBuffer {
         if self.flipped {
             0
         } else {
-            self.data_capacity / 2
+            (self.capacity_elements * self.element_size) / 2
         }
     }
 
@@ -132,22 +151,23 @@ impl InputOutputBuffer {
         let old_output_partition_offset = self.output_partition_offset();
 
         // The output of last frame is now the input of this frame.
-        self.input_partition_size = self.output_partition_size;
+        self.input_partition_elements = self.output_partition_elements;
         // The new output is of the given size.
-        self.output_partition_size = new_partition_elements * self.element_size;
+        self.output_partition_elements = new_partition_elements;
         // We're now flipped.
         self.flipped = !self.flipped;
 
         // Gather a new data capcity
-        let new_data_capacity = Self::capacity(self.input_partition_size, self.output_partition_size);
+        let new_capacity_elements =
+            Self::capacity_elements(self.input_partition_elements, self.output_partition_elements);
 
-        if new_data_capacity != self.data_capacity {
+        if new_capacity_elements != self.capacity_elements {
             // Set the capacity reserved
-            self.data_capacity = new_data_capacity;
+            self.capacity_elements = new_capacity_elements;
             let new_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-                label: Some("SuballocatedPingPongBuffer"),
-                size: Self::buffer_size(new_data_capacity),
-                usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+                label: Some(&self.label),
+                size: Self::buffer_size(new_capacity_elements, self.element_size),
+                usage: Self::USAGES,
                 mapped_at_creation: false,
             });
             if !self.clear_on_swap {
@@ -157,14 +177,14 @@ impl InputOutputBuffer {
                 // as we need the old buffer offsets.
                 encoder.copy_buffer_to_buffer(
                     &self.buffer,
-                    old_output_partition_offset,
+                    old_output_partition_offset + Self::HEADER_SIZE,
                     &new_buffer,
-                    self.input_partition_offset(),
-                    self.input_partition_size,
+                    self.input_partition_offset() + Self::HEADER_SIZE,
+                    self.input_partition_elements * self.element_size,
                 );
             }
             // We now set the new buffer.
-            self.buffer = new_buffer;
+            self.buffer = Arc::new(new_buffer);
         } else if self.clear_on_swap {
             encoder.clear_buffer(&self.buffer, Self::HEADER_SIZE, None);
         }

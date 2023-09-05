@@ -70,7 +70,7 @@ impl CullingBufferMap {
 
                 b
             }
-            Entry::Vacant(b) => b.insert(CullingBuffers::new(device, sizes)),
+            Entry::Vacant(b) => b.insert(CullingBuffers::new(device, queue, sizes)),
         }
     }
 }
@@ -89,13 +89,21 @@ pub struct CullingBuffers {
 }
 
 impl CullingBuffers {
-    fn new(device: &Device, sizes: CullingBufferSizes) -> Self {
+    fn new(device: &Device, queue: &Queue, sizes: CullingBufferSizes) -> Self {
         Self {
             culling_data_buffer: WrappedPotBuffer::new(&device, wgpu::BufferUsages::STORAGE, "culling data buffer"),
             // One element per triangle/invocation
-            index_buffer: InputOutputBuffer::new(&device, sizes.invocations, 12, false),
-            draw_call_buffer: InputOutputBuffer::new(&device, sizes.draw_calls, 20, true),
-            culling_results_buffer: InputOutputBuffer::new(&device, sizes.invocations.div_round_up(32), 4, false),
+            index_buffer: InputOutputBuffer::new(&device, queue, sizes.invocations, "Index Buffer", 4, false),
+            draw_call_buffer: InputOutputBuffer::new(&device, queue, sizes.draw_calls, "Draw Call Buffer", 20, true),
+            culling_results_buffer: InputOutputBuffer::new(
+                &device,
+                queue,
+                // 32 bits in a u32
+                sizes.invocations.div_round_up(u32::BITS as _),
+                "Culling Results Buffer",
+                4,
+                false,
+            ),
         }
     }
 
@@ -106,7 +114,7 @@ impl CullingBuffers {
         encoder: &mut CommandEncoder,
         sizes: CullingBufferSizes,
     ) {
-        self.index_buffer.swap(&queue, &device, encoder, sizes.invocations);
+        self.index_buffer.swap(&queue, &device, encoder, sizes.invocations * 3);
         self.draw_call_buffer.swap(&queue, &device, encoder, sizes.draw_calls);
         self.culling_results_buffer
             .swap(&queue, &device, encoder, sizes.invocations.div_round_up(32));
@@ -561,17 +569,16 @@ impl GpuCuller {
         let encoder = ctx.encoder_or_pass.take_encoder();
 
         let mut culling_buffer_map = ctx.data_core.graph_storage.get_mut(&self.culling_buffer_map_handle);
-        let buffers = culling_buffer_map
-            .get_or_resize_buffers(
-                &ctx.renderer.queue,
-                &ctx.renderer.device,
-                encoder,
-                camera_idx,
-                CullingBufferSizes {
-                    invocations: total_invocations as u64,
-                    draw_calls: jobs.regions.len() as u64,
-                },
-            );
+        let buffers = culling_buffer_map.get_or_resize_buffers(
+            &ctx.renderer.queue,
+            &ctx.renderer.device,
+            encoder,
+            camera_idx,
+            CullingBufferSizes {
+                invocations: total_invocations as u64,
+                draw_calls: jobs.regions.len() as u64,
+            },
+        );
 
         let per_camera_uniform = Arc::clone(
             ctx.data_core
