@@ -155,7 +155,7 @@ fn get_previous_culling_result(object_info: ptr<function, ObjectCullingInformati
     }
 
     let previous_global_invocation = object_invocation + (*object_info).previous_global_invocation;
-    let bitmask = culling_results.bits[culling_results.output_offset + (previous_global_invocation / 32u)];
+    let bitmask = culling_results.bits[culling_results.input_offset + (previous_global_invocation / 32u)];
     return ((bitmask >> (previous_global_invocation % 32u)) & 0x1u) == 0x1u;
 }
 
