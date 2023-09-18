@@ -58,7 +58,7 @@ smallvec = "1"
 smartstring = "1.0"
 thiserror = "1"
 wgpu = "0.16.1"
-wgpu-profiler = "0.12.0"
+wgpu-profiler = "0.14.2"
 
 [dev-dependencies]
 pollster = "0.3"
