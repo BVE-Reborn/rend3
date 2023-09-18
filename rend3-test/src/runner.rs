@@ -70,6 +70,8 @@ impl TestRunnerBuilder {
     }
 
     pub async fn build(self) -> Result<TestRunner> {
+        let _ = env_logger::try_init();
+
         let iad = match self.iad {
             Some(iad) => iad,
             None => rend3::create_iad(None, None, None, None)

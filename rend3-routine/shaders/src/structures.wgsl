@@ -67,9 +67,9 @@ const PCU_FLAGS_NEGATIVE_AREA_VISIBLE: u32 = 0x0u;
 const PCU_FLAGS_POSITIVE_AREA_VISIBLE: u32 = 0x1u;
 
 // Multisampled
-const PCU_FLAGS_MULTISAMPLE_MASK: u32 = 0x3u;
+const PCU_FLAGS_MULTISAMPLE_MASK: u32 = 0x2u;
 const PCU_FLAGS_MULTISAMPLE_DISABLED: u32 = 0x0u;
-const PCU_FLAGS_MULTISAMPLE_ENABLED: u32 = 0x3u;
+const PCU_FLAGS_MULTISAMPLE_ENABLED: u32 = 0x2u;
 
 struct DirectionalLight {
     /// View/Projection of directional light. Shadow rendering uses viewports

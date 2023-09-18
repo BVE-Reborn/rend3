@@ -18,7 +18,7 @@ members = [
     "rend3-imgui",
     "rend3-routine",
     "rend3-test",
-    "rend3-types"
+    "rend3-types",
 ]
 
 [profile.ci]
