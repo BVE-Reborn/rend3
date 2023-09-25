@@ -14,7 +14,7 @@ use rend3::{
     graph::{DataHandle, DeclaredDependency, NodeExecutionContext, NodeResourceUsage, RenderGraph, RenderTargetHandle},
     managers::{CameraManager, ShaderObject, TextureBindGroupIndex},
     types::{GraphDataHandle, Material, MaterialArray, RawObjectHandle, SampleCount, VERTEX_ATTRIBUTE_POSITION},
-    util::{buffer::WrappedPotBuffer, frustum::Frustum, math::IntegerExt, typedefs::FastHashMap},
+    util::{frustum::Frustum, math::IntegerExt, typedefs::FastHashMap},
     Renderer, ShaderPreProcessor, ShaderVertexBufferConfig,
 };
 use wgpu::{
@@ -33,6 +33,7 @@ use crate::culling::{
 
 #[derive(Debug)]
 pub struct DrawCallSet {
+    pub culling_data_buffer: Buffer,
     pub per_camera_uniform: Arc<Buffer>,
     pub draw_calls: Vec<DrawCall>,
     /// Range of draw calls in the draw call array corresponding to a given material key.
@@ -82,7 +83,6 @@ struct CullingBufferSizes {
 
 #[derive(Debug)]
 pub struct CullingBuffers {
-    pub culling_data_buffer: WrappedPotBuffer<Vec<ShaderBatchData>>,
     pub index_buffer: InputOutputBuffer,
     pub draw_call_buffer: InputOutputBuffer,
     pub culling_results_buffer: InputOutputBuffer,
@@ -91,16 +91,16 @@ pub struct CullingBuffers {
 impl CullingBuffers {
     fn new(device: &Device, queue: &Queue, sizes: CullingBufferSizes) -> Self {
         Self {
-            culling_data_buffer: WrappedPotBuffer::new(&device, wgpu::BufferUsages::STORAGE, "culling data buffer"),
             // One element per triangle/invocation
-            index_buffer: InputOutputBuffer::new(&device, queue, sizes.invocations, "Index Buffer", 4, false),
-            draw_call_buffer: InputOutputBuffer::new(&device, queue, sizes.draw_calls, "Draw Call Buffer", 20, true),
+            index_buffer: InputOutputBuffer::new(&device, queue, sizes.invocations, "Index Buffer", 4, 4, false),
+            draw_call_buffer: InputOutputBuffer::new(&device, queue, sizes.draw_calls, "Draw Call Buffer", 20, 4, true),
             culling_results_buffer: InputOutputBuffer::new(
                 &device,
                 queue,
                 // 32 bits in a u32
                 sizes.invocations.div_round_up(u32::BITS as _),
                 "Culling Results Buffer",
+                4,
                 4,
                 false,
             ),
@@ -588,12 +588,23 @@ impl GpuCuller {
                 .unwrap_or_else(|| panic!("No per camera uniform for camera {:?}", camera_idx)),
         );
 
-        {
+        let culling_data_buffer = {
             profiling::scope!("Culling Job Data Upload");
-            buffers
-                .culling_data_buffer
-                .write_to_buffer(&ctx.renderer.device, &ctx.renderer.queue, &jobs.jobs);
-        }
+
+            let culling_data_buffer = ctx.renderer.device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("Culling Data Buffer"),
+                size: jobs.jobs.size().get(),
+                usage: wgpu::BufferUsages::STORAGE,
+                mapped_at_creation: true,
+            });
+
+            let mut mapping = culling_data_buffer.slice(..).get_mapped_range_mut();
+            StorageBuffer::new(&mut *mapping).write(&jobs.jobs).unwrap();
+            drop(mapping);
+            culling_data_buffer.unmap();
+
+            culling_data_buffer
+        };
 
         let hi_z_buffer = ctx.graph_data.get_render_target(depth_handle);
 
@@ -612,7 +623,7 @@ impl GpuCuller {
                 BindGroupEntry {
                     binding: 2,
                     resource: BindingResource::Buffer(BufferBinding {
-                        buffer: &buffers.culling_data_buffer,
+                        buffer: &culling_data_buffer,
                         offset: 0,
                         size: Some(ShaderBatchData::SHADER_SIZE),
                     }),
@@ -688,6 +699,7 @@ impl GpuCuller {
         drop(cpass);
 
         DrawCallSet {
+            culling_data_buffer,
             per_camera_uniform,
             draw_calls,
             material_key_ranges,

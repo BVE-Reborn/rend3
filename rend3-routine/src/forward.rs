@@ -228,7 +228,7 @@ impl<M: Material> ForwardRoutine<M> {
                 BindGroupBuilder::new()
                     .append_buffer(ctx.data_core.object_manager.buffer::<M>().unwrap())
                     .append_buffer_with_size(
-                        &culling_buffers.culling_data_buffer,
+                        &draw_call_set.culling_data_buffer,
                         culling::ShaderBatchData::SHADER_SIZE.get(),
                     )
                     .append_buffer(&ctx.eval_output.mesh_buffer)

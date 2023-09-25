@@ -96,6 +96,15 @@ impl<'a> BindGroupBuilder<'a> {
         self
     }
 
+    pub fn append_buffer_with_offset_and_size(&mut self, buffer: &'a Buffer, offset: u64, size: u64) -> &mut Self {
+        self.append(BindingResource::Buffer(BufferBinding {
+            buffer,
+            offset,
+            size: NonZeroU64::new(size),
+        }));
+        self
+    }
+
     pub fn append_sampler(&mut self, sampler: &'a Sampler) -> &mut Self {
         self.append(BindingResource::Sampler(sampler));
         self
