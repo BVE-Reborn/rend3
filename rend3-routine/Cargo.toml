@@ -19,7 +19,7 @@ encase = { version = "0.6", features = ["glam"] }
 flume = "0.11"
 glam = { version = "0.24.0", features = ["bytemuck"] }
 log = "0.4"
-ordered-float = "3"
+ordered-float = "4"
 parking_lot = "0.12"
 profiling = {version = "1", default-features = false }
 rend3 = { version = "^0.3.0", path = "../rend3" }
