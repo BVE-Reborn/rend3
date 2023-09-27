@@ -16,7 +16,12 @@ pub async fn multi_frame_add() -> anyhow::Result<()> {
     let iad = no_gpu_return!(rend3::create_iad(None, None, None, None).await)
         .context("InstanceAdapterDevice creation failed")?;
 
-    let Ok(runner) = TestRunner::builder().iad(iad.clone()).handedness(Handedness::Left).build().await else {
+    let Ok(runner) = TestRunner::builder()
+        .iad(iad.clone())
+        .handedness(Handedness::Left)
+        .build()
+        .await
+    else {
         return Ok(());
     };
 

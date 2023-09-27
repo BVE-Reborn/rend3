@@ -245,7 +245,7 @@ impl TestRunner {
             let Ok(expected) = image::open(path) else {
                 create_dir_all(parent_path).context("Could not create parent directory")?;
                 test_rgba.save(path).context("Could not save image")?;
-                return Ok(())
+                return Ok(());
             };
 
             let expected_rgb = expected.into_rgb8();

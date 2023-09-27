@@ -5,6 +5,32 @@ use rend3_test::{no_gpu_return, test_attr, FrameRenderSettings, TestRunner, Thre
 use wgpu::FrontFace;
 
 #[test_attr]
+pub async fn empty() -> anyhow::Result<()> {
+    let iad = no_gpu_return!(rend3::create_iad(None, None, None, None).await)
+        .context("InstanceAdapterDevice creation failed")?;
+
+    let Ok(runner) = TestRunner::builder().iad(iad).build().await else {
+        return Ok(());
+    };
+
+    runner.set_camera_data(Camera {
+        projection: rend3::types::CameraProjection::Raw(Mat4::IDENTITY),
+        view: Mat4::IDENTITY,
+    });
+
+    runner
+        .render_and_compare(
+            FrameRenderSettings::new(),
+            "tests/results/simple/empty.png",
+            Threshold::Mean(0.0),
+        )
+        .await
+        .context("Image Comparison Failed")?;
+
+    Ok(())
+}
+
+#[test_attr]
 pub async fn triangle() -> anyhow::Result<()> {
     let tests = [
         (Handedness::Left, FrontFace::Cw, true),
@@ -17,7 +43,12 @@ pub async fn triangle() -> anyhow::Result<()> {
         .context("InstanceAdapterDevice creation failed")?;
 
     for (handedness, winding, visible) in tests {
-        let Ok(runner) = TestRunner::builder().iad(iad.clone()).handedness(handedness).build().await else {
+        let Ok(runner) = TestRunner::builder()
+            .iad(iad.clone())
+            .handedness(handedness)
+            .build()
+            .await
+        else {
             return Ok(());
         };
 
@@ -89,9 +120,14 @@ pub async fn coordinate_space() -> anyhow::Result<()> {
     let iad = no_gpu_return!(rend3::create_iad(None, None, None, None).await)
         .context("InstanceAdapterDevice creation failed")?;
 
-    let Ok(runner) = TestRunner::builder().iad(iad.clone()).handedness(Handedness::Left).build().await else {
-            return Ok(());
-        };
+    let Ok(runner) = TestRunner::builder()
+        .iad(iad.clone())
+        .handedness(Handedness::Left)
+        .build()
+        .await
+    else {
+        return Ok(());
+    };
 
     let _objects = tests.map(|(_name, right_vector, up_vector, camera_vector)| {
         // Clockwise triangle

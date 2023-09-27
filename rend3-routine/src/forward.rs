@@ -179,10 +179,10 @@ impl<M: Material> ForwardRoutine<M> {
                 // If we are provided a culling output handle, we are rendering the second pass
                 // with the residual triangles from this frame.
                 Some(handle) => {
-                    let draw_call_set = ctx
-                        .graph_data
-                        .get_data(ctx.temps, handle)
-                        .expect("Expected culling output to be present if a culling output handle is provided");
+                    // If there is no draw call set for this camera in the cache, there isn't actually anything to render.
+                    let Some(draw_call_set) = ctx.graph_data.get_data(ctx.temps, handle) else {
+                        return;
+                    };
 
                     // As we're in the residual, we need to store the draw call set for the next frame.
                     draw_call_set_cache.insert(args.camera, Arc::clone(&draw_call_set));
