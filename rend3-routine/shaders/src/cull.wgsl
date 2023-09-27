@@ -150,7 +150,7 @@ struct CullingResults {
 var<storage, read_write> culling_results: CullingResults;
 
 fn get_previous_culling_result(object_info: ptr<function, ObjectCullingInformation>, object_invocation: u32) -> bool {
-    if (*object_info).previous_global_invocation != 0xFFFFFFFFu {
+    if (*object_info).previous_global_invocation == 0xFFFFFFFFu {
         return false;
     }
 
