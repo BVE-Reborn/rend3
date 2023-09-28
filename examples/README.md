@@ -6,6 +6,8 @@ If you want to demo running rend3, [`scene-viewer`](scene-viewer) is what you sh
 
 If you want to look at how the basics of the code works, look at either the [`cube`](cube) or [`cube-no-framework`](cube-no-framework) example.
 
+To build the cube example for the web, use the build script in the repository root: `bash build.bash web-bin cube`
+
 | Name                | Description | Image |
 |:-------------------:|:------------|-------|
 | scene-viewer        | Advanced gltf model and scene viewer. Used to test all of rend3's complex features. | ![](scene-viewer/scifi-base.jpg) ![](scene-viewer/screenshot.jpg) ![](scene-viewer/bistro.jpg) ![](scene-viewer/emerald-square.jpg) |
