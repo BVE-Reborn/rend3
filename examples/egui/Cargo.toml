@@ -13,7 +13,7 @@ path = "src/main.rs"
 
 [dependencies]
 # The egui immediate mode gui library
-egui = "0.22.0"
+egui = "0.23.0"
 # Winit integration with egui (turn off the clipboard feature)
 egui-winit = { version = "0.22", default-features = false, features = ["links", "wayland"] }
 # logging
