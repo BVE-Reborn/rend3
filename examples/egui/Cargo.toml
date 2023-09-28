@@ -15,7 +15,7 @@ path = "src/main.rs"
 # The egui immediate mode gui library
 egui = "0.22.0"
 # Winit integration with egui (turn off the clipboard feature)
-egui-winit = { version = "0.22", default-features = false, features = ["links", "wayland"] }
+egui-winit = { version = "0.23", default-features = false, features = ["links", "wayland"] }
 # logging
 env_logger = { version = "0.10", default-features = false, features = ["auto-color", "humantime"] }
 # Linear algebra library
