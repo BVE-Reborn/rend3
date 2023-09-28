@@ -20,7 +20,7 @@ glam = "0.24"
 image = { version =  "0.24", default-features = false, features = ["png"] }
 rend3 = { path = "../rend3" }
 rend3-routine = { path = "../rend3-routine" }
-wgpu = "0.16"
+wgpu = "0.17"
 
 # These should be dev-deps but doing this allows us to have a single attribute on all tests
 # and not need to have conditional attributes on every single test.
