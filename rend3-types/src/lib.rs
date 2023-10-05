@@ -486,6 +486,10 @@ impl MeshBuilder {
             indices: self.indices.unwrap_or_else(|| (0..self.vertex_count as u32).collect()),
         };
 
+        if self.double_sided {
+            mesh.double_side();
+        }
+
         let has_normals = mesh.find_attribute_index(&VERTEX_ATTRIBUTE_NORMAL).is_some();
         let has_tangents = mesh.find_attribute_index(&VERTEX_ATTRIBUTE_TANGENT).is_some();
 
