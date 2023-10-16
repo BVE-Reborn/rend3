@@ -391,6 +391,22 @@ fn handle_surface<A: App<T>, T: 'static>(
             surface_info.sample_count = app.sample_count();
             surface_info.present_mode = app.present_mode();
 
+            // Winit erroniously stomps on the canvas CSS when a scale factor
+            // change happens, so we need to put it back to normal. We can't
+            // do this in a scale factor changed event, as the override happens
+            // after the event is sent.
+            //
+            // https://github.com/rust-windowing/winit/issues/3023
+            #[cfg(target_arch = "wasm32")]
+            {
+                use winit::platform::web::WindowExtWebSys;
+                let canvas = window.canvas();
+                let style = canvas.style();
+
+                style.set_property("width", "100%").unwrap();
+                style.set_property("height", "100%").unwrap();
+            }
+
             // Reconfigure the surface for the new size.
             rend3::configure_surface(
                 surface.as_ref().unwrap(),
