@@ -92,10 +92,10 @@ impl CullingBuffers {
     fn new(device: &Device, queue: &Queue, sizes: CullingBufferSizes) -> Self {
         Self {
             // One element per triangle/invocation
-            index_buffer: InputOutputBuffer::new(&device, queue, sizes.invocations, "Index Buffer", 4, 4, false),
-            draw_call_buffer: InputOutputBuffer::new(&device, queue, sizes.draw_calls, "Draw Call Buffer", 20, 4, true),
+            index_buffer: InputOutputBuffer::new(device, queue, sizes.invocations, "Index Buffer", 4, 4, false),
+            draw_call_buffer: InputOutputBuffer::new(device, queue, sizes.draw_calls, "Draw Call Buffer", 20, 4, true),
             culling_results_buffer: InputOutputBuffer::new(
-                &device,
+                device,
                 queue,
                 // 32 bits in a u32
                 sizes.invocations.div_round_up(u32::BITS as _),
@@ -114,10 +114,10 @@ impl CullingBuffers {
         encoder: &mut CommandEncoder,
         sizes: CullingBufferSizes,
     ) {
-        self.index_buffer.swap(&queue, &device, encoder, sizes.invocations * 3);
-        self.draw_call_buffer.swap(&queue, &device, encoder, sizes.draw_calls);
+        self.index_buffer.swap(queue, device, encoder, sizes.invocations * 3);
+        self.draw_call_buffer.swap(queue, device, encoder, sizes.draw_calls);
         self.culling_results_buffer
-            .swap(&queue, &device, encoder, sizes.invocations.div_round_up(32));
+            .swap(queue, device, encoder, sizes.invocations.div_round_up(32));
     }
 }
 
@@ -262,11 +262,9 @@ impl GpuCuller {
         let culling_source = spp
             .render_shader(
                 "rend3-routine/cull.wgsl",
-                &{
-                    let mut map = HashMap::new();
-                    map.insert("position_attribute_offset", position_offset);
-                    map
-                },
+                &serde_json::json! {{
+                    "position_attribute_offset": position_offset,
+                }},
                 Some(&ShaderVertexBufferConfig::from_material::<M>()),
             )
             .unwrap();
@@ -423,7 +421,7 @@ impl GpuCuller {
         }
     }
 
-    pub fn uniform_bake<M>(
+    pub fn object_uniform_upload<M>(
         &self,
         ctx: &mut NodeExecutionContext,
         camera: &CameraManager,
@@ -433,7 +431,7 @@ impl GpuCuller {
     ) where
         M: Material,
     {
-        profiling::scope!("GpuCuller::uniform_bake");
+        profiling::scope!("GpuCuller::object_uniform_upload");
 
         assert_eq!(TypeId::of::<M>(), self.type_id);
 
@@ -706,7 +704,7 @@ impl GpuCuller {
         }
     }
 
-    pub fn add_uniform_bake_to_graph<'node, M: Material>(
+    pub fn add_object_uniform_upload_to_graph<'node, M: Material>(
         &'node self,
         graph: &mut RenderGraph<'node>,
         camera_idx: Option<usize>,
@@ -723,7 +721,7 @@ impl GpuCuller {
                 None => &ctx.data_core.camera_manager,
             };
 
-            self.uniform_bake::<M>(&mut ctx, camera, camera_idx, resolution, samples);
+            self.object_uniform_upload::<M>(&mut ctx, camera, camera_idx, resolution, samples);
         });
     }
 

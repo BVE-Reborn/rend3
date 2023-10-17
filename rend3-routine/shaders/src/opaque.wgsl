@@ -88,6 +88,10 @@ struct VertexOutput {
 
 @vertex
 fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
+    // If the vertex index is our sentinel invalid value, return a degenerate triangle.
+    //
+    // This is used by the culling shader to discard triangles when the ordering of the
+    // triangles are important, and atomics can't be used.
     if vertex_index == INVALID_VERTEX {
         var vs_out: VertexOutput;
         vs_out.position = vec4<f32>(0.0);
@@ -96,6 +100,9 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
     let indices = unpack_vertex_index(vertex_index);
     
     let data = object_buffer[indices.object];
+    // If the object is disabled, return a degenerate triangle.
+    //
+    // This happens when the object is deleted, and we're rendering last-frame's objects.
     if data.enabled == 0u {
         var vs_out: VertexOutput;
         vs_out.position = vec4<f32>(0.0);

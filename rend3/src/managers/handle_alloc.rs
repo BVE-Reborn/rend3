@@ -18,6 +18,14 @@ where
 {
     max_allocated: AtomicUsize,
     freelist: Mutex<Vec<usize>>,
+    /// We want the render routines to be able to rely on deleted handles being valid for at
+    /// least one frame.
+    ///
+    /// To facilitate this, we first put the handle in the delay list, then at the top of
+    /// every frame, we move the handles from the delay list to the freelist.
+    ///
+    /// We do not need to do this for everything though, only for Object handles, as these
+    /// are the root handle which the renderer accesses everything.
     delay_list: Option<Mutex<Vec<usize>>>,
     _phantom: PhantomData<T>,
 }

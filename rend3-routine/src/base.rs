@@ -117,47 +117,58 @@ impl BaseRenderGraph {
         ambient: Vec4,
         clear_color: Vec4,
     ) {
-        // Create intermediate storage
+        // Create the data and handles for the graph.
         let state = BaseRenderGraphIntermediateState::new(graph, eval_output, resolution, samples);
 
-        // Clear shadow
+        // Clear the shadow map.
         state.clear_shadow(graph);
 
-        // Preparing and uploading data
+        // Prepare all the uniforms that all shaders need access to.
         state.create_frame_uniforms(graph, self, ambient, resolution);
 
-        // Skinning
+        // Perform compute based skinning.
         state.skinning(graph, self);
 
-        // Culling
-        state.pbr_shadow_uniform_bake(graph, self, eval_output);
+        // Upload the uniforms for the objects in the shadow pass.
+        state.shadow_object_uniform_upload(graph, self, eval_output);
+        // Perform culling for the objects in the shadow pass.
         state.pbr_shadow_culling(graph, self);
 
-        // Depth-only rendering
+        // Render all the shadows to the shadow map.
         state.pbr_shadow_rendering(graph, pbr, &eval_output.shadows);
 
-        // Clear targets
+        // Clear the primary render target and depth target.
         state.clear(graph, clear_color);
 
-        // Forward rendering opaque
+        // Upload the uniforms for the objects in the forward pass.
+        state.object_uniform_upload(graph, self, resolution, samples);
 
-        state.pbr_uniform_bake(graph, self, resolution, samples);
+        // Do the first pass, rendering the predicted triangles from last frame.
+        state.pbr_render_opaque_predicted_triangles(graph, pbr, samples);
 
-        state.pbr_forward_rendering_opaque_pass_1(graph, pbr, samples);
-
+        // Create the hi-z buffer.
         state.hi_z(graph, pbr, resolution);
 
+        // Perform culling for the objects in the forward pass.
+        //
+        // The result of culling will be used to predict the visible triangles for
+        // the next frame. It will also render all the triangles that were visible
+        // but were not predicted last frame.
         state.pbr_culling(graph, self);
 
-        state.pbr_forward_rendering_opaque_pass_2(graph, pbr, samples);
+        // Do the second pass, rendering the residual triangles.
+        state.pbr_render_opaque_residual_triangles(graph, pbr, samples);
 
-        // Skybox
+        // Render the skybox.
         state.skybox(graph, skybox, samples);
 
-        // Forward rendering transparent
+        // Render all transparent objects.
+        //
+        // This _must_ happen after culling, as all transparent objects are
+        // considered "residual".
         state.pbr_forward_rendering_transparent(graph, pbr, samples);
 
-        // Make the reference to the surface
+        // Tonemap the HDR inner buffer to the output buffer.
         state.tonemapping(graph, tonemapping, target_texture);
     }
 }
@@ -268,14 +279,14 @@ impl BaseRenderGraphIntermediateState {
             resolution,
         );
     }
-    pub fn pbr_shadow_uniform_bake<'node>(
+    pub fn shadow_object_uniform_upload<'node>(
         &self,
         graph: &mut RenderGraph<'node>,
         base: &'node BaseRenderGraph,
         eval_output: &InstructionEvaluationOutput,
     ) {
         for (shadow_index, shadow) in eval_output.shadows.iter().enumerate() {
-            base.gpu_culler.add_uniform_bake_to_graph::<pbr::PbrMaterial>(
+            base.gpu_culler.add_object_uniform_upload_to_graph::<pbr::PbrMaterial>(
                 graph,
                 Some(shadow_index),
                 UVec2::splat(shadow.map.size),
@@ -302,15 +313,20 @@ impl BaseRenderGraphIntermediateState {
         skinning::add_skinning_to_graph(graph, &base.gpu_skinner);
     }
 
-    pub fn pbr_uniform_bake<'node>(
+    pub fn object_uniform_upload<'node>(
         &self,
         graph: &mut RenderGraph<'node>,
         base: &'node BaseRenderGraph,
         resolution: UVec2,
         samples: SampleCount,
     ) {
-        base.gpu_culler
-            .add_uniform_bake_to_graph::<pbr::PbrMaterial>(graph, None, resolution, samples, "Uniform Bake");
+        base.gpu_culler.add_object_uniform_upload_to_graph::<pbr::PbrMaterial>(
+            graph,
+            None,
+            resolution,
+            samples,
+            "Uniform Bake",
+        );
     }
 
     /// Does all culling for the forward PBR materials.
@@ -391,7 +407,7 @@ impl BaseRenderGraphIntermediateState {
     }
 
     /// Render the PBR materials.
-    pub fn pbr_forward_rendering_opaque_pass_1<'node>(
+    pub fn pbr_render_opaque_predicted_triangles<'node>(
         &self,
         graph: &mut RenderGraph<'node>,
         pbr: &'node pbr::PbrRoutine,
@@ -416,7 +432,7 @@ impl BaseRenderGraphIntermediateState {
     }
 
     /// Render the PBR materials.
-    pub fn pbr_forward_rendering_opaque_pass_2<'node>(
+    pub fn pbr_render_opaque_residual_triangles<'node>(
         &self,
         graph: &mut RenderGraph<'node>,
         pbr: &'node pbr::PbrRoutine,

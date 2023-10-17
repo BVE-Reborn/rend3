@@ -65,13 +65,11 @@ impl InputOutputBuffer {
 
     fn capacity_elements(input_partition_elements: u64, output_partition_elements: u64) -> u64 {
         let max = input_partition_elements.max(output_partition_elements);
-        let buffer = max.next_power_of_two() * 2;
-        buffer
+        max.next_power_of_two() * 2
     }
 
     fn buffer_size(padded_header_size: u64, capacity_elements: u64, element_size: u64) -> u64 {
-        let with_header = capacity_elements * element_size + padded_header_size;
-        with_header
+        capacity_elements * element_size + padded_header_size
     }
 
     pub fn new(
@@ -107,7 +105,7 @@ impl InputOutputBuffer {
             padded_header_size,
         };
 
-        this.write_headers(&queue);
+        this.write_headers(queue);
 
         this
     }

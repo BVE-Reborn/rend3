@@ -71,6 +71,9 @@ pub struct RoutineArgs<'a, M> {
 pub struct RoutineAddToGraphArgs<'a, 'node, M> {
     pub graph: &'a mut RenderGraph<'node>,
     pub whole_frame_uniform_bg: DataHandle<BindGroup>,
+    // If this is None, we are rendering the first pass with the predicted triangles from last frame.
+    //
+    // If this is Some, we are rendering the second pass with the residual triangles from this frame.
     pub culling_output_handle: Option<DataHandle<Arc<culling::DrawCallSet>>>,
     pub per_material: &'node PerMaterialArchetypeInterface<M>,
     pub extra_bgs: Option<&'node [BindGroup]>,
@@ -185,7 +188,7 @@ impl<M: Material> ForwardRoutine<M> {
                     };
 
                     // As we're in the residual, we need to store the draw call set for the next frame.
-                    draw_call_set_cache.insert(args.camera, Arc::clone(&draw_call_set));
+                    draw_call_set_cache.insert(args.camera, Arc::clone(draw_call_set));
 
                     draw_call_set
                 }
