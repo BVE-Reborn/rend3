@@ -13,8 +13,6 @@ license-files = [{ path = "COPYRIGHT", hash = 972598577 }]
 multiple-versions = "deny"
 wildcards = "allow"
 skip = [
-    # hashbrown
-    { name = "ahash", version = "0.7.6" },
     # gltf / reqwest
     { name = "base64", version = "0.13.1" },
     # ddsfile
