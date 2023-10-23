@@ -25,6 +25,6 @@ rend3-framework = { version = "^0.3.0", path = "../../rend3-framework" }
 # Programmable render list that dictates how the scene renders
 rend3-routine = { version = "^0.3.0", path = "../../rend3-routine" }
 # windowing
-winit = "0.28"
+winit = "0.29"
 # Load image
 image = { version = "0.24", default-features = false, features = ["png"]}
