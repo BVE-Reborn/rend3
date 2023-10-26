@@ -37,7 +37,7 @@ winit = "0.28"
 # Opening URL's
 webbrowser = "0.8.2"
 # Creating textures
-wgpu = "0.16"
+wgpu = "0.18"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 # Winit integration with egui
