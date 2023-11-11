@@ -13,7 +13,7 @@ use rend3::{
     format_sso,
     graph::{DataHandle, DeclaredDependency, NodeExecutionContext, NodeResourceUsage, RenderGraph, RenderTargetHandle},
     managers::{CameraManager, ShaderObject, TextureBindGroupIndex},
-    types::{GraphDataHandle, Material, MaterialArray, RawObjectHandle, SampleCount, VERTEX_ATTRIBUTE_POSITION},
+    types::{GraphDataHandle, Material, MaterialArray, SampleCount, VERTEX_ATTRIBUTE_POSITION},
     util::{frustum::Frustum, math::IntegerExt, typedefs::FastHashMap},
     Renderer, ShaderPreProcessor, ShaderVertexBufferConfig,
 };
@@ -25,10 +25,13 @@ use wgpu::{
     ShaderModuleDescriptor, ShaderStages, TextureSampleType, TextureViewDimension,
 };
 
-use crate::culling::{
-    batching::{batch_objects, JobSubRegion, ShaderBatchData, ShaderBatchDatas},
-    suballoc::InputOutputBuffer,
-    WORKGROUP_SIZE,
+use crate::{
+    common::CameraIndex,
+    culling::{
+        batching::{batch_objects, JobSubRegion, PerCameraPreviousInvocationsMap, ShaderBatchData, ShaderBatchDatas},
+        suballoc::InputOutputBuffer,
+        WORKGROUP_SIZE,
+    },
 };
 
 #[derive(Debug)]
@@ -48,10 +51,10 @@ pub struct DrawCall {
 
 #[derive(Default)]
 pub struct CullingBufferMap {
-    inner: FastHashMap<Option<usize>, CullingBuffers>,
+    inner: FastHashMap<CameraIndex, CullingBuffers>,
 }
 impl CullingBufferMap {
-    pub fn get_buffers(&self, camera: Option<usize>) -> Option<&CullingBuffers> {
+    pub fn get_buffers(&self, camera: CameraIndex) -> Option<&CullingBuffers> {
         self.inner.get(&camera)
     }
 
@@ -60,7 +63,7 @@ impl CullingBufferMap {
         queue: &Queue,
         device: &Device,
         encoder: &mut CommandEncoder,
-        camera: Option<usize>,
+        camera: CameraIndex,
         sizes: CullingBufferSizes,
     ) -> &mut CullingBuffers {
         match self.inner.entry(camera) {
@@ -187,9 +190,9 @@ pub struct GpuCuller {
     sampler: Sampler,
     winding: wgpu::FrontFace,
     type_id: TypeId,
-    per_material_buffer_handle: GraphDataHandle<HashMap<Option<usize>, Arc<Buffer>>>,
+    per_material_buffer_handle: GraphDataHandle<HashMap<CameraIndex, Arc<Buffer>>>,
     pub culling_buffer_map_handle: GraphDataHandle<CullingBufferMap>,
-    previous_invocation_map_handle: GraphDataHandle<HashMap<Option<usize>, HashMap<RawObjectHandle, u32>>>,
+    previous_invocation_map_handle: GraphDataHandle<PerCameraPreviousInvocationsMap>,
 }
 
 impl GpuCuller {
@@ -405,7 +408,7 @@ impl GpuCuller {
 
         let per_material_buffer_handle = renderer.add_graph_data(HashMap::default());
         let culling_buffer_map_handle = renderer.add_graph_data(CullingBufferMap::default());
-        let previous_invocation_map_handle = renderer.add_graph_data(HashMap::default());
+        let previous_invocation_map_handle = renderer.add_graph_data(PerCameraPreviousInvocationsMap::new());
 
         Self {
             prep_bgl,
@@ -425,7 +428,7 @@ impl GpuCuller {
         &self,
         ctx: &mut NodeExecutionContext,
         camera: &CameraManager,
-        camera_idx: Option<usize>,
+        camera_idx: CameraIndex,
         resolution: UVec2,
         samples: SampleCount,
     ) where
@@ -477,8 +480,8 @@ impl GpuCuller {
         };
 
         let culling = match camera_idx {
-            Some(_) => wgpu::Face::Front,
-            None => wgpu::Face::Back,
+            CameraIndex::Shadow(_) => wgpu::Face::Front,
+            CameraIndex::Viewport => wgpu::Face::Back,
         };
 
         {
@@ -487,7 +490,7 @@ impl GpuCuller {
             let per_camera_data = PerCameraUniform {
                 view: camera.view(),
                 view_proj: camera.view_proj(),
-                shadow_index: camera_idx.unwrap_or(u32::MAX as _) as u32,
+                shadow_index: camera_idx.to_shader_index(),
                 frustum: camera.world_frustum(),
                 resolution: resolution.as_vec2(),
                 flags: {
@@ -544,7 +547,7 @@ impl GpuCuller {
         ctx: &mut NodeExecutionContext,
         jobs: ShaderBatchDatas,
         depth_handle: DeclaredDependency<RenderTargetHandle>,
-        camera_idx: Option<usize>,
+        camera_idx: CameraIndex,
     ) -> DrawCallSet
     where
         M: Material,
@@ -707,7 +710,7 @@ impl GpuCuller {
     pub fn add_object_uniform_upload_to_graph<'node, M: Material>(
         &'node self,
         graph: &mut RenderGraph<'node>,
-        camera_idx: Option<usize>,
+        camera_idx: CameraIndex,
         resolution: UVec2,
         samples: SampleCount,
         name: &str,
@@ -717,8 +720,8 @@ impl GpuCuller {
 
         node.build(move |mut ctx| {
             let camera = match camera_idx {
-                Some(i) => &ctx.eval_output.shadows[i].camera,
-                None => &ctx.data_core.camera_manager,
+                CameraIndex::Shadow(i) => &ctx.eval_output.shadows[i as usize].camera,
+                CameraIndex::Viewport => &ctx.data_core.camera_manager,
             };
 
             self.object_uniform_upload::<M>(&mut ctx, camera, camera_idx, resolution, samples);
@@ -730,7 +733,7 @@ impl GpuCuller {
         graph: &mut RenderGraph<'node>,
         draw_calls_hdl: DataHandle<Arc<DrawCallSet>>,
         depth_handle: RenderTargetHandle,
-        camera_idx: Option<usize>,
+        camera_idx: CameraIndex,
         name: &str,
     ) {
         let mut node = graph.add_node(name);
@@ -739,8 +742,8 @@ impl GpuCuller {
 
         node.build(move |mut ctx| {
             let camera = match camera_idx {
-                Some(i) => &ctx.eval_output.shadows[i].camera,
-                None => &ctx.data_core.camera_manager,
+                CameraIndex::Shadow(i) => &ctx.eval_output.shadows[i as usize].camera,
+                CameraIndex::Viewport => &ctx.data_core.camera_manager,
             };
 
             let jobs = batch_objects::<M>(&mut ctx, &self.previous_invocation_map_handle, camera, camera_idx);

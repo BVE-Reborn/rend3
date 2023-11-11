@@ -25,10 +25,7 @@ impl<T> Copy for DataHandle<T> {}
 
 impl<T> Clone for DataHandle<T> {
     fn clone(&self) -> Self {
-        Self {
-            idx: self.idx,
-            _phantom: self._phantom,
-        }
+        *self
     }
 }
 

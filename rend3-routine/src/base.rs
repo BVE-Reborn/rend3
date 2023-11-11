@@ -27,7 +27,12 @@ use rend3::{
 };
 use wgpu::{BindGroup, Buffer};
 
-use crate::{common, culling, forward::RoutineAddToGraphArgs, pbr, skinning, skybox, tonemapping};
+use crate::{
+    common::{self, CameraIndex},
+    culling,
+    forward::RoutineAddToGraphArgs,
+    pbr, skinning, skybox, tonemapping,
+};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct DepthTargets {
@@ -288,7 +293,7 @@ impl BaseRenderGraphIntermediateState {
         for (shadow_index, shadow) in eval_output.shadows.iter().enumerate() {
             base.gpu_culler.add_object_uniform_upload_to_graph::<pbr::PbrMaterial>(
                 graph,
-                Some(shadow_index),
+                CameraIndex::Shadow(shadow_index as u32),
                 UVec2::splat(shadow.map.size),
                 SampleCount::One,
                 &format_sso!("Shadow Culling S{}", shadow_index),
@@ -303,7 +308,7 @@ impl BaseRenderGraphIntermediateState {
                 graph,
                 shadow_culled,
                 self.shadow,
-                Some(shadow_index),
+                CameraIndex::Shadow(shadow_index as u32),
                 &format_sso!("Shadow Culling S{}", shadow_index),
             );
         }
@@ -322,7 +327,7 @@ impl BaseRenderGraphIntermediateState {
     ) {
         base.gpu_culler.add_object_uniform_upload_to_graph::<pbr::PbrMaterial>(
             graph,
-            None,
+            CameraIndex::Viewport,
             resolution,
             samples,
             "Uniform Bake",
@@ -335,7 +340,7 @@ impl BaseRenderGraphIntermediateState {
             graph,
             self.cull,
             self.depth.single_sample_mipped,
-            None,
+            CameraIndex::Viewport,
             "Primary Culling",
         );
     }
@@ -376,7 +381,7 @@ impl BaseRenderGraphIntermediateState {
                     extra_bgs: None,
                     label: &format!("pbr shadow renderering S{shadow_index}"),
                     samples: SampleCount::One,
-                    camera: Some(shadow_index),
+                    camera: CameraIndex::Shadow(shadow_index as u32),
                     color: None,
                     resolve: None,
                     depth: self
@@ -423,7 +428,7 @@ impl BaseRenderGraphIntermediateState {
                 extra_bgs: None,
                 label: "PBR Forward Pass 1",
                 samples,
-                camera: None,
+                camera: CameraIndex::Viewport,
                 color: Some(self.color),
                 resolve: self.resolve,
                 depth: self.depth.rendering_target(),
@@ -448,7 +453,7 @@ impl BaseRenderGraphIntermediateState {
                 extra_bgs: None,
                 label: "PBR Forward Pass 2",
                 samples,
-                camera: None,
+                camera: CameraIndex::Viewport,
                 color: Some(self.color),
                 resolve: self.resolve,
                 depth: self.depth.rendering_target(),
@@ -470,7 +475,7 @@ impl BaseRenderGraphIntermediateState {
             per_material: &pbr.per_material,
             extra_bgs: None,
             label: "PBR Forward",
-            camera: None,
+            camera: CameraIndex::Viewport,
             samples,
             color: Some(self.color),
             resolve: self.resolve,

@@ -57,10 +57,7 @@ impl<T> Copy for RawResourceHandle<T> {}
 
 impl<T> Clone for RawResourceHandle<T> {
     fn clone(&self) -> Self {
-        Self {
-            idx: self.idx,
-            _phantom: PhantomData,
-        }
+        *self
     }
 }
 

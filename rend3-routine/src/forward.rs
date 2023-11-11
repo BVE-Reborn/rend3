@@ -24,7 +24,7 @@ use wgpu::{
 };
 
 use crate::{
-    common::{PerMaterialArchetypeInterface, WholeFrameInterfaces},
+    common::{CameraIndex, PerMaterialArchetypeInterface, WholeFrameInterfaces},
     culling::{self, CullingBufferMap, DrawCall, DrawCallSet, InputOutputPartition},
 };
 
@@ -82,7 +82,7 @@ pub struct RoutineAddToGraphArgs<'a, 'node, M> {
     pub color: Option<RenderTargetHandle>,
     pub resolve: Option<RenderTargetHandle>,
     pub depth: RenderTargetHandle,
-    pub camera: Option<usize>,
+    pub camera: CameraIndex,
 }
 
 /// A set of pipelines for rendering a specific combination of a material.
@@ -91,7 +91,7 @@ pub struct ForwardRoutine<M: Material> {
     pub pipeline_s4: RenderPipeline,
     pub material_key: u64,
     pub culling_buffer_map_handle: GraphDataHandle<CullingBufferMap>,
-    pub draw_call_set_cache_handle: GraphDataHandle<FastHashMap<Option<usize>, Arc<DrawCallSet>>>,
+    pub draw_call_set_cache_handle: GraphDataHandle<FastHashMap<CameraIndex, Arc<DrawCallSet>>>,
     pub _phantom: PhantomData<M>,
 }
 impl<M: Material> ForwardRoutine<M> {
@@ -204,7 +204,7 @@ impl<M: Material> ForwardRoutine<M> {
                     draw_call_set
                 }
             };
-            let residual = culling_output_handle.is_some() && args.camera.is_none();
+            let residual = culling_output_handle.is_some() && args.camera.is_viewport();
 
             let culling_buffer_storage = ctx.data_core.graph_storage.get(&self.culling_buffer_map_handle);
 

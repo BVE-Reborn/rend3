@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, collections::HashMap, mem};
+use std::{cmp::Ordering, collections::HashMap};
 
 use encase::ShaderType;
 use ordered_float::OrderedFloat;
@@ -6,8 +6,10 @@ use rend3::{
     graph::NodeExecutionContext,
     managers::{CameraManager, TextureBindGroupIndex},
     types::{GraphDataHandle, Material, RawObjectHandle, SortingOrder, SortingReason},
-    util::math::round_up,
+    util::{math::round_up, typedefs::FastHashMap},
 };
+
+use crate::common::CameraIndex;
 
 use super::{BATCH_SIZE, WORKGROUP_SIZE};
 
@@ -97,23 +99,37 @@ pub(super) struct ShaderObjectCullingInformation {
     pub atomic_capable: u32,
 }
 
+/// Map containing the previous invocation of each object.
+pub struct PerCameraPreviousInvocationsMap {
+    inner: FastHashMap<CameraIndex, FastHashMap<RawObjectHandle, u32>>,
+}
+impl PerCameraPreviousInvocationsMap {
+    pub fn new() -> Self {
+        Self {
+            inner: HashMap::default(),
+        }
+    }
+
+    pub fn get_and_reset_camera(&mut self, camera: CameraIndex) -> FastHashMap<RawObjectHandle, u32> {
+        self.inner.remove(&camera).unwrap_or_default()
+    }
+
+    pub fn set_camera(&mut self, camera: CameraIndex, previous_invocations: FastHashMap<RawObjectHandle, u32>) {
+        self.inner.insert(camera, previous_invocations);
+    }
+}
+
 pub(super) fn batch_objects<M: Material>(
     ctx: &mut NodeExecutionContext,
-    previous_invocation_map_handle: &GraphDataHandle<HashMap<Option<usize>, HashMap<RawObjectHandle, u32>>>,
+    previous_invocation_map_handle: &GraphDataHandle<PerCameraPreviousInvocationsMap>,
     camera: &CameraManager,
-    camera_idx: Option<usize>,
+    camera_idx: CameraIndex,
 ) -> ShaderBatchDatas {
     profiling::scope!("Batch Objects");
 
-    let mut current_invocation_map_map = ctx.data_core.graph_storage.get_mut(previous_invocation_map_handle);
-    let current_invocation_map = current_invocation_map_map
-        .entry(camera_idx)
-        .or_insert_with(Default::default);
-    let current_invocation_map_len = current_invocation_map.len();
-    let previous_invocation_map = mem::replace(
-        current_invocation_map,
-        HashMap::with_capacity(current_invocation_map_len),
-    );
+    let mut per_camera_previous_invocation_map = ctx.data_core.graph_storage.get_mut(previous_invocation_map_handle);
+    let previous_invocation_map = per_camera_previous_invocation_map.get_and_reset_camera(camera_idx);
+    let mut current_invocation_map = FastHashMap::default();
 
     let mut jobs = ShaderBatchDatas {
         jobs: Vec::new(),
@@ -256,6 +272,8 @@ pub(super) fn batch_objects<M: Material>(
             batch_base_invocation: current_base_invocation,
         });
     }
+
+    per_camera_previous_invocation_map.set_camera(camera_idx, current_invocation_map);
 
     jobs
 }
