@@ -216,11 +216,11 @@ fn clear_culling_results(lid: u32) {
     }
 }
 
-fn save_culling_results(global_invocation: u32, lid: u32, passed_culling: bool) {
+fn compute_culling_results(lid: u32, passed_culling: bool) {
     atomicOr(&workgroup_culling_results[lid / 32u], u32(passed_culling) << (lid % 32u));
+}
 
-    workgroupBarrier();
-
+fn save_culling_results(global_invocation: u32, lid: u32) {
     if lid == 0u {
         let culling_results_index = culling_results.output_offset + (global_invocation / 32u);
         culling_results.bits[culling_results_index + 0u] = atomicLoad(&workgroup_culling_results[0]);
@@ -324,45 +324,55 @@ fn cs_main(
     let batch_object_index = object_search_results.index_within_region;
     let global_invocation = culling_job.batch_base_invocation + gid.x;
 
+    // We need the workgroupBarrier to be in uniform control flow, so we can't return early here.
+    //
+    // If this is true, continue working on the other side of the barrier.
+    var write_culling_output = true;
     if gid.x >= object_info.invocation_end {
         if object_info.atomic_capable == 0u {
             write_invalid_residual_nonatomic_triangle(global_invocation, &object_info);
         }
-        return;
-    }
+        write_culling_output = false;
+    } else {
+        let object_invocation = gid.x - object_info.invocation_start;
 
-    let object_invocation = gid.x - object_info.invocation_start;
+        // If the first invocation in the region, set the region's draw call
+        if object_info.local_region_id == 0u && object_invocation == 0u {
+            init_draw_calls(global_invocation, object_info.region_id);
+        }
 
-    // If the first invocation in the region, set the region's draw call
-    if object_info.local_region_id == 0u && object_invocation == 0u {
-        init_draw_calls(global_invocation, object_info.region_id);
-    }
+        let triangle = vertex_fetch(object_invocation, &object_info);
 
-    let triangle = vertex_fetch(object_invocation, &object_info);
+        let model_view_proj = per_camera_uniform.objects[object_info.object_id].model_view_proj;
 
-    let model_view_proj = per_camera_uniform.objects[object_info.object_id].model_view_proj;
+        let passes_culling = execute_culling(model_view_proj, triangle.vertices);
 
-    let passes_culling = execute_culling(model_view_proj, triangle.vertices);
+        if object_info.atomic_capable == 1u {
+            if passes_culling {
+                write_predicted_atomic_triangle(batch_object_index, &object_info, triangle.indices);
 
-    if object_info.atomic_capable == 1u {
-        if passes_culling {
-            write_predicted_atomic_triangle(batch_object_index, &object_info, triangle.indices);
+                if !is_shadow_pass() {
+                    let previously_passed_culling = get_previous_culling_result(&object_info, object_invocation);
 
-            if !is_shadow_pass() {
-                let previously_passed_culling = get_previous_culling_result(&object_info, object_invocation);
-
-                if !previously_passed_culling {
-                    write_residual_atomic_triangle(batch_object_index, &object_info, triangle.indices);
+                    if !previously_passed_culling {
+                        write_residual_atomic_triangle(batch_object_index, &object_info, triangle.indices);
+                    }
                 }
             }
-        }
-    } else {
-        if passes_culling {
-            write_residual_nonatomic_triangle(global_invocation, batch_object_index, &object_info, triangle.indices);
         } else {
-            write_invalid_residual_nonatomic_triangle(global_invocation, &object_info);
+            if passes_culling {
+                write_residual_nonatomic_triangle(global_invocation, batch_object_index, &object_info, triangle.indices);
+            } else {
+                write_invalid_residual_nonatomic_triangle(global_invocation, &object_info);
+            }
         }
+
+        compute_culling_results(lid.x, passes_culling);
     }
 
-    save_culling_results(global_invocation, lid.x, passes_culling);
+    workgroupBarrier();
+
+    if write_culling_output {
+        save_culling_results(global_invocation, lid.x);
+    }
 }
