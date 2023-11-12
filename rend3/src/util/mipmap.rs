@@ -8,8 +8,8 @@ use wgpu::{
     ColorTargetState, ColorWrites, CommandEncoder, Device, FilterMode, FragmentState, FrontFace, LoadOp,
     MultisampleState, Operations, PipelineLayout, PipelineLayoutDescriptor, PolygonMode, PrimitiveState,
     PrimitiveTopology, RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor,
-    SamplerBindingType, SamplerDescriptor, ShaderModule, ShaderStages, Texture, TextureDescriptor, TextureSampleType,
-    TextureViewDescriptor, TextureViewDimension, VertexState, StoreOp,
+    SamplerBindingType, SamplerDescriptor, ShaderModule, ShaderStages, StoreOp, Texture, TextureDescriptor,
+    TextureSampleType, TextureViewDescriptor, TextureViewDimension, VertexState,
 };
 
 use crate::{

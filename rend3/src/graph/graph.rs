@@ -10,8 +10,8 @@ use std::{
 use glam::UVec2;
 use wgpu::{
     Buffer, CommandBuffer, CommandEncoder, CommandEncoderDescriptor, LoadOp, Operations, RenderPass,
-    RenderPassColorAttachment, RenderPassDepthStencilAttachment, RenderPassDescriptor, SurfaceTexture, Texture,
-    TextureView, TextureViewDescriptor, StoreOp,
+    RenderPassColorAttachment, RenderPassDepthStencilAttachment, RenderPassDescriptor, StoreOp, SurfaceTexture,
+    Texture, TextureView, TextureViewDescriptor,
 };
 
 use super::ViewportRect;
@@ -530,7 +530,11 @@ impl<'node> RenderGraph<'node> {
         data_core.profiler.try_lock().unwrap().end_frame().unwrap();
 
         // This variable seems superfluous, but solves borrow checker issues with the borrow of data_core.
-        let timers = data_core.profiler.try_lock().unwrap().process_finished_frame(renderer.queue.get_timestamp_period());
+        let timers = data_core
+            .profiler
+            .try_lock()
+            .unwrap()
+            .process_finished_frame(renderer.queue.get_timestamp_period());
 
         timers
     }

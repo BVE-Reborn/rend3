@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use arrayvec::ArrayVec;
 use wgpu::{
-    Adapter, AdapterInfo, Backend, Backends, BufferAddress, Device, DeviceDescriptor, DeviceType, Features, Instance,
-    Limits, Queue, Gles3MinorVersion, InstanceFlags,
+    Adapter, AdapterInfo, Backend, Backends, BufferAddress, Device, DeviceDescriptor, DeviceType, Features,
+    Gles3MinorVersion, Instance, InstanceFlags, Limits, Queue,
 };
 
 #[allow(unused_imports)]
