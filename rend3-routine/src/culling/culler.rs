@@ -306,6 +306,7 @@ impl GpuCuller {
             .take_encoder()
             .begin_compute_pass(&ComputePassDescriptor {
                 label: Some(&format_sso!("GpuCuller {type_name} Culling")),
+                timestamp_writes: None,
             });
         cpass.set_pipeline(&self.pipeline);
         for (idx, job) in jobs.jobs.iter().enumerate() {

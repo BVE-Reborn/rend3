@@ -3,6 +3,7 @@ use std::sync::Arc;
 use parking_lot::Mutex;
 use rend3_types::{Camera, Handedness, TextureFormat};
 use wgpu::TextureViewDimension;
+use wgpu_profiler::GpuProfilerSettings;
 
 use crate::{
     graph::GraphTextureStore,
@@ -60,10 +61,12 @@ pub fn create_renderer(
     );
 
     let profiler = Mutex::new(wgpu_profiler::GpuProfiler::new(
-        4,
-        iad.queue.get_timestamp_period(),
-        iad.device.features(),
-    ));
+        GpuProfilerSettings {
+            enable_timer_scopes: true,
+            enable_debug_groups: true,
+            max_num_pending_frames:4,
+        }
+    ).map_err(|e| RendererInitializationError::GpuProfilerCreation(e))?);
 
     let scatter = ScatterCopy::new(&iad.device);
 

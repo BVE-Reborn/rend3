@@ -130,6 +130,7 @@ impl ScatterCopy {
 
         let mut cpass = encoder.begin_compute_pass(&ComputePassDescriptor {
             label: Some("ScatterCopy cpass"),
+            timestamp_writes: None,
         });
         cpass.set_pipeline(&self.pipeline);
         cpass.set_bind_group(0, &bg, &[]);

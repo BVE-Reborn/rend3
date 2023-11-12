@@ -26,8 +26,8 @@ impl ImguiRenderRoutine {
 
         let renderer = imgui_wgpu::Renderer::new(
             imgui,
-            &renderer.device,
-            &renderer.queue,
+            renderer.device.as_ref(),
+            renderer.queue.as_ref(),
             RendererConfig {
                 texture_format: output_format,
                 ..base
