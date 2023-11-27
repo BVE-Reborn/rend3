@@ -41,7 +41,7 @@ jobs:
       - name: Set up Rust toolchain
         id: setup-rust
         run: |
-          rustup toolchain install 1.71 -c clippy -t ${{ matrix.target }}
+          rustup toolchain install 1.72 -c clippy -t ${{ matrix.target }}
 
       - name: caching
         uses: Swatinem/rust-cache@v2
@@ -51,26 +51,26 @@ jobs:
 
       - name: build
         run: |
-          cargo +1.71 build --target ${{ matrix.target }} --profile ci
+          cargo +1.72 build --target ${{ matrix.target }} --profile ci
         if: matrix.target != 'wasm32-unknown-unknown'
 
       - name: test
         run: |
-          cargo +1.71 test --target ${{ matrix.target }} --profile ci
+          cargo +1.72 test --target ${{ matrix.target }} --profile ci
         if: matrix.target != 'wasm32-unknown-unknown'
 
       - name: clippy (rend3-gltf featureless)
         run: |
-          cargo +1.71 clippy --target ${{ matrix.target }} --profile ci -p rend3-gltf --no-default-features
+          cargo +1.72 clippy --target ${{ matrix.target }} --profile ci -p rend3-gltf --no-default-features
 
       - name: clippy
         run: |
-          cargo +1.71 clippy --target ${{ matrix.target }} --profile ci
+          cargo +1.72 clippy --target ${{ matrix.target }} --profile ci
         if: matrix.target != 'wasm32-unknown-unknown'
 
       - name: doc
         run: |
-          cargo +1.71 doc --target ${{ matrix.target }} --profile ci --no-deps
+          cargo +1.72 doc --target ${{ matrix.target }} --profile ci --no-deps
         if: matrix.target != 'wasm32-unknown-unknown'
       
       - uses: actions/upload-artifact@v3
@@ -89,11 +89,11 @@ jobs:
       - name: Set up Rust toolchain
         id: setup-rust
         run: |
-          rustup toolchain install 1.71 -c rustfmt
+          rustup toolchain install 1.72 -c rustfmt
 
       - name: format
         run: |
-          cargo +1.71 fmt --check
+          cargo +1.72 fmt --check
 
   cargo-deny:
     runs-on: ubuntu-latest
