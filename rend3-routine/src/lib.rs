@@ -1,3 +1,5 @@
+#![cfg_attr(target_arch = "wasm32", allow(clippy::arc_with_non_send_sync))]
+
 //! Render Routines for the rend3 3D renderer library.
 //!
 //! The routines in this crate provide powerful default routines as well as

@@ -4,7 +4,7 @@ use glam::Mat4;
 use parking_lot::Mutex;
 use rend3_types::{
     GraphDataHandle, GraphDataTag, Handedness, Material, MaterialTag, ObjectChange, Skeleton, SkeletonHandle,
-    Texture2DTag, TextureCubeHandle, TextureCubeTag, TextureFromTexture,
+    Texture2DTag, TextureCubeHandle, TextureCubeTag, TextureFromTexture, WasmNotSend,
 };
 use wgpu::{CommandEncoderDescriptor, Device, DownlevelCapabilities, Features, Limits, Queue};
 use wgpu_profiler::GpuProfiler;
@@ -402,7 +402,7 @@ impl Renderer {
     ///
     /// The handle will keep the data alive.
     #[track_caller]
-    pub fn add_graph_data<T: Send + 'static>(self: &Arc<Renderer>, data: T) -> GraphDataHandle<T> {
+    pub fn add_graph_data<T: WasmNotSend + 'static>(self: &Arc<Renderer>, data: T) -> GraphDataHandle<T> {
         let handle = self.resource_handle_allocators.graph_storage.allocate(self);
         let handle2 = handle.clone();
         self.instructions.push(

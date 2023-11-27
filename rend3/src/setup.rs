@@ -1,9 +1,11 @@
+#![cfg_attr(target_arch = "wasm32", allow(clippy::arc_with_non_send_sync))]
+
 use std::sync::Arc;
 
 use arrayvec::ArrayVec;
 use wgpu::{
-    Adapter, AdapterInfo, Backend, Backends, BufferAddress, Device, DeviceDescriptor, DeviceType, Features, Instance,
-    Limits, Queue,
+    Adapter, AdapterInfo, Backend, Backends, BufferAddress, Device, DeviceDescriptor, DeviceType, Features,
+    Gles3MinorVersion, Instance, InstanceFlags, Limits, Queue,
 };
 
 #[allow(unused_imports)]
@@ -94,6 +96,7 @@ pub const GPU_REQUIRED_LIMITS: Limits = Limits {
     max_compute_workgroup_size_z: 64,
     max_compute_workgroups_per_dimension: 65535,
     max_buffer_size: 8192 * 8 * 18,
+    max_non_sampler_bindings: 1_000_000,
 };
 
 /// Limits required to run in the CpuDriven profile.
@@ -127,6 +130,7 @@ pub const CPU_REQUIRED_LIMITS: Limits = Limits {
     max_compute_workgroup_size_z: 64,
     max_compute_workgroups_per_dimension: 65535,
     max_buffer_size: 8192 * 8 * 8,
+    max_non_sampler_bindings: 1_000_000,
 };
 
 fn check_limit_unlimited<LimitValue: Into<u64> + Ord>(
@@ -315,6 +319,7 @@ pub fn check_limits(profile: RendererProfile, device_limits: &Limits) -> Result<
             required_limits.max_buffer_size,
             LimitType::MaxBufferSize,
         )?,
+        max_non_sampler_bindings: 1_000_000,
     })
 }
 
@@ -399,9 +404,9 @@ impl From<AdapterInfo> for ExtendedAdapterInfo {
                 0x14E4 => Vendor::Broadcom,
                 0x5143 => Vendor::Qualcomm,
                 0x8086 => Vendor::Intel,
-                v => Vendor::Unknown(v),
+                v => Vendor::Unknown(v as usize),
             },
-            device: info.device,
+            device: info.device as usize,
             device_type: info.device_type,
             backend: info.backend,
         }
@@ -454,6 +459,8 @@ pub async fn create_iad(
     let instance = Instance::new(wgpu::InstanceDescriptor {
         backends: backend_bits,
         dx12_shader_compiler: wgpu::Dx12Compiler::Fxc,
+        gles_minor_version: Gles3MinorVersion::default(),
+        flags: InstanceFlags::default(),
     });
 
     let mut valid_adapters = FastHashMap::<Backend, ArrayVec<PotentialAdapter<Adapter>, 4>>::default();

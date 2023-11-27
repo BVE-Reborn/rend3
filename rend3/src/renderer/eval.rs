@@ -50,7 +50,7 @@ pub fn evaluate_instructions(renderer: &Renderer) -> InstructionEvaluationOutput
                         &handle,
                         skeleton,
                     );
-                    data_core.profiler.try_lock().unwrap().end_scope(&mut encoder);
+                    let _ = data_core.profiler.try_lock().unwrap().end_scope(&mut encoder);
                 }
                 InstructionKind::AddTexture2D {
                     handle,

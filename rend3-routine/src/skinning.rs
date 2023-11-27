@@ -192,6 +192,7 @@ impl GpuSkinner {
 
         let mut cpass = encoder.begin_compute_pass(&ComputePassDescriptor {
             label: Some("GPU Skinning"),
+            timestamp_writes: None,
         });
         cpass.set_pipeline(&self.pipeline);
         for (i, skel) in ctx.data_core.skeleton_manager.skeletons().enumerate() {

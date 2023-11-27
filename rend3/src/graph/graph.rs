@@ -10,8 +10,8 @@ use std::{
 use glam::UVec2;
 use wgpu::{
     Buffer, CommandBuffer, CommandEncoder, CommandEncoderDescriptor, LoadOp, Operations, RenderPass,
-    RenderPassColorAttachment, RenderPassDepthStencilAttachment, RenderPassDescriptor, SurfaceTexture, Texture,
-    TextureView, TextureViewDescriptor,
+    RenderPassColorAttachment, RenderPassDepthStencilAttachment, RenderPassDescriptor, StoreOp, SurfaceTexture,
+    Texture, TextureView, TextureViewDescriptor,
 };
 
 use super::ViewportRect;
@@ -507,7 +507,7 @@ impl<'node> RenderGraph<'node> {
                     None => RenderGraphEncoderOrPassInner::Encoder(unsafe { &mut *encoder_cell.get() }),
                 };
 
-                data_core.profiler.try_lock().unwrap().end_scope(&mut encoder_or_rpass);
+                let _ = data_core.profiler.try_lock().unwrap().end_scope(&mut encoder_or_rpass);
             }
         }
 
@@ -539,7 +539,11 @@ impl<'node> RenderGraph<'node> {
         data_core.profiler.try_lock().unwrap().end_frame().unwrap();
 
         // This variable seems superfluous, but solves borrow checker issues with the borrow of data_core.
-        let timers = data_core.profiler.try_lock().unwrap().process_finished_frame();
+        let timers = data_core
+            .profiler
+            .try_lock()
+            .unwrap()
+            .process_finished_frame(renderer.queue.get_timestamp_period());
 
         timers
     }
@@ -568,7 +572,7 @@ impl<'node> RenderGraph<'node> {
                     LoadOp::Load
                 };
 
-                let store = view_span.last_reference != Some(pass_end_idx);
+                let store = if view_span.last_reference == Some(pass_end_idx) { StoreOp::Discard } else { StoreOp::Store };
 
                 RenderPassColorAttachment {
                     view: match target.color.handle.resource {
@@ -597,7 +601,7 @@ impl<'node> RenderGraph<'node> {
 
             let first_usage = view_span.first_usage.expect("internal rendergraph error: renderpass attachment counts as a usage, but no first usage registered on texture");
 
-            let store = view_span.last_reference != Some(pass_end_idx);
+            let store = if view_span.last_reference == Some(pass_end_idx) { StoreOp::Discard } else { StoreOp::Store };
 
             let depth_ops = ds_target.depth_clear.map(|clear| {
                 let load = if first_usage == node_idx {
@@ -635,6 +639,8 @@ impl<'node> RenderGraph<'node> {
             label: None,
             color_attachments: &color_attachments,
             depth_stencil_attachment,
+            timestamp_writes: None,
+            occlusion_query_set: None,
         })
     }
 }

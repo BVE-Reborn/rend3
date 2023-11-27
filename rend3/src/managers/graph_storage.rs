@@ -4,12 +4,15 @@ use std::{
 };
 
 use parking_lot::RwLock;
-use rend3_types::{GraphDataHandle, RawGraphDataHandleUntyped};
+use rend3_types::{GraphDataHandle, RawGraphDataHandleUntyped, WasmNotSend};
 
 #[derive(Default)]
 pub struct GraphStorage {
     // Type under any is RwLock<T>
+    #[cfg(not(target_arch = "wasm32"))]
     data: Vec<Option<Box<dyn Any + Send>>>,
+    #[cfg(target_arch = "wasm32")]
+    data: Vec<Option<Box<dyn Any>>>,
 }
 
 impl GraphStorage {
@@ -17,7 +20,7 @@ impl GraphStorage {
         Self::default()
     }
 
-    pub fn add<T: Send + 'static>(&mut self, handle: &RawGraphDataHandleUntyped, data: T) {
+    pub fn add<T: WasmNotSend + 'static>(&mut self, handle: &RawGraphDataHandleUntyped, data: T) {
         if handle.idx >= self.data.len() {
             self.data.resize_with(handle.idx + 1, || None);
         }

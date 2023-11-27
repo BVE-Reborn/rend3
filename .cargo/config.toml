@@ -1,2 +1,7 @@
 [alias]
 rend3-doc = ["doc", "--no-deps", "--lib", "--workspace", "--exclude", "scene-viewer", "--exclude", "rend3-cube-example"]
+
+[build]
+rustflags = [
+    "--cfg=web_sys_unstable_apis"
+]

@@ -8,8 +8,8 @@ use wgpu::{
     ColorTargetState, ColorWrites, CommandEncoder, Device, FilterMode, FragmentState, FrontFace, LoadOp,
     MultisampleState, Operations, PipelineLayout, PipelineLayoutDescriptor, PolygonMode, PrimitiveState,
     PrimitiveTopology, RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor,
-    SamplerBindingType, SamplerDescriptor, ShaderModule, ShaderStages, Texture, TextureDescriptor, TextureSampleType,
-    TextureViewDescriptor, TextureViewDimension, VertexState,
+    SamplerBindingType, SamplerDescriptor, ShaderModule, ShaderStages, StoreOp, Texture, TextureDescriptor,
+    TextureSampleType, TextureViewDescriptor, TextureViewDimension, VertexState,
 };
 
 use crate::{
@@ -195,10 +195,12 @@ impl MipmapGenerator {
                     resolve_target: None,
                     ops: Operations {
                         load: LoadOp::Clear(Color::BLACK),
-                        store: true,
+                        store: StoreOp::Store,
                     },
                 })],
                 depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
             });
 
             rpass.set_pipeline(pipeline);

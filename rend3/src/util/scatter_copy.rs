@@ -130,6 +130,7 @@ impl ScatterCopy {
 
         let mut cpass = encoder.begin_compute_pass(&ComputePassDescriptor {
             label: Some("ScatterCopy cpass"),
+            timestamp_writes: None,
         });
         cpass.set_pipeline(&self.pipeline);
         cpass.set_bind_group(0, &bg, &[]);
@@ -154,11 +155,9 @@ mod test {
             let backends = wgpu::util::backend_bits_from_env().unwrap_or(wgpu::Backends::all());
             let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
                 backends,
-                dx12_shader_compiler: wgpu::Dx12Compiler::Fxc,
+                ..wgpu::InstanceDescriptor::default()
             });
-            let adapter = pollster::block_on(wgpu::util::initialize_adapter_from_env_or_default(
-                &instance, backends, None,
-            ))?;
+            let adapter = pollster::block_on(wgpu::util::initialize_adapter_from_env_or_default(&instance, None))?;
             let (device, queue) = pollster::block_on(adapter.request_device(
                 &wgpu::DeviceDescriptor {
                     label: None,

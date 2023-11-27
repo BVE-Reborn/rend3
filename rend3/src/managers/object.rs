@@ -3,9 +3,9 @@ use std::{any::TypeId, ops::Range};
 use bytemuck::Zeroable;
 use encase::ShaderType;
 use glam::{Mat4, Vec3A};
-use list_any::VecAny;
 use rend3_types::{
     Material, MaterialArray, MaterialHandle, ObjectChange, ObjectMeshKind, RawObjectHandle, VertexAttributeId,
+    WasmVecAny,
 };
 use wgpu::{Buffer, CommandEncoder, Device};
 
@@ -85,11 +85,11 @@ impl<M: Material> Clone for InternalObject<M> {
 
 struct ObjectArchetype {
     /// Inner type is Option<InternalObject<M>>
-    data_vec: VecAny,
+    data_vec: WasmVecAny,
     object_count: usize,
     buffer: FreelistDerivedBuffer,
-    set_object_transform: fn(&mut VecAny, &mut FreelistDerivedBuffer, usize, Mat4),
-    duplicate_object: fn(&VecAny, usize, ObjectChange) -> Object,
+    set_object_transform: fn(&mut WasmVecAny, &mut FreelistDerivedBuffer, usize, Mat4),
+    duplicate_object: fn(&WasmVecAny, usize, ObjectChange) -> Object,
     remove: fn(&mut ObjectArchetype, usize),
     evaluate: fn(&mut ObjectArchetype, &Device, &mut CommandEncoder, &ScatterCopy, &[RawObjectHandle]),
 }
@@ -112,7 +112,7 @@ impl ObjectManager {
     fn ensure_archetype<M: Material>(&mut self, device: &Device) -> &mut ObjectArchetype {
         let type_id = TypeId::of::<M>();
         self.archetype.entry(type_id).or_insert_with(|| ObjectArchetype {
-            data_vec: VecAny::new::<Option<InternalObject<M>>>(),
+            data_vec: WasmVecAny::new::<Option<InternalObject<M>>>(),
             object_count: 0,
             buffer: FreelistDerivedBuffer::new::<ShaderObject<M>>(device),
             set_object_transform: set_object_transform::<M>,
@@ -326,7 +326,7 @@ pub(super) fn object_add_callback<M: Material>(_material: &M, args: ObjectAddCal
 }
 
 fn set_object_transform<M: Material>(
-    data: &mut VecAny,
+    data: &mut WasmVecAny,
     buffer: &mut FreelistDerivedBuffer,
     idx: usize,
     transform: Mat4,
@@ -341,7 +341,7 @@ fn set_object_transform<M: Material>(
     buffer.use_index(idx);
 }
 
-fn duplicate_object<M: Material>(data: &VecAny, idx: usize, change: ObjectChange) -> Object {
+fn duplicate_object<M: Material>(data: &WasmVecAny, idx: usize, change: ObjectChange) -> Object {
     let data_vec = data.downcast_slice::<Option<InternalObject<M>>>().unwrap();
 
     let src_obj = data_vec[idx].as_ref().unwrap();
