@@ -61,7 +61,7 @@ rend3-gltf = { version = "^0.3.0", default-features = false, path = "../../rend3
 rend3-routine = { version = "^0.3.0", path = "../../rend3-routine" }
 rustc-hash = "1"
 smallvec = "1"
-tracy-client = { version = "0.15", optional = true }
+tracy-client = { version = "0.16", optional = true }
 wgpu = "0.18.0"
 wgpu-profiler = "0.15.0"
 winit = "0.28"
