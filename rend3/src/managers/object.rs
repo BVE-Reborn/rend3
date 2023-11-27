@@ -52,14 +52,7 @@ impl<M: Material> Copy for ShaderObject<M> {}
 // Manual impl so that M: !Clone
 impl<M: Material> Clone for ShaderObject<M> {
     fn clone(&self) -> Self {
-        Self {
-            transform: self.transform,
-            bounding_sphere: self.bounding_sphere,
-            first_index: self.first_index,
-            index_count: self.index_count,
-            material_index: self.material_index,
-            vertex_attribute_start_offsets: self.vertex_attribute_start_offsets,
-        }
+        *self
     }
 }
 

@@ -66,7 +66,7 @@ pub fn create_renderer(
             enable_debug_groups: true,
             max_num_pending_frames: 4,
         })
-        .map_err(|e| RendererInitializationError::GpuProfilerCreation(e))?,
+        .map_err(RendererInitializationError::GpuProfilerCreation)?,
     );
 
     let scatter = ScatterCopy::new(&iad.device);

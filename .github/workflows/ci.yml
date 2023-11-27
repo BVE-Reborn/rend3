@@ -54,11 +54,6 @@ jobs:
           cargo +1.71 build --target ${{ matrix.target }} --profile ci
         if: matrix.target != 'wasm32-unknown-unknown'
 
-      - name: build (no imgui)
-        run: |
-          cargo +1.71 build --target ${{ matrix.target }} --profile ci --workspace --exclude rend3-imgui --exclude rend3-imgui-example
-        if: matrix.target == 'wasm32-unknown-unknown'
-
       - name: test
         run: |
           cargo +1.71 test --target ${{ matrix.target }} --profile ci
@@ -72,11 +67,6 @@ jobs:
         run: |
           cargo +1.71 clippy --target ${{ matrix.target }} --profile ci
         if: matrix.target != 'wasm32-unknown-unknown'
-
-      - name: clippy (no imgui)
-        run: |
-          cargo +1.71 clippy --target ${{ matrix.target }} --profile ci --workspace --exclude rend3-imgui --exclude rend3-imgui-example
-        if: matrix.target == 'wasm32-unknown-unknown'
 
       - name: doc
         run: |

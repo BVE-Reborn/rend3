@@ -27,7 +27,7 @@ impl rend3_framework::App for EguiExample {
 
     fn setup(
         &mut self,
-        event_loop: &winit::event_loop::EventLoop<rend3_framework::UserResizeEvent<()>>,
+        _event_loop: &winit::event_loop::EventLoop<rend3_framework::UserResizeEvent<()>>,
         window: &winit::window::Window,
         renderer: &Arc<rend3::Renderer>,
         _routines: &Arc<rend3_framework::DefaultRoutines>,
@@ -104,8 +104,12 @@ impl rend3_framework::App for EguiExample {
         // Create the egui context
         let context = egui::Context::default();
         // Create the winit/egui integration.
-        let mut platform = egui_winit::State::new(event_loop);
-        platform.set_pixels_per_point(window.scale_factor() as f32);
+        let platform = egui_winit::State::new(
+            egui::ViewportId::default(),
+            &window,
+            Some(window.scale_factor() as f32),
+            None,
+        );
 
         //Images
         let image_bytes = include_bytes!("images/rust-logo-128x128-blk.png");
@@ -173,7 +177,10 @@ impl rend3_framework::App for EguiExample {
                     }
                     ui.label("Want to get rusty?");
                     if ui
-                        .add(egui::widgets::ImageButton::new(self.rust_logo, egui::Vec2::splat(64.0)))
+                        .add(egui::widgets::ImageButton::new((
+                            self.rust_logo,
+                            egui::Vec2::splat(64.0),
+                        )))
                         .clicked()
                     {
                         webbrowser::open("https://www.rust-lang.org").expect("failed to open URL");
@@ -185,7 +192,7 @@ impl rend3_framework::App for EguiExample {
                 let egui::FullOutput {
                     shapes, textures_delta, ..
                 } = data.context.end_frame();
-                let paint_jobs = data.context.tessellate(shapes);
+                let paint_jobs = data.context.tessellate(shapes, window.scale_factor() as f32);
 
                 let input = rend3_egui::Input {
                     clipped_meshes: &paint_jobs,
@@ -241,7 +248,7 @@ impl rend3_framework::App for EguiExample {
             }
             rend3_framework::Event::WindowEvent { event, .. } => {
                 // Pass the window events to the egui integration.
-                if data.platform.on_event(&data.context, &event).consumed {
+                if data.platform.on_window_event(&data.context, &event).consumed {
                     return;
                 }
 

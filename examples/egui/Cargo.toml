@@ -13,9 +13,9 @@ path = "src/main.rs"
 
 [dependencies]
 # The egui immediate mode gui library
-egui = "0.22.0"
+egui = "0.24.0"
 # Winit integration with egui (turn off the clipboard feature)
-egui-winit = { version = "0.22", default-features = false, features = ["links", "wayland"] }
+egui-winit = { version = "0.24", default-features = false, features = ["links", "wayland"] }
 # logging
 env_logger = { version = "0.10", default-features = false, features = ["auto-color", "humantime"] }
 # Linear algebra library
@@ -37,8 +37,8 @@ winit = "0.28"
 # Opening URL's
 webbrowser = "0.8.2"
 # Creating textures
-wgpu = "0.16"
+wgpu = "0.18"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 # Winit integration with egui
-egui-winit = { version = "0.22", default-features = false, features = ["clipboard", "links", "wayland"] }
+egui-winit = { version = "0.24", default-features = false, features = ["clipboard", "links", "wayland"] }
