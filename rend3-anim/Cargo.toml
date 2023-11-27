@@ -11,7 +11,7 @@ categories = ["game-development", "graphics", "rendering", "rendering::engine", 
 rust-version = "1.71"
 
 [dependencies]
-itertools = "0.11"
+itertools = "0.12"
 rend3 = { version = "^0.3.0", path = "../rend3" }
 rend3-routine = { version = "^0.3.0", path = "../rend3-routine" }
 rend3-gltf = { version = "^0.3.0", path = "../rend3-gltf" }
