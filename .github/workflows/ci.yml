@@ -43,6 +43,11 @@ jobs:
         run: |
           rustup toolchain install 1.72 -c clippy -t ${{ matrix.target }}
 
+      - name: Install cargo-nextest and cargo-llvm-cov
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+
       - name: caching
         uses: Swatinem/rust-cache@v2
         if: matrix.os[1] != 'gpu'
@@ -56,7 +61,7 @@ jobs:
 
       - name: test
         run: |
-          cargo +1.72 test --target ${{ matrix.target }} --profile ci
+          cargo +1.72 nextest run --target ${{ matrix.target }} --profile ci
         if: matrix.target != 'wasm32-unknown-unknown'
 
       - name: clippy (rend3-gltf featureless)
