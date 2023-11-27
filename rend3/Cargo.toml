@@ -51,7 +51,7 @@ parking_lot = "0.12"
 profiling = { version = "1", default-features = false }
 range-alloc = "0.1.3"
 rend3-types = { version = "^0.3.0", path = "../rend3-types" }
-rust-embed = { version = "6", features = ["interpolate-folder-path"] }
+rust-embed = { version = "8", features = ["interpolate-folder-path"] }
 rustc-hash = "1"
 serde = { version = "1", features = ["derive"] }
 smallvec = "1"
@@ -65,4 +65,4 @@ pollster = "0.3"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 # Needed to embed shaders in the binary on wasm
-rust-embed = { version = "6", features = ["interpolate-folder-path", "debug-embed"] }
+rust-embed = { version = "8", features = ["interpolate-folder-path", "debug-embed"] }

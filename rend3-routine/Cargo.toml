@@ -23,7 +23,7 @@ ordered-float = "4"
 parking_lot = "0.12"
 profiling = {version = "1", default-features = false }
 rend3 = { version = "^0.3.0", path = "../rend3" }
-rust-embed = { version = "6", features = ["interpolate-folder-path"] }
+rust-embed = { version = "8", features = ["interpolate-folder-path"] }
 serde = { version = "1", features = ["derive"] }
 wgpu = "0.18.0"
 wgpu-profiler = "0.15.0"
