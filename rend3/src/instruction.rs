@@ -3,9 +3,10 @@ use std::{mem, panic::Location};
 use glam::Mat4;
 use parking_lot::Mutex;
 use rend3_types::{
-    MaterialHandle, MeshHandle, ObjectChange, ObjectHandle, RawDirectionalLightHandle, RawGraphDataHandleUntyped,
-    RawMaterialHandle, RawMeshHandle, RawSkeletonHandle, RawTexture2DHandle, RawTextureCubeHandle, Skeleton,
-    SkeletonHandle, Texture2DHandle, TextureCubeHandle, TextureFromTexture,
+    trait_supertrait_alias, MaterialHandle, MeshHandle, ObjectChange, ObjectHandle, RawDirectionalLightHandle,
+    RawGraphDataHandleUntyped, RawMaterialHandle, RawMeshHandle, RawSkeletonHandle, RawTexture2DHandle,
+    RawTextureCubeHandle, Skeleton, SkeletonHandle, Texture2DHandle, TextureCubeHandle, TextureFromTexture,
+    WasmNotSend, WasmNotSync,
 };
 use wgpu::{CommandBuffer, Device};
 
@@ -14,6 +15,10 @@ use crate::{
     types::{Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Object, RawObjectHandle},
     RendererProfile,
 };
+
+trait_supertrait_alias!(pub AddMaterialFillInvoke: FnOnce(&mut MaterialManager, &Device, RendererProfile, &mut TextureManager<crate::types::Texture2DTag>, &MaterialHandle) + WasmNotSend + WasmNotSync);
+trait_supertrait_alias!(pub ChangeMaterialChangeInvoke: FnOnce(&mut MaterialManager, &Device, &TextureManager<crate::types::Texture2DTag>, &MaterialHandle) + WasmNotSend + WasmNotSync);
+trait_supertrait_alias!(pub AddGraphDataAddInvoke: FnOnce(&mut GraphStorage) + WasmNotSend);
 
 pub struct Instruction {
     pub kind: InstructionKind,
@@ -47,16 +52,7 @@ pub enum InstructionKind {
     },
     AddMaterial {
         handle: MaterialHandle,
-        fill_invoke: Box<
-            dyn FnOnce(
-                    &mut MaterialManager,
-                    &Device,
-                    RendererProfile,
-                    &mut TextureManager<crate::types::Texture2DTag>,
-                    &MaterialHandle,
-                ) + Send
-                + Sync,
-        >,
+        fill_invoke: Box<dyn AddMaterialFillInvoke>,
     },
     AddObject {
         handle: ObjectHandle,
@@ -67,15 +63,11 @@ pub enum InstructionKind {
         light: DirectionalLight,
     },
     AddGraphData {
-        add_invoke: Box<dyn FnOnce(&mut GraphStorage) + Send>,
+        add_invoke: Box<dyn AddGraphDataAddInvoke>,
     },
     ChangeMaterial {
         handle: MaterialHandle,
-        change_invoke: Box<
-            dyn FnOnce(&mut MaterialManager, &Device, &TextureManager<crate::types::Texture2DTag>, &MaterialHandle)
-                + Send
-                + Sync,
-        >,
+        change_invoke: Box<dyn ChangeMaterialChangeInvoke>,
     },
     ChangeDirectionalLight {
         handle: RawDirectionalLightHandle,

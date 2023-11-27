@@ -6,6 +6,7 @@
 //! api arguments.
 
 use std::{
+    any::Any,
     fmt::Debug,
     hash::Hash,
     marker::PhantomData,
@@ -20,7 +21,6 @@ use bytemuck::Zeroable;
 /// Reexport of the glam version rend3 is using.
 pub use glam;
 use glam::{Mat4, UVec2, Vec2, Vec3, Vec3A, Vec4};
-use list_any::VecAny;
 use thiserror::Error;
 
 mod attribute;
@@ -82,7 +82,10 @@ pub struct ResourceHandle<T> {
     /// need to phone home. We're just reusing
     /// the allocation for both refcount and function
     /// purposes.
+    #[cfg(not(target_arch = "wasm32"))]
     refcount: Arc<dyn Fn(RawResourceHandle<T>) + Send + Sync>,
+    #[cfg(target_arch = "wasm32")]
+    refcount: Arc<dyn Fn(RawResourceHandle<T>)>,
     raw: RawResourceHandle<T>,
     _phantom: PhantomData<T>,
 }
@@ -132,7 +135,7 @@ impl<T> ResourceHandle<T> {
     /// Create a new resource handle from an index.
     ///
     /// Part of rend3's internal interface, use `Renderer::add_*` instead.
-    pub fn new(destroy_fn: impl Fn(RawResourceHandle<T>) + Send + Sync + 'static, idx: usize) -> Self {
+    pub fn new(destroy_fn: impl Fn(RawResourceHandle<T>) + WasmNotSend + WasmNotSync + 'static, idx: usize) -> Self {
         Self {
             refcount: Arc::new(destroy_fn),
             raw: RawResourceHandle {
@@ -277,7 +280,7 @@ pub enum MeshValidationError {
 #[derive(Debug)]
 pub struct StoredVertexAttributeData {
     id: &'static VertexAttributeId,
-    data: VecAny,
+    data: WasmVecAny,
     ptr: *const u8,
     bytes: u64,
 }
@@ -290,7 +293,7 @@ impl StoredVertexAttributeData {
         let ptr = data.as_ptr() as *const u8;
         Self {
             id: attribute.id(),
-            data: VecAny::from(data),
+            data: WasmVecAny::from(data),
             ptr,
             bytes,
         }
@@ -1055,7 +1058,7 @@ impl<const C: usize, T> MaterialArray<T> for [T; C] {
 ///     ge thte texture.
 ///   - Padding to 16 byte alignemnet.
 ///   - The data provided by the material.
-pub trait Material: Send + Sync + 'static {
+pub trait Material: WasmNotSend + WasmNotSync + 'static {
     type DataType: encase::ShaderSize + encase::internal::WriteInto;
     type TextureArrayType: MaterialArray<Option<RawTexture2DHandle>>;
     type RequiredAttributeArrayType: MaterialArray<&'static VertexAttributeId>;
@@ -1231,4 +1234,30 @@ impl Skeleton {
             .map(|(global_pos, inv_bind_pos)| (*global_pos) * (*inv_bind_pos))
             .collect()
     }
+}
+
+#[cfg(target_arch = "wasm32")]
+trait_supertrait_alias!(pub WasmNotSend: Any);
+#[cfg(not(target_arch = "wasm32"))]
+trait_supertrait_alias!(pub WasmNotSend: Any + Send);
+#[cfg(target_arch = "wasm32")]
+trait_supertrait_alias!(pub WasmNotSync: Any);
+#[cfg(not(target_arch = "wasm32"))]
+trait_supertrait_alias!(pub WasmNotSync: Any + Sync);
+#[cfg(target_arch = "wasm32")]
+trait_supertrait_alias!(pub WasmNotSendSync: Any);
+#[cfg(not(target_arch = "wasm32"))]
+trait_supertrait_alias!(pub WasmNotSendSync: Any + Send + Sync);
+
+#[cfg(target_arch = "wasm32")]
+pub type WasmVecAny = list_any::VecAny<dyn Any>;
+#[cfg(not(target_arch = "wasm32"))]
+pub type WasmVecAny = list_any::VecAny<dyn Any + Send + Sync>;
+
+#[macro_export]
+macro_rules! trait_supertrait_alias {
+    ($vis:vis $name:ident: $($supertraits:tt)*) => {
+        $vis trait $name: $($supertraits)* {}
+        impl<T: $($supertraits)*> $name for T {}
+    };
 }

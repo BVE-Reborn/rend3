@@ -8,7 +8,13 @@ readme = "README.md"
 repository = "https://github.com/BVE-Reborn/rend3"
 license = "MIT OR Apache-2.0 OR Zlib"
 keywords = ["3d", "graphics", "rend3", "renderer", "wgpu"]
-categories = ["game-development", "graphics", "rendering", "rendering::engine", "wasm"]
+categories = [
+    "game-development",
+    "graphics",
+    "rendering",
+    "rendering::engine",
+    "wasm",
+]
 rust-version = "1.71"
 exclude = [
     "bistro.jpg",
@@ -35,7 +41,11 @@ cfg-if = "1"
 glam = "0.24"
 # 0.7 is a completely unrelated library
 histogram = "0.6"
-image = { version = "0.24", default-features = false, features = ["png", "jpeg", "tiff"]}
+image = { version = "0.24", default-features = false, features = [
+    "png",
+    "jpeg",
+    "tiff",
+] }
 indoc = "2"
 instant = { version = "0.1", features = ["wasm-bindgen"] }
 log = "0.4"
@@ -44,20 +54,20 @@ pollster = "0.3"
 profiling = { version = "1", default-features = false }
 rend3 = { version = "^0.3.0", path = "../../rend3" }
 rend3-framework = { version = "^0.3.0", path = "../../rend3-framework" }
-rend3-gltf = { version = "^0.3.0", default-features = false, path = "../../rend3-gltf", features = ["ddsfile", "ktx2"] }
+rend3-gltf = { version = "^0.3.0", default-features = false, path = "../../rend3-gltf", features = [
+    "ddsfile",
+    "ktx2",
+] }
 rend3-routine = { version = "^0.3.0", path = "../../rend3-routine" }
 rustc-hash = "1"
 smallvec = "1"
 tracy-client = { version = "0.15", optional = true }
+wgpu = "0.18.0"
 wgpu-profiler = "0.15.0"
 winit = "0.28"
 
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-wgpu = { version = "0.18.0" }
-
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen-futures = "0.4"
-wgpu = { version = "0.18.0", features = ["fragile-send-sync-non-atomic-wasm"] }
 
 [target.'cfg(target_os = "android")'.dependencies]
 ndk-glue = { version = "0.7", features = ["logger"] }

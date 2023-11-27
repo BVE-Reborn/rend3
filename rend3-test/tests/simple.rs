@@ -17,7 +17,12 @@ pub async fn triangle() -> anyhow::Result<()> {
         .context("InstanceAdapterDevice creation failed")?;
 
     for (handedness, winding, visible) in tests {
-        let Ok(runner) = TestRunner::builder().iad(iad.clone()).handedness(handedness).build().await else {
+        let Ok(runner) = TestRunner::builder()
+            .iad(iad.clone())
+            .handedness(handedness)
+            .build()
+            .await
+        else {
             return Ok(());
         };
 
@@ -84,9 +89,14 @@ pub async fn coordinate_space() -> anyhow::Result<()> {
     let iad = no_gpu_return!(rend3::create_iad(None, None, None, None).await)
         .context("InstanceAdapterDevice creation failed")?;
 
-    let Ok(runner) = TestRunner::builder().iad(iad.clone()).handedness(Handedness::Left).build().await else {
-            return Ok(());
-        };
+    let Ok(runner) = TestRunner::builder()
+        .iad(iad.clone())
+        .handedness(Handedness::Left)
+        .build()
+        .await
+    else {
+        return Ok(());
+    };
 
     let _objects = tests.map(|(_name, right_vector, up_vector, camera_vector)| {
         // Clockwise triangle
