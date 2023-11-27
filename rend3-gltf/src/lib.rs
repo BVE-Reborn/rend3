@@ -1811,7 +1811,7 @@ pub mod util {
             | r3F::Bgra8Unorm
             | r3F::Bgra8UnormSrgb => Some(4),
             r3F::Rgb9e5Ufloat => Some(4),
-            r3F::Rgb10a2Unorm => Some(4),
+            r3F::Rgb10a2Unorm | r3F::Rgb10a2Uint => Some(4),
             r3F::Rg11b10Float => Some(3),
             r3F::Rg32Uint | r3F::Rg32Sint | r3F::Rg32Float => Some(2),
             r3F::Rgba16Uint

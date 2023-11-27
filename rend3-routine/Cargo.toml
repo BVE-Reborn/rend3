@@ -19,16 +19,16 @@ encase = { version = "0.6", features = ["glam"] }
 flume = "0.11"
 glam = { version = "0.24.0", features = ["bytemuck"] }
 log = "0.4"
-ordered-float = "3"
+ordered-float = "4"
 parking_lot = "0.12"
 profiling = {version = "1", default-features = false }
 rend3 = { version = "^0.3.0", path = "../rend3" }
-rust-embed = { version = "6", features = ["interpolate-folder-path"] }
+rust-embed = { version = "8", features = ["interpolate-folder-path"] }
 serde = { version = "1", features = ["derive"] }
-wgpu = "0.16.1"
-wgpu-profiler = "0.12.0"
+wgpu = "0.18.0"
+wgpu-profiler = "0.15.0"
 
 [dev-dependencies]
 codespan-reporting = "0.11"
-naga = { version = "0.12", features = ["wgsl-in"] }
+naga = { version = "0.14", features = ["wgsl-in"] }
 serde_json = { version = "1" }

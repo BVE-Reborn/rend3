@@ -1,3 +1,5 @@
+#![cfg_attr(target_arch = "wasm32", allow(clippy::arc_with_non_send_sync))]
+
 //! Easy to use, customizable, efficient 3D renderer library built on wgpu.
 //!
 //! Library is under active development. While internals are might change in the

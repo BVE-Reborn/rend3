@@ -1,3 +1,5 @@
+#![cfg_attr(target_arch = "wasm32", allow(clippy::arc_with_non_send_sync))]
+
 use std::{future::Future, pin::Pin, sync::Arc};
 
 use glam::UVec2;

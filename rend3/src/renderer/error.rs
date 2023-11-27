@@ -1,5 +1,6 @@
 use thiserror::Error;
 use wgpu::Features;
+use wgpu_profiler::CreationError;
 
 /// Enum mapping to each of a device's limit.
 #[derive(Debug)]
@@ -55,4 +56,6 @@ pub enum RendererInitializationError {
     MissingDeviceFeatures { features: Features },
     #[error("Requesting a device failed")]
     RequestDeviceFailed,
+    #[error("Failed to create GpuProfiler")]
+    GpuProfilerCreation(#[source] CreationError),
 }

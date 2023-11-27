@@ -5,8 +5,7 @@ use std::{
 };
 
 use encase::{ShaderSize, ShaderType};
-use list_any::VecAny;
-use rend3_types::{Material, MaterialArray, RawMaterialHandle, RawTexture2DHandle, VertexAttributeId};
+use rend3_types::{Material, MaterialArray, RawMaterialHandle, RawTexture2DHandle, VertexAttributeId, WasmVecAny};
 use wgpu::{BindGroup, BindGroupLayout, BindingType, Buffer, BufferBindingType, CommandEncoder, Device, ShaderStages};
 
 use crate::{
@@ -46,20 +45,20 @@ struct MaterialArchetype {
     // Inner type is CpuPoweredShaderWrapper<M> or GpuPoweredShaderWrapper<M>
     buffer: FreelistDerivedBuffer,
     // Inner type is Option<InnerMaterial<M>>
-    data_vec: VecAny,
-    remove_data: fn(&mut VecAny, RawMaterialHandle) -> ProfileData<TextureBindGroupIndex, ()>,
-    apply_data_cpu: fn(&mut FreelistDerivedBuffer, &Device, &mut CommandEncoder, &ScatterCopy, &mut VecAny),
+    data_vec: WasmVecAny,
+    remove_data: fn(&mut WasmVecAny, RawMaterialHandle) -> ProfileData<TextureBindGroupIndex, ()>,
+    apply_data_cpu: fn(&mut FreelistDerivedBuffer, &Device, &mut CommandEncoder, &ScatterCopy, &mut WasmVecAny),
     apply_data_gpu: fn(
         &mut FreelistDerivedBuffer,
         &Device,
         &mut CommandEncoder,
         &ScatterCopy,
-        &mut VecAny,
+        &mut WasmVecAny,
         &TextureManager<crate::types::Texture2DTag>,
     ),
     #[allow(clippy::type_complexity)]
     get_attributes: fn(&mut dyn FnMut(&[&'static VertexAttributeId], &[&'static VertexAttributeId])),
-    object_add_callback_wrapper: fn(&VecAny, usize, ObjectAddCallbackArgs<'_>),
+    object_add_callback_wrapper: fn(&WasmVecAny, usize, ObjectAddCallbackArgs<'_>),
 }
 
 pub struct MaterialArchetypeView<'a, M: Material> {
@@ -125,7 +124,7 @@ impl MaterialManager {
                 RendererProfile::CpuDriven => FreelistDerivedBuffer::new::<CpuPoweredShaderWrapper<M>>(device),
                 RendererProfile::GpuDriven => FreelistDerivedBuffer::new::<GpuPoweredShaderWrapper<M>>(device),
             },
-            data_vec: VecAny::new::<Option<InternalMaterial<M>>>(),
+            data_vec: WasmVecAny::new::<Option<InternalMaterial<M>>>(),
             remove_data: remove_data::<M>,
             apply_data_cpu: apply_buffer_cpu::<M>,
             apply_data_gpu: apply_buffer_gpu::<M>,
@@ -298,7 +297,7 @@ impl MaterialManager {
 }
 
 fn remove_data<M: Material>(
-    data_vec: &mut VecAny,
+    data_vec: &mut WasmVecAny,
     handle: RawMaterialHandle,
 ) -> ProfileData<TextureBindGroupIndex, ()> {
     let data_vec = data_vec.downcast_slice_mut::<Option<InternalMaterial<M>>>().unwrap();
@@ -313,7 +312,7 @@ fn apply_buffer_cpu<M: Material>(
     device: &Device,
     encoder: &mut CommandEncoder,
     scatter: &ScatterCopy,
-    data_vec: &mut VecAny,
+    data_vec: &mut WasmVecAny,
 ) {
     let data_vec = data_vec.downcast_slice::<Option<InternalMaterial<M>>>().unwrap();
 
@@ -339,7 +338,7 @@ fn apply_buffer_gpu<M: Material>(
     device: &Device,
     encoder: &mut CommandEncoder,
     scatter: &ScatterCopy,
-    data_vec: &mut VecAny,
+    data_vec: &mut WasmVecAny,
     texture_manager: &TextureManager<crate::types::Texture2DTag>,
 ) {
     let data_vec = data_vec.downcast_slice::<Option<InternalMaterial<M>>>().unwrap();
@@ -361,7 +360,7 @@ fn get_attributes<M: Material>(callback: &mut dyn FnMut(&[&'static VertexAttribu
     callback(M::required_attributes().as_ref(), M::supported_attributes().as_ref())
 }
 
-fn object_add_callback_wrapper<M: Material>(vec_any: &VecAny, idx: usize, args: ObjectAddCallbackArgs) {
+fn object_add_callback_wrapper<M: Material>(vec_any: &WasmVecAny, idx: usize, args: ObjectAddCallbackArgs) {
     let data_vec = vec_any.downcast_slice::<Option<InternalMaterial<M>>>().unwrap();
 
     let material = &data_vec[idx].as_ref().unwrap().inner;
