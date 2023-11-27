@@ -1,6 +1,7 @@
 use std::{collections::HashMap, future::Future, hash::BuildHasher, path::Path, sync::Arc, time::Duration};
 
-use glam::{DVec2, Mat3A, Mat4, UVec2, Vec3, Vec3A};
+use dolly::prelude::*;
+use glam::{DVec2, Mat4, UVec2, Vec3};
 use instant::Instant;
 use pico_args::Arguments;
 use rend3::{
@@ -275,9 +276,7 @@ struct SceneViewer {
     fullscreen: bool,
 
     scancode_status: FastHashMap<u32, bool>,
-    camera_pitch: f32,
-    camera_yaw: f32,
-    camera_location: Vec3A,
+    camera: CameraRig,
     previous_profiling_stats: Option<Vec<GpuTimerScopeResult>>,
     timestamp_last_second: Instant,
     timestamp_last_frame: Instant,
@@ -363,6 +362,14 @@ impl SceneViewer {
             gltf_settings.directional_light_resolution = shadow_resolution;
         }
 
+        //Note: depends on size of model
+        let dist = 2.0;
+
+        let camera: CameraRig = CameraRig::builder()
+            .with(YawPitch::new().yaw_degrees(45.0).pitch_degrees(-22.5))
+            .with(Arm::new(dolly::glam::Vec3::Z * dist))
+            .build();
+
         Self {
             absolute_mouse,
             desired_backend,
@@ -382,9 +389,7 @@ impl SceneViewer {
             fullscreen,
 
             scancode_status: FastHashMap::default(),
-            camera_pitch: -std::f32::consts::FRAC_PI_8,
-            camera_yaw: std::f32::consts::FRAC_PI_4,
-            camera_location: Vec3A::new(3.0, 3.0, 3.0),
+            camera,
             previous_profiling_stats: None,
             timestamp_last_second: Instant::now(),
             timestamp_last_frame: Instant::now(),
@@ -498,6 +503,8 @@ impl rend3_framework::App for SceneViewer {
                 let delta_time = now - self.timestamp_last_frame;
                 self.frame_times.increment(delta_time.as_micros() as u64).unwrap();
 
+                self.camera.update(delta_time.as_secs_f32());
+
                 let elapsed_since_second = now - self.timestamp_last_second;
                 if elapsed_since_second > Duration::from_secs(1) {
                     let count = self.frame_times.entries();
@@ -524,33 +531,40 @@ impl rend3_framework::App for SceneViewer {
 
                 self.timestamp_last_frame = now;
 
-                let rotation =
-                    Mat3A::from_euler(glam::EulerRot::XYZ, -self.camera_pitch, -self.camera_yaw, 0.0).transpose();
-                let forward = -rotation.z_axis;
-                let up = rotation.y_axis;
-                let side = -rotation.x_axis;
-                let velocity = if button_pressed(&self.scancode_status, platform::Scancodes::SHIFT) {
-                    self.run_speed
-                } else {
-                    self.walk_speed
-                };
+                let shift = button_pressed(&self.scancode_status, platform::Scancodes::SHIFT);
+
+                let velocity = if shift { self.run_speed } else { self.walk_speed };
+
+                // Note: depends on size of model
+                let velocity_factor = 0.001;
+
+                let angular_velocity_deg = if shift { 1.0 } else { 0.5 };
+
                 if button_pressed(&self.scancode_status, platform::Scancodes::W) {
-                    self.camera_location += forward * velocity * delta_time.as_secs_f32();
+                    self.camera.driver_mut::<Arm>().offset -= dolly::glam::Vec3::Z * velocity * velocity_factor;
                 }
                 if button_pressed(&self.scancode_status, platform::Scancodes::S) {
-                    self.camera_location -= forward * velocity * delta_time.as_secs_f32();
+                    self.camera.driver_mut::<Arm>().offset += dolly::glam::Vec3::Z * velocity * velocity_factor;
                 }
                 if button_pressed(&self.scancode_status, platform::Scancodes::A) {
-                    self.camera_location += side * velocity * delta_time.as_secs_f32();
+                    self.camera
+                        .driver_mut::<YawPitch>()
+                        .rotate_yaw_pitch(-angular_velocity_deg, 0.0);
                 }
                 if button_pressed(&self.scancode_status, platform::Scancodes::D) {
-                    self.camera_location -= side * velocity * delta_time.as_secs_f32();
+                    self.camera
+                        .driver_mut::<YawPitch>()
+                        .rotate_yaw_pitch(angular_velocity_deg, 0.0);
                 }
                 if button_pressed(&self.scancode_status, platform::Scancodes::Q) {
-                    self.camera_location += up * velocity * delta_time.as_secs_f32();
+                    self.camera
+                        .driver_mut::<YawPitch>()
+                        .rotate_yaw_pitch(0.0, -angular_velocity_deg);
                 }
                 if button_pressed(&self.scancode_status, platform::Scancodes::Z) {
-                    self.camera_location -= up * velocity * delta_time.as_secs_f32();
+                    self.camera
+                        .driver_mut::<YawPitch>()
+                        .rotate_yaw_pitch(0.0, angular_velocity_deg);
                 }
 
                 if button_pressed(&self.scancode_status, platform::Scancodes::ESCAPE) {
@@ -570,8 +584,10 @@ impl rend3_framework::App for SceneViewer {
                 window.request_redraw()
             }
             Event::RedrawRequested(_) => {
-                let view = Mat4::from_euler(glam::EulerRot::XYZ, -self.camera_pitch, -self.camera_yaw, 0.0);
-                let view = view * Mat4::from_translation((-self.camera_location).into());
+                // let view = Mat4::from_euler(glam::EulerRot::XYZ, -self.camera_pitch, -self.camera_yaw, 0.0);
+                // let view = view * Mat4::from_translation((-self.camera_location).into());
+                let transform = self.camera.final_transform;
+                let view = Mat4::from_rotation_translation(transform.rotation, transform.position).inverse();
 
                 renderer.set_camera_data(Camera {
                     projection: CameraProjection::Perspective { vfov: 60.0, near: 0.1 },
@@ -670,8 +686,6 @@ impl rend3_framework::App for SceneViewer {
                     return;
                 }
 
-                const TAU: f32 = std::f32::consts::PI * 2.0;
-
                 let mouse_delta = if self.absolute_mouse {
                     let prev = self.last_mouse_delta.replace(DVec2::new(delta_x, delta_y));
                     if let Some(prev) = prev {
@@ -683,17 +697,13 @@ impl rend3_framework::App for SceneViewer {
                     DVec2::new(delta_x, delta_y)
                 };
 
-                self.camera_yaw -= (mouse_delta.x / 1000.0) as f32;
-                self.camera_pitch -= (mouse_delta.y / 1000.0) as f32;
-                if self.camera_yaw < 0.0 {
-                    self.camera_yaw += TAU;
-                } else if self.camera_yaw >= TAU {
-                    self.camera_yaw -= TAU;
-                }
-                self.camera_pitch = self.camera_pitch.clamp(
-                    -std::f32::consts::FRAC_PI_2 + 0.0001,
-                    std::f32::consts::FRAC_PI_2 - 0.0001,
-                )
+                let mouse_scale = 1.0;
+                let yaw_vel = (mouse_delta.x * mouse_scale) as f32;
+                let pitch_vel = (mouse_delta.y * mouse_scale) as f32;
+
+                self.camera
+                    .driver_mut::<YawPitch>()
+                    .rotate_yaw_pitch(yaw_vel, pitch_vel);
             }
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
