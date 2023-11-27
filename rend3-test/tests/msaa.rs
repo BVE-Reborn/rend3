@@ -1,7 +1,7 @@
 use anyhow::Context;
 use glam::{Mat4, Vec3, Vec4};
 use rend3::types::{Camera, Handedness, MeshBuilder, Object, ObjectMeshKind, SampleCount};
-use rend3_test::{no_gpu_return, test_attr, FrameRenderSettings, TestRunner};
+use rend3_test::{no_gpu_return, test_attr, FrameRenderSettings, TestRunner, Threshold};
 
 #[test_attr]
 pub async fn triangle() -> anyhow::Result<()> {
@@ -47,7 +47,7 @@ pub async fn triangle() -> anyhow::Result<()> {
         .render_and_compare(
             FrameRenderSettings::new().samples(SampleCount::Four),
             "tests/results/msaa/four.png",
-            0.0,
+            Threshold::Mean(0.0),
         )
         .await?;
 
@@ -96,7 +96,7 @@ pub async fn sample_coverage() -> anyhow::Result<()> {
             .render_and_compare(
                 FrameRenderSettings::new().samples(samples),
                 &format!("tests/results/msaa/sample-coverage-{}.png", samples as u8),
-                0.0,
+                Threshold::Mean(0.0),
             )
             .await?;
     }

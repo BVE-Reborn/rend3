@@ -14,6 +14,8 @@ use wgpu::{
     Extent3d, ImageCopyBuffer, ImageDataLayout, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages,
 };
 
+use crate::{helpers::CaptureDropGuard, ThresholdSet};
+
 #[derive(Clone)]
 pub struct FrameRenderSettings {
     size: u32,
@@ -68,12 +70,16 @@ impl TestRunnerBuilder {
     }
 
     pub async fn build(self) -> Result<TestRunner> {
+        let _ = env_logger::try_init();
+
         let iad = match self.iad {
             Some(iad) => iad,
             None => rend3::create_iad(None, None, None, None)
                 .await
                 .context("InstanceAdapterDevice creation failed")?,
         };
+
+        let capture_guard = CaptureDropGuard::start_capture(Arc::clone(&iad.device));
 
         let renderer = rend3::Renderer::new(iad, self.handness.unwrap_or(Handedness::Left), None)
             .context("Renderer initialization failed")?;
@@ -87,6 +93,7 @@ impl TestRunnerBuilder {
             &mut renderer.data_core.lock(),
             &spp,
             &base_rendergraph.interfaces,
+            &base_rendergraph.gpu_culler.culling_buffer_map_handle,
         );
         let tonemapping = TonemappingRoutine::new(
             &renderer,
@@ -100,6 +107,7 @@ impl TestRunnerBuilder {
             pbr,
             tonemapping,
             base_rendergraph,
+            capture_guard,
         })
     }
 }
@@ -109,6 +117,7 @@ pub struct TestRunner {
     pub pbr: PbrRoutine,
     pub tonemapping: TonemappingRoutine,
     pub base_rendergraph: BaseRenderGraph,
+    pub capture_guard: CaptureDropGuard,
 }
 
 impl Deref for TestRunner {
@@ -147,6 +156,7 @@ impl TestRunner {
         let mut graph = rend3::graph::RenderGraph::new();
         let frame_handle = graph.add_imported_render_target(
             &texture,
+            0..1,
             0..1,
             rend3::graph::ViewportRect::from_size(UVec2::splat(settings.size)),
         );
@@ -223,7 +233,12 @@ impl TestRunner {
             .context("Failed to create image from mapping")
     }
 
-    pub fn compare_image_to_path(&self, test_rgba: &image::RgbaImage, path: &Path, threshold: f32) -> Result<()> {
+    pub fn compare_image_to_path(
+        &self,
+        test_rgba: &image::RgbaImage,
+        path: &Path,
+        threshold: impl Into<ThresholdSet>,
+    ) -> Result<()> {
         #[cfg(not(target_arch = "wasm32"))]
         {
             let parent_path = path.parent().context("Path given had no parent")?;
@@ -249,11 +264,11 @@ impl TestRunner {
 
             let mut pool = nv_flip::FlipPool::from_image(&result_float);
 
-            let mean: f32 = pool.mean();
+            println!("Image Comparison Results");
+            let threshold_set: ThresholdSet = threshold.into();
+            let pass = threshold_set.check(&mut pool);
 
-            let pass = mean <= threshold;
-
-            println!("Image Comparison Results: {}", if pass { "passed" } else { "failed" });
+            println!();
             println!("    Mean: {}", pool.mean());
             println!("     Min: {}", pool.min_value());
             println!("     25%: {}", pool.get_percentile(0.25, true));
@@ -262,6 +277,8 @@ impl TestRunner {
             println!("     95%: {}", pool.get_percentile(0.95, true));
             println!("     99%: {}", pool.get_percentile(0.99, true));
             println!("     Max: {}", pool.max_value());
+            println!("{}", if pass { "Passed!" } else { "Failed!" });
+            println!();
 
             let filename = path.file_stem().unwrap();
 
@@ -286,7 +303,7 @@ impl TestRunner {
         &self,
         settings: FrameRenderSettings,
         path: impl AsRef<Path>,
-        threshold: f32,
+        threshold: impl Into<ThresholdSet>,
     ) -> Result<()> {
         let test_rgba = self.render_frame(settings).await?;
 

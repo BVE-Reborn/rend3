@@ -18,7 +18,7 @@ struct ObjectOutputData {
 }
 
 struct IndirectCall {
-    vertex_count: u32,
+    vertex_count: atomic<u32>,
     instance_count: u32,
     base_index: u32,
     vertex_offset: i32,
@@ -36,6 +36,40 @@ struct UniformData {
     ambient: vec4<f32>,
     resolution: vec2<u32>,
 }
+
+struct PerCameraUniformObjectData {
+    // TODO: use less space
+    model_view: mat4x4<f32>,
+    // TODO: use less space
+    model_view_proj: mat4x4<f32>,
+}
+
+struct PerCameraUniform {
+    // TODO: use less space
+    view: mat4x4<f32>,
+    // TODO: use less space
+    view_proj: mat4x4<f32>,
+    // The index of which shadow caster we are rendering for.
+    //
+    // This will be u32::MAX if we're rendering for a camera, not a shadow map.
+    shadow_index: u32,
+    frustum: Frustum,
+    resolution: vec2<f32>,
+    // Uses PCU_FLAGS_* constants
+    flags: u32,
+    object_count: u32,
+    objects: array<PerCameraUniformObjectData>,
+}
+
+// Area visible
+const PCU_FLAGS_AREA_VISIBLE_MASK: u32 = 0x1u;
+const PCU_FLAGS_NEGATIVE_AREA_VISIBLE: u32 = 0x0u;
+const PCU_FLAGS_POSITIVE_AREA_VISIBLE: u32 = 0x1u;
+
+// Multisampled
+const PCU_FLAGS_MULTISAMPLE_MASK: u32 = 0x2u;
+const PCU_FLAGS_MULTISAMPLE_DISABLED: u32 = 0x0u;
+const PCU_FLAGS_MULTISAMPLE_ENABLED: u32 = 0x2u;
 
 struct DirectionalLight {
     /// View/Projection of directional light. Shadow rendering uses viewports

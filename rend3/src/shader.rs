@@ -20,6 +20,7 @@ struct Rend3ShaderSources;
 #[derive(Debug, Default, Serialize)]
 pub struct ShaderConfig {
     pub profile: Option<RendererProfile>,
+    pub position_attribute_offset: usize,
 }
 
 pub struct ShaderVertexBufferConfig {
@@ -263,11 +264,10 @@ impl<'a> ShaderVertexBufferHelper<'a> {
         let unpack_function = format!(
             "
             fn unpack_vertex_index(vertex_index: u32) -> Indices {{
-                 let local_object_id = vertex_index >> 24u;
-                 let vertex_id = vertex_index & 0xFFFFFFu;
-                 let object_id = {batch_buffer}.ranges[local_object_id].object_id;
+                 let batch_indices = unpack_batch_index(vertex_index);
+                 let object_id = {batch_buffer}.object_culling_information[batch_indices.local_object].object_id;
                  
-                 return Indices(vertex_id, object_id);
+                 return Indices(object_id, batch_indices.vertex);
             }}"
         );
 
@@ -354,7 +354,10 @@ mod tests {
         let mut pp = ShaderPreProcessor::new();
         pp.add_shader("simple", "{{include \"other\"}} simple");
         pp.add_shader("other", "other");
-        let config = ShaderConfig { profile: None };
+        let config = ShaderConfig {
+            profile: None,
+            position_attribute_offset: 0,
+        };
         let output = pp.render_shader("simple", &config, None).unwrap();
 
         assert_eq!(output, "other simple");
@@ -365,7 +368,10 @@ mod tests {
         let mut pp = ShaderPreProcessor::new();
         pp.add_shader("simple", "{{include \"other\"}} simple");
         pp.add_shader("other", "{{include \"simple\"}} other");
-        let config = ShaderConfig { profile: None };
+        let config = ShaderConfig {
+            profile: None,
+            position_attribute_offset: 0,
+        };
         let output = pp.render_shader("simple", &config, None).unwrap();
 
         assert_eq!(output, " other simple");
@@ -375,7 +381,10 @@ mod tests {
     fn error_include() {
         let mut pp = ShaderPreProcessor::new();
         pp.add_shader("simple", "{{include \"other\"}} simple");
-        let config = ShaderConfig { profile: None };
+        let config = ShaderConfig {
+            profile: None,
+            position_attribute_offset: 0,
+        };
         let output = pp.render_shader("simple", &config, None);
 
         assert!(output.is_err(), "Expected error, got {output:?}");
@@ -385,7 +394,10 @@ mod tests {
     fn no_arg_include() {
         let mut pp = ShaderPreProcessor::new();
         pp.add_shader("simple", "{{include}} simple");
-        let config = ShaderConfig { profile: None };
+        let config = ShaderConfig {
+            profile: None,
+            position_attribute_offset: 0,
+        };
         let output = pp.render_shader("simple", &config, None);
 
         assert!(output.is_err(), "Expected error, got {output:?}");

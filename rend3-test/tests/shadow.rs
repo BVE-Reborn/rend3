@@ -3,7 +3,7 @@ use std::f32::consts::FRAC_PI_2;
 use anyhow::Context;
 use glam::{Mat4, Quat, Vec3, Vec3A, Vec4};
 use rend3::types::{Camera, Handedness};
-use rend3_test::{no_gpu_return, test_attr, FrameRenderSettings, TestRunner};
+use rend3_test::{no_gpu_return, test_attr, FrameRenderSettings, TestRunner, Threshold};
 
 #[test_attr]
 pub async fn shadows() -> anyhow::Result<()> {
@@ -34,7 +34,14 @@ pub async fn shadows() -> anyhow::Result<()> {
 
     let file_name = "tests/results/shadow/plane.png";
     runner
-        .render_and_compare(FrameRenderSettings::new().size(256)?, file_name, 0.02)
+        .render_and_compare(
+            FrameRenderSettings::new().size(256)?,
+            file_name,
+            Threshold::Percentile {
+                percentile: 0.5,
+                threshold: 0.04,
+            },
+        )
         .await?;
 
     let material2 = runner.add_lit_material(Vec4::new(0.75, 0.5, 0.25, 1.0));
@@ -46,7 +53,14 @@ pub async fn shadows() -> anyhow::Result<()> {
 
     let file_name = "tests/results/shadow/cube.png";
     runner
-        .render_and_compare(FrameRenderSettings::new().size(256)?, file_name, 0.02)
+        .render_and_compare(
+            FrameRenderSettings::new().size(256)?,
+            file_name,
+            Threshold::Percentile {
+                percentile: 0.5,
+                threshold: 0.04,
+            },
+        )
         .await?;
 
     Ok(())

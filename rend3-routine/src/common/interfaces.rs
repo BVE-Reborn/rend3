@@ -123,6 +123,15 @@ impl<M: Material> PerMaterialArchetypeInterface<M> {
                 },
                 None,
             )
+            .append(
+                ShaderStages::VERTEX_FRAGMENT,
+                BindingType::Buffer {
+                    ty: BufferBindingType::Storage { read_only: true },
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                None,
+            )
             .build(device, Some("per material bgl"));
 
         Self {

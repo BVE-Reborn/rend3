@@ -8,7 +8,7 @@ use wgpu::{
 
 use crate::util::{
     bind_merge::{BindGroupBuilder, BindGroupLayoutBuilder},
-    math::round_up_div,
+    math::div_round_up,
 };
 
 pub struct ScatterData<T> {
@@ -134,7 +134,7 @@ impl ScatterCopy {
         });
         cpass.set_pipeline(&self.pipeline);
         cpass.set_bind_group(0, &bg, &[]);
-        cpass.dispatch_workgroups(round_up_div(count_u32, 64), 1, 1);
+        cpass.dispatch_workgroups(div_round_up(count_u32, 64), 1, 1);
         drop(cpass);
     }
 }

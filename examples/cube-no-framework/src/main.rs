@@ -1,3 +1,5 @@
+#![cfg_attr(target_arch = "wasm32", allow(clippy::arc_with_non_send_sync))]
+
 use std::sync::Arc;
 
 fn vertex(pos: [f32; 3]) -> glam::Vec3 {
@@ -107,8 +109,13 @@ fn main() {
     let base_rendergraph = rend3_routine::base::BaseRenderGraph::new(&renderer, &spp);
 
     let mut data_core = renderer.data_core.lock();
-    let pbr_routine =
-        rend3_routine::pbr::PbrRoutine::new(&renderer, &mut data_core, &spp, &base_rendergraph.interfaces);
+    let pbr_routine = rend3_routine::pbr::PbrRoutine::new(
+        &renderer,
+        &mut data_core,
+        &spp,
+        &base_rendergraph.interfaces,
+        &base_rendergraph.gpu_culler.culling_buffer_map_handle,
+    );
     drop(data_core);
     let tonemapping_routine = rend3_routine::tonemapping::TonemappingRoutine::new(
         &renderer,
@@ -209,7 +216,7 @@ fn main() {
 
             // Import the surface texture into the render graph.
             let frame_handle =
-                graph.add_imported_render_target(&frame, 0..1, rend3::graph::ViewportRect::from_size(resolution));
+                graph.add_imported_render_target(&frame, 0..1, 0..1, rend3::graph::ViewportRect::from_size(resolution));
             // Add the default rendergraph without a skybox
             base_rendergraph.add_to_graph(
                 &mut graph,

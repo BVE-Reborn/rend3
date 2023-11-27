@@ -65,7 +65,6 @@ pub struct Renderer {
 }
 
 /// Handle allocators
-#[derive(Default)]
 struct HandleAllocators {
     pub mesh: HandleAllocator<Mesh>,
     pub skeleton: HandleAllocator<Skeleton>,
@@ -75,6 +74,21 @@ struct HandleAllocators {
     pub object: HandleAllocator<Object>,
     pub directional_light: HandleAllocator<DirectionalLight>,
     pub graph_storage: HandleAllocator<GraphDataTag>,
+}
+
+impl Default for HandleAllocators {
+    fn default() -> Self {
+        Self {
+            mesh: HandleAllocator::new(false),
+            skeleton: HandleAllocator::new(false),
+            d2_texture: HandleAllocator::new(false),
+            d2c_texture: HandleAllocator::new(false),
+            material: HandleAllocator::new(false),
+            object: HandleAllocator::new(true),
+            directional_light: HandleAllocator::new(false),
+            graph_storage: HandleAllocator::new(false),
+        }
+    }
 }
 
 /// All the mutex protected data within the renderer

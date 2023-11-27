@@ -16,7 +16,7 @@ members = [
     "rend3-gltf",
     "rend3-routine",
     "rend3-test",
-    "rend3-types"
+    "rend3-types",
 ]
 
 [profile.ci]

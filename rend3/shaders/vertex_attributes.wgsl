@@ -1,8 +1,43 @@
 // -- DO NOT VALIDATE --
 
 struct Indices {
-    vertex: u32,
     object: u32,
+    vertex: u32,
+}
+
+struct BatchIndices {
+    /// Index _within_ the batch
+    local_object: u32,
+    /// Vertex index within the object
+    vertex: u32,
+}
+
+const INVALID_VERTEX: u32 = 0x00FFFFFFu;
+
+fn unpack_batch_index(vertex_index: u32) -> BatchIndices {
+    return BatchIndices(
+        vertex_index >> 24u,
+        vertex_index & 0xFFFFFFu,
+    );
+}
+
+fn pack_batch_index(local_object: u32, index: u32) -> u32 {
+    return (local_object << 24u) | (index & 0xFFFFFFu);
+}
+
+alias TriangleVertices = array<vec3f, 3>;
+alias TriangleIndices = array<u32, 3>;
+struct Triangle {
+    vertices: TriangleVertices,
+    indices: TriangleIndices,
+}
+
+fn pack_batch_indices(local_object: u32, indices: TriangleIndices) -> TriangleIndices {
+    return TriangleIndices(
+        pack_batch_index(local_object, indices[0]),
+        pack_batch_index(local_object, indices[1]),
+        pack_batch_index(local_object, indices[2]),
+    );
 }
 
 fn extract_attribute_vec2_f32(byte_base_offset: u32, vertex_index: u32) -> vec2<f32> {

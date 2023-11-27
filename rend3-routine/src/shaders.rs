@@ -23,7 +23,8 @@ mod tests {
         },
     };
     use naga::WithSpan;
-    use rend3::{RendererProfile, ShaderConfig, ShaderPreProcessor, ShaderVertexBufferConfig};
+    use rend3::{RendererProfile, ShaderPreProcessor, ShaderVertexBufferConfig};
+    use serde_json::json;
 
     use crate::{pbr::PbrMaterial, shaders::Rend3RoutineShaderSources};
 
@@ -70,16 +71,24 @@ mod tests {
 
             let source = pp.get(shader).unwrap();
             let configs = if source.contains("#if") {
-                &[
-                    ShaderConfig {
-                        profile: Some(RendererProfile::CpuDriven),
-                    },
-                    ShaderConfig {
-                        profile: Some(RendererProfile::GpuDriven),
-                    },
-                ][..]
+                vec![
+                    json!({
+                        "profile": Some(RendererProfile::GpuDriven),
+                        "position_attribute_offset": 0,
+                        "SAMPLES": 1,
+                    }),
+                    json!({
+                        "profile": Some(RendererProfile::CpuDriven),
+                        "position_attribute_offset": 0,
+                        "SAMPLES": 1,
+                    }),
+                ]
             } else {
-                &[ShaderConfig { profile: None }][..]
+                vec![json!({
+                    "profile": Some(RendererProfile::CpuDriven),
+                    "position_attribute_offset": 0,
+                    "SAMPLES": 1,
+                })]
             };
 
             if source.contains("DO NOT VALIDATE") {
@@ -87,12 +96,11 @@ mod tests {
             }
 
             for config in configs {
-                let serialized_config = serde_json::to_value(config).unwrap();
-                println!("Testing shader {shader} with config {serialized_config:?}");
+                println!("Testing shader {shader} with config {config:?}");
 
                 let output = pp.render_shader(
                     shader,
-                    config,
+                    &config,
                     Some(&ShaderVertexBufferConfig::from_material::<PbrMaterial>()),
                 );
 

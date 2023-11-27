@@ -10,6 +10,12 @@ use crate::TestRunner;
 pub struct CaptureDropGuard {
     device: Arc<Device>,
 }
+impl CaptureDropGuard {
+    pub fn start_capture(device: Arc<Device>) -> Self {
+        device.start_capture();
+        Self { device }
+    }
+}
 impl Drop for CaptureDropGuard {
     fn drop(&mut self) {
         self.device.stop_capture();
@@ -19,13 +25,6 @@ impl Drop for CaptureDropGuard {
 }
 
 impl TestRunner {
-    pub fn start_capture(&self) -> CaptureDropGuard {
-        self.device.start_capture();
-        CaptureDropGuard {
-            device: self.device.clone(),
-        }
-    }
-
     pub fn add_directional_light(&self, direction: Vec3) -> DirectionalLightHandle {
         self.renderer.add_directional_light(rend3::types::DirectionalLight {
             color: glam::Vec3::ONE,

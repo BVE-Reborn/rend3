@@ -31,6 +31,8 @@ pub struct ShaderObject<M: Material> {
     pub material_index: u32,
     pub vertex_attribute_start_offsets:
         <M::SupportedAttributeArrayType as MaterialArray<&'static VertexAttributeId>>::U32Array,
+    // 1 if enabled, 0 if disabled
+    pub enabled: u32,
 }
 
 impl<M: Material> Default for ShaderObject<M> {
@@ -42,6 +44,7 @@ impl<M: Material> Default for ShaderObject<M> {
             index_count: Default::default(),
             material_index: Default::default(),
             vertex_attribute_start_offsets: Zeroable::zeroed(),
+            enabled: Default::default(),
         }
     }
 }
@@ -87,8 +90,8 @@ struct ObjectArchetype {
     buffer: FreelistDerivedBuffer,
     set_object_transform: fn(&mut WasmVecAny, &mut FreelistDerivedBuffer, usize, Mat4),
     duplicate_object: fn(&WasmVecAny, usize, ObjectChange) -> Object,
-    remove: fn(&mut WasmVecAny, usize),
-    evaluate: fn(&mut ObjectArchetype, &Device, &mut CommandEncoder, &ScatterCopy),
+    remove: fn(&mut ObjectArchetype, usize),
+    evaluate: fn(&mut ObjectArchetype, &Device, &mut CommandEncoder, &ScatterCopy, &[RawObjectHandle]),
 }
 
 /// Manages objects. That's it. ¯\\\_(ツ)\_/¯
@@ -167,14 +170,18 @@ impl ObjectManager {
 
         let archetype = self.archetype.get_mut(&type_id).unwrap();
 
-        (archetype.remove)(&mut archetype.data_vec, handle.idx);
-
-        archetype.object_count -= 1;
+        (archetype.remove)(archetype, handle.idx);
     }
 
-    pub fn evaluate(&mut self, device: &Device, encoder: &mut CommandEncoder, scatter: &ScatterCopy) {
+    pub fn evaluate(
+        &mut self,
+        device: &Device,
+        encoder: &mut CommandEncoder,
+        scatter: &ScatterCopy,
+        deferred_removals: &[RawObjectHandle],
+    ) {
         for archetype in self.archetype.values_mut() {
-            (archetype.evaluate)(archetype, device, encoder, scatter);
+            (archetype.evaluate)(archetype, device, encoder, scatter, deferred_removals);
         }
     }
 
@@ -298,6 +305,7 @@ pub(super) fn object_add_callback<M: Material>(_material: &M, args: ObjectAddCal
             first_index: (index_range.start / 4) as u32,
             index_count: ((index_range.end - index_range.start) / 4) as u32,
             vertex_attribute_start_offsets,
+            enabled: true as u32,
         },
         material_handle: args.object.material,
         mesh_kind: args.object.mesh_kind,
@@ -345,10 +353,21 @@ fn duplicate_object<M: Material>(data: &WasmVecAny, idx: usize, change: ObjectCh
     }
 }
 
-fn remove<M: Material>(data: &mut WasmVecAny, idx: usize) {
-    let data_vec = data.downcast_slice_mut::<Option<InternalObject<M>>>().unwrap();
+fn remove<M: Material>(archetype: &mut ObjectArchetype, idx: usize) {
+    let data_vec = archetype
+        .data_vec
+        .downcast_slice_mut::<Option<InternalObject<M>>>()
+        .unwrap();
 
-    data_vec[idx] = None;
+    // We don't actually remove the object at this point,
+    // we just mark it as disabled. Next frame, this handle
+    // will be provided in `deferred_removals` in `evaluate`
+    // so we can actually delete it.
+    //
+    // We defer objects one frame so that temporal culling
+    // has valid data.
+    archetype.buffer.use_index(idx);
+    data_vec[idx].as_mut().unwrap().inner.enabled = false as u32;
 }
 
 fn evaluate<M: Material>(
@@ -356,11 +375,22 @@ fn evaluate<M: Material>(
     device: &Device,
     encoder: &mut CommandEncoder,
     scatter: &ScatterCopy,
+    deferred_removals: &[RawObjectHandle],
 ) {
     let data_vec = archetype
         .data_vec
-        .downcast_slice::<Option<InternalObject<M>>>()
+        .downcast_slice_mut::<Option<InternalObject<M>>>()
         .unwrap();
+
+    for removal in deferred_removals {
+        // Only one archetype will have each handle,
+        // so if we have it, we can be sure it's ours.
+        let removed_obj = data_vec[removal.idx].take();
+
+        if removed_obj.is_some() {
+            archetype.object_count -= 1;
+        }
+    }
 
     archetype.buffer.apply(device, encoder, scatter, |idx| {
         data_vec[idx].as_ref().map(|o| o.inner).unwrap_or_default()

@@ -136,6 +136,21 @@ impl<'a, 'node> RenderGraphNodeBuilder<'a, 'node> {
         DeclaredDependency { handle }
     }
 
+    /// Sugar over [add_data] which makes it easy to
+    /// declare optional textures.
+    ///
+    /// [add_data]: RenderGraphNodeBuilder::add_data
+    pub fn add_optional_data<T>(
+        &mut self,
+        handle: Option<DataHandle<T>>,
+        usage: NodeResourceUsage,
+    ) -> Option<DeclaredDependency<DataHandle<T>>>
+    where
+        T: 'static,
+    {
+        Some(self.add_data(handle?, usage))
+    }
+
     /// Declares a data handle as having the given render targets
     pub fn add_dependencies_to_render_targets<T>(
         &mut self,

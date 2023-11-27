@@ -216,8 +216,12 @@ impl rend3_framework::App for EguiExample {
                 let mut graph = rend3::graph::RenderGraph::new();
 
                 // Import the surface texture into the render graph.
-                let frame_handle =
-                    graph.add_imported_render_target(&frame, 0..1, rend3::graph::ViewportRect::from_size(resolution));
+                let frame_handle = graph.add_imported_render_target(
+                    &frame,
+                    0..1,
+                    0..1,
+                    rend3::graph::ViewportRect::from_size(resolution),
+                );
                 // Add the default rendergraph without a skybox
                 base_rendergraph.add_to_graph(
                     &mut graph,

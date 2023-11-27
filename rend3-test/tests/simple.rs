@@ -1,8 +1,34 @@
 use anyhow::Context;
 use glam::{Mat4, Vec3, Vec4};
 use rend3::types::{Camera, Handedness, MeshBuilder, Object, ObjectMeshKind};
-use rend3_test::{no_gpu_return, test_attr, FrameRenderSettings, TestRunner};
+use rend3_test::{no_gpu_return, test_attr, FrameRenderSettings, TestRunner, Threshold};
 use wgpu::FrontFace;
+
+#[test_attr]
+pub async fn empty() -> anyhow::Result<()> {
+    let iad = no_gpu_return!(rend3::create_iad(None, None, None, None).await)
+        .context("InstanceAdapterDevice creation failed")?;
+
+    let Ok(runner) = TestRunner::builder().iad(iad).build().await else {
+        return Ok(());
+    };
+
+    runner.set_camera_data(Camera {
+        projection: rend3::types::CameraProjection::Raw(Mat4::IDENTITY),
+        view: Mat4::IDENTITY,
+    });
+
+    runner
+        .render_and_compare(
+            FrameRenderSettings::new(),
+            "tests/results/simple/empty.png",
+            Threshold::Mean(0.0),
+        )
+        .await
+        .context("Image Comparison Failed")?;
+
+    Ok(())
+}
 
 #[test_attr]
 pub async fn triangle() -> anyhow::Result<()> {
@@ -67,8 +93,13 @@ pub async fn triangle() -> anyhow::Result<()> {
             false => "tests/results/simple/triangle-backface.png",
         };
         runner
-            .render_and_compare(FrameRenderSettings::new(), file_name, 0.0)
-            .await?;
+            .render_and_compare(FrameRenderSettings::new(), file_name, Threshold::Mean(0.0))
+            .await
+            .with_context(|| {
+                format!(
+                "Comparison failed on test (Handedness::{handedness:?}, FrontFace::{winding:?}, Visible: {visible})"
+            )
+            })?;
     }
 
     Ok(())
@@ -135,8 +166,9 @@ pub async fn coordinate_space() -> anyhow::Result<()> {
 
         let file_name = format!("tests/results/simple/coordinate-space-{name}.png");
         runner
-            .render_and_compare(FrameRenderSettings::new(), file_name, 0.0)
-            .await?;
+            .render_and_compare(FrameRenderSettings::new(), file_name, Threshold::Mean(0.0))
+            .await
+            .with_context(|| format!("Comparison failed on test {name}"))?;
     }
 
     Ok(())

@@ -194,6 +194,18 @@ pub type GraphDataHandleUntyped = ResourceHandle<GraphDataTag>;
 /// Refcounted handle to an instance of GraphData
 pub struct GraphDataHandle<T>(pub GraphDataHandleUntyped, pub PhantomData<T>);
 
+impl<T> Debug for GraphDataHandle<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl<T> Clone for GraphDataHandle<T> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone(), PhantomData)
+    }
+}
+
 /// Internal non-owning handle to a Mesh
 pub type RawMeshHandle = RawResourceHandle<Mesh>;
 /// Internal non-owning handle to a Texture2D
@@ -252,7 +264,9 @@ pub use wgt::{
 ///
 /// The value allows for 8 bits of information packed in the high 8 bits of the
 /// index for object recombination.
-pub const MAX_VERTEX_COUNT: u32 = 1 << 24;
+///
+/// We leave exactly one value at the top for the "invalid vertex" value: 0x00_FF_FF_FF;
+pub const MAX_VERTEX_COUNT: u32 = (1 << 24) - 1;
 /// The maximum amount of indices any one object can have.
 pub const MAX_INDEX_COUNT: u32 = u32::MAX;
 
@@ -1172,8 +1186,8 @@ impl SampleCount {
     pub const ARRAY: [Self; 2] = [Self::One, Self::Four];
 
     /// Determines if a resolve texture is needed for this texture.
-    pub fn needs_resolve(self) -> bool {
-        self != Self::One
+    pub const fn needs_resolve(self) -> bool {
+        !matches!(self, Self::One)
     }
 }
 
@@ -1191,6 +1205,15 @@ impl SampleCount {
 pub enum Handedness {
     Left,
     Right,
+}
+
+impl From<Handedness> for wgt::FrontFace {
+    fn from(value: Handedness) -> Self {
+        match value {
+            Handedness::Left => Self::Cw,
+            Handedness::Right => Self::Ccw,
+        }
+    }
 }
 
 impl Default for Handedness {
