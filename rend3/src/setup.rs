@@ -2,7 +2,6 @@
 
 use std::sync::Arc;
 
-use arrayvec::ArrayVec;
 use wgpu::{
     Adapter, AdapterInfo, Backend, Backends, BufferAddress, Device, DeviceDescriptor, DeviceType, Features,
     Gles3MinorVersion, Instance, InstanceFlags, Limits, Queue,
@@ -463,7 +462,7 @@ pub async fn create_iad(
         flags: InstanceFlags::default(),
     });
 
-    let mut valid_adapters = FastHashMap::<Backend, ArrayVec<PotentialAdapter<Adapter>, 4>>::default();
+    let mut valid_adapters = FastHashMap::<Backend, Vec<PotentialAdapter<Adapter>>>::default();
 
     for backend in &default_backend_order {
         profiling::scope!("enumerating backend");
@@ -479,7 +478,7 @@ pub async fn create_iad(
             .await
             .into_iter();
 
-        let mut potential_adapters = ArrayVec::<PotentialAdapter<Adapter>, 4>::new();
+        let mut potential_adapters = Vec::new();
         for (idx, adapter) in adapters.enumerate() {
             let info = adapter.get_info();
             let limits = adapter.limits();
