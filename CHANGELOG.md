@@ -51,6 +51,7 @@ Per Keep a Changelog there are 6 main categories of changes:
 - Fixed building with `profiling/profile-with-tracing`. @SparkyPotato
 - Fixed panic when a mesh object with a skeleton was despawned. @setzer22
 - Fixed forward pass not writing to depth when no depth prepass was used. @IsseW
+- Fixed panic in IAD creation when system has more than 4 wgpu adapters. @marceline-cramer
 
 ## v0.3.0
 
