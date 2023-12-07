@@ -150,6 +150,7 @@ pub mod managers {
     mod material;
     mod mesh;
     mod object;
+    mod point;
     mod skeleton;
     mod texture;
 
@@ -160,6 +161,7 @@ pub mod managers {
     pub use material::*;
     pub use mesh::*;
     pub use object::*;
+    pub use point::*;
     pub use skeleton::*;
     pub use texture::*;
 }

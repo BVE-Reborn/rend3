@@ -3,10 +3,10 @@ use std::{mem, panic::Location};
 use glam::Mat4;
 use parking_lot::Mutex;
 use rend3_types::{
-    trait_supertrait_alias, MaterialHandle, MeshHandle, ObjectChange, ObjectHandle, RawDirectionalLightHandle,
-    RawGraphDataHandleUntyped, RawMaterialHandle, RawMeshHandle, RawSkeletonHandle, RawTexture2DHandle,
-    RawTextureCubeHandle, Skeleton, SkeletonHandle, Texture2DHandle, TextureCubeHandle, TextureFromTexture,
-    WasmNotSend, WasmNotSync,
+    trait_supertrait_alias, MaterialHandle, MeshHandle, ObjectChange, ObjectHandle, PointLight, PointLightChange,
+    PointLightHandle, RawDirectionalLightHandle, RawGraphDataHandleUntyped, RawMaterialHandle, RawMeshHandle,
+    RawPointLightHandle, RawSkeletonHandle, RawTexture2DHandle, RawTextureCubeHandle, Skeleton, SkeletonHandle,
+    Texture2DHandle, TextureCubeHandle, TextureFromTexture, WasmNotSend, WasmNotSync,
 };
 use wgpu::{CommandBuffer, Device};
 
@@ -62,6 +62,10 @@ pub enum InstructionKind {
         handle: DirectionalLightHandle,
         light: DirectionalLight,
     },
+    AddPointLight {
+        handle: PointLightHandle,
+        light: PointLight,
+    },
     AddGraphData {
         add_invoke: Box<dyn AddGraphDataAddInvoke>,
     },
@@ -72,6 +76,10 @@ pub enum InstructionKind {
     ChangeDirectionalLight {
         handle: RawDirectionalLightHandle,
         change: DirectionalLightChange,
+    },
+    ChangePointLight {
+        handle: RawPointLightHandle,
+        change: PointLightChange,
     },
     DeleteMesh {
         handle: RawMeshHandle,
@@ -93,6 +101,9 @@ pub enum InstructionKind {
     },
     DeleteDirectionalLight {
         handle: RawDirectionalLightHandle,
+    },
+    DeletePointLight {
+        handle: RawPointLightHandle,
     },
     DeleteGraphData {
         handle: RawGraphDataHandleUntyped,
@@ -186,6 +197,12 @@ impl DeletableRawResourceHandle for RawObjectHandle {
 impl DeletableRawResourceHandle for RawDirectionalLightHandle {
     fn into_delete_instruction_kind(self) -> InstructionKind {
         InstructionKind::DeleteDirectionalLight { handle: self }
+    }
+}
+
+impl DeletableRawResourceHandle for RawPointLightHandle {
+    fn into_delete_instruction_kind(self) -> InstructionKind {
+        InstructionKind::DeletePointLight { handle: self }
     }
 }
 
