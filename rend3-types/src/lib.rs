@@ -187,6 +187,8 @@ pub type MaterialHandle = ResourceHandle<MaterialTag>;
 pub type ObjectHandle = ResourceHandle<Object>;
 /// Refcounted handle to a DirectionalLight
 pub type DirectionalLightHandle = ResourceHandle<DirectionalLight>;
+/// Refcounted handle to a PointLight
+pub type PointLightHandle = ResourceHandle<PointLight>;
 /// Refcounted handle to a Skeleton
 pub type SkeletonHandle = ResourceHandle<Skeleton>;
 /// Refcounted handle to an instance of GraphData with the type erased
@@ -218,6 +220,8 @@ pub type RawMaterialHandle = RawResourceHandle<MaterialTag>;
 pub type RawObjectHandle = RawResourceHandle<Object>;
 /// Internal non-owning handle to a DirectionalLight
 pub type RawDirectionalLightHandle = RawResourceHandle<DirectionalLight>;
+/// Internal non-owning handle to a PointLight
+pub type RawPointLightHandle = RawResourceHandle<PointLight>;
 /// Internal non-owning handle to a Skeleton
 pub type RawSkeletonHandle = RawResourceHandle<Skeleton>;
 /// Internal non-owning handle to an instance of GraphData with the type erased
@@ -1153,6 +1157,23 @@ changeable_struct! {
         pub direction: Vec3,
         /// Distance from the camera that shadows should be calculated.
         pub distance: f32,
+    }
+}
+
+changeable_struct! {
+    /// Describes how point lights and their shadows should be processed.
+    pub struct PointLight <- PointLightChange {
+        /// The position of the light in the world.
+        pub position: Vec3,
+
+        /// The color of the light.
+        pub color: Vec3,
+
+        /// The radius of the light.
+        pub radius: f32,
+
+        /// Constant multiplier for the light.
+        pub intensity: f32,
     }
 }
 
