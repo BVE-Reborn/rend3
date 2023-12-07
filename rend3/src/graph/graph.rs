@@ -343,14 +343,15 @@ impl<'node> RenderGraph<'node> {
             match *sub_resource {
                 GraphSubResource::Texture(region) => {
                     if let Entry::Vacant(vacant) = active_views.entry(region) {
-                        let view = active_textures[&region.idx].create_view(&TextureViewDescriptor {
+                        let texture = &active_textures[&region.idx];
+                        let view = texture.create_view(&TextureViewDescriptor {
                             base_array_layer: region.layer_start,
                             array_layer_count: Some(region.layer_end - region.layer_start),
                             base_mip_level: region.mip_start as u32,
                             mip_level_count: Some((region.mip_end - region.mip_start) as u32),
                             ..TextureViewDescriptor::default()
                         });
-                        vacant.insert(view);
+                        vacant.insert((view, Arc::clone(texture)));
                     }
                 }
                 GraphSubResource::ImportedTexture(region) => {
@@ -549,13 +550,13 @@ impl<'node> RenderGraph<'node> {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn create_rpass_from_desc<'rpass>(
+    fn create_rpass_from_desc<'rpass, A>(
         desc: &RenderPassTargets,
         encoder: &'rpass mut CommandEncoder,
         node_idx: usize,
         pass_end_idx: usize,
         resource_spans: &'rpass FastHashMap<GraphResource, ResourceSpan>,
-        active_views: &'rpass FastHashMap<TextureRegion, TextureView>,
+        active_views: &'rpass FastHashMap<TextureRegion, (TextureView, A)>,
         active_imported_views: &'rpass FastHashMap<TextureRegion, TextureView>,
     ) -> RenderPass<'rpass> {
         let color_attachments: Vec<_> = desc
@@ -577,14 +578,14 @@ impl<'node> RenderGraph<'node> {
                 RenderPassColorAttachment {
                     view: match target.color.handle.resource {
                         GraphSubResource::ImportedTexture(region) => &active_imported_views[&region],
-                        GraphSubResource::Texture(region) => &active_views[&region],
+                        GraphSubResource::Texture(region) => &active_views[&region].0,
                         _ => {
                             panic!("internal rendergraph error: using a non-texture as a renderpass attachment")
                         }
                     },
                     resolve_target: target.resolve.as_ref().map(|dep| match dep.handle.resource {
                         GraphSubResource::ImportedTexture(region) => &active_imported_views[&region],
-                        GraphSubResource::Texture(region) => &active_views[&region],
+                        GraphSubResource::Texture(region) => &active_views[&region].0,
                         _ => {
                             panic!("internal rendergraph error: using a non-texture as a renderpass attachment")
                         }
@@ -626,7 +627,7 @@ impl<'node> RenderGraph<'node> {
             RenderPassDepthStencilAttachment {
                 view: match resource {
                     GraphSubResource::ImportedTexture(region) => &active_imported_views[&region],
-                    GraphSubResource::Texture(region) => &active_views[&region],
+                    GraphSubResource::Texture(region) => &active_views[&region].0,
                     _ => {
                         panic!("internal rendergraph error: using a non-texture as a renderpass attachment")
                     }
