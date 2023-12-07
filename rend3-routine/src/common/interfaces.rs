@@ -1,7 +1,11 @@
 use std::{marker::PhantomData, mem, num::NonZeroU64};
 
 use glam::{Mat4, Vec3};
-use rend3::{managers::DirectionalLightManager, types::Material, util::bind_merge::BindGroupLayoutBuilder};
+use rend3::{
+    managers::{DirectionalLightManager, PointLightManager},
+    types::Material,
+    util::bind_merge::BindGroupLayoutBuilder,
+};
 use wgpu::{
     BindGroupLayout, BindingType, BufferBindingType, Device, ShaderStages, TextureSampleType, TextureViewDimension,
 };
@@ -39,6 +43,7 @@ impl WholeFrameInterfaces {
         );
 
         DirectionalLightManager::add_to_bgl(&mut uniform_bglb);
+        PointLightManager::add_to_bgl(&mut uniform_bglb);
 
         let shadow_uniform_bgl = uniform_bglb.build(device, Some("shadow uniform bgl"));
 

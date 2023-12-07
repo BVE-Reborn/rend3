@@ -17,6 +17,8 @@ var<uniform> uniforms: UniformData;
 @group(0) @binding(4)
 var<storage> directional_lights: DirectionalLightData;
 @group(0) @binding(5)
+var<storage> point_lights: PointLightData;
+@group(0) @binding(6)
 var shadows: texture_depth_2d;
 
 @group(1) @binding(0)
@@ -435,10 +437,7 @@ fn get_pixel_data(material: Material, vs_out: VertexOutput) -> PixelData {
 }
 {{/if}}
 
-fn surface_shading(light: DirectionalLight, pixel: PixelData, view_pos: vec3<f32>, occlusion: f32) -> vec3<f32> {
-    let view_mat3 = mat3x3<f32>(uniforms.view[0].xyz, uniforms.view[1].xyz, uniforms.view[2].xyz);
-    let l = normalize(view_mat3 * -light.direction);
-
+fn surface_shading(l: vec3<f32>, intensity: vec3<f32>, pixel: PixelData, view_pos: vec3<f32>, occlusion: f32) -> vec3<f32> {
     let n = pixel.normal;
     let h = normalize(view_pos + l);
 
@@ -465,7 +464,7 @@ fn surface_shading(light: DirectionalLight, pixel: PixelData, view_pos: vec3<f32
 
     let light_attenuation = 1.0;
 
-    return (color * light.color) * (light_attenuation * nol * occlusion);
+    return (color * intensity) * (light_attenuation * nol * occlusion);
 }
 
 @fragment
@@ -478,7 +477,11 @@ fn fs_main(vs_out: VertexOutput) -> @location(0) vec4<f32> {
         return pixel.albedo;
     }
 
+    // View vector
     let v = -normalize(vs_out.view_position.xyz);
+
+    // Transform vectors into view space
+    let view_mat3 = mat3x3<f32>(uniforms.view[0].xyz, uniforms.view[1].xyz, uniforms.view[2].xyz);
 
     var color = pixel.emissive.rgb;
     for (var i = 0; i < i32(directional_lights.count); i += 1) {
@@ -512,7 +515,33 @@ fn fs_main(vs_out: VertexOutput) -> @location(0) vec4<f32> {
             shadow_value = shadow_sample_pcf5(shadows, comparison_sampler, shadow_coords, shadow_ndc.z);
         }
 
-        color += surface_shading(light, pixel, v, shadow_value * pixel.ambient_occlusion);
+        // Calculate light source vector
+        let l = normalize(view_mat3 * -light.direction);
+
+        color += surface_shading(l, light.color, pixel, v, shadow_value * pixel.ambient_occlusion);
+    }
+
+    for (var i = 0; i < i32(point_lights.count); i += 1) {
+        let light = point_lights.data[i];
+
+        // Delta to light
+        let delta = (uniforms.view * light.position).xyz - vs_out.view_position.xyz;
+
+        // Distance
+        let d = length(delta);
+
+        // Attenuate from light and cusp at radius
+        // Derivative is 0 at both d = 0 and d = radius
+        // Source: https://lisyarus.github.io/blog/graphics/2022/07/30/point-light-attenuation.html
+        let s = saturate(d / light.radius);
+        let s2 = pow(s, 2.0);
+        let att = pow(1.0 - s2, 2.0) / (1.0 + s2);
+        let intensity = light.color * att;
+
+        // Calculate light source vector
+        let l = delta / d;
+
+        color += max(surface_shading(l, intensity, pixel, v, pixel.ambient_occlusion), vec3<f32>(0.0));
     }
 
     let ambient = uniforms.ambient * pixel.albedo;

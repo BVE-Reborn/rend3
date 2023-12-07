@@ -93,6 +93,7 @@ pub fn add_to_graph<'node>(
         bgb.append_buffer(&uniform_buffer);
 
         ctx.data_core.directional_light_manager.add_to_bg(&mut bgb);
+        ctx.data_core.point_light_manager.add_to_bg(&mut bgb);
 
         let shadow_uniform_bg = bgb.build(
             &ctx.renderer.device,
