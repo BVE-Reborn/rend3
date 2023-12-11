@@ -6,9 +6,13 @@ use rend3_types::{
     MeshHandle, RawSkeletonHandle, Skeleton, SkeletonHandle, VertexAttributeId, VERTEX_ATTRIBUTE_JOINT_INDICES,
     VERTEX_ATTRIBUTE_JOINT_WEIGHTS, VERTEX_ATTRIBUTE_NORMAL, VERTEX_ATTRIBUTE_POSITION, VERTEX_ATTRIBUTE_TANGENT,
 };
+use thiserror::Error;
 use wgpu::{CommandEncoder, Device};
 
-use crate::{managers::MeshManager, util::iter::ExactSizerIterator};
+use crate::{
+    managers::{MeshCreationError, MeshManager},
+    util::iter::ExactSizerIterator,
+};
 
 /// Internal representation of a Skeleton
 #[derive(Debug)]
@@ -26,6 +30,24 @@ pub struct InternalSkeleton {
     pub overridden_attribute_ranges: ArrayVec<(VertexAttributeId, Range<u64>), 3>,
     /// Amount of vertices in the pointed to mesh
     pub vertex_count: u32,
+}
+
+#[derive(Debug, Error)]
+pub enum SkeletonCreationError {
+    #[error("Failed to create needed resources in the mesh manager")]
+    MeshFailure(#[from] MeshCreationError),
+    #[error("Mesh must have joint indices to be used in a skeleton")]
+    MissingAttributesJointIndices,
+    #[error("Mesh must have joint weights to be used in a skeleton")]
+    MissingAttributesJointWeights,
+    #[error(
+        "Not enough joints to create this skeleton. The mesh has {mesh_joint_count} joints, \
+         but only {joint_matrix_count} joint matrices were provided."
+    )]
+    NotEnoughJoints {
+        mesh_joint_count: u16,
+        joint_matrix_count: usize,
+    },
 }
 
 /// Manages skeletons.
@@ -49,36 +71,31 @@ impl SkeletonManager {
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
-    pub fn add(
-        &mut self,
+    pub fn validate_skeleton(
         device: &Device,
         encoder: &mut CommandEncoder,
         mesh_manager: &MeshManager,
-        handle: &SkeletonHandle,
         skeleton: Skeleton,
-    ) {
+    ) -> Result<InternalSkeleton, SkeletonCreationError> {
         let internal_mesh = &mesh_manager.lock_internal_data()[skeleton.mesh.get_raw()];
         let required_joint_count = internal_mesh
             .required_joint_count
-            .expect("Mesh must have joint weights and joint indices to be used in a skeleton");
+            .ok_or(SkeletonCreationError::MissingAttributesJointIndices)?;
 
         let joint_weight_range = internal_mesh
             .get_attribute(&VERTEX_ATTRIBUTE_JOINT_WEIGHTS)
-            .expect("Mesh must have joint weights and joint indices to be used in a skeleton");
+            .ok_or(SkeletonCreationError::MissingAttributesJointWeights)?;
         let joint_indices_range = internal_mesh
             .get_attribute(&VERTEX_ATTRIBUTE_JOINT_INDICES)
-            .expect("Mesh must have joint weights and joint indices to be used in a skeleton");
+            .ok_or(SkeletonCreationError::MissingAttributesJointIndices)?;
 
-        assert!(
-            required_joint_count as usize <= skeleton.joint_matrices.len(),
-            "Not enough joints to create this skeleton. The mesh has {} joints, \
-             but only {} joint matrices were provided.",
-            required_joint_count,
-            skeleton.joint_matrices.len(),
-        );
-
-        self.global_joint_count += required_joint_count as usize;
+        // Converts the following assert to an error
+        if required_joint_count as usize > skeleton.joint_matrices.len() {
+            return Err(SkeletonCreationError::NotEnoughJoints {
+                mesh_joint_count: required_joint_count,
+                joint_matrix_count: skeleton.joint_matrices.len(),
+            });
+        }
 
         let overridden_attributes = [
             &VERTEX_ATTRIBUTE_POSITION,
@@ -105,7 +122,7 @@ impl SkeletonManager {
         // We skip the first two as those are always the joint* attributes.
         for (attribute_id, original_range) in &source_attribute_ranges[2..] {
             let skeleton_range =
-                mesh_manager.allocate_range(device, encoder, original_range.end - original_range.start);
+                mesh_manager.allocate_range(device, encoder, original_range.end - original_range.start)?;
             overridden_attribute_ranges.push((*attribute_id, skeleton_range));
         }
 
@@ -113,13 +130,18 @@ impl SkeletonManager {
         let mut joint_matrices = skeleton.joint_matrices;
         joint_matrices.truncate(required_joint_count as _);
 
-        let internal = InternalSkeleton {
+        Ok(InternalSkeleton {
             joint_matrices,
             mesh_handle: skeleton.mesh,
             source_attribute_ranges,
             overridden_attribute_ranges,
             vertex_count: internal_mesh.vertex_count,
-        };
+        })
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn add(&mut self, handle: &SkeletonHandle, internal: InternalSkeleton) {
+        self.global_joint_count += internal.joint_matrices.len();
 
         if handle.idx >= self.data.len() {
             self.data.resize_with(handle.idx + 1, || None);

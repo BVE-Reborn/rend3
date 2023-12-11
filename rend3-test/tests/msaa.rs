@@ -29,7 +29,7 @@ pub async fn triangle() -> anyhow::Result<()> {
     .build()
     .context("Failed to create mesh")?;
 
-    let mesh_hdl = runner.add_mesh(mesh);
+    let mesh_hdl = runner.add_mesh(mesh).unwrap();
     let material_hdl = runner.add_unlit_material(Vec4::new(0.25, 0.5, 0.75, 1.0));
     let object = Object {
         mesh_kind: ObjectMeshKind::Static(mesh_hdl),

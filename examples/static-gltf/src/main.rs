@@ -36,7 +36,7 @@ fn load_gltf(
         .unwrap();
 
     // Add mesh to renderer's world
-    let mesh_handle = renderer.add_mesh(mesh);
+    let mesh_handle = renderer.add_mesh(mesh).unwrap();
 
     // Add basic material with all defaults except a single color.
     let material = primitive.material();

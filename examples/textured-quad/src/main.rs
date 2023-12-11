@@ -62,7 +62,7 @@ impl rend3_framework::App for TexturedQuadExample {
         //
         // All handles are refcounted, so we only need to hang onto the handle until we
         // make an object.
-        let mesh_handle = renderer.add_mesh(mesh);
+        let mesh_handle = renderer.add_mesh(mesh).unwrap();
 
         // Add texture to renderer's world.
         let image_checker =
@@ -76,7 +76,7 @@ impl rend3_framework::App for TexturedQuadExample {
             mip_count: rend3::types::MipmapCount::ONE,
             mip_source: rend3::types::MipmapSource::Uploaded,
         };
-        let texture_checker_handle = renderer.add_texture_2d(texture_checker);
+        let texture_checker_handle = renderer.add_texture_2d(texture_checker).unwrap();
 
         // Add PBR material with all defaults except a single color.
         let material = rend3_routine::pbr::PbrMaterial {

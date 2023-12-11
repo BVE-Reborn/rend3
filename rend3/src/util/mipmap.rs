@@ -3,6 +3,7 @@
 use arrayvec::ArrayVec;
 use parking_lot::RwLock;
 use rend3_types::TextureFormat;
+use thiserror::Error;
 use wgpu::{
     AddressMode, BindGroup, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, Color,
     ColorTargetState, ColorWrites, CommandEncoder, Device, FilterMode, FragmentState, FrontFace, LoadOp,
@@ -14,8 +15,20 @@ use wgpu::{
 
 use crate::{
     format_sso,
-    util::{bind_merge::BindGroupBuilder, typedefs::FastHashMap},
+    util::{bind_merge::BindGroupBuilder, error_scope::AllocationErrorScope, typedefs::FastHashMap},
 };
+
+#[derive(Debug, Error)]
+pub enum MipmapGenerationError {
+    #[error("Failed to create texture view for mipmap level {mip_level}")]
+    TextureViewCreationFailed {
+        mip_level: u32,
+        #[source]
+        source: wgpu::Error,
+    },
+    #[error("Failed to create bind group")]
+    BindGroupCreationFailed(#[source] wgpu::Error),
+}
 
 /// Generator for mipmaps.
 pub struct MipmapGenerator {
@@ -143,18 +156,25 @@ impl MipmapGenerator {
         encoder: &mut CommandEncoder,
         texture: &Texture,
         desc: &TextureDescriptor,
-    ) {
+    ) -> Result<(), MipmapGenerationError> {
         profiling::scope!("generating mipmaps");
-        let mips: ArrayVec<_, 14> = (0..desc.size.max_mips(desc.dimension))
+        let mips: Result<ArrayVec<_, 14>, _> = (0..desc.size.max_mips(desc.dimension))
             .map(|mip_level| {
-                texture.create_view(&TextureViewDescriptor {
+                let scope = AllocationErrorScope::new(device);
+                let view = texture.create_view(&TextureViewDescriptor {
                     label: None,
                     base_mip_level: mip_level,
                     mip_level_count: Some(1),
                     ..Default::default()
-                })
+                });
+                scope
+                    .end()
+                    .map_err(|source| MipmapGenerationError::TextureViewCreationFailed { mip_level, source })?;
+
+                Ok(view)
             })
             .collect();
+        let mips = mips?;
 
         let mut read_pipelines = self.pipelines.read();
         let pipeline = match read_pipelines.get(&desc.format) {
@@ -182,11 +202,13 @@ impl MipmapGenerator {
             profiling::scope!("mip level generation");
             // profiler.lock().begin_scope(&dst_label, encoder, device);
 
+            let scope = AllocationErrorScope::new(device);
             let bg = BindGroupBuilder::new().append_texture_view(src_view).build(
                 device,
                 Some(&src_label),
                 &self.texture_bgl,
             );
+            scope.end().map_err(MipmapGenerationError::BindGroupCreationFailed)?;
 
             let mut rpass = encoder.begin_render_pass(&RenderPassDescriptor {
                 label: None,
@@ -212,5 +234,7 @@ impl MipmapGenerator {
 
             // profiler.lock().end_scope(encoder);
         }
+
+        Ok(())
     }
 }
