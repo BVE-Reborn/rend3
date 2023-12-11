@@ -50,7 +50,6 @@ integration crates
 There are extension crates that are not required, but provide pre-made bits
 of useful code that I would recommend using.
 
-- `rend3-anim`: Skeletal animation playback utilities. Currently tied to rend3-gltf.
 - `rend3-framework`: Vastly simplifies correct handling of the window and
   surface across platforms.
 - `rend3-gltf`: Modular gltf file and scene loader.
@@ -61,54 +60,9 @@ Integration with other external libraries are also offered. Due to external
 dependencies, the versions of these may increase at a much higher rate than
 the rest of the ecosystem.
 
+- `rend3-anim`: Skeletal animation playback utilities. Currently tied to rend3-gltf.
 - `rend3-egui`: Integration with the [egui](https://github.com/emilk/egui)
   immediate mode gui.
-- `rend3-imgui`: Integration with the [imgui](https://github.com/ocornut/imgui)
-  immediate mode gui.
-
-## Features and Platform Support
-
-rend3 supports two different rendering profiles one for speed and one for
-compatibility.
-
-#### Profile Features
-
-The modern profile not only offloads a lot more work to the gpu, it can do more
-aggressive performance optimizations including only drawing exactly the triangles that are needed
-
-| Profile   | Texture Access | Object Culling | Triangle Culling | Draw Calls          |
-|:----------|----------------|----------------|------------------|---------------------|
-| GpuDriven | Bindless       | On GPU         | On GPU           | Merged Indirect     |
-| CpuDriven | Bound          | On CPU         | ❌                | Instanced Direct    |
-
-#### Profile Support
-
-The following table shows support of various profiles on various apis/platforms. This will
-hopefully help you judge what your target demographic supports.
-
-| OS                   | API    | GPU                                        | GpuDriven | CpuDriven |
-|----------------------|--------|--------------------------------------------|:---------:|:---------:|
-| Windows 7+           | Vulkan | AMD / NVIDIA                               | ✅    | —       |
-|                      | Vulkan | Intel 6XXX+                                | ❌      | ✅     |
-|                      | Dx11   | Intel 2XXX+                                | ❌      | 🚧     |
-| Windows 10+          | Dx12   | Intel 6XXX+ / AMD GCN 2+ / NVIDIA 6XX+     | 🚧    | ✅     |
-| MacOS 10.13+ iOS 11+ | Metal  | Intel / Apple A13+ / M1+                   | ✅    | —       |
-|                      |        | Apple A9+                                  | ❌      | ✅     |
-| Linux                | Vulkan | Intel 6XXX+ / AMD GCN 2+  / NVIDIA 6XX+    | ✅    | —       |
-|                      |        | Intel 4XXX+                                | ❌      | ✅     |
-| Android              | Vulkan | All                                        | ❌      | ✅     |
-
-Footnotes:
-- ✅ Supported
-- 🚧 In Progress
-- ❌ Unsupported
-- — Modern Profile Used
-- Intel 6XXX = Skylake
-- Intel 4XXX = Haswell
-- Intel 2XXX = Sandy Bridge
-- AMD GCN 2 = Rx 200+, RX 5000+
-- Apple A9 = iPhone 6S, iPad 5th Gen
-- Apple A13 = iPhone 11, iPad 9th Gen
 
 ## Purpose
 
@@ -122,7 +76,7 @@ Footnotes:
     advanced game or simulation nor care how you structure your program.
     If you want a very basic framework to deal with windowing and event loop management,
     `rend3-framework` can help you. This will always be optional and is just there to help
-    with the limited set of cases it canhelp
+    with the limited set of cases it can help.
 
 ## Future Plans
 
