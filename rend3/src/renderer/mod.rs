@@ -13,8 +13,8 @@ use crate::{
     graph::{GraphTextureStore, InstructionEvaluationOutput},
     instruction::{InstructionKind, InstructionStreamPair},
     managers::{
-        CameraManager, DirectionalLightManager, GraphStorage, HandleAllocator, MaterialManager, MeshManager,
-        ObjectManager, SkeletonManager, TextureManager,
+        CameraManager, DirectionalLightManager, GraphStorage, HandleAllocator, MaterialManager, MeshCreationError,
+        MeshManager, ObjectManager, SkeletonCreationError, SkeletonManager, TextureCreationError, TextureManager,
     },
     types::{
         Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, MaterialHandle, Mesh, MeshHandle,
@@ -139,13 +139,11 @@ impl Renderer {
     /// The handle will keep the mesh alive. All objects created will also keep
     /// the mesh alive.
     #[track_caller]
-    pub fn add_mesh(self: &Arc<Self>, mesh: Mesh) -> MeshHandle {
+    pub fn add_mesh(self: &Arc<Self>, mesh: Mesh) -> Result<MeshHandle, MeshCreationError> {
         let handle = self.resource_handle_allocators.mesh.allocate(self);
 
-        // todo: move out of data core
-
         let mut encoder = self.device.create_command_encoder(&CommandEncoderDescriptor::default());
-        let internal_mesh = self.mesh_manager.add(&self.device, &self.queue, &mut encoder, mesh);
+        let internal_mesh = self.mesh_manager.add(&self.device, &self.queue, &mut encoder, mesh)?;
 
         self.instructions.push(
             InstructionKind::AddMesh {
@@ -156,7 +154,7 @@ impl Renderer {
             *Location::caller(),
         );
 
-        handle
+        Ok(handle)
     }
 
     /// Adds a skeleton into the renderer. This combines a [`Mesh`] with a set
@@ -166,16 +164,21 @@ impl Renderer {
     /// keep the skeleton alive. The skeleton will also keep the mesh it
     /// references alive.
     #[track_caller]
-    pub fn add_skeleton(self: &Arc<Self>, skeleton: Skeleton) -> SkeletonHandle {
+    pub fn add_skeleton(self: &Arc<Self>, skeleton: Skeleton) -> Result<SkeletonHandle, SkeletonCreationError> {
         let handle = self.resource_handle_allocators.skeleton.allocate(self);
+
+        let mut encoder = self.device.create_command_encoder(&CommandEncoderDescriptor::default());
+        let internal = SkeletonManager::validate_skeleton(&self.device, &mut encoder, &self.mesh_manager, skeleton)?;
+
         self.instructions.push(
             InstructionKind::AddSkeleton {
                 handle: handle.clone(),
-                skeleton,
+                skeleton: Box::new(internal),
             },
             *Location::caller(),
         );
-        handle
+
+        Ok(handle)
     }
 
     /// Add a 2D texture to the renderer. This can be used in a [`Material`].
@@ -183,11 +186,11 @@ impl Renderer {
     /// The handle will keep the texture alive. All materials created with this
     /// texture will also keep the texture alive.
     #[track_caller]
-    pub fn add_texture_2d(self: &Arc<Self>, texture: Texture) -> Texture2DHandle {
+    pub fn add_texture_2d(self: &Arc<Self>, texture: Texture) -> Result<Texture2DHandle, TextureCreationError> {
         profiling::scope!("Add Texture 2D");
 
         let handle = self.resource_handle_allocators.d2_texture.allocate(self);
-        let (cmd_buf, internal_texture) = TextureManager::<Texture2DTag>::add(self, texture, false);
+        let (cmd_buf, internal_texture) = TextureManager::<Texture2DTag>::add(self, texture, false)?;
 
         self.instructions.push(
             InstructionKind::AddTexture2D {
@@ -197,7 +200,8 @@ impl Renderer {
             },
             *Location::caller(),
         );
-        handle
+
+        Ok(handle)
     }
 
     /// Add a 2D texture to the renderer by copying a set of mipmaps from an
@@ -227,11 +231,11 @@ impl Renderer {
     ///
     /// The handle will keep the texture alive.
     #[track_caller]
-    pub fn add_texture_cube(self: &Arc<Self>, texture: Texture) -> TextureCubeHandle {
+    pub fn add_texture_cube(self: &Arc<Self>, texture: Texture) -> Result<TextureCubeHandle, TextureCreationError> {
         profiling::scope!("Add Texture Cube");
 
         let handle = self.resource_handle_allocators.d2c_texture.allocate(self);
-        let (cmd_buf, internal_texture) = TextureManager::<TextureCubeTag>::add(self, texture, true);
+        let (cmd_buf, internal_texture) = TextureManager::<TextureCubeTag>::add(self, texture, true)?;
 
         self.instructions.push(
             InstructionKind::AddTextureCube {
@@ -241,7 +245,8 @@ impl Renderer {
             },
             *Location::caller(),
         );
-        handle
+
+        Ok(handle)
     }
 
     /// Adds a material to the renderer. This can be used in an [`Object`].

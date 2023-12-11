@@ -243,6 +243,12 @@ pub enum GltfLoadError<E: std::error::Error + 'static> {
     MissingKeyframeTimes(usize, usize),
     #[error("Animation {0} channel {1} does not have keyframe values.")]
     MissingKeyframeValues(usize, usize),
+    #[error("Failed to create a mesh")]
+    MeshCreation(#[from] rend3::managers::MeshCreationError),
+    #[error("Failed to create a skeleton")]
+    SkeletonCreation(#[from] rend3::managers::SkeletonCreationError),
+    #[error("Failed to create a texture")]
+    TextureCreation(#[from] rend3::managers::TextureCreationError),
 }
 
 /// Tries to decode data as base64, failing if the prefix doesn't match.
@@ -459,7 +465,7 @@ pub fn add_mesh_by_index<E: std::error::Error + 'static>(
                 // joint matrix is inv_bind_pose * bind_pose, thus the identity matrix.
                 joint_matrices: vec![Mat4::IDENTITY; skin.inner.inverse_bind_matrices.len()],
                 mesh: prim.handle.clone(),
-            });
+            })?;
             skeletons.push(skeleton.clone());
             ObjectMeshKind::Animated(skeleton)
         } else {
@@ -708,7 +714,7 @@ pub fn load_meshes<'a, E: std::error::Error + 'static>(
                     .build()
                     .map_err(|valid| GltfLoadError::MeshValidationError(mesh.index(), valid))?;
 
-                let handle = renderer.add_mesh(mesh);
+                let handle = renderer.add_mesh(mesh)?;
 
                 res_prims.push(MeshPrimitive {
                     handle,
@@ -1224,7 +1230,7 @@ where
 
     let texture = texture.unwrap();
     let format = texture.format;
-    let handle = renderer.add_texture_2d(texture);
+    let handle = renderer.add_texture_2d(texture)?;
 
     Ok(Labeled::new(Texture { handle, format }, image.name()))
 }

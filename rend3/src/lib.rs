@@ -174,6 +174,7 @@ pub mod types {
 pub mod util {
     pub mod bind_merge;
     pub mod buffer;
+    pub mod error_scope;
     pub mod frustum;
     pub mod freelist {
         mod buffer;

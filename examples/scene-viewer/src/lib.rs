@@ -55,7 +55,7 @@ async fn load_skybox(
         label: Some("background".into()),
         mip_count: rend3::types::MipmapCount::ONE,
         mip_source: rend3::types::MipmapSource::Uploaded,
-    });
+    })?;
     lock(skybox_routine).set_background_texture(Some(handle));
     Ok(())
 }

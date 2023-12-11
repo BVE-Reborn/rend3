@@ -1,6 +1,7 @@
 use std::{marker::PhantomData, num::NonZeroU32, sync::Arc};
 
 use rend3_types::{MipmapCount, MipmapSource, RawResourceHandle, TextureFormat, TextureFromTexture, TextureUsages};
+use thiserror::Error;
 use wgpu::{
     util::DeviceExt, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor,
     BindGroupLayoutEntry, BindingResource, BindingType, CommandBuffer, CommandEncoder, CommandEncoderDescriptor,
@@ -8,7 +9,11 @@ use wgpu::{
     TextureDescriptor, TextureDimension, TextureSampleType, TextureView, TextureViewDescriptor, TextureViewDimension,
 };
 
-use crate::{profile::ProfileData, util::math::round_up, Renderer, RendererProfile};
+use crate::{
+    profile::ProfileData,
+    util::{error_scope::AllocationErrorScope, math::round_up, mipmap::MipmapGenerationError},
+    Renderer, RendererProfile,
+};
 
 /// When using the GpuDriven profile, we start the 2D texture manager with a bind group with
 /// this many textures.
@@ -24,6 +29,28 @@ pub struct InternalTexture {
     pub texture: Texture,
     pub view: TextureView,
     pub desc: TextureDescriptor<'static>,
+}
+
+#[derive(Debug, Error)]
+pub enum TextureCreationError {
+    #[error("Failed to allocate texture")]
+    TextureAllocationFailed(#[source] wgpu::Error),
+    #[error("Failed to write to texture")]
+    WriteTextureFailed(#[source] wgpu::Error),
+    #[error("Failed to create texture view")]
+    TextureViewCreationFailed(#[source] wgpu::Error),
+    #[error("Textures formats must allow filtering with a linear filter. {format:?} has sample type {sample_type:?} which does not.")]
+    TextureFormatNotFilterable {
+        format: TextureFormat,
+        sample_type: TextureSampleType,
+    },
+    #[error("Textures formats must be sample-able as floating point. {format:?} has sample type {sample_type:?}.")]
+    TextureFormatNotFloat {
+        format: TextureFormat,
+        sample_type: Option<TextureSampleType>,
+    },
+    #[error("Mipmap creation failed")]
+    MipmapCreationFailed(#[from] MipmapGenerationError),
 }
 
 /// Preallocation count of texture view array
@@ -77,8 +104,8 @@ impl<T: 'static> TextureManager<T> {
         renderer: &Renderer,
         texture: crate::types::Texture,
         cube: bool,
-    ) -> (Option<CommandBuffer>, InternalTexture) {
-        validate_texture_format(texture.format);
+    ) -> Result<(Option<CommandBuffer>, InternalTexture), TextureCreationError> {
+        validate_texture_format(texture.format)?;
 
         let (block_x, block_y) = texture.format.block_dimensions();
         let size = Extent3d {
@@ -110,12 +137,14 @@ impl<T: 'static> TextureManager<T> {
         };
 
         let (buffer, tex) = match texture.mip_source {
-            MipmapSource::Uploaded => (
-                None,
-                renderer
+            MipmapSource::Uploaded => {
+                let scope = AllocationErrorScope::new(&renderer.device);
+                let texture = renderer
                     .device
-                    .create_texture_with_data(&renderer.queue, &desc, &texture.data),
-            ),
+                    .create_texture_with_data(&renderer.queue, &desc, &texture.data);
+                scope.end().map_err(TextureCreationError::TextureAllocationFailed)?;
+                (None, texture)
+            }
             MipmapSource::Generated => {
                 assert!(!cube, "Cannot generate mipmaps from cubemaps currently");
 
@@ -123,11 +152,14 @@ impl<T: 'static> TextureManager<T> {
                     usage: desc.usage | TextureUsages::RENDER_ATTACHMENT,
                     ..desc
                 };
+                let scope = AllocationErrorScope::new(&renderer.device);
                 let tex = renderer.device.create_texture(&desc);
+                scope.end().map_err(TextureCreationError::TextureAllocationFailed)?;
 
                 let (block_width, _) = texture.format.block_dimensions();
                 let block_size = texture.format.block_size(None).unwrap();
 
+                let scope = AllocationErrorScope::new(&renderer.device);
                 // write first level
                 renderer.queue.write_texture(
                     ImageCopyTexture {
@@ -144,6 +176,7 @@ impl<T: 'static> TextureManager<T> {
                     },
                     size,
                 );
+                scope.end().map_err(TextureCreationError::WriteTextureFailed)?;
 
                 let mut encoder = renderer
                     .device
@@ -152,12 +185,13 @@ impl<T: 'static> TextureManager<T> {
                 // generate mipmaps
                 renderer
                     .mipmap_generator
-                    .generate_mipmaps(&renderer.device, &mut encoder, &tex, &desc);
+                    .generate_mipmaps(&renderer.device, &mut encoder, &tex, &desc)?;
 
                 (Some(encoder.finish()), tex)
             }
         };
 
+        let scope = AllocationErrorScope::new(&renderer.device);
         let view = tex.create_view(&TextureViewDescriptor {
             dimension: match cube {
                 true => Some(TextureViewDimension::Cube),
@@ -165,15 +199,16 @@ impl<T: 'static> TextureManager<T> {
             },
             ..Default::default()
         });
+        scope.end().map_err(TextureCreationError::TextureViewCreationFailed)?;
 
-        (
+        Ok((
             buffer,
             InternalTexture {
                 texture: tex,
                 view,
                 desc,
             },
-        )
+        ))
     }
 
     pub fn fill_from_texture(
@@ -377,19 +412,14 @@ fn create_null_tex_view(device: &Device, dimension: TextureViewDimension) -> Tex
         })
 }
 
-fn validate_texture_format(format: TextureFormat) {
+fn validate_texture_format(format: TextureFormat) -> Result<(), TextureCreationError> {
     let sample_type = format.sample_type(None);
-    if let Some(TextureSampleType::Float { filterable }) = sample_type {
-        if !filterable {
-            panic!(
-                "Textures formats must allow filtering with a linear filter. {:?} has sample type {:?} which does not.",
-                format, sample_type
-            )
-        }
-    } else {
-        panic!(
-            "Textures formats must be sample-able as floating point. {:?} has sample type {:?}.",
-            format, sample_type
-        )
+    match sample_type {
+        Some(TextureSampleType::Float { filterable: true }) => Ok(()),
+        Some(TextureSampleType::Float { filterable: false }) => Err(TextureCreationError::TextureFormatNotFilterable {
+            format,
+            sample_type: sample_type.unwrap(),
+        }),
+        _ => Err(TextureCreationError::TextureFormatNotFloat { format, sample_type }),
     }
 }
