@@ -5,13 +5,13 @@ use parking_lot::Mutex;
 use rend3_types::{
     trait_supertrait_alias, MaterialHandle, MeshHandle, ObjectChange, ObjectHandle, PointLight, PointLightChange,
     PointLightHandle, RawDirectionalLightHandle, RawGraphDataHandleUntyped, RawMaterialHandle, RawMeshHandle,
-    RawPointLightHandle, RawSkeletonHandle, RawTexture2DHandle, RawTextureCubeHandle, Skeleton, SkeletonHandle,
-    Texture2DHandle, TextureCubeHandle, TextureFromTexture, WasmNotSend, WasmNotSync,
+    RawPointLightHandle, RawSkeletonHandle, RawTexture2DHandle, RawTextureCubeHandle, SkeletonHandle, Texture2DHandle,
+    TextureCubeHandle, TextureFromTexture, WasmNotSend, WasmNotSync,
 };
 use wgpu::{CommandBuffer, Device};
 
 use crate::{
-    managers::{GraphStorage, InternalMesh, InternalTexture, MaterialManager, TextureManager},
+    managers::{GraphStorage, InternalMesh, InternalSkeleton, InternalTexture, MaterialManager, TextureManager},
     types::{Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Object, RawObjectHandle},
     RendererProfile,
 };
@@ -34,7 +34,8 @@ pub enum InstructionKind {
     },
     AddSkeleton {
         handle: SkeletonHandle,
-        skeleton: Skeleton,
+        // Boxed for size
+        skeleton: Box<InternalSkeleton>,
     },
     AddTexture2D {
         handle: Texture2DHandle,

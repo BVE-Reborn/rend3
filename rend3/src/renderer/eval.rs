@@ -43,13 +43,7 @@ pub fn evaluate_instructions(renderer: &Renderer) -> InstructionEvaluationOutput
                         .try_lock()
                         .unwrap()
                         .begin_scope("Add Skeleton", &mut encoder, &renderer.device);
-                    data_core.skeleton_manager.add(
-                        &renderer.device,
-                        &mut encoder,
-                        &renderer.mesh_manager,
-                        &handle,
-                        skeleton,
-                    );
+                    data_core.skeleton_manager.add(&handle, *skeleton);
                     let _ = data_core.profiler.try_lock().unwrap().end_scope(&mut encoder);
                 }
                 InstructionKind::AddTexture2D {

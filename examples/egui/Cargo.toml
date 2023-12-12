@@ -22,8 +22,6 @@ env_logger = { version = "0.10", default-features = false, features = ["auto-col
 glam = "0.24"
 # Importing png's
 image = { version = "0.24.3", default-features = false, features = ["png"] }
-# Portable implementation of Instant.
-instant = { version = "0.1", features = ["wasm-bindgen"] }
 # Renderer core
 rend3 = { version = "^0.3.0",path = "../../rend3" }
 # Egui renderer integration

@@ -67,7 +67,7 @@ impl TestRunner {
         .unwrap();
 
         self.add_object(rend3::types::Object {
-            mesh_kind: rend3::types::ObjectMeshKind::Static(self.add_mesh(mesh)),
+            mesh_kind: rend3::types::ObjectMeshKind::Static(self.add_mesh(mesh).unwrap()),
             material,
             transform,
         })
@@ -123,7 +123,7 @@ impl TestRunner {
             .unwrap();
 
         self.add_object(rend3::types::Object {
-            mesh_kind: rend3::types::ObjectMeshKind::Static(self.add_mesh(mesh)),
+            mesh_kind: rend3::types::ObjectMeshKind::Static(self.add_mesh(mesh).unwrap()),
             material,
             transform,
         })

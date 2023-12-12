@@ -47,7 +47,6 @@ image = { version = "0.24", default-features = false, features = [
     "tiff",
 ] }
 indoc = "2"
-instant = { version = "0.1", features = ["wasm-bindgen"] }
 log = "0.4"
 pico-args = "0.5"
 pollster = "0.3"
@@ -62,6 +61,7 @@ rend3-routine = { version = "^0.3.0", path = "../../rend3-routine" }
 rustc-hash = "1"
 smallvec = "1"
 tracy-client = { version = "0.16", optional = true }
+web-time = "0.2"
 wgpu = "0.18.0"
 wgpu-profiler = "0.15.0"
 winit = "0.28"

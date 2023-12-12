@@ -1,7 +1,6 @@
 use std::{collections::HashMap, future::Future, hash::BuildHasher, path::Path, sync::Arc, time::Duration};
 
 use glam::{DVec2, Mat3A, Mat4, UVec2, Vec3, Vec3A};
-use instant::Instant;
 use pico_args::Arguments;
 use rend3::{
     types::{
@@ -14,6 +13,7 @@ use rend3::{
 use rend3_framework::{lock, AssetPath, Mutex};
 use rend3_gltf::GltfSceneInstance;
 use rend3_routine::{base::BaseRenderGraph, pbr::NormalTextureYDirection, skybox::SkyboxRoutine};
+use web_time::Instant;
 use wgpu_profiler::GpuTimerScopeResult;
 use winit::{
     event::{DeviceEvent, ElementState, Event, KeyboardInput, MouseButton, WindowEvent},
@@ -55,7 +55,7 @@ async fn load_skybox(
         label: Some("background".into()),
         mip_count: rend3::types::MipmapCount::ONE,
         mip_source: rend3::types::MipmapSource::Uploaded,
-    });
+    })?;
     lock(skybox_routine).set_background_texture(Some(handle));
     Ok(())
 }

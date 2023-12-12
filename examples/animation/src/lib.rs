@@ -11,7 +11,7 @@ struct AnimatedObject {
     loaded_instance: rend3_gltf::GltfSceneInstance,
     animation_data: rend3_anim::AnimationData,
     animation_time: f32,
-    last_frame_time: instant::Instant,
+    last_frame_time: web_time::Instant,
 }
 
 #[derive(Default)]
@@ -91,7 +91,7 @@ impl rend3_framework::App for AnimationExample {
             loaded_scene,
             loaded_instance,
             animation_time: 0.0,
-            last_frame_time: instant::Instant::now(),
+            last_frame_time: web_time::Instant::now(),
         };
 
         let path = Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/resources/cube_3.gltf"));
@@ -110,7 +110,7 @@ impl rend3_framework::App for AnimationExample {
             loaded_scene,
             loaded_instance,
             animation_time: 0.0,
-            last_frame_time: instant::Instant::now(),
+            last_frame_time: web_time::Instant::now(),
         };
 
         self.animated_objects = vec![animated_object, animated_object2];
@@ -136,7 +136,7 @@ impl rend3_framework::App for AnimationExample {
                 control_flow(winit::event_loop::ControlFlow::Exit);
             }
             rend3_framework::Event::MainEventsCleared => {
-                let now = instant::Instant::now();
+                let now = web_time::Instant::now();
 
                 self.animated_objects.iter_mut().for_each(|animated_object| {
                     let delta = now.duration_since(animated_object.last_frame_time).as_secs_f32();

@@ -19,8 +19,6 @@ path = "src/main.rs"
 env_logger = { version = "0.10", default-features = false, features = ["auto-color", "humantime"] }
 # Linear algebra library
 glam = "0.24"
-# std::time::Instant that works on wasm
-instant = "0.1"
 # block on async functions
 pollster = "0.3"
 # Renderer core
@@ -33,6 +31,8 @@ rend3-framework = { version = "^0.3.0", path = "../../rend3-framework" }
 rend3-anim = { version = "^0.3.0", path = "../../rend3-anim" }
 # Import gltf models
 rend3-gltf = { version = "^0.3.0", path = "../../rend3-gltf" }
+# std::time::Instant that works on wasm
+web-time = "0.2"
 # windowing
 winit = "0.28"
 image = { version = "0.24", default-features = false, features = ["jpeg"] }
