@@ -127,7 +127,13 @@ impl rend3_framework::App for CubeExample {
             resolution: 2048,
         }));
 
-        let mut add_point_light = |position, color| {
+        let lights = [
+            // position, color
+            (glam::vec3(0.1, 1.2, -1.5), glam::vec3(1.0, 0.0, 0.0)),
+            (glam::vec3(1.5, 1.2, -0.1), glam::vec3(0.0, 1.0, 0.0)),
+        ];
+
+        for (position, color) in lights {
             self.point_lights
                 .push(renderer.add_point_light(rend3::types::PointLight {
                     position,
@@ -135,10 +141,7 @@ impl rend3_framework::App for CubeExample {
                     radius: 2.0,
                     intensity: 4.0,
                 }));
-        };
-
-        add_point_light(glam::vec3(0.1, 1.2, -1.5), glam::vec3(1.0, 0.0, 0.0));
-        add_point_light(glam::vec3(1.5, 1.2, -0.1), glam::vec3(0.0, 1.0, 0.0));
+        }
     }
 
     fn handle_event(
