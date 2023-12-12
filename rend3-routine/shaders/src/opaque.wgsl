@@ -437,14 +437,14 @@ fn get_pixel_data(material: Material, vs_out: VertexOutput) -> PixelData {
 }
 {{/if}}
 
-fn surface_shading(l: vec3<f32>, intensity: vec3<f32>, pixel: PixelData, view_pos: vec3<f32>, occlusion: f32) -> vec3<f32> {
+fn surface_shading(light_dir: vec3<f32>, intensity: vec3<f32>, pixel: PixelData, view_pos: vec3<f32>, occlusion: f32) -> vec3<f32> {
     let n = pixel.normal;
-    let h = normalize(view_pos + l);
+    let h = normalize(view_pos + light_dir);
 
     let nov = abs(dot(n, view_pos)) + 0.00001;
-    let nol = saturate(dot(n, l));
+    let nol = saturate(dot(n, light_dir));
     let noh = saturate(dot(n, h));
-    let loh = saturate(dot(l, h));
+    let loh = saturate(dot(light_dir, h));
 
     let f90 = saturate(dot(pixel.f0, vec3<f32>(50.0 * 0.33)));
 
