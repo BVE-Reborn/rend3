@@ -3,8 +3,9 @@ use std::{marker::PhantomData, panic::Location, sync::Arc};
 use glam::Mat4;
 use parking_lot::Mutex;
 use rend3_types::{
-    GraphDataHandle, GraphDataTag, Handedness, Material, MaterialTag, ObjectChange, Skeleton, SkeletonHandle,
-    Texture2DTag, TextureCubeHandle, TextureCubeTag, TextureFromTexture, WasmNotSend,
+    GraphDataHandle, GraphDataTag, Handedness, Material, MaterialTag, ObjectChange, PointLight, PointLightChange,
+    PointLightHandle, Skeleton, SkeletonHandle, Texture2DTag, TextureCubeHandle, TextureCubeTag, TextureFromTexture,
+    WasmNotSend,
 };
 use wgpu::{CommandEncoderDescriptor, Device, DownlevelCapabilities, Features, Limits, Queue};
 use wgpu_profiler::GpuProfiler;
@@ -14,7 +15,8 @@ use crate::{
     instruction::{InstructionKind, InstructionStreamPair},
     managers::{
         CameraManager, DirectionalLightManager, GraphStorage, HandleAllocator, MaterialManager, MeshCreationError,
-        MeshManager, ObjectManager, SkeletonCreationError, SkeletonManager, TextureCreationError, TextureManager,
+        MeshManager, ObjectManager, PointLightManager, SkeletonCreationError, SkeletonManager, TextureCreationError,
+        TextureManager,
     },
     types::{
         Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, MaterialHandle, Mesh, MeshHandle,
@@ -73,6 +75,7 @@ struct HandleAllocators {
     pub material: HandleAllocator<MaterialTag>,
     pub object: HandleAllocator<Object>,
     pub directional_light: HandleAllocator<DirectionalLight>,
+    pub point_light: HandleAllocator<PointLight>,
     pub graph_storage: HandleAllocator<GraphDataTag>,
 }
 
@@ -86,6 +89,7 @@ impl Default for HandleAllocators {
             material: HandleAllocator::new(false),
             object: HandleAllocator::new(true),
             directional_light: HandleAllocator::new(false),
+            point_light: HandleAllocator::new(false),
             graph_storage: HandleAllocator::new(false),
         }
     }
@@ -105,6 +109,8 @@ pub struct RendererDataCore {
     pub object_manager: ObjectManager,
     /// Manages all directional lights, including their shadow maps.
     pub directional_light_manager: DirectionalLightManager,
+    /// Manages all point lights, including their shadow maps.
+    pub point_light_manager: PointLightManager,
     /// Manages skeletons, and their owned portion of the MeshManager's buffers
     pub skeleton_manager: SkeletonManager,
     /// Managed long term storage of data for the graph and it's routines
@@ -397,11 +403,45 @@ impl Renderer {
         handle
     }
 
+    /// Add a point (aka punctual) light into the world.
+    ///
+    /// **WARNING**: point lighting is currently very inefficient, as every
+    /// fragment in the forward pass is shaded with every point light in the
+    /// world.
+    ///
+    /// The handle will keep the light alive.
+    #[track_caller]
+    pub fn add_point_light(self: &Arc<Self>, light: PointLight) -> PointLightHandle {
+        let handle = self.resource_handle_allocators.point_light.allocate(self);
+
+        self.instructions.push(
+            InstructionKind::AddPointLight {
+                handle: handle.clone(),
+                light,
+            },
+            *Location::caller(),
+        );
+
+        handle
+    }
+
     /// Updates the settings for given directional light.
     #[track_caller]
     pub fn update_directional_light(&self, handle: &DirectionalLightHandle, change: DirectionalLightChange) {
         self.instructions.push(
             InstructionKind::ChangeDirectionalLight {
+                handle: handle.get_raw(),
+                change,
+            },
+            *Location::caller(),
+        )
+    }
+
+    /// Updates the settings for given point light.
+    #[track_caller]
+    pub fn update_point_light(&self, handle: &PointLightHandle, change: PointLightChange) {
+        self.instructions.push(
+            InstructionKind::ChangePointLight {
                 handle: handle.get_raw(),
                 change,
             },

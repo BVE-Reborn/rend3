@@ -110,6 +110,12 @@ pub fn evaluate_instructions(renderer: &Renderer) -> InstructionEvaluationOutput
                 InstructionKind::ChangeDirectionalLight { handle, change } => {
                     data_core.directional_light_manager.update(handle, change);
                 }
+                InstructionKind::AddPointLight { handle, light } => {
+                    data_core.point_light_manager.add(&handle, light);
+                }
+                InstructionKind::ChangePointLight { handle, change } => {
+                    data_core.point_light_manager.update(handle, change);
+                }
                 InstructionKind::SetAspectRatio { ratio } => data_core.camera_manager.set_aspect_ratio(Some(ratio)),
                 InstructionKind::SetCameraData { data } => {
                     data_core.camera_manager.set_data(data);
@@ -157,6 +163,10 @@ pub fn evaluate_instructions(renderer: &Renderer) -> InstructionEvaluationOutput
                     renderer.resource_handle_allocators.directional_light.deallocate(handle);
                     data_core.directional_light_manager.remove(handle)
                 }
+                InstructionKind::DeletePointLight { handle } => {
+                    renderer.resource_handle_allocators.point_light.deallocate(handle);
+                    data_core.point_light_manager.remove(handle);
+                }
                 InstructionKind::DeleteGraphData { handle } => {
                     renderer.resource_handle_allocators.graph_storage.deallocate(handle);
                     data_core.graph_storage.remove(&handle);
@@ -193,6 +203,7 @@ pub fn evaluate_instructions(renderer: &Renderer) -> InstructionEvaluationOutput
     let (shadow_target_size, shadows) = data_core
         .directional_light_manager
         .evaluate(renderer, &data_core.camera_manager);
+    data_core.point_light_manager.evaluate(renderer);
     let mesh_buffer = renderer.mesh_manager.evaluate();
 
     cmd_bufs.push(encoder.finish());

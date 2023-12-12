@@ -59,6 +59,7 @@ const SAMPLE_COUNT: rend3::types::SampleCount = rend3::types::SampleCount::One;
 struct CubeExample {
     object_handle: Option<rend3::types::ObjectHandle>,
     directional_light_handle: Option<rend3::types::DirectionalLightHandle>,
+    point_lights: Vec<rend3::types::PointLightHandle>,
 }
 
 impl rend3_framework::App for CubeExample {
@@ -87,7 +88,7 @@ impl rend3_framework::App for CubeExample {
 
         // Add PBR material with all defaults except a single color.
         let material = rend3_routine::pbr::PbrMaterial {
-            albedo: rend3_routine::pbr::AlbedoComponent::Value(glam::Vec4::new(0.0, 0.5, 0.5, 1.0)),
+            albedo: rend3_routine::pbr::AlbedoComponent::Value(glam::Vec4::new(0.5, 0.5, 0.5, 1.0)),
             ..rend3_routine::pbr::PbrMaterial::default()
         };
         let material_handle = renderer.add_material(material);
@@ -119,12 +120,28 @@ impl rend3_framework::App for CubeExample {
         // We need to keep the directional light handle alive.
         self.directional_light_handle = Some(renderer.add_directional_light(rend3::types::DirectionalLight {
             color: glam::Vec3::ONE,
-            intensity: 10.0,
+            intensity: 1.0,
             // Direction will be normalized
             direction: glam::Vec3::new(-1.0, -4.0, 2.0),
             distance: 400.0,
             resolution: 2048,
         }));
+
+        let lights = [
+            // position, color
+            (glam::vec3(0.1, 1.2, -1.5), glam::vec3(1.0, 0.0, 0.0)),
+            (glam::vec3(1.5, 1.2, -0.1), glam::vec3(0.0, 1.0, 0.0)),
+        ];
+
+        for (position, color) in lights {
+            self.point_lights
+                .push(renderer.add_point_light(rend3::types::PointLight {
+                    position,
+                    color,
+                    radius: 2.0,
+                    intensity: 4.0,
+                }));
+        }
     }
 
     fn handle_event(

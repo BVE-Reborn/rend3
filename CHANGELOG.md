@@ -41,6 +41,7 @@ Per Keep a Changelog there are 6 main categories of changes:
 - rend3-routine: Added the option to set a custom primitive topology value when building a forward routine. @setzer22
 - rend3-routine: Added a resolution field to the per-frame uniforms. @setzer22
 - rend3-routine: Added add_clear_to_graph to make clears explicit and add `clear_color` argument to base rendergraph.
+- rend3: Added basic (no shadow maps, no clustering) point light support to the renderer API. @marceline-cramer
 
 ### Changes
 - rend3: Update to wgpu 0.13, naga 0.9 @garyttierney

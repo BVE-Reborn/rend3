@@ -6,8 +6,6 @@
 var primary_sampler: sampler;
 @group(0) @binding(3)
 var<uniform> uniforms: UniformData;
-@group(0) @binding(4)
-var<storage> directional_lights: DirectionalLightData;
 
 @group(1) @binding(0)
 var<storage> object_buffer: array<Object>;

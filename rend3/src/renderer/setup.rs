@@ -10,7 +10,7 @@ use crate::{
     instruction::InstructionStreamPair,
     managers::{
         CameraManager, DirectionalLightManager, GraphStorage, MaterialManager, MeshManager, ObjectManager,
-        SkeletonManager, TextureManager,
+        PointLightManager, SkeletonManager, TextureManager,
     },
     renderer::{HandleAllocators, RendererDataCore},
     util::{mipmap::MipmapGenerator, scatter_copy::ScatterCopy},
@@ -46,6 +46,7 @@ pub fn create_renderer(
     let material_manager = MaterialManager::new(&iad.device);
     let object_manager = ObjectManager::new();
     let directional_light_manager = DirectionalLightManager::new(&iad.device);
+    let point_light_manager = PointLightManager::new(&iad.device);
     let skeleton_manager = SkeletonManager::new();
     let graph_storage = GraphStorage::new();
 
@@ -93,6 +94,7 @@ pub fn create_renderer(
             material_manager,
             object_manager,
             directional_light_manager,
+            point_light_manager,
             skeleton_manager,
             graph_storage,
             profiler,
