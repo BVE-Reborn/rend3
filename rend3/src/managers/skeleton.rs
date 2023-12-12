@@ -139,7 +139,6 @@ impl SkeletonManager {
         })
     }
 
-    #[allow(clippy::too_many_arguments)]
     pub fn add(&mut self, handle: &SkeletonHandle, internal: InternalSkeleton) {
         self.global_joint_count += internal.joint_matrices.len();
 

@@ -140,10 +140,11 @@ impl Renderer {
     /// the mesh alive.
     #[track_caller]
     pub fn add_mesh(self: &Arc<Self>, mesh: Mesh) -> Result<MeshHandle, MeshCreationError> {
-        let handle = self.resource_handle_allocators.mesh.allocate(self);
-
         let mut encoder = self.device.create_command_encoder(&CommandEncoderDescriptor::default());
         let internal_mesh = self.mesh_manager.add(&self.device, &self.queue, &mut encoder, mesh)?;
+
+        // Handle allocation must be done _after_ any validation to prevent deletion of a handle that never gets fully added.
+        let handle = self.resource_handle_allocators.mesh.allocate(self);
 
         self.instructions.push(
             InstructionKind::AddMesh {
@@ -165,10 +166,11 @@ impl Renderer {
     /// references alive.
     #[track_caller]
     pub fn add_skeleton(self: &Arc<Self>, skeleton: Skeleton) -> Result<SkeletonHandle, SkeletonCreationError> {
-        let handle = self.resource_handle_allocators.skeleton.allocate(self);
-
         let mut encoder = self.device.create_command_encoder(&CommandEncoderDescriptor::default());
         let internal = SkeletonManager::validate_skeleton(&self.device, &mut encoder, &self.mesh_manager, skeleton)?;
+
+        // Handle allocation must be done _after_ any validation to prevent deletion of a handle that never gets fully added.
+        let handle = self.resource_handle_allocators.skeleton.allocate(self);
 
         self.instructions.push(
             InstructionKind::AddSkeleton {
@@ -189,8 +191,10 @@ impl Renderer {
     pub fn add_texture_2d(self: &Arc<Self>, texture: Texture) -> Result<Texture2DHandle, TextureCreationError> {
         profiling::scope!("Add Texture 2D");
 
-        let handle = self.resource_handle_allocators.d2_texture.allocate(self);
         let (cmd_buf, internal_texture) = TextureManager::<Texture2DTag>::add(self, texture, false)?;
+
+        // Handle allocation must be done _after_ any validation to prevent deletion of a handle that never gets fully added.
+        let handle = self.resource_handle_allocators.d2_texture.allocate(self);
 
         self.instructions.push(
             InstructionKind::AddTexture2D {
@@ -234,8 +238,10 @@ impl Renderer {
     pub fn add_texture_cube(self: &Arc<Self>, texture: Texture) -> Result<TextureCubeHandle, TextureCreationError> {
         profiling::scope!("Add Texture Cube");
 
-        let handle = self.resource_handle_allocators.d2c_texture.allocate(self);
         let (cmd_buf, internal_texture) = TextureManager::<TextureCubeTag>::add(self, texture, true)?;
+
+        // Handle allocation must be done _after_ any validation to prevent deletion of a handle that never gets fully added.
+        let handle = self.resource_handle_allocators.d2c_texture.allocate(self);
 
         self.instructions.push(
             InstructionKind::AddTextureCube {
