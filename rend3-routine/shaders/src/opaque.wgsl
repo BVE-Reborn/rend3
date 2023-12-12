@@ -534,8 +534,9 @@ fn fs_main(vs_out: VertexOutput) -> @location(0) vec4<f32> {
         // Derivative is 0 at both d = 0 and d = radius
         // Source: https://lisyarus.github.io/blog/graphics/2022/07/30/point-light-attenuation.html
         let s = saturate(d / light.radius);
-        let s2 = pow(s, 2.0);
-        let att = pow(1.0 - s2, 2.0) / (1.0 + s2);
+        let s2 = s * s;
+        let inv_s2 = 1.0 - s2;
+        let att = inv_s2 * inv_s2 / (1.0 + s2);
         let intensity = light.color * att;
 
         // Calculate light source vector
