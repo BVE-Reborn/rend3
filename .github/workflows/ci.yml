@@ -78,7 +78,7 @@ jobs:
           cargo +1.72 doc --target ${{ matrix.target }} --profile ci --no-deps
         if: matrix.target != 'wasm32-unknown-unknown'
       
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         # always run
         if: ${{ !cancelled() }}
         with:
