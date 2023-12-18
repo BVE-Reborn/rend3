@@ -9,7 +9,7 @@ use crate::{
     graph::GraphTextureStore,
     instruction::InstructionStreamPair,
     managers::{
-        CameraManager, DirectionalLightManager, GraphStorage, MaterialManager, MeshManager, ObjectManager,
+        CameraState, DirectionalLightManager, GraphStorage, MaterialManager, MeshManager, ObjectManager,
         PointLightManager, SkeletonManager, TextureManager,
     },
     renderer::{HandleAllocators, RendererDataCore},
@@ -28,7 +28,7 @@ pub fn create_renderer(
     let limits = iad.device.limits();
     let downlevel = iad.adapter.get_downlevel_capabilities();
 
-    let camera_manager = CameraManager::new(Camera::default(), handedness, aspect_ratio);
+    let camera_state = CameraState::new(Camera::default(), handedness, aspect_ratio);
 
     let d2_texture_manager = TextureManager::new(
         &iad.device,
@@ -88,7 +88,7 @@ pub fn create_renderer(
         resource_handle_allocators: HandleAllocators::default(),
         mesh_manager,
         data_core: Mutex::new(RendererDataCore {
-            camera_manager,
+            viewport_camera_state: camera_state,
             d2_texture_manager,
             d2c_texture_manager,
             material_manager,

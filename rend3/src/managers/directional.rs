@@ -7,7 +7,7 @@ use wgpu::{
 };
 
 use crate::{
-    managers::CameraManager,
+    managers::CameraState,
     types::{DirectionalLight, DirectionalLightHandle},
     util::{
         bind_merge::{BindGroupBuilder, BindGroupLayoutBuilder},
@@ -55,7 +55,7 @@ struct ShaderDirectionalLight {
 #[derive(Debug, Clone)]
 pub struct ShadowDesc {
     pub map: ShadowMap,
-    pub camera: CameraManager,
+    pub camera: CameraState,
 }
 
 /// Manages directional lights and their associated shadow maps.
@@ -100,7 +100,7 @@ impl DirectionalLightManager {
         self.data[handle.idx].take().unwrap();
     }
 
-    pub fn evaluate(&mut self, renderer: &Renderer, user_camera: &CameraManager) -> (UVec2, Vec<ShadowDesc>) {
+    pub fn evaluate(&mut self, renderer: &Renderer, user_camera: &CameraState) -> (UVec2, Vec<ShadowDesc>) {
         profiling::scope!("DirectionalLightManager::evaluate");
 
         let shadow_maps: Vec<_> = self

@@ -5,12 +5,13 @@
 use std::{mem, sync::Arc};
 
 use egui::TexturesDelta;
+use glam::Vec4;
 use rend3::{
-    graph::{NodeResourceUsage, RenderGraph, RenderPassTarget, RenderPassTargets, RenderTargetHandle},
+    graph::{RenderGraph, RenderPassTarget, RenderPassTargets, RenderTargetHandle},
     types::SampleCount,
     Renderer,
 };
-use wgpu::{Color, TextureFormat};
+use wgpu::TextureFormat;
 
 pub struct EguiRenderRoutine {
     pub internal: egui_wgpu::Renderer,
@@ -58,12 +59,10 @@ impl EguiRenderRoutine {
     ) {
         let mut builder = graph.add_node("egui");
 
-        let output_handle = builder.add_render_target(output, NodeResourceUsage::InputOutput);
-
         let rpass_handle = builder.add_renderpass(RenderPassTargets {
             targets: vec![RenderPassTarget {
-                color: output_handle,
-                clear: Color::BLACK,
+                color: output,
+                clear: Vec4::ZERO,
                 resolve: None,
             }],
             depth_stencil: None,

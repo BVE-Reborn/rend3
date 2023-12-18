@@ -24,10 +24,10 @@ inherits = "dev"
 debug = false
 incremental = false
 
-[profile.dev-release]
-inherits = "dev"
+[profile.ci.package."*"]
+opt-level = 0
 
-[profile.dev-release.package."*"]
+[profile.dev.package."*"]
 opt-level = 3
 
 [profile.release]

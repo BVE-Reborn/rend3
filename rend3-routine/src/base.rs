@@ -19,7 +19,8 @@ use glam::{UVec2, Vec4};
 use rend3::{
     format_sso,
     graph::{
-        DataHandle, InstructionEvaluationOutput, RenderGraph, RenderTargetDescriptor, RenderTargetHandle, ViewportRect,
+        self, DataHandle, InstructionEvaluationOutput, RenderGraph, RenderPassTargets, RenderTargetDescriptor,
+        RenderTargetHandle, ViewportRect,
     },
     types::{SampleCount, TextureFormat, TextureUsages},
     Renderer, ShaderPreProcessor, INTERNAL_SHADOW_DEPTH_FORMAT,
@@ -27,10 +28,10 @@ use rend3::{
 use wgpu::{BindGroup, Buffer};
 
 use crate::{
-    common::{self, CameraIndex},
+    common::{self, CameraSpecifier},
     culling,
-    forward::RoutineAddToGraphArgs,
-    pbr, skinning,
+    forward::{self, ForwardRoutineArgs},
+    pbr, skinning, uniforms,
 };
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -86,7 +87,7 @@ pub struct BaseRenderGraphInputs<'a, 'node> {
 
 #[derive(Debug, Default)]
 pub struct BaseRenderGraphSettings {
-    pub ambient: Vec4,
+    pub ambient_color: Vec4,
     pub clear_color: Vec4,
 }
 
@@ -133,9 +134,6 @@ impl BaseRenderGraph {
         // Create the data and handles for the graph.
         let mut state = BaseRenderGraphIntermediateState::new(graph, inputs, settings);
 
-        // Clear the shadow map.
-        state.clear_shadow();
-
         // Prepare all the uniforms that all shaders need access to.
         state.create_frame_uniforms(self);
 
@@ -149,9 +147,6 @@ impl BaseRenderGraph {
 
         // Render all the shadows to the shadow map.
         state.pbr_shadow_rendering();
-
-        // Clear the primary render target and depth target.
-        state.clear();
 
         // Upload the uniforms for the objects in the forward pass.
         state.object_uniform_upload(self);
@@ -201,10 +196,11 @@ pub struct BaseRenderGraphIntermediateState<'a, 'node> {
 
     pub shadow_uniform_bg: DataHandle<BindGroup>,
     pub forward_uniform_bg: DataHandle<BindGroup>,
+
     pub shadow: RenderTargetHandle,
-    pub color: RenderTargetHandle,
-    pub resolve: Option<RenderTargetHandle>,
     pub depth: DepthTargets,
+    pub primary_renderpass: RenderPassTargets,
+
     pub pre_skinning_buffers: DataHandle<skinning::PreSkinningBuffers>,
 }
 impl<'a, 'node> BaseRenderGraphIntermediateState<'a, 'node> {
@@ -254,6 +250,18 @@ impl<'a, 'node> BaseRenderGraphIntermediateState<'a, 'node> {
             })
         });
         let depth = DepthTargets::new(graph, inputs.resolution, inputs.samples);
+        let primary_renderpass = graph::RenderPassTargets {
+            targets: vec![graph::RenderPassTarget {
+                color,
+                resolve,
+                clear: settings.clear_color,
+            }],
+            depth_stencil: Some(graph::RenderPassDepthTarget {
+                target: depth.rendering_target(),
+                depth_clear: Some(0.0),
+                stencil_clear: None,
+            }),
+        };
 
         let pre_skinning_buffers = graph.add_data::<skinning::PreSkinningBuffers>();
 
@@ -272,25 +280,30 @@ impl<'a, 'node> BaseRenderGraphIntermediateState<'a, 'node> {
 
             shadow_uniform_bg,
             forward_uniform_bg,
+
             shadow,
-            color,
-            resolve,
             depth,
+            primary_renderpass,
+
             pre_skinning_buffers,
         }
     }
 
     /// Create all the uniforms all the shaders in this graph need.
     pub fn create_frame_uniforms(&mut self, base: &'node BaseRenderGraph) {
-        crate::uniforms::add_to_graph(
+        uniforms::add_to_graph(
             self.graph,
-            self.shadow_uniform_bg,
-            self.forward_uniform_bg,
             self.shadow,
-            &base.interfaces,
-            &base.samplers,
-            self.settings.ambient,
-            self.inputs.resolution,
+            uniforms::UniformBindingHandles {
+                interfaces: &base.interfaces,
+                shadow_uniform_bg: self.shadow_uniform_bg,
+                forward_uniform_bg: self.forward_uniform_bg,
+            },
+            uniforms::UniformInformation {
+                samplers: &base.samplers,
+                ambient: self.settings.ambient_color,
+                resolution: self.inputs.resolution,
+            },
         );
     }
 
@@ -298,7 +311,7 @@ impl<'a, 'node> BaseRenderGraphIntermediateState<'a, 'node> {
         for (shadow_index, shadow) in self.inputs.eval_output.shadows.iter().enumerate() {
             base.gpu_culler.add_object_uniform_upload_to_graph::<pbr::PbrMaterial>(
                 self.graph,
-                CameraIndex::Shadow(shadow_index as u32),
+                CameraSpecifier::Shadow(shadow_index as u32),
                 UVec2::splat(shadow.map.size),
                 SampleCount::One,
                 &format_sso!("Shadow Culling S{}", shadow_index),
@@ -313,7 +326,7 @@ impl<'a, 'node> BaseRenderGraphIntermediateState<'a, 'node> {
                 self.graph,
                 shadow_culled,
                 self.shadow,
-                CameraIndex::Shadow(shadow_index as u32),
+                CameraSpecifier::Shadow(shadow_index as u32),
                 &format_sso!("Shadow Culling S{}", shadow_index),
             );
         }
@@ -326,7 +339,7 @@ impl<'a, 'node> BaseRenderGraphIntermediateState<'a, 'node> {
     pub fn object_uniform_upload(&mut self, base: &'node BaseRenderGraph) {
         base.gpu_culler.add_object_uniform_upload_to_graph::<pbr::PbrMaterial>(
             self.graph,
-            CameraIndex::Viewport,
+            CameraSpecifier::Viewport,
             self.inputs.resolution,
             self.inputs.samples,
             "Uniform Bake",
@@ -339,25 +352,8 @@ impl<'a, 'node> BaseRenderGraphIntermediateState<'a, 'node> {
             self.graph,
             self.cull,
             self.depth.single_sample_mipped,
-            CameraIndex::Viewport,
+            CameraSpecifier::Viewport,
             "Primary Culling",
-        );
-    }
-
-    /// Clear all the targets to their needed values
-    pub fn clear_shadow(&mut self) {
-        crate::clear::add_clear_to_graph(self.graph, None, None, self.shadow, Vec4::ZERO, 0.0);
-    }
-
-    /// Clear all the targets to their needed values
-    pub fn clear(&mut self) {
-        crate::clear::add_clear_to_graph(
-            self.graph,
-            Some(self.color),
-            self.resolve,
-            self.depth.rendering_target(),
-            self.settings.clear_color,
-            0.0,
         );
     }
 
@@ -365,22 +361,32 @@ impl<'a, 'node> BaseRenderGraphIntermediateState<'a, 'node> {
     pub fn pbr_shadow_rendering(&mut self) {
         let iter = zip(&self.shadow_cull, &self.inputs.eval_output.shadows);
         for (shadow_index, (shadow_cull, desc)) in iter.enumerate() {
+            let target = self
+                .shadow
+                .set_viewport(ViewportRect::new(desc.map.offset, UVec2::splat(desc.map.size)));
+            let renderpass = graph::RenderPassTargets {
+                targets: vec![],
+                depth_stencil: Some(graph::RenderPassDepthTarget {
+                    target,
+                    depth_clear: Some(0.0),
+                    stencil_clear: None,
+                }),
+            };
+
             let routines = [&self.inputs.pbr.opaque_depth, &self.inputs.pbr.cutout_depth];
             for routine in routines {
-                routine.add_forward_to_graph(RoutineAddToGraphArgs {
+                routine.add_forward_to_graph(ForwardRoutineArgs {
                     graph: self.graph,
-                    whole_frame_uniform_bg: self.shadow_uniform_bg,
-                    culling_output_handle: Some(*shadow_cull),
-                    per_material: &self.inputs.pbr.per_material,
-                    extra_bgs: None,
                     label: &format!("pbr shadow renderering S{shadow_index}"),
+                    camera: CameraSpecifier::Shadow(shadow_index as u32),
+                    binding_data: forward::ForwardRoutineBindingData {
+                        whole_frame_uniform_bg: self.shadow_uniform_bg,
+                        per_material_bgl: &self.inputs.pbr.per_material,
+                        extra_bgs: None,
+                    },
+                    culling_source: forward::CullingSource::Residual(*shadow_cull),
                     samples: SampleCount::One,
-                    camera: CameraIndex::Shadow(shadow_index as u32),
-                    color: None,
-                    resolve: None,
-                    depth: self
-                        .shadow
-                        .set_viewport(ViewportRect::new(desc.map.offset, UVec2::splat(desc.map.size))),
+                    renderpass: renderpass.clone(),
                 });
             }
         }
@@ -391,9 +397,7 @@ impl<'a, 'node> BaseRenderGraphIntermediateState<'a, 'node> {
         if let Some(skybox) = self.inputs.skybox {
             skybox.add_to_graph(
                 self.graph,
-                self.color,
-                self.resolve,
-                self.depth.rendering_target(),
+                self.primary_renderpass.clone(),
                 self.forward_uniform_bg,
                 self.inputs.samples,
             );
@@ -404,18 +408,18 @@ impl<'a, 'node> BaseRenderGraphIntermediateState<'a, 'node> {
     pub fn pbr_render_opaque_predicted_triangles(&mut self) {
         let routines = [&self.inputs.pbr.opaque_routine, &self.inputs.pbr.cutout_routine];
         for routine in routines {
-            routine.add_forward_to_graph(RoutineAddToGraphArgs {
+            routine.add_forward_to_graph(ForwardRoutineArgs {
                 graph: self.graph,
-                whole_frame_uniform_bg: self.forward_uniform_bg,
-                culling_output_handle: None,
-                per_material: &self.inputs.pbr.per_material,
-                extra_bgs: None,
                 label: "PBR Forward Pass 1",
+                camera: CameraSpecifier::Viewport,
+                binding_data: forward::ForwardRoutineBindingData {
+                    whole_frame_uniform_bg: self.forward_uniform_bg,
+                    per_material_bgl: &self.inputs.pbr.per_material,
+                    extra_bgs: None,
+                },
+                culling_source: forward::CullingSource::Predicted,
                 samples: self.inputs.samples,
-                camera: CameraIndex::Viewport,
-                color: Some(self.color),
-                resolve: self.resolve,
-                depth: self.depth.rendering_target(),
+                renderpass: self.primary_renderpass.clone(),
             });
         }
     }
@@ -424,40 +428,37 @@ impl<'a, 'node> BaseRenderGraphIntermediateState<'a, 'node> {
     pub fn pbr_render_opaque_residual_triangles(&mut self) {
         let routines = [&self.inputs.pbr.opaque_routine, &self.inputs.pbr.cutout_routine];
         for routine in routines {
-            routine.add_forward_to_graph(RoutineAddToGraphArgs {
+            routine.add_forward_to_graph(ForwardRoutineArgs {
                 graph: self.graph,
-                whole_frame_uniform_bg: self.forward_uniform_bg,
-                culling_output_handle: Some(self.cull),
-                per_material: &self.inputs.pbr.per_material,
-                extra_bgs: None,
                 label: "PBR Forward Pass 2",
+                camera: CameraSpecifier::Viewport,
+                binding_data: forward::ForwardRoutineBindingData {
+                    whole_frame_uniform_bg: self.forward_uniform_bg,
+                    per_material_bgl: &self.inputs.pbr.per_material,
+                    extra_bgs: None,
+                },
+                culling_source: forward::CullingSource::Residual(self.cull),
                 samples: self.inputs.samples,
-                camera: CameraIndex::Viewport,
-                color: Some(self.color),
-                resolve: self.resolve,
-                depth: self.depth.rendering_target(),
+                renderpass: self.primary_renderpass.clone(),
             });
         }
     }
 
     /// Render the PBR materials.
     pub fn pbr_forward_rendering_transparent(&mut self) {
-        self.inputs
-            .pbr
-            .blend_routine
-            .add_forward_to_graph(RoutineAddToGraphArgs {
-                graph: self.graph,
+        self.inputs.pbr.blend_routine.add_forward_to_graph(ForwardRoutineArgs {
+            graph: self.graph,
+            label: "PBR Forward Transparent",
+            camera: CameraSpecifier::Viewport,
+            binding_data: forward::ForwardRoutineBindingData {
                 whole_frame_uniform_bg: self.forward_uniform_bg,
-                culling_output_handle: Some(self.cull),
-                per_material: &self.inputs.pbr.per_material,
+                per_material_bgl: &self.inputs.pbr.per_material,
                 extra_bgs: None,
-                label: "PBR Forward",
-                camera: CameraIndex::Viewport,
-                samples: self.inputs.samples,
-                color: Some(self.color),
-                resolve: self.resolve,
-                depth: self.depth.rendering_target(),
-            });
+            },
+            culling_source: forward::CullingSource::Residual(self.cull),
+            samples: self.inputs.samples,
+            renderpass: self.primary_renderpass.clone(),
+        });
     }
 
     pub fn hi_z(&mut self) {
@@ -471,7 +472,7 @@ impl<'a, 'node> BaseRenderGraphIntermediateState<'a, 'node> {
     pub fn tonemapping(&mut self) {
         self.inputs.tonemapping.add_to_graph(
             self.graph,
-            self.resolve.unwrap_or(self.color),
+            self.primary_renderpass.resolved_color(0),
             self.inputs.target_texture,
             self.forward_uniform_bg,
         );

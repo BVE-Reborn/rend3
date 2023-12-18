@@ -211,17 +211,12 @@ impl HiZRoutine {
         if let Some(multi_sample) = depth_targets.multi_sample {
             let mut node = graph.add_node("HiZ Resolve");
 
-            let target = node.add_render_target(
-                depth_targets.single_sample_mipped.set_mips(0..1),
-                NodeResourceUsage::Output,
-            );
-
             let source = node.add_render_target(multi_sample, NodeResourceUsage::Output);
 
             let rpass_handle = node.add_renderpass(RenderPassTargets {
                 targets: vec![],
                 depth_stencil: Some(RenderPassDepthTarget {
-                    target,
+                    target: depth_targets.single_sample_mipped.set_mips(0..1),
                     depth_clear: Some(0.0),
                     stencil_clear: None,
                 }),
@@ -242,13 +237,10 @@ impl HiZRoutine {
             let dst_extent = extent.mip_level_size(dst_mip as u32, TextureDimension::D2);
             let src_extent = extent.mip_level_size(src_mip as u32, TextureDimension::D2);
 
-            let dst_target = node.add_render_target(
-                depth_targets
-                    .single_sample_mipped
-                    .set_mips(dst_mip..dst_mip + 1)
-                    .set_viewport(ViewportRect::from_size(UVec2::new(dst_extent.width, dst_extent.height))),
-                NodeResourceUsage::Output,
-            );
+            let dst_target = depth_targets
+                .single_sample_mipped
+                .set_mips(dst_mip..dst_mip + 1)
+                .set_viewport(ViewportRect::from_size(UVec2::new(dst_extent.width, dst_extent.height)));
             let src_target = node.add_render_target(
                 depth_targets
                     .single_sample_mipped

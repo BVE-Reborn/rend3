@@ -101,6 +101,13 @@ impl<'a, 'node> RenderGraphNodeBuilder<'a, 'node> {
             self.rpass.is_none(),
             "Cannot have more than one graph-associated renderpass per node."
         );
+        for targets in &targets.targets {
+            self.add_render_target(targets.color, NodeResourceUsage::InputOutput);
+            self.add_optional_render_target(targets.resolve, NodeResourceUsage::InputOutput);
+        }
+        if let Some(depth_stencil) = &targets.depth_stencil {
+            self.add_render_target(depth_stencil.target, NodeResourceUsage::InputOutput);
+        }
         self.rpass = Some(targets);
         DeclaredDependency {
             handle: RenderPassHandle,
