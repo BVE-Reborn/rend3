@@ -179,7 +179,7 @@ where
 }
 
 #[cfg(target_arch = "wasm32")]
-fn winit_run<F, T>(event_loop: EventLoop<T>, event_handler: F)
+fn winit_run<F, T>(event_loop: EventLoop<T>, event_handler: F) -> ()
 where
     F: FnMut(winit::event::Event<T>, &EventLoopWindowTarget<T>) + 'static,
     T: 'static,
@@ -209,7 +209,7 @@ where
     }
 }
 
-pub async fn async_start<A: App<T> + 'static, T: 'static>(mut app: A, window_builder: WindowBuilder) -> () {
+pub async fn async_start<A: App<T> + 'static, T: 'static>(mut app: A, window_builder: WindowBuilder) {
     app.register_logger();
     app.register_panic_hook();
 
@@ -303,7 +303,7 @@ pub async fn async_start<A: App<T> + 'static, T: 'static>(mut app: A, window_bui
         present_mode: app.present_mode(),
     };
 
-    winit_run(event_loop, move |event, event_loop_window_target| {
+    let _ = winit_run(event_loop, move |event, event_loop_window_target| {
         let event = match event {
             Event::UserEvent(UserResizeEvent::Resize { size, window_id }) => Event::WindowEvent {
                 window_id,
@@ -361,7 +361,7 @@ pub async fn async_start<A: App<T> + 'static, T: 'static>(mut app: A, window_bui
             },
             event_loop_window_target,
         )
-    })
+    });
 }
 
 struct StoredSurfaceInfo {
@@ -449,6 +449,6 @@ pub fn start<A: App<T> + 'static, T: 'static>(app: A, window_builder: WindowBuil
 
     #[cfg(not(target_arch = "wasm32"))]
     {
-        pollster::block_on(async_start(app, window_builder)).unwrap();
+        pollster::block_on(async_start(app, window_builder));
     }
 }
