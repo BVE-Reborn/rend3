@@ -669,6 +669,7 @@ impl rend3_framework::App for SceneViewer {
                     self.grabber.as_mut().unwrap().request_ungrab(window);
                 }
             }
+
             Event::WindowEvent {
                 event:
                     WindowEvent::KeyboardInput {
@@ -692,6 +693,7 @@ impl rend3_framework::App for SceneViewer {
                     },
                 );
             }
+
             Event::WindowEvent {
                 event:
                     WindowEvent::MouseInput {

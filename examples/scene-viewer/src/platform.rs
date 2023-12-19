@@ -1,5 +1,4 @@
 #![allow(non_snake_case, unused)]
-
 cfg_if::cfg_if!(
     if #[cfg(target_os = "macos")] {
         // https://stackoverflow.com/a/16125341 reference
@@ -21,20 +20,21 @@ cfg_if::cfg_if!(
         }
     } else if #[cfg(target_arch = "wasm32")] {
         pub mod Scancodes {
-            pub const W: u32 = 0x57;
-            pub const A: u32 = 0x41;
-            pub const S: u32 = 0x53;
-            pub const D: u32 = 0x44;
-            pub const Q: u32 = 0x51;
-            pub const Z: u32 = 0x5a;
-            pub const P: u32 = 0x50;
-            pub const SEMICOLON: u32 = 0xba;
-            pub const QUOTE: u32 = 0xde;
-            pub const COMMA: u32 = 0xbc;
-            pub const PERIOD: u32 = 0xbe;
-            pub const SHIFT: u32 = 0x10;
-            pub const ESCAPE: u32 = 0x1b;
-            pub const LALT: u32 = 0x12;
+            use winit::keyboard::KeyCode;
+            pub const W: u32 = KeyCode::KeyW as u32;
+            pub const A: u32 = KeyCode::KeyA as u32;
+            pub const S: u32 = KeyCode::KeyS as u32;
+            pub const D: u32 = KeyCode::KeyD as u32;
+            pub const Q: u32 = KeyCode::KeyQ as u32;
+            pub const Z: u32 = KeyCode::KeyZ as u32;
+            pub const P: u32 = KeyCode::KeyP as u32;
+            pub const SEMICOLON: u32 = KeyCode::Semicolon as u32;
+            pub const QUOTE: u32 = KeyCode::Quote as u32;
+            pub const COMMA: u32 = KeyCode::Comma as u32;
+            pub const PERIOD: u32 = KeyCode::Period as u32;
+            pub const SHIFT: u32 = KeyCode::ShiftLeft as u32;
+            pub const ESCAPE: u32 = KeyCode::Escape as u32;
+            pub const LALT: u32 = KeyCode::AltLeft as u32;
         }
     } else {
         pub mod Scancodes {
