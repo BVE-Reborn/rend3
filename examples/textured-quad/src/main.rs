@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
 use image::GenericImageView;
+use rend3_framework::UserResizeEvent;
+use winit::event_loop::EventLoopWindowTarget;
 
 fn vertex(pos: [f32; 3]) -> glam::Vec3 {
     glam::Vec3::from(pos)
@@ -132,7 +134,8 @@ impl rend3_framework::App for TexturedQuadExample {
         surface: Option<&Arc<rend3::types::Surface>>,
         resolution: glam::UVec2,
         event: rend3_framework::Event<'_, ()>,
-        control_flow: impl FnOnce(winit::event_loop::ControlFlow),
+        _control_flow: impl FnOnce(winit::event_loop::ControlFlow),
+        event_loop_window_target: &EventLoopWindowTarget<UserResizeEvent<()>>,
     ) {
         match event {
             // Close button was clicked, we should close.
@@ -140,7 +143,7 @@ impl rend3_framework::App for TexturedQuadExample {
                 event: winit::event::WindowEvent::CloseRequested,
                 ..
             } => {
-                control_flow(winit::event_loop::ControlFlow::Exit);
+                event_loop_window_target.exit();
             }
             // Window was resized, need to resize renderer.
             winit::event::Event::WindowEvent {
@@ -157,7 +160,7 @@ impl rend3_framework::App for TexturedQuadExample {
                 });
             }
             // Render!
-            winit::event::Event::MainEventsCleared => {
+            winit::event::Event::AboutToWait => {
                 // Get a frame
                 let frame = surface.unwrap().get_current_texture().unwrap();
 

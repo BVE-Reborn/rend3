@@ -10,13 +10,15 @@ use rend3::{
     util::typedefs::FastHashMap,
     Renderer, RendererProfile,
 };
-use rend3_framework::{lock, AssetPath, Mutex};
+use rend3_framework::{lock, AssetPath, Mutex, UserResizeEvent};
 use rend3_gltf::GltfSceneInstance;
 use rend3_routine::{base::BaseRenderGraph, pbr::NormalTextureYDirection, skybox::SkyboxRoutine};
 use web_time::Instant;
 use wgpu_profiler::GpuTimerScopeResult;
 use winit::{
-    event::{DeviceEvent, ElementState, Event, KeyboardInput, MouseButton, WindowEvent},
+    event::{DeviceEvent, ElementState, Event, KeyEvent, MouseButton, WindowEvent},
+    event_loop::EventLoopWindowTarget,
+    platform::scancode::PhysicalKeyExtScancode,
     window::{Fullscreen, WindowBuilder},
 };
 
@@ -509,10 +511,11 @@ impl rend3_framework::App for SceneViewer {
         surface: Option<&Arc<rend3::types::Surface>>,
         resolution: UVec2,
         event: rend3_framework::Event<'_, ()>,
-        control_flow: impl FnOnce(winit::event_loop::ControlFlow),
+        _control_flow: impl FnOnce(winit::event_loop::ControlFlow),
+        event_loop_window_target: &EventLoopWindowTarget<UserResizeEvent<()>>,
     ) {
         match event {
-            Event::MainEventsCleared => {
+            Event::AboutToWait => {
                 profiling::scope!("MainEventsCleared");
                 let now = Instant::now();
 
@@ -599,7 +602,10 @@ impl rend3_framework::App for SceneViewer {
 
                 window.request_redraw()
             }
-            Event::RedrawRequested(_) => {
+            Event::WindowEvent {
+                event: winit::event::WindowEvent::RedrawRequested,
+                ..
+            } => {
                 let view = Mat4::from_euler(glam::EulerRot::XYZ, -self.camera_pitch, -self.camera_yaw, 0.0);
                 let view = view * Mat4::from_translation((-self.camera_location).into());
 
@@ -663,11 +669,14 @@ impl rend3_framework::App for SceneViewer {
             Event::WindowEvent {
                 event:
                     WindowEvent::KeyboardInput {
-                        input: KeyboardInput { scancode, state, .. },
+                        event: KeyEvent {
+                            physical_key, state, ..
+                        },
                         ..
                     },
                 ..
             } => {
+                let scancode = PhysicalKeyExtScancode::to_scancode(physical_key).unwrap();
                 log::info!("WE scancode {:x}", scancode);
                 self.scancode_status.insert(
                     scancode,
@@ -733,7 +742,7 @@ impl rend3_framework::App for SceneViewer {
                 event: WindowEvent::CloseRequested,
                 ..
             } => {
-                control_flow(winit::event_loop::ControlFlow::Exit);
+                event_loop_window_target.exit();
             }
             _ => {}
         }

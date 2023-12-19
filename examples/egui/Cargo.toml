@@ -13,9 +13,9 @@ path = "src/main.rs"
 
 [dependencies]
 # The egui immediate mode gui library
-egui = "0.24.0"
+egui = {git = "https://github.com/emilk/egui.git", branch="master"}
 # Winit integration with egui (turn off the clipboard feature)
-egui-winit = { version = "0.24", default-features = false, features = ["links", "wayland"] }
+egui-winit = { git = "https://github.com/emilk/egui.git", branch="master", default-features = false, features = ["links", "wayland"] }
 # logging
 env_logger = { version = "0.10", default-features = false, features = ["auto-color", "humantime"] }
 # Linear algebra library
@@ -31,7 +31,7 @@ rend3-framework = { version = "^0.3.0", path = "../../rend3-framework" }
 # Programmable render list that dictates how the scene renders
 rend3-routine = { version = "^0.3.0",path = "../../rend3-routine" }
 # Windowing
-winit = "0.28"
+winit = "0.29.4"
 # Opening URL's
 webbrowser = "0.8.2"
 # Creating textures
@@ -39,4 +39,4 @@ wgpu = "0.18"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 # Winit integration with egui
-egui-winit = { version = "0.24", default-features = false, features = ["clipboard", "links", "wayland"] }
+egui-winit = { git = "https://github.com/emilk/egui.git", branch="master", default-features = false, features = ["clipboard", "links", "wayland"] }

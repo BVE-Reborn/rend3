@@ -1,5 +1,8 @@
 use std::sync::Arc;
 
+use rend3_framework::UserResizeEvent;
+use winit::{event::WindowEvent, event_loop::EventLoopWindowTarget};
+
 struct EguiExampleData {
     _object_handle: rend3::types::ObjectHandle,
     material_handle: rend3::types::MaterialHandle,
@@ -105,6 +108,7 @@ impl rend3_framework::App for EguiExample {
         let context = egui::Context::default();
         // Create the winit/egui integration.
         let platform = egui_winit::State::new(
+            context.clone(),
             egui::ViewportId::default(),
             &window,
             Some(window.scale_factor() as f32),
@@ -154,11 +158,15 @@ impl rend3_framework::App for EguiExample {
         resolution: glam::UVec2,
         event: rend3_framework::Event<'_, ()>,
         control_flow: impl FnOnce(winit::event_loop::ControlFlow),
+        event_loop_window_target: &EventLoopWindowTarget<UserResizeEvent<()>>,
     ) {
         let data = self.data.as_mut().unwrap();
 
         match event {
-            rend3_framework::Event::RedrawRequested(..) => {
+            winit::event::Event::WindowEvent {
+                window_id: _,
+                event: WindowEvent::RedrawRequested,
+            } => {
                 data.context.begin_frame(data.platform.take_egui_input(window));
 
                 // Insert egui commands here
@@ -247,12 +255,12 @@ impl rend3_framework::App for EguiExample {
 
                 control_flow(winit::event_loop::ControlFlow::Poll);
             }
-            rend3_framework::Event::MainEventsCleared => {
+            rend3_framework::Event::AboutToWait => {
                 window.request_redraw();
             }
             rend3_framework::Event::WindowEvent { event, .. } => {
                 // Pass the window events to the egui integration.
-                if data.platform.on_window_event(&data.context, &event).consumed {
+                if data.platform.on_window_event(window, &event).consumed {
                     return;
                 }
 
@@ -262,7 +270,7 @@ impl rend3_framework::App for EguiExample {
                             .resize(size.width, size.height, window.scale_factor() as f32);
                     }
                     winit::event::WindowEvent::CloseRequested => {
-                        control_flow(winit::event_loop::ControlFlow::Exit);
+                        event_loop_window_target.exit();
                     }
                     _ => {}
                 }

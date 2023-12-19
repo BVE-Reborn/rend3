@@ -1,6 +1,6 @@
 #![cfg_attr(target_arch = "wasm32", allow(clippy::arc_with_non_send_sync))]
 
-use std::{future::Future, pin::Pin, sync::Arc};
+use std::{future::Future, pin::Pin, process::exit, sync::Arc};
 
 use glam::UVec2;
 use rend3::{
@@ -11,6 +11,7 @@ use rend3_routine::base::BaseRenderGraph;
 use wgpu::{Instance, PresentMode};
 use winit::{
     dpi::PhysicalSize,
+    error::EventLoopError,
     event::WindowEvent,
     event_loop::{ControlFlow, EventLoop, EventLoopBuilder, EventLoopWindowTarget},
     window::{Window, WindowBuilder, WindowId},
@@ -24,7 +25,7 @@ mod resize_observer;
 pub use assets::*;
 pub use grab::*;
 pub use parking_lot::{Mutex, MutexGuard};
-pub type Event<'a, T> = winit::event::Event<'a, UserResizeEvent<T>>;
+pub type Event<'a, T> = winit::event::Event<UserResizeEvent<T>>;
 
 /// User event which the framework uses to resize on wasm.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -58,10 +59,13 @@ pub trait App<T: 'static = ()> {
         std::panic::set_hook(Box::new(console_error_panic_hook::hook));
     }
 
-    fn create_window(&mut self, builder: WindowBuilder) -> (EventLoop<UserResizeEvent<T>>, Window) {
+    fn create_window(
+        &mut self,
+        builder: WindowBuilder,
+    ) -> Result<(EventLoop<UserResizeEvent<T>>, Window), EventLoopError> {
         profiling::scope!("creating window");
 
-        let event_loop = EventLoopBuilder::with_user_event().build();
+        let event_loop = EventLoopBuilder::with_user_event().build()?;
         let window = builder.build(&event_loop).expect("Could not build window");
 
         #[cfg(target_arch = "wasm32")]
@@ -80,7 +84,7 @@ pub trait App<T: 'static = ()> {
                 .expect("couldn't append canvas to document body");
         }
 
-        (event_loop, window)
+        Ok((event_loop, window))
     }
 
     fn create_iad<'a>(&'a mut self) -> Pin<Box<dyn Future<Output = anyhow::Result<InstanceAdapterDevice>> + 'a>> {
@@ -134,6 +138,7 @@ pub trait App<T: 'static = ()> {
         resolution: UVec2,
         event: Event<'_, T>,
         control_flow: impl FnOnce(winit::event_loop::ControlFlow),
+        event_loop_window_target: &EventLoopWindowTarget<UserResizeEvent<T>>,
     ) {
         let _ = (
             window,
@@ -144,6 +149,7 @@ pub trait App<T: 'static = ()> {
             surface,
             event,
             control_flow,
+            event_loop_window_target,
         );
     }
 }
@@ -164,9 +170,9 @@ pub struct DefaultRoutines {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-fn winit_run<F, T>(event_loop: winit::event_loop::EventLoop<T>, event_handler: F) -> !
+fn winit_run<F, T>(event_loop: winit::event_loop::EventLoop<T>, event_handler: F) -> Result<(), EventLoopError>
 where
-    F: FnMut(winit::event::Event<'_, T>, &EventLoopWindowTarget<T>, &mut ControlFlow) + 'static,
+    F: FnMut(winit::event::Event<T>, &EventLoopWindowTarget<T>) + 'static,
     T: 'static,
 {
     event_loop.run(event_handler)
@@ -175,7 +181,7 @@ where
 #[cfg(target_arch = "wasm32")]
 fn winit_run<F, T>(event_loop: EventLoop<T>, event_handler: F)
 where
-    F: FnMut(winit::event::Event<'_, T>, &EventLoopWindowTarget<T>, &mut ControlFlow) + 'static,
+    F: FnMut(winit::event::Event<T>, &EventLoopWindowTarget<T>) + 'static,
     T: 'static,
 {
     use wasm_bindgen::prelude::*;
@@ -203,12 +209,17 @@ where
     }
 }
 
-pub async fn async_start<A: App<T> + 'static, T: 'static>(mut app: A, window_builder: WindowBuilder) {
+pub async fn async_start<A: App<T> + 'static, T: 'static>(
+    mut app: A,
+    window_builder: WindowBuilder,
+) -> Result<(), winit::error::EventLoopError> {
     app.register_logger();
     app.register_panic_hook();
 
     // Create the window invisible until we are rendering
-    let (event_loop, window) = app.create_window(window_builder.with_visible(false));
+    let Ok((event_loop, window)) = app.create_window(window_builder.with_visible(false)) else {
+        exit(1)
+    };
     let window_size = window.inner_size();
 
     let iad = app.create_iad().await.unwrap();
@@ -295,7 +306,7 @@ pub async fn async_start<A: App<T> + 'static, T: 'static>(mut app: A, window_bui
         present_mode: app.present_mode(),
     };
 
-    winit_run(event_loop, move |event, _event_loop, control_flow| {
+    winit_run(event_loop, move |event, event_loop_window_target| {
         let event = match event {
             Event::UserEvent(UserResizeEvent::Resize { size, window_id }) => Event::WindowEvent {
                 window_id,
@@ -303,7 +314,7 @@ pub async fn async_start<A: App<T> + 'static, T: 'static>(mut app: A, window_bui
             },
             e => e,
         };
-
+        let mut control_flow = event_loop_window_target.control_flow();
         if let Some(suspend) = handle_surface(
             &app,
             &window,
@@ -320,16 +331,20 @@ pub async fn async_start<A: App<T> + 'static, T: 'static>(mut app: A, window_bui
         // We move to Wait when we get suspended so we don't spin at 50k FPS.
         match event {
             Event::Suspended => {
-                *control_flow = ControlFlow::Wait;
+                control_flow = ControlFlow::Wait;
             }
             Event::Resumed => {
-                *control_flow = last_user_control_mode;
+                control_flow = last_user_control_mode;
             }
             _ => {}
         }
 
         // We need to block all updates
-        if let Event::RedrawRequested(_) | Event::RedrawEventsCleared | Event::MainEventsCleared = event {
+        if let Event::WindowEvent {
+            window_id: _,
+            event: winit::event::WindowEvent::RedrawRequested,
+        } = event
+        {
             if suspended {
                 return;
             }
@@ -344,11 +359,12 @@ pub async fn async_start<A: App<T> + 'static, T: 'static>(mut app: A, window_bui
             stored_surface_info.size,
             event,
             |c: ControlFlow| {
-                *control_flow = c;
+                control_flow = c;
                 last_user_control_mode = c;
             },
+            event_loop_window_target,
         )
-    });
+    })
 }
 
 struct StoredSurfaceInfo {
@@ -436,6 +452,6 @@ pub fn start<A: App<T> + 'static, T: 'static>(app: A, window_builder: WindowBuil
 
     #[cfg(not(target_arch = "wasm32"))]
     {
-        pollster::block_on(async_start(app, window_builder));
+        pollster::block_on(async_start(app, window_builder)).unwrap();
     }
 }

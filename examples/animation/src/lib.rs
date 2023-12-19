@@ -1,6 +1,8 @@
 use std::{path::Path, sync::Arc};
 
 use rend3::types::DirectionalLightHandle;
+use rend3_framework::UserResizeEvent;
+use winit::{event::WindowEvent, event_loop::EventLoopWindowTarget};
 
 const SAMPLE_COUNT: rend3::types::SampleCount = rend3::types::SampleCount::One;
 
@@ -125,17 +127,16 @@ impl rend3_framework::App for AnimationExample {
         surface: Option<&Arc<rend3::types::Surface>>,
         resolution: glam::UVec2,
         event: rend3_framework::Event<'_, ()>,
-        control_flow: impl FnOnce(winit::event_loop::ControlFlow),
+        _control_flow: impl FnOnce(winit::event_loop::ControlFlow),
+        event_loop_window_target: &EventLoopWindowTarget<UserResizeEvent<()>>,
     ) {
         match event {
             // Close button was clicked, we should close.
             rend3_framework::Event::WindowEvent {
                 event: winit::event::WindowEvent::CloseRequested,
                 ..
-            } => {
-                control_flow(winit::event_loop::ControlFlow::Exit);
-            }
-            rend3_framework::Event::MainEventsCleared => {
+            } => event_loop_window_target.exit(),
+            rend3_framework::Event::AboutToWait => {
                 let now = web_time::Instant::now();
 
                 self.animated_objects.iter_mut().for_each(|animated_object| {
@@ -147,7 +148,10 @@ impl rend3_framework::App for AnimationExample {
                 window.request_redraw();
             }
             // Render!
-            rend3_framework::Event::RedrawRequested(_) => {
+            rend3_framework::Event::WindowEvent {
+                window_id: _,
+                event: WindowEvent::RedrawRequested,
+            } => {
                 // Get a frame
                 let frame = surface.unwrap().get_current_texture().unwrap();
 
