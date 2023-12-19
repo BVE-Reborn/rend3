@@ -179,7 +179,7 @@ where
 }
 
 #[cfg(target_arch = "wasm32")]
-fn winit_run<F, T>(event_loop: EventLoop<T>, event_handler: F) -> ()
+fn winit_run<F, T>(event_loop: EventLoop<T>, event_handler: F)
 where
     F: FnMut(winit::event::Event<T>, &EventLoopWindowTarget<T>) + 'static,
     T: 'static,
