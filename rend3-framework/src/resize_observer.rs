@@ -34,7 +34,7 @@ pub struct ResizeObserver {
 }
 impl ResizeObserver {
     pub fn new<T: 'static>(window: &Window, proxy: EventLoopProxy<UserResizeEvent<T>>) -> Self {
-        let canvas = window.canvas();
+        let canvas = window.canvas().unwrap();
         let id = window.id();
         let callback: Box<dyn FnMut(u32, u32)> = Box::new(move |width, height| {
             let _res = proxy.send_event(UserResizeEvent::Resize {
@@ -48,7 +48,7 @@ impl ResizeObserver {
 
         let js_value = Closure::wrap(callback).into_js_value();
 
-        __wasm_rend3_framework_register_resize_observer_impl(&window.canvas(), &js_value);
+        __wasm_rend3_framework_register_resize_observer_impl(&window.canvas().unwrap(), &js_value);
 
         Self { _callback: js_value }
     }

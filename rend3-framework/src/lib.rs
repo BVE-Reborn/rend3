@@ -72,7 +72,7 @@ pub trait App<T: 'static = ()> {
         {
             use winit::platform::web::WindowExtWebSys;
 
-            let canvas = window.canvas();
+            let canvas = window.canvas().unwrap();
             let style = canvas.style();
             style.set_property("width", "100%").unwrap();
             style.set_property("height", "100%").unwrap();
@@ -186,7 +186,7 @@ where
 {
     use wasm_bindgen::prelude::*;
 
-    let winit_closure = Closure::once_into_js(move || event_loop.run(event_handler));
+    let winit_closure = Closure::once_into_js(move || event_loop.run(event_handler).expect("Init failed"));
 
     // make sure to handle JS exceptions thrown inside start.
     // Otherwise wasm_bindgen_futures Queue would break and never handle any tasks
@@ -209,10 +209,7 @@ where
     }
 }
 
-pub async fn async_start<A: App<T> + 'static, T: 'static>(
-    mut app: A,
-    window_builder: WindowBuilder,
-) -> Result<(), winit::error::EventLoopError> {
+pub async fn async_start<A: App<T> + 'static, T: 'static>(mut app: A, window_builder: WindowBuilder) -> () {
     app.register_logger();
     app.register_panic_hook();
 
@@ -421,7 +418,7 @@ fn handle_surface<A: App<T>, T: 'static>(
             #[cfg(target_arch = "wasm32")]
             {
                 use winit::platform::web::WindowExtWebSys;
-                let canvas = window.canvas();
+                let canvas = window.canvas().unwrap();
                 let style = canvas.style();
 
                 style.set_property("width", "100%").unwrap();

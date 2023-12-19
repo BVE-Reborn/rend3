@@ -15,10 +15,13 @@ use rend3_gltf::GltfSceneInstance;
 use rend3_routine::{base::BaseRenderGraph, pbr::NormalTextureYDirection, skybox::SkyboxRoutine};
 use web_time::Instant;
 use wgpu_profiler::GpuTimerScopeResult;
+#[cfg(target_arch = "wasm32")]
+use winit::keyboard::PhysicalKey::Code;
+#[cfg(not(target_arch = "wasm32"))]
+use winit::platform::scancode::PhysicalKeyExtScancode;
 use winit::{
     event::{DeviceEvent, ElementState, Event, KeyEvent, MouseButton, WindowEvent},
     event_loop::EventLoopWindowTarget,
-    platform::scancode::PhysicalKeyExtScancode,
     window::{Fullscreen, WindowBuilder},
 };
 
@@ -676,7 +679,10 @@ impl rend3_framework::App for SceneViewer {
                     },
                 ..
             } => {
+                #[cfg(not(target_arch = "wasm32"))]
                 let scancode = PhysicalKeyExtScancode::to_scancode(physical_key).unwrap();
+                #[cfg(target_arch = "wasm32")]
+                let scancode = if let Code(kk) = physical_key { kk as u32 } else { 0 };
                 log::info!("WE scancode {:x}", scancode);
                 self.scancode_status.insert(
                     scancode,

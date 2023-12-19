@@ -25,7 +25,7 @@ impl Grabber {
 
         let inner_clone = Arc::clone(&inner);
 
-        let canvas = window.canvas();
+        let canvas = window.canvas().unwrap();
         let document = canvas.owner_document().unwrap();
 
         let function: Box<dyn FnMut()> = Box::new(move || {
@@ -50,7 +50,7 @@ impl Grabber {
     }
 
     pub fn request_grab(&mut self, window: &Window) {
-        let canvas = window.canvas();
+        let canvas = window.canvas().unwrap();
         let document = canvas.owner_document().unwrap();
         canvas.request_pointer_lock();
 
@@ -62,7 +62,7 @@ impl Grabber {
     }
 
     pub fn request_ungrab(&mut self, window: &Window) {
-        let canvas = window.canvas();
+        let canvas = window.canvas().unwrap();
         let document = canvas.owner_document().unwrap();
 
         document
