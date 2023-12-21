@@ -302,7 +302,8 @@ pub async fn async_start<A: App<T> + 'static, T: 'static>(mut app: A, window_bui
         sample_count: app.sample_count(),
         present_mode: app.present_mode(),
     };
-
+    // On native this is a result, but on wasm it's a unit type.
+    #[allow(clippy::let_unit_value)]
     let _ = winit_run(event_loop, move |event, event_loop_window_target| {
         let event = match event {
             Event::UserEvent(UserResizeEvent::Resize { size, window_id }) => Event::WindowEvent {
