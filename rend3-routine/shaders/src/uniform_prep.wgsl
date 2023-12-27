@@ -6,7 +6,7 @@ var<storage> object_buffer: array<Object>;
 @group(0) @binding(1)
 var<storage, read_write> per_camera_uniform: PerCameraUniform;
 
-@compute @workgroup_size(64)
+@compute @workgroup_size(256)
 fn cs_main(
     @builtin(global_invocation_id) gid: vec3<u32>,
 ) {

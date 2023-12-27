@@ -1,5 +1,5 @@
 const BATCH_SIZE: usize = 256;
-const WORKGROUP_SIZE: u32 = 64;
+const WORKGROUP_SIZE: u32 = 256;
 
 mod batching;
 mod culler;
