@@ -220,15 +220,23 @@ fn main() {
             // Add the default rendergraph without a skybox
             base_rendergraph.add_to_graph(
                 &mut graph,
-                &eval_output,
-                &pbr_routine,
-                None,
-                &tonemapping_routine,
-                frame_handle,
-                resolution,
-                rend3::types::SampleCount::One,
-                glam::Vec4::ZERO,
-                glam::Vec4::new(0.10, 0.05, 0.10, 1.0), // Nice scene-referred purple
+                rend3_routine::base::BaseRenderGraphInputs {
+                    eval_output: &eval_output,
+                    routines: rend3_routine::base::BaseRenderGraphRoutines {
+                        pbr: &pbr_routine,
+                        skybox: None,
+                        tonemapping: &tonemapping_routine,
+                    },
+                    target: rend3_routine::base::OutputRenderTarget {
+                        handle: frame_handle,
+                        resolution,
+                        samples: rend3::types::SampleCount::One,
+                    },
+                },
+                rend3_routine::base::BaseRenderGraphSettings {
+                    ambient_color: glam::Vec4::ZERO,
+                    clear_color: glam::Vec4::new(0.10, 0.05, 0.10, 1.0), // Nice scene-referred purple
+                },
             );
 
             // Dispatch a render using the built up rendergraph!

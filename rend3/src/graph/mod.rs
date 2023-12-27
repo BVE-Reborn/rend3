@@ -45,9 +45,9 @@
 
 use std::ops::Range;
 
-use glam::UVec2;
+use glam::{UVec2, Vec4};
 use rend3_types::{SampleCount, TextureFormat, TextureUsages};
-use wgpu::{Color, Extent3d, TextureDimension, TextureView};
+use wgpu::{Extent3d, TextureDimension, TextureView};
 
 use crate::util::typedefs::SsoString;
 
@@ -241,7 +241,7 @@ impl RenderTargetHandle {
 }
 
 /// Targets that make up a renderpass.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct RenderPassTargets {
     /// Color targets
     pub targets: Vec<RenderPassTarget>,
@@ -250,6 +250,14 @@ pub struct RenderPassTargets {
 }
 
 impl RenderPassTargets {
+    pub fn resolved_color(&self, idx: usize) -> RenderTargetHandle {
+        let target = &self.targets[idx];
+        match target.resolve {
+            Some(resolve) => resolve,
+            None => target.color,
+        }
+    }
+
     /// Determines if two renderpasses have compatible targets.
     ///
     /// `this: Some, other: Some` will check the contents  
@@ -260,9 +268,9 @@ impl RenderPassTargets {
             (Some(this), Some(other)) => {
                 let targets_compatible = this.targets.len() == other.targets.len()
                     && this.targets.iter().zip(other.targets.iter()).all(|(me, you)| {
-                        let color_compat = me.color.handle.compatible(&you.color.handle);
+                        let color_compat = me.color.compatible(&you.color);
                         let resolve_compat = match (me.resolve, you.resolve) {
-                            (Some(me_dep), Some(you_dep)) => me_dep.handle.compatible(&you_dep.handle),
+                            (Some(me_dep), Some(you_dep)) => me_dep.compatible(&you_dep),
                             (None, None) => true,
                             _ => false,
                         };
@@ -271,7 +279,7 @@ impl RenderPassTargets {
 
                 let depth_compatible = match (&this.depth_stencil, &other.depth_stencil) {
                     (Some(this_depth), Some(other_depth)) => {
-                        this_depth.target.handle.compatible(&other_depth.target.handle)
+                        this_depth.target.compatible(&other_depth.target)
                             && this_depth.depth_clear == other_depth.depth_clear
                             && this_depth.stencil_clear == other_depth.stencil_clear
                     }
@@ -288,23 +296,23 @@ impl RenderPassTargets {
 }
 
 /// Color target in a renderpass.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct RenderPassTarget {
     /// Color attachment. Must be declared as a dependency of the node before it
     /// can be used.
-    pub color: DeclaredDependency<RenderTargetHandle>,
+    pub color: RenderTargetHandle,
     /// Color the attachment will be cleared with if this is the first use.
-    pub clear: Color,
+    pub clear: Vec4,
     /// Resolve attachment. Can only be present if color attachment has > 1
     /// sample.
-    pub resolve: Option<DeclaredDependency<RenderTargetHandle>>,
+    pub resolve: Option<RenderTargetHandle>,
 }
 
 /// Depth target in a renderpass.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct RenderPassDepthTarget {
     /// The target to use as depth.
-    pub target: DeclaredDependency<RenderTargetHandle>,
+    pub target: RenderTargetHandle,
     /// Depth value the attachment will be cleared with if this is the first
     /// use.
     pub depth_clear: Option<f32>,

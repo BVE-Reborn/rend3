@@ -179,7 +179,7 @@ struct ObjectSearchResult {
 }
 
 fn find_object_info(wid: u32) -> ObjectSearchResult {
-    let target_invocation = wid * 64u;
+    let target_invocation = wid * 256u;
     // pulled directly from https://doc.rust-lang.org/src/core/slice/mod.rs.html#2412-2438
 
     var size = culling_job.total_objects;
@@ -206,13 +206,19 @@ fn find_object_info(wid: u32) -> ObjectSearchResult {
     return ObjectSearchResult(object_info, 0xFFFFFFFFu);
 }
 
-// 64 workgroup size / 32 bits
-var<workgroup> workgroup_culling_results: array<atomic<u32>, 2>;
+// 256 workgroup size / 32 bits
+var<workgroup> workgroup_culling_results: array<atomic<u32>, 8>;
 
 fn clear_culling_results(lid: u32) {
     if lid == 0u {
         atomicStore(&workgroup_culling_results[0], 0u);
         atomicStore(&workgroup_culling_results[1], 0u);
+        atomicStore(&workgroup_culling_results[2], 0u);
+        atomicStore(&workgroup_culling_results[3], 0u);
+        atomicStore(&workgroup_culling_results[4], 0u);
+        atomicStore(&workgroup_culling_results[5], 0u);
+        atomicStore(&workgroup_culling_results[6], 0u);
+        atomicStore(&workgroup_culling_results[7], 0u);
     }
 }
 
@@ -225,6 +231,12 @@ fn save_culling_results(global_invocation: u32, lid: u32) {
         let culling_results_index = culling_results.output_offset + (global_invocation / 32u);
         culling_results.bits[culling_results_index + 0u] = atomicLoad(&workgroup_culling_results[0]);
         culling_results.bits[culling_results_index + 1u] = atomicLoad(&workgroup_culling_results[1]);
+        culling_results.bits[culling_results_index + 2u] = atomicLoad(&workgroup_culling_results[2]);
+        culling_results.bits[culling_results_index + 3u] = atomicLoad(&workgroup_culling_results[3]);
+        culling_results.bits[culling_results_index + 4u] = atomicLoad(&workgroup_culling_results[4]);
+        culling_results.bits[culling_results_index + 5u] = atomicLoad(&workgroup_culling_results[5]);
+        culling_results.bits[culling_results_index + 6u] = atomicLoad(&workgroup_culling_results[6]);
+        culling_results.bits[culling_results_index + 7u] = atomicLoad(&workgroup_culling_results[7]);
     }
 }
 
@@ -311,7 +323,7 @@ fn execute_culling(
     return true;
 }
 
-@compute @workgroup_size(64)
+@compute @workgroup_size(256)
 fn cs_main(
     @builtin(workgroup_id) wid: vec3<u32>,
     @builtin(global_invocation_id) gid: vec3<u32>,

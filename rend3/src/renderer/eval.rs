@@ -116,9 +116,11 @@ pub fn evaluate_instructions(renderer: &Renderer) -> InstructionEvaluationOutput
                 InstructionKind::ChangePointLight { handle, change } => {
                     data_core.point_light_manager.update(handle, change);
                 }
-                InstructionKind::SetAspectRatio { ratio } => data_core.camera_manager.set_aspect_ratio(Some(ratio)),
+                InstructionKind::SetAspectRatio { ratio } => {
+                    data_core.viewport_camera_state.set_aspect_ratio(Some(ratio))
+                }
                 InstructionKind::SetCameraData { data } => {
-                    data_core.camera_manager.set_data(data);
+                    data_core.viewport_camera_state.set_data(data);
                 }
                 InstructionKind::DuplicateObject {
                     src_handle,
@@ -202,7 +204,7 @@ pub fn evaluate_instructions(renderer: &Renderer) -> InstructionEvaluationOutput
     let d2c_texture = data_core.d2c_texture_manager.evaluate(&renderer.device);
     let (shadow_target_size, shadows) = data_core
         .directional_light_manager
-        .evaluate(renderer, &data_core.camera_manager);
+        .evaluate(renderer, &data_core.viewport_camera_state);
     data_core.point_light_manager.evaluate(renderer);
     let mesh_buffer = renderer.mesh_manager.evaluate();
 

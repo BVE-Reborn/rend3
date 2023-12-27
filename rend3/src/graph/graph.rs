@@ -224,7 +224,6 @@ impl<'node> RenderGraph<'node> {
                     resource_spans
                         .entry(reference.to_resource())
                         .and_modify(|span| {
-                            span.first_usage.get_or_insert(idx);
                             span.last_reference = Some(idx);
                         })
                         .or_insert(ResourceSpan {
@@ -257,7 +256,10 @@ impl<'node> RenderGraph<'node> {
                     };
                     resource_spans
                         .entry(output.to_resource())
-                        .and_modify(|span| span.last_reference = end)
+                        .and_modify(|span| {
+                            span.first_usage.get_or_insert(idx);
+                            span.last_reference = end
+                        })
                         .or_insert(ResourceSpan {
                             first_reference: idx,
                             first_usage: Some(idx),
@@ -457,8 +459,8 @@ impl<'node> RenderGraph<'node> {
                             .targets
                             .first()
                             .map_or_else(
-                                || rpass_desc.depth_stencil.as_ref().unwrap().target.handle.to_region(),
-                                |t| t.color.handle.to_region(),
+                                || rpass_desc.depth_stencil.as_ref().unwrap().target.to_region(),
+                                |t| t.color.to_region(),
                             )
                             .viewport;
 
@@ -562,12 +564,18 @@ impl<'node> RenderGraph<'node> {
             .targets
             .iter()
             .map(|target| {
-                let view_span = resource_spans[&target.color.handle.resource.to_resource()];
+                let view_span = resource_spans[&target.color.resource.to_resource()];
 
                 let first_usage = view_span.first_usage.expect("internal rendergraph error: renderpass attachment counts as a usage, but no first usage registered on texture");
 
                 let load = if first_usage == node_idx {
-                    LoadOp::Clear(target.clear)
+                    let clear_f64 = target.clear.as_dvec4();
+                    LoadOp::Clear(wgpu::Color {
+                        r: clear_f64.x,
+                        g: clear_f64.y,
+                        b: clear_f64.z,
+                        a: clear_f64.w,
+                    })
                 } else {
                     LoadOp::Load
                 };
@@ -575,14 +583,14 @@ impl<'node> RenderGraph<'node> {
                 let store = if view_span.last_reference == Some(pass_end_idx) { StoreOp::Discard } else { StoreOp::Store };
 
                 RenderPassColorAttachment {
-                    view: match target.color.handle.resource {
+                    view: match target.color.resource {
                         GraphSubResource::ImportedTexture(region) => &active_imported_views[&region],
                         GraphSubResource::Texture(region) => &active_views[&region],
                         _ => {
                             panic!("internal rendergraph error: using a non-texture as a renderpass attachment")
                         }
                     },
-                    resolve_target: target.resolve.as_ref().map(|dep| match dep.handle.resource {
+                    resolve_target: target.resolve.as_ref().map(|dep| match dep.resource {
                         GraphSubResource::ImportedTexture(region) => &active_imported_views[&region],
                         GraphSubResource::Texture(region) => &active_views[&region],
                         _ => {
@@ -595,7 +603,7 @@ impl<'node> RenderGraph<'node> {
             .map(Option::Some)
             .collect();
         let depth_stencil_attachment = desc.depth_stencil.as_ref().map(|ds_target| {
-            let resource = ds_target.target.handle.resource;
+            let resource = ds_target.target.resource;
 
             let view_span = resource_spans[&resource.to_resource()];
 

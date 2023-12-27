@@ -1,24 +1,19 @@
 //! Helpers for building the per-camera uniform data used for cameras and
 //! shadows.
 
-use std::iter::once;
-
+use encase::{ShaderSize, ShaderType, UniformBuffer};
 use glam::{Mat4, UVec2, Vec4};
 use rend3::{
     graph::{DataHandle, NodeResourceUsage, RenderGraph, RenderTargetHandle},
-    managers::CameraManager,
+    managers::CameraState,
     util::{bind_merge::BindGroupBuilder, frustum::Frustum},
 };
-use wgpu::{
-    util::{BufferInitDescriptor, DeviceExt},
-    BindGroup, BufferUsages,
-};
+use wgpu::{BindGroup, BufferUsages};
 
 use crate::common::{Samplers, WholeFrameInterfaces};
 
-/// The actual structure passed to the shader.
-#[derive(Debug, Copy, Clone)]
-#[repr(C, align(16))]
+/// Set of uniforms that are useful for the whole frame.
+#[derive(Debug, Copy, Clone, ShaderType)]
 pub struct FrameUniforms {
     pub view: Mat4,
     pub view_proj: Mat4,
@@ -32,7 +27,7 @@ pub struct FrameUniforms {
 }
 impl FrameUniforms {
     /// Use the given camera to generate these uniforms.
-    pub fn new(camera: &CameraManager, ambient: Vec4, resolution: UVec2) -> Self {
+    pub fn new(camera: &CameraState, info: &UniformInformation<'_>) -> Self {
         profiling::scope!("create uniforms");
 
         let view = camera.view();
@@ -47,48 +42,66 @@ impl FrameUniforms {
             inv_view_proj: view_proj.inverse(),
             inv_origin_view_proj: origin_view_proj.inverse(),
             frustum: Frustum::from_matrix(camera.proj()),
-            ambient,
-            resolution,
+            ambient: info.ambient,
+            resolution: info.resolution,
         }
     }
 }
 
-unsafe impl bytemuck::Zeroable for FrameUniforms {}
-unsafe impl bytemuck::Pod for FrameUniforms {}
+/// Various information sources for the uniform data.
+pub struct UniformInformation<'node> {
+    /// Struct containing the default set of samplers.
+    pub samplers: &'node Samplers,
+    /// Ambient light color.
+    pub ambient: Vec4,
+    /// Resolution of the viewport.
+    pub resolution: UVec2,
+}
+
+pub struct UniformBindingHandles<'node> {
+    /// Interfaces containing the bind group layouts for the uniform bind groups.
+    pub interfaces: &'node WholeFrameInterfaces,
+    /// The output bind group handle for the shadow uniform data. This does not
+    /// include the shadow map texture, preventing a cycle.
+    pub shadow_uniform_bg: DataHandle<BindGroup>,
+    /// The output bind group handle for the forward uniform data. This does
+    /// include the shadow map texture.
+    pub forward_uniform_bg: DataHandle<BindGroup>,
+}
 
 /// Add the creation of these uniforms to the graph.
-#[allow(clippy::too_many_arguments)]
 pub fn add_to_graph<'node>(
     graph: &mut RenderGraph<'node>,
-    shadow_uniform_bg: DataHandle<BindGroup>,
-    forward_uniform_bg: DataHandle<BindGroup>,
     shadow_target: RenderTargetHandle,
-    interfaces: &'node WholeFrameInterfaces,
-    samplers: &'node Samplers,
-    ambient: Vec4,
-    resolution: UVec2,
+    binding_handles: UniformBindingHandles<'node>,
+    info: UniformInformation<'node>,
 ) {
     let mut builder = graph.add_node("build uniform data");
-    let shadow_handle = builder.add_data(shadow_uniform_bg, NodeResourceUsage::Output);
-    let forward_handle = builder.add_data(forward_uniform_bg, NodeResourceUsage::Output);
+    let shadow_handle = builder.add_data(binding_handles.shadow_uniform_bg, NodeResourceUsage::Output);
+    let forward_handle = builder.add_data(binding_handles.forward_uniform_bg, NodeResourceUsage::Output);
 
     // Get the shadow target and declare it a dependency of the forward_uniform_bg
     let shadow_target_handle = builder.add_render_target(shadow_target, NodeResourceUsage::Reference);
-    builder.add_dependencies_to_render_targets(forward_uniform_bg, once(shadow_target));
+    builder.add_dependencies_to_render_targets(binding_handles.forward_uniform_bg, [shadow_target]);
 
     builder.build(move |ctx| {
         let shadow_target = ctx.graph_data.get_render_target(shadow_target_handle);
 
         let mut bgb = BindGroupBuilder::new();
 
-        samplers.add_to_bg(&mut bgb);
+        info.samplers.add_to_bg(&mut bgb);
 
-        let uniforms = FrameUniforms::new(&ctx.data_core.camera_manager, ambient, resolution);
-        let uniform_buffer = ctx.renderer.device.create_buffer_init(&BufferInitDescriptor {
-            label: Some("frame uniform"),
-            contents: bytemuck::bytes_of(&uniforms),
+        let uniforms = FrameUniforms::new(&ctx.data_core.viewport_camera_state, &info);
+        let uniform_buffer = ctx.renderer.device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Frame Uniforms"),
+            size: FrameUniforms::SHADER_SIZE.get(),
             usage: BufferUsages::UNIFORM,
+            mapped_at_creation: true,
         });
+        let mut mapping = uniform_buffer.slice(..).get_mapped_range_mut();
+        UniformBuffer::new(&mut *mapping).write(&uniforms).unwrap();
+        drop(mapping);
+        uniform_buffer.unmap();
 
         bgb.append_buffer(&uniform_buffer);
 
@@ -98,7 +111,7 @@ pub fn add_to_graph<'node>(
         let shadow_uniform_bg = bgb.build(
             &ctx.renderer.device,
             Some("shadow uniform bg"),
-            &interfaces.depth_uniform_bgl,
+            &binding_handles.interfaces.depth_uniform_bgl,
         );
 
         bgb.append_texture_view(shadow_target);
@@ -106,7 +119,7 @@ pub fn add_to_graph<'node>(
         let forward_uniform_bg = bgb.build(
             &ctx.renderer.device,
             Some("forward uniform bg"),
-            &interfaces.forward_uniform_bgl,
+            &binding_handles.interfaces.forward_uniform_bgl,
         );
 
         ctx.graph_data.set_data(shadow_handle, Some(shadow_uniform_bg));

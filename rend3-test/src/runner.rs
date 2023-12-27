@@ -163,15 +163,23 @@ impl TestRunner {
 
         self.base_rendergraph.add_to_graph(
             &mut graph,
-            &eval_output,
-            &self.pbr,
-            None,
-            &self.tonemapping,
-            frame_handle,
-            UVec2::splat(settings.size),
-            settings.samples,
-            glam::Vec4::ZERO,
-            glam::Vec4::ZERO,
+            rend3_routine::base::BaseRenderGraphInputs {
+                eval_output: &eval_output,
+                routines: rend3_routine::base::BaseRenderGraphRoutines {
+                    pbr: &self.pbr,
+                    skybox: None,
+                    tonemapping: &self.tonemapping,
+                },
+                target: rend3_routine::base::OutputRenderTarget {
+                    handle: frame_handle,
+                    resolution: UVec2::splat(settings.size),
+                    samples: settings.samples,
+                },
+            },
+            rend3_routine::base::BaseRenderGraphSettings {
+                ambient_color: glam::Vec4::ZERO,
+                clear_color: glam::Vec4::ZERO,
+            },
         );
 
         graph.execute(&self.renderer, &mut eval_output);
