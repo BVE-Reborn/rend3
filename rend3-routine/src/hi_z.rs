@@ -213,14 +213,17 @@ impl HiZRoutine {
 
             let source = node.add_render_target(multi_sample, NodeResourceUsage::Output);
 
-            let rpass_handle = node.add_renderpass(RenderPassTargets {
-                targets: vec![],
-                depth_stencil: Some(RenderPassDepthTarget {
-                    target: depth_targets.single_sample_mipped.set_mips(0..1),
-                    depth_clear: Some(0.0),
-                    stencil_clear: None,
-                }),
-            });
+            let rpass_handle = node.add_renderpass(
+                RenderPassTargets {
+                    targets: vec![],
+                    depth_stencil: Some(RenderPassDepthTarget {
+                        target: depth_targets.single_sample_mipped.set_mips(0..1),
+                        depth_clear: Some(0.0),
+                        stencil_clear: None,
+                    }),
+                },
+                NodeResourceUsage::InputOutput,
+            );
 
             node.add_side_effect();
 
@@ -249,14 +252,17 @@ impl HiZRoutine {
                 NodeResourceUsage::Input,
             );
 
-            let rpass_handle = node.add_renderpass(RenderPassTargets {
-                targets: vec![],
-                depth_stencil: Some(RenderPassDepthTarget {
-                    target: dst_target,
-                    depth_clear: Some(0.0),
-                    stencil_clear: None,
-                }),
-            });
+            let rpass_handle = node.add_renderpass(
+                RenderPassTargets {
+                    targets: vec![],
+                    depth_stencil: Some(RenderPassDepthTarget {
+                        target: dst_target,
+                        depth_clear: Some(0.0),
+                        stencil_clear: None,
+                    }),
+                },
+                NodeResourceUsage::InputOutput,
+            );
 
             node.add_side_effect();
 

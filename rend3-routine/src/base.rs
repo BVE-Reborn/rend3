@@ -28,6 +28,7 @@ use rend3::{
 use wgpu::{BindGroup, Buffer};
 
 use crate::{
+    clear,
     common::{self, CameraSpecifier},
     culling,
     forward::{self, ForwardRoutineArgs},
@@ -141,6 +142,9 @@ impl BaseRenderGraph {
     ) {
         // Create the data and handles for the graph.
         let mut state = BaseRenderGraphIntermediateState::new(graph, inputs, settings);
+
+        // Clear the shadow buffers. This, as an explicit node, must be done as a limitation of the graph dependency system.
+        state.clear_shadow_buffers();
 
         // Prepare all the uniforms that all shaders need access to.
         state.create_frame_uniforms(self);
@@ -295,6 +299,11 @@ impl<'a, 'node> BaseRenderGraphIntermediateState<'a, 'node> {
 
             pre_skinning_buffers,
         }
+    }
+
+    /// Clear the shadow buffers. This, as an explicit node, must be done as a limitation of the graph dependency system.
+    fn clear_shadow_buffers(&mut self) {
+        clear::add_depth_clear_to_graph(self.graph, self.shadow, 0.0);
     }
 
     /// Create all the uniforms all the shaders in this graph need.

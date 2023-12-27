@@ -740,7 +740,14 @@ impl GpuCuller {
     ) {
         let mut node = graph.add_node(name);
         let output = node.add_data(draw_calls_hdl, NodeResourceUsage::Output);
-        let depth_handle = node.add_render_target(depth_handle, NodeResourceUsage::Input);
+        let depth_handle = node.add_render_target(
+            depth_handle,
+            if camera_specifier.is_shadow() {
+                NodeResourceUsage::Reference
+            } else {
+                NodeResourceUsage::Input
+            },
+        );
 
         node.build(move |mut ctx| {
             let camera = match camera_specifier {

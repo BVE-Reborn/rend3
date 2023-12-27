@@ -19,6 +19,7 @@
 //! too much user side boilerplate.
 
 pub mod base;
+pub mod clear;
 pub mod common;
 pub mod culling;
 pub mod forward;

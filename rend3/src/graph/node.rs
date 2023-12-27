@@ -41,6 +41,7 @@ pub(super) struct RenderGraphNode<'node> {
     pub exec: Box<dyn for<'a, 'pass> FnOnce(NodeExecutionContext<'a, 'pass, 'node>) + 'node>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NodeResourceUsage {
     /// Doesn't access the resource at all, just need access to the resource.
     Reference,
@@ -96,17 +97,17 @@ impl<'a, 'node> RenderGraphNodeBuilder<'a, 'node> {
 
     /// Declares a renderpass that will be written to. Declaring a renderpass
     /// will prevent access to an encoder in the node.
-    pub fn add_renderpass(&mut self, targets: RenderPassTargets) -> DeclaredDependency<RenderPassHandle> {
+    pub fn add_renderpass(&mut self, targets: RenderPassTargets, usage: NodeResourceUsage) -> DeclaredDependency<RenderPassHandle> {
         assert!(
             self.rpass.is_none(),
             "Cannot have more than one graph-associated renderpass per node."
         );
         for targets in &targets.targets {
-            self.add_render_target(targets.color, NodeResourceUsage::InputOutput);
-            self.add_optional_render_target(targets.resolve, NodeResourceUsage::InputOutput);
+            self.add_render_target(targets.color, usage);
+            self.add_optional_render_target(targets.resolve, usage);
         }
         if let Some(depth_stencil) = &targets.depth_stencil {
-            self.add_render_target(depth_stencil.target, NodeResourceUsage::InputOutput);
+            self.add_render_target(depth_stencil.target, usage);
         }
         self.rpass = Some(targets);
         DeclaredDependency {

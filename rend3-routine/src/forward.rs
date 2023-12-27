@@ -194,7 +194,7 @@ impl<M: Material> ForwardRoutine<M> {
 
         builder.add_side_effect();
 
-        let rpass_handle = builder.add_renderpass(args.renderpass.clone());
+        let rpass_handle = builder.add_renderpass(args.renderpass.clone(), NodeResourceUsage::Output);
 
         let whole_frame_uniform_handle =
             builder.add_data(args.binding_data.whole_frame_uniform_bg, NodeResourceUsage::Input);

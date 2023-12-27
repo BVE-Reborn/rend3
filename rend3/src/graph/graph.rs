@@ -224,7 +224,6 @@ impl<'node> RenderGraph<'node> {
                     resource_spans
                         .entry(reference.to_resource())
                         .and_modify(|span| {
-                            span.first_usage.get_or_insert(idx);
                             span.last_reference = Some(idx);
                         })
                         .or_insert(ResourceSpan {
@@ -257,7 +256,10 @@ impl<'node> RenderGraph<'node> {
                     };
                     resource_spans
                         .entry(output.to_resource())
-                        .and_modify(|span| span.last_reference = end)
+                        .and_modify(|span| {
+                            span.first_usage.get_or_insert(idx);
+                            span.last_reference = end
+                        })
                         .or_insert(ResourceSpan {
                             first_reference: idx,
                             first_usage: Some(idx),

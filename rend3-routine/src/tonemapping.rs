@@ -129,14 +129,17 @@ impl TonemappingRoutine {
 
         let input_handle = builder.add_render_target(src, NodeResourceUsage::Input);
 
-        let rpass_handle = builder.add_renderpass(RenderPassTargets {
-            targets: vec![RenderPassTarget {
-                color: dst,
-                clear: Vec4::ZERO,
-                resolve: None,
-            }],
-            depth_stencil: None,
-        });
+        let rpass_handle = builder.add_renderpass(
+            RenderPassTargets {
+                targets: vec![RenderPassTarget {
+                    color: dst,
+                    clear: Vec4::ZERO,
+                    resolve: None,
+                }],
+                depth_stencil: None,
+            },
+            NodeResourceUsage::InputOutput,
+        );
 
         let forward_uniform_handle = builder.add_data(forward_uniform_bg, NodeResourceUsage::Input);
 

@@ -90,7 +90,7 @@ impl SkyboxRoutine {
     ) {
         let mut builder = graph.add_node("Skybox");
 
-        let rpass_handle = builder.add_renderpass(renderpass);
+        let rpass_handle = builder.add_renderpass(renderpass, NodeResourceUsage::InputOutput);
 
         let forward_uniform_handle = builder.add_data(forward_uniform_bg, NodeResourceUsage::Input);
 
