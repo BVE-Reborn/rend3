@@ -3,15 +3,15 @@ use std::{mem, panic::Location};
 use glam::Mat4;
 use parking_lot::Mutex;
 use rend3_types::{
-    trait_supertrait_alias, MaterialHandle, MeshHandle, ObjectChange, ObjectHandle, PointLight, PointLightChange,
-    PointLightHandle, RawDirectionalLightHandle, RawGraphDataHandleUntyped, RawMaterialHandle, RawMeshHandle,
-    RawPointLightHandle, RawSkeletonHandle, RawTexture2DHandle, RawTextureCubeHandle, SkeletonHandle, Texture2DHandle,
-    TextureCubeHandle, TextureFromTexture, WasmNotSend, WasmNotSync,
+    trait_supertrait_alias, MaterialHandle, ObjectChange, ObjectHandle, PointLight, PointLightChange, PointLightHandle,
+    RawDirectionalLightHandle, RawGraphDataHandleUntyped, RawMaterialHandle, RawMeshHandle, RawPointLightHandle,
+    RawSkeletonHandle, RawTexture2DHandle, RawTextureCubeHandle, SkeletonHandle, Texture2DHandle, TextureCubeHandle,
+    TextureFromTexture, WasmNotSend, WasmNotSync,
 };
 use wgpu::{CommandBuffer, Device};
 
 use crate::{
-    managers::{GraphStorage, InternalMesh, InternalSkeleton, InternalTexture, MaterialManager, TextureManager},
+    managers::{GraphStorage, InternalSkeleton, InternalTexture, MaterialManager, TextureManager},
     types::{Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Object, RawObjectHandle},
     RendererProfile,
 };
@@ -28,8 +28,6 @@ pub struct Instruction {
 #[allow(clippy::type_complexity)]
 pub enum InstructionKind {
     AddMesh {
-        handle: MeshHandle,
-        internal_mesh: InternalMesh,
         cmd_buf: CommandBuffer,
     },
     AddSkeleton {
