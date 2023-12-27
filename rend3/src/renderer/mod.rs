@@ -152,10 +152,10 @@ impl Renderer {
         // Handle allocation must be done _after_ any validation to prevent deletion of a handle that never gets fully added.
         let handle = self.resource_handle_allocators.mesh.allocate(self);
 
+        self.mesh_manager.fill(&handle, internal_mesh);
+
         self.instructions.push(
             InstructionKind::AddMesh {
-                handle: handle.clone(),
-                internal_mesh,
                 cmd_buf: encoder.finish(),
             },
             *Location::caller(),

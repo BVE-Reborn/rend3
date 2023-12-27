@@ -27,13 +27,7 @@ pub fn evaluate_instructions(renderer: &Renderer) -> InstructionEvaluationOutput
         profiling::scope!("Instruction Processing");
         for Instruction { kind, location: _ } in instructions.drain(..) {
             match kind {
-                InstructionKind::AddMesh {
-                    handle,
-                    internal_mesh,
-                    cmd_buf: buffer,
-                } => {
-                    profiling::scope!("Add Mesh");
-                    renderer.mesh_manager.fill(&handle, internal_mesh);
+                InstructionKind::AddMesh { cmd_buf: buffer } => {
                     cmd_bufs.push(buffer);
                 }
                 InstructionKind::AddSkeleton { handle, skeleton } => {
