@@ -97,7 +97,11 @@ impl<'a, 'node> RenderGraphNodeBuilder<'a, 'node> {
 
     /// Declares a renderpass that will be written to. Declaring a renderpass
     /// will prevent access to an encoder in the node.
-    pub fn add_renderpass(&mut self, targets: RenderPassTargets, usage: NodeResourceUsage) -> DeclaredDependency<RenderPassHandle> {
+    pub fn add_renderpass(
+        &mut self,
+        targets: RenderPassTargets,
+        usage: NodeResourceUsage,
+    ) -> DeclaredDependency<RenderPassHandle> {
         assert!(
             self.rpass.is_none(),
             "Cannot have more than one graph-associated renderpass per node."
