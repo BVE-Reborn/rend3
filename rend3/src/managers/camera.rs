@@ -8,7 +8,7 @@ use crate::{
 
 /// Manages the camera's location and projection settings.
 #[derive(Debug, Clone)]
-pub struct CameraManager {
+pub struct CameraState {
     handedness: Handedness,
     orig_view: Mat4,
     proj: Mat4,
@@ -17,11 +17,11 @@ pub struct CameraManager {
     data: Camera,
     aspect_ratio: f32,
 }
-impl CameraManager {
+impl CameraState {
     /// Builds a new camera, using the given aspect ratio. If no aspect ratio is
     /// given it is assumed that no aspect ratio scaling should be done.
     pub fn new(data: Camera, handedness: Handedness, aspect_ratio: Option<f32>) -> Self {
-        profiling::scope!("CameraManager::new");
+        profiling::scope!("CameraState::new");
 
         let aspect_ratio = aspect_ratio.unwrap_or(1.0);
         let proj = compute_projection_matrix(data, handedness, aspect_ratio);

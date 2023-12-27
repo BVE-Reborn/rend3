@@ -7,24 +7,21 @@ use std::{marker::PhantomData, sync::Arc};
 use arrayvec::ArrayVec;
 use encase::ShaderSize;
 use rend3::{
-    graph::{
-        DataHandle, NodeResourceUsage, RenderGraph, RenderPassDepthTarget, RenderPassTarget, RenderPassTargets,
-        RenderTargetHandle,
-    },
+    graph::{self, DataHandle, NodeResourceUsage, RenderGraph, RenderPassTargets},
     types::{GraphDataHandle, Material, SampleCount},
     util::{bind_merge::BindGroupBuilder, typedefs::FastHashMap},
     ProfileData, Renderer, RendererDataCore, RendererProfile, ShaderPreProcessor,
 };
 use serde::Serialize;
 use wgpu::{
-    BindGroup, BindGroupLayout, Color, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState,
-    DepthStencilState, FragmentState, IndexFormat, MultisampleState, PipelineLayoutDescriptor, PolygonMode,
-    PrimitiveState, PrimitiveTopology, RenderPipeline, RenderPipelineDescriptor, ShaderModule, StencilState,
-    TextureFormat, VertexState,
+    BindGroup, BindGroupLayout, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState, DepthStencilState,
+    FragmentState, IndexFormat, MultisampleState, PipelineLayoutDescriptor, PolygonMode, PrimitiveState,
+    PrimitiveTopology, RenderPipeline, RenderPipelineDescriptor, ShaderModule, StencilState, TextureFormat,
+    VertexState,
 };
 
 use crate::{
-    common::{CameraIndex, PerMaterialArchetypeInterface, WholeFrameInterfaces},
+    common::{CameraSpecifier, PerMaterialArchetypeInterface, WholeFrameInterfaces},
     culling::{self, CullingBufferMap, DrawCall, DrawCallSet, InputOutputPartition},
 };
 
@@ -47,7 +44,45 @@ pub struct ShaderModulePair<'a> {
     pub fs_module: &'a ShaderModule,
 }
 
-pub struct RoutineArgs<'a, M> {
+enum DeclaredCullingOutput {
+    Predicted,
+    Residual(graph::DeclaredDependency<DataHandle<Arc<culling::DrawCallSet>>>),
+}
+
+impl DeclaredCullingOutput {
+    /// Returns `true` if the declared culling output is [`Residual`].
+    ///
+    /// [`Residual`]: DeclaredCullingOutput::Residual
+    #[must_use]
+    fn is_residual(&self) -> bool {
+        matches!(self, Self::Residual(..))
+    }
+}
+
+pub enum CullingSource {
+    /// We are rendering the first pass with the predicted triangles from last frame.
+    ///
+    /// This is used on the first pass.
+    Predicted,
+    /// We are rendering the second pass with the residual triangles from this frame.
+    ///
+    /// This is used when we are rendering the residual triangles from this frame, as part of the second pass.
+    Residual(DataHandle<Arc<culling::DrawCallSet>>),
+}
+
+impl CullingSource {
+    fn add_inner_data(&self, builder: &mut graph::RenderGraphNodeBuilder<'_, '_>) -> DeclaredCullingOutput {
+        match self {
+            CullingSource::Predicted => DeclaredCullingOutput::Predicted,
+            CullingSource::Residual(handle) => {
+                let handle = builder.add_data(*handle, NodeResourceUsage::Input);
+                DeclaredCullingOutput::Residual(handle)
+            }
+        }
+    }
+}
+
+pub struct ForwardRoutineCreateArgs<'a, M> {
     pub name: &'a str,
 
     pub renderer: &'a Arc<Renderer>,
@@ -68,31 +103,42 @@ pub struct RoutineArgs<'a, M> {
     pub descriptor_callback: Option<&'a dyn Fn(&mut RenderPipelineDescriptor<'_>, &mut [Option<ColorTargetState>])>,
 }
 
-pub struct RoutineAddToGraphArgs<'a, 'node, M> {
-    pub graph: &'a mut RenderGraph<'node>,
+pub struct ForwardRoutineBindingData<'node, M> {
+    /// Bind group holding references to all the uniforms needed by the entire frame.
+    /// This is will be either the shadow pass uniforms, or the forward pass uniforms.
+    ///
+    /// This includes bindings provided by all the managers.
     pub whole_frame_uniform_bg: DataHandle<BindGroup>,
-    // If this is None, we are rendering the first pass with the predicted triangles from last frame.
-    //
-    // If this is Some, we are rendering the second pass with the residual triangles from this frame.
-    pub culling_output_handle: Option<DataHandle<Arc<culling::DrawCallSet>>>,
-    pub per_material: &'node PerMaterialArchetypeInterface<M>,
+    /// Bind group layout for all the per-material uniforms for this material.
+    ///
+    /// The bind group is constructed in the rendergraph nodes.
+    pub per_material_bgl: &'node PerMaterialArchetypeInterface<M>,
+    /// Extra bind groups to be added to the pipeline.
     pub extra_bgs: Option<&'node [BindGroup]>,
+}
+
+pub struct ForwardRoutineArgs<'a, 'node, M> {
+    pub graph: &'a mut RenderGraph<'node>,
+
     pub label: &'a str,
+
+    pub camera: CameraSpecifier,
+    pub binding_data: ForwardRoutineBindingData<'node, M>,
+
+    /// Source of culling information, determines which triangles are rendered this pass.
+    pub culling_source: CullingSource,
     pub samples: SampleCount,
-    pub color: Option<RenderTargetHandle>,
-    pub resolve: Option<RenderTargetHandle>,
-    pub depth: RenderTargetHandle,
-    pub camera: CameraIndex,
+    pub renderpass: RenderPassTargets,
 }
 
 /// A set of pipelines for rendering a specific combination of a material.
 pub struct ForwardRoutine<M: Material> {
-    pub pipeline_s1: RenderPipeline,
-    pub pipeline_s4: RenderPipeline,
-    pub material_key: u64,
-    pub culling_buffer_map_handle: GraphDataHandle<CullingBufferMap>,
-    pub draw_call_set_cache_handle: GraphDataHandle<FastHashMap<CameraIndex, Arc<DrawCallSet>>>,
-    pub _phantom: PhantomData<M>,
+    pipeline_s1: RenderPipeline,
+    pipeline_s4: RenderPipeline,
+    material_key: u64,
+    culling_buffer_map_handle: GraphDataHandle<CullingBufferMap>,
+    draw_call_set_cache_handle: GraphDataHandle<FastHashMap<CameraSpecifier, Arc<DrawCallSet>>>,
+    _phantom: PhantomData<M>,
 }
 impl<M: Material> ForwardRoutine<M> {
     /// Create a new forward routine with optional customizations.
@@ -110,7 +156,7 @@ impl<M: Material> ForwardRoutine<M> {
     /// If use_prepass is true, depth tests/writes are set such that it is
     /// assumed a full depth-prepass has happened before.
     #[allow(clippy::too_many_arguments)]
-    pub fn new(args: RoutineArgs<'_, M>) -> Self {
+    pub fn new(args: ForwardRoutineCreateArgs<'_, M>) -> Self {
         profiling::scope!("PrimaryPasses::new");
 
         let mut bgls: ArrayVec<&BindGroupLayout, 8> = ArrayVec::new();
@@ -143,33 +189,16 @@ impl<M: Material> ForwardRoutine<M> {
     }
 
     /// Add the given routine to the graph with the given settings.
-    pub fn add_forward_to_graph<'node>(&'node self, args: RoutineAddToGraphArgs<'_, 'node, M>) {
+    pub fn add_forward_to_graph<'node>(&'node self, args: ForwardRoutineArgs<'_, 'node, M>) {
         let mut builder = args.graph.add_node(args.label);
-
-        let color_handle = builder.add_optional_render_target(args.color, NodeResourceUsage::InputOutput);
-        let resolve_handle = builder.add_optional_render_target(args.resolve, NodeResourceUsage::InputOutput);
-        let depth_handle = builder.add_render_target(args.depth, NodeResourceUsage::InputOutput);
 
         builder.add_side_effect();
 
-        let rpass_handle = builder.add_renderpass(RenderPassTargets {
-            targets: match color_handle {
-                Some(color) => vec![RenderPassTarget {
-                    color,
-                    clear: Color::BLACK,
-                    resolve: resolve_handle,
-                }],
-                None => vec![],
-            },
-            depth_stencil: Some(RenderPassDepthTarget {
-                target: depth_handle,
-                depth_clear: Some(0.0),
-                stencil_clear: None,
-            }),
-        });
+        let rpass_handle = builder.add_renderpass(args.renderpass.clone(), NodeResourceUsage::Output);
 
-        let whole_frame_uniform_handle = builder.add_data(args.whole_frame_uniform_bg, NodeResourceUsage::Input);
-        let culling_output_handle = builder.add_optional_data(args.culling_output_handle, NodeResourceUsage::Input);
+        let whole_frame_uniform_handle =
+            builder.add_data(args.binding_data.whole_frame_uniform_bg, NodeResourceUsage::Input);
+        let culling_output_handle = args.culling_source.add_inner_data(&mut builder);
 
         builder.build(move |mut ctx| {
             let rpass = ctx.encoder_or_pass.take_rpass(rpass_handle);
@@ -179,9 +208,8 @@ impl<M: Material> ForwardRoutine<M> {
             let mut draw_call_set_cache = ctx.data_core.graph_storage.get_mut(&self.draw_call_set_cache_handle);
 
             let draw_call_set = match culling_output_handle {
-                // If we are provided a culling output handle, we are rendering the second pass
-                // with the residual triangles from this frame.
-                Some(handle) => {
+                // We are rendering the second pass with the residual triangles from this frame.
+                DeclaredCullingOutput::Residual(handle) => {
                     // If there is no draw call set for this camera in the cache, there isn't actually anything to render.
                     let Some(draw_call_set) = ctx.graph_data.get_data(ctx.temps, handle) else {
                         return;
@@ -192,11 +220,10 @@ impl<M: Material> ForwardRoutine<M> {
 
                     draw_call_set
                 }
-                // If we are not provided a culling output handle, this mean we are rendering the first pass
-                // with the predicted triangles from last frame.
-                None => {
+                // We are rendering the first pass with the predicted triangles from last frame.
+                DeclaredCullingOutput::Predicted => {
                     // If there is no draw call set for this camera in the cache, that means we have yet to actually render anything,
-                    // so either no objects yet exist, or we are in the first frame.
+                    // so either no objects yet exist, or we are in the first frame, so we can bail out.
                     let Some(draw_call_set) = draw_call_set_cache.get(&args.camera) else {
                         return;
                     };
@@ -204,7 +231,7 @@ impl<M: Material> ForwardRoutine<M> {
                     draw_call_set
                 }
             };
-            let residual = culling_output_handle.is_some() && args.camera.is_viewport();
+            let residual = culling_output_handle.is_residual() && args.camera.is_viewport();
 
             let culling_buffer_storage = ctx.data_core.graph_storage.get(&self.culling_buffer_map_handle);
 
@@ -237,7 +264,11 @@ impl<M: Material> ForwardRoutine<M> {
                     .append_buffer(&ctx.eval_output.mesh_buffer)
                     .append_buffer(&draw_call_set.per_camera_uniform)
                     .append_buffer(ctx.data_core.material_manager.archetype_view::<M>().buffer())
-                    .build(&ctx.renderer.device, Some("Per-Material BG"), &args.per_material.bgl),
+                    .build(
+                        &ctx.renderer.device,
+                        Some("Per-Material BG"),
+                        &args.binding_data.per_material_bgl.bgl,
+                    ),
             );
 
             let pipeline = match args.samples {
@@ -250,7 +281,7 @@ impl<M: Material> ForwardRoutine<M> {
             );
             rpass.set_pipeline(pipeline);
             rpass.set_bind_group(0, whole_frame_uniform_bg, &[]);
-            if let Some(v) = args.extra_bgs {
+            if let Some(v) = args.binding_data.extra_bgs {
                 for (idx, bg) in v.iter().enumerate() {
                     rpass.set_bind_group((idx + 3) as _, bg, &[])
                 }
@@ -294,7 +325,7 @@ impl<M: Material> ForwardRoutine<M> {
 
 fn build_forward_pipeline_inner<M: Material>(
     pll: &wgpu::PipelineLayout,
-    args: &RoutineArgs<'_, M>,
+    args: &ForwardRoutineCreateArgs<'_, M>,
     samples: SampleCount,
 ) -> RenderPipeline {
     let mut render_targets: ArrayVec<_, 1> = ArrayVec::new();

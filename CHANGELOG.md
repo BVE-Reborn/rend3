@@ -33,6 +33,7 @@ Per Keep a Changelog there are 6 main categories of changes:
 
 ### Major Changes
 - rend3: `add_mesh`, `add_skeleton` and `add_texture_*` now return Results with fully typed errors. This will catch all errors on all platforms except for web, where wgpu allocation errors will not be caught. @cwfitzgerald
+- rend3-routine: Argument structs broken up into multiple sub-structs for better ergonomics. @cwfitzgerald
 
 ### Added
 - rend3-egui: Added the ability to create egui textures (egui::TextureId) with the wgpu backend @AlbinSjoegren

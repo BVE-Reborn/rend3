@@ -1,9 +1,9 @@
 use glam::{Mat4, Vec3, Vec3A};
 use rend3_types::{Camera, CameraProjection, Handedness};
 
-use crate::managers::{CameraManager, InternalDirectionalLight};
+use crate::managers::{CameraState, InternalDirectionalLight};
 
-pub(super) fn shadow_camera(l: &InternalDirectionalLight, user_camera: &CameraManager) -> CameraManager {
+pub(super) fn shadow_camera(l: &InternalDirectionalLight, user_camera: &CameraState) -> CameraState {
     let camera_location = user_camera.location();
 
     let shadow_texel_size = l.inner.distance / l.inner.resolution as f32;
@@ -22,7 +22,7 @@ pub(super) fn shadow_camera(l: &InternalDirectionalLight, user_camera: &CameraMa
     let inv_origin_view = origin_view.inverse();
     let new_shadow_location = inv_origin_view.transform_point3(shadow_location);
 
-    CameraManager::new(
+    CameraState::new(
         Camera {
             projection: CameraProjection::Orthographic {
                 size: Vec3A::splat(l.inner.distance),

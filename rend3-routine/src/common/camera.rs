@@ -1,22 +1,22 @@
-/// Index representing which camera we're referring to.
+/// Specifier representing which camera we're referring to.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub enum CameraIndex {
+pub enum CameraSpecifier {
     Viewport,
     Shadow(u32),
 }
 
-impl CameraIndex {
-    /// Returns `true` if the camera index is [`Viewport`].
+impl CameraSpecifier {
+    /// Returns `true` if the camera specifier is [`Viewport`].
     ///
-    /// [`Viewport`]: CameraIndex::Viewport
+    /// [`Viewport`]: CameraSpecifier::Viewport
     #[must_use]
     pub fn is_viewport(&self) -> bool {
         matches!(self, Self::Viewport)
     }
 
-    /// Returns `true` if the camera index is [`Shadow`].
+    /// Returns `true` if the camera specifier is [`Shadow`].
     ///
-    /// [`Shadow`]: CameraIndex::Shadow
+    /// [`Shadow`]: CameraSpecifier::Shadow
     #[must_use]
     pub fn is_shadow(&self) -> bool {
         matches!(self, Self::Shadow(..))

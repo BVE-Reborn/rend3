@@ -9,7 +9,7 @@ use wgpu::{BlendState, ShaderModuleDescriptor, ShaderSource};
 use crate::{
     common::{PerMaterialArchetypeInterface, WholeFrameInterfaces},
     culling::CullingBufferMap,
-    forward::{ForwardRoutine, RoutineArgs, RoutineType, ShaderModulePair},
+    forward::{ForwardRoutine, ForwardRoutineCreateArgs, RoutineType, ShaderModulePair},
     hi_z::HiZRoutine,
     pbr::{PbrMaterial, TransparencyType},
 };
@@ -109,7 +109,7 @@ impl PbrRoutine {
         });
 
         let mut inner = |routine_type, module, transparency| {
-            ForwardRoutine::new(RoutineArgs {
+            ForwardRoutine::new(ForwardRoutineCreateArgs {
                 name: &format!("pbr {routine_type:?} {transparency:?}"),
                 renderer,
                 data_core,

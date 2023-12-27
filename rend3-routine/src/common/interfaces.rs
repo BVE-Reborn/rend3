@@ -92,6 +92,7 @@ pub struct PerMaterialArchetypeInterface<M> {
 impl<M: Material> PerMaterialArchetypeInterface<M> {
     pub fn new(device: &Device) -> Self {
         let bgl = BindGroupLayoutBuilder::new()
+            // Object data buffer
             .append(
                 ShaderStages::VERTEX_FRAGMENT,
                 BindingType::Buffer {
@@ -101,6 +102,7 @@ impl<M: Material> PerMaterialArchetypeInterface<M> {
                 },
                 None,
             )
+            // Batch data buffer
             .append(
                 ShaderStages::VERTEX_FRAGMENT,
                 BindingType::Buffer {
@@ -110,6 +112,7 @@ impl<M: Material> PerMaterialArchetypeInterface<M> {
                 },
                 None,
             )
+            // Vertex buffer
             .append(
                 ShaderStages::VERTEX_FRAGMENT,
                 BindingType::Buffer {
@@ -119,6 +122,7 @@ impl<M: Material> PerMaterialArchetypeInterface<M> {
                 },
                 None,
             )
+            // Per-Camera uniforms
             .append(
                 ShaderStages::VERTEX_FRAGMENT,
                 BindingType::Buffer {
@@ -128,6 +132,7 @@ impl<M: Material> PerMaterialArchetypeInterface<M> {
                 },
                 None,
             )
+            // Mateiral data
             .append(
                 ShaderStages::VERTEX_FRAGMENT,
                 BindingType::Buffer {

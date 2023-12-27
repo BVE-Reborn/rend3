@@ -19,19 +19,20 @@ use glam::{UVec2, Vec4};
 use rend3::{
     format_sso,
     graph::{
-        DataHandle, InstructionEvaluationOutput, RenderGraph, RenderTargetDescriptor, RenderTargetHandle, ViewportRect,
+        self, DataHandle, InstructionEvaluationOutput, RenderGraph, RenderPassTargets, RenderTargetDescriptor,
+        RenderTargetHandle, ViewportRect,
     },
-    managers::ShadowDesc,
     types::{SampleCount, TextureFormat, TextureUsages},
     Renderer, ShaderPreProcessor, INTERNAL_SHADOW_DEPTH_FORMAT,
 };
 use wgpu::{BindGroup, Buffer};
 
 use crate::{
-    common::{self, CameraIndex},
+    clear,
+    common::{self, CameraSpecifier},
     culling,
-    forward::RoutineAddToGraphArgs,
-    pbr, skinning, skybox, tonemapping,
+    forward::{self, ForwardRoutineArgs},
+    pbr, skinning, uniforms,
 };
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -75,6 +76,30 @@ impl DepthTargets {
     }
 }
 
+pub struct OutputRenderTarget {
+    pub handle: RenderTargetHandle,
+    pub resolution: UVec2,
+    pub samples: SampleCount,
+}
+
+pub struct BaseRenderGraphRoutines<'node> {
+    pub pbr: &'node crate::pbr::PbrRoutine,
+    pub skybox: Option<&'node crate::skybox::SkyboxRoutine>,
+    pub tonemapping: &'node crate::tonemapping::TonemappingRoutine,
+}
+
+pub struct BaseRenderGraphInputs<'a, 'node> {
+    pub eval_output: &'a InstructionEvaluationOutput,
+    pub routines: BaseRenderGraphRoutines<'node>,
+    pub target: OutputRenderTarget,
+}
+
+#[derive(Debug, Default)]
+pub struct BaseRenderGraphSettings {
+    pub ambient_color: Vec4,
+    pub clear_color: Vec4,
+}
+
 /// Starter RenderGraph.
 ///
 /// See module for documentation.
@@ -112,69 +137,59 @@ impl BaseRenderGraph {
     pub fn add_to_graph<'node>(
         &'node self,
         graph: &mut RenderGraph<'node>,
-        eval_output: &InstructionEvaluationOutput,
-        pbr: &'node crate::pbr::PbrRoutine,
-        skybox: Option<&'node crate::skybox::SkyboxRoutine>,
-        tonemapping: &'node crate::tonemapping::TonemappingRoutine,
-        target_texture: RenderTargetHandle,
-        resolution: UVec2,
-        samples: SampleCount,
-        ambient: Vec4,
-        clear_color: Vec4,
+        inputs: BaseRenderGraphInputs<'_, 'node>,
+        settings: BaseRenderGraphSettings,
     ) {
         // Create the data and handles for the graph.
-        let state = BaseRenderGraphIntermediateState::new(graph, eval_output, resolution, samples);
+        let mut state = BaseRenderGraphIntermediateState::new(graph, inputs, settings);
 
-        // Clear the shadow map.
-        state.clear_shadow(graph);
+        // Clear the shadow buffers. This, as an explicit node, must be done as a limitation of the graph dependency system.
+        state.clear_shadow_buffers();
 
         // Prepare all the uniforms that all shaders need access to.
-        state.create_frame_uniforms(graph, self, ambient, resolution);
+        state.create_frame_uniforms(self);
 
         // Perform compute based skinning.
-        state.skinning(graph, self);
+        state.skinning(self);
 
         // Upload the uniforms for the objects in the shadow pass.
-        state.shadow_object_uniform_upload(graph, self, eval_output);
+        state.shadow_object_uniform_upload(self);
         // Perform culling for the objects in the shadow pass.
-        state.pbr_shadow_culling(graph, self);
+        state.pbr_shadow_culling(self);
 
         // Render all the shadows to the shadow map.
-        state.pbr_shadow_rendering(graph, pbr, &eval_output.shadows);
-
-        // Clear the primary render target and depth target.
-        state.clear(graph, clear_color);
+        state.pbr_shadow_rendering();
 
         // Upload the uniforms for the objects in the forward pass.
-        state.object_uniform_upload(graph, self, resolution, samples);
+        state.object_uniform_upload(self);
 
         // Do the first pass, rendering the predicted triangles from last frame.
-        state.pbr_render_opaque_predicted_triangles(graph, pbr, samples);
+        state.pbr_render_opaque_predicted_triangles();
 
         // Create the hi-z buffer.
-        state.hi_z(graph, pbr, resolution);
+        state.hi_z();
 
         // Perform culling for the objects in the forward pass.
         //
         // The result of culling will be used to predict the visible triangles for
         // the next frame. It will also render all the triangles that were visible
         // but were not predicted last frame.
-        state.pbr_culling(graph, self);
+        state.pbr_culling(self);
 
         // Do the second pass, rendering the residual triangles.
-        state.pbr_render_opaque_residual_triangles(graph, pbr, samples);
+        state.pbr_render_opaque_residual_triangles();
 
         // Render the skybox.
-        state.skybox(graph, skybox, samples);
+        state.skybox();
 
         // Render all transparent objects.
         //
         // This _must_ happen after culling, as all transparent objects are
         // considered "residual".
-        state.pbr_forward_rendering_transparent(graph, pbr, samples);
+        state.pbr_forward_rendering_transparent();
 
         // Tonemap the HDR inner buffer to the output buffer.
-        state.tonemapping(graph, tonemapping, target_texture);
+        state.tonemapping();
     }
 }
 
@@ -182,29 +197,33 @@ impl BaseRenderGraph {
 ///
 /// This is intentionally public so all this can be changed by the user if they
 /// so desire.
-pub struct BaseRenderGraphIntermediateState {
+pub struct BaseRenderGraphIntermediateState<'a, 'node> {
+    pub graph: &'a mut RenderGraph<'node>,
+    pub inputs: BaseRenderGraphInputs<'a, 'node>,
+    pub settings: BaseRenderGraphSettings,
+
     pub pre_cull: DataHandle<Buffer>,
     pub shadow_cull: Vec<DataHandle<Arc<culling::DrawCallSet>>>,
     pub cull: DataHandle<Arc<culling::DrawCallSet>>,
 
     pub shadow_uniform_bg: DataHandle<BindGroup>,
     pub forward_uniform_bg: DataHandle<BindGroup>,
+
     pub shadow: RenderTargetHandle,
-    pub color: RenderTargetHandle,
-    pub resolve: Option<RenderTargetHandle>,
     pub depth: DepthTargets,
+    pub primary_renderpass: RenderPassTargets,
+
     pub pre_skinning_buffers: DataHandle<skinning::PreSkinningBuffers>,
 }
-impl BaseRenderGraphIntermediateState {
+impl<'a, 'node> BaseRenderGraphIntermediateState<'a, 'node> {
     /// Create the default setting for all state.
     pub fn new(
-        graph: &mut RenderGraph<'_>,
-        eval_output: &InstructionEvaluationOutput,
-        resolution: UVec2,
-        samples: SampleCount,
+        graph: &'a mut RenderGraph<'node>,
+        inputs: BaseRenderGraphInputs<'a, 'node>,
+        settings: BaseRenderGraphSettings,
     ) -> Self {
         // We need to know how many shadows we need to render
-        let shadow_count = eval_output.shadows.len();
+        let shadow_count = inputs.eval_output.shadows.len();
 
         // Create global bind group information
         let shadow_uniform_bg = graph.add_data::<BindGroup>();
@@ -213,7 +232,7 @@ impl BaseRenderGraphIntermediateState {
         // Shadow render target
         let shadow = graph.add_render_target(RenderTargetDescriptor {
             label: Some("shadow target".into()),
-            resolution: eval_output.shadow_target_size,
+            resolution: inputs.eval_output.shadow_target_size,
             depth: 1,
             mip_levels: Some(1),
             samples: SampleCount::One,
@@ -224,17 +243,17 @@ impl BaseRenderGraphIntermediateState {
         // Make the actual render targets we want to render to.
         let color = graph.add_render_target(RenderTargetDescriptor {
             label: Some("hdr color".into()),
-            resolution,
+            resolution: inputs.target.resolution,
             depth: 1,
-            samples,
+            samples: inputs.target.samples,
             mip_levels: Some(1),
             format: TextureFormat::Rgba16Float,
             usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
         });
-        let resolve = samples.needs_resolve().then(|| {
+        let resolve = inputs.target.samples.needs_resolve().then(|| {
             graph.add_render_target(RenderTargetDescriptor {
                 label: Some("hdr resolve".into()),
-                resolution,
+                resolution: inputs.target.resolution,
                 depth: 1,
                 mip_levels: Some(1),
                 samples: SampleCount::One,
@@ -242,58 +261,74 @@ impl BaseRenderGraphIntermediateState {
                 usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
             })
         });
-        let depth = DepthTargets::new(graph, resolution, samples);
+        let depth = DepthTargets::new(graph, inputs.target.resolution, inputs.target.samples);
+        let primary_renderpass = graph::RenderPassTargets {
+            targets: vec![graph::RenderPassTarget {
+                color,
+                resolve,
+                clear: settings.clear_color,
+            }],
+            depth_stencil: Some(graph::RenderPassDepthTarget {
+                target: depth.rendering_target(),
+                depth_clear: Some(0.0),
+                stencil_clear: None,
+            }),
+        };
 
         let pre_skinning_buffers = graph.add_data::<skinning::PreSkinningBuffers>();
 
+        let pre_cull = graph.add_data();
+        let mut shadow_cull = Vec::with_capacity(shadow_count);
+        shadow_cull.resize_with(shadow_count, || graph.add_data());
+        let cull = graph.add_data();
         Self {
-            pre_cull: graph.add_data(),
-            shadow_cull: {
-                let mut shadows = Vec::with_capacity(shadow_count);
-                shadows.resize_with(shadow_count, || graph.add_data());
-                shadows
-            },
-            cull: graph.add_data(),
+            graph,
+            inputs,
+            settings,
+
+            pre_cull,
+            shadow_cull,
+            cull,
 
             shadow_uniform_bg,
             forward_uniform_bg,
+
             shadow,
-            color,
-            resolve,
             depth,
+            primary_renderpass,
+
             pre_skinning_buffers,
         }
     }
 
+    /// Clear the shadow buffers. This, as an explicit node, must be done as a limitation of the graph dependency system.
+    fn clear_shadow_buffers(&mut self) {
+        clear::add_depth_clear_to_graph(self.graph, self.shadow, 0.0);
+    }
+
     /// Create all the uniforms all the shaders in this graph need.
-    pub fn create_frame_uniforms<'node>(
-        &self,
-        graph: &mut RenderGraph<'node>,
-        base: &'node BaseRenderGraph,
-        ambient: Vec4,
-        resolution: UVec2,
-    ) {
-        crate::uniforms::add_to_graph(
-            graph,
-            self.shadow_uniform_bg,
-            self.forward_uniform_bg,
+    pub fn create_frame_uniforms(&mut self, base: &'node BaseRenderGraph) {
+        uniforms::add_to_graph(
+            self.graph,
             self.shadow,
-            &base.interfaces,
-            &base.samplers,
-            ambient,
-            resolution,
+            uniforms::UniformBindingHandles {
+                interfaces: &base.interfaces,
+                shadow_uniform_bg: self.shadow_uniform_bg,
+                forward_uniform_bg: self.forward_uniform_bg,
+            },
+            uniforms::UniformInformation {
+                samplers: &base.samplers,
+                ambient: self.settings.ambient_color,
+                resolution: self.inputs.target.resolution,
+            },
         );
     }
-    pub fn shadow_object_uniform_upload<'node>(
-        &self,
-        graph: &mut RenderGraph<'node>,
-        base: &'node BaseRenderGraph,
-        eval_output: &InstructionEvaluationOutput,
-    ) {
-        for (shadow_index, shadow) in eval_output.shadows.iter().enumerate() {
+
+    pub fn shadow_object_uniform_upload(&mut self, base: &'node BaseRenderGraph) {
+        for (shadow_index, shadow) in self.inputs.eval_output.shadows.iter().enumerate() {
             base.gpu_culler.add_object_uniform_upload_to_graph::<pbr::PbrMaterial>(
-                graph,
-                CameraIndex::Shadow(shadow_index as u32),
+                self.graph,
+                CameraSpecifier::Shadow(shadow_index as u32),
                 UVec2::splat(shadow.map.size),
                 SampleCount::One,
                 &format_sso!("Shadow Culling S{}", shadow_index),
@@ -302,202 +337,174 @@ impl BaseRenderGraphIntermediateState {
     }
 
     /// Does all shadow culling for the PBR materials.
-    pub fn pbr_shadow_culling<'node>(&self, graph: &mut RenderGraph<'node>, base: &'node BaseRenderGraph) {
+    pub fn pbr_shadow_culling(&mut self, base: &'node BaseRenderGraph) {
         for (shadow_index, &shadow_culled) in self.shadow_cull.iter().enumerate() {
             base.gpu_culler.add_culling_to_graph::<pbr::PbrMaterial>(
-                graph,
+                self.graph,
                 shadow_culled,
                 self.shadow,
-                CameraIndex::Shadow(shadow_index as u32),
+                CameraSpecifier::Shadow(shadow_index as u32),
                 &format_sso!("Shadow Culling S{}", shadow_index),
             );
         }
     }
 
-    pub fn skinning<'node>(&self, graph: &mut RenderGraph<'node>, base: &'node BaseRenderGraph) {
-        skinning::add_skinning_to_graph(graph, &base.gpu_skinner);
+    pub fn skinning(&mut self, base: &'node BaseRenderGraph) {
+        skinning::add_skinning_to_graph(self.graph, &base.gpu_skinner);
     }
 
-    pub fn object_uniform_upload<'node>(
-        &self,
-        graph: &mut RenderGraph<'node>,
-        base: &'node BaseRenderGraph,
-        resolution: UVec2,
-        samples: SampleCount,
-    ) {
+    pub fn object_uniform_upload(&mut self, base: &'node BaseRenderGraph) {
         base.gpu_culler.add_object_uniform_upload_to_graph::<pbr::PbrMaterial>(
-            graph,
-            CameraIndex::Viewport,
-            resolution,
-            samples,
+            self.graph,
+            CameraSpecifier::Viewport,
+            self.inputs.target.resolution,
+            self.inputs.target.samples,
             "Uniform Bake",
         );
     }
 
     /// Does all culling for the forward PBR materials.
-    pub fn pbr_culling<'node>(&self, graph: &mut RenderGraph<'node>, base: &'node BaseRenderGraph) {
+    pub fn pbr_culling(&mut self, base: &'node BaseRenderGraph) {
         base.gpu_culler.add_culling_to_graph::<pbr::PbrMaterial>(
-            graph,
+            self.graph,
             self.cull,
             self.depth.single_sample_mipped,
-            CameraIndex::Viewport,
+            CameraSpecifier::Viewport,
             "Primary Culling",
         );
     }
 
-    /// Clear all the targets to their needed values
-    pub fn clear_shadow(&self, graph: &mut RenderGraph<'_>) {
-        crate::clear::add_clear_to_graph(graph, None, None, self.shadow, Vec4::ZERO, 0.0);
-    }
-
-    /// Clear all the targets to their needed values
-    pub fn clear(&self, graph: &mut RenderGraph<'_>, clear_color: Vec4) {
-        crate::clear::add_clear_to_graph(
-            graph,
-            Some(self.color),
-            self.resolve,
-            self.depth.rendering_target(),
-            clear_color,
-            0.0,
-        );
-    }
-
     /// Render all shadows for the PBR materials.
-    pub fn pbr_shadow_rendering<'node>(
-        &self,
-        graph: &mut RenderGraph<'node>,
-        pbr: &'node pbr::PbrRoutine,
-        shadows: &[ShadowDesc],
-    ) {
-        let iter = zip(&self.shadow_cull, shadows);
+    pub fn pbr_shadow_rendering(&mut self) {
+        let iter = zip(&self.shadow_cull, &self.inputs.eval_output.shadows);
         for (shadow_index, (shadow_cull, desc)) in iter.enumerate() {
-            let routines = [&pbr.opaque_depth, &pbr.cutout_depth];
+            let target = self
+                .shadow
+                .set_viewport(ViewportRect::new(desc.map.offset, UVec2::splat(desc.map.size)));
+            let renderpass = graph::RenderPassTargets {
+                targets: vec![],
+                depth_stencil: Some(graph::RenderPassDepthTarget {
+                    target,
+                    depth_clear: Some(0.0),
+                    stencil_clear: None,
+                }),
+            };
+
+            let routines = [
+                &self.inputs.routines.pbr.opaque_depth,
+                &self.inputs.routines.pbr.cutout_depth,
+            ];
             for routine in routines {
-                routine.add_forward_to_graph(RoutineAddToGraphArgs {
-                    graph,
-                    whole_frame_uniform_bg: self.shadow_uniform_bg,
-                    culling_output_handle: Some(*shadow_cull),
-                    per_material: &pbr.per_material,
-                    extra_bgs: None,
+                routine.add_forward_to_graph(ForwardRoutineArgs {
+                    graph: self.graph,
                     label: &format!("pbr shadow renderering S{shadow_index}"),
+                    camera: CameraSpecifier::Shadow(shadow_index as u32),
+                    binding_data: forward::ForwardRoutineBindingData {
+                        whole_frame_uniform_bg: self.shadow_uniform_bg,
+                        per_material_bgl: &self.inputs.routines.pbr.per_material,
+                        extra_bgs: None,
+                    },
+                    culling_source: forward::CullingSource::Residual(*shadow_cull),
                     samples: SampleCount::One,
-                    camera: CameraIndex::Shadow(shadow_index as u32),
-                    color: None,
-                    resolve: None,
-                    depth: self
-                        .shadow
-                        .set_viewport(ViewportRect::new(desc.map.offset, UVec2::splat(desc.map.size))),
+                    renderpass: renderpass.clone(),
                 });
             }
         }
     }
 
     /// Render the skybox.
-    pub fn skybox<'node>(
-        &self,
-        graph: &mut RenderGraph<'node>,
-        skybox: Option<&'node skybox::SkyboxRoutine>,
-        samples: SampleCount,
-    ) {
-        if let Some(skybox) = skybox {
+    pub fn skybox(&mut self) {
+        if let Some(skybox) = self.inputs.routines.skybox {
             skybox.add_to_graph(
-                graph,
-                self.color,
-                self.resolve,
-                self.depth.rendering_target(),
+                self.graph,
+                self.primary_renderpass.clone(),
                 self.forward_uniform_bg,
-                samples,
+                self.inputs.target.samples,
             );
         }
     }
 
     /// Render the PBR materials.
-    pub fn pbr_render_opaque_predicted_triangles<'node>(
-        &self,
-        graph: &mut RenderGraph<'node>,
-        pbr: &'node pbr::PbrRoutine,
-        samples: SampleCount,
-    ) {
-        let routines = [&pbr.opaque_routine, &pbr.cutout_routine];
+    pub fn pbr_render_opaque_predicted_triangles(&mut self) {
+        let routines = [
+            &self.inputs.routines.pbr.opaque_routine,
+            &self.inputs.routines.pbr.cutout_routine,
+        ];
         for routine in routines {
-            routine.add_forward_to_graph(RoutineAddToGraphArgs {
-                graph,
-                whole_frame_uniform_bg: self.forward_uniform_bg,
-                culling_output_handle: None,
-                per_material: &pbr.per_material,
-                extra_bgs: None,
+            routine.add_forward_to_graph(ForwardRoutineArgs {
+                graph: self.graph,
                 label: "PBR Forward Pass 1",
-                samples,
-                camera: CameraIndex::Viewport,
-                color: Some(self.color),
-                resolve: self.resolve,
-                depth: self.depth.rendering_target(),
+                camera: CameraSpecifier::Viewport,
+                binding_data: forward::ForwardRoutineBindingData {
+                    whole_frame_uniform_bg: self.forward_uniform_bg,
+                    per_material_bgl: &self.inputs.routines.pbr.per_material,
+                    extra_bgs: None,
+                },
+                culling_source: forward::CullingSource::Predicted,
+                samples: self.inputs.target.samples,
+                renderpass: self.primary_renderpass.clone(),
             });
         }
     }
 
     /// Render the PBR materials.
-    pub fn pbr_render_opaque_residual_triangles<'node>(
-        &self,
-        graph: &mut RenderGraph<'node>,
-        pbr: &'node pbr::PbrRoutine,
-        samples: SampleCount,
-    ) {
-        let routines = [&pbr.opaque_routine, &pbr.cutout_routine];
+    pub fn pbr_render_opaque_residual_triangles(&mut self) {
+        let routines = [
+            &self.inputs.routines.pbr.opaque_routine,
+            &self.inputs.routines.pbr.cutout_routine,
+        ];
         for routine in routines {
-            routine.add_forward_to_graph(RoutineAddToGraphArgs {
-                graph,
-                whole_frame_uniform_bg: self.forward_uniform_bg,
-                culling_output_handle: Some(self.cull),
-                per_material: &pbr.per_material,
-                extra_bgs: None,
+            routine.add_forward_to_graph(ForwardRoutineArgs {
+                graph: self.graph,
                 label: "PBR Forward Pass 2",
-                samples,
-                camera: CameraIndex::Viewport,
-                color: Some(self.color),
-                resolve: self.resolve,
-                depth: self.depth.rendering_target(),
+                camera: CameraSpecifier::Viewport,
+                binding_data: forward::ForwardRoutineBindingData {
+                    whole_frame_uniform_bg: self.forward_uniform_bg,
+                    per_material_bgl: &self.inputs.routines.pbr.per_material,
+                    extra_bgs: None,
+                },
+                culling_source: forward::CullingSource::Residual(self.cull),
+                samples: self.inputs.target.samples,
+                renderpass: self.primary_renderpass.clone(),
             });
         }
     }
 
     /// Render the PBR materials.
-    pub fn pbr_forward_rendering_transparent<'node>(
-        &self,
-        graph: &mut RenderGraph<'node>,
-        pbr: &'node pbr::PbrRoutine,
-        samples: SampleCount,
-    ) {
-        pbr.blend_routine.add_forward_to_graph(RoutineAddToGraphArgs {
-            graph,
-            whole_frame_uniform_bg: self.forward_uniform_bg,
-            culling_output_handle: Some(self.cull),
-            per_material: &pbr.per_material,
-            extra_bgs: None,
-            label: "PBR Forward",
-            camera: CameraIndex::Viewport,
-            samples,
-            color: Some(self.color),
-            resolve: self.resolve,
-            depth: self.depth.rendering_target(),
-        });
+    pub fn pbr_forward_rendering_transparent(&mut self) {
+        self.inputs
+            .routines
+            .pbr
+            .blend_routine
+            .add_forward_to_graph(ForwardRoutineArgs {
+                graph: self.graph,
+                label: "PBR Forward Transparent",
+                camera: CameraSpecifier::Viewport,
+                binding_data: forward::ForwardRoutineBindingData {
+                    whole_frame_uniform_bg: self.forward_uniform_bg,
+                    per_material_bgl: &self.inputs.routines.pbr.per_material,
+                    extra_bgs: None,
+                },
+                culling_source: forward::CullingSource::Residual(self.cull),
+                samples: self.inputs.target.samples,
+                renderpass: self.primary_renderpass.clone(),
+            });
     }
 
-    pub fn hi_z<'node>(&self, graph: &mut RenderGraph<'node>, pbr: &'node pbr::PbrRoutine, resolution: UVec2) {
-        pbr.hi_z.add_hi_z_to_graph(graph, self.depth, resolution);
+    pub fn hi_z(&mut self) {
+        self.inputs
+            .routines
+            .pbr
+            .hi_z
+            .add_hi_z_to_graph(self.graph, self.depth, self.inputs.target.resolution);
     }
 
     /// Tonemap onto the given render target.
-    pub fn tonemapping<'node>(
-        &self,
-        graph: &mut RenderGraph<'node>,
-        tonemapping: &'node tonemapping::TonemappingRoutine,
-        target: RenderTargetHandle,
-    ) {
-        tonemapping.add_to_graph(
-            graph,
-            self.resolve.unwrap_or(self.color),
-            target,
+    pub fn tonemapping(&mut self) {
+        self.inputs.routines.tonemapping.add_to_graph(
+            self.graph,
+            self.primary_renderpass.resolved_color(0),
+            self.inputs.target.handle,
             self.forward_uniform_bg,
         );
     }

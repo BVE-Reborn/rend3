@@ -643,15 +643,23 @@ impl rend3_framework::App for SceneViewer {
                 // Add the default rendergraph
                 base_rendergraph.add_to_graph(
                     &mut graph,
-                    &eval_output,
-                    &pbr_routine,
-                    Some(&skybox_routine),
-                    &tonemapping_routine,
-                    frame_handle,
-                    resolution,
-                    self.samples,
-                    Vec3::splat(self.ambient_light_level).extend(1.0),
-                    glam::Vec4::new(0.0, 0.0, 0.0, 1.0),
+                    rend3_routine::base::BaseRenderGraphInputs {
+                        eval_output: &eval_output,
+                        routines: rend3_routine::base::BaseRenderGraphRoutines {
+                            pbr: &pbr_routine,
+                            skybox: Some(&skybox_routine),
+                            tonemapping: &tonemapping_routine,
+                        },
+                        target: rend3_routine::base::OutputRenderTarget {
+                            handle: frame_handle,
+                            resolution,
+                            samples: self.samples,
+                        },
+                    },
+                    rend3_routine::base::BaseRenderGraphSettings {
+                        ambient_color: Vec3::splat(self.ambient_light_level).extend(1.0),
+                        clear_color: glam::Vec4::new(0.0, 0.0, 0.0, 1.0),
+                    },
                 );
 
                 // Dispatch a render using the built up rendergraph!

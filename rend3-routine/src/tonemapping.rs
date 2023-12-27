@@ -11,13 +11,14 @@
 
 use std::borrow::Cow;
 
+use glam::Vec4;
 use rend3::{
     graph::{DataHandle, NodeResourceUsage, RenderGraph, RenderPassTarget, RenderPassTargets, RenderTargetHandle},
     util::bind_merge::{BindGroupBuilder, BindGroupLayoutBuilder},
     Renderer, ShaderConfig, ShaderPreProcessor,
 };
 use wgpu::{
-    BindGroup, BindGroupLayout, BindingType, Color, ColorTargetState, ColorWrites, Device, FragmentState, FrontFace,
+    BindGroup, BindGroupLayout, BindingType, ColorTargetState, ColorWrites, Device, FragmentState, FrontFace,
     MultisampleState, PipelineLayoutDescriptor, PolygonMode, PrimitiveState, PrimitiveTopology, RenderPipeline,
     RenderPipelineDescriptor, ShaderModuleDescriptor, ShaderSource, ShaderStages, TextureFormat, TextureSampleType,
     TextureViewDimension, VertexState,
@@ -127,16 +128,18 @@ impl TonemappingRoutine {
         let mut builder = graph.add_node("Tonemapping");
 
         let input_handle = builder.add_render_target(src, NodeResourceUsage::Input);
-        let output_handle = builder.add_render_target(dst, NodeResourceUsage::Output);
 
-        let rpass_handle = builder.add_renderpass(RenderPassTargets {
-            targets: vec![RenderPassTarget {
-                color: output_handle,
-                clear: Color::BLACK,
-                resolve: None,
-            }],
-            depth_stencil: None,
-        });
+        let rpass_handle = builder.add_renderpass(
+            RenderPassTargets {
+                targets: vec![RenderPassTarget {
+                    color: dst,
+                    clear: Vec4::ZERO,
+                    resolve: None,
+                }],
+                depth_stencil: None,
+            },
+            NodeResourceUsage::InputOutput,
+        );
 
         let forward_uniform_handle = builder.add_data(forward_uniform_bg, NodeResourceUsage::Input);
 

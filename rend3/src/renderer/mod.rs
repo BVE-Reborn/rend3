@@ -14,7 +14,7 @@ use crate::{
     graph::{GraphTextureStore, InstructionEvaluationOutput},
     instruction::{InstructionKind, InstructionStreamPair},
     managers::{
-        CameraManager, DirectionalLightManager, GraphStorage, HandleAllocator, MaterialManager, MeshCreationError,
+        CameraState, DirectionalLightManager, GraphStorage, HandleAllocator, MaterialManager, MeshCreationError,
         MeshManager, ObjectManager, PointLightManager, SkeletonCreationError, SkeletonManager, TextureCreationError,
         TextureManager,
     },
@@ -97,8 +97,8 @@ impl Default for HandleAllocators {
 
 /// All the mutex protected data within the renderer
 pub struct RendererDataCore {
-    /// Position and settings of the camera.
-    pub camera_manager: CameraManager,
+    /// Position and settings of the viewport camera.
+    pub viewport_camera_state: CameraState,
     /// Manages all 2D textures, including bindless bind group.
     pub d2_texture_manager: TextureManager<Texture2DTag>,
     /// Manages all Cube textures, including bindless bind groups.
@@ -152,10 +152,10 @@ impl Renderer {
         // Handle allocation must be done _after_ any validation to prevent deletion of a handle that never gets fully added.
         let handle = self.resource_handle_allocators.mesh.allocate(self);
 
+        self.mesh_manager.fill(&handle, internal_mesh);
+
         self.instructions.push(
             InstructionKind::AddMesh {
-                handle: handle.clone(),
-                internal_mesh,
                 cmd_buf: encoder.finish(),
             },
             *Location::caller(),

@@ -3,16 +3,13 @@
 use std::borrow::Cow;
 
 use rend3::{
-    graph::{
-        DataHandle, NodeResourceUsage, RenderGraph, RenderPassDepthTarget, RenderPassTarget, RenderPassTargets,
-        RenderTargetHandle,
-    },
+    graph::{DataHandle, NodeResourceUsage, RenderGraph, RenderPassTargets},
     types::{SampleCount, TextureCubeHandle},
     util::bind_merge::{BindGroupBuilder, BindGroupLayoutBuilder},
     Renderer, ShaderConfig, ShaderPreProcessor,
 };
 use wgpu::{
-    BindGroup, BindGroupLayout, BindingType, Color, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState,
+    BindGroup, BindGroupLayout, BindingType, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState,
     DepthStencilState, Face, FragmentState, FrontFace, MultisampleState, PipelineLayoutDescriptor, PolygonMode,
     PrimitiveState, PrimitiveTopology, RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptor, ShaderSource,
     ShaderStages, StencilState, TextureFormat, TextureSampleType, TextureViewDimension, VertexState,
@@ -87,30 +84,13 @@ impl SkyboxRoutine {
     pub fn add_to_graph<'node>(
         &'node self,
         graph: &mut RenderGraph<'node>,
-        color: RenderTargetHandle,
-        resolve: Option<RenderTargetHandle>,
-        depth: RenderTargetHandle,
+        renderpass: RenderPassTargets,
         forward_uniform_bg: DataHandle<BindGroup>,
         samples: SampleCount,
     ) {
         let mut builder = graph.add_node("Skybox");
 
-        let hdr_color_handle = builder.add_render_target(color, NodeResourceUsage::InputOutput);
-        let hdr_resolve = builder.add_optional_render_target(resolve, NodeResourceUsage::InputOutput);
-        let hdr_depth_handle = builder.add_render_target(depth, NodeResourceUsage::Input);
-
-        let rpass_handle = builder.add_renderpass(RenderPassTargets {
-            targets: vec![RenderPassTarget {
-                color: hdr_color_handle,
-                clear: Color::BLACK,
-                resolve: hdr_resolve,
-            }],
-            depth_stencil: Some(RenderPassDepthTarget {
-                target: hdr_depth_handle,
-                depth_clear: Some(0.0),
-                stencil_clear: None,
-            }),
-        });
+        let rpass_handle = builder.add_renderpass(renderpass, NodeResourceUsage::InputOutput);
 
         let forward_uniform_handle = builder.add_data(forward_uniform_bg, NodeResourceUsage::Input);
 
