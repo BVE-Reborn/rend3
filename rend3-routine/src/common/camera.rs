@@ -8,7 +8,7 @@ pub enum CameraSpecifier {
 impl CameraSpecifier {
     /// Returns `true` if the camera specifier is [`Viewport`].
     ///
-    /// [`Viewport`]: CameraIndex::Viewport
+    /// [`Viewport`]: CameraSpecifier::Viewport
     #[must_use]
     pub fn is_viewport(&self) -> bool {
         matches!(self, Self::Viewport)
@@ -16,7 +16,7 @@ impl CameraSpecifier {
 
     /// Returns `true` if the camera specifier is [`Shadow`].
     ///
-    /// [`Shadow`]: CameraIndex::Shadow
+    /// [`Shadow`]: CameraSpecifier::Shadow
     #[must_use]
     pub fn is_shadow(&self) -> bool {
         matches!(self, Self::Shadow(..))
