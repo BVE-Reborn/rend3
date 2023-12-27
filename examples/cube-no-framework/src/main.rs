@@ -222,12 +222,16 @@ fn main() {
                 &mut graph,
                 rend3_routine::base::BaseRenderGraphInputs {
                     eval_output: &eval_output,
-                    pbr: &pbr_routine,
-                    skybox: None,
-                    tonemapping: &tonemapping_routine,
-                    target_texture: frame_handle,
-                    resolution,
-                    samples: rend3::types::SampleCount::One,
+                    routines: rend3_routine::base::BaseRenderGraphRoutines {
+                        pbr: &pbr_routine,
+                        skybox: None,
+                        tonemapping: &tonemapping_routine,
+                    },
+                    target: rend3_routine::base::OutputRenderTarget {
+                        handle: frame_handle,
+                        resolution,
+                        samples: rend3::types::SampleCount::One,
+                    },
                 },
                 rend3_routine::base::BaseRenderGraphSettings {
                     ambient_color: glam::Vec4::ZERO,

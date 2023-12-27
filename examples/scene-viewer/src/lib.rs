@@ -636,12 +636,16 @@ impl rend3_framework::App for SceneViewer {
                     &mut graph,
                     rend3_routine::base::BaseRenderGraphInputs {
                         eval_output: &eval_output,
-                        pbr: &pbr_routine,
-                        skybox: Some(&skybox_routine),
-                        tonemapping: &tonemapping_routine,
-                        target_texture: frame_handle,
-                        resolution,
-                        samples: self.samples,
+                        routines: rend3_routine::base::BaseRenderGraphRoutines {
+                            pbr: &pbr_routine,
+                            skybox: Some(&skybox_routine),
+                            tonemapping: &tonemapping_routine,
+                        },
+                        target: rend3_routine::base::OutputRenderTarget {
+                            handle: frame_handle,
+                            resolution,
+                            samples: self.samples,
+                        },
                     },
                     rend3_routine::base::BaseRenderGraphSettings {
                         ambient_color: Vec3::splat(self.ambient_light_level).extend(1.0),

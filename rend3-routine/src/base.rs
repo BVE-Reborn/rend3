@@ -75,14 +75,22 @@ impl DepthTargets {
     }
 }
 
-pub struct BaseRenderGraphInputs<'a, 'node> {
-    pub eval_output: &'a InstructionEvaluationOutput,
+pub struct OutputRenderTarget {
+    pub handle: RenderTargetHandle,
+    pub resolution: UVec2,
+    pub samples: SampleCount,
+}
+
+pub struct BaseRenderGraphRoutines<'node> {
     pub pbr: &'node crate::pbr::PbrRoutine,
     pub skybox: Option<&'node crate::skybox::SkyboxRoutine>,
     pub tonemapping: &'node crate::tonemapping::TonemappingRoutine,
-    pub target_texture: RenderTargetHandle,
-    pub resolution: UVec2,
-    pub samples: SampleCount,
+}
+
+pub struct BaseRenderGraphInputs<'a, 'node> {
+    pub eval_output: &'a InstructionEvaluationOutput,
+    pub routines: BaseRenderGraphRoutines<'node>,
+    pub target: OutputRenderTarget,
 }
 
 #[derive(Debug, Default)]
@@ -231,17 +239,17 @@ impl<'a, 'node> BaseRenderGraphIntermediateState<'a, 'node> {
         // Make the actual render targets we want to render to.
         let color = graph.add_render_target(RenderTargetDescriptor {
             label: Some("hdr color".into()),
-            resolution: inputs.resolution,
+            resolution: inputs.target.resolution,
             depth: 1,
-            samples: inputs.samples,
+            samples: inputs.target.samples,
             mip_levels: Some(1),
             format: TextureFormat::Rgba16Float,
             usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
         });
-        let resolve = inputs.samples.needs_resolve().then(|| {
+        let resolve = inputs.target.samples.needs_resolve().then(|| {
             graph.add_render_target(RenderTargetDescriptor {
                 label: Some("hdr resolve".into()),
-                resolution: inputs.resolution,
+                resolution: inputs.target.resolution,
                 depth: 1,
                 mip_levels: Some(1),
                 samples: SampleCount::One,
@@ -249,7 +257,7 @@ impl<'a, 'node> BaseRenderGraphIntermediateState<'a, 'node> {
                 usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
             })
         });
-        let depth = DepthTargets::new(graph, inputs.resolution, inputs.samples);
+        let depth = DepthTargets::new(graph, inputs.target.resolution, inputs.target.samples);
         let primary_renderpass = graph::RenderPassTargets {
             targets: vec![graph::RenderPassTarget {
                 color,
@@ -302,7 +310,7 @@ impl<'a, 'node> BaseRenderGraphIntermediateState<'a, 'node> {
             uniforms::UniformInformation {
                 samplers: &base.samplers,
                 ambient: self.settings.ambient_color,
-                resolution: self.inputs.resolution,
+                resolution: self.inputs.target.resolution,
             },
         );
     }
@@ -340,8 +348,8 @@ impl<'a, 'node> BaseRenderGraphIntermediateState<'a, 'node> {
         base.gpu_culler.add_object_uniform_upload_to_graph::<pbr::PbrMaterial>(
             self.graph,
             CameraSpecifier::Viewport,
-            self.inputs.resolution,
-            self.inputs.samples,
+            self.inputs.target.resolution,
+            self.inputs.target.samples,
             "Uniform Bake",
         );
     }
@@ -373,7 +381,10 @@ impl<'a, 'node> BaseRenderGraphIntermediateState<'a, 'node> {
                 }),
             };
 
-            let routines = [&self.inputs.pbr.opaque_depth, &self.inputs.pbr.cutout_depth];
+            let routines = [
+                &self.inputs.routines.pbr.opaque_depth,
+                &self.inputs.routines.pbr.cutout_depth,
+            ];
             for routine in routines {
                 routine.add_forward_to_graph(ForwardRoutineArgs {
                     graph: self.graph,
@@ -381,7 +392,7 @@ impl<'a, 'node> BaseRenderGraphIntermediateState<'a, 'node> {
                     camera: CameraSpecifier::Shadow(shadow_index as u32),
                     binding_data: forward::ForwardRoutineBindingData {
                         whole_frame_uniform_bg: self.shadow_uniform_bg,
-                        per_material_bgl: &self.inputs.pbr.per_material,
+                        per_material_bgl: &self.inputs.routines.pbr.per_material,
                         extra_bgs: None,
                     },
                     culling_source: forward::CullingSource::Residual(*shadow_cull),
@@ -394,19 +405,22 @@ impl<'a, 'node> BaseRenderGraphIntermediateState<'a, 'node> {
 
     /// Render the skybox.
     pub fn skybox(&mut self) {
-        if let Some(skybox) = self.inputs.skybox {
+        if let Some(skybox) = self.inputs.routines.skybox {
             skybox.add_to_graph(
                 self.graph,
                 self.primary_renderpass.clone(),
                 self.forward_uniform_bg,
-                self.inputs.samples,
+                self.inputs.target.samples,
             );
         }
     }
 
     /// Render the PBR materials.
     pub fn pbr_render_opaque_predicted_triangles(&mut self) {
-        let routines = [&self.inputs.pbr.opaque_routine, &self.inputs.pbr.cutout_routine];
+        let routines = [
+            &self.inputs.routines.pbr.opaque_routine,
+            &self.inputs.routines.pbr.cutout_routine,
+        ];
         for routine in routines {
             routine.add_forward_to_graph(ForwardRoutineArgs {
                 graph: self.graph,
@@ -414,11 +428,11 @@ impl<'a, 'node> BaseRenderGraphIntermediateState<'a, 'node> {
                 camera: CameraSpecifier::Viewport,
                 binding_data: forward::ForwardRoutineBindingData {
                     whole_frame_uniform_bg: self.forward_uniform_bg,
-                    per_material_bgl: &self.inputs.pbr.per_material,
+                    per_material_bgl: &self.inputs.routines.pbr.per_material,
                     extra_bgs: None,
                 },
                 culling_source: forward::CullingSource::Predicted,
-                samples: self.inputs.samples,
+                samples: self.inputs.target.samples,
                 renderpass: self.primary_renderpass.clone(),
             });
         }
@@ -426,7 +440,10 @@ impl<'a, 'node> BaseRenderGraphIntermediateState<'a, 'node> {
 
     /// Render the PBR materials.
     pub fn pbr_render_opaque_residual_triangles(&mut self) {
-        let routines = [&self.inputs.pbr.opaque_routine, &self.inputs.pbr.cutout_routine];
+        let routines = [
+            &self.inputs.routines.pbr.opaque_routine,
+            &self.inputs.routines.pbr.cutout_routine,
+        ];
         for routine in routines {
             routine.add_forward_to_graph(ForwardRoutineArgs {
                 graph: self.graph,
@@ -434,11 +451,11 @@ impl<'a, 'node> BaseRenderGraphIntermediateState<'a, 'node> {
                 camera: CameraSpecifier::Viewport,
                 binding_data: forward::ForwardRoutineBindingData {
                     whole_frame_uniform_bg: self.forward_uniform_bg,
-                    per_material_bgl: &self.inputs.pbr.per_material,
+                    per_material_bgl: &self.inputs.routines.pbr.per_material,
                     extra_bgs: None,
                 },
                 culling_source: forward::CullingSource::Residual(self.cull),
-                samples: self.inputs.samples,
+                samples: self.inputs.target.samples,
                 renderpass: self.primary_renderpass.clone(),
             });
         }
@@ -446,34 +463,39 @@ impl<'a, 'node> BaseRenderGraphIntermediateState<'a, 'node> {
 
     /// Render the PBR materials.
     pub fn pbr_forward_rendering_transparent(&mut self) {
-        self.inputs.pbr.blend_routine.add_forward_to_graph(ForwardRoutineArgs {
-            graph: self.graph,
-            label: "PBR Forward Transparent",
-            camera: CameraSpecifier::Viewport,
-            binding_data: forward::ForwardRoutineBindingData {
-                whole_frame_uniform_bg: self.forward_uniform_bg,
-                per_material_bgl: &self.inputs.pbr.per_material,
-                extra_bgs: None,
-            },
-            culling_source: forward::CullingSource::Residual(self.cull),
-            samples: self.inputs.samples,
-            renderpass: self.primary_renderpass.clone(),
-        });
+        self.inputs
+            .routines
+            .pbr
+            .blend_routine
+            .add_forward_to_graph(ForwardRoutineArgs {
+                graph: self.graph,
+                label: "PBR Forward Transparent",
+                camera: CameraSpecifier::Viewport,
+                binding_data: forward::ForwardRoutineBindingData {
+                    whole_frame_uniform_bg: self.forward_uniform_bg,
+                    per_material_bgl: &self.inputs.routines.pbr.per_material,
+                    extra_bgs: None,
+                },
+                culling_source: forward::CullingSource::Residual(self.cull),
+                samples: self.inputs.target.samples,
+                renderpass: self.primary_renderpass.clone(),
+            });
     }
 
     pub fn hi_z(&mut self) {
         self.inputs
+            .routines
             .pbr
             .hi_z
-            .add_hi_z_to_graph(self.graph, self.depth, self.inputs.resolution);
+            .add_hi_z_to_graph(self.graph, self.depth, self.inputs.target.resolution);
     }
 
     /// Tonemap onto the given render target.
     pub fn tonemapping(&mut self) {
-        self.inputs.tonemapping.add_to_graph(
+        self.inputs.routines.tonemapping.add_to_graph(
             self.graph,
             self.primary_renderpass.resolved_color(0),
-            self.inputs.target_texture,
+            self.inputs.target.handle,
             self.forward_uniform_bg,
         );
     }

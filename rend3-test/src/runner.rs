@@ -165,12 +165,16 @@ impl TestRunner {
             &mut graph,
             rend3_routine::base::BaseRenderGraphInputs {
                 eval_output: &eval_output,
-                pbr: &self.pbr,
-                skybox: None,
-                tonemapping: &self.tonemapping,
-                target_texture: frame_handle,
-                resolution: UVec2::splat(settings.size),
-                samples: settings.samples,
+                routines: rend3_routine::base::BaseRenderGraphRoutines {
+                    pbr: &self.pbr,
+                    skybox: None,
+                    tonemapping: &self.tonemapping,
+                },
+                target: rend3_routine::base::OutputRenderTarget {
+                    handle: frame_handle,
+                    resolution: UVec2::splat(settings.size),
+                    samples: settings.samples,
+                },
             },
             rend3_routine::base::BaseRenderGraphSettings {
                 ambient_color: glam::Vec4::ZERO,
