@@ -68,7 +68,7 @@ impl EguiRenderRoutine {
                 }],
                 depth_stencil: None,
             },
-            NodeResourceUsage::Output,
+            NodeResourceUsage::InputOutput,
         );
 
         // We can't free textures directly after the call to `execute_with_renderpass` as it freezes
