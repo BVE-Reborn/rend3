@@ -147,7 +147,7 @@ impl Renderer {
     #[track_caller]
     pub fn add_mesh(self: &Arc<Self>, mesh: Mesh) -> Result<MeshHandle, MeshCreationError> {
         let mut encoder = self.device.create_command_encoder(&CommandEncoderDescriptor::default());
-        let internal_mesh = self.mesh_manager.add(&self.device, &self.queue, &mut encoder, mesh)?;
+        let internal_mesh = self.mesh_manager.add(&self.device, &mut encoder, mesh)?;
 
         // Handle allocation must be done _after_ any validation to prevent deletion of a handle that never gets fully added.
         let handle = self.resource_handle_allocators.mesh.allocate(self);

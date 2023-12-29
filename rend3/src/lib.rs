@@ -145,6 +145,7 @@ pub mod util {
     pub mod output;
     pub mod scatter_copy;
     pub mod typedefs;
+    pub mod upload;
 }
 
 pub mod graph;
