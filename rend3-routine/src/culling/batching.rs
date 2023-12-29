@@ -215,7 +215,7 @@ pub(super) fn batch_objects<M: Material>(
             let invocation_count = object.inner.index_count / 3;
 
             let key_difference = key != current_key;
-            let object_limit = current_object_index == 256;
+            let object_limit = current_object_index == BATCH_SIZE as u32;
             let dispatch_limit = (current_invocation + invocation_count) >= max_dispatch_count * WORKGROUP_SIZE;
 
             if key_difference || object_limit || dispatch_limit {
