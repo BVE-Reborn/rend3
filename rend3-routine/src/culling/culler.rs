@@ -79,6 +79,7 @@ impl CullingBufferMap {
     }
 }
 
+#[derive(Debug)]
 struct CullingBufferSizes {
     invocations: u64,
     draw_calls: u64,
@@ -95,7 +96,7 @@ impl CullingBuffers {
     fn new(device: &Device, queue: &Queue, sizes: CullingBufferSizes) -> Self {
         Self {
             // One element per triangle/invocation
-            index_buffer: InputOutputBuffer::new(device, queue, sizes.invocations, "Index Buffer", 4, 4, false),
+            index_buffer: InputOutputBuffer::new(device, queue, sizes.invocations * 3, "Index Buffer", 4, 4, false),
             draw_call_buffer: InputOutputBuffer::new(device, queue, sizes.draw_calls, "Draw Call Buffer", 20, 4, true),
             culling_results_buffer: InputOutputBuffer::new(
                 device,
