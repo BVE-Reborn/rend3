@@ -180,7 +180,7 @@ impl Renderer {
 
         self.instructions.push(
             InstructionKind::AddSkeleton {
-                handle: handle.clone(),
+                handle: *handle,
                 skeleton: Box::new(internal),
             },
             *Location::caller(),
@@ -204,7 +204,7 @@ impl Renderer {
 
         self.instructions.push(
             InstructionKind::AddTexture2D {
-                handle: handle.clone(),
+                handle: *handle,
                 internal_texture,
                 cmd_buf,
             },
@@ -227,7 +227,7 @@ impl Renderer {
 
         self.instructions.push(
             InstructionKind::AddTexture2DFromTexture {
-                handle: handle.clone(),
+                handle: *handle,
                 texture,
             },
             *Location::caller(),
@@ -251,7 +251,7 @@ impl Renderer {
 
         self.instructions.push(
             InstructionKind::AddTextureCube {
-                handle: handle.clone(),
+                handle: *handle,
                 internal_texture,
                 cmd_buf,
             },
@@ -272,7 +272,7 @@ impl Renderer {
         let handle = self.resource_handle_allocators.material.allocate(self);
         self.instructions.push(
             InstructionKind::AddMaterial {
-                handle: handle.clone(),
+                handle: *handle,
                 fill_invoke: Box::new(move |material_manager, device, profile, d2_manager, mat_handle| {
                     material_manager.add(device, profile, d2_manager, mat_handle, material)
                 }),
@@ -287,7 +287,7 @@ impl Renderer {
     pub fn update_material<M: Material>(&self, handle: &MaterialHandle, material: M) {
         self.instructions.push(
             InstructionKind::ChangeMaterial {
-                handle: handle.clone(),
+                handle: **handle,
                 change_invoke: Box::new(move |material_manager, device, d2_manager, mat_handle| {
                     material_manager.update(device, d2_manager, mat_handle, material)
                 }),
@@ -307,7 +307,7 @@ impl Renderer {
         let handle = self.resource_handle_allocators.object.allocate(self);
         self.instructions.push(
             InstructionKind::AddObject {
-                handle: handle.clone(),
+                handle: *handle,
                 object,
             },
             *Location::caller(),
@@ -324,8 +324,8 @@ impl Renderer {
         let dst_handle = self.resource_handle_allocators.object.allocate(self);
         self.instructions.push(
             InstructionKind::DuplicateObject {
-                src_handle: object_handle.clone(),
-                dst_handle: dst_handle.clone(),
+                src_handle: **object_handle,
+                dst_handle: *dst_handle,
                 change,
             },
             *Location::caller(),
@@ -393,10 +393,7 @@ impl Renderer {
         let handle = self.resource_handle_allocators.directional_light.allocate(self);
 
         self.instructions.push(
-            InstructionKind::AddDirectionalLight {
-                handle: handle.clone(),
-                light,
-            },
+            InstructionKind::AddDirectionalLight { handle: *handle, light },
             *Location::caller(),
         );
 
@@ -415,10 +412,7 @@ impl Renderer {
         let handle = self.resource_handle_allocators.point_light.allocate(self);
 
         self.instructions.push(
-            InstructionKind::AddPointLight {
-                handle: handle.clone(),
-                light,
-            },
+            InstructionKind::AddPointLight { handle: *handle, light },
             *Location::caller(),
         );
 
@@ -455,7 +449,7 @@ impl Renderer {
     #[track_caller]
     pub fn add_graph_data<T: WasmNotSend + 'static>(self: &Arc<Renderer>, data: T) -> GraphDataHandle<T> {
         let handle = self.resource_handle_allocators.graph_storage.allocate(self);
-        let handle2 = handle.clone();
+        let handle2 = *handle;
         self.instructions.push(
             InstructionKind::AddGraphData {
                 add_invoke: Box::new(move |storage| storage.add(&handle2, data)),

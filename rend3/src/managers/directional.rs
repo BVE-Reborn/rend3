@@ -8,7 +8,7 @@ use wgpu::{
 
 use crate::{
     managers::CameraState,
-    types::{DirectionalLight, DirectionalLightHandle},
+    types::DirectionalLight,
     util::{
         bind_merge::{BindGroupBuilder, BindGroupLayoutBuilder},
         buffer::WrappedPotBuffer,
@@ -81,7 +81,7 @@ impl DirectionalLightManager {
         }
     }
 
-    pub fn add(&mut self, handle: &DirectionalLightHandle, light: DirectionalLight) {
+    pub fn add(&mut self, handle: RawDirectionalLightHandle, light: DirectionalLight) {
         if handle.idx >= self.data.len() {
             self.data.resize_with(handle.idx + 1, || None);
         }

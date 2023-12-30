@@ -37,7 +37,7 @@ pub fn evaluate_instructions(renderer: &Renderer) -> InstructionEvaluationOutput
                         .try_lock()
                         .unwrap()
                         .begin_scope("Add Skeleton", &mut encoder, &renderer.device);
-                    data_core.skeleton_manager.add(&handle, *skeleton);
+                    data_core.skeleton_manager.add(handle, *skeleton);
                     let _ = data_core.profiler.try_lock().unwrap().end_scope(&mut encoder);
                 }
                 InstructionKind::AddTexture2D {
@@ -46,18 +46,18 @@ pub fn evaluate_instructions(renderer: &Renderer) -> InstructionEvaluationOutput
                     cmd_buf,
                 } => {
                     cmd_bufs.extend(cmd_buf);
-                    data_core.d2_texture_manager.fill(*handle, internal_texture);
+                    data_core.d2_texture_manager.fill(handle, internal_texture);
                 }
                 InstructionKind::AddTexture2DFromTexture { handle, texture } => data_core
                     .d2_texture_manager
-                    .fill_from_texture(&renderer.device, &mut encoder, *handle, texture),
+                    .fill_from_texture(&renderer.device, &mut encoder, handle, texture),
                 InstructionKind::AddTextureCube {
                     handle,
                     internal_texture,
                     cmd_buf,
                 } => {
                     cmd_bufs.extend(cmd_buf);
-                    data_core.d2c_texture_manager.fill(*handle, internal_texture);
+                    data_core.d2c_texture_manager.fill(handle, internal_texture);
                 }
                 InstructionKind::AddMaterial { handle, fill_invoke } => {
                     profiling::scope!("Add Material");
@@ -66,7 +66,7 @@ pub fn evaluate_instructions(renderer: &Renderer) -> InstructionEvaluationOutput
                         &renderer.device,
                         renderer.profile,
                         &mut data_core.d2_texture_manager,
-                        &handle,
+                        handle,
                     );
                 }
                 InstructionKind::AddGraphData { add_invoke } => {
@@ -79,13 +79,13 @@ pub fn evaluate_instructions(renderer: &Renderer) -> InstructionEvaluationOutput
                         &mut data_core.material_manager,
                         &renderer.device,
                         &mut data_core.d2_texture_manager,
-                        &handle,
+                        handle,
                     );
                 }
                 InstructionKind::AddObject { handle, object } => {
                     data_core.object_manager.add(
                         &renderer.device,
-                        &handle,
+                        handle,
                         object,
                         &renderer.mesh_manager,
                         &data_core.skeleton_manager,
@@ -99,13 +99,13 @@ pub fn evaluate_instructions(renderer: &Renderer) -> InstructionEvaluationOutput
                     data_core.skeleton_manager.set_joint_matrices(handle, joint_matrices);
                 }
                 InstructionKind::AddDirectionalLight { handle, light } => {
-                    data_core.directional_light_manager.add(&handle, light);
+                    data_core.directional_light_manager.add(handle, light);
                 }
                 InstructionKind::ChangeDirectionalLight { handle, change } => {
                     data_core.directional_light_manager.update(handle, change);
                 }
                 InstructionKind::AddPointLight { handle, light } => {
-                    data_core.point_light_manager.add(&handle, light);
+                    data_core.point_light_manager.add(handle, light);
                 }
                 InstructionKind::ChangePointLight { handle, change } => {
                     data_core.point_light_manager.update(handle, change);

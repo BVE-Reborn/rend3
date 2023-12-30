@@ -3,7 +3,7 @@ use std::ops::Range;
 use arrayvec::ArrayVec;
 use glam::Mat4;
 use rend3_types::{
-    MeshHandle, RawSkeletonHandle, Skeleton, SkeletonHandle, VertexAttributeId, VERTEX_ATTRIBUTE_JOINT_INDICES,
+    MeshHandle, RawSkeletonHandle, Skeleton, VertexAttributeId, VERTEX_ATTRIBUTE_JOINT_INDICES,
     VERTEX_ATTRIBUTE_JOINT_WEIGHTS, VERTEX_ATTRIBUTE_NORMAL, VERTEX_ATTRIBUTE_POSITION, VERTEX_ATTRIBUTE_TANGENT,
 };
 use thiserror::Error;
@@ -139,7 +139,7 @@ impl SkeletonManager {
         })
     }
 
-    pub fn add(&mut self, handle: &SkeletonHandle, internal: InternalSkeleton) {
+    pub fn add(&mut self, handle: RawSkeletonHandle, internal: InternalSkeleton) {
         self.global_joint_count += internal.joint_matrices.len();
 
         if handle.idx >= self.data.len() {
