@@ -11,7 +11,6 @@ use wgpu::{BindGroup, BindGroupLayout, BindingType, Buffer, BufferBindingType, C
 use crate::{
     managers::{object_add_callback, ObjectAddCallbackArgs, TextureManager},
     profile::ProfileData,
-    types::MaterialHandle,
     util::{
         bind_merge::BindGroupLayoutBuilder, freelist::FreelistDerivedBuffer, math::round_up, scatter_copy::ScatterCopy,
         typedefs::FastHashMap,
@@ -138,7 +137,7 @@ impl MaterialManager {
         device: &Device,
         profile: RendererProfile,
         texture_manager_2d: &mut TextureManager<crate::types::Texture2DTag>,
-        handle: &MaterialHandle,
+        handle: RawMaterialHandle,
         material: M,
     ) {
         let bind_group_index = if profile == RendererProfile::CpuDriven {
@@ -169,17 +168,17 @@ impl MaterialManager {
         });
         drop(data_vec);
 
-        self.handle_to_typeid.insert(**handle, TypeId::of::<M>());
+        self.handle_to_typeid.insert(handle, TypeId::of::<M>());
     }
 
     pub fn update<M: Material>(
         &mut self,
         device: &Device,
         texture_manager_2d: &TextureManager<crate::types::Texture2DTag>,
-        handle: &MaterialHandle,
+        handle: RawMaterialHandle,
         material: M,
     ) {
-        let type_id = self.handle_to_typeid[&**handle];
+        let type_id = self.handle_to_typeid[&handle];
 
         assert_eq!(type_id, TypeId::of::<M>());
 
