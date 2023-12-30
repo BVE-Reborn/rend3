@@ -12,7 +12,7 @@ use wgpu::{Buffer, CommandEncoder, Device};
 use super::SkeletonManager;
 use crate::{
     managers::{InternalMesh, MaterialManager, MeshManager},
-    types::{Object, ObjectHandle},
+    types::Object,
     util::{
         freelist::FreelistDerivedBuffer, frustum::BoundingSphere, iter::ExactSizerIterator, scatter_copy::ScatterCopy,
         typedefs::FastHashMap,
@@ -125,7 +125,7 @@ impl ObjectManager {
     pub fn add(
         &mut self,
         device: &Device,
-        handle: &ObjectHandle,
+        handle: RawObjectHandle,
         object: Object,
         mesh_manager: &MeshManager,
         skeleton_manager: &SkeletonManager,
@@ -151,7 +151,7 @@ impl ObjectManager {
                 manager: self,
                 internal_mesh,
                 skeleton_ranges,
-                handle: **handle,
+                handle,
                 object,
             },
         );
@@ -211,14 +211,14 @@ impl ObjectManager {
     pub fn duplicate_object(
         &mut self,
         device: &Device,
-        src_handle: ObjectHandle,
-        dst_handle: ObjectHandle,
+        src_handle: RawObjectHandle,
+        dst_handle: RawObjectHandle,
         change: ObjectChange,
         mesh_manager: &MeshManager,
         skeleton_manager: &SkeletonManager,
         material_manager: &mut MaterialManager,
     ) {
-        let type_id = self.handle_to_typeid[&*src_handle];
+        let type_id = self.handle_to_typeid[&src_handle];
 
         let archetype = self.archetype.get_mut(&type_id).unwrap();
 
@@ -226,7 +226,7 @@ impl ObjectManager {
 
         self.add(
             device,
-            &dst_handle,
+            dst_handle,
             dst_obj,
             mesh_manager,
             skeleton_manager,

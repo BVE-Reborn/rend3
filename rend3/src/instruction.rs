@@ -3,21 +3,20 @@ use std::{mem, panic::Location};
 use glam::Mat4;
 use parking_lot::Mutex;
 use rend3_types::{
-    trait_supertrait_alias, MaterialHandle, ObjectChange, ObjectHandle, PointLight, PointLightChange, PointLightHandle,
-    RawDirectionalLightHandle, RawGraphDataHandleUntyped, RawMaterialHandle, RawMeshHandle, RawPointLightHandle,
-    RawSkeletonHandle, RawTexture2DHandle, RawTextureCubeHandle, SkeletonHandle, Texture2DHandle, TextureCubeHandle,
-    TextureFromTexture, WasmNotSend, WasmNotSync,
+    trait_supertrait_alias, ObjectChange, PointLight, PointLightChange, RawDirectionalLightHandle,
+    RawGraphDataHandleUntyped, RawMaterialHandle, RawMeshHandle, RawPointLightHandle, RawSkeletonHandle,
+    RawTexture2DHandle, RawTextureCubeHandle, TextureFromTexture, WasmNotSend, WasmNotSync,
 };
 use wgpu::{CommandBuffer, Device};
 
 use crate::{
     managers::{GraphStorage, InternalSkeleton, InternalTexture, MaterialManager, TextureManager},
-    types::{Camera, DirectionalLight, DirectionalLightChange, DirectionalLightHandle, Object, RawObjectHandle},
+    types::{Camera, DirectionalLight, DirectionalLightChange, Object, RawObjectHandle},
     RendererProfile,
 };
 
-trait_supertrait_alias!(pub AddMaterialFillInvoke: FnOnce(&mut MaterialManager, &Device, RendererProfile, &mut TextureManager<crate::types::Texture2DTag>, &MaterialHandle) + WasmNotSend + WasmNotSync);
-trait_supertrait_alias!(pub ChangeMaterialChangeInvoke: FnOnce(&mut MaterialManager, &Device, &TextureManager<crate::types::Texture2DTag>, &MaterialHandle) + WasmNotSend + WasmNotSync);
+trait_supertrait_alias!(pub AddMaterialFillInvoke: FnOnce(&mut MaterialManager, &Device, RendererProfile, &mut TextureManager<crate::types::Texture2DTag>, RawMaterialHandle) + WasmNotSend + WasmNotSync);
+trait_supertrait_alias!(pub ChangeMaterialChangeInvoke: FnOnce(&mut MaterialManager, &Device, &TextureManager<crate::types::Texture2DTag>, RawMaterialHandle) + WasmNotSend + WasmNotSync);
 trait_supertrait_alias!(pub AddGraphDataAddInvoke: FnOnce(&mut GraphStorage) + WasmNotSend);
 
 pub struct Instruction {
@@ -25,51 +24,52 @@ pub struct Instruction {
     pub location: Location<'static>,
 }
 
-#[allow(clippy::type_complexity)]
+// None of these need strong handles to the resources, as any
+// resource deletions will also be instructions, added after the given instruction is added.
 pub enum InstructionKind {
     AddMesh {
         cmd_buf: CommandBuffer,
     },
     AddSkeleton {
-        handle: SkeletonHandle,
+        handle: RawSkeletonHandle,
         // Boxed for size
         skeleton: Box<InternalSkeleton>,
     },
     AddTexture2D {
-        handle: Texture2DHandle,
+        handle: RawTexture2DHandle,
         internal_texture: InternalTexture,
         cmd_buf: Option<CommandBuffer>,
     },
     AddTexture2DFromTexture {
-        handle: Texture2DHandle,
+        handle: RawTexture2DHandle,
         texture: TextureFromTexture,
     },
     AddTextureCube {
-        handle: TextureCubeHandle,
+        handle: RawTextureCubeHandle,
         internal_texture: InternalTexture,
         cmd_buf: Option<CommandBuffer>,
     },
     AddMaterial {
-        handle: MaterialHandle,
+        handle: RawMaterialHandle,
         fill_invoke: Box<dyn AddMaterialFillInvoke>,
     },
     AddObject {
-        handle: ObjectHandle,
+        handle: RawObjectHandle,
         object: Object,
     },
     AddDirectionalLight {
-        handle: DirectionalLightHandle,
+        handle: RawDirectionalLightHandle,
         light: DirectionalLight,
     },
     AddPointLight {
-        handle: PointLightHandle,
+        handle: RawPointLightHandle,
         light: PointLight,
     },
     AddGraphData {
         add_invoke: Box<dyn AddGraphDataAddInvoke>,
     },
     ChangeMaterial {
-        handle: MaterialHandle,
+        handle: RawMaterialHandle,
         change_invoke: Box<dyn ChangeMaterialChangeInvoke>,
     },
     ChangeDirectionalLight {
@@ -122,8 +122,8 @@ pub enum InstructionKind {
         data: Camera,
     },
     DuplicateObject {
-        src_handle: ObjectHandle,
-        dst_handle: ObjectHandle,
+        src_handle: RawObjectHandle,
+        dst_handle: RawObjectHandle,
         change: ObjectChange,
     },
 }

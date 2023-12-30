@@ -962,7 +962,7 @@ pub struct Texture {
 #[derive(Debug, Clone)]
 pub struct TextureFromTexture {
     pub label: Option<String>,
-    pub src: Texture2DHandle,
+    pub src: RawTexture2DHandle,
     pub start_mip: u32,
     pub mip_count: Option<NonZeroU32>,
 }

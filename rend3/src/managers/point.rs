@@ -1,6 +1,6 @@
 use encase::{ArrayLength, ShaderType};
 use glam::{Vec3, Vec4};
-use rend3_types::{PointLight, PointLightChange, PointLightHandle, RawPointLightHandle};
+use rend3_types::{PointLight, PointLightChange, RawPointLightHandle};
 use wgpu::{BufferUsages, Device, ShaderStages};
 
 use crate::{
@@ -39,7 +39,7 @@ impl PointLightManager {
         }
     }
 
-    pub fn add(&mut self, handle: &PointLightHandle, light: PointLight) {
+    pub fn add(&mut self, handle: RawPointLightHandle, light: PointLight) {
         if handle.idx >= self.data.len() {
             self.data.resize(handle.idx + 1, None);
         }
