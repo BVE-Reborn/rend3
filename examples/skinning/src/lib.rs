@@ -1,6 +1,7 @@
-use std::{path::Path, sync::Arc, time::Instant};
+use std::{path::Path, time::Instant};
 
 use rend3_gltf::GltfSceneInstance;
+use winit::event::WindowEvent;
 
 const SAMPLE_COUNT: rend3::types::SampleCount = rend3::types::SampleCount::One;
 
@@ -63,14 +64,7 @@ impl rend3_framework::App for SkinningExample {
         SAMPLE_COUNT
     }
 
-    fn setup(
-        &mut self,
-        _event_loop: &winit::event_loop::EventLoop<rend3_framework::UserResizeEvent<()>>,
-        _window: &winit::window::Window,
-        renderer: &Arc<rend3::Renderer>,
-        _routines: &Arc<rend3_framework::DefaultRoutines>,
-        _surface_format: rend3::types::TextureFormat,
-    ) {
+    fn setup(&mut self, context: rend3_framework::SetupContext<'_>) {
         // Store the startup time. Use later to animate the joint rotation
         self.start_time = Some(Instant::now());
 
@@ -79,7 +73,7 @@ impl rend3_framework::App for SkinningExample {
         let view = view * glam::Mat4::from_translation(-view_location);
 
         // Set camera's location
-        renderer.set_camera_data(rend3::types::Camera {
+        context.renderer.set_camera_data(rend3::types::Camera {
             projection: rend3::types::CameraProjection::Perspective { vfov: 60.0, near: 0.1 },
             view,
         });
@@ -89,7 +83,7 @@ impl rend3_framework::App for SkinningExample {
         let gltf_data = std::fs::read(path).unwrap();
         let parent_directory = path.parent().unwrap();
         let (loaded_scene, loaded_instance) = pollster::block_on(rend3_gltf::load_gltf(
-            renderer,
+            context.renderer,
             &gltf_data,
             &rend3_gltf::GltfLoadSettings::default(),
             |p| async move { rend3_gltf::filesystem_io_func(&parent_directory, &p).await },
@@ -108,7 +102,7 @@ impl rend3_framework::App for SkinningExample {
         // Create a single directional light
         //
         // We need to keep the directional light handle alive.
-        self.directional_light_handle = Some(renderer.add_directional_light(rend3::types::DirectionalLight {
+        self.directional_light_handle = Some(context.renderer.add_directional_light(rend3::types::DirectionalLight {
             color: glam::Vec3::ONE,
             intensity: 10.0,
             // Direction will be normalized
@@ -118,42 +112,27 @@ impl rend3_framework::App for SkinningExample {
         }));
     }
 
-    fn handle_event(
-        &mut self,
-        window: &winit::window::Window,
-        renderer: &Arc<rend3::Renderer>,
-        routines: &Arc<rend3_framework::DefaultRoutines>,
-        base_rendergraph: &rend3_routine::base::BaseRenderGraph,
-        surface: Option<&Arc<rend3::types::Surface>>,
-        resolution: glam::UVec2,
-        event: rend3_framework::Event<'_, ()>,
-        control_flow: impl FnOnce(winit::event_loop::ControlFlow),
-    ) {
+    fn handle_event(&mut self, context: rend3_framework::EventContext<'_>, event: winit::event::Event<()>) {
+        #[allow(clippy::single_match)]
         match event {
-            // Close button was clicked, we should close.
-            rend3_framework::Event::WindowEvent {
-                event: winit::event::WindowEvent::CloseRequested,
-                ..
-            } => {
-                control_flow(winit::event_loop::ControlFlow::Exit);
-            }
-            rend3_framework::Event::MainEventsCleared => {
-                self.update_skeleton(renderer);
-                window.request_redraw();
-            }
             // Render!
-            rend3_framework::Event::RedrawRequested(_) => {
+            winit::event::Event::WindowEvent {
+                window_id: _,
+                event: WindowEvent::RedrawRequested,
+            } => {
+                self.update_skeleton(context.renderer);
+
                 // Get a frame
-                let frame = surface.unwrap().get_current_texture().unwrap();
+                let frame = context.surface.unwrap().get_current_texture().unwrap();
 
                 // Swap the instruction buffers so that our frame's changes can be processed.
-                renderer.swap_instruction_buffers();
+                context.renderer.swap_instruction_buffers();
                 // Evaluate our frame's world-change instructions
-                let mut eval_output = renderer.evaluate_instructions();
+                let mut eval_output = context.renderer.evaluate_instructions();
 
                 // Lock the routines
-                let pbr_routine = rend3_framework::lock(&routines.pbr);
-                let tonemapping_routine = rend3_framework::lock(&routines.tonemapping);
+                let pbr_routine = rend3_framework::lock(&context.routines.pbr);
+                let tonemapping_routine = rend3_framework::lock(&context.routines.tonemapping);
 
                 // Build a rendergraph
                 let mut graph = rend3::graph::RenderGraph::new();
@@ -162,10 +141,10 @@ impl rend3_framework::App for SkinningExample {
                     &frame,
                     0..1,
                     0..1,
-                    rend3::graph::ViewportRect::from_size(resolution),
+                    rend3::graph::ViewportRect::from_size(context.resolution),
                 );
                 // Add the default rendergraph without a skybox
-                base_rendergraph.add_to_graph(
+                context.base_rendergraph.add_to_graph(
                     &mut graph,
                     rend3_routine::base::BaseRenderGraphInputs {
                         eval_output: &eval_output,
@@ -176,7 +155,7 @@ impl rend3_framework::App for SkinningExample {
                         },
                         target: rend3_routine::base::OutputRenderTarget {
                             handle: frame_handle,
-                            resolution,
+                            resolution: context.resolution,
                             samples: SAMPLE_COUNT,
                         },
                     },
@@ -187,9 +166,11 @@ impl rend3_framework::App for SkinningExample {
                 );
 
                 // Dispatch a render using the built up rendergraph!
-                graph.execute(renderer, &mut eval_output);
+                graph.execute(context.renderer, &mut eval_output);
 
                 frame.present();
+
+                context.window.request_redraw();
             }
             // Other events we don't care about
             _ => {}

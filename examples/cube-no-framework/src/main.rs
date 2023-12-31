@@ -60,7 +60,7 @@ fn main() {
     env_logger::init();
 
     // Create event loop and window
-    let event_loop = winit::event_loop::EventLoop::new();
+    let event_loop = winit::event_loop::EventLoop::new().unwrap();
     let window = {
         let mut builder = winit::window::WindowBuilder::new();
         builder = builder.with_title("rend3 cube");
@@ -176,76 +176,78 @@ fn main() {
 
     let mut resolution = glam::UVec2::new(window_size.width, window_size.height);
 
-    event_loop.run(move |event, _, control| match event {
-        // Close button was clicked, we should close.
-        winit::event::Event::WindowEvent {
-            event: winit::event::WindowEvent::CloseRequested,
-            ..
-        } => {
-            *control = winit::event_loop::ControlFlow::Exit;
-        }
-        // Window was resized, need to resize renderer.
-        winit::event::Event::WindowEvent {
-            event: winit::event::WindowEvent::Resized(physical_size),
-            ..
-        } => {
-            resolution = glam::UVec2::new(physical_size.width, physical_size.height);
-            // Reconfigure the surface for the new size.
-            rend3::configure_surface(
-                &surface,
-                &renderer.device,
-                preferred_format,
-                glam::UVec2::new(resolution.x, resolution.y),
-                rend3::types::PresentMode::Fifo,
-            );
-            // Tell the renderer about the new aspect ratio.
-            renderer.set_aspect_ratio(resolution.x as f32 / resolution.y as f32);
-        }
-        // Render!
-        winit::event::Event::MainEventsCleared => {
-            // Get a frame
-            let frame = surface.get_current_texture().unwrap();
+    event_loop
+        .run(move |event, _event_loop_window_target| match event {
+            // Window was resized, need to resize renderer.
+            winit::event::Event::WindowEvent {
+                event: winit::event::WindowEvent::Resized(physical_size),
+                ..
+            } => {
+                resolution = glam::UVec2::new(physical_size.width, physical_size.height);
+                // Reconfigure the surface for the new size.
+                rend3::configure_surface(
+                    &surface,
+                    &renderer.device,
+                    preferred_format,
+                    glam::UVec2::new(resolution.x, resolution.y),
+                    rend3::types::PresentMode::Fifo,
+                );
+                // Tell the renderer about the new aspect ratio.
+                renderer.set_aspect_ratio(resolution.x as f32 / resolution.y as f32);
+            }
+            // Render!
+            winit::event::Event::WindowEvent {
+                event: winit::event::WindowEvent::RedrawRequested,
+                ..
+            } => {
+                // Get a frame
+                let frame = surface.get_current_texture().unwrap();
 
-            // Swap the instruction buffers so that our frame's changes can be processed.
-            renderer.swap_instruction_buffers();
-            // Evaluate our frame's world-change instructions
-            let mut eval_output = renderer.evaluate_instructions();
+                // Swap the instruction buffers so that our frame's changes can be processed.
+                renderer.swap_instruction_buffers();
+                // Evaluate our frame's world-change instructions
+                let mut eval_output = renderer.evaluate_instructions();
 
-            // Build a rendergraph
-            let mut graph = rend3::graph::RenderGraph::new();
+                // Build a rendergraph
+                let mut graph = rend3::graph::RenderGraph::new();
 
-            // Import the surface texture into the render graph.
-            let frame_handle =
-                graph.add_imported_render_target(&frame, 0..1, 0..1, rend3::graph::ViewportRect::from_size(resolution));
-            // Add the default rendergraph without a skybox
-            base_rendergraph.add_to_graph(
-                &mut graph,
-                rend3_routine::base::BaseRenderGraphInputs {
-                    eval_output: &eval_output,
-                    routines: rend3_routine::base::BaseRenderGraphRoutines {
-                        pbr: &pbr_routine,
-                        skybox: None,
-                        tonemapping: &tonemapping_routine,
+                // Import the surface texture into the render graph.
+                let frame_handle = graph.add_imported_render_target(
+                    &frame,
+                    0..1,
+                    0..1,
+                    rend3::graph::ViewportRect::from_size(resolution),
+                );
+                // Add the default rendergraph without a skybox
+                base_rendergraph.add_to_graph(
+                    &mut graph,
+                    rend3_routine::base::BaseRenderGraphInputs {
+                        eval_output: &eval_output,
+                        routines: rend3_routine::base::BaseRenderGraphRoutines {
+                            pbr: &pbr_routine,
+                            skybox: None,
+                            tonemapping: &tonemapping_routine,
+                        },
+                        target: rend3_routine::base::OutputRenderTarget {
+                            handle: frame_handle,
+                            resolution,
+                            samples: rend3::types::SampleCount::One,
+                        },
                     },
-                    target: rend3_routine::base::OutputRenderTarget {
-                        handle: frame_handle,
-                        resolution,
-                        samples: rend3::types::SampleCount::One,
+                    rend3_routine::base::BaseRenderGraphSettings {
+                        ambient_color: glam::Vec4::ZERO,
+                        clear_color: glam::Vec4::new(0.10, 0.05, 0.10, 1.0), // Nice scene-referred purple
                     },
-                },
-                rend3_routine::base::BaseRenderGraphSettings {
-                    ambient_color: glam::Vec4::ZERO,
-                    clear_color: glam::Vec4::new(0.10, 0.05, 0.10, 1.0), // Nice scene-referred purple
-                },
-            );
+                );
 
-            // Dispatch a render using the built up rendergraph!
-            graph.execute(&renderer, &mut eval_output);
+                // Dispatch a render using the built up rendergraph!
+                graph.execute(&renderer, &mut eval_output);
 
-            // Present the frame
-            frame.present();
-        }
-        // Other events we don't care about
-        _ => {}
-    });
+                // Present the frame
+                frame.present();
+            }
+            // Other events we don't care about
+            _ => {}
+        })
+        .expect("");
 }

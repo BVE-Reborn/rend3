@@ -773,7 +773,7 @@ impl Mesh {
         debug_assert_ne!(normal_index, uv_0_index);
 
         // Assert that all indices are in bounds.
-        debug_assert!(self.attributes.get(0).is_some());
+        debug_assert!(self.attributes.first().is_some());
         debug_assert!(self.attributes.get(tangent_index).is_some());
         debug_assert!(self.attributes.get(normal_index).is_some());
         debug_assert!(self.attributes.get(uv_0_index).is_some());

@@ -12,8 +12,8 @@ categories = ["game-development", "graphics", "rendering", "rendering::engine", 
 rust-version = "1.71"
 
 [dependencies]
-egui = "0.24.0"
-egui-wgpu = "0.24"
+egui = {git = "https://github.com/emilk/egui.git", branch="master"}
+egui-wgpu = {git = "https://github.com/emilk/egui.git", branch="master"}
 glam = "0.24"
 rend3 = { version = "^0.3.0", path = "../rend3" }
 wgpu = "0.18.0"

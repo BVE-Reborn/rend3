@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use winit::event::WindowEvent;
 
 fn vertex(pos: [f32; 3]) -> glam::Vec3 {
     glam::Vec3::from(pos)
@@ -69,14 +69,7 @@ impl rend3_framework::App for CubeExample {
         SAMPLE_COUNT
     }
 
-    fn setup(
-        &mut self,
-        _event_loop: &winit::event_loop::EventLoop<rend3_framework::UserResizeEvent<()>>,
-        _window: &winit::window::Window,
-        renderer: &Arc<rend3::Renderer>,
-        _routines: &Arc<rend3_framework::DefaultRoutines>,
-        _surface_format: rend3::types::TextureFormat,
-    ) {
+    fn setup(&mut self, context: rend3_framework::SetupContext<'_>) {
         // Create mesh and calculate smooth normals based on vertices
         let mesh = create_mesh();
 
@@ -84,14 +77,14 @@ impl rend3_framework::App for CubeExample {
         //
         // All handles are refcounted, so we only need to hang onto the handle until we
         // make an object.
-        let mesh_handle = renderer.add_mesh(mesh).unwrap();
+        let mesh_handle = context.renderer.add_mesh(mesh).unwrap();
 
         // Add PBR material with all defaults except a single color.
         let material = rend3_routine::pbr::PbrMaterial {
             albedo: rend3_routine::pbr::AlbedoComponent::Value(glam::Vec4::new(0.5, 0.5, 0.5, 1.0)),
             ..rend3_routine::pbr::PbrMaterial::default()
         };
-        let material_handle = renderer.add_material(material);
+        let material_handle = context.renderer.add_material(material);
 
         // Combine the mesh and the material with a location to give an object.
         let object = rend3::types::Object {
@@ -103,14 +96,14 @@ impl rend3_framework::App for CubeExample {
         // even if they are deleted.
         //
         // We need to keep the object handle alive.
-        self.object_handle = Some(renderer.add_object(object));
+        self.object_handle = Some(context.renderer.add_object(object));
 
         let view_location = glam::Vec3::new(3.0, 3.0, -5.0);
         let view = glam::Mat4::from_euler(glam::EulerRot::XYZ, -0.55, 0.5, 0.0);
         let view = view * glam::Mat4::from_translation(-view_location);
 
         // Set camera's location
-        renderer.set_camera_data(rend3::types::Camera {
+        context.renderer.set_camera_data(rend3::types::Camera {
             projection: rend3::types::CameraProjection::Perspective { vfov: 60.0, near: 0.1 },
             view,
         });
@@ -118,7 +111,7 @@ impl rend3_framework::App for CubeExample {
         // Create a single directional light
         //
         // We need to keep the directional light handle alive.
-        self.directional_light_handle = Some(renderer.add_directional_light(rend3::types::DirectionalLight {
+        self.directional_light_handle = Some(context.renderer.add_directional_light(rend3::types::DirectionalLight {
             color: glam::Vec3::ONE,
             intensity: 1.0,
             // Direction will be normalized
@@ -135,7 +128,7 @@ impl rend3_framework::App for CubeExample {
 
         for (position, color) in lights {
             self.point_lights
-                .push(renderer.add_point_light(rend3::types::PointLight {
+                .push(context.renderer.add_point_light(rend3::types::PointLight {
                     position,
                     color,
                     radius: 2.0,
@@ -144,41 +137,25 @@ impl rend3_framework::App for CubeExample {
         }
     }
 
-    fn handle_event(
-        &mut self,
-        window: &winit::window::Window,
-        renderer: &Arc<rend3::Renderer>,
-        routines: &Arc<rend3_framework::DefaultRoutines>,
-        base_rendergraph: &rend3_routine::base::BaseRenderGraph,
-        surface: Option<&Arc<rend3::types::Surface>>,
-        resolution: glam::UVec2,
-        event: rend3_framework::Event<'_, ()>,
-        control_flow: impl FnOnce(winit::event_loop::ControlFlow),
-    ) {
+    fn handle_event(&mut self, context: rend3_framework::EventContext<'_>, event: winit::event::Event<()>) {
+        #[allow(clippy::single_match)]
         match event {
-            // Close button was clicked, we should close.
-            rend3_framework::Event::WindowEvent {
-                event: winit::event::WindowEvent::CloseRequested,
-                ..
-            } => {
-                control_flow(winit::event_loop::ControlFlow::Exit);
-            }
-            rend3_framework::Event::MainEventsCleared => {
-                window.request_redraw();
-            }
             // Render!
-            rend3_framework::Event::RedrawRequested(_) => {
+            winit::event::Event::WindowEvent {
+                window_id: _,
+                event: WindowEvent::RedrawRequested,
+            } => {
                 // Get a frame
-                let frame = surface.unwrap().get_current_texture().unwrap();
+                let frame = context.surface.unwrap().get_current_texture().unwrap();
 
                 // Swap the instruction buffers so that our frame's changes can be processed.
-                renderer.swap_instruction_buffers();
+                context.renderer.swap_instruction_buffers();
                 // Evaluate our frame's world-change instructions
-                let mut eval_output = renderer.evaluate_instructions();
+                let mut eval_output = context.renderer.evaluate_instructions();
 
                 // Lock the routines
-                let pbr_routine = rend3_framework::lock(&routines.pbr);
-                let tonemapping_routine = rend3_framework::lock(&routines.tonemapping);
+                let pbr_routine = rend3_framework::lock(&context.routines.pbr);
+                let tonemapping_routine = rend3_framework::lock(&context.routines.tonemapping);
 
                 // Build a rendergraph
                 let mut graph = rend3::graph::RenderGraph::new();
@@ -188,10 +165,10 @@ impl rend3_framework::App for CubeExample {
                     &frame,
                     0..1,
                     0..1,
-                    rend3::graph::ViewportRect::from_size(resolution),
+                    rend3::graph::ViewportRect::from_size(context.resolution),
                 );
                 // Add the default rendergraph without a skybox
-                base_rendergraph.add_to_graph(
+                context.base_rendergraph.add_to_graph(
                     &mut graph,
                     rend3_routine::base::BaseRenderGraphInputs {
                         eval_output: &eval_output,
@@ -202,7 +179,7 @@ impl rend3_framework::App for CubeExample {
                         },
                         target: rend3_routine::base::OutputRenderTarget {
                             handle: frame_handle,
-                            resolution,
+                            resolution: context.resolution,
                             samples: SAMPLE_COUNT,
                         },
                     },
@@ -213,10 +190,12 @@ impl rend3_framework::App for CubeExample {
                 );
 
                 // Dispatch a render using the built up rendergraph!
-                graph.execute(renderer, &mut eval_output);
+                graph.execute(context.renderer, &mut eval_output);
 
                 // Present the frame
                 frame.present();
+
+                context.window.request_redraw()
             }
             // Other events we don't care about
             _ => {}

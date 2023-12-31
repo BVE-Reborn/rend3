@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use winit::event::WindowEvent;
+
 fn load_gltf(
     renderer: &Arc<rend3::Renderer>,
     path: &'static str,
@@ -64,18 +66,11 @@ impl rend3_framework::App for GltfExample {
         SAMPLE_COUNT
     }
 
-    fn setup(
-        &mut self,
-        _event_loop: &winit::event_loop::EventLoop<rend3_framework::UserResizeEvent<()>>,
-        _window: &winit::window::Window,
-        renderer: &Arc<rend3::Renderer>,
-        _routines: &Arc<rend3_framework::DefaultRoutines>,
-        _surface_format: rend3::types::TextureFormat,
-    ) {
+    fn setup(&mut self, context: rend3_framework::SetupContext<'_>) {
         // Create mesh and calculate smooth normals based on vertices.
         //
         // We do not need to keep these handles alive once we make the object
-        let (mesh, material) = load_gltf(renderer, concat!(env!("CARGO_MANIFEST_DIR"), "/data.glb"));
+        let (mesh, material) = load_gltf(context.renderer, concat!(env!("CARGO_MANIFEST_DIR"), "/data.glb"));
 
         // Combine the mesh and the material with a location to give an object.
         let object = rend3::types::Object {
@@ -84,14 +79,14 @@ impl rend3_framework::App for GltfExample {
             transform: glam::Mat4::from_scale(glam::Vec3::new(1.0, 1.0, -1.0)),
         };
         // We need to keep the object alive.
-        self.object_handle = Some(renderer.add_object(object));
+        self.object_handle = Some(context.renderer.add_object(object));
 
         let view_location = glam::Vec3::new(3.0, 3.0, -5.0);
         let view = glam::Mat4::from_euler(glam::EulerRot::XYZ, -0.55, 0.5, 0.0);
         let view = view * glam::Mat4::from_translation(-view_location);
 
         // Set camera's location
-        renderer.set_camera_data(rend3::types::Camera {
+        context.renderer.set_camera_data(rend3::types::Camera {
             projection: rend3::types::CameraProjection::Perspective { vfov: 60.0, near: 0.1 },
             view,
         });
@@ -99,7 +94,7 @@ impl rend3_framework::App for GltfExample {
         // Create a single directional light
         //
         // We need to keep the directional light handle alive.
-        self.directional_light_handle = Some(renderer.add_directional_light(rend3::types::DirectionalLight {
+        self.directional_light_handle = Some(context.renderer.add_directional_light(rend3::types::DirectionalLight {
             color: glam::Vec3::ONE,
             intensity: 4.0,
             // Direction will be normalized
@@ -109,41 +104,25 @@ impl rend3_framework::App for GltfExample {
         }));
     }
 
-    fn handle_event(
-        &mut self,
-        window: &winit::window::Window,
-        renderer: &Arc<rend3::Renderer>,
-        routines: &Arc<rend3_framework::DefaultRoutines>,
-        base_rendergraph: &rend3_routine::base::BaseRenderGraph,
-        surface: Option<&Arc<rend3::types::Surface>>,
-        resolution: glam::UVec2,
-        event: rend3_framework::Event<'_, ()>,
-        control_flow: impl FnOnce(winit::event_loop::ControlFlow),
-    ) {
+    fn handle_event(&mut self, context: rend3_framework::EventContext<'_>, event: winit::event::Event<()>) {
+        #[allow(clippy::single_match)]
         match event {
-            // Close button was clicked, we should close.
-            rend3_framework::Event::WindowEvent {
-                event: winit::event::WindowEvent::CloseRequested,
-                ..
-            } => {
-                control_flow(winit::event_loop::ControlFlow::Exit);
-            }
-            rend3_framework::Event::MainEventsCleared => {
-                window.request_redraw();
-            }
             // Render!
-            rend3_framework::Event::RedrawRequested(..) => {
+            winit::event::Event::WindowEvent {
+                window_id: _,
+                event: WindowEvent::RedrawRequested,
+            } => {
                 // Get a frame
-                let frame = surface.unwrap().get_current_texture().unwrap();
+                let frame = context.surface.unwrap().get_current_texture().unwrap();
 
                 // Swap the instruction buffers so that our frame's changes can be processed.
-                renderer.swap_instruction_buffers();
+                context.renderer.swap_instruction_buffers();
                 // Evaluate our frame's world-change instructions
-                let mut eval_output = renderer.evaluate_instructions();
+                let mut eval_output = context.renderer.evaluate_instructions();
 
                 // Lock the routines
-                let pbr_routine = rend3_framework::lock(&routines.pbr);
-                let tonemapping_routine = rend3_framework::lock(&routines.tonemapping);
+                let pbr_routine = rend3_framework::lock(&context.routines.pbr);
+                let tonemapping_routine = rend3_framework::lock(&context.routines.tonemapping);
 
                 // Build a rendergraph
                 let mut graph = rend3::graph::RenderGraph::new();
@@ -153,10 +132,10 @@ impl rend3_framework::App for GltfExample {
                     &frame,
                     0..1,
                     0..1,
-                    rend3::graph::ViewportRect::from_size(resolution),
+                    rend3::graph::ViewportRect::from_size(context.resolution),
                 );
                 // Add the default rendergraph without a skybox
-                base_rendergraph.add_to_graph(
+                context.base_rendergraph.add_to_graph(
                     &mut graph,
                     rend3_routine::base::BaseRenderGraphInputs {
                         eval_output: &eval_output,
@@ -167,7 +146,7 @@ impl rend3_framework::App for GltfExample {
                         },
                         target: rend3_routine::base::OutputRenderTarget {
                             handle: frame_handle,
-                            resolution,
+                            resolution: context.resolution,
                             samples: SAMPLE_COUNT,
                         },
                     },
@@ -177,10 +156,12 @@ impl rend3_framework::App for GltfExample {
                     },
                 );
                 // Dispatch a render using the built up rendergraph!
-                graph.execute(renderer, &mut eval_output);
+                graph.execute(context.renderer, &mut eval_output);
 
                 // Present the frame
                 frame.present();
+
+                context.window.request_redraw();
             }
             // Other events we don't care about
             _ => {}
