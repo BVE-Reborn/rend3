@@ -262,7 +262,7 @@ impl rend3_framework::App for EguiExample {
     }
 }
 
-fn main() {
+pub fn main() {
     let app = EguiExample::default();
     rend3_framework::start(
         app,

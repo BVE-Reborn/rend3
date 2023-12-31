@@ -7,7 +7,7 @@ const SAMPLE_COUNT: rend3::types::SampleCount = rend3::types::SampleCount::One;
 
 /// The application data, can only be obtained at `setup` time, so it's under an
 /// Option in the main struct.
-struct AnimatedObject {
+pub struct AnimatedObject {
     loaded_scene: rend3_gltf::LoadedGltfScene,
     loaded_instance: rend3_gltf::GltfSceneInstance,
     animation_data: rend3_anim::AnimationData,
@@ -55,7 +55,10 @@ impl rend3_framework::App for AnimationExample {
 
         // Load a gltf model with animation data
         // Needs to be stored somewhere, otherwise all the data gets freed.
-        let path = Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/resources/scene.gltf"));
+        let path = Path::new(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/src/animation/resources/scene.gltf"
+        ));
         let gltf_data = std::fs::read(path).unwrap();
         let parent_directory = path.parent().unwrap();
         let (loaded_scene, loaded_instance) = pollster::block_on(rend3_gltf::load_gltf(
@@ -88,7 +91,10 @@ impl rend3_framework::App for AnimationExample {
             last_frame_time: web_time::Instant::now(),
         };
 
-        let path = Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/resources/cube_3.gltf"));
+        let path = Path::new(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/src/animation/resources/cube_3.gltf"
+        ));
         let gltf_data = std::fs::read(path).unwrap();
         let parent_directory = path.parent().unwrap();
         let (loaded_scene, loaded_instance) = pollster::block_on(rend3_gltf::load_gltf(
@@ -184,7 +190,6 @@ impl rend3_framework::App for AnimationExample {
     }
 }
 
-#[cfg_attr(target_os = "android", ndk_glue::main(backtrace = "on", logger(level = "debug")))]
 pub fn main() {
     let app = AnimationExample::default();
     rend3_framework::start(

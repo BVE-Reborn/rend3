@@ -1,63 +1,65 @@
-use std::{path::Path, time::Instant};
+use std::sync::Arc;
 
-use rend3_gltf::GltfSceneInstance;
 use winit::event::WindowEvent;
+
+fn load_gltf(
+    renderer: &Arc<rend3::Renderer>,
+    path: &'static str,
+) -> (rend3::types::MeshHandle, rend3::types::MaterialHandle) {
+    let (doc, datas, _) = gltf::import(path).unwrap();
+    let mesh_data = doc.meshes().next().expect("no meshes in data.glb");
+
+    let primitive = mesh_data.primitives().next().expect("no primitives in data.glb");
+    let reader = primitive.reader(|b| Some(&datas.get(b.index())?.0[..b.length()]));
+
+    let vertex_positions: Vec<_> = reader.read_positions().unwrap().map(glam::Vec3::from).collect();
+    let vertex_normals: Vec<_> = reader.read_normals().unwrap().map(glam::Vec3::from).collect();
+    let vertex_tangents: Vec<_> = reader
+        .read_tangents()
+        .unwrap()
+        .map(glam::Vec4::from)
+        .map(glam::Vec4::truncate)
+        .collect();
+    let vertex_uvs: Vec<_> = reader
+        .read_tex_coords(0)
+        .unwrap()
+        .into_f32()
+        .map(glam::Vec2::from)
+        .collect();
+    let indices = reader.read_indices().unwrap().into_u32().collect();
+
+    let mesh = rend3::types::MeshBuilder::new(vertex_positions.to_vec(), rend3::types::Handedness::Right)
+        .with_vertex_normals(vertex_normals)
+        .with_vertex_tangents(vertex_tangents)
+        .with_vertex_texture_coordinates_0(vertex_uvs)
+        .with_indices(indices)
+        .with_flip_winding_order()
+        .build()
+        .unwrap();
+
+    // Add mesh to renderer's world
+    let mesh_handle = renderer.add_mesh(mesh).unwrap();
+
+    // Add basic material with all defaults except a single color.
+    let material = primitive.material();
+    let metallic_roughness = material.pbr_metallic_roughness();
+    let material_handle = renderer.add_material(rend3_routine::pbr::PbrMaterial {
+        albedo: rend3_routine::pbr::AlbedoComponent::Value(metallic_roughness.base_color_factor().into()),
+        ..Default::default()
+    });
+
+    (mesh_handle, material_handle)
+}
 
 const SAMPLE_COUNT: rend3::types::SampleCount = rend3::types::SampleCount::One;
 
 #[derive(Default)]
-struct SkinningExample {
-    loaded_scene: Option<rend3_gltf::LoadedGltfScene>,
-    loaded_instance: Option<rend3_gltf::GltfSceneInstance>,
+struct GltfExample {
+    object_handle: Option<rend3::types::ObjectHandle>,
     directional_light_handle: Option<rend3::types::DirectionalLightHandle>,
-    armature: Option<rend3_gltf::Armature>,
-    start_time: Option<Instant>,
 }
 
-/// Locates an object in the node list that corresponds to an animated mesh
-/// and returns its list of skeletons. Note that a gltf object may contain
-/// multiple primitives, and there will be one skeleton per primitive.
-pub fn find_armature(instance: &GltfSceneInstance) -> Option<rend3_gltf::Armature> {
-    for node in &instance.nodes {
-        if let Some(ref obj) = node.inner.object {
-            if let Some(ref armature) = obj.inner.armature {
-                return Some(armature.clone());
-            }
-        }
-    }
-    None
-}
-
-impl SkinningExample {
-    /// This function gets called every frame. Updates the skeleton's joint
-    /// positions
-    pub fn update_skeleton(&mut self, renderer: &rend3::Renderer) {
-        let armature = &self.armature.as_ref().expect("Data must be loaded by now");
-        let loaded_scene = &self.loaded_scene.as_ref().expect("Data must be loaded by now");
-        let inverse_bind_matrices = &loaded_scene.skins[armature.skin_index].inner.inverse_bind_matrices;
-
-        // Compute a very simple animation for the top bone
-        let elapsed_time = Instant::now().duration_since(self.start_time.unwrap());
-        let t = elapsed_time.as_secs_f32();
-        let rotation_degrees = 30.0 * f32::sin(5.0 * t);
-
-        // An armature contains multiple skeletons, one per mesh primitive being
-        // deformed. We need to set the joint matrices per each skeleton.
-        for skeleton in &armature.skeletons {
-            renderer.set_skeleton_joint_transforms(
-                skeleton,
-                &[
-                    glam::Mat4::from_translation(glam::Vec3::new(0.0, 0.0, -4.18)),
-                    glam::Mat4::from_translation(glam::Vec3::new(0.0, 0.0, 0.0))
-                        * glam::Mat4::from_rotation_x(rotation_degrees.to_radians()),
-                ],
-                inverse_bind_matrices,
-            );
-        }
-    }
-}
-
-impl rend3_framework::App for SkinningExample {
+impl rend3_framework::App for GltfExample {
     const HANDEDNESS: rend3::types::Handedness = rend3::types::Handedness::Left;
 
     fn sample_count(&self) -> rend3::types::SampleCount {
@@ -65,11 +67,25 @@ impl rend3_framework::App for SkinningExample {
     }
 
     fn setup(&mut self, context: rend3_framework::SetupContext<'_>) {
-        // Store the startup time. Use later to animate the joint rotation
-        self.start_time = Some(Instant::now());
+        // Create mesh and calculate smooth normals based on vertices.
+        //
+        // We do not need to keep these handles alive once we make the object
+        let (mesh, material) = load_gltf(
+            context.renderer,
+            concat!(env!("CARGO_MANIFEST_DIR"), "/src/static_gltf/data.glb"),
+        );
 
-        let view_location = glam::Vec3::new(0.0, 0.0, -10.0);
-        let view = glam::Mat4::from_euler(glam::EulerRot::XYZ, 0.0, 0.0, 0.0);
+        // Combine the mesh and the material with a location to give an object.
+        let object = rend3::types::Object {
+            mesh_kind: rend3::types::ObjectMeshKind::Static(mesh),
+            material,
+            transform: glam::Mat4::from_scale(glam::Vec3::new(1.0, 1.0, -1.0)),
+        };
+        // We need to keep the object alive.
+        self.object_handle = Some(context.renderer.add_object(object));
+
+        let view_location = glam::Vec3::new(3.0, 3.0, -5.0);
+        let view = glam::Mat4::from_euler(glam::EulerRot::XYZ, -0.55, 0.5, 0.0);
         let view = view * glam::Mat4::from_translation(-view_location);
 
         // Set camera's location
@@ -78,36 +94,15 @@ impl rend3_framework::App for SkinningExample {
             view,
         });
 
-        // Load a gltf model with animation data
-        let path = Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/RiggedSimple.glb"));
-        let gltf_data = std::fs::read(path).unwrap();
-        let parent_directory = path.parent().unwrap();
-        let (loaded_scene, loaded_instance) = pollster::block_on(rend3_gltf::load_gltf(
-            context.renderer,
-            &gltf_data,
-            &rend3_gltf::GltfLoadSettings::default(),
-            |p| async move { rend3_gltf::filesystem_io_func(&parent_directory, &p).await },
-        ))
-        .expect("Loading gltf scene");
-
-        // The returned loaded model contains a node hierarchy with a complete
-        // scene. We know in our case there will be a single node in the tree
-        // with an armature.
-        self.armature = Some(find_armature(&loaded_instance).unwrap());
-
-        // Store the loaded model somewhere, otherwise all the data gets freed.
-        self.loaded_scene = Some(loaded_scene);
-        self.loaded_instance = Some(loaded_instance);
-
         // Create a single directional light
         //
         // We need to keep the directional light handle alive.
         self.directional_light_handle = Some(context.renderer.add_directional_light(rend3::types::DirectionalLight {
             color: glam::Vec3::ONE,
-            intensity: 10.0,
+            intensity: 4.0,
             // Direction will be normalized
             direction: glam::Vec3::new(-1.0, -4.0, 2.0),
-            distance: 400.0,
+            distance: 20.0,
             resolution: 2048,
         }));
     }
@@ -120,8 +115,6 @@ impl rend3_framework::App for SkinningExample {
                 window_id: _,
                 event: WindowEvent::RedrawRequested,
             } => {
-                self.update_skeleton(context.renderer);
-
                 // Get a frame
                 let frame = context.surface.unwrap().get_current_texture().unwrap();
 
@@ -137,6 +130,7 @@ impl rend3_framework::App for SkinningExample {
                 // Build a rendergraph
                 let mut graph = rend3::graph::RenderGraph::new();
 
+                // Import the surface texture into the render graph.
                 let frame_handle = graph.add_imported_render_target(
                     &frame,
                     0..1,
@@ -164,10 +158,10 @@ impl rend3_framework::App for SkinningExample {
                         clear_color: glam::Vec4::new(0.10, 0.05, 0.10, 1.0), // Nice scene-referred purple
                     },
                 );
-
                 // Dispatch a render using the built up rendergraph!
                 graph.execute(context.renderer, &mut eval_output);
 
+                // Present the frame
                 frame.present();
 
                 context.window.request_redraw();
@@ -178,13 +172,12 @@ impl rend3_framework::App for SkinningExample {
     }
 }
 
-#[cfg_attr(target_os = "android", ndk_glue::main(backtrace = "on", logger(level = "debug")))]
 pub fn main() {
-    let app = SkinningExample::default();
+    let app = GltfExample::default();
     rend3_framework::start(
         app,
         winit::window::WindowBuilder::new()
-            .with_title("skinning-example")
+            .with_title("gltf-example")
             .with_maximized(true),
     );
 }
