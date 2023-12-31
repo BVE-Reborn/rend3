@@ -1,5 +1,5 @@
 [package]
-name = "rend3-examples"
+name = "rend3-examples-package"
 license = "MIT OR Apache-2.0 OR Zlib"
 version = "0.3.0"
 authors = ["The rend3 Developers"]
@@ -9,6 +9,10 @@ rust-version = "1.71"
 
 [lib]
 crate-type = ["lib", "cdylib"]
+
+[[bin]]
+name = "rend3-examples"
+path = "src/main.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

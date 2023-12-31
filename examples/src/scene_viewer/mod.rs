@@ -91,8 +91,8 @@ async fn load_gltf(
                 to download and unzip it into the right place. If you're running it through not-git, pass a custom folder to the -C argument
                 to tar, then run scene-viewer path/to/scene.gltf.
                 
-                curl{0} https://cdn.cwfitz.com/scenes/rend3-default-scene.tar -o ./examples/scene-viewer/resources/rend3-default-scene.tar
-                tar{0} xf ./examples/scene-viewer/resources/rend3-default-scene.tar -C ./examples/scene-viewer/resources
+                curl{0} https://cdn.cwfitz.com/scenes/rend3-default-scene.tar -o ./examples/src/scene_viewer/resources/rend3-default-scene.tar
+                tar{0} xf ./examples/src/scene_viewer/resources/rend3-default-scene.tar -C ./examples/src/scene_viewer/resources
 
                 ***************
             ", suffix);

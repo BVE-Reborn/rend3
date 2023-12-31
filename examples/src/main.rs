@@ -1,3 +1,3 @@
 fn main() {
-    rend3_examples::main();
+    rend3_examples_package::main();
 }
