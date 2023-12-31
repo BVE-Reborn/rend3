@@ -48,6 +48,7 @@ Per Keep a Changelog there are 6 main categories of changes:
 - rend3: Update to wgpu 0.13, naga 0.9 @garyttierney
 - rend3: Convert all shaders to WGSL using a custom preprocessing solution @cwfitzgerald
 - rend3: Update to winit 0.29.4 @pillowtrucker
+- rend3-framework: Consolidate many arguments into single `SetupContext` and `EventContext` structs. @cwfitzgerald
 
 ### Fixes
 - Fixed renderpass compatibility checks to avoid issues when RODS is used. @OptimisticPeach
