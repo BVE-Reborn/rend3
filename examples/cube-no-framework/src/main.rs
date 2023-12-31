@@ -177,14 +177,7 @@ fn main() {
     let mut resolution = glam::UVec2::new(window_size.width, window_size.height);
 
     event_loop
-        .run(move |event, event_loop_window_target| match event {
-            // Close button was clicked, we should close.
-            winit::event::Event::WindowEvent {
-                event: winit::event::WindowEvent::CloseRequested,
-                ..
-            } => {
-                event_loop_window_target.exit();
-            }
+        .run(move |event, _event_loop_window_target| match event {
             // Window was resized, need to resize renderer.
             winit::event::Event::WindowEvent {
                 event: winit::event::WindowEvent::Resized(physical_size),
@@ -203,7 +196,10 @@ fn main() {
                 renderer.set_aspect_ratio(resolution.x as f32 / resolution.y as f32);
             }
             // Render!
-            winit::event::Event::AboutToWait => {
+            winit::event::Event::WindowEvent {
+                event: winit::event::WindowEvent::RedrawRequested,
+                ..
+            } => {
                 // Get a frame
                 let frame = surface.get_current_texture().unwrap();
 

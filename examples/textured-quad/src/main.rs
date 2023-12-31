@@ -1,8 +1,4 @@
-use std::sync::Arc;
-
 use image::GenericImageView;
-use rend3_framework::UserResizeEvent;
-use winit::event_loop::EventLoopWindowTarget;
 
 fn vertex(pos: [f32; 3]) -> glam::Vec3 {
     glam::Vec3::from(pos)
@@ -49,14 +45,7 @@ impl rend3_framework::App for TexturedQuadExample {
         SAMPLE_COUNT
     }
 
-    fn setup(
-        &mut self,
-        _event_loop: &winit::event_loop::EventLoop<rend3_framework::UserResizeEvent<()>>,
-        window: &winit::window::Window,
-        renderer: &Arc<rend3::Renderer>,
-        _routines: &Arc<rend3_framework::DefaultRoutines>,
-        _surface_format: rend3::types::TextureFormat,
-    ) {
+    fn setup(&mut self, context: rend3_framework::SetupContext<'_>) {
         // Create mesh and calculate smooth normals based on vertices
         let mesh = create_quad(300.0);
 
@@ -64,7 +53,7 @@ impl rend3_framework::App for TexturedQuadExample {
         //
         // All handles are refcounted, so we only need to hang onto the handle until we
         // make an object.
-        let mesh_handle = renderer.add_mesh(mesh).unwrap();
+        let mesh_handle = context.renderer.add_mesh(mesh).unwrap();
 
         // Add texture to renderer's world.
         let image_checker =
@@ -78,7 +67,7 @@ impl rend3_framework::App for TexturedQuadExample {
             mip_count: rend3::types::MipmapCount::ONE,
             mip_source: rend3::types::MipmapSource::Uploaded,
         };
-        let texture_checker_handle = renderer.add_texture_2d(texture_checker).unwrap();
+        let texture_checker_handle = context.renderer.add_texture_2d(texture_checker).unwrap();
 
         // Add PBR material with all defaults except a single color.
         let material = rend3_routine::pbr::PbrMaterial {
@@ -87,7 +76,7 @@ impl rend3_framework::App for TexturedQuadExample {
             sample_type: rend3_routine::pbr::SampleType::Nearest,
             ..rend3_routine::pbr::PbrMaterial::default()
         };
-        let material_handle = renderer.add_material(material);
+        let material_handle = context.renderer.add_material(material);
 
         // Combine the mesh and the material with a location to give an object.
         let object = rend3::types::Object {
@@ -104,20 +93,17 @@ impl rend3_framework::App for TexturedQuadExample {
         // even if they are deleted.
         //
         // We need to keep the object handle alive.
-        let _object_handle = renderer.add_object(object);
+        let _object_handle = context.renderer.add_object(object);
 
         let view_location = glam::Vec3::new(0.0, 0.0, -1.0);
         let view = glam::Mat4::from_euler(glam::EulerRot::XYZ, 0.0, 0.0, 0.0);
         let view = view * glam::Mat4::from_translation(-view_location);
 
         // Set camera's location
-        renderer.set_camera_data(rend3::types::Camera {
+        let inner_size = context.window.inner_size();
+        context.renderer.set_camera_data(rend3::types::Camera {
             projection: rend3::types::CameraProjection::Orthographic {
-                size: glam::Vec3A::new(
-                    window.inner_size().width as f32,
-                    window.inner_size().height as f32,
-                    CAMERA_DEPTH,
-                ),
+                size: glam::Vec3A::new(inner_size.width as f32, inner_size.width as f32, CAMERA_DEPTH),
             },
             view,
         });
@@ -125,26 +111,8 @@ impl rend3_framework::App for TexturedQuadExample {
         self.data = Some(TexturedQuadExampleData { _object_handle, view })
     }
 
-    fn handle_event(
-        &mut self,
-        _window: &winit::window::Window,
-        renderer: &Arc<rend3::Renderer>,
-        routines: &Arc<rend3_framework::DefaultRoutines>,
-        base_rendergraph: &rend3_routine::base::BaseRenderGraph,
-        surface: Option<&Arc<rend3::types::Surface>>,
-        resolution: glam::UVec2,
-        event: rend3_framework::Event<'_, ()>,
-        _control_flow: impl FnOnce(winit::event_loop::ControlFlow),
-        event_loop_window_target: &EventLoopWindowTarget<UserResizeEvent<()>>,
-    ) {
+    fn handle_event(&mut self, context: rend3_framework::EventContext<'_>, event: winit::event::Event<()>) {
         match event {
-            // Close button was clicked, we should close.
-            winit::event::Event::WindowEvent {
-                event: winit::event::WindowEvent::CloseRequested,
-                ..
-            } => {
-                event_loop_window_target.exit();
-            }
             // Window was resized, need to resize renderer.
             winit::event::Event::WindowEvent {
                 event: winit::event::WindowEvent::Resized(size),
@@ -152,7 +120,7 @@ impl rend3_framework::App for TexturedQuadExample {
             } => {
                 let size = glam::UVec2::new(size.width, size.height);
                 // Reset camera
-                renderer.set_camera_data(rend3::types::Camera {
+                context.renderer.set_camera_data(rend3::types::Camera {
                     projection: rend3::types::CameraProjection::Orthographic {
                         size: glam::Vec3A::new(size.x as f32, size.y as f32, CAMERA_DEPTH),
                     },
@@ -160,18 +128,21 @@ impl rend3_framework::App for TexturedQuadExample {
                 });
             }
             // Render!
-            winit::event::Event::AboutToWait => {
+            winit::event::Event::WindowEvent {
+                event: winit::event::WindowEvent::RedrawRequested,
+                ..
+            } => {
                 // Get a frame
-                let frame = surface.unwrap().get_current_texture().unwrap();
+                let frame = context.surface.unwrap().get_current_texture().unwrap();
 
                 // Swap the instruction buffers so that our frame's changes can be processed.
-                renderer.swap_instruction_buffers();
+                context.renderer.swap_instruction_buffers();
                 // Evaluate our frame's world-change instructions
-                let mut eval_output = renderer.evaluate_instructions();
+                let mut eval_output = context.renderer.evaluate_instructions();
 
                 // Lock the routines
-                let pbr_routine = rend3_framework::lock(&routines.pbr);
-                let tonemapping_routine = rend3_framework::lock(&routines.tonemapping);
+                let pbr_routine = rend3_framework::lock(&context.routines.pbr);
+                let tonemapping_routine = rend3_framework::lock(&context.routines.tonemapping);
 
                 // Build a rendergraph
                 let mut graph = rend3::graph::RenderGraph::new();
@@ -181,10 +152,10 @@ impl rend3_framework::App for TexturedQuadExample {
                     &frame,
                     0..1,
                     0..1,
-                    rend3::graph::ViewportRect::from_size(resolution),
+                    rend3::graph::ViewportRect::from_size(context.resolution),
                 );
                 // Add the default rendergraph
-                base_rendergraph.add_to_graph(
+                context.base_rendergraph.add_to_graph(
                     &mut graph,
                     rend3_routine::base::BaseRenderGraphInputs {
                         eval_output: &eval_output,
@@ -195,7 +166,7 @@ impl rend3_framework::App for TexturedQuadExample {
                         },
                         target: rend3_routine::base::OutputRenderTarget {
                             handle: frame_handle,
-                            resolution,
+                            resolution: context.resolution,
                             samples: SAMPLE_COUNT,
                         },
                     },
@@ -206,7 +177,7 @@ impl rend3_framework::App for TexturedQuadExample {
                 );
 
                 // Dispatch a render using the built up rendergraph!
-                graph.execute(renderer, &mut eval_output);
+                graph.execute(context.renderer, &mut eval_output);
 
                 // Present the frame
                 frame.present();

@@ -1,7 +1,4 @@
-use std::sync::Arc;
-
-use rend3_framework::UserResizeEvent;
-use winit::{event::WindowEvent, event_loop::EventLoopWindowTarget};
+use winit::event::WindowEvent;
 
 struct EguiExampleData {
     _object_handle: rend3::types::ObjectHandle,
@@ -28,24 +25,17 @@ impl rend3_framework::App for EguiExample {
         SAMPLE_COUNT
     }
 
-    fn setup(
-        &mut self,
-        _event_loop: &winit::event_loop::EventLoop<rend3_framework::UserResizeEvent<()>>,
-        window: &winit::window::Window,
-        renderer: &Arc<rend3::Renderer>,
-        _routines: &Arc<rend3_framework::DefaultRoutines>,
-        surface_format: rend3::types::TextureFormat,
-    ) {
-        let window_size = window.inner_size();
+    fn setup(&mut self, context: rend3_framework::SetupContext<'_>) {
+        let window_size = context.window.inner_size();
 
         // Create the egui render routine
         let mut egui_routine = rend3_egui::EguiRenderRoutine::new(
-            renderer,
-            surface_format,
+            context.renderer,
+            context.surface_format,
             rend3::types::SampleCount::One,
             window_size.width,
             window_size.height,
-            window.scale_factor() as f32,
+            context.window.scale_factor() as f32,
         );
 
         // Create mesh and calculate smooth normals based on vertices
@@ -55,7 +45,7 @@ impl rend3_framework::App for EguiExample {
         //
         // All handles are refcounted, so we only need to hang onto the handle until we
         // make an object.
-        let mesh_handle = renderer.add_mesh(mesh).unwrap();
+        let mesh_handle = context.renderer.add_mesh(mesh).unwrap();
 
         // Add PBR material with all defaults except a single color.
         let material = rend3_routine::pbr::PbrMaterial {
@@ -63,7 +53,7 @@ impl rend3_framework::App for EguiExample {
             transparency: rend3_routine::pbr::Transparency::Blend,
             ..rend3_routine::pbr::PbrMaterial::default()
         };
-        let material_handle = renderer.add_material(material);
+        let material_handle = context.renderer.add_material(material);
 
         // Combine the mesh and the material with a location to give an object.
         let object = rend3::types::Object {
@@ -76,7 +66,7 @@ impl rend3_framework::App for EguiExample {
         // even if they are deleted.
         //
         // We need to keep the object handle alive.
-        let _object_handle = renderer.add_object(object);
+        let _object_handle = context.renderer.add_object(object);
 
         let camera_pitch = std::f32::consts::FRAC_PI_4;
         let camera_yaw = -std::f32::consts::FRAC_PI_4;
@@ -87,7 +77,7 @@ impl rend3_framework::App for EguiExample {
         let view = view * glam::Mat4::from_translation((-camera_location).into());
 
         // Set camera location data
-        renderer.set_camera_data(rend3::types::Camera {
+        context.renderer.set_camera_data(rend3::types::Camera {
             projection: rend3::types::CameraProjection::Perspective { vfov: 60.0, near: 0.1 },
             view,
         });
@@ -95,7 +85,7 @@ impl rend3_framework::App for EguiExample {
         // Create a single directional light
         //
         // We need to keep the directional light handle alive.
-        let _directional_handle = renderer.add_directional_light(rend3::types::DirectionalLight {
+        let _directional_handle = context.renderer.add_directional_light(rend3::types::DirectionalLight {
             color: glam::Vec3::ONE,
             intensity: 10.0,
             // Direction will be normalized
@@ -105,13 +95,13 @@ impl rend3_framework::App for EguiExample {
         });
 
         // Create the egui context
-        let context = egui::Context::default();
+        let egui_context = egui::Context::default();
         // Create the winit/egui integration.
         let platform = egui_winit::State::new(
-            context.clone(),
+            egui_context.clone(),
             egui::ViewportId::default(),
-            &window,
-            Some(window.scale_factor() as f32),
+            &context.window,
+            Some(context.window.scale_factor() as f32),
             None,
         );
 
@@ -127,7 +117,7 @@ impl rend3_framework::App for EguiExample {
 
         self.rust_logo = rend3_egui::EguiRenderRoutine::create_egui_texture(
             &mut egui_routine.internal,
-            renderer,
+            context.renderer,
             format,
             &image_rgba,
             dimensions,
@@ -142,24 +132,13 @@ impl rend3_framework::App for EguiExample {
             _directional_handle,
 
             egui_routine,
-            context,
+            context: egui_context,
             platform,
             color,
         });
     }
 
-    fn handle_event(
-        &mut self,
-        window: &winit::window::Window,
-        renderer: &Arc<rend3::Renderer>,
-        routines: &Arc<rend3_framework::DefaultRoutines>,
-        base_rendergraph: &rend3_routine::base::BaseRenderGraph,
-        surface: Option<&Arc<rend3::types::Surface>>,
-        resolution: glam::UVec2,
-        event: rend3_framework::Event<'_, ()>,
-        control_flow: impl FnOnce(winit::event_loop::ControlFlow),
-        event_loop_window_target: &EventLoopWindowTarget<UserResizeEvent<()>>,
-    ) {
+    fn handle_event(&mut self, context: rend3_framework::EventContext<'_>, event: winit::event::Event<()>) {
         let data = self.data.as_mut().unwrap();
 
         match event {
@@ -167,14 +146,14 @@ impl rend3_framework::App for EguiExample {
                 window_id: _,
                 event: WindowEvent::RedrawRequested,
             } => {
-                data.context.begin_frame(data.platform.take_egui_input(window));
+                data.context.begin_frame(data.platform.take_egui_input(context.window));
 
                 // Insert egui commands here
                 let ctx = &data.context;
                 egui::Window::new("Change color").resizable(true).show(ctx, |ui| {
                     ui.label("Change the color of the cube");
                     if ui.color_edit_button_rgba_unmultiplied(&mut data.color).changed() {
-                        renderer.update_material(
+                        context.renderer.update_material(
                             &data.material_handle.clone(),
                             rend3_routine::pbr::PbrMaterial {
                                 albedo: rend3_routine::pbr::AlbedoComponent::Value(glam::Vec4::from(data.color)),
@@ -200,7 +179,7 @@ impl rend3_framework::App for EguiExample {
                 let egui::FullOutput {
                     shapes, textures_delta, ..
                 } = data.context.end_frame();
-                let paint_jobs = data.context.tessellate(shapes, window.scale_factor() as f32);
+                let paint_jobs = data.context.tessellate(shapes, context.window.scale_factor() as f32);
 
                 let input = rend3_egui::Input {
                     clipped_meshes: &paint_jobs,
@@ -209,16 +188,16 @@ impl rend3_framework::App for EguiExample {
                 };
 
                 // Get a frame
-                let frame = surface.unwrap().get_current_texture().unwrap();
+                let frame = context.surface.unwrap().get_current_texture().unwrap();
 
                 // Swap the instruction buffers so that our frame's changes can be processed.
-                renderer.swap_instruction_buffers();
+                context.renderer.swap_instruction_buffers();
                 // Evaluate our frame's world-change instructions
-                let mut eval_output = renderer.evaluate_instructions();
+                let mut eval_output = context.renderer.evaluate_instructions();
 
                 // Lock the routines
-                let pbr_routine = rend3_framework::lock(&routines.pbr);
-                let tonemapping_routine = rend3_framework::lock(&routines.tonemapping);
+                let pbr_routine = rend3_framework::lock(&context.routines.pbr);
+                let tonemapping_routine = rend3_framework::lock(&context.routines.tonemapping);
 
                 // Build a rendergraph
                 let mut graph = rend3::graph::RenderGraph::new();
@@ -228,10 +207,10 @@ impl rend3_framework::App for EguiExample {
                     &frame,
                     0..1,
                     0..1,
-                    rend3::graph::ViewportRect::from_size(resolution),
+                    rend3::graph::ViewportRect::from_size(context.resolution),
                 );
                 // Add the default rendergraph without a skybox
-                base_rendergraph.add_to_graph(
+                context.base_rendergraph.add_to_graph(
                     &mut graph,
                     rend3_routine::base::BaseRenderGraphInputs {
                         eval_output: &eval_output,
@@ -242,7 +221,7 @@ impl rend3_framework::App for EguiExample {
                         },
                         target: rend3_routine::base::OutputRenderTarget {
                             handle: frame_handle,
-                            resolution,
+                            resolution: context.resolution,
                             samples: SAMPLE_COUNT,
                         },
                     },
@@ -256,29 +235,24 @@ impl rend3_framework::App for EguiExample {
                 data.egui_routine.add_to_graph(&mut graph, input, frame_handle);
 
                 // Dispatch a render using the built up rendergraph!
-                graph.execute(renderer, &mut eval_output);
+                graph.execute(context.renderer, &mut eval_output);
 
                 // Present the frame
                 frame.present();
 
-                control_flow(winit::event_loop::ControlFlow::Poll);
+                context.window.request_redraw();
             }
-            rend3_framework::Event::AboutToWait => {
-                window.request_redraw();
-            }
-            rend3_framework::Event::WindowEvent { event, .. } => {
+            winit::event::Event::WindowEvent { event, .. } => {
                 // Pass the window events to the egui integration.
-                if data.platform.on_window_event(window, &event).consumed {
+                if data.platform.on_window_event(context.window, &event).consumed {
                     return;
                 }
 
+                #[allow(clippy::single_match)]
                 match event {
                     winit::event::WindowEvent::Resized(size) => {
                         data.egui_routine
-                            .resize(size.width, size.height, window.scale_factor() as f32);
-                    }
-                    winit::event::WindowEvent::CloseRequested => {
-                        event_loop_window_target.exit();
+                            .resize(size.width, size.height, context.window.scale_factor() as f32);
                     }
                     _ => {}
                 }

@@ -1,6 +1,6 @@
 #![cfg_attr(target_arch = "wasm32", allow(clippy::arc_with_non_send_sync))]
 
-use std::{future::Future, pin::Pin, process::exit, sync::Arc};
+use std::{future::Future, pin::Pin, sync::Arc};
 
 use glam::UVec2;
 use rend3::{
@@ -10,33 +10,39 @@ use rend3::{
 use rend3_routine::base::BaseRenderGraph;
 use wgpu::{Instance, PresentMode};
 use winit::{
-    dpi::PhysicalSize,
     error::EventLoopError,
-    event::WindowEvent,
+    event::Event,
     event_loop::{ControlFlow, EventLoop, EventLoopBuilder, EventLoopWindowTarget},
-    window::{Window, WindowBuilder, WindowId},
+    window::{Window, WindowBuilder},
 };
 
 mod assets;
 mod grab;
-#[cfg(target_arch = "wasm32")]
-mod resize_observer;
 
 pub use assets::*;
 pub use grab::*;
 pub use parking_lot::{Mutex, MutexGuard};
-pub type Event<'a, T> = winit::event::Event<UserResizeEvent<T>>;
 
-/// User event which the framework uses to resize on wasm.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum UserResizeEvent<T: 'static> {
-    /// Used to fire off resizing on wasm
-    Resize {
-        window_id: WindowId,
-        size: PhysicalSize<u32>,
-    },
-    /// Custom user event type
-    Other(T),
+/// Context passed to the setup function. Contains
+/// everything needed to setup examples
+pub struct SetupContext<'a, T: 'static = ()> {
+    pub event_loop: &'a EventLoop<T>,
+    pub window: &'a Window,
+    pub renderer: &'a Arc<Renderer>,
+    pub routines: &'a Arc<DefaultRoutines>,
+    pub surface_format: rend3::types::TextureFormat,
+}
+
+/// Context passed to the event handler.
+pub struct EventContext<'a, T: 'static = ()> {
+    pub window: &'a Window,
+    pub renderer: &'a Arc<Renderer>,
+    pub routines: &'a Arc<DefaultRoutines>,
+    pub base_rendergraph: &'a BaseRenderGraph,
+    pub surface: Option<&'a Arc<Surface>>,
+    pub resolution: UVec2,
+    pub control_flow: &'a mut dyn FnMut(winit::event_loop::ControlFlow),
+    pub event_loop_window_target: &'a EventLoopWindowTarget<T>,
 }
 
 pub trait App<T: 'static = ()> {
@@ -59,10 +65,7 @@ pub trait App<T: 'static = ()> {
         std::panic::set_hook(Box::new(console_error_panic_hook::hook));
     }
 
-    fn create_window(
-        &mut self,
-        builder: WindowBuilder,
-    ) -> Result<(EventLoop<UserResizeEvent<T>>, Window), EventLoopError> {
+    fn create_window(&mut self, builder: WindowBuilder) -> Result<(EventLoop<T>, Window), EventLoopError> {
         profiling::scope!("creating window");
 
         let event_loop = EventLoopBuilder::with_user_event().build()?;
@@ -112,15 +115,8 @@ pub trait App<T: 'static = ()> {
         1.0
     }
 
-    fn setup(
-        &mut self,
-        event_loop: &EventLoop<UserResizeEvent<T>>,
-        window: &Window,
-        renderer: &Arc<Renderer>,
-        routines: &Arc<DefaultRoutines>,
-        surface_format: rend3::types::TextureFormat,
-    ) {
-        let _ = (event_loop, window, renderer, routines, surface_format);
+    fn setup(&mut self, context: SetupContext<'_, T>) {
+        let _ = context;
     }
 
     /// RedrawRequested/RedrawEventsCleared will only be fired if the window
@@ -128,29 +124,8 @@ pub trait App<T: 'static = ()> {
     /// in RedrawRequested and use MainEventsCleared for things that need to
     /// keep running when minimized.
     #[allow(clippy::too_many_arguments)]
-    fn handle_event(
-        &mut self,
-        window: &Window,
-        renderer: &Arc<rend3::Renderer>,
-        routines: &Arc<DefaultRoutines>,
-        base_rendergraph: &BaseRenderGraph,
-        surface: Option<&Arc<Surface>>,
-        resolution: UVec2,
-        event: Event<'_, T>,
-        control_flow: impl FnOnce(winit::event_loop::ControlFlow),
-        event_loop_window_target: &EventLoopWindowTarget<UserResizeEvent<T>>,
-    ) {
-        let _ = (
-            window,
-            renderer,
-            routines,
-            base_rendergraph,
-            resolution,
-            surface,
-            event,
-            control_flow,
-            event_loop_window_target,
-        );
+    fn handle_event(&mut self, context: EventContext<'_, T>, event: Event<T>) {
+        let _ = (context, event);
     }
 }
 
@@ -169,54 +144,12 @@ pub struct DefaultRoutines {
     pub tonemapping: Mutex<rend3_routine::tonemapping::TonemappingRoutine>,
 }
 
-#[cfg(not(target_arch = "wasm32"))]
-fn winit_run<F, T>(event_loop: winit::event_loop::EventLoop<T>, event_handler: F) -> Result<(), EventLoopError>
-where
-    F: FnMut(winit::event::Event<T>, &EventLoopWindowTarget<T>) + 'static,
-    T: 'static,
-{
-    event_loop.run(event_handler)
-}
-
-#[cfg(target_arch = "wasm32")]
-fn winit_run<F, T>(event_loop: EventLoop<T>, event_handler: F)
-where
-    F: FnMut(winit::event::Event<T>, &EventLoopWindowTarget<T>) + 'static,
-    T: 'static,
-{
-    use wasm_bindgen::prelude::*;
-
-    let winit_closure = Closure::once_into_js(move || event_loop.run(event_handler).expect("Init failed"));
-
-    // make sure to handle JS exceptions thrown inside start.
-    // Otherwise wasm_bindgen_futures Queue would break and never handle any tasks
-    // again. This is required, because winit uses JS exception for control flow
-    // to escape from `run`.
-    if let Err(error) = call_catch(&winit_closure) {
-        let is_control_flow_exception = error
-            .dyn_ref::<js_sys::Error>()
-            .map_or(false, |e| e.message().includes("Using exceptions for control flow", 0));
-
-        if !is_control_flow_exception {
-            web_sys::console::error_1(&error);
-        }
-    }
-
-    #[wasm_bindgen]
-    extern "C" {
-        #[wasm_bindgen(catch, js_namespace = Function, js_name = "prototype.call.call")]
-        fn call_catch(this: &JsValue) -> Result<(), JsValue>;
-    }
-}
-
 pub async fn async_start<A: App<T> + 'static, T: 'static>(mut app: A, window_builder: WindowBuilder) {
     app.register_logger();
     app.register_panic_hook();
 
     // Create the window invisible until we are rendering
-    let Ok((event_loop, window)) = app.create_window(window_builder.with_visible(false)) else {
-        exit(1)
-    };
+    let (event_loop, window) = app.create_window(window_builder.with_visible(false)).unwrap();
     let window_size = window.inner_size();
 
     let iad = app.create_iad().await.unwrap();
@@ -286,83 +219,104 @@ pub async fn async_start<A: App<T> + 'static, T: 'static>(mut app: A, window_bui
     });
     drop(data_core);
 
-    app.setup(&event_loop, &window, &renderer, &routines, format);
-
-    #[cfg(target_arch = "wasm32")]
-    let _observer = resize_observer::ResizeObserver::new(&window, event_loop.create_proxy());
+    app.setup(SetupContext {
+        event_loop: &event_loop,
+        window: &window,
+        renderer: &renderer,
+        routines: &routines,
+        surface_format: format,
+    });
 
     // We're ready, so lets make things visible
     window.set_visible(true);
 
     let mut suspended = cfg!(target_os = "android");
-    let mut last_user_control_mode = ControlFlow::Poll;
+    let mut last_user_control_mode = ControlFlow::Wait;
     let mut stored_surface_info = StoredSurfaceInfo {
         size: glam::UVec2::new(window_size.width, window_size.height),
         scale_factor: app.scale_factor(),
         sample_count: app.sample_count(),
         present_mode: app.present_mode(),
     };
+
+    cfg_if::cfg_if! {
+        if #[cfg(target_arch = "wasm32")] {
+            use winit::platform::web::EventLoopExtWebSys;
+            let event_loop_function = EventLoop::spawn;
+        } else {
+            let event_loop_function = EventLoop::run;
+        }
+    }
+
     // On native this is a result, but on wasm it's a unit type.
     #[allow(clippy::let_unit_value)]
-    let _ = winit_run(event_loop, move |event, event_loop_window_target| {
-        let event = match event {
-            Event::UserEvent(UserResizeEvent::Resize { size, window_id }) => Event::WindowEvent {
-                window_id,
-                event: WindowEvent::Resized(size),
-            },
-            e => e,
-        };
-        let mut control_flow = event_loop_window_target.control_flow();
-        if let Some(suspend) = handle_surface(
-            &app,
-            &window,
-            &event,
-            &iad.instance,
-            &mut surface,
-            &renderer,
-            format,
-            &mut stored_surface_info,
-        ) {
-            suspended = suspend;
-        }
-
-        // We move to Wait when we get suspended so we don't spin at 50k FPS.
-        match event {
-            Event::Suspended => {
-                control_flow = ControlFlow::Wait;
+    let _ = (event_loop_function)(
+        event_loop,
+        move |event: Event<T>, event_loop_window_target: &EventLoopWindowTarget<T>| {
+            let mut control_flow = event_loop_window_target.control_flow();
+            if let Some(suspend) = handle_surface(
+                &app,
+                &window,
+                &event,
+                &iad.instance,
+                &mut surface,
+                &renderer,
+                format,
+                &mut stored_surface_info,
+            ) {
+                suspended = suspend;
             }
-            Event::Resumed => {
-                control_flow = last_user_control_mode;
-            }
-            _ => {}
-        }
 
-        // We need to block all updates
-        if let Event::WindowEvent {
-            window_id: _,
-            event: winit::event::WindowEvent::RedrawRequested,
-        } = event
-        {
-            if suspended {
+            // We move to Wait when we get suspended so we don't spin at 50k FPS.
+            match event {
+                Event::Suspended => {
+                    control_flow = ControlFlow::Wait;
+                }
+                Event::Resumed => {
+                    control_flow = last_user_control_mode;
+                }
+                _ => {}
+            }
+
+            // Close button was clicked, we should close.
+            if let winit::event::Event::WindowEvent {
+                event: winit::event::WindowEvent::CloseRequested,
+                ..
+            } = event
+            {
+                event_loop_window_target.exit();
                 return;
             }
-        }
 
-        app.handle_event(
-            &window,
-            &renderer,
-            &routines,
-            &base_rendergraph,
-            surface.as_ref(),
-            stored_surface_info.size,
-            event,
-            |c: ControlFlow| {
-                control_flow = c;
-                last_user_control_mode = c;
-            },
-            event_loop_window_target,
-        )
-    });
+            // We need to block all updates
+            if let Event::WindowEvent {
+                window_id: _,
+                event: winit::event::WindowEvent::RedrawRequested,
+            } = event
+            {
+                if suspended {
+                    return;
+                }
+            }
+
+            app.handle_event(
+                EventContext {
+                    window: &window,
+                    renderer: &renderer,
+                    routines: &routines,
+                    base_rendergraph: &base_rendergraph,
+                    surface: surface.as_ref(),
+                    resolution: stored_surface_info.size,
+                    control_flow: &mut |c: ControlFlow| {
+                        control_flow = c;
+                        last_user_control_mode = c;
+                    },
+                    event_loop_window_target,
+                },
+                event,
+            );
+        },
+    );
 }
 
 struct StoredSurfaceInfo {
