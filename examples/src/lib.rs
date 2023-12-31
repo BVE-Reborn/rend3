@@ -48,6 +48,8 @@ const EXAMPLES: &[ExampleDesc] = &[
 ];
 
 fn print_examples() {
+    println!("Usage: cargo run <example_name>");
+    println!();
     println!("Available examples:");
     for example in EXAMPLES {
         println!("    {}", example.name);
@@ -63,6 +65,7 @@ pub fn main() {
 
     let Some(example) = EXAMPLES.iter().find(|example| example.name == example_name) else {
         println!("Unknown example: {}", example_name);
+        println!();
         print_examples();
         return;
     };
