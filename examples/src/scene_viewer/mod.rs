@@ -15,16 +15,11 @@ use rend3_gltf::GltfSceneInstance;
 use rend3_routine::{pbr::NormalTextureYDirection, skybox::SkyboxRoutine};
 use web_time::Instant;
 use wgpu_profiler::GpuTimerScopeResult;
-#[cfg(target_arch = "wasm32")]
-use winit::keyboard::PhysicalKey::Code;
-#[cfg(not(target_arch = "wasm32"))]
-use winit::platform::scancode::PhysicalKeyExtScancode;
 use winit::{
     event::{DeviceEvent, ElementState, Event, KeyEvent, MouseButton, WindowEvent},
+    keyboard::{KeyCode, PhysicalKey},
     window::{Fullscreen, WindowBuilder},
 };
-
-mod platform;
 
 async fn load_skybox_image(loader: &rend3_framework::AssetLoader, data: &mut Vec<u8>, path: &str) {
     let decoded = image::load_from_memory(
@@ -130,7 +125,7 @@ async fn load_gltf(
     Some((scene, instance))
 }
 
-fn button_pressed<Hash: BuildHasher>(map: &HashMap<u32, bool, Hash>, key: u32) -> bool {
+fn button_pressed<Hash: BuildHasher>(map: &HashMap<KeyCode, bool, Hash>, key: KeyCode) -> bool {
     map.get(&key).map_or(false, |b| *b)
 }
 
@@ -277,7 +272,7 @@ Controls:
   --camera x,y,z,pitch,yaw     Spawns the camera at the given position. Press Period to get the current camera position.
 ";
 
-struct SceneViewer {
+pub struct SceneViewer {
     absolute_mouse: bool,
     desired_backend: Option<Backend>,
     desired_device_name: Option<String>,
@@ -295,7 +290,7 @@ struct SceneViewer {
 
     fullscreen: bool,
 
-    scancode_status: FastHashMap<u32, bool>,
+    scancode_status: FastHashMap<KeyCode, bool>,
     camera_pitch: f32,
     camera_yaw: f32,
     camera_location: Vec3A,
@@ -312,7 +307,8 @@ impl SceneViewer {
         #[cfg(feature = "tracy")]
         tracy_client::Client::start();
 
-        let mut args = Arguments::from_vec(std::env::args_os().skip(1).collect());
+        // Skip the first two arguments, which are the binary name and the example name.
+        let mut args = Arguments::from_vec(std::env::args_os().skip(2).collect());
 
         // Meta
         let help = args.contains(["-h", "--help"]);
@@ -446,15 +442,7 @@ impl rend3_framework::App for SceneViewer {
     }
 
     fn scale_factor(&self) -> f32 {
-        // Android has very low memory bandwidth, so lets run internal buffers at half
-        // res by default
-        cfg_if::cfg_if! {
-            if #[cfg(target_os = "android")] {
-                0.5
-            } else {
-                1.0
-            }
-        }
+        1.0
     }
 
     fn setup(&mut self, context: rend3_framework::SetupContext<'_>) {
@@ -476,7 +464,7 @@ impl rend3_framework::App for SceneViewer {
         let routines = Arc::clone(context.routines);
         spawn(async move {
             let loader = rend3_framework::AssetLoader::new_local(
-                concat!(env!("CARGO_MANIFEST_DIR"), "/resources/"),
+                concat!(env!("CARGO_MANIFEST_DIR"), "/src/scene_viewer/resources/"),
                 "",
                 "http://localhost:8000/resources/",
             );
@@ -542,27 +530,27 @@ impl rend3_framework::App for SceneViewer {
                 let forward = -rotation.z_axis;
                 let up = rotation.y_axis;
                 let side = -rotation.x_axis;
-                let velocity = if button_pressed(&self.scancode_status, platform::Scancodes::SHIFT) {
+                let velocity = if button_pressed(&self.scancode_status, KeyCode::ShiftLeft) {
                     self.run_speed
                 } else {
                     self.walk_speed
                 };
-                if button_pressed(&self.scancode_status, platform::Scancodes::W) {
+                if button_pressed(&self.scancode_status, KeyCode::KeyW) {
                     self.camera_location += forward * velocity * delta_time.as_secs_f32();
                 }
-                if button_pressed(&self.scancode_status, platform::Scancodes::S) {
+                if button_pressed(&self.scancode_status, KeyCode::KeyS) {
                     self.camera_location -= forward * velocity * delta_time.as_secs_f32();
                 }
-                if button_pressed(&self.scancode_status, platform::Scancodes::A) {
+                if button_pressed(&self.scancode_status, KeyCode::KeyA) {
                     self.camera_location += side * velocity * delta_time.as_secs_f32();
                 }
-                if button_pressed(&self.scancode_status, platform::Scancodes::D) {
+                if button_pressed(&self.scancode_status, KeyCode::KeyD) {
                     self.camera_location -= side * velocity * delta_time.as_secs_f32();
                 }
-                if button_pressed(&self.scancode_status, platform::Scancodes::Q) {
+                if button_pressed(&self.scancode_status, KeyCode::KeyQ) {
                     self.camera_location += up * velocity * delta_time.as_secs_f32();
                 }
-                if button_pressed(&self.scancode_status, platform::Scancodes::PERIOD) {
+                if button_pressed(&self.scancode_status, KeyCode::Period) {
                     println!(
                         "{x},{y},{z},{pitch},{yaw}",
                         x = self.camera_location.x,
@@ -573,11 +561,11 @@ impl rend3_framework::App for SceneViewer {
                     );
                 }
 
-                if button_pressed(&self.scancode_status, platform::Scancodes::ESCAPE) {
+                if button_pressed(&self.scancode_status, winit::keyboard::KeyCode::Escape) {
                     self.grabber.as_mut().unwrap().request_ungrab(context.window);
                 }
 
-                if button_pressed(&self.scancode_status, platform::Scancodes::P) {
+                if button_pressed(&self.scancode_status, KeyCode::KeyP) {
                     // write out gpu side performance info into a trace readable by chrome://tracing
                     if let Some(ref stats) = self.previous_profiling_stats {
                         println!("Outputing gpu timing chrome trace to profile.json");
@@ -668,11 +656,11 @@ impl rend3_framework::App for SceneViewer {
                     },
                 ..
             } => {
-                #[cfg(not(target_arch = "wasm32"))]
-                let scancode = PhysicalKeyExtScancode::to_scancode(physical_key).unwrap();
-                #[cfg(target_arch = "wasm32")]
-                let scancode = if let Code(kk) = physical_key { kk as u32 } else { 0 };
-                log::info!("WE scancode {:x}", scancode);
+                let PhysicalKey::Code(scancode) = physical_key else {
+                    return;
+                };
+
+                log::info!("Key Pressed {:?}", scancode);
                 self.scancode_status.insert(
                     scancode,
                     match state {

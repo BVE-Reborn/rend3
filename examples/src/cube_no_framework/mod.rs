@@ -55,7 +55,7 @@ fn create_mesh() -> rend3::types::Mesh {
         .unwrap()
 }
 
-fn main() {
+pub fn main() {
     // Setup logging
     env_logger::init();
 

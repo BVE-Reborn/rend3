@@ -1,44 +1,68 @@
-use image::GenericImageView;
+use winit::event::WindowEvent;
 
 fn vertex(pos: [f32; 3]) -> glam::Vec3 {
     glam::Vec3::from(pos)
 }
 
-fn uv(pos: [f32; 2]) -> glam::Vec2 {
-    glam::Vec2::from(pos)
-}
-
-fn create_quad(size: f32) -> rend3::types::Mesh {
+fn create_mesh() -> rend3::types::Mesh {
     let vertex_positions = [
-        vertex([-size * 0.5, size * 0.5, 0.0]),
-        vertex([size * 0.5, size * 0.5, 0.0]),
-        vertex([size * 0.5, -size * 0.5, 0.0]),
-        vertex([-size * 0.5, -size * 0.5, 0.0]),
+        // far side (0.0, 0.0, 1.0)
+        vertex([-1.0, -1.0, 1.0]),
+        vertex([1.0, -1.0, 1.0]),
+        vertex([1.0, 1.0, 1.0]),
+        vertex([-1.0, 1.0, 1.0]),
+        // near side (0.0, 0.0, -1.0)
+        vertex([-1.0, 1.0, -1.0]),
+        vertex([1.0, 1.0, -1.0]),
+        vertex([1.0, -1.0, -1.0]),
+        vertex([-1.0, -1.0, -1.0]),
+        // right side (1.0, 0.0, 0.0)
+        vertex([1.0, -1.0, -1.0]),
+        vertex([1.0, 1.0, -1.0]),
+        vertex([1.0, 1.0, 1.0]),
+        vertex([1.0, -1.0, 1.0]),
+        // left side (-1.0, 0.0, 0.0)
+        vertex([-1.0, -1.0, 1.0]),
+        vertex([-1.0, 1.0, 1.0]),
+        vertex([-1.0, 1.0, -1.0]),
+        vertex([-1.0, -1.0, -1.0]),
+        // top (0.0, 1.0, 0.0)
+        vertex([1.0, 1.0, -1.0]),
+        vertex([-1.0, 1.0, -1.0]),
+        vertex([-1.0, 1.0, 1.0]),
+        vertex([1.0, 1.0, 1.0]),
+        // bottom (0.0, -1.0, 0.0)
+        vertex([1.0, -1.0, 1.0]),
+        vertex([-1.0, -1.0, 1.0]),
+        vertex([-1.0, -1.0, -1.0]),
+        vertex([1.0, -1.0, -1.0]),
     ];
-    let uv_positions = [uv([0.0, 0.0]), uv([1.0, 0.0]), uv([1.0, 1.0]), uv([0.0, 1.0])];
-    let index_data: &[u32] = &[0, 1, 2, 2, 3, 0];
+
+    let index_data: &[u32] = &[
+        0, 1, 2, 2, 3, 0, // far
+        4, 5, 6, 6, 7, 4, // near
+        8, 9, 10, 10, 11, 8, // right
+        12, 13, 14, 14, 15, 12, // left
+        16, 17, 18, 18, 19, 16, // top
+        20, 21, 22, 22, 23, 20, // bottom
+    ];
 
     rend3::types::MeshBuilder::new(vertex_positions.to_vec(), rend3::types::Handedness::Left)
-        .with_vertex_texture_coordinates_0(uv_positions.to_vec())
         .with_indices(index_data.to_vec())
         .build()
         .unwrap()
 }
 
-const CAMERA_DEPTH: f32 = 10.0;
-
-struct TexturedQuadExampleData {
-    _object_handle: rend3::types::ObjectHandle,
-    view: glam::Mat4,
-}
-
 const SAMPLE_COUNT: rend3::types::SampleCount = rend3::types::SampleCount::One;
 
 #[derive(Default)]
-struct TexturedQuadExample {
-    data: Option<TexturedQuadExampleData>,
+pub struct CubeExample {
+    object_handle: Option<rend3::types::ObjectHandle>,
+    directional_light_handle: Option<rend3::types::DirectionalLightHandle>,
+    point_lights: Vec<rend3::types::PointLightHandle>,
 }
-impl rend3_framework::App for TexturedQuadExample {
+
+impl rend3_framework::App for CubeExample {
     const HANDEDNESS: rend3::types::Handedness = rend3::types::Handedness::Left;
 
     fn sample_count(&self) -> rend3::types::SampleCount {
@@ -47,7 +71,7 @@ impl rend3_framework::App for TexturedQuadExample {
 
     fn setup(&mut self, context: rend3_framework::SetupContext<'_>) {
         // Create mesh and calculate smooth normals based on vertices
-        let mesh = create_quad(300.0);
+        let mesh = create_mesh();
 
         // Add mesh to renderer's world.
         //
@@ -55,25 +79,9 @@ impl rend3_framework::App for TexturedQuadExample {
         // make an object.
         let mesh_handle = context.renderer.add_mesh(mesh).unwrap();
 
-        // Add texture to renderer's world.
-        let image_checker =
-            image::load_from_memory(include_bytes!("checker.png")).expect("Failed to load image from memory");
-        let image_checker_rgba8 = image_checker.to_rgba8();
-        let texture_checker = rend3::types::Texture {
-            label: Option::None,
-            data: image_checker_rgba8.to_vec(),
-            format: rend3::types::TextureFormat::Rgba8UnormSrgb,
-            size: glam::UVec2::new(image_checker.dimensions().0, image_checker.dimensions().1),
-            mip_count: rend3::types::MipmapCount::ONE,
-            mip_source: rend3::types::MipmapSource::Uploaded,
-        };
-        let texture_checker_handle = context.renderer.add_texture_2d(texture_checker).unwrap();
-
         // Add PBR material with all defaults except a single color.
         let material = rend3_routine::pbr::PbrMaterial {
-            albedo: rend3_routine::pbr::AlbedoComponent::Texture(texture_checker_handle),
-            unlit: true,
-            sample_type: rend3_routine::pbr::SampleType::Nearest,
+            albedo: rend3_routine::pbr::AlbedoComponent::Value(glam::Vec4::new(0.5, 0.5, 0.5, 1.0)),
             ..rend3_routine::pbr::PbrMaterial::default()
         };
         let material_handle = context.renderer.add_material(material);
@@ -82,55 +90,60 @@ impl rend3_framework::App for TexturedQuadExample {
         let object = rend3::types::Object {
             mesh_kind: rend3::types::ObjectMeshKind::Static(mesh_handle),
             material: material_handle,
-            transform: glam::Mat4::from_scale_rotation_translation(
-                glam::Vec3::new(1.0, 1.0, 1.0),
-                glam::Quat::from_euler(glam::EulerRot::XYZ, 0.0, 0.0, 0.0),
-                glam::Vec3::new(0.0, 0.0, 0.0),
-            ),
+            transform: glam::Mat4::IDENTITY,
         };
-
         // Creating an object will hold onto both the mesh and the material
         // even if they are deleted.
         //
         // We need to keep the object handle alive.
-        let _object_handle = context.renderer.add_object(object);
+        self.object_handle = Some(context.renderer.add_object(object));
 
-        let view_location = glam::Vec3::new(0.0, 0.0, -1.0);
-        let view = glam::Mat4::from_euler(glam::EulerRot::XYZ, 0.0, 0.0, 0.0);
+        let view_location = glam::Vec3::new(3.0, 3.0, -5.0);
+        let view = glam::Mat4::from_euler(glam::EulerRot::XYZ, -0.55, 0.5, 0.0);
         let view = view * glam::Mat4::from_translation(-view_location);
 
         // Set camera's location
-        let inner_size = context.window.inner_size();
         context.renderer.set_camera_data(rend3::types::Camera {
-            projection: rend3::types::CameraProjection::Orthographic {
-                size: glam::Vec3A::new(inner_size.width as f32, inner_size.width as f32, CAMERA_DEPTH),
-            },
+            projection: rend3::types::CameraProjection::Perspective { vfov: 60.0, near: 0.1 },
             view,
         });
 
-        self.data = Some(TexturedQuadExampleData { _object_handle, view })
+        // Create a single directional light
+        //
+        // We need to keep the directional light handle alive.
+        self.directional_light_handle = Some(context.renderer.add_directional_light(rend3::types::DirectionalLight {
+            color: glam::Vec3::ONE,
+            intensity: 1.0,
+            // Direction will be normalized
+            direction: glam::Vec3::new(-1.0, -4.0, 2.0),
+            distance: 400.0,
+            resolution: 2048,
+        }));
+
+        let lights = [
+            // position, color
+            (glam::vec3(0.1, 1.2, -1.5), glam::vec3(1.0, 0.0, 0.0)),
+            (glam::vec3(1.5, 1.2, -0.1), glam::vec3(0.0, 1.0, 0.0)),
+        ];
+
+        for (position, color) in lights {
+            self.point_lights
+                .push(context.renderer.add_point_light(rend3::types::PointLight {
+                    position,
+                    color,
+                    radius: 2.0,
+                    intensity: 4.0,
+                }));
+        }
     }
 
     fn handle_event(&mut self, context: rend3_framework::EventContext<'_>, event: winit::event::Event<()>) {
+        #[allow(clippy::single_match)]
         match event {
-            // Window was resized, need to resize renderer.
-            winit::event::Event::WindowEvent {
-                event: winit::event::WindowEvent::Resized(size),
-                ..
-            } => {
-                let size = glam::UVec2::new(size.width, size.height);
-                // Reset camera
-                context.renderer.set_camera_data(rend3::types::Camera {
-                    projection: rend3::types::CameraProjection::Orthographic {
-                        size: glam::Vec3A::new(size.x as f32, size.y as f32, CAMERA_DEPTH),
-                    },
-                    view: self.data.as_ref().unwrap().view,
-                });
-            }
             // Render!
             winit::event::Event::WindowEvent {
-                event: winit::event::WindowEvent::RedrawRequested,
-                ..
+                window_id: _,
+                event: WindowEvent::RedrawRequested,
             } => {
                 // Get a frame
                 let frame = context.surface.unwrap().get_current_texture().unwrap();
@@ -154,7 +167,7 @@ impl rend3_framework::App for TexturedQuadExample {
                     0..1,
                     rend3::graph::ViewportRect::from_size(context.resolution),
                 );
-                // Add the default rendergraph
+                // Add the default rendergraph without a skybox
                 context.base_rendergraph.add_to_graph(
                     &mut graph,
                     rend3_routine::base::BaseRenderGraphInputs {
@@ -181,6 +194,8 @@ impl rend3_framework::App for TexturedQuadExample {
 
                 // Present the frame
                 frame.present();
+
+                context.window.request_redraw()
             }
             // Other events we don't care about
             _ => {}
@@ -188,12 +203,13 @@ impl rend3_framework::App for TexturedQuadExample {
     }
 }
 
-fn main() {
-    let app = TexturedQuadExample::default();
+#[cfg_attr(target_os = "android", ndk_glue::main(backtrace = "on", logger(level = "debug")))]
+pub fn main() {
+    let app = CubeExample::default();
     rend3_framework::start(
         app,
         winit::window::WindowBuilder::new()
-            .with_title("textured-quad")
+            .with_title("cube-example")
             .with_maximized(true),
-    )
+    );
 }

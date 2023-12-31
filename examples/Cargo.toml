@@ -1,0 +1,86 @@
+[package]
+name = "rend3-examples"
+license = "MIT OR Apache-2.0 OR Zlib"
+version = "0.3.0"
+authors = ["The rend3 Developers"]
+edition = "2021"
+publish = false
+rust-version = "1.71"
+
+[lib]
+crate-type = ["lib", "cdylib"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+# error handling
+anyhow = "1"
+# The egui immediate mode gui library
+egui = {git = "https://github.com/emilk/egui.git", branch="master"}
+# Winit integration with egui (turn off the clipboard feature)
+egui-winit = { git = "https://github.com/emilk/egui.git", branch="master", default-features = false, features = ["links", "wayland"] }
+# logging
+env_logger = { version = "0.10", default-features = false, features = ["auto-color", "humantime"] }
+# Linear algebra library
+glam = "0.24"
+# gltf model loading
+gltf = "1.4"
+# 0.7 is a completely unrelated library
+histogram = "0.6"
+# Logging infrastructure
+log = "0.4"
+# Inline string
+indoc = "1"
+# Importing images
+image = { version = "0.24", default-features = false, features = [
+    "png",
+    "jpeg",
+    "tiff",
+] }
+# profiling
+profiling = "1"
+# argument parsing
+pico-args = "0.5"
+# block on async functions
+pollster = "0.3"
+# Renderer core
+rend3 = { version = "^0.3.0", path = "../rend3" }
+# Play animations on imported gltf models
+rend3-anim = { version = "^0.3.0", path = "../rend3-anim" }
+# Egui integration with rend3
+rend3-egui = { version = "^0.3.0", path = "../rend3-egui" }
+# Programmable render list that dictates how the scene renders
+rend3-routine = { version = "^0.3.0", path = "../rend3-routine" }
+# Framework that deals with the event loop, setting up the renderer, and platform differences.
+rend3-framework = { version = "^0.3.0", path = "../rend3-framework" }
+# Import gltf models
+rend3-gltf = { version = "^0.3.0", path = "../rend3-gltf" }
+# Opening URL's
+webbrowser = "0.8.2"
+# Instant but portable to the web
+web-time = "0.2"
+# windowing
+winit = "0.29.4"
+# Integration with wgpu
+wgpu = "0.18"
+# Profiling with wgpu
+wgpu-profiler = "0.15"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+console_log = "1"
+console_error_panic_hook = "0.1"
+js-sys = "0.3"
+web-sys = "0.3"
+wasm-bindgen = "0.2.83"
+wasm-bindgen-futures = "0.4"
+
+[target.'cfg(target_os = "android")'.dependencies]
+ndk-glue = { version = "0.7", features = ["logger"] }
+
+[package.metadata.android]
+build_targets = ["aarch64-linux-android"]
+
+[package.metadata.android.sdk]
+min_sdk_version = 28
+target_sdk_version = 28
+compile_sdk_version = 28

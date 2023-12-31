@@ -1,6 +1,6 @@
 # rend3 Examples
 
-The examples are separate crates, so to run an example run `cargo run --bin <name>`.
+The examples are separate crates, so to run an example run `cargo run <name>`.
 
 If you want to demo running rend3, [`scene-viewer`](scene-viewer) is what you should use. It is a full fledged gltf viewer.
 
