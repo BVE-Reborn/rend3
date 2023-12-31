@@ -12,5 +12,5 @@ If you want to look at how the basics of the code works, look at either the [`cu
 | cube                | Basic example. Shows how to get started with the api, both with and without the use of rend3-framework. | ![](src/cube/screenshot.png) |
 | egui                | Shows integration with egui and rend3-egui | ![](src/egui/screenshot.png) |
 | skinning            | Basic bone deformation of a loaded gltf model | ![](src/skinning/screenshot.png) |
-| static-gltf         | Similar to cube, but geometry is pulled from a simple gltf file | ![](src/static-gltf/screenshot.png) |
-| textured-quad       | Basic 2D rendering with an orthographic camera | ![](src/textured-quad/screenshot.png) |
+| static-gltf         | Similar to cube, but geometry is pulled from a simple gltf file | ![](src/static_gltf/screenshot.png) |
+| textured-quad       | Basic 2D rendering with an orthographic camera | ![](src/textured_quad/screenshot.png) |

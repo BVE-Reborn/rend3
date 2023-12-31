@@ -15,12 +15,12 @@
 //!
 //! ### Screenshots
 //!
-//! These screenshots are from the scene-viewer example.
+//! These screenshots are from the scene_viewer example.
 //!
-//! ![scifi-base](https://raw.githubusercontent.com/BVE-Reborn/rend3/trunk/examples/scene-viewer/scifi-base.jpg)
-//! ![example](https://raw.githubusercontent.com/BVE-Reborn/rend3/trunk/examples/scene-viewer/screenshot.jpg)
-//! ![bistro](https://raw.githubusercontent.com/BVE-Reborn/rend3/trunk/examples/scene-viewer/bistro.jpg)
-//! ![emerald-square](https://raw.githubusercontent.com/BVE-Reborn/rend3/trunk/examples/scene-viewer/emerald-square.jpg)
+//! ![scifi-base](https://raw.githubusercontent.com/BVE-Reborn/rend3/trunk/examples/src/scene_viewer/scifi-base.jpg)
+//! ![example](https://raw.githubusercontent.com/BVE-Reborn/rend3/trunk/examples/src/scene_viewer/screenshot.jpg)
+//! ![bistro](https://raw.githubusercontent.com/BVE-Reborn/rend3/trunk/examples/src/scene_viewer/bistro.jpg)
+//! ![emerald-square](https://raw.githubusercontent.com/BVE-Reborn/rend3/trunk/examples/src/scene_viewer/emerald-square.jpg)
 //!
 //! # Crates
 //!
