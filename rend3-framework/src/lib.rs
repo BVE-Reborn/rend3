@@ -110,7 +110,7 @@ pub trait App<T: 'static = ()> {
     fn create_iad<'a>(
         &'a mut self,
     ) -> Pin<Box<dyn Future<Output = Result<InstanceAdapterDevice, rend3::RendererInitializationError>> + 'a>> {
-        Box::pin(async move { Ok(rend3::create_iad(None, None, None, None).await?) })
+        Box::pin(async move { rend3::create_iad(None, None, None, None).await })
     }
 
     fn create_base_rendergraph(&mut self, renderer: &Arc<Renderer>, spp: &ShaderPreProcessor) -> BaseRenderGraph {
@@ -363,7 +363,7 @@ pub async fn async_start<A: App<T> + 'static, T: 'static>(mut app: A, window_bui
                         last_user_control_mode = c;
                     },
                     event_loop_window_target: Some(event_loop_window_target),
-                    delta_t_seconds
+                    delta_t_seconds,
                 });
 
                 surface_texture.present();
@@ -435,22 +435,6 @@ fn handle_surface<A: App<T>, T: 'static>(
             surface_info.sample_count = app.sample_count();
             surface_info.present_mode = app.present_mode();
             surface_info.requires_reconfigure = true;
-
-            // Winit erroniously stomps on the canvas CSS when a scale factor
-            // change happens, so we need to put it back to normal. We can't
-            // do this in a scale factor changed event, as the override happens
-            // after the event is sent.
-            //
-            // https://github.com/rust-windowing/winit/issues/3023
-            #[cfg(target_arch = "wasm32")]
-            {
-                use winit::platform::web::WindowExtWebSys;
-                let canvas = window.canvas().unwrap();
-                let style = canvas.style();
-
-                style.set_property("width", "100%").unwrap();
-                style.set_property("height", "100%").unwrap();
-            }
 
             // Tell the renderer about the new aspect ratio.
             renderer.set_aspect_ratio(size.x as f32 / size.y as f32);

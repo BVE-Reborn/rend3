@@ -251,6 +251,9 @@ pub enum GltfLoadError<E: std::error::Error + 'static> {
     TextureCreation(#[from] rend3::managers::TextureCreationError),
 }
 
+unsafe impl<E: std::error::Error + 'static> Send for GltfLoadError<E> {}
+unsafe impl<E: std::error::Error + 'static> Sync for GltfLoadError<E> {}
+
 /// Tries to decode data as base64, failing if the prefix doesn't match.
 pub fn try_load_base64(uri: &str) -> Option<Vec<u8>> {
     let octet_stream_header = "data:";

@@ -31,6 +31,12 @@ case $1 in
         RUSTFLAGS=--cfg=web_sys_unstable_apis cargo clippy --target wasm32-unknown-unknown --workspace --exclude rend3-imgui --exclude rend3-imgui-example
         cargo deny --all-features check
     ;;
+    download-assets)
+        curl https://cdn.cwfitz.com/scenes/rend3-default-scene.tar -o ./examples/src/scene_viewer/resources/rend3-default-scene.tar
+        tar xf ./examples/src/scene_viewer/resources/rend3-default-scene.tar -C ./examples/src/scene_viewer/resources
+        curl https://cdn.cwfitz.com/scenes/bistro-full.zip -o ./examples/src/scene_viewer/resources/bistro-full.zip
+        unzip ./examples/src/scene_viewer/resources/bistro-full.zip -d ./examples/src/scene_viewer/resources
+    ;;
     update-readme)
         cd rend3
         cargo install cargo-readme
@@ -46,6 +52,7 @@ case $1 in
         echo "Subcommands:"
         echo "help                         This message."
         echo "update-readme                Rebuilds the README.md file from the rend3 crate docs."
+        echo "download-assets              Downloads the assets used in the examples/tests."
         echo "web-bin [release] <BINARY>   Builds BINARY as wasm, and runs wasm-bindgen on the result."
         echo "serve                        Serve a web server from target/generated using simple-http-server."
 esac

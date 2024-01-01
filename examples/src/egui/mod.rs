@@ -143,6 +143,7 @@ impl rend3_framework::App for EguiExample {
     fn handle_event(&mut self, context: rend3_framework::EventContext<'_>, event: winit::event::Event<()>) {
         let data = self.data.as_mut().unwrap();
 
+        #[allow(clippy::single_match)]
         match event {
             winit::event::Event::WindowEvent { event, .. } => {
                 if let Some(window) = context.window {

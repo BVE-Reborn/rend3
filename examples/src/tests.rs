@@ -12,6 +12,7 @@ pub struct TestConfiguration<A> {
     pub threshold_set: rend3_test::ThresholdSet,
 }
 
+#[allow(clippy::await_holding_lock)] // false positive
 pub async fn test_app<A: App<T>, T: 'static>(mut config: TestConfiguration<A>) -> anyhow::Result<()> {
     config.app.register_logger();
     config.app.register_panic_hook();

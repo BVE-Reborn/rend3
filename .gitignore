@@ -9,8 +9,8 @@ cargo-timing*
 Cargo.lock
 
 /profile.json
-/examples/src/scene_viewer/resources/default-scene/
-/examples/src/scene_viewer/resources/rend3-default-scene.tar
+/examples/src/scene_viewer/resources/
+!/examples/src/scene_viewer/resources/skybox
 
 *-diff.png
 *-success.png

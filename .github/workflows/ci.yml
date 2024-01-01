@@ -59,6 +59,11 @@ jobs:
           cargo +1.72 build --target ${{ matrix.target }} --profile ci
         if: matrix.target != 'wasm32-unknown-unknown'
 
+      - name: download test resources
+        if: matrix.os[1] == 'gpu'
+        run: |
+          bash ./build.bash download-assets
+
       - name: test
         run: |
           cargo +1.72 nextest run --target ${{ matrix.target }} --cargo-profile ci
@@ -77,7 +82,7 @@ jobs:
         run: |
           cargo +1.72 doc --target ${{ matrix.target }} --profile ci --no-deps
         if: matrix.target != 'wasm32-unknown-unknown'
-      
+
       - uses: actions/upload-artifact@v4
         # always run
         if: ${{ !cancelled() }}

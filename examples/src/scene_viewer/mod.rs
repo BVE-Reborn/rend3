@@ -1,5 +1,8 @@
-use std::{collections::HashMap, future::Future, hash::BuildHasher, path::Path, sync::Arc, time::Duration};
+#![allow(clippy::field_reassign_with_default)] // much clearer this way
 
+use std::{collections::HashMap, future::Future, hash::BuildHasher, path::Path, sync::Arc};
+
+use flume::Receiver;
 use glam::{DVec2, Mat3A, Mat4, UVec2, Vec3, Vec3A};
 use pico_args::Arguments;
 use rend3::{
@@ -11,7 +14,7 @@ use rend3::{
     Renderer, RendererProfile,
 };
 use rend3_framework::{lock, AssetPath, Mutex};
-use rend3_gltf::GltfSceneInstance;
+use rend3_gltf::{GltfLoadSettings, GltfSceneInstance, LoadedGltfScene};
 use rend3_routine::{pbr::NormalTextureYDirection, skybox::SkyboxRoutine};
 use web_time::Instant;
 use wgpu_profiler::GpuTimerScopeResult;
@@ -38,7 +41,7 @@ async fn load_skybox(
     renderer: &Arc<Renderer>,
     loader: &rend3_framework::AssetLoader,
     skybox_routine: &Mutex<SkyboxRoutine>,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> anyhow::Result<()> {
     let mut data = Vec::new();
     load_skybox_image(loader, &mut data, "skybox/right.jpg").await;
     load_skybox_image(loader, &mut data, "skybox/left.jpg").await;
@@ -64,7 +67,7 @@ async fn load_gltf(
     loader: &rend3_framework::AssetLoader,
     settings: &rend3_gltf::GltfLoadSettings,
     location: AssetPath<'_>,
-) -> Option<(rend3_gltf::LoadedGltfScene, GltfSceneInstance)> {
+) -> anyhow::Result<(rend3_gltf::LoadedGltfScene, GltfSceneInstance)> {
     // profiling::scope!("loading gltf");
     let gltf_start = Instant::now();
     let is_default_scene = matches!(location, AssetPath::Internal(_));
@@ -97,7 +100,7 @@ async fn load_gltf(
                 ***************
             ", suffix);
 
-            return None;
+            anyhow::bail!("No file to display");
         }
         e => e.unwrap(),
     };
@@ -114,15 +117,14 @@ async fn load_gltf(
             loader.get_asset(AssetPath::External(&full_uri)).await
         }
     })
-    .await
-    .unwrap();
+    .await?;
 
     log::info!(
         "Loaded gltf in {:.3?}, resources loaded in {:.3?}",
         gltf_elapsed,
         resources_start.elapsed()
     );
-    Some((scene, instance))
+    Ok((scene, instance))
 }
 
 fn button_pressed<Hash: BuildHasher>(map: &HashMap<KeyCode, bool, Hash>, key: KeyCode) -> bool {
@@ -270,6 +272,9 @@ Controls:
   --walk <speed>               Walk speed (speed without holding shift) in units/second (typically meters). Default 10.
   --run  <speed>               Run speed (speed while holding shift) in units/second (typically meters). Default 50.
   --camera x,y,z,pitch,yaw     Spawns the camera at the given position. Press Period to get the current camera position.
+
+Debug:
+  --wait-for-load              Wait for the gltf before rendering the first frame. Useful for debugging and testing rend3.
 ";
 
 pub struct SceneViewer {
@@ -289,21 +294,58 @@ pub struct SceneViewer {
     samples: SampleCount,
 
     fullscreen: bool,
+    wait_for_load: bool,
+    loading_reciever: Option<Receiver<anyhow::Result<(LoadedGltfScene, GltfSceneInstance)>>>,
 
     scancode_status: FastHashMap<KeyCode, bool>,
     camera_pitch: f32,
     camera_yaw: f32,
     camera_location: Vec3A,
     previous_profiling_stats: Option<Vec<GpuTimerScopeResult>>,
-    timestamp_last_second: Instant,
-    timestamp_last_frame: Instant,
-    frame_times: histogram::Histogram,
     last_mouse_delta: Option<DVec2>,
 
+    scene: Option<LoadedGltfScene>,
+    instance: Option<GltfSceneInstance>,
     grabber: Option<rend3_framework::Grabber>,
 }
+
+impl Default for SceneViewer {
+    fn default() -> Self {
+        Self {
+            absolute_mouse: false,
+            desired_backend: None,
+            desired_device_name: None,
+            desired_profile: None,
+            file_to_load: None,
+            walk_speed: 10.0,
+            run_speed: 50.0,
+            gltf_settings: GltfLoadSettings::default(),
+            directional_light_direction: None,
+            directional_light_intensity: 1.0,
+            directional_light: None,
+            ambient_light_level: 0.1,
+            present_mode: wgpu::PresentMode::Fifo,
+            samples: SampleCount::One,
+            fullscreen: false,
+            wait_for_load: false,
+            loading_reciever: None,
+            scancode_status: HashMap::default(),
+
+            // Camera settings for the default scene
+            camera_pitch: -0.08869916,
+            camera_yaw: 5.899576,
+            camera_location: Vec3A::new(-2.9936655, 2.189423, 5.308956),
+
+            previous_profiling_stats: None,
+            last_mouse_delta: None,
+            scene: None,
+            instance: None,
+            grabber: None,
+        }
+    }
+}
 impl SceneViewer {
-    pub fn new() -> Self {
+    pub fn from_args() -> Self {
         #[cfg(feature = "tracy")]
         tracy_client::Client::start();
 
@@ -313,43 +355,77 @@ impl SceneViewer {
         // Meta
         let help = args.contains(["-h", "--help"]);
 
+        let mut app = SceneViewer::default();
+
         // Rendering
-        let desired_backend = option_arg(args.opt_value_from_fn(["-b", "--backend"], extract_backend));
-        let desired_device_name: Option<String> =
+        app.desired_backend = option_arg(args.opt_value_from_fn(["-b", "--backend"], extract_backend));
+        app.desired_device_name =
             option_arg(args.opt_value_from_str(["-d", "--device"])).map(|s: String| s.to_lowercase());
-        let desired_mode = option_arg(args.opt_value_from_fn(["-p", "--profile"], extract_profile));
-        let samples = option_arg(args.opt_value_from_fn("--msaa", extract_msaa)).unwrap_or(SampleCount::One);
-        let present_mode = option_arg(args.opt_value_from_fn(["-v", "--vsync"], extract_vsync))
-            .unwrap_or(rend3::types::PresentMode::Fifo);
+        app.desired_profile = option_arg(args.opt_value_from_fn(["-p", "--profile"], extract_profile));
+        if let Some(samples) = option_arg(args.opt_value_from_fn("--msaa", extract_msaa)) {
+            app.samples = samples;
+        }
+        if let Some(present_mode) = option_arg(args.opt_value_from_fn(["-v", "--vsync"], extract_vsync)) {
+            app.present_mode = present_mode;
+        }
 
         // Windowing
-        let absolute_mouse: bool = args.contains("--absolute-mouse");
-        let fullscreen = args.contains("--fullscreen");
+        app.absolute_mouse = args.contains("--absolute-mouse");
+        app.fullscreen = args.contains("--fullscreen");
 
         // Assets
-        let normal_direction = match args.contains("--normal-y-down") {
+        app.gltf_settings.normal_direction = match args.contains("--normal-y-down") {
             true => NormalTextureYDirection::Down,
             false => NormalTextureYDirection::Up,
         };
-        let directional_light_direction = option_arg(args.opt_value_from_fn("--directional-light", extract_vec3));
-        let directional_light_intensity: f32 =
-            option_arg(args.opt_value_from_str("--directional-light-intensity")).unwrap_or(4.0);
-        let ambient_light_level: f32 = option_arg(args.opt_value_from_str("--ambient")).unwrap_or(0.10);
-        let scale: Option<f32> = option_arg(args.opt_value_from_str("--scale"));
-        let shadow_distance: Option<f32> = option_arg(args.opt_value_from_str("--shadow-distance"));
-        let shadow_resolution: Option<u16> = option_arg(args.opt_value_from_str("--shadow-resolution"));
-        let gltf_disable_directional_light: bool = args.contains("--gltf-disable-directional-lights");
+        app.directional_light_direction = option_arg(args.opt_value_from_fn("--directional-light", extract_vec3));
+        if let Some(directional_light_intensity) = option_arg(args.opt_value_from_str("--directional-light-intensity"))
+        {
+            app.directional_light_intensity = directional_light_intensity;
+        }
+        if let Some(ambient_light_level) = option_arg(args.opt_value_from_str("--ambient")) {
+            app.ambient_light_level = ambient_light_level;
+        }
+        if let Some(scale) = option_arg(args.opt_value_from_str("--scale")) {
+            app.gltf_settings.scale = scale;
+        }
+        if let Some(shadow_distance) = option_arg(args.opt_value_from_str("--shadow-distance")) {
+            app.gltf_settings.directional_light_shadow_distance = shadow_distance;
+        }
+        if let Some(shadow_resolution) = option_arg(args.opt_value_from_str("--shadow-resolution")) {
+            app.gltf_settings.directional_light_resolution = shadow_resolution;
+        }
+        app.gltf_settings.enable_directional = !args.contains("--gltf-disable-directional-lights");
 
         // Controls
-        let walk_speed = args.value_from_str("--walk").unwrap_or(10.0_f32);
-        let run_speed = args.value_from_str("--run").unwrap_or(50.0_f32);
-        let camera_default = [3.0, 3.0, 3.0, -std::f32::consts::FRAC_PI_8, std::f32::consts::FRAC_PI_4];
-        let camera_info = args
+        if let Some(walk_speed) = option_arg(args.opt_value_from_str("--walk")) {
+            app.walk_speed = walk_speed;
+        }
+        if let Some(run_speed) = option_arg(args.opt_value_from_str("--run")) {
+            app.run_speed = run_speed;
+        }
+
+        let camera_default = [
+            app.camera_location.x,
+            app.camera_location.y,
+            app.camera_location.z,
+            app.camera_pitch,
+            app.camera_yaw,
+        ];
+        if let Ok(camera_info) = args
             .value_from_str("--camera")
-            .map_or(camera_default, |s: String| extract_array(&s, camera_default).unwrap());
+            .map(|s: String| extract_array(&s, camera_default).unwrap())
+        {
+            app.camera_location = Vec3A::new(camera_info[0], camera_info[1], camera_info[2]);
+            app.camera_pitch = camera_info[3];
+            app.camera_yaw = camera_info[4];
+        }
+
+        // Debug
+        app.wait_for_load = args.contains("--wait-for-load");
 
         // Free args
-        let file_to_load: Option<String> = args.free_from_str().ok();
+        app.file_to_load = args.free_from_str().ok();
 
         let remaining = args.finish();
 
@@ -369,51 +445,7 @@ impl SceneViewer {
             std::process::exit(1);
         }
 
-        let mut gltf_settings = rend3_gltf::GltfLoadSettings {
-            normal_direction,
-            enable_directional: !gltf_disable_directional_light,
-            ..Default::default()
-        };
-        if let Some(scale) = scale {
-            gltf_settings.scale = scale
-        }
-        if let Some(shadow_distance) = shadow_distance {
-            gltf_settings.directional_light_shadow_distance = shadow_distance;
-        }
-        if let Some(shadow_resolution) = shadow_resolution {
-            gltf_settings.directional_light_resolution = shadow_resolution;
-        }
-
-        Self {
-            absolute_mouse,
-            desired_backend,
-            desired_device_name,
-            desired_profile: desired_mode,
-            file_to_load,
-            walk_speed,
-            run_speed,
-            gltf_settings,
-            directional_light_direction,
-            directional_light_intensity,
-            directional_light: None,
-            ambient_light_level,
-            present_mode,
-            samples,
-
-            fullscreen,
-
-            scancode_status: FastHashMap::default(),
-            camera_pitch: camera_info[3],
-            camera_yaw: camera_info[4],
-            camera_location: Vec3A::new(camera_info[0], camera_info[1], camera_info[2]),
-            previous_profiling_stats: None,
-            timestamp_last_second: Instant::now(),
-            timestamp_last_frame: Instant::now(),
-            frame_times: histogram::Histogram::new(),
-            last_mouse_delta: None,
-
-            grabber: None,
-        }
+        app
     }
 }
 impl rend3_framework::App for SceneViewer {
@@ -428,13 +460,13 @@ impl rend3_framework::App for SceneViewer {
         >,
     > {
         Box::pin(async move {
-            Ok(rend3::create_iad(
+            rend3::create_iad(
                 self.desired_backend,
                 self.desired_device_name.clone(),
                 self.desired_profile,
                 None,
             )
-            .await?)
+            .await
         })
     }
 
@@ -451,11 +483,9 @@ impl rend3_framework::App for SceneViewer {
     }
 
     fn setup(&mut self, context: rend3_framework::SetupContext<'_>) {
-        self.grabber = if let Some(windowing) = context.windowing {
-            Some(rend3_framework::Grabber::new(windowing.window))
-        } else {
-            None
-        };
+        self.grabber = context
+            .windowing
+            .map(|windowing| rend3_framework::Grabber::new(windowing.window));
 
         if let Some(direction) = self.directional_light_direction {
             self.directional_light = Some(context.renderer.add_directional_light(DirectionalLight {
@@ -471,6 +501,10 @@ impl rend3_framework::App for SceneViewer {
         let file_to_load = self.file_to_load.take();
         let renderer = Arc::clone(context.renderer);
         let routines = Arc::clone(context.routines);
+
+        let (sender, receiver) = flume::bounded(1);
+
+        let wait_for_load = self.wait_for_load;
         spawn(async move {
             let loader = rend3_framework::AssetLoader::new_local(
                 concat!(env!("CARGO_MANIFEST_DIR"), "/src/scene_viewer/resources/"),
@@ -480,18 +514,26 @@ impl rend3_framework::App for SceneViewer {
             if let Err(e) = load_skybox(&renderer, &loader, &routines.skybox).await {
                 println!("Failed to load skybox {}", e)
             };
-            Box::leak(Box::new(
-                load_gltf(
-                    &renderer,
-                    &loader,
-                    &gltf_settings,
-                    file_to_load
-                        .as_deref()
-                        .map_or_else(|| AssetPath::Internal("default-scene/scene.gltf"), AssetPath::External),
-                )
-                .await,
-            ));
+            let loaded = load_gltf(
+                &renderer,
+                &loader,
+                &gltf_settings,
+                file_to_load
+                    .as_deref()
+                    .map_or_else(|| AssetPath::Internal("default-scene/scene.gltf"), AssetPath::External),
+            )
+            .await;
+
+            sender.send(loaded).unwrap();
         });
+
+        if wait_for_load {
+            let (scene, instance) = receiver.recv().unwrap().unwrap();
+            self.scene = Some(scene);
+            self.instance = Some(instance);
+        } else {
+            self.loading_reciever = Some(receiver);
+        }
     }
 
     fn handle_event(&mut self, context: rend3_framework::EventContext<'_>, event: winit::event::Event<()>) {
@@ -590,38 +632,15 @@ impl rend3_framework::App for SceneViewer {
 
     fn handle_redraw(&mut self, context: rend3_framework::RedrawContext<'_, ()>) {
         profiling::scope!("RedrawRequested");
-        let now = Instant::now();
 
-        let delta_time = now - self.timestamp_last_frame;
-        self.frame_times.increment(delta_time.as_micros() as u64).unwrap();
-
-        let elapsed_since_second = now - self.timestamp_last_second;
-        if elapsed_since_second > Duration::from_secs(1) {
-            let count = self.frame_times.entries();
-            println!(
-                "{:0>5} frames over {:0>5.2}s. \
-                        Min: {:0>5.2}ms; \
-                        Average: {:0>5.2}ms; \
-                        95%: {:0>5.2}ms; \
-                        99%: {:0>5.2}ms; \
-                        Max: {:0>5.2}ms; \
-                        StdDev: {:0>5.2}ms",
-                count,
-                elapsed_since_second.as_secs_f32(),
-                self.frame_times.minimum().unwrap() as f32 / 1_000.0,
-                self.frame_times.mean().unwrap() as f32 / 1_000.0,
-                self.frame_times.percentile(95.0).unwrap() as f32 / 1_000.0,
-                self.frame_times.percentile(99.0).unwrap() as f32 / 1_000.0,
-                self.frame_times.maximum().unwrap() as f32 / 1_000.0,
-                self.frame_times.stddev().unwrap() as f32 / 1_000.0,
-            );
-            self.timestamp_last_second = now;
-            self.frame_times.clear();
+        if let Some(ref receiver) = self.loading_reciever {
+            if let Ok(loaded) = receiver.try_recv() {
+                let (scene, instance) = loaded.unwrap();
+                self.scene = Some(scene);
+                self.instance = Some(instance);
+                self.loading_reciever = None;
+            }
         }
-
-        self.timestamp_last_frame = now;
-
-        // std::thread::sleep(Duration::from_millis(100));
 
         let rotation = Mat3A::from_euler(glam::EulerRot::XYZ, -self.camera_pitch, -self.camera_yaw, 0.0).transpose();
         let forward = -rotation.z_axis;
@@ -633,19 +652,19 @@ impl rend3_framework::App for SceneViewer {
             self.walk_speed
         };
         if button_pressed(&self.scancode_status, KeyCode::KeyW) {
-            self.camera_location += forward * velocity * delta_time.as_secs_f32();
+            self.camera_location += forward * velocity * context.delta_t_seconds;
         }
         if button_pressed(&self.scancode_status, KeyCode::KeyS) {
-            self.camera_location -= forward * velocity * delta_time.as_secs_f32();
+            self.camera_location -= forward * velocity * context.delta_t_seconds;
         }
         if button_pressed(&self.scancode_status, KeyCode::KeyA) {
-            self.camera_location += side * velocity * delta_time.as_secs_f32();
+            self.camera_location += side * velocity * context.delta_t_seconds;
         }
         if button_pressed(&self.scancode_status, KeyCode::KeyD) {
-            self.camera_location -= side * velocity * delta_time.as_secs_f32();
+            self.camera_location -= side * velocity * context.delta_t_seconds;
         }
         if button_pressed(&self.scancode_status, KeyCode::KeyQ) {
-            self.camera_location += up * velocity * delta_time.as_secs_f32();
+            self.camera_location += up * velocity * context.delta_t_seconds;
         }
         if button_pressed(&self.scancode_status, KeyCode::Period) {
             println!(
@@ -735,7 +754,7 @@ impl rend3_framework::App for SceneViewer {
 }
 
 pub fn main() {
-    let app = SceneViewer::new();
+    let app = SceneViewer::from_args();
 
     let mut builder = WindowBuilder::new().with_title("scene-viewer").with_maximized(true);
     if app.fullscreen {
@@ -743,4 +762,48 @@ pub fn main() {
     }
 
     rend3_framework::start(app, builder);
+}
+
+#[cfg(test)]
+#[rend3_test::test_attr]
+async fn default_scene() {
+    let mut app = SceneViewer::default();
+    app.file_to_load = Some("src/scene_viewer/resources/default-scene/scene.gltf".into());
+    app.wait_for_load = true;
+    app.samples = SampleCount::Four;
+
+    crate::tests::test_app(crate::tests::TestConfiguration {
+        app,
+        reference_path: "src/scene_viewer/screenshot.png",
+        size: glam::UVec2::new(1280, 720),
+        threshold_set: rend3_test::Threshold::Mean(0.0).into(),
+    })
+    .await
+    .unwrap();
+}
+
+#[cfg(test)]
+#[rend3_test::test_attr]
+async fn bistro() {
+    let mut app = SceneViewer::default();
+    app.file_to_load = Some("src/scene_viewer/resources/bistro-full/bistro.gltf".into());
+    app.wait_for_load = true;
+    app.samples = SampleCount::Four;
+    app.gltf_settings.normal_direction = NormalTextureYDirection::Down;
+    app.gltf_settings.enable_directional = false;
+    app.directional_light_direction = Some(Vec3::new(1.0, -5.0, -1.0));
+    app.directional_light_intensity = 15.0;
+
+    app.camera_location = Vec3A::new(-17.174278, 3.715882, -4.631997);
+    app.camera_pitch = 0.04430086;
+    app.camera_yaw = 4.6065736;
+
+    crate::tests::test_app(crate::tests::TestConfiguration {
+        app,
+        reference_path: "src/scene_viewer/bistro.png",
+        size: glam::UVec2::new(1280, 720),
+        threshold_set: rend3_test::Threshold::Mean(0.0).into(),
+    })
+    .await
+    .unwrap();
 }

@@ -7,7 +7,7 @@ use rend3_types::{
     VERTEX_ATTRIBUTE_JOINT_WEIGHTS, VERTEX_ATTRIBUTE_NORMAL, VERTEX_ATTRIBUTE_POSITION, VERTEX_ATTRIBUTE_TANGENT,
 };
 use thiserror::Error;
-use wgpu::{CommandEncoder, Device};
+use wgpu::Device;
 
 use crate::{
     managers::{MeshCreationError, MeshManager},
@@ -73,7 +73,6 @@ impl SkeletonManager {
 
     pub fn validate_skeleton(
         device: &Device,
-        encoder: &mut CommandEncoder,
         mesh_manager: &MeshManager,
         skeleton: Skeleton,
     ) -> Result<InternalSkeleton, SkeletonCreationError> {
@@ -121,8 +120,7 @@ impl SkeletonManager {
         //
         // We skip the first two as those are always the joint* attributes.
         for (attribute_id, original_range) in &source_attribute_ranges[2..] {
-            let skeleton_range =
-                mesh_manager.allocate_range(device, encoder, original_range.end - original_range.start)?;
+            let skeleton_range = mesh_manager.allocate_range(device, original_range.end - original_range.start)?;
             overridden_attribute_ranges.push((*attribute_id, skeleton_range));
         }
 
