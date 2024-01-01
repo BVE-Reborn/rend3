@@ -59,6 +59,7 @@ pub struct RedrawContext<'a, T: 'static = ()> {
     pub resolution: UVec2,
     pub control_flow: &'a mut dyn FnMut(winit::event_loop::ControlFlow),
     pub event_loop_window_target: Option<&'a EventLoopWindowTarget<T>>,
+    pub delta_t_seconds: f32,
 }
 
 pub trait App<T: 'static = ()> {
@@ -268,6 +269,8 @@ pub async fn async_start<A: App<T> + 'static, T: 'static>(mut app: A, window_bui
         }
     }
 
+    let mut previous_time = web_time::Instant::now();
+
     // On native this is a result, but on wasm it's a unit type.
     #[allow(clippy::let_unit_value)]
     let _ = (event_loop_function)(
@@ -344,6 +347,10 @@ pub async fn async_start<A: App<T> + 'static, T: 'static>(mut app: A, window_bui
                     Err(SurfaceError::OutOfMemory | SurfaceError::Lost) => panic!("Surface OOM"),
                 };
 
+                let current_time = web_time::Instant::now();
+                let delta_t_seconds = (current_time - previous_time).as_secs_f32();
+                previous_time = current_time;
+
                 app.handle_redraw(RedrawContext {
                     window: Some(&window),
                     renderer: &renderer,
@@ -356,6 +363,7 @@ pub async fn async_start<A: App<T> + 'static, T: 'static>(mut app: A, window_bui
                         last_user_control_mode = c;
                     },
                     event_loop_window_target: Some(event_loop_window_target),
+                    delta_t_seconds
                 });
 
                 surface_texture.present();

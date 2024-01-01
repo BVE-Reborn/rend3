@@ -11,7 +11,6 @@ pub struct AnimatedObject {
     loaded_instance: rend3_gltf::GltfSceneInstance,
     animation_data: rend3_anim::AnimationData,
     animation_time: f32,
-    last_frame_time: web_time::Instant,
 }
 
 #[derive(Default)]
@@ -87,7 +86,6 @@ impl rend3_framework::App for AnimationExample {
             loaded_scene,
             loaded_instance,
             animation_time: 0.0,
-            last_frame_time: web_time::Instant::now(),
         };
 
         let path = Path::new(concat!(
@@ -109,19 +107,14 @@ impl rend3_framework::App for AnimationExample {
             loaded_scene,
             loaded_instance,
             animation_time: 0.0,
-            last_frame_time: web_time::Instant::now(),
         };
 
         self.animated_objects = vec![animated_object, animated_object2];
     }
 
     fn handle_redraw(&mut self, context: rend3_framework::RedrawContext<'_, ()>) {
-        let now = web_time::Instant::now();
-
         self.animated_objects.iter_mut().for_each(|animated_object| {
-            let delta = now.duration_since(animated_object.last_frame_time).as_secs_f32();
-            animated_object.last_frame_time = now;
-            update(context.renderer, delta, animated_object);
+            update(context.renderer, context.delta_t_seconds, animated_object);
         });
 
         // Swap the instruction buffers so that our frame's changes can be processed.

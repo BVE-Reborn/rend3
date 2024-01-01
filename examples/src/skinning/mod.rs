@@ -1,4 +1,4 @@
-use std::{path::Path, time::Instant};
+use std::path::Path;
 
 use rend3_gltf::GltfSceneInstance;
 
@@ -10,7 +10,7 @@ pub struct SkinningExample {
     loaded_instance: Option<rend3_gltf::GltfSceneInstance>,
     directional_light_handle: Option<rend3::types::DirectionalLightHandle>,
     armature: Option<rend3_gltf::Armature>,
-    start_time: Option<Instant>,
+    elapsed_time: f32,
 }
 
 /// Locates an object in the node list that corresponds to an animated mesh
@@ -36,8 +36,7 @@ impl SkinningExample {
         let inverse_bind_matrices = &loaded_scene.skins[armature.skin_index].inner.inverse_bind_matrices;
 
         // Compute a very simple animation for the top bone
-        let elapsed_time = Instant::now().duration_since(self.start_time.unwrap());
-        let t = elapsed_time.as_secs_f32();
+        let t = self.elapsed_time;
         let rotation_degrees = 30.0 * f32::sin(5.0 * t);
 
         // An armature contains multiple skeletons, one per mesh primitive being
@@ -64,9 +63,6 @@ impl rend3_framework::App for SkinningExample {
     }
 
     fn setup(&mut self, context: rend3_framework::SetupContext<'_>) {
-        // Store the startup time. Use later to animate the joint rotation
-        self.start_time = Some(Instant::now());
-
         let view_location = glam::Vec3::new(0.0, 0.0, -10.0);
         let view = glam::Mat4::from_euler(glam::EulerRot::XYZ, 0.0, 0.0, 0.0);
         let view = view * glam::Mat4::from_translation(-view_location);
