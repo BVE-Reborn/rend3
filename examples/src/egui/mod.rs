@@ -1,5 +1,3 @@
-use winit::event::WindowEvent;
-
 struct EguiExampleData {
     _object_handle: rend3::types::ObjectHandle,
     material_handle: rend3::types::MaterialHandle,
@@ -7,7 +5,7 @@ struct EguiExampleData {
 
     egui_routine: rend3_egui::EguiRenderRoutine,
     context: egui::Context,
-    platform: egui_winit::State,
+    platform: Option<egui_winit::State>,
     color: [f32; 4],
 }
 
@@ -26,16 +24,16 @@ impl rend3_framework::App for EguiExample {
     }
 
     fn setup(&mut self, context: rend3_framework::SetupContext<'_>) {
-        let window_size = context.window.inner_size();
+        let window_size = context.resolution;
 
         // Create the egui render routine
         let mut egui_routine = rend3_egui::EguiRenderRoutine::new(
             context.renderer,
             context.surface_format,
             rend3::types::SampleCount::One,
-            window_size.width,
-            window_size.height,
-            context.window.scale_factor() as f32,
+            window_size.x,
+            window_size.y,
+            context.scale_factor,
         );
 
         // Create mesh and calculate smooth normals based on vertices
@@ -97,13 +95,17 @@ impl rend3_framework::App for EguiExample {
         // Create the egui context
         let egui_context = egui::Context::default();
         // Create the winit/egui integration.
-        let platform = egui_winit::State::new(
-            egui_context.clone(),
-            egui::ViewportId::default(),
-            &context.window,
-            Some(context.window.scale_factor() as f32),
-            None,
-        );
+        let platform = if let Some(windowing) = context.windowing {
+            Some(egui_winit::State::new(
+                egui_context.clone(),
+                egui::ViewportId::default(),
+                &windowing.window,
+                Some(context.scale_factor),
+                None,
+            ))
+        } else {
+            None
+        };
 
         //Images
         let image_bytes = include_bytes!("images/rust-logo-128x128-blk.png");
@@ -142,123 +144,125 @@ impl rend3_framework::App for EguiExample {
         let data = self.data.as_mut().unwrap();
 
         match event {
-            winit::event::Event::WindowEvent {
-                window_id: _,
-                event: WindowEvent::RedrawRequested,
-            } => {
-                data.context.begin_frame(data.platform.take_egui_input(context.window));
-
-                // Insert egui commands here
-                let ctx = &data.context;
-                egui::Window::new("Change color").resizable(true).show(ctx, |ui| {
-                    ui.label("Change the color of the cube");
-                    if ui.color_edit_button_rgba_unmultiplied(&mut data.color).changed() {
-                        context.renderer.update_material(
-                            &data.material_handle.clone(),
-                            rend3_routine::pbr::PbrMaterial {
-                                albedo: rend3_routine::pbr::AlbedoComponent::Value(glam::Vec4::from(data.color)),
-                                transparency: rend3_routine::pbr::Transparency::Blend,
-                                ..rend3_routine::pbr::PbrMaterial::default()
-                            },
-                        );
-                    }
-                    ui.label("Want to get rusty?");
-                    if ui
-                        .add(egui::widgets::ImageButton::new((
-                            self.rust_logo,
-                            egui::Vec2::splat(64.0),
-                        )))
-                        .clicked()
-                    {
-                        webbrowser::open("https://www.rust-lang.org").expect("failed to open URL");
-                    }
-                });
-
-                // End the UI frame. Now let's draw the UI with our Backend, we could also
-                // handle the output here
-                let egui::FullOutput {
-                    shapes, textures_delta, ..
-                } = data.context.end_frame();
-                let paint_jobs = data.context.tessellate(shapes, context.window.scale_factor() as f32);
-
-                let input = rend3_egui::Input {
-                    clipped_meshes: &paint_jobs,
-                    textures_delta,
-                    context: data.context.clone(),
-                };
-
-                // Get a frame
-                let frame = context.surface.unwrap().get_current_texture().unwrap();
-
-                // Swap the instruction buffers so that our frame's changes can be processed.
-                context.renderer.swap_instruction_buffers();
-                // Evaluate our frame's world-change instructions
-                let mut eval_output = context.renderer.evaluate_instructions();
-
-                // Lock the routines
-                let pbr_routine = rend3_framework::lock(&context.routines.pbr);
-                let tonemapping_routine = rend3_framework::lock(&context.routines.tonemapping);
-
-                // Build a rendergraph
-                let mut graph = rend3::graph::RenderGraph::new();
-
-                // Import the surface texture into the render graph.
-                let frame_handle = graph.add_imported_render_target(
-                    &frame,
-                    0..1,
-                    0..1,
-                    rend3::graph::ViewportRect::from_size(context.resolution),
-                );
-                // Add the default rendergraph without a skybox
-                context.base_rendergraph.add_to_graph(
-                    &mut graph,
-                    rend3_routine::base::BaseRenderGraphInputs {
-                        eval_output: &eval_output,
-                        routines: rend3_routine::base::BaseRenderGraphRoutines {
-                            pbr: &pbr_routine,
-                            skybox: None,
-                            tonemapping: &tonemapping_routine,
-                        },
-                        target: rend3_routine::base::OutputRenderTarget {
-                            handle: frame_handle,
-                            resolution: context.resolution,
-                            samples: SAMPLE_COUNT,
-                        },
-                    },
-                    rend3_routine::base::BaseRenderGraphSettings {
-                        ambient_color: glam::Vec4::ZERO,
-                        clear_color: glam::Vec4::new(0.10, 0.05, 0.10, 1.0), // Nice scene-referred purple
-                    },
-                );
-
-                // Add egui on top of all the other passes
-                data.egui_routine.add_to_graph(&mut graph, input, frame_handle);
-
-                // Dispatch a render using the built up rendergraph!
-                graph.execute(context.renderer, &mut eval_output);
-
-                // Present the frame
-                frame.present();
-
-                context.window.request_redraw();
-            }
             winit::event::Event::WindowEvent { event, .. } => {
-                // Pass the window events to the egui integration.
-                if data.platform.on_window_event(context.window, &event).consumed {
-                    return;
-                }
-
-                #[allow(clippy::single_match)]
-                match event {
-                    winit::event::WindowEvent::Resized(size) => {
-                        data.egui_routine
-                            .resize(size.width, size.height, context.window.scale_factor() as f32);
+                if let Some(window) = context.window {
+                    // Pass the window events to the egui integration.
+                    if data.platform.as_mut().unwrap().on_window_event(window, &event).consumed {
+                        return;
                     }
-                    _ => {}
+
+                    #[allow(clippy::single_match)]
+                    match event {
+                        winit::event::WindowEvent::Resized(size) => {
+                            data.egui_routine
+                                .resize(size.width, size.height, window.scale_factor() as f32);
+                        }
+                        _ => {}
+                    }
                 }
             }
             _ => {}
         }
+    }
+
+    fn handle_redraw(&mut self, context: rend3_framework::RedrawContext<'_, ()>) {
+        let data = self.data.as_mut().unwrap();
+
+        let input = if let Some(window) = context.window {
+            data.platform.as_mut().unwrap().take_egui_input(window)
+        } else {
+            egui::RawInput::default()
+        };
+
+        data.context.begin_frame(input);
+
+        // Insert egui commands here
+        let ctx = &data.context;
+        egui::Window::new("Change color").resizable(true).show(ctx, |ui| {
+            ui.label("Change the color of the cube");
+            if ui.color_edit_button_rgba_unmultiplied(&mut data.color).changed() {
+                context.renderer.update_material(
+                    &data.material_handle.clone(),
+                    rend3_routine::pbr::PbrMaterial {
+                        albedo: rend3_routine::pbr::AlbedoComponent::Value(glam::Vec4::from(data.color)),
+                        transparency: rend3_routine::pbr::Transparency::Blend,
+                        ..rend3_routine::pbr::PbrMaterial::default()
+                    },
+                );
+            }
+            ui.label("Want to get rusty?");
+            if ui
+                .add(egui::widgets::ImageButton::new((
+                    self.rust_logo,
+                    egui::Vec2::splat(64.0),
+                )))
+                .clicked()
+            {
+                webbrowser::open("https://www.rust-lang.org").expect("failed to open URL");
+            }
+        });
+
+        let scale_factor = context.window.map(|w| w.scale_factor() as f32).unwrap_or(1.0);
+
+        // End the UI frame. Now let's draw the UI with our Backend, we could also
+        // handle the output here
+        let egui::FullOutput {
+            shapes, textures_delta, ..
+        } = data.context.end_frame();
+        let paint_jobs = data.context.tessellate(shapes, scale_factor);
+
+        let input = rend3_egui::Input {
+            clipped_meshes: &paint_jobs,
+            textures_delta,
+            context: data.context.clone(),
+        };
+
+        // Swap the instruction buffers so that our frame's changes can be processed.
+        context.renderer.swap_instruction_buffers();
+        // Evaluate our frame's world-change instructions
+        let mut eval_output = context.renderer.evaluate_instructions();
+
+        // Lock the routines
+        let pbr_routine = rend3_framework::lock(&context.routines.pbr);
+        let tonemapping_routine = rend3_framework::lock(&context.routines.tonemapping);
+
+        // Build a rendergraph
+        let mut graph = rend3::graph::RenderGraph::new();
+
+        // Import the surface texture into the render graph.
+        let frame_handle = graph.add_imported_render_target(
+            context.surface_texture,
+            0..1,
+            0..1,
+            rend3::graph::ViewportRect::from_size(context.resolution),
+        );
+        // Add the default rendergraph without a skybox
+        context.base_rendergraph.add_to_graph(
+            &mut graph,
+            rend3_routine::base::BaseRenderGraphInputs {
+                eval_output: &eval_output,
+                routines: rend3_routine::base::BaseRenderGraphRoutines {
+                    pbr: &pbr_routine,
+                    skybox: None,
+                    tonemapping: &tonemapping_routine,
+                },
+                target: rend3_routine::base::OutputRenderTarget {
+                    handle: frame_handle,
+                    resolution: context.resolution,
+                    samples: SAMPLE_COUNT,
+                },
+            },
+            rend3_routine::base::BaseRenderGraphSettings {
+                ambient_color: glam::Vec4::ZERO,
+                clear_color: glam::Vec4::new(0.10, 0.05, 0.10, 1.0), // Nice scene-referred purple
+            },
+        );
+
+        // Add egui on top of all the other passes
+        data.egui_routine.add_to_graph(&mut graph, input, frame_handle);
+
+        // Dispatch a render using the built up rendergraph!
+        graph.execute(context.renderer, &mut eval_output);
     }
 }
 
@@ -323,4 +327,17 @@ fn create_mesh() -> rend3::types::Mesh {
         .with_indices(index_data.to_vec())
         .build()
         .unwrap()
+}
+
+#[cfg(test)]
+#[rend3_test::test_attr]
+async fn test() {
+    crate::tests::test_app(crate::tests::TestConfiguration {
+        app: EguiExample::default(),
+        reference_path: "src/egui/screenshot.png",
+        size: glam::UVec2::new(1280, 720),
+        threshold_set: rend3_test::Threshold::Mean(0.0).into(),
+    })
+    .await
+    .unwrap();
 }

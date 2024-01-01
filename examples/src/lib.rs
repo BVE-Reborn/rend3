@@ -7,6 +7,9 @@ mod skinning;
 mod static_gltf;
 mod textured_quad;
 
+#[cfg(test)]
+mod tests;
+
 struct ExampleDesc {
     name: &'static str,
     run: fn(),

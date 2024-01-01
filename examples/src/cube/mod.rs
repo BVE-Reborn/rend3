@@ -1,5 +1,3 @@
-use winit::event::WindowEvent;
-
 fn vertex(pos: [f32; 3]) -> glam::Vec3 {
     glam::Vec3::from(pos)
 }
@@ -137,73 +135,53 @@ impl rend3_framework::App for CubeExample {
         }
     }
 
-    fn handle_event(&mut self, context: rend3_framework::EventContext<'_>, event: winit::event::Event<()>) {
-        #[allow(clippy::single_match)]
-        match event {
-            // Render!
-            winit::event::Event::WindowEvent {
-                window_id: _,
-                event: WindowEvent::RedrawRequested,
-            } => {
-                // Get a frame
-                let frame = context.surface.unwrap().get_current_texture().unwrap();
+    fn handle_redraw(&mut self, context: rend3_framework::RedrawContext<'_, ()>) {
+        // Swap the instruction buffers so that our frame's changes can be processed.
+        context.renderer.swap_instruction_buffers();
+        // Evaluate our frame's world-change instructions
+        let mut eval_output = context.renderer.evaluate_instructions();
 
-                // Swap the instruction buffers so that our frame's changes can be processed.
-                context.renderer.swap_instruction_buffers();
-                // Evaluate our frame's world-change instructions
-                let mut eval_output = context.renderer.evaluate_instructions();
+        // Lock the routines
+        let pbr_routine = rend3_framework::lock(&context.routines.pbr);
+        let tonemapping_routine = rend3_framework::lock(&context.routines.tonemapping);
 
-                // Lock the routines
-                let pbr_routine = rend3_framework::lock(&context.routines.pbr);
-                let tonemapping_routine = rend3_framework::lock(&context.routines.tonemapping);
+        // Build a rendergraph
+        let mut graph = rend3::graph::RenderGraph::new();
 
-                // Build a rendergraph
-                let mut graph = rend3::graph::RenderGraph::new();
+        // Import the surface texture into the render graph.
+        let frame_handle = graph.add_imported_render_target(
+            context.surface_texture,
+            0..1,
+            0..1,
+            rend3::graph::ViewportRect::from_size(context.resolution),
+        );
+        // Add the default rendergraph without a skybox
+        context.base_rendergraph.add_to_graph(
+            &mut graph,
+            rend3_routine::base::BaseRenderGraphInputs {
+                eval_output: &eval_output,
+                routines: rend3_routine::base::BaseRenderGraphRoutines {
+                    pbr: &pbr_routine,
+                    skybox: None,
+                    tonemapping: &tonemapping_routine,
+                },
+                target: rend3_routine::base::OutputRenderTarget {
+                    handle: frame_handle,
+                    resolution: context.resolution,
+                    samples: SAMPLE_COUNT,
+                },
+            },
+            rend3_routine::base::BaseRenderGraphSettings {
+                ambient_color: glam::Vec4::ZERO,
+                clear_color: glam::Vec4::new(0.10, 0.05, 0.10, 1.0), // Nice scene-referred purple
+            },
+        );
 
-                // Import the surface texture into the render graph.
-                let frame_handle = graph.add_imported_render_target(
-                    &frame,
-                    0..1,
-                    0..1,
-                    rend3::graph::ViewportRect::from_size(context.resolution),
-                );
-                // Add the default rendergraph without a skybox
-                context.base_rendergraph.add_to_graph(
-                    &mut graph,
-                    rend3_routine::base::BaseRenderGraphInputs {
-                        eval_output: &eval_output,
-                        routines: rend3_routine::base::BaseRenderGraphRoutines {
-                            pbr: &pbr_routine,
-                            skybox: None,
-                            tonemapping: &tonemapping_routine,
-                        },
-                        target: rend3_routine::base::OutputRenderTarget {
-                            handle: frame_handle,
-                            resolution: context.resolution,
-                            samples: SAMPLE_COUNT,
-                        },
-                    },
-                    rend3_routine::base::BaseRenderGraphSettings {
-                        ambient_color: glam::Vec4::ZERO,
-                        clear_color: glam::Vec4::new(0.10, 0.05, 0.10, 1.0), // Nice scene-referred purple
-                    },
-                );
-
-                // Dispatch a render using the built up rendergraph!
-                graph.execute(context.renderer, &mut eval_output);
-
-                // Present the frame
-                frame.present();
-
-                context.window.request_redraw()
-            }
-            // Other events we don't care about
-            _ => {}
-        }
+        // Dispatch a render using the built up rendergraph!
+        graph.execute(context.renderer, &mut eval_output);
     }
 }
 
-#[cfg_attr(target_os = "android", ndk_glue::main(backtrace = "on", logger(level = "debug")))]
 pub fn main() {
     let app = CubeExample::default();
     rend3_framework::start(
@@ -212,4 +190,17 @@ pub fn main() {
             .with_title("cube-example")
             .with_maximized(true),
     );
+}
+
+#[cfg(test)]
+#[rend3_test::test_attr]
+async fn test() {
+    crate::tests::test_app(crate::tests::TestConfiguration {
+        app: CubeExample::default(),
+        reference_path: "src/cube/screenshot.png",
+        size: glam::UVec2::new(1280, 720),
+        threshold_set: rend3_test::Threshold::Mean(0.0).into(),
+    })
+    .await
+    .unwrap();
 }

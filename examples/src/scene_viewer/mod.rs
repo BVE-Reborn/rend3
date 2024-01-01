@@ -421,7 +421,12 @@ impl rend3_framework::App for SceneViewer {
 
     fn create_iad<'a>(
         &'a mut self,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<rend3::InstanceAdapterDevice>> + 'a>> {
+    ) -> std::pin::Pin<
+        Box<
+            dyn std::future::Future<Output = Result<rend3::InstanceAdapterDevice, rend3::RendererInitializationError>>
+                + 'a,
+        >,
+    > {
         Box::pin(async move {
             Ok(rend3::create_iad(
                 self.desired_backend,
@@ -446,7 +451,11 @@ impl rend3_framework::App for SceneViewer {
     }
 
     fn setup(&mut self, context: rend3_framework::SetupContext<'_>) {
-        self.grabber = Some(rend3_framework::Grabber::new(context.window));
+        self.grabber = if let Some(windowing) = context.windowing {
+            Some(rend3_framework::Grabber::new(windowing.window))
+        } else {
+            None
+        };
 
         if let Some(direction) = self.directional_light_direction {
             self.directional_light = Some(context.renderer.add_directional_light(DirectionalLight {
@@ -488,161 +497,14 @@ impl rend3_framework::App for SceneViewer {
     fn handle_event(&mut self, context: rend3_framework::EventContext<'_>, event: winit::event::Event<()>) {
         match event {
             Event::WindowEvent {
-                event: winit::event::WindowEvent::RedrawRequested,
-                ..
-            } => {
-                profiling::scope!("RedrawRequested");
-                let now = Instant::now();
-
-                let delta_time = now - self.timestamp_last_frame;
-                self.frame_times.increment(delta_time.as_micros() as u64).unwrap();
-
-                let elapsed_since_second = now - self.timestamp_last_second;
-                if elapsed_since_second > Duration::from_secs(1) {
-                    let count = self.frame_times.entries();
-                    println!(
-                        "{:0>5} frames over {:0>5.2}s. \
-                        Min: {:0>5.2}ms; \
-                        Average: {:0>5.2}ms; \
-                        95%: {:0>5.2}ms; \
-                        99%: {:0>5.2}ms; \
-                        Max: {:0>5.2}ms; \
-                        StdDev: {:0>5.2}ms",
-                        count,
-                        elapsed_since_second.as_secs_f32(),
-                        self.frame_times.minimum().unwrap() as f32 / 1_000.0,
-                        self.frame_times.mean().unwrap() as f32 / 1_000.0,
-                        self.frame_times.percentile(95.0).unwrap() as f32 / 1_000.0,
-                        self.frame_times.percentile(99.0).unwrap() as f32 / 1_000.0,
-                        self.frame_times.maximum().unwrap() as f32 / 1_000.0,
-                        self.frame_times.stddev().unwrap() as f32 / 1_000.0,
-                    );
-                    self.timestamp_last_second = now;
-                    self.frame_times.clear();
-                }
-
-                self.timestamp_last_frame = now;
-
-                // std::thread::sleep(Duration::from_millis(100));
-
-                let rotation =
-                    Mat3A::from_euler(glam::EulerRot::XYZ, -self.camera_pitch, -self.camera_yaw, 0.0).transpose();
-                let forward = -rotation.z_axis;
-                let up = rotation.y_axis;
-                let side = -rotation.x_axis;
-                let velocity = if button_pressed(&self.scancode_status, KeyCode::ShiftLeft) {
-                    self.run_speed
-                } else {
-                    self.walk_speed
-                };
-                if button_pressed(&self.scancode_status, KeyCode::KeyW) {
-                    self.camera_location += forward * velocity * delta_time.as_secs_f32();
-                }
-                if button_pressed(&self.scancode_status, KeyCode::KeyS) {
-                    self.camera_location -= forward * velocity * delta_time.as_secs_f32();
-                }
-                if button_pressed(&self.scancode_status, KeyCode::KeyA) {
-                    self.camera_location += side * velocity * delta_time.as_secs_f32();
-                }
-                if button_pressed(&self.scancode_status, KeyCode::KeyD) {
-                    self.camera_location -= side * velocity * delta_time.as_secs_f32();
-                }
-                if button_pressed(&self.scancode_status, KeyCode::KeyQ) {
-                    self.camera_location += up * velocity * delta_time.as_secs_f32();
-                }
-                if button_pressed(&self.scancode_status, KeyCode::Period) {
-                    println!(
-                        "{x},{y},{z},{pitch},{yaw}",
-                        x = self.camera_location.x,
-                        y = self.camera_location.y,
-                        z = self.camera_location.z,
-                        pitch = self.camera_pitch,
-                        yaw = self.camera_yaw
-                    );
-                }
-
-                if button_pressed(&self.scancode_status, winit::keyboard::KeyCode::Escape) {
-                    self.grabber.as_mut().unwrap().request_ungrab(context.window);
-                }
-
-                if button_pressed(&self.scancode_status, KeyCode::KeyP) {
-                    // write out gpu side performance info into a trace readable by chrome://tracing
-                    if let Some(ref stats) = self.previous_profiling_stats {
-                        println!("Outputing gpu timing chrome trace to profile.json");
-                        wgpu_profiler::chrometrace::write_chrometrace(Path::new("profile.json"), stats).unwrap();
-                    } else {
-                        println!("No gpu timing trace available, either timestamp queries are unsupported or not enough frames have elapsed yet!");
-                    }
-                }
-
-                let view = Mat4::from_euler(glam::EulerRot::XYZ, -self.camera_pitch, -self.camera_yaw, 0.0);
-                let view = view * Mat4::from_translation((-self.camera_location).into());
-
-                context.renderer.set_camera_data(Camera {
-                    projection: CameraProjection::Perspective { vfov: 60.0, near: 0.1 },
-                    view,
-                });
-
-                // Get a frame
-                let frame = context.surface.unwrap().get_current_texture().unwrap();
-                // Lock all the routines
-                let pbr_routine = lock(&context.routines.pbr);
-                let mut skybox_routine = lock(&context.routines.skybox);
-                let tonemapping_routine = lock(&context.routines.tonemapping);
-
-                // Swap the instruction buffers so that our frame's changes can be processed.
-                context.renderer.swap_instruction_buffers();
-                // Evaluate our frame's world-change instructions
-                let mut eval_output = context.renderer.evaluate_instructions();
-                // Evaluate changes to routines.
-                skybox_routine.evaluate(context.renderer);
-
-                // Build a rendergraph
-                let mut graph = rend3::graph::RenderGraph::new();
-
-                let frame_handle = graph.add_imported_render_target(
-                    &frame,
-                    0..1,
-                    0..1,
-                    rend3::graph::ViewportRect::from_size(context.resolution),
-                );
-                // Add the default rendergraph
-                context.base_rendergraph.add_to_graph(
-                    &mut graph,
-                    rend3_routine::base::BaseRenderGraphInputs {
-                        eval_output: &eval_output,
-                        routines: rend3_routine::base::BaseRenderGraphRoutines {
-                            pbr: &pbr_routine,
-                            skybox: Some(&skybox_routine),
-                            tonemapping: &tonemapping_routine,
-                        },
-                        target: rend3_routine::base::OutputRenderTarget {
-                            handle: frame_handle,
-                            resolution: context.resolution,
-                            samples: self.samples,
-                        },
-                    },
-                    rend3_routine::base::BaseRenderGraphSettings {
-                        ambient_color: Vec3::splat(self.ambient_light_level).extend(1.0),
-                        clear_color: glam::Vec4::new(0.0, 0.0, 0.0, 1.0),
-                    },
-                );
-
-                // Dispatch a render using the built up rendergraph!
-                self.previous_profiling_stats = graph.execute(context.renderer, &mut eval_output);
-
-                frame.present();
-                // mark the end of the frame for tracy/other profilers
-                profiling::finish_frame!();
-
-                context.window.request_redraw()
-            }
-            Event::WindowEvent {
                 event: WindowEvent::Focused(focus),
                 ..
             } => {
                 if !focus {
-                    self.grabber.as_mut().unwrap().request_ungrab(context.window);
+                    self.grabber
+                        .as_mut()
+                        .unwrap()
+                        .request_ungrab(context.window.as_ref().unwrap());
                 }
             }
 
@@ -682,7 +544,7 @@ impl rend3_framework::App for SceneViewer {
                 let grabber = self.grabber.as_mut().unwrap();
 
                 if !grabber.grabbed() {
-                    grabber.request_grab(context.window);
+                    grabber.request_grab(context.window.as_ref().unwrap());
                 }
             }
             Event::DeviceEvent {
@@ -725,9 +587,153 @@ impl rend3_framework::App for SceneViewer {
             _ => {}
         }
     }
+
+    fn handle_redraw(&mut self, context: rend3_framework::RedrawContext<'_, ()>) {
+        profiling::scope!("RedrawRequested");
+        let now = Instant::now();
+
+        let delta_time = now - self.timestamp_last_frame;
+        self.frame_times.increment(delta_time.as_micros() as u64).unwrap();
+
+        let elapsed_since_second = now - self.timestamp_last_second;
+        if elapsed_since_second > Duration::from_secs(1) {
+            let count = self.frame_times.entries();
+            println!(
+                "{:0>5} frames over {:0>5.2}s. \
+                        Min: {:0>5.2}ms; \
+                        Average: {:0>5.2}ms; \
+                        95%: {:0>5.2}ms; \
+                        99%: {:0>5.2}ms; \
+                        Max: {:0>5.2}ms; \
+                        StdDev: {:0>5.2}ms",
+                count,
+                elapsed_since_second.as_secs_f32(),
+                self.frame_times.minimum().unwrap() as f32 / 1_000.0,
+                self.frame_times.mean().unwrap() as f32 / 1_000.0,
+                self.frame_times.percentile(95.0).unwrap() as f32 / 1_000.0,
+                self.frame_times.percentile(99.0).unwrap() as f32 / 1_000.0,
+                self.frame_times.maximum().unwrap() as f32 / 1_000.0,
+                self.frame_times.stddev().unwrap() as f32 / 1_000.0,
+            );
+            self.timestamp_last_second = now;
+            self.frame_times.clear();
+        }
+
+        self.timestamp_last_frame = now;
+
+        // std::thread::sleep(Duration::from_millis(100));
+
+        let rotation = Mat3A::from_euler(glam::EulerRot::XYZ, -self.camera_pitch, -self.camera_yaw, 0.0).transpose();
+        let forward = -rotation.z_axis;
+        let up = rotation.y_axis;
+        let side = -rotation.x_axis;
+        let velocity = if button_pressed(&self.scancode_status, KeyCode::ShiftLeft) {
+            self.run_speed
+        } else {
+            self.walk_speed
+        };
+        if button_pressed(&self.scancode_status, KeyCode::KeyW) {
+            self.camera_location += forward * velocity * delta_time.as_secs_f32();
+        }
+        if button_pressed(&self.scancode_status, KeyCode::KeyS) {
+            self.camera_location -= forward * velocity * delta_time.as_secs_f32();
+        }
+        if button_pressed(&self.scancode_status, KeyCode::KeyA) {
+            self.camera_location += side * velocity * delta_time.as_secs_f32();
+        }
+        if button_pressed(&self.scancode_status, KeyCode::KeyD) {
+            self.camera_location -= side * velocity * delta_time.as_secs_f32();
+        }
+        if button_pressed(&self.scancode_status, KeyCode::KeyQ) {
+            self.camera_location += up * velocity * delta_time.as_secs_f32();
+        }
+        if button_pressed(&self.scancode_status, KeyCode::Period) {
+            println!(
+                "{x},{y},{z},{pitch},{yaw}",
+                x = self.camera_location.x,
+                y = self.camera_location.y,
+                z = self.camera_location.z,
+                pitch = self.camera_pitch,
+                yaw = self.camera_yaw
+            );
+        }
+
+        if button_pressed(&self.scancode_status, winit::keyboard::KeyCode::Escape) {
+            self.grabber
+                .as_mut()
+                .unwrap()
+                .request_ungrab(context.window.as_ref().unwrap());
+        }
+
+        if button_pressed(&self.scancode_status, KeyCode::KeyP) {
+            // write out gpu side performance info into a trace readable by chrome://tracing
+            if let Some(ref stats) = self.previous_profiling_stats {
+                println!("Outputing gpu timing chrome trace to profile.json");
+                wgpu_profiler::chrometrace::write_chrometrace(Path::new("profile.json"), stats).unwrap();
+            } else {
+                println!("No gpu timing trace available, either timestamp queries are unsupported or not enough frames have elapsed yet!");
+            }
+        }
+
+        let view = Mat4::from_euler(glam::EulerRot::XYZ, -self.camera_pitch, -self.camera_yaw, 0.0);
+        let view = view * Mat4::from_translation((-self.camera_location).into());
+
+        context.renderer.set_camera_data(Camera {
+            projection: CameraProjection::Perspective { vfov: 60.0, near: 0.1 },
+            view,
+        });
+
+        // Lock all the routines
+        let pbr_routine = lock(&context.routines.pbr);
+        let mut skybox_routine = lock(&context.routines.skybox);
+        let tonemapping_routine = lock(&context.routines.tonemapping);
+
+        // Swap the instruction buffers so that our frame's changes can be processed.
+        context.renderer.swap_instruction_buffers();
+        // Evaluate our frame's world-change instructions
+        let mut eval_output = context.renderer.evaluate_instructions();
+        // Evaluate changes to routines.
+        skybox_routine.evaluate(context.renderer);
+
+        // Build a rendergraph
+        let mut graph = rend3::graph::RenderGraph::new();
+
+        let frame_handle = graph.add_imported_render_target(
+            context.surface_texture,
+            0..1,
+            0..1,
+            rend3::graph::ViewportRect::from_size(context.resolution),
+        );
+        // Add the default rendergraph
+        context.base_rendergraph.add_to_graph(
+            &mut graph,
+            rend3_routine::base::BaseRenderGraphInputs {
+                eval_output: &eval_output,
+                routines: rend3_routine::base::BaseRenderGraphRoutines {
+                    pbr: &pbr_routine,
+                    skybox: Some(&skybox_routine),
+                    tonemapping: &tonemapping_routine,
+                },
+                target: rend3_routine::base::OutputRenderTarget {
+                    handle: frame_handle,
+                    resolution: context.resolution,
+                    samples: self.samples,
+                },
+            },
+            rend3_routine::base::BaseRenderGraphSettings {
+                ambient_color: Vec3::splat(self.ambient_light_level).extend(1.0),
+                clear_color: glam::Vec4::new(0.0, 0.0, 0.0, 1.0),
+            },
+        );
+
+        // Dispatch a render using the built up rendergraph!
+        self.previous_profiling_stats = graph.execute(context.renderer, &mut eval_output);
+
+        // mark the end of the frame for tracy/other profilers
+        profiling::finish_frame!();
+    }
 }
 
-#[cfg_attr(target_os = "android", ndk_glue::main(backtrace = "on", logger(level = "debug")))]
 pub fn main() {
     let app = SceneViewer::new();
 

@@ -81,6 +81,10 @@ wasm-bindgen-futures = "0.4"
 [target.'cfg(target_os = "android")'.dependencies]
 ndk-glue = { version = "0.7", features = ["logger"] }
 
+[dev-dependencies]
+rend3-test = { version = "^0.3.0", path = "../rend3-test" }
+tokio = "1"
+
 [package.metadata.android]
 build_targets = ["aarch64-linux-android"]
 
