@@ -80,7 +80,7 @@ jobs:
 
       - name: test
         run: |
-          cargo +1.72 nextest run --target ${{ matrix.target }} --no-fail-fast
+          cargo +1.72 nextest run --target ${{ matrix.target }} --cargo-profile ci --no-fail-fast
         if: matrix.target != 'wasm32-unknown-unknown'
 
       - uses: actions/upload-artifact@v4
