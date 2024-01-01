@@ -40,7 +40,7 @@ bumpalo = "3"
 bytemuck = "1"
 encase = { version = "0.6" }
 flume = "0.11"
-glam = { version = "0.24.0", features = ["bytemuck"] }
+glam = { version = "0.25.0", features = ["bytemuck"] }
 handlebars = "4"
 indexmap = "2"
 list-any = "0.2"

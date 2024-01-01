@@ -26,7 +26,7 @@ egui-winit = { git = "https://github.com/emilk/egui.git", branch="master", defau
 # logging
 env_logger = { version = "0.10", default-features = false, features = ["auto-color", "humantime"] }
 # Linear algebra library
-glam = "0.24"
+glam = "0.25"
 # gltf model loading
 gltf = "1.4"
 # Channel
