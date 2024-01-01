@@ -34,7 +34,7 @@ histogram = "0.6"
 # Logging infrastructure
 log = "0.4"
 # Inline string
-indoc = "1"
+indoc = "2"
 # Importing images
 image = { version = "0.24", default-features = false, features = [
     "png",
