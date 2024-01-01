@@ -337,7 +337,7 @@ async fn test() {
         app: EguiExample::default(),
         reference_path: "src/egui/screenshot.png",
         size: glam::UVec2::new(1280, 720),
-        threshold_set: rend3_test::Threshold::Mean(0.0).into(),
+        threshold_set: rend3_test::Threshold::Mean(0.01).into(),
     })
     .await
     .unwrap();

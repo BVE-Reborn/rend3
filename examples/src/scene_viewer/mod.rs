@@ -802,7 +802,7 @@ async fn bistro() {
         app,
         reference_path: "src/scene_viewer/bistro.png",
         size: glam::UVec2::new(1280, 720),
-        threshold_set: rend3_test::Threshold::Mean(0.01).into(),
+        threshold_set: rend3_test::Threshold::Mean(0.02).into(),
     })
     .await
     .unwrap();

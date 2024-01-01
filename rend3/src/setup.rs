@@ -440,7 +440,7 @@ pub async fn create_iad(
     profiling::scope!("create_iad");
     #[cfg(not(target_arch = "wasm32"))]
     let backend_bits = Backends::VULKAN |
-         // Backends::DX12 | https://github.com/BVE-Reborn/rend3/issues/496
+         // Backends::DX12 | https://github.com/gfx-rs/wgpu/issues/4423
          Backends::METAL;
     #[cfg(target_arch = "wasm32")]
     let backend_bits = Backends::BROWSER_WEBGPU;
