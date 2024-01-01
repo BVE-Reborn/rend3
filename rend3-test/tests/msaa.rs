@@ -83,7 +83,6 @@ pub async fn sample_coverage() -> anyhow::Result<()> {
                     * base_matrix,
             ));
         }
-        runner.process_events(FrameRenderSettings::new());
     }
 
     runner.set_camera_data(Camera {

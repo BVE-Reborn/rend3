@@ -1,7 +1,6 @@
 use std::path::Path;
 
 use rend3::types::DirectionalLightHandle;
-use winit::event::WindowEvent;
 
 const SAMPLE_COUNT: rend3::types::SampleCount = rend3::types::SampleCount::One;
 
@@ -12,7 +11,6 @@ pub struct AnimatedObject {
     loaded_instance: rend3_gltf::GltfSceneInstance,
     animation_data: rend3_anim::AnimationData,
     animation_time: f32,
-    last_frame_time: web_time::Instant,
 }
 
 #[derive(Default)]
@@ -88,7 +86,6 @@ impl rend3_framework::App for AnimationExample {
             loaded_scene,
             loaded_instance,
             animation_time: 0.0,
-            last_frame_time: web_time::Instant::now(),
         };
 
         let path = Path::new(concat!(
@@ -110,83 +107,59 @@ impl rend3_framework::App for AnimationExample {
             loaded_scene,
             loaded_instance,
             animation_time: 0.0,
-            last_frame_time: web_time::Instant::now(),
         };
 
         self.animated_objects = vec![animated_object, animated_object2];
     }
 
-    fn handle_event(&mut self, context: rend3_framework::EventContext<'_>, event: winit::event::Event<()>) {
-        #[allow(clippy::single_match)]
-        match event {
-            // Render!
-            winit::event::Event::WindowEvent {
-                window_id: _,
-                event: WindowEvent::RedrawRequested,
-            } => {
-                let now = web_time::Instant::now();
+    fn handle_redraw(&mut self, context: rend3_framework::RedrawContext<'_, ()>) {
+        self.animated_objects.iter_mut().for_each(|animated_object| {
+            update(context.renderer, context.delta_t_seconds, animated_object);
+        });
 
-                self.animated_objects.iter_mut().for_each(|animated_object| {
-                    let delta = now.duration_since(animated_object.last_frame_time).as_secs_f32();
-                    animated_object.last_frame_time = now;
-                    update(context.renderer, delta, animated_object);
-                });
+        // Swap the instruction buffers so that our frame's changes can be processed.
+        context.renderer.swap_instruction_buffers();
+        // Evaluate our frame's world-change instructions
+        let mut eval_output = context.renderer.evaluate_instructions();
 
-                context.window.request_redraw();
+        // Lock the routines
+        let pbr_routine = rend3_framework::lock(&context.routines.pbr);
+        let tonemapping_routine = rend3_framework::lock(&context.routines.tonemapping);
 
-                // Get a frame
-                let frame = context.surface.unwrap().get_current_texture().unwrap();
+        // Build a rendergraph
+        let mut graph = rend3::graph::RenderGraph::new();
 
-                // Swap the instruction buffers so that our frame's changes can be processed.
-                context.renderer.swap_instruction_buffers();
-                // Evaluate our frame's world-change instructions
-                let mut eval_output = context.renderer.evaluate_instructions();
+        // Import the surface texture into the render graph.
+        let frame_handle = graph.add_imported_render_target(
+            context.surface_texture,
+            0..1,
+            0..1,
+            rend3::graph::ViewportRect::from_size(context.resolution),
+        );
+        // Add the default rendergraph without a skybox
+        context.base_rendergraph.add_to_graph(
+            &mut graph,
+            rend3_routine::base::BaseRenderGraphInputs {
+                eval_output: &eval_output,
+                routines: rend3_routine::base::BaseRenderGraphRoutines {
+                    pbr: &pbr_routine,
+                    skybox: None,
+                    tonemapping: &tonemapping_routine,
+                },
+                target: rend3_routine::base::OutputRenderTarget {
+                    handle: frame_handle,
+                    resolution: context.resolution,
+                    samples: SAMPLE_COUNT,
+                },
+            },
+            rend3_routine::base::BaseRenderGraphSettings {
+                ambient_color: glam::Vec4::ZERO,
+                clear_color: glam::Vec4::new(0.10, 0.05, 0.10, 1.0), // Nice scene-referred purple
+            },
+        );
 
-                // Lock the routines
-                let pbr_routine = rend3_framework::lock(&context.routines.pbr);
-                let tonemapping_routine = rend3_framework::lock(&context.routines.tonemapping);
-
-                // Build a rendergraph
-                let mut graph = rend3::graph::RenderGraph::new();
-
-                // Import the surface texture into the render graph.
-                let frame_handle = graph.add_imported_render_target(
-                    &frame,
-                    0..1,
-                    0..1,
-                    rend3::graph::ViewportRect::from_size(context.resolution),
-                );
-                // Add the default rendergraph without a skybox
-                context.base_rendergraph.add_to_graph(
-                    &mut graph,
-                    rend3_routine::base::BaseRenderGraphInputs {
-                        eval_output: &eval_output,
-                        routines: rend3_routine::base::BaseRenderGraphRoutines {
-                            pbr: &pbr_routine,
-                            skybox: None,
-                            tonemapping: &tonemapping_routine,
-                        },
-                        target: rend3_routine::base::OutputRenderTarget {
-                            handle: frame_handle,
-                            resolution: context.resolution,
-                            samples: SAMPLE_COUNT,
-                        },
-                    },
-                    rend3_routine::base::BaseRenderGraphSettings {
-                        ambient_color: glam::Vec4::ZERO,
-                        clear_color: glam::Vec4::new(0.10, 0.05, 0.10, 1.0), // Nice scene-referred purple
-                    },
-                );
-
-                // Dispatch a render using the built up rendergraph!
-                graph.execute(context.renderer, &mut eval_output);
-
-                // Present the frame
-                frame.present();
-            }
-            // Other events we don't care about
-            _ => {}
-        }
+        // Dispatch a render using the built up rendergraph!
+        graph.execute(context.renderer, &mut eval_output);
     }
 }
 
@@ -198,4 +171,17 @@ pub fn main() {
             .with_title("animation-example")
             .with_maximized(true),
     );
+}
+
+#[cfg(test)]
+#[rend3_test::test_attr]
+async fn test() {
+    crate::tests::test_app(crate::tests::TestConfiguration {
+        app: AnimationExample::default(),
+        reference_path: "src/animation/screenshot.png",
+        size: glam::UVec2::new(1280, 720),
+        threshold_set: rend3_test::Threshold::Mean(0.01).into(),
+    })
+    .await
+    .unwrap();
 }

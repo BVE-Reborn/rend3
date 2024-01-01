@@ -100,10 +100,9 @@ impl rend3_framework::App for TexturedQuadExample {
         let view = view * glam::Mat4::from_translation(-view_location);
 
         // Set camera's location
-        let inner_size = context.window.inner_size();
         context.renderer.set_camera_data(rend3::types::Camera {
             projection: rend3::types::CameraProjection::Orthographic {
-                size: glam::Vec3A::new(inner_size.width as f32, inner_size.width as f32, CAMERA_DEPTH),
+                size: glam::Vec3A::new(context.resolution.x as f32, context.resolution.y as f32, CAMERA_DEPTH),
             },
             view,
         });
@@ -112,79 +111,66 @@ impl rend3_framework::App for TexturedQuadExample {
     }
 
     fn handle_event(&mut self, context: rend3_framework::EventContext<'_>, event: winit::event::Event<()>) {
-        match event {
-            // Window was resized, need to resize renderer.
-            winit::event::Event::WindowEvent {
-                event: winit::event::WindowEvent::Resized(size),
-                ..
-            } => {
-                let size = glam::UVec2::new(size.width, size.height);
-                // Reset camera
-                context.renderer.set_camera_data(rend3::types::Camera {
-                    projection: rend3::types::CameraProjection::Orthographic {
-                        size: glam::Vec3A::new(size.x as f32, size.y as f32, CAMERA_DEPTH),
-                    },
-                    view: self.data.as_ref().unwrap().view,
-                });
-            }
-            // Render!
-            winit::event::Event::WindowEvent {
-                event: winit::event::WindowEvent::RedrawRequested,
-                ..
-            } => {
-                // Get a frame
-                let frame = context.surface.unwrap().get_current_texture().unwrap();
-
-                // Swap the instruction buffers so that our frame's changes can be processed.
-                context.renderer.swap_instruction_buffers();
-                // Evaluate our frame's world-change instructions
-                let mut eval_output = context.renderer.evaluate_instructions();
-
-                // Lock the routines
-                let pbr_routine = rend3_framework::lock(&context.routines.pbr);
-                let tonemapping_routine = rend3_framework::lock(&context.routines.tonemapping);
-
-                // Build a rendergraph
-                let mut graph = rend3::graph::RenderGraph::new();
-
-                // Import the surface texture into the render graph.
-                let frame_handle = graph.add_imported_render_target(
-                    &frame,
-                    0..1,
-                    0..1,
-                    rend3::graph::ViewportRect::from_size(context.resolution),
-                );
-                // Add the default rendergraph
-                context.base_rendergraph.add_to_graph(
-                    &mut graph,
-                    rend3_routine::base::BaseRenderGraphInputs {
-                        eval_output: &eval_output,
-                        routines: rend3_routine::base::BaseRenderGraphRoutines {
-                            pbr: &pbr_routine,
-                            skybox: None,
-                            tonemapping: &tonemapping_routine,
-                        },
-                        target: rend3_routine::base::OutputRenderTarget {
-                            handle: frame_handle,
-                            resolution: context.resolution,
-                            samples: SAMPLE_COUNT,
-                        },
-                    },
-                    rend3_routine::base::BaseRenderGraphSettings {
-                        ambient_color: glam::Vec4::ZERO,
-                        clear_color: glam::Vec4::new(0.10, 0.05, 0.10, 1.0), // Nice scene-referred purple
-                    },
-                );
-
-                // Dispatch a render using the built up rendergraph!
-                graph.execute(context.renderer, &mut eval_output);
-
-                // Present the frame
-                frame.present();
-            }
-            // Other events we don't care about
-            _ => {}
+        if let winit::event::Event::WindowEvent {
+            event: winit::event::WindowEvent::Resized(size),
+            ..
+        } = event
+        {
+            let size = glam::UVec2::new(size.width, size.height);
+            // Reset camera
+            context.renderer.set_camera_data(rend3::types::Camera {
+                projection: rend3::types::CameraProjection::Orthographic {
+                    size: glam::Vec3A::new(size.x as f32, size.y as f32, CAMERA_DEPTH),
+                },
+                view: self.data.as_ref().unwrap().view,
+            });
         }
+    }
+
+    fn handle_redraw(&mut self, context: rend3_framework::RedrawContext<'_, ()>) {
+        // Swap the instruction buffers so that our frame's changes can be processed.
+        context.renderer.swap_instruction_buffers();
+        // Evaluate our frame's world-change instructions
+        let mut eval_output = context.renderer.evaluate_instructions();
+
+        // Lock the routines
+        let pbr_routine = rend3_framework::lock(&context.routines.pbr);
+        let tonemapping_routine = rend3_framework::lock(&context.routines.tonemapping);
+
+        // Build a rendergraph
+        let mut graph = rend3::graph::RenderGraph::new();
+
+        // Import the surface texture into the render graph.
+        let frame_handle = graph.add_imported_render_target(
+            context.surface_texture,
+            0..1,
+            0..1,
+            rend3::graph::ViewportRect::from_size(context.resolution),
+        );
+        // Add the default rendergraph
+        context.base_rendergraph.add_to_graph(
+            &mut graph,
+            rend3_routine::base::BaseRenderGraphInputs {
+                eval_output: &eval_output,
+                routines: rend3_routine::base::BaseRenderGraphRoutines {
+                    pbr: &pbr_routine,
+                    skybox: None,
+                    tonemapping: &tonemapping_routine,
+                },
+                target: rend3_routine::base::OutputRenderTarget {
+                    handle: frame_handle,
+                    resolution: context.resolution,
+                    samples: SAMPLE_COUNT,
+                },
+            },
+            rend3_routine::base::BaseRenderGraphSettings {
+                ambient_color: glam::Vec4::ZERO,
+                clear_color: glam::Vec4::new(0.10, 0.05, 0.10, 1.0), // Nice scene-referred purple
+            },
+        );
+
+        // Dispatch a render using the built up rendergraph!
+        graph.execute(context.renderer, &mut eval_output);
     }
 }
 
@@ -196,4 +182,17 @@ pub fn main() {
             .with_title("textured-quad")
             .with_maximized(true),
     )
+}
+
+#[cfg(test)]
+#[rend3_test::test_attr]
+async fn test() {
+    crate::tests::test_app(crate::tests::TestConfiguration {
+        app: TexturedQuadExample::default(),
+        reference_path: "src/textured_quad/screenshot.png",
+        size: glam::UVec2::new(1280, 720),
+        threshold_set: rend3_test::Threshold::Mean(0.0).into(),
+    })
+    .await
+    .unwrap();
 }

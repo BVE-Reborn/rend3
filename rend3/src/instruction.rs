@@ -27,9 +27,6 @@ pub struct Instruction {
 // None of these need strong handles to the resources, as any
 // resource deletions will also be instructions, added after the given instruction is added.
 pub enum InstructionKind {
-    AddMesh {
-        cmd_buf: CommandBuffer,
-    },
     AddSkeleton {
         handle: RawSkeletonHandle,
         // Boxed for size

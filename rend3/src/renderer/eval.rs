@@ -27,9 +27,6 @@ pub fn evaluate_instructions(renderer: &Renderer) -> InstructionEvaluationOutput
         profiling::scope!("Instruction Processing");
         for Instruction { kind, location: _ } in instructions.drain(..) {
             match kind {
-                InstructionKind::AddMesh { cmd_buf: buffer } => {
-                    cmd_bufs.push(buffer);
-                }
                 InstructionKind::AddSkeleton { handle, skeleton } => {
                     profiling::scope!("Add Skeleton");
                     data_core
@@ -200,8 +197,9 @@ pub fn evaluate_instructions(renderer: &Renderer) -> InstructionEvaluationOutput
         .directional_light_manager
         .evaluate(renderer, &data_core.viewport_camera_state);
     data_core.point_light_manager.evaluate(renderer);
-    let mesh_buffer = renderer.mesh_manager.evaluate();
+    let (mesh_buffer, mesh_cmd_buf) = renderer.mesh_manager.evaluate(&renderer.device);
 
+    cmd_bufs.push(mesh_cmd_buf);
     cmd_bufs.push(encoder.finish());
 
     InstructionEvaluationOutput {

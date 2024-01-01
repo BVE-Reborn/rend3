@@ -7,7 +7,7 @@ use rend3_types::{
     PointLightHandle, Skeleton, SkeletonHandle, Texture2DTag, TextureCubeHandle, TextureCubeTag, TextureFromTexture,
     WasmNotSend,
 };
-use wgpu::{CommandEncoderDescriptor, Device, DownlevelCapabilities, Features, Limits, Queue};
+use wgpu::{Device, DownlevelCapabilities, Features, Limits, Queue};
 use wgpu_profiler::GpuProfiler;
 
 use crate::{
@@ -146,20 +146,12 @@ impl Renderer {
     /// the mesh alive.
     #[track_caller]
     pub fn add_mesh(self: &Arc<Self>, mesh: Mesh) -> Result<MeshHandle, MeshCreationError> {
-        let mut encoder = self.device.create_command_encoder(&CommandEncoderDescriptor::default());
-        let internal_mesh = self.mesh_manager.add(&self.device, &mut encoder, mesh)?;
+        let internal_mesh = self.mesh_manager.add(&self.device, mesh)?;
 
         // Handle allocation must be done _after_ any validation to prevent deletion of a handle that never gets fully added.
         let handle = self.resource_handle_allocators.mesh.allocate(self);
 
         self.mesh_manager.fill(&handle, internal_mesh);
-
-        self.instructions.push(
-            InstructionKind::AddMesh {
-                cmd_buf: encoder.finish(),
-            },
-            *Location::caller(),
-        );
 
         Ok(handle)
     }
@@ -172,8 +164,7 @@ impl Renderer {
     /// references alive.
     #[track_caller]
     pub fn add_skeleton(self: &Arc<Self>, skeleton: Skeleton) -> Result<SkeletonHandle, SkeletonCreationError> {
-        let mut encoder = self.device.create_command_encoder(&CommandEncoderDescriptor::default());
-        let internal = SkeletonManager::validate_skeleton(&self.device, &mut encoder, &self.mesh_manager, skeleton)?;
+        let internal = SkeletonManager::validate_skeleton(&self.device, &self.mesh_manager, skeleton)?;
 
         // Handle allocation must be done _after_ any validation to prevent deletion of a handle that never gets fully added.
         let handle = self.resource_handle_allocators.skeleton.allocate(self);

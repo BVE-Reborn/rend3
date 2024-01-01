@@ -1,18 +1,21 @@
 use std::{
-    borrow::Cow,
+    mem,
     ops::{Index, Range},
     sync::Arc,
 };
 
-use parking_lot::{Mutex, MutexGuard, RwLock};
+use parking_lot::{Mutex, MutexGuard};
 use range_alloc::RangeAllocator;
 use rend3_types::{RawMeshHandle, VertexAttributeId, VERTEX_ATTRIBUTE_JOINT_INDICES, VERTEX_ATTRIBUTE_POSITION};
 use thiserror::Error;
-use wgpu::{Buffer, BufferAddress, BufferDescriptor, BufferUsages, CommandEncoder, Device};
+use wgpu::{
+    Buffer, BufferAddress, BufferDescriptor, BufferUsages, CommandBuffer, CommandEncoder, CommandEncoderDescriptor,
+    Device,
+};
 
 use crate::{
     types::{Mesh, MeshHandle},
-    util::{error_scope::AllocationErrorScope, frustum::BoundingSphere, upload::upload_buffer_via_encoder},
+    util::{error_scope::AllocationErrorScope, frustum::BoundingSphere, upload::UploadChainer},
 };
 
 /// Vertex buffer slot for object indices
@@ -66,29 +69,27 @@ pub enum MeshCreationError {
     },
     #[error("Exceeded maximum mesh data buffer size of {max_buffer_size}")]
     ExceededMaximumBufferSize { max_buffer_size: u32 },
-    #[error(
-        "Failed to write new mesh data to buffer using write_buffer_with.
-         Tried to write {bytes} bytes. Trying to write {}",
-        if let Some(attribute) = attribute {
-            Cow::Owned(format!("attribute data named \"{}\"", attribute.name()))
-        } else {
-            Cow::Borrowed("the index data")
-        }
-    )]
+    #[error("Failed to write new mesh data to buffer. Failed to allocate staging buffer.")]
     BufferWriteFailed {
-        attribute: Option<VertexAttributeId>,
-        bytes: u64,
         #[source]
         inner: wgpu::Error,
     },
 }
 
+/// Contains all the state for the mesh buffer.
+///
+/// As the mesh manager is multithreaded, this needs to be wrapped in a single mutex
+/// to make sure a single order of operations happen to all of them.
+pub struct BufferState {
+    pub buffer: Arc<Buffer>,
+    pub allocator: RangeAllocator<u64>,
+    pub encoder: CommandEncoder,
+}
+
 /// Manages vertex and instance buffers. All buffers are sub-allocated from
 /// megabuffers.
 pub struct MeshManager {
-    buffer: RwLock<Arc<Buffer>>,
-
-    allocator: Mutex<RangeAllocator<u64>>,
+    buffer_state: Mutex<BufferState>,
 
     data: Mutex<Vec<Option<InternalMesh>>>,
 }
@@ -97,30 +98,32 @@ impl MeshManager {
     pub fn new(device: &Device) -> Self {
         profiling::scope!("MeshManager::new");
 
-        let buffer: RwLock<Arc<Buffer>> = RwLock::new(Arc::new(device.create_buffer(&BufferDescriptor {
+        let buffer = Arc::new(device.create_buffer(&BufferDescriptor {
             label: Some("mesh data buffer"),
             size: STARTING_MESH_DATA as BufferAddress,
             usage: BufferUsages::COPY_SRC | BufferUsages::COPY_DST | BufferUsages::INDEX | BufferUsages::STORAGE,
             mapped_at_creation: false,
-        })));
+        }));
 
-        let allocator = Mutex::new(RangeAllocator::new(0..STARTING_MESH_DATA));
+        let allocator = RangeAllocator::new(0..STARTING_MESH_DATA);
 
         let data = Mutex::new(Vec::new());
 
+        let encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("mesh manager init encoder"),
+        });
+
         Self {
-            buffer,
-            allocator,
+            buffer_state: Mutex::new(BufferState {
+                buffer,
+                allocator,
+                encoder,
+            }),
             data,
         }
     }
 
-    pub fn add(
-        &self,
-        device: &Device,
-        encoder: &mut CommandEncoder,
-        mesh: Mesh,
-    ) -> Result<InternalMesh, MeshCreationError> {
+    pub fn add(&self, device: &Device, mesh: Mesh) -> Result<InternalMesh, MeshCreationError> {
         profiling::scope!("MeshManager::add");
 
         let vertex_count = mesh.vertex_count;
@@ -141,45 +144,30 @@ impl MeshManager {
             required_joint_count = Some(joint_indices.iter().flatten().max().map_or(0, |v| v + 1));
         }
 
-        let mut allocator_guard = self.allocator.lock();
         let mut vertex_attribute_ranges = Vec::with_capacity(mesh.attributes.len());
+        let mut upload = UploadChainer::new();
+
+        // Need to deref to allow split borrows
+        let mut buffer_state_guard = self.buffer_state.lock();
+        let buffer_state = &mut *buffer_state_guard;
+
         for attribute in &mesh.attributes {
-            let range = self.allocate_range_impl(device, encoder, &mut allocator_guard, attribute.bytes())?;
+            let range = self.allocate_range_impl(device, buffer_state, attribute.bytes())?;
+            upload.add(range.start, attribute.untyped_data());
             vertex_attribute_ranges.push((*attribute.id(), range));
         }
-        let index_range = self.allocate_range_impl(device, encoder, &mut allocator_guard, index_count as u64 * 4)?;
-        drop(allocator_guard);
 
-        let buffer_guard = self.buffer.read();
-        for (attribute_data, (attribute, range)) in mesh.attributes.iter().zip(&vertex_attribute_ranges) {
-            upload_buffer_via_encoder(
-                device,
-                encoder,
-                &buffer_guard,
-                range.start,
-                attribute_data.untyped_data(),
-            )
-            .map_err(|e| MeshCreationError::BufferWriteFailed {
-                attribute: Some(*attribute),
-                bytes: attribute_data.bytes(),
-                inner: e,
-            })?;
-        }
+        let index_range = self.allocate_range_impl(device, buffer_state, index_count as u64 * 4)?;
+        upload.add(index_range.start, bytemuck::cast_slice(&mesh.indices));
+        upload
+            .create_staging_buffer(device)
+            .map_err(|e| MeshCreationError::BufferWriteFailed { inner: e })?;
+        upload.encode_upload(&mut buffer_state.encoder, &buffer_state.buffer);
+        drop(buffer_state_guard);
 
-        let index_write_size = mesh.indices.len() as u64 * 4;
-        upload_buffer_via_encoder(
-            device,
-            encoder,
-            &buffer_guard,
-            index_range.start,
-            bytemuck::cast_slice(&mesh.indices),
-        )
-        .map_err(|e| MeshCreationError::BufferWriteFailed {
-            attribute: None,
-            bytes: index_write_size,
-            inner: e,
-        })?;
-        drop(buffer_guard);
+        // We intentionally write to the internal staging buffer _after_ we drop
+        // the mutex, as we merely need to complete this before the next submission.
+        upload.stage();
 
         // We can cheat here as we know vertex positions are always the first attribute as they must exist.
         let bounding_sphere = BoundingSphere::from_mesh(
@@ -213,45 +201,45 @@ impl MeshManager {
     pub fn remove(&self, object_id: RawMeshHandle) {
         let mesh = self.data.lock()[object_id.idx].take().unwrap();
 
-        let mut allocator_guard = self.allocator.lock();
+        let mut buffer_state = self.buffer_state.lock();
         for (_id, range) in mesh.vertex_attribute_ranges {
             if range.is_empty() {
                 continue;
             }
-            allocator_guard.free_range(range);
+            buffer_state.allocator.free_range(range);
         }
         if mesh.index_range.is_empty() {
             return;
         }
-        allocator_guard.free_range(mesh.index_range);
+        buffer_state.allocator.free_range(mesh.index_range);
     }
 
-    pub fn evaluate(&self) -> Arc<Buffer> {
-        self.buffer.read().clone()
+    pub fn evaluate(&self, device: &Device) -> (Arc<Buffer>, CommandBuffer) {
+        let mut buffer_state = self.buffer_state.lock();
+        let buffer = buffer_state.buffer.clone();
+        let new_encoder = device.create_command_encoder(&CommandEncoderDescriptor {
+            label: Some("mesh manager init encoder"),
+        });
+        let cmd_enc = mem::replace(&mut buffer_state.encoder, new_encoder);
+        (buffer, cmd_enc.finish())
     }
 
     /// Duplicates a mesh's vertex data so that it can be skinned on the GPU.
-    pub fn allocate_range(
-        &self,
-        device: &Device,
-        encoder: &mut CommandEncoder,
-        bytes: u64,
-    ) -> Result<Range<u64>, MeshCreationError> {
-        self.allocate_range_impl(device, encoder, &mut self.allocator.lock(), bytes)
+    pub fn allocate_range(&self, device: &Device, bytes: u64) -> Result<Range<u64>, MeshCreationError> {
+        self.allocate_range_impl(device, &mut self.buffer_state.lock(), bytes)
     }
 
     fn allocate_range_impl(
         &self,
         device: &Device,
-        encoder: &mut CommandEncoder,
-        allocator: &mut RangeAllocator<u64>,
+        buffer_state: &mut BufferState,
         bytes: u64,
     ) -> Result<Range<u64>, MeshCreationError> {
-        Ok(match allocator.allocate_range(bytes) {
+        Ok(match buffer_state.allocator.allocate_range(bytes) {
             Ok(range) => range,
             Err(..) => {
-                self.reallocate_buffers(device, encoder, allocator, bytes)?;
-                allocator.allocate_range(bytes).expect(
+                self.reallocate_buffers(device, buffer_state, bytes)?;
+                buffer_state.allocator.allocate_range(bytes).expect(
                     "Second allocation range should always succeed, as there should always be enough space in the tail of the buffer",
                 )
             }
@@ -259,14 +247,14 @@ impl MeshManager {
     }
 
     pub fn free_range(&self, range: Range<u64>) {
-        Self::free_range_impl(&mut self.allocator.lock(), range);
+        Self::free_range_impl(&mut self.buffer_state.lock(), range);
     }
 
-    fn free_range_impl(allocator: &mut RangeAllocator<u64>, range: Range<u64>) {
+    fn free_range_impl(buffer_state: &mut BufferState, range: Range<u64>) {
         if range.is_empty() {
             return;
         }
-        allocator.free_range(range);
+        buffer_state.allocator.free_range(range);
     }
 
     pub fn lock_internal_data(&self) -> LockedInternalMeshDataArray<'_> {
@@ -276,13 +264,12 @@ impl MeshManager {
     fn reallocate_buffers(
         &self,
         device: &Device,
-        encoder: &mut CommandEncoder,
-        allocator: &mut RangeAllocator<u64>,
+        buffer_state: &mut BufferState,
         needed_bytes: u64,
     ) -> Result<(), MeshCreationError> {
         profiling::scope!("reallocate mesh buffers");
 
-        let current_bytes = allocator.initial_range().end;
+        let current_bytes = buffer_state.allocator.initial_range().end;
         let desired_bytes = current_bytes
             .checked_add(needed_bytes)
             .expect("Using more than 2^64 bytes of mesh data")
@@ -309,11 +296,16 @@ impl MeshManager {
             inner: e,
         })?;
 
-        let mut buffer_guard = self.buffer.write();
-        encoder.copy_buffer_to_buffer(&buffer_guard, 0, &new_buffer, 0, allocator.initial_range().end);
+        buffer_state.encoder.copy_buffer_to_buffer(
+            &buffer_state.buffer,
+            0,
+            &new_buffer,
+            0,
+            buffer_state.allocator.initial_range().end,
+        );
 
-        *buffer_guard = new_buffer;
-        allocator.grow_to(new_bytes);
+        buffer_state.buffer = new_buffer;
+        buffer_state.allocator.grow_to(new_bytes);
 
         Ok(())
     }

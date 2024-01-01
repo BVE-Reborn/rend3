@@ -48,7 +48,8 @@ Per Keep a Changelog there are 6 main categories of changes:
 - rend3: Update to wgpu 0.13, naga 0.9 @garyttierney
 - rend3: Convert all shaders to WGSL using a custom preprocessing solution @cwfitzgerald
 - rend3: Update to winit 0.29.4 @pillowtrucker
-- rend3-framework: Consolidate many arguments into single `SetupContext` and `EventContext` structs. @cwfitzgerald
+- rend3-framework: Consolidate many arguments into single `SetupContext`, `EventContext`, and `RedrawContext` structs. @cwfitzgerald
+- rend3-framework: Surfaces are now handled amost entirely by the framework, including acquiring frames and presenting. Redraws now happen in a dedicated `handle_redraw` callback. @cwfitzgerald
 
 ### Fixes
 - Fixed renderpass compatibility checks to avoid issues when RODS is used. @OptimisticPeach
@@ -59,6 +60,8 @@ Per Keep a Changelog there are 6 main categories of changes:
 - Fixed panic when a mesh object with a skeleton was despawned. @setzer22
 - Fixed forward pass not writing to depth when no depth prepass was used. @IsseW
 - Fixed panic in IAD creation when system has more than 4 wgpu adapters. @marceline-cramer
+- Fixed multiple issues with mesh management. @cwfitzgerald
+- Fixed hang when adding a large amount of meshes in a single frame on MacOS. @cwfitzgerald
 
 ## v0.3.0
 

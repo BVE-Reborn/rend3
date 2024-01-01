@@ -53,6 +53,9 @@ pub enum TextureCreationError {
     MipmapCreationFailed(#[from] MipmapGenerationError),
 }
 
+unsafe impl Send for TextureCreationError {}
+unsafe impl Sync for TextureCreationError {}
+
 /// Preallocation count of texture view array
 const TEXTURE_PREALLOCATION: usize = 1024;
 /// What we divide the texture limit by to get the count supplied in the BGL.

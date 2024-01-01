@@ -29,8 +29,8 @@ env_logger = { version = "0.10", default-features = false, features = ["auto-col
 glam = "0.24"
 # gltf model loading
 gltf = "1.4"
-# 0.7 is a completely unrelated library
-histogram = "0.6"
+# Channel
+flume = "0.11"
 # Logging infrastructure
 log = "0.4"
 # Inline string
@@ -80,6 +80,10 @@ wasm-bindgen-futures = "0.4"
 
 [target.'cfg(target_os = "android")'.dependencies]
 ndk-glue = { version = "0.7", features = ["logger"] }
+
+[dev-dependencies]
+rend3-test = { version = "^0.3.0", path = "../rend3-test" }
+tokio = "1"
 
 [package.metadata.android]
 build_targets = ["aarch64-linux-android"]

@@ -8,7 +8,7 @@ use rend3::{
     InstanceAdapterDevice, Renderer, ShaderPreProcessor,
 };
 use rend3_routine::base::BaseRenderGraph;
-use wgpu::{Instance, PresentMode};
+use wgpu::{Instance, PresentMode, SurfaceError};
 use winit::{
     error::EventLoopError,
     event::Event,
@@ -23,26 +23,43 @@ pub use assets::*;
 pub use grab::*;
 pub use parking_lot::{Mutex, MutexGuard};
 
+pub struct WindowingSetup<'a, T: 'static = ()> {
+    pub event_loop: &'a EventLoop<T>,
+    pub window: &'a Window,
+}
+
 /// Context passed to the setup function. Contains
 /// everything needed to setup examples
 pub struct SetupContext<'a, T: 'static = ()> {
-    pub event_loop: &'a EventLoop<T>,
-    pub window: &'a Window,
+    pub windowing: Option<WindowingSetup<'a, T>>,
     pub renderer: &'a Arc<Renderer>,
     pub routines: &'a Arc<DefaultRoutines>,
     pub surface_format: rend3::types::TextureFormat,
+    pub resolution: UVec2,
+    pub scale_factor: f32,
 }
 
 /// Context passed to the event handler.
 pub struct EventContext<'a, T: 'static = ()> {
-    pub window: &'a Window,
+    pub window: Option<&'a Window>,
     pub renderer: &'a Arc<Renderer>,
     pub routines: &'a Arc<DefaultRoutines>,
     pub base_rendergraph: &'a BaseRenderGraph,
-    pub surface: Option<&'a Arc<Surface>>,
     pub resolution: UVec2,
     pub control_flow: &'a mut dyn FnMut(winit::event_loop::ControlFlow),
     pub event_loop_window_target: &'a EventLoopWindowTarget<T>,
+}
+
+pub struct RedrawContext<'a, T: 'static = ()> {
+    pub window: Option<&'a Window>,
+    pub renderer: &'a Arc<Renderer>,
+    pub routines: &'a Arc<DefaultRoutines>,
+    pub base_rendergraph: &'a BaseRenderGraph,
+    pub surface_texture: &'a wgpu::Texture,
+    pub resolution: UVec2,
+    pub control_flow: &'a mut dyn FnMut(winit::event_loop::ControlFlow),
+    pub event_loop_window_target: Option<&'a EventLoopWindowTarget<T>>,
+    pub delta_t_seconds: f32,
 }
 
 pub trait App<T: 'static = ()> {
@@ -90,8 +107,10 @@ pub trait App<T: 'static = ()> {
         Ok((event_loop, window))
     }
 
-    fn create_iad<'a>(&'a mut self) -> Pin<Box<dyn Future<Output = anyhow::Result<InstanceAdapterDevice>> + 'a>> {
-        Box::pin(async move { Ok(rend3::create_iad(None, None, None, None).await?) })
+    fn create_iad<'a>(
+        &'a mut self,
+    ) -> Pin<Box<dyn Future<Output = Result<InstanceAdapterDevice, rend3::RendererInitializationError>> + 'a>> {
+        Box::pin(async move { rend3::create_iad(None, None, None, None).await })
     }
 
     fn create_base_rendergraph(&mut self, renderer: &Arc<Renderer>, spp: &ShaderPreProcessor) -> BaseRenderGraph {
@@ -119,14 +138,11 @@ pub trait App<T: 'static = ()> {
         let _ = context;
     }
 
-    /// RedrawRequested/RedrawEventsCleared will only be fired if the window
-    /// size is non-zero. As such you should always render
-    /// in RedrawRequested and use MainEventsCleared for things that need to
-    /// keep running when minimized.
-    #[allow(clippy::too_many_arguments)]
     fn handle_event(&mut self, context: EventContext<'_, T>, event: Event<T>) {
         let _ = (context, event);
     }
+
+    fn handle_redraw(&mut self, context: RedrawContext<'_, T>);
 }
 
 pub fn lock<T>(lock: &parking_lot::Mutex<T>) -> parking_lot::MutexGuard<'_, T> {
@@ -220,11 +236,15 @@ pub async fn async_start<A: App<T> + 'static, T: 'static>(mut app: A, window_bui
     drop(data_core);
 
     app.setup(SetupContext {
-        event_loop: &event_loop,
-        window: &window,
+        windowing: Some(WindowingSetup {
+            event_loop: &event_loop,
+            window: &window,
+        }),
         renderer: &renderer,
         routines: &routines,
         surface_format: format,
+        resolution: UVec2::new(window_size.width, window_size.height),
+        scale_factor: window.scale_factor() as f32,
     });
 
     // We're ready, so lets make things visible
@@ -237,6 +257,7 @@ pub async fn async_start<A: App<T> + 'static, T: 'static>(mut app: A, window_bui
         scale_factor: app.scale_factor(),
         sample_count: app.sample_count(),
         present_mode: app.present_mode(),
+        requires_reconfigure: true,
     };
 
     cfg_if::cfg_if! {
@@ -247,6 +268,8 @@ pub async fn async_start<A: App<T> + 'static, T: 'static>(mut app: A, window_bui
             let event_loop_function = EventLoop::run;
         }
     }
+
+    let mut previous_time = web_time::Instant::now();
 
     // On native this is a result, but on wasm it's a unit type.
     #[allow(clippy::let_unit_value)]
@@ -261,7 +284,6 @@ pub async fn async_start<A: App<T> + 'static, T: 'static>(mut app: A, window_bui
                 &iad.instance,
                 &mut surface,
                 &renderer,
-                format,
                 &mut stored_surface_info,
             ) {
                 suspended = suspend;
@@ -297,24 +319,73 @@ pub async fn async_start<A: App<T> + 'static, T: 'static>(mut app: A, window_bui
                 if suspended {
                     return;
                 }
-            }
 
-            app.handle_event(
-                EventContext {
-                    window: &window,
+                let Some(surface) = surface.as_ref() else {
+                    return;
+                };
+
+                if stored_surface_info.requires_reconfigure {
+                    rend3::configure_surface(
+                        surface,
+                        &renderer.device,
+                        format,
+                        stored_surface_info.size,
+                        stored_surface_info.present_mode,
+                    );
+                    stored_surface_info.requires_reconfigure = false;
+                }
+
+                let surface_texture = match surface.get_current_texture() {
+                    Ok(texture) => texture,
+                    Err(SurfaceError::Outdated) => {
+                        stored_surface_info.requires_reconfigure = true;
+                        return;
+                    }
+                    Err(SurfaceError::Timeout) => {
+                        return;
+                    }
+                    Err(SurfaceError::OutOfMemory | SurfaceError::Lost) => panic!("Surface OOM"),
+                };
+
+                let current_time = web_time::Instant::now();
+                let delta_t_seconds = (current_time - previous_time).as_secs_f32();
+                previous_time = current_time;
+
+                app.handle_redraw(RedrawContext {
+                    window: Some(&window),
                     renderer: &renderer,
                     routines: &routines,
                     base_rendergraph: &base_rendergraph,
-                    surface: surface.as_ref(),
+                    surface_texture: &surface_texture.texture,
                     resolution: stored_surface_info.size,
                     control_flow: &mut |c: ControlFlow| {
                         control_flow = c;
                         last_user_control_mode = c;
                     },
-                    event_loop_window_target,
-                },
-                event,
-            );
+                    event_loop_window_target: Some(event_loop_window_target),
+                    delta_t_seconds,
+                });
+
+                surface_texture.present();
+
+                window.request_redraw();
+            } else {
+                app.handle_event(
+                    EventContext {
+                        window: Some(&window),
+                        renderer: &renderer,
+                        routines: &routines,
+                        base_rendergraph: &base_rendergraph,
+                        resolution: stored_surface_info.size,
+                        control_flow: &mut |c: ControlFlow| {
+                            control_flow = c;
+                            last_user_control_mode = c;
+                        },
+                        event_loop_window_target,
+                    },
+                    event,
+                );
+            }
         },
     );
 }
@@ -324,6 +395,7 @@ struct StoredSurfaceInfo {
     scale_factor: f32,
     sample_count: SampleCount,
     present_mode: PresentMode,
+    requires_reconfigure: bool,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -334,7 +406,6 @@ fn handle_surface<A: App<T>, T: 'static>(
     instance: &Instance,
     surface: &mut Option<Arc<Surface>>,
     renderer: &Arc<Renderer>,
-    format: rend3::types::TextureFormat,
     surface_info: &mut StoredSurfaceInfo,
 ) -> Option<bool> {
     match *event {
@@ -363,31 +434,8 @@ fn handle_surface<A: App<T>, T: 'static>(
             surface_info.scale_factor = app.scale_factor();
             surface_info.sample_count = app.sample_count();
             surface_info.present_mode = app.present_mode();
+            surface_info.requires_reconfigure = true;
 
-            // Winit erroniously stomps on the canvas CSS when a scale factor
-            // change happens, so we need to put it back to normal. We can't
-            // do this in a scale factor changed event, as the override happens
-            // after the event is sent.
-            //
-            // https://github.com/rust-windowing/winit/issues/3023
-            #[cfg(target_arch = "wasm32")]
-            {
-                use winit::platform::web::WindowExtWebSys;
-                let canvas = window.canvas().unwrap();
-                let style = canvas.style();
-
-                style.set_property("width", "100%").unwrap();
-                style.set_property("height", "100%").unwrap();
-            }
-
-            // Reconfigure the surface for the new size.
-            rend3::configure_surface(
-                surface.as_ref().unwrap(),
-                &renderer.device,
-                format,
-                size,
-                surface_info.present_mode,
-            );
             // Tell the renderer about the new aspect ratio.
             renderer.set_aspect_ratio(size.x as f32 / size.y as f32);
             Some(false)
