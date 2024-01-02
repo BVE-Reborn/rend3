@@ -144,6 +144,7 @@ pub mod util {
     pub mod mipmap;
     pub mod output;
     pub mod scatter_copy;
+    pub mod sync;
     pub mod typedefs;
     pub mod upload;
 }
