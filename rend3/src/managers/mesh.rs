@@ -15,7 +15,7 @@ use wgpu::{
 
 use crate::{
     types::{Mesh, MeshHandle},
-    util::{error_scope::AllocationErrorScope, frustum::BoundingSphere, upload::UploadChainer},
+    util::{error_scope::AllocationErrorScope, frustum::BoundingSphere, sync::WaitGroup, upload::UploadChainer},
 };
 
 /// Vertex buffer slot for object indices
@@ -84,6 +84,10 @@ pub struct BufferState {
     pub buffer: Arc<Buffer>,
     pub allocator: RangeAllocator<u64>,
     pub encoder: CommandEncoder,
+
+    // We need to block submission until all the staging actions are complete
+    // and the buffers are no longer mapped.
+    pub wait_group: Arc<WaitGroup>,
 }
 
 /// Manages vertex and instance buffers. All buffers are sub-allocated from
@@ -118,6 +122,7 @@ impl MeshManager {
                 buffer,
                 allocator,
                 encoder,
+                wait_group: WaitGroup::new(),
             }),
             data,
         }
@@ -163,11 +168,14 @@ impl MeshManager {
             .create_staging_buffer(device)
             .map_err(|e| MeshCreationError::BufferWriteFailed { inner: e })?;
         upload.encode_upload(&mut buffer_state.encoder, &buffer_state.buffer);
+
+        let staging_guard = buffer_state.wait_group.increment();
         drop(buffer_state_guard);
 
         // We intentionally write to the internal staging buffer _after_ we drop
         // the mutex, as we merely need to complete this before the next submission.
         upload.stage();
+        drop(staging_guard);
 
         // We can cheat here as we know vertex positions are always the first attribute as they must exist.
         let bounding_sphere = BoundingSphere::from_mesh(
@@ -215,12 +223,17 @@ impl MeshManager {
     }
 
     pub fn evaluate(&self, device: &Device) -> (Arc<Buffer>, CommandBuffer) {
-        let mut buffer_state = self.buffer_state.lock();
-        let buffer = buffer_state.buffer.clone();
         let new_encoder = device.create_command_encoder(&CommandEncoderDescriptor {
             label: Some("mesh manager init encoder"),
         });
+
+        let mut buffer_state = self.buffer_state.lock();
+        let buffer = buffer_state.buffer.clone();
         let cmd_enc = mem::replace(&mut buffer_state.encoder, new_encoder);
+        let wait_group = mem::replace(&mut buffer_state.wait_group, WaitGroup::new());
+        drop(buffer_state);
+
+        wait_group.wait();
         (buffer, cmd_enc.finish())
     }
 
