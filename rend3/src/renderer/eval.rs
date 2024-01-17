@@ -29,13 +29,17 @@ pub fn evaluate_instructions(renderer: &Renderer) -> InstructionEvaluationOutput
             match kind {
                 InstructionKind::AddSkeleton { handle, skeleton } => {
                     profiling::scope!("Add Skeleton");
+                    let profiler_query = data_core.profiler.try_lock().unwrap().begin_query(
+                        "Add Skeleton",
+                        &mut encoder,
+                        &renderer.device,
+                    );
+                    data_core.skeleton_manager.add(handle, *skeleton);
                     data_core
                         .profiler
                         .try_lock()
                         .unwrap()
-                        .begin_scope("Add Skeleton", &mut encoder, &renderer.device);
-                    data_core.skeleton_manager.add(handle, *skeleton);
-                    let _ = data_core.profiler.try_lock().unwrap().end_scope(&mut encoder);
+                        .end_query(&mut encoder, profiler_query);
                 }
                 InstructionKind::AddTexture2D {
                     handle,

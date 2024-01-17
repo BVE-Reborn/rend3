@@ -45,7 +45,7 @@ Per Keep a Changelog there are 6 main categories of changes:
 - rend3: Added basic (no shadow maps, no clustering) point light support to the renderer API. @marceline-cramer
 
 ### Changes
-- rend3: Update to wgpu 0.13, naga 0.9 @garyttierney
+- rend3: Update to wgpu 0.19, naga 0.14 @garyttierney @kpreid
 - rend3: Convert all shaders to WGSL using a custom preprocessing solution @cwfitzgerald
 - rend3: Update to winit 0.29.4 @pillowtrucker
 - rend3-framework: Consolidate many arguments into single `SetupContext`, `EventContext`, and `RedrawContext` structs. @cwfitzgerald

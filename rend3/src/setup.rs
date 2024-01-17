@@ -445,13 +445,7 @@ pub async fn create_iad(
     #[cfg(target_arch = "wasm32")]
     let backend_bits = Backends::BROWSER_WEBGPU;
     #[cfg(not(target_arch = "wasm32"))]
-    let default_backend_order = [
-        Backend::Vulkan,
-        Backend::Metal,
-        Backend::Dx12,
-        Backend::Dx11,
-        Backend::Gl,
-    ];
+    let default_backend_order = [Backend::Vulkan, Backend::Metal, Backend::Dx12, Backend::Gl];
     #[cfg(target_arch = "wasm32")]
     let default_backend_order = [Backend::BrowserWebGpu];
 
@@ -479,7 +473,7 @@ pub async fn create_iad(
             .into_iter();
 
         let mut potential_adapters = Vec::new();
-        for (idx, adapter) in adapters.enumerate() {
+        for (idx, adapter) in adapters.into_iter().enumerate() {
             let info = adapter.get_info();
             let limits = adapter.limits();
             let features = adapter.features();
@@ -544,10 +538,10 @@ pub async fn create_iad(
                 .request_device(
                     &DeviceDescriptor {
                         label: None,
-                        features: adapter
+                        required_features: adapter
                             .features
                             .union(additional_features.unwrap_or_else(Features::empty)),
-                        limits: adapter.limits,
+                        required_limits: adapter.limits,
                     },
                     None,
                 )

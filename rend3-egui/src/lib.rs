@@ -137,7 +137,7 @@ impl EguiRenderRoutine {
             image_rgba,
             dimensions,
             format.block_dimensions(),
-            format.block_size(None).unwrap(),
+            format.block_copy_size(None).unwrap(),
         )
     }
 

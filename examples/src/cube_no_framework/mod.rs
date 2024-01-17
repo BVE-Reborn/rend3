@@ -79,7 +79,7 @@ pub fn main() {
     // SAFETY: this surface _must_ not be used after the `window` dies. Both the
     // event loop and the renderer are owned by the `run` closure passed to winit,
     // so rendering work will stop after the window dies.
-    let surface = Arc::new(unsafe { iad.instance.create_surface(&window) }.unwrap());
+    let surface = Arc::new(iad.instance.create_surface(&window).unwrap());
     // Get the preferred format for the surface.
     let caps = surface.get_capabilities(&iad.adapter);
     let preferred_format = caps.formats[0];

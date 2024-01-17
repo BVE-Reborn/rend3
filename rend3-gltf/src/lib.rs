@@ -1797,63 +1797,6 @@ pub mod util {
     }
 
     pub fn format_components(tex: types::TextureFormat) -> Option<u8> {
-        use types::TextureFormat as r3F;
-
-        match tex {
-            r3F::R8Unorm
-            | r3F::R8Snorm
-            | r3F::R8Uint
-            | r3F::R8Sint
-            | r3F::R16Uint
-            | r3F::R16Sint
-            | r3F::R16Unorm
-            | r3F::R16Snorm
-            | r3F::R16Float => Some(1),
-            r3F::Rg8Unorm | r3F::Rg8Snorm | r3F::Rg8Uint | r3F::Rg8Sint => Some(2),
-            r3F::R32Uint | r3F::R32Sint | r3F::R32Float => Some(1),
-            r3F::Rg16Uint | r3F::Rg16Sint | r3F::Rg16Unorm | r3F::Rg16Snorm | r3F::Rg16Float => Some(2),
-            r3F::Rgba8Unorm
-            | r3F::Rgba8UnormSrgb
-            | r3F::Rgba8Snorm
-            | r3F::Rgba8Uint
-            | r3F::Rgba8Sint
-            | r3F::Bgra8Unorm
-            | r3F::Bgra8UnormSrgb => Some(4),
-            r3F::Rgb9e5Ufloat => Some(4),
-            r3F::Rgb10a2Unorm | r3F::Rgb10a2Uint => Some(4),
-            r3F::Rg11b10Float => Some(3),
-            r3F::Rg32Uint | r3F::Rg32Sint | r3F::Rg32Float => Some(2),
-            r3F::Rgba16Uint
-            | r3F::Rgba16Sint
-            | r3F::Rgba16Unorm
-            | r3F::Rgba16Snorm
-            | r3F::Rgba16Float
-            | r3F::Rgba32Uint
-            | r3F::Rgba32Sint
-            | r3F::Rgba32Float => Some(4),
-            r3F::Stencil8 => Some(1),
-            r3F::Depth16Unorm => Some(1),
-            r3F::Depth24Plus => Some(1),
-            r3F::Depth24PlusStencil8 => Some(2),
-            r3F::Depth32Float => Some(1),
-            r3F::Depth32FloatStencil8 => Some(2),
-            r3F::Bc1RgbaUnorm => Some(4),
-            r3F::Bc1RgbaUnormSrgb => Some(4),
-            r3F::Bc2RgbaUnorm => Some(4),
-            r3F::Bc2RgbaUnormSrgb => Some(4),
-            r3F::Bc3RgbaUnorm => Some(4),
-            r3F::Bc3RgbaUnormSrgb => Some(4),
-            r3F::Bc4RUnorm | r3F::Bc4RSnorm => Some(1),
-            r3F::Bc5RgUnorm | r3F::Bc5RgSnorm => Some(2),
-            r3F::Bc6hRgbUfloat | r3F::Bc6hRgbFloat => Some(3),
-            r3F::Bc7RgbaUnorm | r3F::Bc7RgbaUnormSrgb => Some(4),
-            r3F::Etc2Rgb8Unorm | r3F::Etc2Rgb8UnormSrgb => Some(3),
-            r3F::Etc2Rgb8A1Unorm | r3F::Etc2Rgb8A1UnormSrgb | r3F::Etc2Rgba8Unorm | r3F::Etc2Rgba8UnormSrgb => Some(4),
-            r3F::EacR11Unorm => Some(1),
-            r3F::EacR11Snorm => Some(1),
-            r3F::EacRg11Unorm => Some(2),
-            r3F::EacRg11Snorm => Some(2),
-            r3F::Astc { block: _, channel: _ } => Some(4),
-        }
+        Some(tex.components())
     }
 }
