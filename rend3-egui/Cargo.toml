@@ -17,4 +17,4 @@ egui-wgpu = {git = "https://github.com/emilk/egui.git", branch="master"}
 glam = "0.24"
 rend3 = { version = "^0.3.0", path = "../rend3" }
 wgpu = "0.18.0"
-wgpu-types = "0.18.0"
+wgpu-types = "0.19.0"
