@@ -12,7 +12,7 @@ pub type FastHasher = rustc_hash::FxHasher;
 /// Build hasher designed for small keys.
 pub type FastBuildHasher = std::hash::BuildHasherDefault<FastHasher>;
 /// Output of wgpu_profiler's code.
-pub type RendererStatistics = Vec<wgpu_profiler::GpuTimerScopeResult>;
+pub type RendererStatistics = Vec<wgpu_profiler::GpuTimerQueryResult>;
 
 #[macro_export]
 /// Similar to the [`format`] macro, but creates a [`SsoString`].

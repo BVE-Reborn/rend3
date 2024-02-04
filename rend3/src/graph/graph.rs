@@ -482,8 +482,8 @@ impl<'node> RenderGraph<'node> {
 
                 profiling::scope!(&format!("Node: {}", node.label));
 
-                data_core.profiler.try_lock().unwrap().begin_scope(
-                    &node.label,
+                let profiler_query = data_core.profiler.try_lock().unwrap().begin_query(
+                    node.label,
                     &mut encoder_or_rpass,
                     &renderer.device,
                 );
@@ -509,7 +509,11 @@ impl<'node> RenderGraph<'node> {
                     None => RenderGraphEncoderOrPassInner::Encoder(unsafe { &mut *encoder_cell.get() }),
                 };
 
-                let _ = data_core.profiler.try_lock().unwrap().end_scope(&mut encoder_or_rpass);
+                data_core
+                    .profiler
+                    .try_lock()
+                    .unwrap()
+                    .end_query(&mut encoder_or_rpass, profiler_query);
             }
         }
 

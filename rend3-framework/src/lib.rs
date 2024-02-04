@@ -166,6 +166,7 @@ pub async fn async_start<A: App<T> + 'static, T: 'static>(mut app: A, window_bui
 
     // Create the window invisible until we are rendering
     let (event_loop, window) = app.create_window(window_builder.with_visible(false)).unwrap();
+    let window = Arc::new(window);
     let window_size = window.inner_size();
 
     let iad = app.create_iad().await.unwrap();
@@ -178,7 +179,7 @@ pub async fn async_start<A: App<T> + 'static, T: 'static>(mut app: A, window_bui
     let mut surface = if cfg!(target_os = "android") {
         None
     } else {
-        Some(Arc::new(unsafe { iad.instance.create_surface(&window) }.unwrap()))
+        Some(Arc::new(iad.instance.create_surface(window.clone()).unwrap()))
     };
 
     // Make us a renderer.
@@ -401,7 +402,7 @@ struct StoredSurfaceInfo {
 #[allow(clippy::too_many_arguments)]
 fn handle_surface<A: App<T>, T: 'static>(
     app: &A,
-    window: &Window,
+    window: &Arc<Window>,
     event: &Event<T>,
     instance: &Instance,
     surface: &mut Option<Arc<Surface>>,
@@ -411,7 +412,7 @@ fn handle_surface<A: App<T>, T: 'static>(
     match *event {
         Event::Resumed => {
             if surface.is_none() {
-                *surface = Some(Arc::new(unsafe { instance.create_surface(window) }.unwrap()));
+                *surface = Some(Arc::new(instance.create_surface(window.clone()).unwrap()));
             }
             Some(false)
         }
