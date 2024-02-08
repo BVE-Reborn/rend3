@@ -50,6 +50,7 @@ Per Keep a Changelog there are 6 main categories of changes:
 - rend3: Update to winit 0.29.4 @pillowtrucker
 - rend3-framework: Consolidate many arguments into single `SetupContext`, `EventContext`, and `RedrawContext` structs. @cwfitzgerald
 - rend3-framework: Surfaces are now handled amost entirely by the framework, including acquiring frames and presenting. Redraws now happen in a dedicated `handle_redraw` callback. @cwfitzgerald
+- rend3-egui: Update to egui 0.26. @Elabajaba
 
 ### Fixes
 - Fixed renderpass compatibility checks to avoid issues when RODS is used. @OptimisticPeach
