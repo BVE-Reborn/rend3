@@ -24,7 +24,7 @@ egui = "0.26"
 # Winit integration with egui (turn off the clipboard feature)
 egui-winit = { version = "0.26", default-features = false, features = ["links", "wayland"] }
 # logging
-env_logger = { version = "0.10", default-features = false, features = ["auto-color", "humantime"] }
+env_logger = { version = "0.11", default-features = false, features = ["auto-color", "humantime"] }
 # Linear algebra library
 glam = "0.24"
 # gltf model loading
