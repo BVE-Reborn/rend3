@@ -12,19 +12,6 @@ pub enum AssetError {
         #[source]
         error: std::io::Error,
     },
-    #[error("Could not read {path} from the network")]
-    #[cfg(target_arch = "wasm32")]
-    NetworkError {
-        path: SsoString,
-        #[source]
-        error: reqwest::Error,
-    },
-    #[error("Reading {path} from the network returned non-success status code {status}")]
-    #[cfg(target_arch = "wasm32")]
-    NetworkStatusError {
-        path: SsoString,
-        status: reqwest::StatusCode,
-    },
 }
 
 pub enum AssetPath<'a> {
