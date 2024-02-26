@@ -74,8 +74,10 @@ pub trait App<T: 'static = ()> {
         if let Err(e) = env_logger::builder()
             .filter_module("rend3", log::LevelFilter::Info)
             .parse_default_env()
-            .try_init() {
-            eprintln!("Error registering logger from Rend3 framework: {:?}", e);    // probably ran two runs in sequence and initialized twice
+            .try_init()
+        {
+            eprintln!("Error registering logger from Rend3 framework: {:?}", e);
+            // probably ran two runs in sequence and initialized twice
         };
     }
 
@@ -148,14 +150,14 @@ pub trait App<T: 'static = ()> {
 
     /// Handle a redraw event.
     fn handle_redraw(&mut self, context: RedrawContext<'_, T>);
-    
+
     /// Called after each redraw for post-processing, if needed.
-    /// By default, this queues another redraw. 
+    /// By default, this queues another redraw.
     /// That behavior is not appropriate on some platforms.
     /// Ref: Issue 570.
-    /// This gives the application the option of overriding that behavior. 
+    /// This gives the application the option of overriding that behavior.
     fn handle_redraw_done(&mut self, window: &Window) {
-        window.request_redraw();    // just queue a redraw.
+        window.request_redraw(); // just queue a redraw.
     }
 }
 
@@ -383,7 +385,7 @@ pub async fn async_start<A: App<T> + 'static, T: 'static>(mut app: A, window_bui
 
                 surface_texture.present();
 
-                app.handle_redraw_done(&window);       // standard action is to redraw, but that can be overridden.
+                app.handle_redraw_done(&window); // standard action is to redraw, but that can be overridden.
             } else {
                 app.handle_event(
                     EventContext {
