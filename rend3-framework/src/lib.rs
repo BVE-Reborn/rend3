@@ -71,10 +71,12 @@ pub trait App<T: 'static = ()> {
         console_log::init().unwrap();
 
         #[cfg(all(not(target_arch = "wasm32"), not(target_os = "android")))]
-        env_logger::builder()
+        if let Err(e) = env_logger::builder()
             .filter_module("rend3", log::LevelFilter::Info)
             .parse_default_env()
-            .init();
+            .try_init() {
+            eprintln!("Error registering logger from Rend3 framework: {:?}", e);    // probably ran two runs in sequence and initialized twice
+        };
     }
 
     fn register_panic_hook(&mut self) {
