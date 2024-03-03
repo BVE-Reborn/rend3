@@ -74,14 +74,14 @@ jobs:
         if: matrix.target != 'wasm32-unknown-unknown'
 
       - name: download test resources
-        if: matrix.os == 'macos-14'
+        if: matrix.os != 'macos-14'
         run: |
           bash ./build.bash download-assets
 
       - name: test
+        if: matrix.os != 'macos-14' && matrix.target != 'wasm32-unknown-unknown'
         run: |
           cargo +1.76 nextest run --target ${{ matrix.target }} --cargo-profile ci --no-fail-fast
-        if: matrix.target != 'wasm32-unknown-unknown'
 
       - uses: actions/upload-artifact@v4
         # always run
