@@ -74,7 +74,7 @@ jobs:
         if: matrix.target != 'wasm32-unknown-unknown'
 
       - name: download test resources
-        if: matrix.os[1] == 'gpu'
+        if: matrix.os == 'macos-14'
         run: |
           bash ./build.bash download-assets
 
