@@ -26,7 +26,7 @@ jobs:
             os: "ubuntu-latest"
             target: "x86_64-unknown-linux-gnu"
           - name: "mac"
-            os: ["macOS", "gpu"]
+            os: "macos-14"
             target: "aarch64-apple-darwin"
           - name: "windows"
             os: "windows-latest"
@@ -41,7 +41,7 @@ jobs:
       - name: Set up Rust toolchain
         id: setup-rust
         run: |
-          rustup toolchain install 1.72 -c clippy -t ${{ matrix.target }}
+          rustup toolchain install 1.76 -c clippy -t ${{ matrix.target }}
 
       - name: Install cargo-nextest and cargo-llvm-cov
         uses: taiki-e/install-action@v2
@@ -56,32 +56,32 @@ jobs:
 
       - name: build
         run: |
-          cargo +1.72 build --target ${{ matrix.target }} --profile ci
+          cargo +1.76 build --target ${{ matrix.target }} --profile ci
         if: matrix.target != 'wasm32-unknown-unknown'
 
       - name: clippy (rend3-gltf featureless)
         run: |
-          cargo +1.72 clippy --target ${{ matrix.target }} --profile ci -p rend3-gltf --no-default-features
+          cargo +1.76 clippy --target ${{ matrix.target }} --profile ci -p rend3-gltf --no-default-features
 
       - name: clippy
         run: |
-          cargo +1.72 clippy --target ${{ matrix.target }} --profile ci
+          cargo +1.76 clippy --target ${{ matrix.target }} --profile ci
         if: matrix.target != 'wasm32-unknown-unknown'
 
       - name: doc
         run: |
-          cargo +1.72 doc --target ${{ matrix.target }} --profile ci --no-deps
+          cargo +1.76 doc --target ${{ matrix.target }} --profile ci --no-deps
         if: matrix.target != 'wasm32-unknown-unknown'
 
       - name: download test resources
-        if: matrix.os[1] == 'gpu'
+        if: matrix.os != 'macos-14'
         run: |
           bash ./build.bash download-assets
 
       - name: test
+        if: matrix.os != 'macos-14' && matrix.target != 'wasm32-unknown-unknown'
         run: |
-          cargo +1.72 nextest run --target ${{ matrix.target }} --cargo-profile ci --no-fail-fast
-        if: matrix.target != 'wasm32-unknown-unknown'
+          cargo +1.76 nextest run --target ${{ matrix.target }} --cargo-profile ci --no-fail-fast
 
       - uses: actions/upload-artifact@v4
         # always run
@@ -101,11 +101,11 @@ jobs:
       - name: Set up Rust toolchain
         id: setup-rust
         run: |
-          rustup toolchain install 1.72 -c rustfmt
+          rustup toolchain install 1.76 -c rustfmt
 
       - name: format
         run: |
-          cargo +1.72 fmt --check
+          cargo +1.76 fmt --check
 
   cargo-deny:
     runs-on: ubuntu-latest
