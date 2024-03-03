@@ -62,7 +62,7 @@ rend3-gltf = { version = "^0.3.0", path = "../rend3-gltf" }
 # Opening URL's
 webbrowser = "0.8.2"
 # Instant but portable to the web
-web-time = "0.2"
+web-time = "1.1"
 # windowing
 winit = "0.29.4"
 # Integration with wgpu
