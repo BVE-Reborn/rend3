@@ -1,6 +1,6 @@
 # rend3
 
-![GitHub Workflow Status](https://img.shields.io/github/workflow/status/BVE-Reborn/rend3/CI)
+![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/BVE-Reborn/rend3/ci.yml)
 [![Crates.io](https://img.shields.io/crates/v/rend3)](https://crates.io/crates/rend3)
 [![Documentation](https://docs.rs/rend3/badge.svg)](https://docs.rs/rend3)
 ![License](https://img.shields.io/crates/l/rend3)

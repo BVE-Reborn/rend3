@@ -71,10 +71,14 @@ pub trait App<T: 'static = ()> {
         console_log::init().unwrap();
 
         #[cfg(all(not(target_arch = "wasm32"), not(target_os = "android")))]
-        env_logger::builder()
+        if let Err(e) = env_logger::builder()
             .filter_module("rend3", log::LevelFilter::Info)
             .parse_default_env()
-            .init();
+            .try_init()
+        {
+            eprintln!("Error registering logger from Rend3 framework: {:?}", e);
+            // probably ran two runs in sequence and initialized twice
+        };
     }
 
     fn register_panic_hook(&mut self) {
@@ -134,15 +138,27 @@ pub trait App<T: 'static = ()> {
         1.0
     }
 
+    /// Set up the rendering environment. Called once at startup.
     fn setup(&mut self, context: SetupContext<'_, T>) {
         let _ = context;
     }
 
+    /// Handle a non-redraw event.
     fn handle_event(&mut self, context: EventContext<'_, T>, event: Event<T>) {
         let _ = (context, event);
     }
 
+    /// Handle a redraw event.
     fn handle_redraw(&mut self, context: RedrawContext<'_, T>);
+
+    /// Called after each redraw for post-processing, if needed.
+    /// By default, this queues another redraw.
+    /// That behavior is not appropriate on some platforms.
+    /// Ref: Issue 570.
+    /// This gives the application the option of overriding that behavior.
+    fn handle_redraw_done(&mut self, window: &Window) {
+        window.request_redraw(); // just queue a redraw.
+    }
 }
 
 pub fn lock<T>(lock: &parking_lot::Mutex<T>) -> parking_lot::MutexGuard<'_, T> {
@@ -166,6 +182,7 @@ pub async fn async_start<A: App<T> + 'static, T: 'static>(mut app: A, window_bui
 
     // Create the window invisible until we are rendering
     let (event_loop, window) = app.create_window(window_builder.with_visible(false)).unwrap();
+    let window = Arc::new(window);
     let window_size = window.inner_size();
 
     let iad = app.create_iad().await.unwrap();
@@ -178,7 +195,7 @@ pub async fn async_start<A: App<T> + 'static, T: 'static>(mut app: A, window_bui
     let mut surface = if cfg!(target_os = "android") {
         None
     } else {
-        Some(Arc::new(unsafe { iad.instance.create_surface(&window) }.unwrap()))
+        Some(Arc::new(iad.instance.create_surface(window.clone()).unwrap()))
     };
 
     // Make us a renderer.
@@ -368,7 +385,7 @@ pub async fn async_start<A: App<T> + 'static, T: 'static>(mut app: A, window_bui
 
                 surface_texture.present();
 
-                window.request_redraw();
+                app.handle_redraw_done(&window); // standard action is to redraw, but that can be overridden.
             } else {
                 app.handle_event(
                     EventContext {
@@ -401,7 +418,7 @@ struct StoredSurfaceInfo {
 #[allow(clippy::too_many_arguments)]
 fn handle_surface<A: App<T>, T: 'static>(
     app: &A,
-    window: &Window,
+    window: &Arc<Window>,
     event: &Event<T>,
     instance: &Instance,
     surface: &mut Option<Arc<Surface>>,
@@ -411,7 +428,7 @@ fn handle_surface<A: App<T>, T: 'static>(
     match *event {
         Event::Resumed => {
             if surface.is_none() {
-                *surface = Some(Arc::new(unsafe { instance.create_surface(window) }.unwrap()));
+                *surface = Some(Arc::new(instance.create_surface(window.clone()).unwrap()));
             }
             Some(false)
         }

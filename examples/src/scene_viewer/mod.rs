@@ -10,14 +10,13 @@ use rend3::{
         Backend, Camera, CameraProjection, DirectionalLight, DirectionalLightHandle, SampleCount, Texture,
         TextureFormat,
     },
-    util::typedefs::FastHashMap,
+    util::typedefs::{FastHashMap, RendererStatistics},
     Renderer, RendererProfile,
 };
 use rend3_framework::{lock, AssetPath, Mutex};
 use rend3_gltf::{GltfLoadSettings, GltfSceneInstance, LoadedGltfScene};
 use rend3_routine::{pbr::NormalTextureYDirection, skybox::SkyboxRoutine};
 use web_time::Instant;
-use wgpu_profiler::GpuTimerScopeResult;
 use winit::{
     event::{DeviceEvent, ElementState, Event, KeyEvent, MouseButton, WindowEvent},
     keyboard::{KeyCode, PhysicalKey},
@@ -135,7 +134,6 @@ fn extract_backend(value: &str) -> Result<Backend, &'static str> {
     Ok(match value.to_lowercase().as_str() {
         "vulkan" | "vk" => Backend::Vulkan,
         "dx12" | "12" => Backend::Dx12,
-        "dx11" | "11" => Backend::Dx11,
         "metal" | "mtl" => Backend::Metal,
         "opengl" | "gl" => Backend::Gl,
         _ => return Err("unknown backend"),
@@ -301,7 +299,7 @@ pub struct SceneViewer {
     camera_pitch: f32,
     camera_yaw: f32,
     camera_location: Vec3A,
-    previous_profiling_stats: Option<Vec<GpuTimerScopeResult>>,
+    previous_profiling_stats: Option<RendererStatistics>,
     last_mouse_delta: Option<DVec2>,
 
     scene: Option<LoadedGltfScene>,

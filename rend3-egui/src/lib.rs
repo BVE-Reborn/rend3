@@ -15,7 +15,7 @@ use wgpu::TextureFormat;
 
 pub struct EguiRenderRoutine {
     pub internal: egui_wgpu::Renderer,
-    screen_descriptor: egui_wgpu::renderer::ScreenDescriptor,
+    screen_descriptor: egui_wgpu::ScreenDescriptor,
     textures_to_free: Vec<egui::TextureId>,
 }
 
@@ -36,7 +36,7 @@ impl EguiRenderRoutine {
 
         Self {
             internal: rpass,
-            screen_descriptor: egui_wgpu::renderer::ScreenDescriptor {
+            screen_descriptor: egui_wgpu::ScreenDescriptor {
                 size_in_pixels: [width, height],
                 pixels_per_point: scale_factor,
             },
@@ -45,7 +45,7 @@ impl EguiRenderRoutine {
     }
 
     pub fn resize(&mut self, new_width: u32, new_height: u32, new_scale_factor: f32) {
-        self.screen_descriptor = egui_wgpu::renderer::ScreenDescriptor {
+        self.screen_descriptor = egui_wgpu::ScreenDescriptor {
             size_in_pixels: [new_width, new_height],
             pixels_per_point: new_scale_factor,
         };
@@ -137,7 +137,7 @@ impl EguiRenderRoutine {
             image_rgba,
             dimensions,
             format.block_dimensions(),
-            format.block_size(None).unwrap(),
+            format.block_copy_size(None).unwrap(),
         )
     }
 

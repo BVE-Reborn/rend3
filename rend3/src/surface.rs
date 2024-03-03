@@ -20,6 +20,7 @@ pub fn configure_surface(
             width: size.x,
             height: size.y,
             present_mode,
+            desired_maximum_frame_latency: 2,
             alpha_mode: CompositeAlphaMode::Auto,
             view_formats: vec![],
         },

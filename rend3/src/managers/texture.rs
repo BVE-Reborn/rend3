@@ -5,7 +5,7 @@ use thiserror::Error;
 use wgpu::{
     util::DeviceExt, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor,
     BindGroupLayoutEntry, BindingResource, BindingType, CommandBuffer, CommandEncoder, CommandEncoderDescriptor,
-    Device, Extent3d, ImageCopyTexture, ImageDataLayout, Origin3d, ShaderStages, Texture, TextureAspect,
+    Device, Extent3d, Features, ImageCopyTexture, ImageDataLayout, Origin3d, ShaderStages, Texture, TextureAspect,
     TextureDescriptor, TextureDimension, TextureSampleType, TextureView, TextureViewDescriptor, TextureViewDimension,
 };
 
@@ -108,7 +108,7 @@ impl<T: 'static> TextureManager<T> {
         texture: crate::types::Texture,
         cube: bool,
     ) -> Result<(Option<CommandBuffer>, InternalTexture), TextureCreationError> {
-        validate_texture_format(texture.format)?;
+        validate_texture_format(texture.format, renderer.device.features())?;
 
         let (block_x, block_y) = texture.format.block_dimensions();
         let size = Extent3d {
@@ -142,9 +142,12 @@ impl<T: 'static> TextureManager<T> {
         let (buffer, tex) = match texture.mip_source {
             MipmapSource::Uploaded => {
                 let scope = AllocationErrorScope::new(&renderer.device);
-                let texture = renderer
-                    .device
-                    .create_texture_with_data(&renderer.queue, &desc, &texture.data);
+                let texture = renderer.device.create_texture_with_data(
+                    &renderer.queue,
+                    &desc,
+                    wgpu::util::TextureDataOrder::LayerMajor,
+                    &texture.data,
+                );
                 scope.end().map_err(TextureCreationError::TextureAllocationFailed)?;
                 (None, texture)
             }
@@ -160,7 +163,7 @@ impl<T: 'static> TextureManager<T> {
                 scope.end().map_err(TextureCreationError::TextureAllocationFailed)?;
 
                 let (block_width, _) = texture.format.block_dimensions();
-                let block_size = texture.format.block_size(None).unwrap();
+                let block_size = texture.format.block_copy_size(None).unwrap();
 
                 let scope = AllocationErrorScope::new(&renderer.device);
                 // write first level
@@ -415,8 +418,8 @@ fn create_null_tex_view(device: &Device, dimension: TextureViewDimension) -> Tex
         })
 }
 
-fn validate_texture_format(format: TextureFormat) -> Result<(), TextureCreationError> {
-    let sample_type = format.sample_type(None);
+fn validate_texture_format(format: TextureFormat, features: Features) -> Result<(), TextureCreationError> {
+    let sample_type = format.sample_type(None, Some(features));
     match sample_type {
         Some(TextureSampleType::Float { filterable: true }) => Ok(()),
         Some(TextureSampleType::Float { filterable: false }) => Err(TextureCreationError::TextureFormatNotFilterable {
