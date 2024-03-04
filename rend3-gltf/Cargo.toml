@@ -16,7 +16,7 @@ default = ["ddsfile", "ktx2"]
 
 [dependencies]
 arrayvec = "0.7"
-base64 = "0.21"
+base64 = "0.22"
 bytemuck = "1"
 ddsfile = { version = "0.5", optional = true }
 float-ord = "0.3.2"
