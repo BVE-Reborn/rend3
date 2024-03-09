@@ -12,6 +12,13 @@ pub enum AssetError {
         #[source]
         error: std::io::Error,
     },
+    #[cfg(target_arch = "wasm32")]
+    #[error("Could not read {path} from network")]
+    NetworkError {
+        path: SsoString,
+        #[source]
+        error: gloo_net::Error,
+    },
 }
 
 pub enum AssetPath<'a> {
@@ -86,28 +93,18 @@ impl AssetLoader {
     #[cfg(target_arch = "wasm32")]
     pub async fn get_asset(&self, path: AssetPath<'_>) -> Result<Vec<u8>, AssetError> {
         let full_path = path.get_path(&self.base);
-        let response = reqwest::get(&*full_path)
-            .await
-            .map_err(|error| AssetError::NetworkError {
-                path: SsoString::from(&*full_path),
-                error,
-            })?;
 
-        let status = response.status();
-        if !status.is_success() {
-            return Err(AssetError::NetworkStatusError {
-                path: SsoString::from(&*full_path),
-                status,
-            });
-        }
-
-        Ok(response
-            .bytes()
-            .await
+        gloo_net::http::Request::get(&full_path)
+            .build()
             .map_err(|error| AssetError::NetworkError {
                 path: SsoString::from(&*full_path),
                 error,
             })?
-            .to_vec())
+            .binary()
+            .await
+            .map_err(|error| AssetError::NetworkError {
+                path: SsoString::from(&*full_path),
+                error,
+            })
     }
 }

@@ -6,7 +6,7 @@ on:
   pull_request:
 
 env:
-  RUSTFLAGS: --cfg=web_sys_unstable_apis -D warnings
+  RUSTFLAGS: -D warnings
   RUSTDOCFLAGS: -D warnings
 
 jobs:
@@ -66,15 +66,13 @@ jobs:
       - name: clippy
         run: |
           cargo +1.76 clippy --target ${{ matrix.target }} --profile ci
-        if: matrix.target != 'wasm32-unknown-unknown'
 
       - name: doc
         run: |
           cargo +1.76 doc --target ${{ matrix.target }} --profile ci --no-deps
-        if: matrix.target != 'wasm32-unknown-unknown'
 
       - name: download test resources
-        if: matrix.os != 'macos-14'
+        if: matrix.os != 'macos-14' && matrix.target != 'wasm32-unknown-unknown'
         run: |
           bash ./build.bash download-assets
 
