@@ -1073,8 +1073,8 @@ impl<const C: usize, T> MaterialArray<T> for [T; C] {
 /// - A material array indexed by the material index. Each material has:
 ///   - One u32 per texture. If this value is 0, the texture doesn't exist. If
 ///     this value is non-zero, subtract one and index into the texture array to
-///     ge thte texture.
-///   - Padding to 16 byte alignemnet.
+///     get the texture.
+///   - Padding to 16 byte alignment.
 ///   - The data provided by the material.
 pub trait Material: WasmNotSend + WasmNotSync + 'static {
     type DataType: encase::ShaderSize + encase::internal::WriteInto;
