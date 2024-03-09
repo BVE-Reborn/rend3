@@ -12,7 +12,7 @@ case $1 in
         else
             WASM_BUILD_DIR=debug
         fi
-        RUSTFLAGS=--cfg=web_sys_unstable_apis cargo build --target wasm32-unknown-unknown $BUILD_FLAGS --bin $@
+        cargo build --target wasm32-unknown-unknown $BUILD_FLAGS --bin $@
         mkdir -p target/generated/
         rm -rf target/generated/*
         cp -r examples/$1/resources target/generated/ || true
@@ -28,7 +28,7 @@ case $1 in
         cargo clippy
         cargo test
         cargo rend3-doc
-        RUSTFLAGS=--cfg=web_sys_unstable_apis cargo clippy --target wasm32-unknown-unknown --workspace --exclude rend3-imgui --exclude rend3-imgui-example
+        cargo clippy --target wasm32-unknown-unknown --workspace --exclude rend3-imgui --exclude rend3-imgui-example
         cargo deny --all-features check
     ;;
     download-assets)
