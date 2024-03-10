@@ -10,12 +10,7 @@ pub async fn shadows() -> anyhow::Result<()> {
     let iad = no_gpu_return!(rend3::create_iad(None, None, None, None).await)
         .context("InstanceAdapterDevice creation failed")?;
 
-    let Ok(runner) = TestRunner::builder()
-        .iad(iad.clone())
-        .handedness(Handedness::Left)
-        .build()
-        .await
-    else {
+    let Ok(runner) = TestRunner::builder().iad(iad.clone()).handedness(Handedness::Left).build().await else {
         return Ok(());
     };
 
@@ -26,9 +21,7 @@ pub async fn shadows() -> anyhow::Result<()> {
     let _plane = runner.plane(material1, Mat4::from_rotation_x(-FRAC_PI_2));
 
     runner.set_camera_data(Camera {
-        projection: rend3::types::CameraProjection::Orthographic {
-            size: Vec3A::new(2.5, 2.5, 5.0),
-        },
+        projection: rend3::types::CameraProjection::Orthographic { size: Vec3A::new(2.5, 2.5, 5.0) },
         view: Mat4::look_at_lh(Vec3::new(0.0, 1.0, -1.0), Vec3::ZERO, Vec3::Y),
     });
 
@@ -37,10 +30,7 @@ pub async fn shadows() -> anyhow::Result<()> {
         .render_and_compare(
             FrameRenderSettings::new().size(256)?,
             file_name,
-            Threshold::Percentile {
-                percentile: 0.5,
-                threshold: 0.04,
-            },
+            Threshold::Percentile { percentile: 0.5, threshold: 0.04 },
         )
         .await?;
 
@@ -56,10 +46,7 @@ pub async fn shadows() -> anyhow::Result<()> {
         .render_and_compare(
             FrameRenderSettings::new().size(256)?,
             file_name,
-            Threshold::Percentile {
-                percentile: 0.5,
-                threshold: 0.04,
-            },
+            Threshold::Percentile { percentile: 0.5, threshold: 0.04 },
         )
         .await?;
 

@@ -155,8 +155,7 @@ impl rend3_framework::App for EguiExample {
                     #[allow(clippy::single_match)]
                     match event {
                         winit::event::WindowEvent::Resized(size) => {
-                            data.egui_routine
-                                .resize(size.width, size.height, window.scale_factor() as f32);
+                            data.egui_routine.resize(size.width, size.height, window.scale_factor() as f32);
                         }
                         _ => {}
                     }
@@ -192,13 +191,7 @@ impl rend3_framework::App for EguiExample {
                 );
             }
             ui.label("Want to get rusty?");
-            if ui
-                .add(egui::widgets::ImageButton::new((
-                    self.rust_logo,
-                    egui::Vec2::splat(64.0),
-                )))
-                .clicked()
-            {
+            if ui.add(egui::widgets::ImageButton::new((self.rust_logo, egui::Vec2::splat(64.0)))).clicked() {
                 webbrowser::open("https://www.rust-lang.org").expect("failed to open URL");
             }
         });
@@ -207,16 +200,10 @@ impl rend3_framework::App for EguiExample {
 
         // End the UI frame. Now let's draw the UI with our Backend, we could also
         // handle the output here
-        let egui::FullOutput {
-            shapes, textures_delta, ..
-        } = data.context.end_frame();
+        let egui::FullOutput { shapes, textures_delta, .. } = data.context.end_frame();
         let paint_jobs = data.context.tessellate(shapes, scale_factor);
 
-        let input = rend3_egui::Input {
-            clipped_meshes: &paint_jobs,
-            textures_delta,
-            context: data.context.clone(),
-        };
+        let input = rend3_egui::Input { clipped_meshes: &paint_jobs, textures_delta, context: data.context.clone() };
 
         // Swap the instruction buffers so that our frame's changes can be processed.
         context.renderer.swap_instruction_buffers();
@@ -269,12 +256,7 @@ impl rend3_framework::App for EguiExample {
 
 pub fn main() {
     let app = EguiExample::default();
-    rend3_framework::start(
-        app,
-        winit::window::WindowBuilder::new()
-            .with_title("egui")
-            .with_maximized(true),
-    )
+    rend3_framework::start(app, winit::window::WindowBuilder::new().with_title("egui").with_maximized(true))
 }
 
 fn vertex(pos: [f32; 3]) -> glam::Vec3 {

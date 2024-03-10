@@ -29,15 +29,7 @@ impl CameraState {
 
         let frustum = Frustum::from_matrix(proj * data.view);
 
-        Self {
-            handedness,
-            orig_view,
-            proj,
-            inv_view: data.view.inverse(),
-            world_frustum: frustum,
-            data,
-            aspect_ratio,
-        }
+        Self { handedness, orig_view, proj, inv_view: data.view.inverse(), world_frustum: frustum, data, aspect_ratio }
     }
 
     /// Sets the camera data, rebuilding the using the given aspect ratio. If no

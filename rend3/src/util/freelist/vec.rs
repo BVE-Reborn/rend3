@@ -10,10 +10,7 @@ pub struct FreelistVec<T> {
 
 impl<T> FreelistVec<T> {
     pub fn new() -> Self {
-        Self {
-            data: Vec::new(),
-            freelist: Vec::new(),
-        }
+        Self { data: Vec::new(), freelist: Vec::new() }
     }
 
     pub fn push(&mut self, value: T) -> FreelistIndex {

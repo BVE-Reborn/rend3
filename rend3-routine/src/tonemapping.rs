@@ -37,16 +37,11 @@ fn create_pipeline(
     let module = device.create_shader_module(ShaderModuleDescriptor {
         label: Some("tonemapping"),
         source: ShaderSource::Wgsl(Cow::Owned(
-            spp.render_shader("rend3-routine/blit.wgsl", &ShaderConfig::default(), None)
-                .unwrap(),
+            spp.render_shader("rend3-routine/blit.wgsl", &ShaderConfig::default(), None).unwrap(),
         )),
     });
 
-    let fs_entry_point = if output_format.is_srgb() {
-        "fs_main_scene"
-    } else {
-        "fs_main_monitor"
-    };
+    let fs_entry_point = if output_format.is_srgb() { "fs_main_scene" } else { "fs_main_monitor" };
 
     let pll = device.create_pipeline_layout(&PipelineLayoutDescriptor {
         label: Some("tonemapping pass"),
@@ -57,11 +52,7 @@ fn create_pipeline(
     device.create_render_pipeline(&RenderPipelineDescriptor {
         label: Some("tonemapping pass"),
         layout: Some(&pll),
-        vertex: VertexState {
-            module: &module,
-            entry_point: "vs_main",
-            buffers: &[],
-        },
+        vertex: VertexState { module: &module, entry_point: "vs_main", buffers: &[] },
         primitive: PrimitiveState {
             topology: PrimitiveTopology::TriangleList,
             strip_index_format: None,
@@ -76,11 +67,7 @@ fn create_pipeline(
         fragment: Some(FragmentState {
             module: &module,
             entry_point: fs_entry_point,
-            targets: &[Some(ColorTargetState {
-                format: output_format,
-                blend: None,
-                write_mask: ColorWrites::all(),
-            })],
+            targets: &[Some(ColorTargetState { format: output_format, blend: None, write_mask: ColorWrites::all() })],
         }),
         multiview: None,
     })
@@ -131,11 +118,7 @@ impl TonemappingRoutine {
 
         let rpass_handle = builder.add_renderpass(
             RenderPassTargets {
-                targets: vec![RenderPassTarget {
-                    color: dst,
-                    clear: Vec4::ZERO,
-                    resolve: None,
-                }],
+                targets: vec![RenderPassTarget { color: dst, clear: Vec4::ZERO, resolve: None }],
                 depth_stencil: None,
             },
             NodeResourceUsage::InputOutput,
@@ -150,13 +133,11 @@ impl TonemappingRoutine {
 
             profiling::scope!("tonemapping");
 
-            let blit_src_bg = ctx
-                .temps
-                .add(BindGroupBuilder::new().append_texture_view(hdr_color).build(
-                    &ctx.renderer.device,
-                    Some("blit src bg"),
-                    &self.bgl,
-                ));
+            let blit_src_bg = ctx.temps.add(BindGroupBuilder::new().append_texture_view(hdr_color).build(
+                &ctx.renderer.device,
+                Some("blit src bg"),
+                &self.bgl,
+            ));
 
             rpass.set_pipeline(&self.pipeline);
             rpass.set_bind_group(0, forward_uniform_bg, &[]);

@@ -169,13 +169,8 @@ impl Renderer {
         // Handle allocation must be done _after_ any validation to prevent deletion of a handle that never gets fully added.
         let handle = self.resource_handle_allocators.skeleton.allocate(self);
 
-        self.instructions.push(
-            InstructionKind::AddSkeleton {
-                handle: *handle,
-                skeleton: Box::new(internal),
-            },
-            *Location::caller(),
-        );
+        self.instructions
+            .push(InstructionKind::AddSkeleton { handle: *handle, skeleton: Box::new(internal) }, *Location::caller());
 
         Ok(handle)
     }
@@ -193,14 +188,8 @@ impl Renderer {
         // Handle allocation must be done _after_ any validation to prevent deletion of a handle that never gets fully added.
         let handle = self.resource_handle_allocators.d2_texture.allocate(self);
 
-        self.instructions.push(
-            InstructionKind::AddTexture2D {
-                handle: *handle,
-                internal_texture,
-                cmd_buf,
-            },
-            *Location::caller(),
-        );
+        self.instructions
+            .push(InstructionKind::AddTexture2D { handle: *handle, internal_texture, cmd_buf }, *Location::caller());
 
         Ok(handle)
     }
@@ -216,13 +205,8 @@ impl Renderer {
 
         let handle = self.resource_handle_allocators.d2_texture.allocate(self);
 
-        self.instructions.push(
-            InstructionKind::AddTexture2DFromTexture {
-                handle: *handle,
-                texture,
-            },
-            *Location::caller(),
-        );
+        self.instructions
+            .push(InstructionKind::AddTexture2DFromTexture { handle: *handle, texture }, *Location::caller());
 
         handle
     }
@@ -240,14 +224,8 @@ impl Renderer {
         // Handle allocation must be done _after_ any validation to prevent deletion of a handle that never gets fully added.
         let handle = self.resource_handle_allocators.d2c_texture.allocate(self);
 
-        self.instructions.push(
-            InstructionKind::AddTextureCube {
-                handle: *handle,
-                internal_texture,
-                cmd_buf,
-            },
-            *Location::caller(),
-        );
+        self.instructions
+            .push(InstructionKind::AddTextureCube { handle: *handle, internal_texture, cmd_buf }, *Location::caller());
 
         Ok(handle)
     }
@@ -296,13 +274,7 @@ impl Renderer {
     #[track_caller]
     pub fn add_object(self: &Arc<Self>, object: Object) -> ObjectHandle {
         let handle = self.resource_handle_allocators.object.allocate(self);
-        self.instructions.push(
-            InstructionKind::AddObject {
-                handle: *handle,
-                object,
-            },
-            *Location::caller(),
-        );
+        self.instructions.push(InstructionKind::AddObject { handle: *handle, object }, *Location::caller());
         handle
     }
 
@@ -314,11 +286,7 @@ impl Renderer {
     pub fn duplicate_object(self: &Arc<Self>, object_handle: &ObjectHandle, change: ObjectChange) -> ObjectHandle {
         let dst_handle = self.resource_handle_allocators.object.allocate(self);
         self.instructions.push(
-            InstructionKind::DuplicateObject {
-                src_handle: **object_handle,
-                dst_handle: *dst_handle,
-                change,
-            },
+            InstructionKind::DuplicateObject { src_handle: **object_handle, dst_handle: *dst_handle, change },
             *Location::caller(),
         );
         dst_handle
@@ -327,13 +295,8 @@ impl Renderer {
     /// Move the given object to a new transform location.
     #[track_caller]
     pub fn set_object_transform(&self, handle: &ObjectHandle, transform: Mat4) {
-        self.instructions.push(
-            InstructionKind::SetObjectTransform {
-                handle: handle.get_raw(),
-                transform,
-            },
-            *Location::caller(),
-        );
+        self.instructions
+            .push(InstructionKind::SetObjectTransform { handle: handle.get_raw(), transform }, *Location::caller());
     }
 
     /// Sets the joint positions for a skeleton. See
@@ -368,10 +331,7 @@ impl Renderer {
     #[track_caller]
     pub fn set_skeleton_joint_matrices(&self, handle: &SkeletonHandle, joint_matrices: Vec<Mat4>) {
         self.instructions.push(
-            InstructionKind::SetSkeletonJointDeltas {
-                handle: handle.get_raw(),
-                joint_matrices,
-            },
+            InstructionKind::SetSkeletonJointDeltas { handle: handle.get_raw(), joint_matrices },
             *Location::caller(),
         )
     }
@@ -383,10 +343,7 @@ impl Renderer {
     pub fn add_directional_light(self: &Arc<Self>, light: DirectionalLight) -> DirectionalLightHandle {
         let handle = self.resource_handle_allocators.directional_light.allocate(self);
 
-        self.instructions.push(
-            InstructionKind::AddDirectionalLight { handle: *handle, light },
-            *Location::caller(),
-        );
+        self.instructions.push(InstructionKind::AddDirectionalLight { handle: *handle, light }, *Location::caller());
 
         handle
     }
@@ -402,10 +359,7 @@ impl Renderer {
     pub fn add_point_light(self: &Arc<Self>, light: PointLight) -> PointLightHandle {
         let handle = self.resource_handle_allocators.point_light.allocate(self);
 
-        self.instructions.push(
-            InstructionKind::AddPointLight { handle: *handle, light },
-            *Location::caller(),
-        );
+        self.instructions.push(InstructionKind::AddPointLight { handle: *handle, light }, *Location::caller());
 
         handle
     }
@@ -413,25 +367,15 @@ impl Renderer {
     /// Updates the settings for given directional light.
     #[track_caller]
     pub fn update_directional_light(&self, handle: &DirectionalLightHandle, change: DirectionalLightChange) {
-        self.instructions.push(
-            InstructionKind::ChangeDirectionalLight {
-                handle: handle.get_raw(),
-                change,
-            },
-            *Location::caller(),
-        )
+        self.instructions
+            .push(InstructionKind::ChangeDirectionalLight { handle: handle.get_raw(), change }, *Location::caller())
     }
 
     /// Updates the settings for given point light.
     #[track_caller]
     pub fn update_point_light(&self, handle: &PointLightHandle, change: PointLightChange) {
-        self.instructions.push(
-            InstructionKind::ChangePointLight {
-                handle: handle.get_raw(),
-                change,
-            },
-            *Location::caller(),
-        )
+        self.instructions
+            .push(InstructionKind::ChangePointLight { handle: handle.get_raw(), change }, *Location::caller())
     }
 
     /// Adds a piece of data for long term storage and convienient use in the RenderGraph
@@ -442,9 +386,7 @@ impl Renderer {
         let handle = self.resource_handle_allocators.graph_storage.allocate(self);
         let handle2 = *handle;
         self.instructions.push(
-            InstructionKind::AddGraphData {
-                add_invoke: Box::new(move |storage| storage.add(&handle2, data)),
-            },
+            InstructionKind::AddGraphData { add_invoke: Box::new(move |storage| storage.add(&handle2, data)) },
             *Location::caller(),
         );
         GraphDataHandle(handle, PhantomData)
@@ -454,15 +396,13 @@ impl Renderer {
     /// aspect ratio of the user.
     #[track_caller]
     pub fn set_aspect_ratio(&self, ratio: f32) {
-        self.instructions
-            .push(InstructionKind::SetAspectRatio { ratio }, *Location::caller())
+        self.instructions.push(InstructionKind::SetAspectRatio { ratio }, *Location::caller())
     }
 
     /// Sets the position, pov, or projection mode of the camera.
     #[track_caller]
     pub fn set_camera_data(&self, data: Camera) {
-        self.instructions
-            .push(InstructionKind::SetCameraData { data }, *Location::caller())
+        self.instructions.push(InstructionKind::SetCameraData { data }, *Location::caller())
     }
 
     /// Swaps the front and back instruction buffer. Any world-modifiying functions

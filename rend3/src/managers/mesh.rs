@@ -53,9 +53,7 @@ impl InternalMesh {
     }
 
     pub fn get_attribute(&self, attribute: &VertexAttributeId) -> Option<Range<u64>> {
-        self.vertex_attribute_ranges
-            .iter()
-            .find_map(|(id, range)| (*id == *attribute).then_some(range.clone()))
+        self.vertex_attribute_ranges.iter().find_map(|(id, range)| (*id == *attribute).then_some(range.clone()))
     }
 }
 
@@ -113,17 +111,11 @@ impl MeshManager {
 
         let data = Mutex::new(Vec::new());
 
-        let encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("mesh manager init encoder"),
-        });
+        let encoder =
+            device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("mesh manager init encoder") });
 
         Self {
-            buffer_state: Mutex::new(BufferState {
-                buffer,
-                allocator,
-                encoder,
-                wait_group: WaitGroup::new(),
-            }),
+            buffer_state: Mutex::new(BufferState { buffer, allocator, encoder, wait_group: WaitGroup::new() }),
             data,
         }
     }
@@ -141,10 +133,8 @@ impl MeshManager {
         // This value is used later when setting joints, to make sure all indices are
         // in-bounds with the specified amount of joints.
         let mut required_joint_count = None;
-        let joint_indices_attribute = mesh
-            .attributes
-            .iter()
-            .find_map(|attribute| attribute.typed_data(&VERTEX_ATTRIBUTE_JOINT_INDICES));
+        let joint_indices_attribute =
+            mesh.attributes.iter().find_map(|attribute| attribute.typed_data(&VERTEX_ATTRIBUTE_JOINT_INDICES));
         if let Some(joint_indices) = joint_indices_attribute {
             required_joint_count = Some(joint_indices.iter().flatten().max().map_or(0, |v| v + 1));
         }
@@ -164,9 +154,7 @@ impl MeshManager {
 
         let index_range = self.allocate_range_impl(device, buffer_state, index_count as u64 * 4)?;
         upload.add(index_range.start, bytemuck::cast_slice(&mesh.indices));
-        upload
-            .create_staging_buffer(device)
-            .map_err(|e| MeshCreationError::BufferWriteFailed { inner: e })?;
+        upload.create_staging_buffer(device).map_err(|e| MeshCreationError::BufferWriteFailed { inner: e })?;
         upload.encode_upload(&mut buffer_state.encoder, &buffer_state.buffer);
 
         let staging_guard = buffer_state.wait_group.increment();
@@ -223,9 +211,8 @@ impl MeshManager {
     }
 
     pub fn evaluate(&self, device: &Device) -> (Arc<Buffer>, CommandBuffer) {
-        let new_encoder = device.create_command_encoder(&CommandEncoderDescriptor {
-            label: Some("mesh manager init encoder"),
-        });
+        let new_encoder =
+            device.create_command_encoder(&CommandEncoderDescriptor { label: Some("mesh manager init encoder") });
 
         let mut buffer_state = self.buffer_state.lock();
         let buffer = buffer_state.buffer.clone();
@@ -304,10 +291,7 @@ impl MeshManager {
             usage: BufferUsages::COPY_SRC | BufferUsages::COPY_DST | BufferUsages::INDEX | BufferUsages::STORAGE,
             mapped_at_creation: false,
         }));
-        scope.end().map_err(|e| MeshCreationError::BufferAllocationFailed {
-            size: new_bytes,
-            inner: e,
-        })?;
+        scope.end().map_err(|e| MeshCreationError::BufferAllocationFailed { size: new_bytes, inner: e })?;
 
         buffer_state.encoder.copy_buffer_to_buffer(
             &buffer_state.buffer,

@@ -98,11 +98,7 @@ impl MaterialManager {
 
         let texture_deduplicator = texture_dedupe::TextureDeduplicator::new(device);
 
-        Self {
-            handle_to_typeid: FastHashMap::default(),
-            archetypes: FastHashMap::default(),
-            texture_deduplicator,
-        }
+        Self { handle_to_typeid: FastHashMap::default(), archetypes: FastHashMap::default(), texture_deduplicator }
     }
 
     pub fn ensure_archetype<M: Material>(&mut self, device: &Device, profile: RendererProfile) {
@@ -144,8 +140,7 @@ impl MaterialManager {
             let textures = material.to_textures();
 
             let texture_bg_index =
-                self.texture_deduplicator
-                    .get_or_insert(device, texture_manager_2d, textures.as_ref());
+                self.texture_deduplicator.get_or_insert(device, texture_manager_2d, textures.as_ref());
 
             ProfileData::Cpu(texture_bg_index)
         } else {
@@ -155,17 +150,11 @@ impl MaterialManager {
         let archetype = self.ensure_archetype_inner::<M>(device, profile);
         archetype.buffer.use_index(handle.idx);
 
-        let mut data_vec = archetype
-            .data_vec
-            .downcast_mut::<Option<InternalMaterial<M>>>()
-            .unwrap();
+        let mut data_vec = archetype.data_vec.downcast_mut::<Option<InternalMaterial<M>>>().unwrap();
         if handle.idx >= data_vec.len() {
             data_vec.resize_with((handle.idx + 1).next_power_of_two(), || None);
         }
-        data_vec[handle.idx] = Some(InternalMaterial {
-            bind_group_index,
-            inner: material,
-        });
+        data_vec[handle.idx] = Some(InternalMaterial { bind_group_index, inner: material });
         drop(data_vec);
 
         self.handle_to_typeid.insert(handle, TypeId::of::<M>());
@@ -184,18 +173,14 @@ impl MaterialManager {
 
         let archetype = self.archetypes.get_mut(&type_id).unwrap();
 
-        let data_vec = archetype
-            .data_vec
-            .downcast_slice_mut::<Option<InternalMaterial<M>>>()
-            .unwrap();
+        let data_vec = archetype.data_vec.downcast_slice_mut::<Option<InternalMaterial<M>>>().unwrap();
         let internal = data_vec[handle.idx].as_mut().unwrap();
 
         if let ProfileData::Cpu(ref mut index) = internal.bind_group_index {
             // Create the new bind group first. If the bind group didn't change, this will prevent
             // the bind group from dying on the call to remove.
             let bind_group_index =
-                self.texture_deduplicator
-                    .get_or_insert(device, texture_manager_2d, material.to_textures().as_ref());
+                self.texture_deduplicator.get_or_insert(device, texture_manager_2d, material.to_textures().as_ref());
             self.texture_deduplicator.remove(*index);
             *index = bind_group_index;
         }
@@ -244,10 +229,7 @@ impl MaterialManager {
     pub fn archetype_view<M: Material>(&self) -> MaterialArchetypeView<'_, M> {
         let archetype = &self.archetypes[&TypeId::of::<M>()];
 
-        MaterialArchetypeView {
-            buffer: &archetype.buffer,
-            data_vec: archetype.data_vec.downcast_slice().unwrap(),
-        }
+        MaterialArchetypeView { buffer: &archetype.buffer, data_vec: archetype.data_vec.downcast_slice().unwrap() }
     }
 
     pub fn texture_bind_group(&self, index: TextureBindGroupIndex) -> &BindGroup {

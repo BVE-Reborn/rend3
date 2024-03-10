@@ -65,10 +65,7 @@ impl DepthTargets {
             })
         });
 
-        Self {
-            single_sample_mipped,
-            multi_sample,
-        }
+        Self { single_sample_mipped, multi_sample }
     }
 
     pub fn rendering_target(&self) -> RenderTargetHandle {
@@ -123,12 +120,7 @@ impl BaseRenderGraph {
 
         let gpu_skinner = skinning::GpuSkinner::new(&renderer.device, spp);
 
-        Self {
-            interfaces,
-            samplers,
-            gpu_culler,
-            gpu_skinner,
-        }
+        Self { interfaces, samplers, gpu_culler, gpu_skinner }
     }
 
     /// Add this to the rendergraph. This is the function you should start
@@ -263,11 +255,7 @@ impl<'a, 'node> BaseRenderGraphIntermediateState<'a, 'node> {
         });
         let depth = DepthTargets::new(graph, inputs.target.resolution, inputs.target.samples);
         let primary_renderpass = graph::RenderPassTargets {
-            targets: vec![graph::RenderPassTarget {
-                color,
-                resolve,
-                clear: settings.clear_color,
-            }],
+            targets: vec![graph::RenderPassTarget { color, resolve, clear: settings.clear_color }],
             depth_stencil: Some(graph::RenderPassDepthTarget {
                 target: depth.rendering_target(),
                 depth_clear: Some(0.0),
@@ -378,9 +366,7 @@ impl<'a, 'node> BaseRenderGraphIntermediateState<'a, 'node> {
     pub fn pbr_shadow_rendering(&mut self) {
         let iter = zip(&self.shadow_cull, &self.inputs.eval_output.shadows);
         for (shadow_index, (shadow_cull, desc)) in iter.enumerate() {
-            let target = self
-                .shadow
-                .set_viewport(ViewportRect::new(desc.map.offset, UVec2::splat(desc.map.size)));
+            let target = self.shadow.set_viewport(ViewportRect::new(desc.map.offset, UVec2::splat(desc.map.size)));
             let renderpass = graph::RenderPassTargets {
                 targets: vec![],
                 depth_stencil: Some(graph::RenderPassDepthTarget {
@@ -390,10 +376,7 @@ impl<'a, 'node> BaseRenderGraphIntermediateState<'a, 'node> {
                 }),
             };
 
-            let routines = [
-                &self.inputs.routines.pbr.opaque_depth,
-                &self.inputs.routines.pbr.cutout_depth,
-            ];
+            let routines = [&self.inputs.routines.pbr.opaque_depth, &self.inputs.routines.pbr.cutout_depth];
             for routine in routines {
                 routine.add_forward_to_graph(ForwardRoutineArgs {
                     graph: self.graph,
@@ -426,10 +409,7 @@ impl<'a, 'node> BaseRenderGraphIntermediateState<'a, 'node> {
 
     /// Render the PBR materials.
     pub fn pbr_render_opaque_predicted_triangles(&mut self) {
-        let routines = [
-            &self.inputs.routines.pbr.opaque_routine,
-            &self.inputs.routines.pbr.cutout_routine,
-        ];
+        let routines = [&self.inputs.routines.pbr.opaque_routine, &self.inputs.routines.pbr.cutout_routine];
         for routine in routines {
             routine.add_forward_to_graph(ForwardRoutineArgs {
                 graph: self.graph,
@@ -449,10 +429,7 @@ impl<'a, 'node> BaseRenderGraphIntermediateState<'a, 'node> {
 
     /// Render the PBR materials.
     pub fn pbr_render_opaque_residual_triangles(&mut self) {
-        let routines = [
-            &self.inputs.routines.pbr.opaque_routine,
-            &self.inputs.routines.pbr.cutout_routine,
-        ];
+        let routines = [&self.inputs.routines.pbr.opaque_routine, &self.inputs.routines.pbr.cutout_routine];
         for routine in routines {
             routine.add_forward_to_graph(ForwardRoutineArgs {
                 graph: self.graph,
@@ -472,31 +449,23 @@ impl<'a, 'node> BaseRenderGraphIntermediateState<'a, 'node> {
 
     /// Render the PBR materials.
     pub fn pbr_forward_rendering_transparent(&mut self) {
-        self.inputs
-            .routines
-            .pbr
-            .blend_routine
-            .add_forward_to_graph(ForwardRoutineArgs {
-                graph: self.graph,
-                label: "PBR Forward Transparent",
-                camera: CameraSpecifier::Viewport,
-                binding_data: forward::ForwardRoutineBindingData {
-                    whole_frame_uniform_bg: self.forward_uniform_bg,
-                    per_material_bgl: &self.inputs.routines.pbr.per_material,
-                    extra_bgs: None,
-                },
-                culling_source: forward::CullingSource::Residual(self.cull),
-                samples: self.inputs.target.samples,
-                renderpass: self.primary_renderpass.clone(),
-            });
+        self.inputs.routines.pbr.blend_routine.add_forward_to_graph(ForwardRoutineArgs {
+            graph: self.graph,
+            label: "PBR Forward Transparent",
+            camera: CameraSpecifier::Viewport,
+            binding_data: forward::ForwardRoutineBindingData {
+                whole_frame_uniform_bg: self.forward_uniform_bg,
+                per_material_bgl: &self.inputs.routines.pbr.per_material,
+                extra_bgs: None,
+            },
+            culling_source: forward::CullingSource::Residual(self.cull),
+            samples: self.inputs.target.samples,
+            renderpass: self.primary_renderpass.clone(),
+        });
     }
 
     pub fn hi_z(&mut self) {
-        self.inputs
-            .routines
-            .pbr
-            .hi_z
-            .add_hi_z_to_graph(self.graph, self.depth, self.inputs.target.resolution);
+        self.inputs.routines.pbr.hi_z.add_hi_z_to_graph(self.graph, self.depth, self.inputs.target.resolution);
     }
 
     /// Tonemap onto the given render target.

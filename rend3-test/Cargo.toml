@@ -15,9 +15,9 @@ name = "rend3-tests"
 
 [dependencies]
 anyhow = "1"
-env_logger = "0.10"
+env_logger = "0.11"
 flume = { version = "0.11", features = ["spin"] }
-glam = "0.24"
+glam = "0.25"
 image = { version =  "0.24", default-features = false, features = ["png"] }
 rend3 = { path = "../rend3" }
 rend3-routine = { path = "../rend3-routine" }

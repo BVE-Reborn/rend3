@@ -16,9 +16,8 @@ pub fn evaluate_instructions(renderer: &Renderer) -> InstructionEvaluationOutput
     // 16 encoders is a reasonable default
     let mut cmd_bufs = Vec::with_capacity(16);
 
-    let mut encoder = renderer.device.create_command_encoder(&CommandEncoderDescriptor {
-        label: Some("primary encoder"),
-    });
+    let mut encoder =
+        renderer.device.create_command_encoder(&CommandEncoderDescriptor { label: Some("primary encoder") });
 
     let mut data_core = renderer.data_core.lock();
     let data_core = &mut *data_core;
@@ -35,28 +34,16 @@ pub fn evaluate_instructions(renderer: &Renderer) -> InstructionEvaluationOutput
                         &renderer.device,
                     );
                     data_core.skeleton_manager.add(handle, *skeleton);
-                    data_core
-                        .profiler
-                        .try_lock()
-                        .unwrap()
-                        .end_query(&mut encoder, profiler_query);
+                    data_core.profiler.try_lock().unwrap().end_query(&mut encoder, profiler_query);
                 }
-                InstructionKind::AddTexture2D {
-                    handle,
-                    internal_texture,
-                    cmd_buf,
-                } => {
+                InstructionKind::AddTexture2D { handle, internal_texture, cmd_buf } => {
                     cmd_bufs.extend(cmd_buf);
                     data_core.d2_texture_manager.fill(handle, internal_texture);
                 }
-                InstructionKind::AddTexture2DFromTexture { handle, texture } => data_core
-                    .d2_texture_manager
-                    .fill_from_texture(&renderer.device, &mut encoder, handle, texture),
-                InstructionKind::AddTextureCube {
-                    handle,
-                    internal_texture,
-                    cmd_buf,
-                } => {
+                InstructionKind::AddTexture2DFromTexture { handle, texture } => {
+                    data_core.d2_texture_manager.fill_from_texture(&renderer.device, &mut encoder, handle, texture)
+                }
+                InstructionKind::AddTextureCube { handle, internal_texture, cmd_buf } => {
                     cmd_bufs.extend(cmd_buf);
                     data_core.d2c_texture_manager.fill(handle, internal_texture);
                 }
@@ -117,11 +104,7 @@ pub fn evaluate_instructions(renderer: &Renderer) -> InstructionEvaluationOutput
                 InstructionKind::SetCameraData { data } => {
                     data_core.viewport_camera_state.set_data(data);
                 }
-                InstructionKind::DuplicateObject {
-                    src_handle,
-                    dst_handle,
-                    change,
-                } => {
+                InstructionKind::DuplicateObject { src_handle, dst_handle, change } => {
                     data_core.object_manager.duplicate_object(
                         &renderer.device,
                         src_handle,
@@ -174,12 +157,7 @@ pub fn evaluate_instructions(renderer: &Renderer) -> InstructionEvaluationOutput
 
     // Do these in dependency order
     // Level 3
-    data_core.object_manager.evaluate(
-        &renderer.device,
-        &mut encoder,
-        &renderer.scatter,
-        &delayed_object_handles,
-    );
+    data_core.object_manager.evaluate(&renderer.device, &mut encoder, &renderer.scatter, &delayed_object_handles);
 
     // Level 2
     let d2_texture = data_core.d2_texture_manager.evaluate(&renderer.device);
@@ -197,21 +175,13 @@ pub fn evaluate_instructions(renderer: &Renderer) -> InstructionEvaluationOutput
 
     // Level 0
     let d2c_texture = data_core.d2c_texture_manager.evaluate(&renderer.device);
-    let (shadow_target_size, shadows) = data_core
-        .directional_light_manager
-        .evaluate(renderer, &data_core.viewport_camera_state);
+    let (shadow_target_size, shadows) =
+        data_core.directional_light_manager.evaluate(renderer, &data_core.viewport_camera_state);
     data_core.point_light_manager.evaluate(renderer);
     let (mesh_buffer, mesh_cmd_buf) = renderer.mesh_manager.evaluate(&renderer.device);
 
     cmd_bufs.push(mesh_cmd_buf);
     cmd_bufs.push(encoder.finish());
 
-    InstructionEvaluationOutput {
-        cmd_bufs,
-        d2_texture,
-        d2c_texture,
-        shadow_target_size,
-        shadows,
-        mesh_buffer,
-    }
+    InstructionEvaluationOutput { cmd_bufs, d2_texture, d2c_texture, shadow_target_size, shadows, mesh_buffer }
 }

@@ -48,10 +48,9 @@ impl<'a> RenderGraphDataStore<'a> {
     /// Get a rendertarget from the handle to one.
     pub fn get_render_target(&self, dep: DeclaredDependency<RenderTargetHandle>) -> &'a TextureView {
         match dep.handle.resource {
-            GraphSubResource::Texture(name) => self
-                .texture_mapping
-                .get(&name)
-                .expect("internal rendergraph error: failed to get named texture"),
+            GraphSubResource::Texture(name) => {
+                self.texture_mapping.get(&name).expect("internal rendergraph error: failed to get named texture")
+            }
             GraphSubResource::ImportedTexture(name) => self
                 .external_texture_mapping
                 .get(&name)

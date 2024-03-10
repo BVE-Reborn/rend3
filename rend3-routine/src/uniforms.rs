@@ -108,11 +108,8 @@ pub fn add_to_graph<'node>(
         ctx.data_core.directional_light_manager.add_to_bg(&mut bgb);
         ctx.data_core.point_light_manager.add_to_bg(&mut bgb);
 
-        let shadow_uniform_bg = bgb.build(
-            &ctx.renderer.device,
-            Some("shadow uniform bg"),
-            &binding_handles.interfaces.depth_uniform_bgl,
-        );
+        let shadow_uniform_bg =
+            bgb.build(&ctx.renderer.device, Some("shadow uniform bg"), &binding_handles.interfaces.depth_uniform_bgl);
 
         bgb.append_texture_view(shadow_target);
 

@@ -105,9 +105,7 @@ pub struct PerCameraPreviousInvocationsMap {
 }
 impl PerCameraPreviousInvocationsMap {
     pub fn new() -> Self {
-        Self {
-            inner: HashMap::default(),
-        }
+        Self { inner: HashMap::default() }
     }
 
     pub fn get_and_reset_camera(&mut self, camera: CameraSpecifier) -> FastHashMap<RawObjectHandle, u32> {
@@ -131,10 +129,7 @@ pub(super) fn batch_objects<M: Material>(
     let previous_invocation_map = per_camera_previous_invocation_map.get_and_reset_camera(camera_specifier);
     let mut current_invocation_map = FastHashMap::default();
 
-    let mut jobs = ShaderBatchDatas {
-        jobs: Vec::new(),
-        regions: Vec::new(),
-    };
+    let mut jobs = ShaderBatchDatas { jobs: Vec::new(), regions: Vec::new() };
 
     let objects = match ctx.data_core.object_manager.enumerated_objects::<M>() {
         Some(o) => o,
@@ -153,28 +148,19 @@ pub(super) fn batch_objects<M: Material>(
             }
 
             let material = material_archetype.material(*object.material_handle);
-            let bind_group_index = material
-                .bind_group_index
-                .map_gpu(|_| TextureBindGroupIndex::DUMMY)
-                .into_common();
+            let bind_group_index = material.bind_group_index.map_gpu(|_| TextureBindGroupIndex::DUMMY).into_common();
 
             let material_key = material.inner.key();
             let sorting = material.inner.sorting();
 
-            let mut distance_sq = ctx
-                .data_core
-                .viewport_camera_state
-                .location()
-                .distance_squared(object.location.into());
+            let mut distance_sq =
+                ctx.data_core.viewport_camera_state.location().distance_squared(object.location.into());
             if sorting.order == SortingOrder::BackToFront {
                 distance_sq = -distance_sq;
             }
             sorted_objects.push((
                 ShaderJobSortingKey {
-                    job_key: ShaderJobKey {
-                        material_key,
-                        bind_group_index,
-                    },
+                    job_key: ShaderJobKey { material_key, bind_group_index },
                     distance: OrderedFloat(distance_sq),
                     sorting_reason: sorting.reason,
                 },
@@ -202,16 +188,7 @@ pub(super) fn batch_objects<M: Material>(
 
         let max_dispatch_count = ctx.renderer.limits.max_compute_workgroups_per_dimension;
 
-        for (
-            ShaderJobSortingKey {
-                job_key: key,
-                sorting_reason,
-                ..
-            },
-            handle,
-            object,
-        ) in sorted_objects
-        {
+        for (ShaderJobSortingKey { job_key: key, sorting_reason, .. }, handle, object) in sorted_objects {
             let invocation_count = object.inner.index_count / 3;
 
             let key_difference = key != current_key;
@@ -219,10 +196,7 @@ pub(super) fn batch_objects<M: Material>(
             let dispatch_limit = (current_invocation + invocation_count) >= max_dispatch_count * WORKGROUP_SIZE;
 
             if key_difference || object_limit || dispatch_limit {
-                jobs.regions.push(JobSubRegion {
-                    job_index: jobs.jobs.len() as u32,
-                    key: current_key,
-                });
+                jobs.regions.push(JobSubRegion { job_index: jobs.jobs.len() as u32, key: current_key });
                 current_region_idx += 1;
                 current_key = key;
                 current_region_object_index = 0;
@@ -261,10 +235,7 @@ pub(super) fn batch_objects<M: Material>(
             current_invocation += round_up(invocation_count, WORKGROUP_SIZE);
         }
 
-        jobs.regions.push(JobSubRegion {
-            job_index: jobs.jobs.len() as u32,
-            key: current_key,
-        });
+        jobs.regions.push(JobSubRegion { job_index: jobs.jobs.len() as u32, key: current_key });
         jobs.jobs.push(ShaderBatchData {
             object_culling_information: current_ranges,
             total_objects: current_object_index,

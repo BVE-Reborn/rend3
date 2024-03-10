@@ -48,11 +48,7 @@ impl SkyboxRoutine {
 
         let pipelines = SkyboxPipelines::new(renderer, spp, interfaces, &bgl);
 
-        Self {
-            current_skybox: StoredSkybox { bg: None, handle: None },
-            bgl,
-            pipelines,
-        }
+        Self { current_skybox: StoredSkybox { bg: None, handle: None }, bgl, pipelines }
     }
 
     /// Set the current background texture. Bad things will happen if this isn't
@@ -130,8 +126,7 @@ impl SkyboxPipelines {
         let skybox_sm = renderer.device.create_shader_module(ShaderModuleDescriptor {
             label: Some("skybox vert"),
             source: ShaderSource::Wgsl(Cow::Owned(
-                spp.render_shader("rend3-routine/skybox.wgsl", &ShaderConfig::default(), None)
-                    .unwrap(),
+                spp.render_shader("rend3-routine/skybox.wgsl", &ShaderConfig::default(), None).unwrap(),
             )),
         });
 
@@ -145,11 +140,7 @@ impl SkyboxPipelines {
             renderer.device.create_render_pipeline(&RenderPipelineDescriptor {
                 label: Some("skybox pass"),
                 layout: Some(&pll),
-                vertex: VertexState {
-                    module: &skybox_sm,
-                    entry_point: "vs_main",
-                    buffers: &[],
-                },
+                vertex: VertexState { module: &skybox_sm, entry_point: "vs_main", buffers: &[] },
                 primitive: PrimitiveState {
                     topology: PrimitiveTopology::TriangleList,
                     strip_index_format: None,
@@ -166,10 +157,7 @@ impl SkyboxPipelines {
                     stencil: StencilState::default(),
                     bias: DepthBiasState::default(),
                 }),
-                multisample: MultisampleState {
-                    count: samples as u32,
-                    ..Default::default()
-                },
+                multisample: MultisampleState { count: samples as u32, ..Default::default() },
                 fragment: Some(FragmentState {
                     module: &skybox_sm,
                     entry_point: "fs_main",
@@ -183,9 +171,6 @@ impl SkyboxPipelines {
             })
         };
 
-        Self {
-            pipeline_s1: inner(SampleCount::One),
-            pipeline_s4: inner(SampleCount::Four),
-        }
+        Self { pipeline_s1: inner(SampleCount::One), pipeline_s4: inner(SampleCount::Four) }
     }
 }

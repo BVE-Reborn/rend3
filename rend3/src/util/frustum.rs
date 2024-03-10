@@ -16,10 +16,7 @@ impl BoundingSphere {
         let center = find_mesh_center(mesh);
         let radius = find_mesh_bounding_sphere_radius(center, mesh);
 
-        Self {
-            center: Vec3::from(center),
-            radius,
-        }
+        Self { center: Vec3::from(center), radius }
     }
 
     pub fn apply_transform(self, matrix: Mat4) -> Self {
@@ -27,20 +24,11 @@ impl BoundingSphere {
             .x_axis
             .xyz()
             .length_squared()
-            .max(
-                matrix
-                    .y_axis
-                    .xyz()
-                    .length_squared()
-                    .max(matrix.z_axis.xyz().length_squared()),
-            )
+            .max(matrix.y_axis.xyz().length_squared().max(matrix.z_axis.xyz().length_squared()))
             .sqrt();
         let center = matrix * self.center.extend(1.0);
 
-        Self {
-            center: center.truncate(),
-            radius: max_scale * self.radius,
-        }
+        Self { center: center.truncate(), radius: max_scale * self.radius }
     }
 }
 
@@ -64,9 +52,7 @@ fn find_mesh_center(mesh: &[Vec3]) -> Vec3A {
 }
 
 fn find_mesh_bounding_sphere_radius(mesh_center: Vec3A, mesh: &[Vec3]) -> f32 {
-    mesh.iter().fold(0.0, |distance, pos| {
-        distance.max((Vec3A::from(*pos) - mesh_center).length())
-    })
+    mesh.iter().fold(0.0, |distance, pos| distance.max((Vec3A::from(*pos) - mesh_center).length()))
 }
 
 /// Represents a plane as a vec4 (or vec3 + f32)
@@ -78,10 +64,7 @@ pub struct Plane {
 
 impl Plane {
     pub fn new(a: f32, b: f32, c: f32, d: f32) -> Self {
-        Self {
-            abc: Vec3::new(a, b, c),
-            d,
-        }
+        Self { abc: Vec3::new(a, b, c), d }
     }
 
     pub fn normalize(mut self) -> Self {

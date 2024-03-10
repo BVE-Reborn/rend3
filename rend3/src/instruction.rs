@@ -131,10 +131,7 @@ pub struct InstructionStreamPair {
 }
 impl InstructionStreamPair {
     pub fn new() -> Self {
-        Self {
-            producer: Mutex::new(Vec::new()),
-            consumer: Mutex::new(Vec::new()),
-        }
+        Self { producer: Mutex::new(Vec::new()), consumer: Mutex::new(Vec::new()) }
     }
 
     pub fn swap(&self) {

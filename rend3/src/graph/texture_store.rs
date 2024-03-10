@@ -19,9 +19,7 @@ pub(crate) struct GraphTextureStore {
 }
 impl GraphTextureStore {
     pub fn new() -> Self {
-        Self {
-            textures: FastHashMap::with_capacity_and_hasher(32, FastBuildHasher::default()),
-        }
+        Self { textures: FastHashMap::with_capacity_and_hasher(32, FastBuildHasher::default()) }
     }
 
     pub fn get_texture(&mut self, device: &Device, desc: RenderTargetCore) -> Arc<Texture> {
@@ -32,11 +30,7 @@ impl GraphTextureStore {
 
         Arc::new(device.create_texture(&TextureDescriptor {
             label: None,
-            size: Extent3d {
-                width: desc.resolution.x,
-                height: desc.resolution.y,
-                depth_or_array_layers: 1,
-            },
+            size: Extent3d { width: desc.resolution.x, height: desc.resolution.y, depth_or_array_layers: 1 },
             mip_level_count: desc.mip_count() as u32,
             sample_count: desc.samples as _,
             dimension: TextureDimension::D2,

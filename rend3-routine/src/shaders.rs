@@ -98,11 +98,8 @@ mod tests {
             for config in configs {
                 println!("Testing shader {shader} with config {config:?}");
 
-                let output = pp.render_shader(
-                    shader,
-                    &config,
-                    Some(&ShaderVertexBufferConfig::from_material::<PbrMaterial>()),
-                );
+                let output =
+                    pp.render_shader(shader, &config, Some(&ShaderVertexBufferConfig::from_material::<PbrMaterial>()));
 
                 assert!(output.is_ok(), "Expected preprocessing success, got {output:?}");
                 let output = output.unwrap_or_else(|e| panic!("Expected preprocessing success, got {e:?}"));

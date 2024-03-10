@@ -40,15 +40,9 @@ pub enum TextureCreationError {
     #[error("Failed to create texture view")]
     TextureViewCreationFailed(#[source] wgpu::Error),
     #[error("Textures formats must allow filtering with a linear filter. {format:?} has sample type {sample_type:?} which does not.")]
-    TextureFormatNotFilterable {
-        format: TextureFormat,
-        sample_type: TextureSampleType,
-    },
+    TextureFormatNotFilterable { format: TextureFormat, sample_type: TextureSampleType },
     #[error("Textures formats must be sample-able as floating point. {format:?} has sample type {sample_type:?}.")]
-    TextureFormatNotFloat {
-        format: TextureFormat,
-        sample_type: Option<TextureSampleType>,
-    },
+    TextureFormatNotFloat { format: TextureFormat, sample_type: Option<TextureSampleType> },
     #[error("Mipmap creation failed")]
     MipmapCreationFailed(#[from] MipmapGenerationError),
 }
@@ -87,10 +81,8 @@ impl<T: 'static> TextureManager<T> {
         data.resize_with(TEXTURE_PREALLOCATION, || None);
 
         let layout = profile.into_data(|| (), || create_bind_group_layout(device, max_textures, dimension));
-        let group = profile.into_data(
-            || (),
-            || create_bind_group(device, layout.as_gpu(), &null_view, &data, dimension),
-        );
+        let group =
+            profile.into_data(|| (), || create_bind_group(device, layout.as_gpu(), &null_view, &data, dimension));
 
         Self {
             layout,
@@ -108,7 +100,7 @@ impl<T: 'static> TextureManager<T> {
         texture: crate::types::Texture,
         cube: bool,
     ) -> Result<(Option<CommandBuffer>, InternalTexture), TextureCreationError> {
-        validate_texture_format(texture.format, renderer.device.features())?;
+        validate_texture_format(texture.format, renderer.features)?;
 
         let (block_x, block_y) = texture.format.block_dimensions();
         let size = Extent3d {
@@ -154,10 +146,7 @@ impl<T: 'static> TextureManager<T> {
             MipmapSource::Generated => {
                 assert!(!cube, "Cannot generate mipmaps from cubemaps currently");
 
-                let desc = TextureDescriptor {
-                    usage: desc.usage | TextureUsages::RENDER_ATTACHMENT,
-                    ..desc
-                };
+                let desc = TextureDescriptor { usage: desc.usage | TextureUsages::RENDER_ATTACHMENT, ..desc };
                 let scope = AllocationErrorScope::new(&renderer.device);
                 let tex = renderer.device.create_texture(&desc);
                 scope.end().map_err(TextureCreationError::TextureAllocationFailed)?;
@@ -184,14 +173,10 @@ impl<T: 'static> TextureManager<T> {
                 );
                 scope.end().map_err(TextureCreationError::WriteTextureFailed)?;
 
-                let mut encoder = renderer
-                    .device
-                    .create_command_encoder(&CommandEncoderDescriptor::default());
+                let mut encoder = renderer.device.create_command_encoder(&CommandEncoderDescriptor::default());
 
                 // generate mipmaps
-                renderer
-                    .mipmap_generator
-                    .generate_mipmaps(&renderer.device, &mut encoder, &tex, &desc)?;
+                renderer.mipmap_generator.generate_mipmaps(&renderer.device, &mut encoder, &tex, &desc)?;
 
                 (Some(encoder.finish()), tex)
             }
@@ -207,14 +192,7 @@ impl<T: 'static> TextureManager<T> {
         });
         scope.end().map_err(TextureCreationError::TextureViewCreationFailed)?;
 
-        Ok((
-            buffer,
-            InternalTexture {
-                texture: tex,
-                view,
-                desc,
-            },
-        ))
+        Ok((buffer, InternalTexture { texture: tex, view, desc }))
     }
 
     pub fn fill_from_texture(
@@ -224,23 +202,15 @@ impl<T: 'static> TextureManager<T> {
         dst_handle: RawResourceHandle<T>,
         texture: TextureFromTexture,
     ) {
-        let InternalTexture {
-            texture: old_texture,
-            desc: old_texture_desc,
-            ..
-        } = self.data[texture.src.idx].as_ref().unwrap();
+        let InternalTexture { texture: old_texture, desc: old_texture_desc, .. } =
+            self.data[texture.src.idx].as_ref().unwrap();
 
         let new_size = old_texture_desc.mip_level_size(texture.start_mip).unwrap();
 
-        let mip_level_count = texture
-            .mip_count
-            .map_or_else(|| old_texture_desc.mip_level_count - texture.start_mip, |c| c.get());
+        let mip_level_count =
+            texture.mip_count.map_or_else(|| old_texture_desc.mip_level_count - texture.start_mip, |c| c.get());
 
-        let desc = TextureDescriptor {
-            size: new_size,
-            mip_level_count,
-            ..old_texture_desc.clone()
-        };
+        let desc = TextureDescriptor { size: new_size, mip_level_count, ..old_texture_desc.clone() };
 
         let tex = device.create_texture(&desc);
 
@@ -268,14 +238,7 @@ impl<T: 'static> TextureManager<T> {
             );
         }
 
-        self.fill(
-            dst_handle,
-            InternalTexture {
-                texture: tex,
-                view,
-                desc,
-            },
-        )
+        self.fill(dst_handle, InternalTexture { texture: tex, view, desc })
     }
 
     pub fn fill(&mut self, handle: RawResourceHandle<T>, internal_texture: InternalTexture) {
@@ -300,23 +263,14 @@ impl<T: 'static> TextureManager<T> {
             profiling::scope!("Update GPU Texture Arrays");
 
             if group_dirty {
-                *self.group.as_gpu_mut() = create_bind_group(
-                    device,
-                    self.layout.as_gpu(),
-                    &self.null_view,
-                    &self.data,
-                    self.dimension,
-                );
+                *self.group.as_gpu_mut() =
+                    create_bind_group(device, self.layout.as_gpu(), &self.null_view, &self.data, self.dimension);
                 *self.group_dirty.as_gpu_mut() = false;
             }
 
-            TextureManagerEvaluateOutput {
-                bg: self.group.as_ref().map(|_| (), Arc::clone),
-            }
+            TextureManagerEvaluateOutput { bg: self.group.as_ref().map(|_| (), Arc::clone) }
         } else {
-            TextureManagerEvaluateOutput {
-                bg: ProfileData::Cpu(()),
-            }
+            TextureManagerEvaluateOutput { bg: ProfileData::Cpu(()) }
         }
     }
 
@@ -379,10 +333,7 @@ fn create_bind_group(
     Arc::new(device.create_bind_group(&BindGroupDescriptor {
         label: Some(&*format!("{:?} texture bg count {}", dimension, count)),
         layout,
-        entries: &[BindGroupEntry {
-            binding: 0,
-            resource: BindingResource::TextureViewArray(&view_array),
-        }],
+        entries: &[BindGroupEntry { binding: 0, resource: BindingResource::TextureViewArray(&view_array) }],
     }))
 }
 
@@ -412,20 +363,16 @@ fn create_null_tex_view(device: &Device, dimension: TextureViewDimension) -> Tex
             usage: TextureUsages::TEXTURE_BINDING,
             view_formats: &[],
         })
-        .create_view(&TextureViewDescriptor {
-            dimension: Some(dimension),
-            ..TextureViewDescriptor::default()
-        })
+        .create_view(&TextureViewDescriptor { dimension: Some(dimension), ..TextureViewDescriptor::default() })
 }
 
 fn validate_texture_format(format: TextureFormat, features: Features) -> Result<(), TextureCreationError> {
     let sample_type = format.sample_type(None, Some(features));
     match sample_type {
         Some(TextureSampleType::Float { filterable: true }) => Ok(()),
-        Some(TextureSampleType::Float { filterable: false }) => Err(TextureCreationError::TextureFormatNotFilterable {
-            format,
-            sample_type: sample_type.unwrap(),
-        }),
+        Some(TextureSampleType::Float { filterable: false }) => {
+            Err(TextureCreationError::TextureFormatNotFilterable { format, sample_type: sample_type.unwrap() })
+        }
         _ => Err(TextureCreationError::TextureFormatNotFloat { format, sample_type }),
     }
 }

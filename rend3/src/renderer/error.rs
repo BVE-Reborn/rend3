@@ -41,17 +41,8 @@ pub enum LimitType {
 pub enum RendererInitializationError {
     #[error("No supported adapter found")]
     MissingAdapter,
-    #[error(
-        "The device limit of {:?} is {} but renderer requires at least {}",
-        ty,
-        device_limit,
-        required_limit
-    )]
-    LowDeviceLimit {
-        ty: LimitType,
-        device_limit: u64,
-        required_limit: u64,
-    },
+    #[error("The device limit of {:?} is {} but renderer requires at least {}", ty, device_limit, required_limit)]
+    LowDeviceLimit { ty: LimitType, device_limit: u64, required_limit: u64 },
     #[error("Device is missing required features: {:?}", features)]
     MissingDeviceFeatures { features: Features },
     #[error("Requesting a device failed")]

@@ -14,19 +14,12 @@ pub struct BindGroupLayoutBuilder {
 }
 impl BindGroupLayoutBuilder {
     pub fn new() -> Self {
-        Self {
-            bgl_entries: Vec::with_capacity(16),
-        }
+        Self { bgl_entries: Vec::with_capacity(16) }
     }
 
     pub fn append(&mut self, visibility: ShaderStages, ty: BindingType, count: Option<NonZeroU32>) -> &mut Self {
         let binding = self.bgl_entries.len() as u32;
-        self.bgl_entries.push(BindGroupLayoutEntry {
-            binding,
-            visibility,
-            ty,
-            count,
-        });
+        self.bgl_entries.push(BindGroupLayoutEntry { binding, visibility, ty, count });
         self
     }
 
@@ -49,10 +42,7 @@ impl BindGroupLayoutBuilder {
     }
 
     pub fn build(&self, device: &Device, label: Option<&str>) -> BindGroupLayout {
-        device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-            label,
-            entries: &self.bgl_entries,
-        })
+        device.create_bind_group_layout(&BindGroupLayoutDescriptor { label, entries: &self.bgl_entries })
     }
 }
 
@@ -68,17 +58,12 @@ pub struct BindGroupBuilder<'a> {
 }
 impl<'a> BindGroupBuilder<'a> {
     pub fn new() -> Self {
-        Self {
-            bg_entries: Vec::with_capacity(16),
-        }
+        Self { bg_entries: Vec::with_capacity(16) }
     }
 
     pub fn append(&mut self, resource: BindingResource<'a>) -> &mut Self {
         let index = self.bg_entries.len();
-        self.bg_entries.push(BindGroupEntry {
-            binding: index as u32,
-            resource,
-        });
+        self.bg_entries.push(BindGroupEntry { binding: index as u32, resource });
         self
     }
 
@@ -88,20 +73,12 @@ impl<'a> BindGroupBuilder<'a> {
     }
 
     pub fn append_buffer_with_size(&mut self, buffer: &'a Buffer, size: u64) -> &mut Self {
-        self.append(BindingResource::Buffer(BufferBinding {
-            buffer,
-            offset: 0,
-            size: NonZeroU64::new(size),
-        }));
+        self.append(BindingResource::Buffer(BufferBinding { buffer, offset: 0, size: NonZeroU64::new(size) }));
         self
     }
 
     pub fn append_buffer_with_offset_and_size(&mut self, buffer: &'a Buffer, offset: u64, size: u64) -> &mut Self {
-        self.append(BindingResource::Buffer(BufferBinding {
-            buffer,
-            offset,
-            size: NonZeroU64::new(size),
-        }));
+        self.append(BindingResource::Buffer(BufferBinding { buffer, offset, size: NonZeroU64::new(size) }));
         self
     }
 
@@ -121,11 +98,7 @@ impl<'a> BindGroupBuilder<'a> {
     }
 
     pub fn build(&self, device: &Device, label: Option<&str>, bgl: &BindGroupLayout) -> BindGroup {
-        device.create_bind_group(&BindGroupDescriptor {
-            label,
-            layout: bgl,
-            entries: &self.bg_entries,
-        })
+        device.create_bind_group(&BindGroupDescriptor { label, layout: bgl, entries: &self.bg_entries })
     }
 }
 

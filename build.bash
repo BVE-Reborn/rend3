@@ -12,12 +12,12 @@ case $1 in
         else
             WASM_BUILD_DIR=debug
         fi
-        cargo build --target wasm32-unknown-unknown $BUILD_FLAGS --bin $@
+        cargo build --target wasm32-unknown-unknown $BUILD_FLAGS --bin rend3-examples
         mkdir -p target/generated/
         rm -rf target/generated/*
-        cp -r examples/$1/resources target/generated/ || true
+        cp -r examples/src/$1/resources target/generated/ || true
         sed "s/{{example}}/$1/g" > target/generated/index.html < examples/resources/index.html
-        wasm-bindgen --out-dir target/generated --target web target/wasm32-unknown-unknown/$WASM_BUILD_DIR/$1.wasm
+        wasm-bindgen --out-dir target/generated --target web target/wasm32-unknown-unknown/$WASM_BUILD_DIR/rend3-examples.wasm
     ;;
     serve)
         shift

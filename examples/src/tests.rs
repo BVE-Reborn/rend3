@@ -20,12 +20,8 @@ pub async fn test_app<A: App<T>, T: 'static>(mut config: TestConfiguration<A>) -
     let iad =
         rend3_test::no_gpu_return!(config.app.create_iad().await).context("InstanceAdapterDevice creation failed")?;
 
-    let renderer = rend3::Renderer::new(
-        iad.clone(),
-        A::HANDEDNESS,
-        Some(config.size.x as f32 / config.size.y as f32),
-    )
-    .unwrap();
+    let renderer =
+        rend3::Renderer::new(iad.clone(), A::HANDEDNESS, Some(config.size.x as f32 / config.size.y as f32)).unwrap();
 
     let mut spp = rend3::ShaderPreProcessor::new();
     rend3_routine::builtin_shaders(&mut spp);
@@ -40,11 +36,7 @@ pub async fn test_app<A: App<T>, T: 'static>(mut config: TestConfiguration<A>) -
             &base_rendergraph.interfaces,
             &base_rendergraph.gpu_culler.culling_buffer_map_handle,
         )),
-        skybox: Mutex::new(rend3_routine::skybox::SkyboxRoutine::new(
-            &renderer,
-            &spp,
-            &base_rendergraph.interfaces,
-        )),
+        skybox: Mutex::new(rend3_routine::skybox::SkyboxRoutine::new(&renderer, &spp, &base_rendergraph.interfaces)),
         tonemapping: Mutex::new(rend3_routine::tonemapping::TonemappingRoutine::new(
             &renderer,
             &spp,
@@ -66,11 +58,7 @@ pub async fn test_app<A: App<T>, T: 'static>(mut config: TestConfiguration<A>) -
 
     let texture = renderer.device.create_texture(&wgpu::TextureDescriptor {
         label: Some("Render Texture"),
-        size: wgpu::Extent3d {
-            width: config.size.x,
-            height: config.size.y,
-            depth_or_array_layers: 1,
-        },
+        size: wgpu::Extent3d { width: config.size.x, height: config.size.y, depth_or_array_layers: 1 },
         mip_level_count: 1,
         sample_count: 1,
         dimension: wgpu::TextureDimension::D2,

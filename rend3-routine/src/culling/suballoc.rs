@@ -137,11 +137,7 @@ impl InputOutputBuffer {
     pub fn write_to_output<T: ShaderType + WriteInto>(&self, queue: &wgpu::Queue, data: &T) {
         assert_eq!(data.size().get(), self.output_partition_elements * self.element_size);
         let mut mapping = queue
-            .write_buffer_with(
-                &self.buffer,
-                self.element_offset(InputOutputPartition::Output, 0),
-                data.size(),
-            )
+            .write_buffer_with(&self.buffer, self.element_offset(InputOutputPartition::Output, 0), data.size())
             .unwrap();
         StorageBuffer::new(&mut *mapping).write(data).unwrap();
         drop(mapping);

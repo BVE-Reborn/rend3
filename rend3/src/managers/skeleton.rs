@@ -44,10 +44,7 @@ pub enum SkeletonCreationError {
         "Not enough joints to create this skeleton. The mesh has {mesh_joint_count} joints, \
          but only {joint_matrix_count} joint matrices were provided."
     )]
-    NotEnoughJoints {
-        mesh_joint_count: u16,
-        joint_matrix_count: usize,
-    },
+    NotEnoughJoints { mesh_joint_count: u16, joint_matrix_count: usize },
 }
 
 /// Manages skeletons.
@@ -64,11 +61,7 @@ impl SkeletonManager {
     pub fn new() -> Self {
         profiling::scope!("SkeletonManager::new");
 
-        Self {
-            data: Vec::new(),
-            skeleton_count: 0,
-            global_joint_count: 0,
-        }
+        Self { data: Vec::new(), skeleton_count: 0, global_joint_count: 0 }
     }
 
     pub fn validate_skeleton(
@@ -77,9 +70,8 @@ impl SkeletonManager {
         skeleton: Skeleton,
     ) -> Result<InternalSkeleton, SkeletonCreationError> {
         let internal_mesh = &mesh_manager.lock_internal_data()[skeleton.mesh.get_raw()];
-        let required_joint_count = internal_mesh
-            .required_joint_count
-            .ok_or(SkeletonCreationError::MissingAttributesJointIndices)?;
+        let required_joint_count =
+            internal_mesh.required_joint_count.ok_or(SkeletonCreationError::MissingAttributesJointIndices)?;
 
         let joint_weight_range = internal_mesh
             .get_attribute(&VERTEX_ATTRIBUTE_JOINT_WEIGHTS)
@@ -96,11 +88,7 @@ impl SkeletonManager {
             });
         }
 
-        let overridden_attributes = [
-            &VERTEX_ATTRIBUTE_POSITION,
-            &VERTEX_ATTRIBUTE_NORMAL,
-            &VERTEX_ATTRIBUTE_TANGENT,
-        ];
+        let overridden_attributes = [&VERTEX_ATTRIBUTE_POSITION, &VERTEX_ATTRIBUTE_NORMAL, &VERTEX_ATTRIBUTE_TANGENT];
 
         let mut source_attribute_ranges: ArrayVec<_, 5> = ArrayVec::new();
         source_attribute_ranges.push((*VERTEX_ATTRIBUTE_JOINT_WEIGHTS.id(), joint_weight_range));

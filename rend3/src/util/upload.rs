@@ -16,19 +16,11 @@ pub struct UploadChainer<'a> {
 
 impl<'a> UploadChainer<'a> {
     pub fn new() -> Self {
-        Self {
-            staging_buffer: None,
-            uploads: Vec::new(),
-            total_size: 0,
-        }
+        Self { staging_buffer: None, uploads: Vec::new(), total_size: 0 }
     }
 
     pub fn add(&mut self, offset: u64, data: &'a [u8]) {
-        self.uploads.push(Upload {
-            staging_offset: self.total_size,
-            offset,
-            data,
-        });
+        self.uploads.push(Upload { staging_offset: self.total_size, offset, data });
         self.total_size += data.len() as u64;
     }
 

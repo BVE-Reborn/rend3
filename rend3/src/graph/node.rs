@@ -102,10 +102,7 @@ impl<'a, 'node> RenderGraphNodeBuilder<'a, 'node> {
         targets: RenderPassTargets,
         usage: NodeResourceUsage,
     ) -> DeclaredDependency<RenderPassHandle> {
-        assert!(
-            self.rpass.is_none(),
-            "Cannot have more than one graph-associated renderpass per node."
-        );
+        assert!(self.rpass.is_none(), "Cannot have more than one graph-associated renderpass per node.");
         for targets in &targets.targets {
             self.add_render_target(targets.color, usage);
             self.add_optional_render_target(targets.resolve, usage);
@@ -114,9 +111,7 @@ impl<'a, 'node> RenderGraphNodeBuilder<'a, 'node> {
             self.add_render_target(depth_stencil.target, usage);
         }
         self.rpass = Some(targets);
-        DeclaredDependency {
-            handle: RenderPassHandle,
-        }
+        DeclaredDependency { handle: RenderPassHandle }
     }
 
     /// Declares use of a data handle for reading.

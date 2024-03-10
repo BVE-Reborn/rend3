@@ -23,37 +23,19 @@ impl Samplers {
         let nearest = create_sampler(device, FilterMode::Nearest, None);
         let shadow = create_sampler(device, FilterMode::Linear, Some(CompareFunction::GreaterEqual));
 
-        Self {
-            linear,
-            nearest,
-            shadow,
-        }
+        Self { linear, nearest, shadow }
     }
 
     /// Add the samplers to the given bind group layout builder.
     pub fn add_to_bgl(bglb: &mut BindGroupLayoutBuilder) {
-        bglb.append(
-            ShaderStages::FRAGMENT,
-            BindingType::Sampler(SamplerBindingType::Filtering),
-            None,
-        )
-        .append(
-            ShaderStages::FRAGMENT,
-            BindingType::Sampler(SamplerBindingType::NonFiltering),
-            None,
-        )
-        .append(
-            ShaderStages::FRAGMENT,
-            BindingType::Sampler(SamplerBindingType::Comparison),
-            None,
-        );
+        bglb.append(ShaderStages::FRAGMENT, BindingType::Sampler(SamplerBindingType::Filtering), None)
+            .append(ShaderStages::FRAGMENT, BindingType::Sampler(SamplerBindingType::NonFiltering), None)
+            .append(ShaderStages::FRAGMENT, BindingType::Sampler(SamplerBindingType::Comparison), None);
     }
 
     /// Add the samplers to the given bind group builder.
     pub fn add_to_bg<'a>(&'a self, bgb: &mut BindGroupBuilder<'a>) {
-        bgb.append_sampler(&self.linear)
-            .append_sampler(&self.nearest)
-            .append_sampler(&self.shadow);
+        bgb.append_sampler(&self.linear).append_sampler(&self.nearest).append_sampler(&self.shadow);
     }
 }
 

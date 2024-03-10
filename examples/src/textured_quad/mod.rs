@@ -111,11 +111,7 @@ impl rend3_framework::App for TexturedQuadExample {
     }
 
     fn handle_event(&mut self, context: rend3_framework::EventContext<'_>, event: winit::event::Event<()>) {
-        if let winit::event::Event::WindowEvent {
-            event: winit::event::WindowEvent::Resized(size),
-            ..
-        } = event
-        {
+        if let winit::event::Event::WindowEvent { event: winit::event::WindowEvent::Resized(size), .. } = event {
             let size = glam::UVec2::new(size.width, size.height);
             // Reset camera
             context.renderer.set_camera_data(rend3::types::Camera {
@@ -176,12 +172,7 @@ impl rend3_framework::App for TexturedQuadExample {
 
 pub fn main() {
     let app = TexturedQuadExample::default();
-    rend3_framework::start(
-        app,
-        winit::window::WindowBuilder::new()
-            .with_title("textured-quad")
-            .with_maximized(true),
-    )
+    rend3_framework::start(app, winit::window::WindowBuilder::new().with_title("textured-quad").with_maximized(true))
 }
 
 #[cfg(test)]
