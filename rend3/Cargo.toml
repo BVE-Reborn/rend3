@@ -41,7 +41,7 @@ bytemuck = "1"
 encase = { version = "0.6" }
 flume = "0.11"
 glam = { version = "0.24.0", features = ["bytemuck"] }
-handlebars = "4"
+handlebars = "5"
 indexmap = "2"
 list-any = "0.2"
 log = "0.4"
