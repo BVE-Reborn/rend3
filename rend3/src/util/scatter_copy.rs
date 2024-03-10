@@ -17,10 +17,7 @@ pub struct ScatterData<T> {
 }
 impl<T> ScatterData<T> {
     pub fn new(byte_offset: u32, data: T) -> Self {
-        Self {
-            word_offset: byte_offset / 4,
-            data,
-        }
+        Self { word_offset: byte_offset / 4, data }
     }
 }
 
@@ -123,15 +120,14 @@ impl ScatterCopy {
         drop(mapped_range);
         source_buffer.unmap();
 
-        let bg = BindGroupBuilder::new()
-            .append_buffer(&source_buffer)
-            .append_buffer(destination_buffer)
-            .build(device, Some("ScatterCopy temporary bind group"), &self.bgl);
+        let bg = BindGroupBuilder::new().append_buffer(&source_buffer).append_buffer(destination_buffer).build(
+            device,
+            Some("ScatterCopy temporary bind group"),
+            &self.bgl,
+        );
 
-        let mut cpass = encoder.begin_compute_pass(&ComputePassDescriptor {
-            label: Some("ScatterCopy cpass"),
-            timestamp_writes: None,
-        });
+        let mut cpass = encoder
+            .begin_compute_pass(&ComputePassDescriptor { label: Some("ScatterCopy cpass"), timestamp_writes: None });
         cpass.set_pipeline(&self.pipeline);
         cpass.set_bind_group(0, &bg, &[]);
         cpass.dispatch_workgroups(div_round_up(count_u32, 64), 1, 1);
@@ -153,10 +149,8 @@ mod test {
     impl TestContext {
         fn new() -> Option<Self> {
             let backends = wgpu::util::backend_bits_from_env().unwrap_or(wgpu::Backends::all());
-            let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-                backends,
-                ..wgpu::InstanceDescriptor::default()
-            });
+            let instance =
+                wgpu::Instance::new(wgpu::InstanceDescriptor { backends, ..wgpu::InstanceDescriptor::default() });
             let adapter = pollster::block_on(wgpu::util::initialize_adapter_from_env_or_default(&instance, None))?;
             let (device, queue) = pollster::block_on(adapter.request_device(
                 &wgpu::DeviceDescriptor {
@@ -180,8 +174,7 @@ mod test {
         }
 
         fn encoder(&self) -> wgpu::CommandEncoder {
-            self.device
-                .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None })
+            self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None })
         }
 
         fn readback<T: bytemuck::Pod>(
@@ -222,15 +215,7 @@ mod test {
 
         let mut encoder = ctx.encoder();
 
-        scatter.execute_copy(
-            &ctx.device,
-            &mut encoder,
-            &buffer,
-            [ScatterData {
-                word_offset: 0,
-                data: 1.0_f32,
-            }],
-        );
+        scatter.execute_copy(&ctx.device, &mut encoder, &buffer, [ScatterData { word_offset: 0, data: 1.0_f32 }]);
 
         assert_eq!(&ctx.readback::<f32>(encoder, &buffer, 16), &[1.0, 5.0, 5.0, 5.0]);
     }
@@ -251,16 +236,7 @@ mod test {
             &ctx.device,
             &mut encoder,
             &buffer,
-            [
-                ScatterData {
-                    word_offset: 0,
-                    data: 1.0_f32,
-                },
-                ScatterData {
-                    word_offset: 2,
-                    data: 3.0_f32,
-                },
-            ],
+            [ScatterData { word_offset: 0, data: 1.0_f32 }, ScatterData { word_offset: 2, data: 3.0_f32 }],
         );
 
         assert_eq!(&ctx.readback::<f32>(encoder, &buffer, 16), &[1.0, 5.0, 3.0, 5.0]);
@@ -283,20 +259,11 @@ mod test {
             &mut encoder,
             &buffer,
             [
-                ScatterData {
-                    word_offset: 0,
-                    data: [1.0_f32, 2.0_f32],
-                },
-                ScatterData {
-                    word_offset: 4,
-                    data: [5.0_f32, 6.0_f32],
-                },
+                ScatterData { word_offset: 0, data: [1.0_f32, 2.0_f32] },
+                ScatterData { word_offset: 4, data: [5.0_f32, 6.0_f32] },
             ],
         );
 
-        assert_eq!(
-            &ctx.readback::<[f32; 2]>(encoder, &buffer, 32),
-            &[[1.0, 2.0], [9.0, 9.0], [5.0, 6.0], [9.0, 9.0]]
-        );
+        assert_eq!(&ctx.readback::<[f32; 2]>(encoder, &buffer, 32), &[[1.0, 2.0], [9.0, 9.0], [5.0, 6.0], [9.0, 9.0]]);
     }
 }

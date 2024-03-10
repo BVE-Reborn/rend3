@@ -49,9 +49,7 @@ impl AssetLoader {
             }
         );
 
-        Self {
-            base: SsoString::from(base),
-        }
+        Self { base: SsoString::from(base) }
     }
 
     pub fn get_asset_path<'a>(&self, path: AssetPath<'a>) -> Cow<'a, str> {
@@ -61,10 +59,7 @@ impl AssetLoader {
     #[cfg(all(not(target_arch = "wasm32"), not(target_os = "android")))]
     pub async fn get_asset(&self, path: AssetPath<'_>) -> Result<Vec<u8>, AssetError> {
         let full_path = path.get_path(&self.base);
-        std::fs::read(&*full_path).map_err(|error| AssetError::FileError {
-            path: SsoString::from(full_path),
-            error,
-        })
+        std::fs::read(&*full_path).map_err(|error| AssetError::FileError { path: SsoString::from(full_path), error })
     }
 
     #[cfg(target_os = "android")]
@@ -83,10 +78,7 @@ impl AssetLoader {
             .and_then(|mut file| {
                 file.get_buffer()
                     .map(|b| b.to_vec())
-                    .map_err(|error| AssetError::FileError {
-                        path: SsoString::from(full_path),
-                        error,
-                    })
+                    .map_err(|error| AssetError::FileError { path: SsoString::from(full_path), error })
             })
     }
 
@@ -96,15 +88,12 @@ impl AssetLoader {
 
         gloo_net::http::Request::get(&full_path)
             .build()
-            .map_err(|error| AssetError::NetworkError {
-                path: SsoString::from(&*full_path),
-                error,
-            })?
+            .map_err(|error| AssetError::NetworkError { path: SsoString::from(&*full_path), error })?
+            .send()
+            .await
+            .map_err(|error| AssetError::NetworkError { path: SsoString::from(&*full_path), error })?
             .binary()
             .await
-            .map_err(|error| AssetError::NetworkError {
-                path: SsoString::from(&*full_path),
-                error,
-            })
+            .map_err(|error| AssetError::NetworkError { path: SsoString::from(&*full_path), error })
     }
 }

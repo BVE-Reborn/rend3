@@ -42,9 +42,7 @@ impl PbrRoutine {
         profiling::scope!("PbrRenderRoutine::new");
 
         // This ensures the BGLs for the material are created
-        data_core
-            .material_manager
-            .ensure_archetype::<PbrMaterial>(&renderer.device, renderer.profile);
+        data_core.material_manager.ensure_archetype::<PbrMaterial>(&renderer.device, renderer.profile);
 
         let per_material = PerMaterialArchetypeInterface::<PbrMaterial>::new(&renderer.device);
 
@@ -53,10 +51,7 @@ impl PbrRoutine {
             source: ShaderSource::Wgsl(Cow::Owned(
                 spp.render_shader(
                     "rend3-routine/depth.wgsl",
-                    &BlendModeWrapper {
-                        profile: renderer.profile,
-                        discard: true,
-                    },
+                    &BlendModeWrapper { profile: renderer.profile, discard: true },
                     Some(&ShaderVertexBufferConfig::from_material::<PbrMaterial>()),
                 )
                 .unwrap(),
@@ -68,10 +63,7 @@ impl PbrRoutine {
             source: ShaderSource::Wgsl(Cow::Owned(
                 spp.render_shader(
                     "rend3-routine/depth.wgsl",
-                    &BlendModeWrapper {
-                        profile: renderer.profile,
-                        discard: false,
-                    },
+                    &BlendModeWrapper { profile: renderer.profile, discard: false },
                     Some(&ShaderVertexBufferConfig::from_material::<PbrMaterial>()),
                 )
                 .unwrap(),
@@ -83,10 +75,7 @@ impl PbrRoutine {
             source: ShaderSource::Wgsl(Cow::Owned(
                 spp.render_shader(
                     "rend3-routine/opaque.wgsl",
-                    &BlendModeWrapper {
-                        profile: renderer.profile,
-                        discard: true,
-                    },
+                    &BlendModeWrapper { profile: renderer.profile, discard: true },
                     Some(&ShaderVertexBufferConfig::from_material::<PbrMaterial>()),
                 )
                 .unwrap(),
@@ -98,10 +87,7 @@ impl PbrRoutine {
             source: ShaderSource::Wgsl(Cow::Owned(
                 spp.render_shader(
                     "rend3-routine/opaque.wgsl",
-                    &BlendModeWrapper {
-                        profile: renderer.profile,
-                        discard: false,
-                    },
+                    &BlendModeWrapper { profile: renderer.profile, discard: false },
                     Some(&ShaderVertexBufferConfig::from_material::<PbrMaterial>()),
                 )
                 .unwrap(),

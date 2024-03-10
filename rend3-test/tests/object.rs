@@ -12,12 +12,7 @@ pub async fn deuplicate_object_retain() -> anyhow::Result<()> {
     let iad = no_gpu_return!(rend3::create_iad(None, None, None, None).await)
         .context("InstanceAdapterDevice creation failed")?;
 
-    let Ok(runner) = TestRunner::builder()
-        .iad(iad.clone())
-        .handedness(Handedness::Left)
-        .build()
-        .await
-    else {
+    let Ok(runner) = TestRunner::builder().iad(iad.clone()).handedness(Handedness::Left).build().await else {
         return Ok(());
     };
 
@@ -74,12 +69,7 @@ pub async fn multi_frame_add() -> anyhow::Result<()> {
     let iad = no_gpu_return!(rend3::create_iad(None, None, None, None).await)
         .context("InstanceAdapterDevice creation failed")?;
 
-    let Ok(runner) = TestRunner::builder()
-        .iad(iad.clone())
-        .handedness(Handedness::Left)
-        .build()
-        .await
-    else {
+    let Ok(runner) = TestRunner::builder().iad(iad.clone()).handedness(Handedness::Left).build().await else {
         return Ok(());
     };
 
@@ -101,10 +91,10 @@ pub async fn multi_frame_add() -> anyhow::Result<()> {
     let mut planes = Vec::with_capacity(2);
     for x in 0..2 {
         for y in 0..count {
-            planes.push(runner.plane(
-                material.clone(),
-                Mat4::from_translation(Vec3::new(x as f32, y as f32, 0.0)) * base_matrix,
-            ));
+            planes.push(
+                runner
+                    .plane(material.clone(), Mat4::from_translation(Vec3::new(x as f32, y as f32, 0.0)) * base_matrix),
+            );
         }
         runner
             .render_and_compare(

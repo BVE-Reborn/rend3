@@ -45,10 +45,8 @@ impl EguiRenderRoutine {
     }
 
     pub fn resize(&mut self, new_width: u32, new_height: u32, new_scale_factor: f32) {
-        self.screen_descriptor = egui_wgpu::ScreenDescriptor {
-            size_in_pixels: [new_width, new_height],
-            pixels_per_point: new_scale_factor,
-        };
+        self.screen_descriptor =
+            egui_wgpu::ScreenDescriptor { size_in_pixels: [new_width, new_height], pixels_per_point: new_scale_factor };
     }
 
     pub fn add_to_graph<'node>(
@@ -61,11 +59,7 @@ impl EguiRenderRoutine {
 
         let rpass_handle = builder.add_renderpass(
             RenderPassTargets {
-                targets: vec![RenderPassTarget {
-                    color: output,
-                    clear: Vec4::ZERO,
-                    resolve: None,
-                }],
+                targets: vec![RenderPassTarget { color: output, clear: Vec4::ZERO, resolve: None }],
                 depth_stencil: None,
             },
             NodeResourceUsage::InputOutput,
@@ -83,13 +77,9 @@ impl EguiRenderRoutine {
                 self.internal.free_texture(&texture);
             }
             for (id, image_delta) in input.textures_delta.set {
-                self.internal
-                    .update_texture(&ctx.renderer.device, &ctx.renderer.queue, id, &image_delta);
+                self.internal.update_texture(&ctx.renderer.device, &ctx.renderer.queue, id, &image_delta);
             }
-            let mut cmd_buffer = ctx
-                .renderer
-                .device
-                .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+            let mut cmd_buffer = ctx.renderer.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
             self.internal.update_buffers(
                 &ctx.renderer.device,
                 &ctx.renderer.queue,
@@ -99,8 +89,7 @@ impl EguiRenderRoutine {
             );
             drop(cmd_buffer);
 
-            self.internal
-                .render(rpass, input.clipped_meshes, &self.screen_descriptor);
+            self.internal.render(rpass, input.clipped_meshes, &self.screen_descriptor);
         });
     }
 
@@ -113,11 +102,7 @@ impl EguiRenderRoutine {
         dimensions: (u32, u32),
         label: Option<&str>,
     ) -> egui::TextureId {
-        let texture_size = wgpu::Extent3d {
-            width: dimensions.0,
-            height: dimensions.1,
-            depth_or_array_layers: 1,
-        };
+        let texture_size = wgpu::Extent3d { width: dimensions.0, height: dimensions.1, depth_or_array_layers: 1 };
 
         let image_texture = renderer.device.create_texture(&wgpu::TextureDescriptor {
             size: texture_size,
@@ -154,11 +139,7 @@ impl EguiRenderRoutine {
         let device = &renderer.device;
         let queue = &renderer.queue;
 
-        let texture_size = wgpu::Extent3d {
-            width: dimensions.0,
-            height: dimensions.1,
-            depth_or_array_layers: 1,
-        };
+        let texture_size = wgpu::Extent3d { width: dimensions.0, height: dimensions.1, depth_or_array_layers: 1 };
 
         queue.write_texture(
             wgpu::ImageCopyTexture {

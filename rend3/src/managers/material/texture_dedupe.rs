@@ -67,11 +67,7 @@ impl TextureDeduplicator {
             })
             .collect();
 
-        Self {
-            bgls,
-            deduplication_map: BiMap::default(),
-            storage: FreelistVec::new(),
-        }
+        Self { bgls, deduplication_map: BiMap::default(), storage: FreelistVec::new() }
     }
 
     pub fn get_or_insert(
@@ -96,10 +92,7 @@ impl TextureDeduplicator {
                     texture_manager_2d.get_null_view()
                 };
 
-                BindGroupEntry {
-                    binding: idx as u32,
-                    resource: BindingResource::TextureView(view),
-                }
+                BindGroupEntry { binding: idx as u32, resource: BindingResource::TextureView(view) }
             })
             .collect();
 

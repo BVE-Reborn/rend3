@@ -265,21 +265,10 @@ pub enum AoMRTextures {
 impl AoMRTextures {
     pub fn to_roughness_texture(&self) -> Option<&Texture2DHandle> {
         match *self {
-            Self::Combined {
-                texture: Some(ref texture),
-            } => Some(texture),
-            Self::SwizzledSplit {
-                mr_texture: Some(ref texture),
-                ..
-            } => Some(texture),
-            Self::Split {
-                mr_texture: Some(ref texture),
-                ..
-            } => Some(texture),
-            Self::BWSplit {
-                r_texture: Some(ref texture),
-                ..
-            } => Some(texture),
+            Self::Combined { texture: Some(ref texture) } => Some(texture),
+            Self::SwizzledSplit { mr_texture: Some(ref texture), .. } => Some(texture),
+            Self::Split { mr_texture: Some(ref texture), .. } => Some(texture),
+            Self::BWSplit { r_texture: Some(ref texture), .. } => Some(texture),
             _ => None,
         }
     }
@@ -289,10 +278,7 @@ impl AoMRTextures {
             Self::Combined { .. } => None,
             Self::SwizzledSplit { .. } => None,
             Self::Split { .. } => None,
-            Self::BWSplit {
-                m_texture: Some(ref texture),
-                ..
-            } => Some(texture),
+            Self::BWSplit { m_texture: Some(ref texture), .. } => Some(texture),
             _ => None,
         }
     }
@@ -300,18 +286,9 @@ impl AoMRTextures {
     pub fn to_ao_texture(&self) -> Option<&Texture2DHandle> {
         match *self {
             Self::Combined { .. } => None,
-            Self::SwizzledSplit {
-                ao_texture: Some(ref texture),
-                ..
-            } => Some(texture),
-            Self::Split {
-                ao_texture: Some(ref texture),
-                ..
-            } => Some(texture),
-            Self::BWSplit {
-                ao_texture: Some(ref texture),
-                ..
-            } => Some(texture),
+            Self::SwizzledSplit { ao_texture: Some(ref texture), .. } => Some(texture),
+            Self::Split { ao_texture: Some(ref texture), .. } => Some(texture),
+            Self::BWSplit { ao_texture: Some(ref texture), .. } => Some(texture),
             _ => None,
         }
     }
@@ -358,17 +335,9 @@ pub enum ClearcoatTextures {
 impl ClearcoatTextures {
     pub fn to_clearcoat_texture(&self) -> Option<&Texture2DHandle> {
         match *self {
-            Self::GltfCombined {
-                texture: Some(ref texture),
-            } => Some(texture),
-            Self::GltfSplit {
-                clearcoat_texture: Some(ref texture),
-                ..
-            } => Some(texture),
-            Self::BWSplit {
-                clearcoat_texture: Some(ref texture),
-                ..
-            } => Some(texture),
+            Self::GltfCombined { texture: Some(ref texture) } => Some(texture),
+            Self::GltfSplit { clearcoat_texture: Some(ref texture), .. } => Some(texture),
+            Self::BWSplit { clearcoat_texture: Some(ref texture), .. } => Some(texture),
             _ => None,
         }
     }
@@ -376,14 +345,8 @@ impl ClearcoatTextures {
     pub fn to_clearcoat_roughness_texture(&self) -> Option<&Texture2DHandle> {
         match *self {
             Self::GltfCombined { .. } => None,
-            Self::GltfSplit {
-                clearcoat_roughness_texture: Some(ref texture),
-                ..
-            } => Some(texture),
-            Self::BWSplit {
-                clearcoat_roughness_texture: Some(ref texture),
-                ..
-            } => Some(texture),
+            Self::GltfSplit { clearcoat_roughness_texture: Some(ref texture), .. } => Some(texture),
+            Self::BWSplit { clearcoat_roughness_texture: Some(ref texture), .. } => Some(texture),
             _ => None,
         }
     }

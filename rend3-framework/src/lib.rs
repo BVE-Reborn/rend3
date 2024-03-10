@@ -71,10 +71,8 @@ pub trait App<T: 'static = ()> {
         console_log::init().unwrap();
 
         #[cfg(all(not(target_arch = "wasm32"), not(target_os = "android")))]
-        if let Err(e) = env_logger::builder()
-            .filter_module("rend3", log::LevelFilter::Info)
-            .parse_default_env()
-            .try_init()
+        if let Err(e) =
+            env_logger::builder().filter_module("rend3", log::LevelFilter::Info).parse_default_env().try_init()
         {
             eprintln!("Error registering logger from Rend3 framework: {:?}", e);
             // probably ran two runs in sequence and initialized twice
@@ -199,12 +197,9 @@ pub async fn async_start<A: App<T> + 'static, T: 'static>(mut app: A, window_bui
     };
 
     // Make us a renderer.
-    let renderer = rend3::Renderer::new(
-        iad.clone(),
-        A::HANDEDNESS,
-        Some(window_size.width as f32 / window_size.height as f32),
-    )
-    .unwrap();
+    let renderer =
+        rend3::Renderer::new(iad.clone(), A::HANDEDNESS, Some(window_size.width as f32 / window_size.height as f32))
+            .unwrap();
 
     // Get the preferred format for the surface.
     //
@@ -238,11 +233,7 @@ pub async fn async_start<A: App<T> + 'static, T: 'static>(mut app: A, window_bui
             &base_rendergraph.interfaces,
             &base_rendergraph.gpu_culler.culling_buffer_map_handle,
         )),
-        skybox: Mutex::new(rend3_routine::skybox::SkyboxRoutine::new(
-            &renderer,
-            &spp,
-            &base_rendergraph.interfaces,
-        )),
+        skybox: Mutex::new(rend3_routine::skybox::SkyboxRoutine::new(&renderer, &spp, &base_rendergraph.interfaces)),
         tonemapping: Mutex::new(rend3_routine::tonemapping::TonemappingRoutine::new(
             &renderer,
             &spp,
@@ -253,10 +244,7 @@ pub async fn async_start<A: App<T> + 'static, T: 'static>(mut app: A, window_bui
     drop(data_core);
 
     app.setup(SetupContext {
-        windowing: Some(WindowingSetup {
-            event_loop: &event_loop,
-            window: &window,
-        }),
+        windowing: Some(WindowingSetup { event_loop: &event_loop, window: &window }),
         renderer: &renderer,
         routines: &routines,
         surface_format: format,
@@ -294,15 +282,9 @@ pub async fn async_start<A: App<T> + 'static, T: 'static>(mut app: A, window_bui
         event_loop,
         move |event: Event<T>, event_loop_window_target: &EventLoopWindowTarget<T>| {
             let mut control_flow = event_loop_window_target.control_flow();
-            if let Some(suspend) = handle_surface(
-                &app,
-                &window,
-                &event,
-                &iad.instance,
-                &mut surface,
-                &renderer,
-                &mut stored_surface_info,
-            ) {
+            if let Some(suspend) =
+                handle_surface(&app, &window, &event, &iad.instance, &mut surface, &renderer, &mut stored_surface_info)
+            {
                 suspended = suspend;
             }
 
@@ -318,21 +300,13 @@ pub async fn async_start<A: App<T> + 'static, T: 'static>(mut app: A, window_bui
             }
 
             // Close button was clicked, we should close.
-            if let winit::event::Event::WindowEvent {
-                event: winit::event::WindowEvent::CloseRequested,
-                ..
-            } = event
-            {
+            if let winit::event::Event::WindowEvent { event: winit::event::WindowEvent::CloseRequested, .. } = event {
                 event_loop_window_target.exit();
                 return;
             }
 
             // We need to block all updates
-            if let Event::WindowEvent {
-                window_id: _,
-                event: winit::event::WindowEvent::RedrawRequested,
-            } = event
-            {
+            if let Event::WindowEvent { window_id: _, event: winit::event::WindowEvent::RedrawRequested } = event {
                 if suspended {
                     return;
                 }
@@ -436,10 +410,7 @@ fn handle_surface<A: App<T>, T: 'static>(
             *surface = None;
             Some(true)
         }
-        Event::WindowEvent {
-            event: winit::event::WindowEvent::Resized(size),
-            ..
-        } => {
+        Event::WindowEvent { event: winit::event::WindowEvent::Resized(size), .. } => {
             log::debug!("resize {:?}", size);
             let size = UVec2::new(size.width, size.height);
 

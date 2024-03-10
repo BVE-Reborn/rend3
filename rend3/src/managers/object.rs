@@ -103,10 +103,7 @@ impl ObjectManager {
     pub fn new() -> Self {
         profiling::scope!("ObjectManager::new");
 
-        Self {
-            archetype: FastHashMap::default(),
-            handle_to_typeid: FastHashMap::default(),
-        }
+        Self { archetype: FastHashMap::default(), handle_to_typeid: FastHashMap::default() }
     }
 
     fn ensure_archetype<M: Material>(&mut self, device: &Device) -> &mut ObjectArchetype {
@@ -146,14 +143,7 @@ impl ObjectManager {
 
         material_manager.call_object_add_callback(
             *object.material,
-            ObjectAddCallbackArgs {
-                device,
-                manager: self,
-                internal_mesh,
-                skeleton_ranges,
-                handle,
-                object,
-            },
+            ObjectAddCallbackArgs { device, manager: self, internal_mesh, skeleton_ranges, handle, object },
         );
     }
 
@@ -224,14 +214,7 @@ impl ObjectManager {
 
         let dst_obj = (archetype.duplicate_object)(&mut archetype.data_vec, src_handle.idx, change);
 
-        self.add(
-            device,
-            dst_handle,
-            dst_obj,
-            mesh_manager,
-            skeleton_manager,
-            material_manager,
-        );
+        self.add(device, dst_handle, dst_obj, mesh_manager, skeleton_manager, material_manager);
     }
 }
 
@@ -254,18 +237,11 @@ pub(super) fn object_add_callback<M: Material>(_material: &M, args: ObjectAddCal
     // Make sure all required attributes are in the mesh and the supported attribute list.
     for &required_attribute in M::required_attributes().into_iter() {
         // We can just directly use the internal mesh, as every attribute in the skeleton is also in the mesh.
-        let found_in_mesh = args
-            .internal_mesh
-            .vertex_attribute_ranges
-            .iter()
-            .any(|&(id, _)| id == required_attribute);
+        let found_in_mesh = args.internal_mesh.vertex_attribute_ranges.iter().any(|&(id, _)| id == required_attribute);
 
         // Check that our required attributes are in the supported one.
-        let found_in_supported = args
-            .internal_mesh
-            .vertex_attribute_ranges
-            .iter()
-            .any(|&(id, _)| id == required_attribute);
+        let found_in_supported =
+            args.internal_mesh.vertex_attribute_ranges.iter().any(|&(id, _)| id == required_attribute);
 
         assert!(found_in_mesh);
         assert!(found_in_supported);
@@ -273,10 +249,8 @@ pub(super) fn object_add_callback<M: Material>(_material: &M, args: ObjectAddCal
 
     let vertex_attribute_start_offsets = M::supported_attributes().map_to_u32(|&supported_attribute| {
         // We first check the skeleton for the attribute's base offset.
-        let found_start_offset = args
-            .skeleton_ranges
-            .iter()
-            .find_map(|(id, range)| (*id == supported_attribute).then_some(range.start));
+        let found_start_offset =
+            args.skeleton_ranges.iter().find_map(|(id, range)| (*id == supported_attribute).then_some(range.start));
 
         if let Some(start_offset) = found_start_offset {
             return start_offset as u32;
@@ -354,10 +328,7 @@ fn duplicate_object<M: Material>(data: &WasmVecAny, idx: usize, change: ObjectCh
 }
 
 fn remove<M: Material>(archetype: &mut ObjectArchetype, idx: usize) {
-    let data_vec = archetype
-        .data_vec
-        .downcast_slice_mut::<Option<InternalObject<M>>>()
-        .unwrap();
+    let data_vec = archetype.data_vec.downcast_slice_mut::<Option<InternalObject<M>>>().unwrap();
 
     // We don't actually remove the object at this point,
     // we just mark it as disabled. Next frame, this handle
@@ -377,10 +348,7 @@ fn evaluate<M: Material>(
     scatter: &ScatterCopy,
     deferred_removals: &[RawObjectHandle],
 ) {
-    let data_vec = archetype
-        .data_vec
-        .downcast_slice_mut::<Option<InternalObject<M>>>()
-        .unwrap();
+    let data_vec = archetype.data_vec.downcast_slice_mut::<Option<InternalObject<M>>>().unwrap();
 
     for removal in deferred_removals {
         // Only one archetype will have each handle,
@@ -392,7 +360,5 @@ fn evaluate<M: Material>(
         }
     }
 
-    archetype.buffer.apply(device, encoder, scatter, |idx| {
-        data_vec[idx].as_ref().map(|o| o.inner).unwrap_or_default()
-    })
+    archetype.buffer.apply(device, encoder, scatter, |idx| data_vec[idx].as_ref().map(|o| o.inner).unwrap_or_default())
 }

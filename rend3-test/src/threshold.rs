@@ -37,10 +37,7 @@ impl Threshold {
                 );
                 within
             }
-            Self::Percentile {
-                percentile: p,
-                threshold: v,
-            } => {
+            Self::Percentile { percentile: p, threshold: v } => {
                 let percentile = pool.get_percentile(p, true);
                 let within = percentile <= v;
                 println!(
@@ -58,16 +55,12 @@ impl Threshold {
 
 impl From<Threshold> for ThresholdSet {
     fn from(threshold: Threshold) -> Self {
-        Self {
-            thresholds: vec![threshold],
-        }
+        Self { thresholds: vec![threshold] }
     }
 }
 
 impl From<&[Threshold]> for ThresholdSet {
     fn from(thresholds: &[Threshold]) -> Self {
-        Self {
-            thresholds: thresholds.into(),
-        }
+        Self { thresholds: thresholds.into() }
     }
 }

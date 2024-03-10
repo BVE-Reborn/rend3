@@ -89,11 +89,7 @@ impl DirectionalLightManager {
     }
 
     pub fn update(&mut self, handle: RawDirectionalLightHandle, change: DirectionalLightChange) {
-        self.data[handle.idx]
-            .as_mut()
-            .unwrap()
-            .inner
-            .update_from_changes(change);
+        self.data[handle.idx].as_mut().unwrap().inner.update_from_changes(change);
     }
 
     pub fn remove(&mut self, handle: RawDirectionalLightHandle) {
@@ -155,8 +151,7 @@ impl DirectionalLightManager {
                 .collect(),
         };
 
-        self.data_buffer
-            .write_to_buffer(&renderer.device, &renderer.queue, &buffer);
+        self.data_buffer.write_to_buffer(&renderer.device, &renderer.queue, &buffer);
 
         (new_shadow_map_size, shadow_data)
     }
@@ -183,11 +178,7 @@ fn create_shadow_texture(device: &Device, size: UVec2) -> TextureView {
 
     let texture = device.create_texture(&TextureDescriptor {
         label: Some("rend3 shadow texture"),
-        size: Extent3d {
-            width: size.x,
-            height: size.y,
-            depth_or_array_layers: 1,
-        },
+        size: Extent3d { width: size.x, height: size.y, depth_or_array_layers: 1 },
         mip_level_count: 1,
         sample_count: 1,
         dimension: TextureDimension::D2,

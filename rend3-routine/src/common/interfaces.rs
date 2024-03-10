@@ -60,10 +60,7 @@ impl WholeFrameInterfaces {
 
         let forward_uniform_bgl = uniform_bglb.build(device, Some("forward uniform bgl"));
 
-        Self {
-            depth_uniform_bgl: shadow_uniform_bgl,
-            forward_uniform_bgl,
-        }
+        Self { depth_uniform_bgl: shadow_uniform_bgl, forward_uniform_bgl }
     }
 }
 
@@ -144,9 +141,6 @@ impl<M: Material> PerMaterialArchetypeInterface<M> {
             )
             .build(device, Some("per material bgl"));
 
-        Self {
-            bgl,
-            _phantom: PhantomData,
-        }
+        Self { bgl, _phantom: PhantomData }
     }
 }

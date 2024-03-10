@@ -24,9 +24,7 @@ pub(super) fn shadow_camera(l: &InternalDirectionalLight, user_camera: &CameraSt
 
     CameraState::new(
         Camera {
-            projection: CameraProjection::Orthographic {
-                size: Vec3A::splat(l.inner.distance),
-            },
+            projection: CameraProjection::Orthographic { size: Vec3A::splat(l.inner.distance) },
             view: look_at(new_shadow_location, new_shadow_location + l.inner.direction, Vec3::Y),
         },
         user_camera.handedness(),

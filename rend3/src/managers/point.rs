@@ -70,8 +70,7 @@ impl PointLightManager {
                 .collect(),
         };
 
-        self.data_buffer
-            .write_to_buffer(&renderer.device, &renderer.queue, &buffer);
+        self.data_buffer.write_to_buffer(&renderer.device, &renderer.queue, &buffer);
     }
 
     pub fn add_to_bgl(bglb: &mut BindGroupLayoutBuilder) {

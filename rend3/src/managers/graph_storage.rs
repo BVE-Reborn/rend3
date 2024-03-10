@@ -29,16 +29,12 @@ impl GraphStorage {
 
     pub fn get<T: 'static>(&self, handle: &GraphDataHandle<T>) -> impl Deref<Target = T> + '_ {
         let rw_lock: &RwLock<T> = self.data[handle.0.idx].as_ref().unwrap().downcast_ref().unwrap();
-        rw_lock
-            .try_read()
-            .expect("Called get on the same handle that was already borrowed mutably within a renderpass")
+        rw_lock.try_read().expect("Called get on the same handle that was already borrowed mutably within a renderpass")
     }
 
     pub fn get_mut<T: 'static>(&self, handle: &GraphDataHandle<T>) -> impl DerefMut<Target = T> + '_ {
         let rw_lock: &RwLock<T> = self.data[handle.0.idx].as_ref().unwrap().downcast_ref().unwrap();
-        rw_lock
-            .try_write()
-            .expect("Tried to call get_mut on the same handle twice within a renderpass")
+        rw_lock.try_write().expect("Tried to call get_mut on the same handle twice within a renderpass")
     }
 
     pub fn remove(&mut self, handle: &RawGraphDataHandleUntyped) {

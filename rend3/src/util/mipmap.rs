@@ -101,13 +101,7 @@ impl MipmapGenerator {
             .map(|&format| (format, Self::build_blit_pipeline(device, format, &pll, &sm)))
             .collect();
 
-        Self {
-            texture_bgl,
-            sampler_bg,
-            sm,
-            pll,
-            pipelines: RwLock::new(pipelines),
-        }
+        Self { texture_bgl, sampler_bg, sm, pll, pipelines: RwLock::new(pipelines) }
     }
 
     fn build_blit_pipeline(
@@ -121,11 +115,7 @@ impl MipmapGenerator {
         device.create_render_pipeline(&RenderPipelineDescriptor {
             label: Some(&label),
             layout: Some(pll),
-            vertex: VertexState {
-                module: sm,
-                entry_point: "vs_main",
-                buffers: &[],
-            },
+            vertex: VertexState { module: sm, entry_point: "vs_main", buffers: &[] },
             primitive: PrimitiveState {
                 topology: PrimitiveTopology::TriangleList,
                 strip_index_format: None,
@@ -140,11 +130,7 @@ impl MipmapGenerator {
             fragment: Some(FragmentState {
                 module: sm,
                 entry_point: "fs_main",
-                targets: &[Some(ColorTargetState {
-                    format,
-                    blend: None,
-                    write_mask: ColorWrites::all(),
-                })],
+                targets: &[Some(ColorTargetState { format, blend: None, write_mask: ColorWrites::all() })],
             }),
             multiview: None,
         })
@@ -167,9 +153,7 @@ impl MipmapGenerator {
                     mip_level_count: Some(1),
                     ..Default::default()
                 });
-                scope
-                    .end()
-                    .map_err(|source| MipmapGenerationError::TextureViewCreationFailed { mip_level, source })?;
+                scope.end().map_err(|source| MipmapGenerationError::TextureViewCreationFailed { mip_level, source })?;
 
                 Ok(view)
             })
@@ -182,10 +166,9 @@ impl MipmapGenerator {
             None => {
                 drop(read_pipelines);
 
-                self.pipelines.write().insert(
-                    desc.format,
-                    Self::build_blit_pipeline(device, desc.format, &self.pll, &self.sm),
-                );
+                self.pipelines
+                    .write()
+                    .insert(desc.format, Self::build_blit_pipeline(device, desc.format, &self.pll, &self.sm));
 
                 read_pipelines = self.pipelines.read();
 
@@ -215,10 +198,7 @@ impl MipmapGenerator {
                 color_attachments: &[Some(RenderPassColorAttachment {
                     view: dst_view,
                     resolve_target: None,
-                    ops: Operations {
-                        load: LoadOp::Clear(Color::BLACK),
-                        store: StoreOp::Store,
-                    },
+                    ops: Operations { load: LoadOp::Clear(Color::BLACK), store: StoreOp::Store },
                 })],
                 depth_stencil_attachment: None,
                 timestamp_writes: None,

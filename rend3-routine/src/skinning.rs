@@ -124,9 +124,7 @@ fn build_gpu_skinning_input_buffers(ctx: &NodeExecutionContext) -> PreSkinningBu
                 // will get incremented once for every joint matrix, and the
                 // length of the buffer is exactly the sum of all joint matrix
                 // vector lengths.
-                joint_matrices_ptr
-                    .add(joint_matrix_idx as usize)
-                    .write_unaligned(joint_matrix.to_cols_array_2d());
+                joint_matrices_ptr.add(joint_matrix_idx as usize).write_unaligned(joint_matrix.to_cols_array_2d());
                 joint_matrix_idx += 1;
             }
         }
@@ -137,10 +135,7 @@ fn build_gpu_skinning_input_buffers(ctx: &NodeExecutionContext) -> PreSkinningBu
     gpu_skinning_inputs.unmap();
     joint_matrices.unmap();
 
-    PreSkinningBuffers {
-        gpu_skinning_inputs,
-        joint_matrices,
-    }
+    PreSkinningBuffers { gpu_skinning_inputs, joint_matrices }
 }
 
 /// Holds the necessary wgpu data structures for the GPU skinning compute pass
@@ -190,10 +185,8 @@ impl GpuSkinner {
             .append_buffer(&buffers.joint_matrices)
             .build(&ctx.renderer.device, Some("GPU skinning inputs"), &self.bgl);
 
-        let mut cpass = encoder.begin_compute_pass(&ComputePassDescriptor {
-            label: Some("GPU Skinning"),
-            timestamp_writes: None,
-        });
+        let mut cpass =
+            encoder.begin_compute_pass(&ComputePassDescriptor { label: Some("GPU Skinning"), timestamp_writes: None });
         cpass.set_pipeline(&self.pipeline);
         for (i, skel) in ctx.data_core.skeleton_manager.skeletons().enumerate() {
             let offset = (i as u64 * GpuSkinningInput::SHADER_SIZE.get()) as u32;

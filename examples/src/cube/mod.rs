@@ -125,13 +125,12 @@ impl rend3_framework::App for CubeExample {
         ];
 
         for (position, color) in lights {
-            self.point_lights
-                .push(context.renderer.add_point_light(rend3::types::PointLight {
-                    position,
-                    color,
-                    radius: 2.0,
-                    intensity: 4.0,
-                }));
+            self.point_lights.push(context.renderer.add_point_light(rend3::types::PointLight {
+                position,
+                color,
+                radius: 2.0,
+                intensity: 4.0,
+            }));
         }
     }
 
@@ -184,12 +183,7 @@ impl rend3_framework::App for CubeExample {
 
 pub fn main() {
     let app = CubeExample::default();
-    rend3_framework::start(
-        app,
-        winit::window::WindowBuilder::new()
-            .with_title("cube-example")
-            .with_maximized(true),
-    );
+    rend3_framework::start(app, winit::window::WindowBuilder::new().with_title("cube-example").with_maximized(true));
 }
 
 #[cfg(test)]

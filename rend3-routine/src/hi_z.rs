@@ -28,11 +28,7 @@ pub struct HiZRoutine {
 impl HiZRoutine {
     pub fn new(renderer: &Renderer, spp: &ShaderPreProcessor) -> Self {
         let resolve_source = spp
-            .render_shader(
-                "rend3-routine/resolve_depth_min.wgsl",
-                &serde_json::json!({"SAMPLES": 4}),
-                None,
-            )
+            .render_shader("rend3-routine/resolve_depth_min.wgsl", &serde_json::json!({"SAMPLES": 4}), None)
             .unwrap();
         let downscale_source = spp.render_shader("rend3-routine/hi_z.wgsl", &(), None).unwrap();
 
@@ -88,11 +84,7 @@ impl HiZRoutine {
         let resolve_pipeline = renderer.device.create_render_pipeline(&RenderPipelineDescriptor {
             label: Some("HiZ Resolve Pipeline"),
             layout: Some(&resolve_pipline_layout),
-            vertex: VertexState {
-                module: &resolve_sm,
-                entry_point: "vs_main",
-                buffers: &[],
-            },
+            vertex: VertexState { module: &resolve_sm, entry_point: "vs_main", buffers: &[] },
             primitive: PrimitiveState::default(),
             depth_stencil: Some(DepthStencilState {
                 format: TextureFormat::Depth32Float,
@@ -102,22 +94,14 @@ impl HiZRoutine {
                 bias: DepthBiasState::default(),
             }),
             multisample: MultisampleState::default(),
-            fragment: Some(FragmentState {
-                module: &resolve_sm,
-                entry_point: "fs_main",
-                targets: &[],
-            }),
+            fragment: Some(FragmentState { module: &resolve_sm, entry_point: "fs_main", targets: &[] }),
             multiview: None,
         });
 
         let downscale_pipeline = renderer.device.create_render_pipeline(&RenderPipelineDescriptor {
             label: Some("HiZ Downscale Pipeline"),
             layout: Some(&downscale_pipline_layout),
-            vertex: VertexState {
-                module: &downscale_sm,
-                entry_point: "vs_main",
-                buffers: &[],
-            },
+            vertex: VertexState { module: &downscale_sm, entry_point: "vs_main", buffers: &[] },
             primitive: PrimitiveState::default(),
             depth_stencil: Some(DepthStencilState {
                 format: TextureFormat::Depth32Float,
@@ -127,20 +111,11 @@ impl HiZRoutine {
                 bias: DepthBiasState::default(),
             }),
             multisample: MultisampleState::default(),
-            fragment: Some(FragmentState {
-                module: &downscale_sm,
-                entry_point: "fs_main",
-                targets: &[],
-            }),
+            fragment: Some(FragmentState { module: &downscale_sm, entry_point: "fs_main", targets: &[] }),
             multiview: None,
         });
 
-        Self {
-            single_sampled_bgl,
-            downscale_pipeline,
-            multisampled_bgl,
-            resolve_pipeline,
-        }
+        Self { single_sampled_bgl, downscale_pipeline, multisampled_bgl, resolve_pipeline }
     }
 
     pub fn resolve<'pass>(
@@ -152,16 +127,11 @@ impl HiZRoutine {
         let rpass = ctx.encoder_or_pass.take_rpass(renderpass_handle);
         let source = ctx.graph_data.get_render_target(source_handle);
 
-        let bind_group = ctx
-            .temps
-            .add(ctx.renderer.device.create_bind_group(&BindGroupDescriptor {
-                label: Some("HiZ Resolve BG"),
-                layout: &self.multisampled_bgl,
-                entries: &[BindGroupEntry {
-                    binding: 0,
-                    resource: BindingResource::TextureView(source),
-                }],
-            }));
+        let bind_group = ctx.temps.add(ctx.renderer.device.create_bind_group(&BindGroupDescriptor {
+            label: Some("HiZ Resolve BG"),
+            layout: &self.multisampled_bgl,
+            entries: &[BindGroupEntry { binding: 0, resource: BindingResource::TextureView(source) }],
+        }));
 
         rpass.set_pipeline(&self.resolve_pipeline);
         rpass.set_bind_group(0, bind_group, &[]);
@@ -177,16 +147,11 @@ impl HiZRoutine {
         let rpass = ctx.encoder_or_pass.take_rpass(renderpass_handle);
         let source = ctx.graph_data.get_render_target(source_handle);
 
-        let bind_group = ctx
-            .temps
-            .add(ctx.renderer.device.create_bind_group(&BindGroupDescriptor {
-                label: Some("HiZ Bind Group Layout"),
-                layout: &self.single_sampled_bgl,
-                entries: &[BindGroupEntry {
-                    binding: 0,
-                    resource: BindingResource::TextureView(source),
-                }],
-            }));
+        let bind_group = ctx.temps.add(ctx.renderer.device.create_bind_group(&BindGroupDescriptor {
+            label: Some("HiZ Bind Group Layout"),
+            layout: &self.single_sampled_bgl,
+            entries: &[BindGroupEntry { binding: 0, resource: BindingResource::TextureView(source) }],
+        }));
 
         rpass.set_pipeline(&self.downscale_pipeline);
         rpass.set_bind_group(0, bind_group, &[]);
@@ -199,11 +164,7 @@ impl HiZRoutine {
         depth_targets: DepthTargets,
         resolution: UVec2,
     ) {
-        let extent = Extent3d {
-            width: resolution.x,
-            height: resolution.y,
-            depth_or_array_layers: 1,
-        };
+        let extent = Extent3d { width: resolution.x, height: resolution.y, depth_or_array_layers: 1 };
         let mips = extent.max_mips(TextureDimension::D2) as u8;
 
         // First we need to downscale the depth buffer to a single sample texture

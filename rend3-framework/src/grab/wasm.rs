@@ -18,10 +18,7 @@ pub struct Grabber {
 }
 impl Grabber {
     pub fn new(window: &Window) -> Self {
-        let inner = Arc::new(GrabberInner {
-            grabbed: AtomicBool::new(false),
-            callback: OnceBox::new(),
-        });
+        let inner = Arc::new(GrabberInner { grabbed: AtomicBool::new(false), callback: OnceBox::new() });
 
         let inner_clone = Arc::clone(&inner);
 
@@ -54,9 +51,7 @@ impl Grabber {
         let document = canvas.owner_document().unwrap();
         canvas.request_pointer_lock();
 
-        document
-            .add_event_listener_with_callback("pointerlockchange", self.inner.callback.get().unwrap())
-            .unwrap();
+        document.add_event_listener_with_callback("pointerlockchange", self.inner.callback.get().unwrap()).unwrap();
 
         self.inner.grabbed.store(true, Ordering::Relaxed);
     }
@@ -65,9 +60,7 @@ impl Grabber {
         let canvas = window.canvas().unwrap();
         let document = canvas.owner_document().unwrap();
 
-        document
-            .remove_event_listener_with_callback("pointerlockchange", self.inner.callback.get().unwrap())
-            .unwrap();
+        document.remove_event_listener_with_callback("pointerlockchange", self.inner.callback.get().unwrap()).unwrap();
 
         document.exit_pointer_lock();
         self.inner.grabbed.store(false, Ordering::Relaxed);

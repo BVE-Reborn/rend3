@@ -13,8 +13,9 @@
 
 <body style="margin: 0px">
     <script type="module">
-        import init from "./{{example}}.js";
-        init();
+        import init, {main_with_name} from "./rend3-examples.js";
+        await init();
+        main_with_name("{{example}}");
     </script>
 </body>
 

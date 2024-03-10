@@ -12,18 +12,9 @@ fn load_gltf(
 
     let vertex_positions: Vec<_> = reader.read_positions().unwrap().map(glam::Vec3::from).collect();
     let vertex_normals: Vec<_> = reader.read_normals().unwrap().map(glam::Vec3::from).collect();
-    let vertex_tangents: Vec<_> = reader
-        .read_tangents()
-        .unwrap()
-        .map(glam::Vec4::from)
-        .map(glam::Vec4::truncate)
-        .collect();
-    let vertex_uvs: Vec<_> = reader
-        .read_tex_coords(0)
-        .unwrap()
-        .into_f32()
-        .map(glam::Vec2::from)
-        .collect();
+    let vertex_tangents: Vec<_> =
+        reader.read_tangents().unwrap().map(glam::Vec4::from).map(glam::Vec4::truncate).collect();
+    let vertex_uvs: Vec<_> = reader.read_tex_coords(0).unwrap().into_f32().map(glam::Vec2::from).collect();
     let indices = reader.read_indices().unwrap().into_u32().collect();
 
     let mesh = rend3::types::MeshBuilder::new(vertex_positions.to_vec(), rend3::types::Handedness::Right)
@@ -68,10 +59,8 @@ impl rend3_framework::App for StaticGltfExample {
         // Create mesh and calculate smooth normals based on vertices.
         //
         // We do not need to keep these handles alive once we make the object
-        let (mesh, material) = load_gltf(
-            context.renderer,
-            concat!(env!("CARGO_MANIFEST_DIR"), "/src/static_gltf/data.glb"),
-        );
+        let (mesh, material) =
+            load_gltf(context.renderer, concat!(env!("CARGO_MANIFEST_DIR"), "/src/static_gltf/data.glb"));
 
         // Combine the mesh and the material with a location to give an object.
         let object = rend3::types::Object {
@@ -153,12 +142,7 @@ impl rend3_framework::App for StaticGltfExample {
 
 pub fn main() {
     let app = StaticGltfExample::default();
-    rend3_framework::start(
-        app,
-        winit::window::WindowBuilder::new()
-            .with_title("gltf-example")
-            .with_maximized(true),
-    );
+    rend3_framework::start(app, winit::window::WindowBuilder::new().with_title("gltf-example").with_maximized(true));
 }
 
 #[cfg(test)]

@@ -53,10 +53,7 @@ impl rend3_framework::App for AnimationExample {
 
         // Load a gltf model with animation data
         // Needs to be stored somewhere, otherwise all the data gets freed.
-        let path = Path::new(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/src/animation/resources/scene.gltf"
-        ));
+        let path = Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/src/animation/resources/scene.gltf"));
         let gltf_data = std::fs::read(path).unwrap();
         let parent_directory = path.parent().unwrap();
         let (loaded_scene, loaded_instance) = pollster::block_on(rend3_gltf::load_gltf(
@@ -88,10 +85,7 @@ impl rend3_framework::App for AnimationExample {
             animation_time: 0.0,
         };
 
-        let path = Path::new(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/src/animation/resources/cube_3.gltf"
-        ));
+        let path = Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/src/animation/resources/cube_3.gltf"));
         let gltf_data = std::fs::read(path).unwrap();
         let parent_directory = path.parent().unwrap();
         let (loaded_scene, loaded_instance) = pollster::block_on(rend3_gltf::load_gltf(
@@ -167,9 +161,7 @@ pub fn main() {
     let app = AnimationExample::default();
     rend3_framework::start(
         app,
-        winit::window::WindowBuilder::new()
-            .with_title("animation-example")
-            .with_maximized(true),
+        winit::window::WindowBuilder::new().with_title("animation-example").with_maximized(true),
     );
 }
 

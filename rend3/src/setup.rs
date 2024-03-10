@@ -138,11 +138,7 @@ fn check_limit_unlimited<LimitValue: Into<u64> + Ord>(
     ty: LimitType,
 ) -> Result<LimitValue, RendererInitializationError> {
     if d < r {
-        Err(RendererInitializationError::LowDeviceLimit {
-            ty,
-            device_limit: d.into(),
-            required_limit: r.into(),
-        })
+        Err(RendererInitializationError::LowDeviceLimit { ty, device_limit: d.into(), required_limit: r.into() })
     } else {
         Ok(d)
     }
@@ -154,11 +150,7 @@ fn check_limit_low<LimitValue: Into<u64> + Ord>(
     ty: LimitType,
 ) -> Result<LimitValue, RendererInitializationError> {
     if r < d {
-        Err(RendererInitializationError::LowDeviceLimit {
-            ty,
-            device_limit: d.into(),
-            required_limit: r.into(),
-        })
+        Err(RendererInitializationError::LowDeviceLimit { ty, device_limit: d.into(), required_limit: r.into() })
     } else {
         Ok(d)
     }
@@ -352,13 +344,7 @@ impl<T> PotentialAdapter<T> {
             profile = RendererProfile::CpuDriven;
         }
 
-        Ok(PotentialAdapter {
-            inner,
-            info,
-            features: features?,
-            limits: limits?,
-            profile,
-        })
+        Ok(PotentialAdapter { inner, info, features: features?, limits: limits?, profile })
     }
 }
 
@@ -479,18 +465,10 @@ pub async fn create_iad(
             let features = adapter.features();
             let potential = PotentialAdapter::new(adapter, info, limits, features, desired_profile);
 
-            log::info!(
-                "{:?} Adapter {}: {:#?}",
-                backend,
-                idx,
-                potential.as_ref().map(|p| &p.info)
-            );
+            log::info!("{:?} Adapter {}: {:#?}", backend, idx, potential.as_ref().map(|p| &p.info));
 
             let desired = if let Some(ref desired_device) = desired_device {
-                potential
-                    .as_ref()
-                    .map(|i| i.info.name.to_lowercase().contains(desired_device))
-                    .unwrap_or(false)
+                potential.as_ref().map(|i| i.info.name.to_lowercase().contains(desired_device)).unwrap_or(false)
             } else {
                 true
             };
@@ -538,9 +516,7 @@ pub async fn create_iad(
                 .request_device(
                     &DeviceDescriptor {
                         label: None,
-                        required_features: adapter
-                            .features
-                            .union(additional_features.unwrap_or_else(Features::empty)),
+                        required_features: adapter.features.union(additional_features.unwrap_or_else(Features::empty)),
                         required_limits: adapter.limits,
                     },
                     None,

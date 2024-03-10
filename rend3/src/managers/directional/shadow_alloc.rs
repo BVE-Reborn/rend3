@@ -38,9 +38,7 @@ impl ShadowNode {
                     return false;
                 }
 
-                children
-                    .into_iter()
-                    .any(|child| ShadowNode::try_alloc(nodes, child, relative_order - 1, handle))
+                children.into_iter().any(|child| ShadowNode::try_alloc(nodes, child, relative_order - 1, handle))
             }
         }
     }
@@ -134,10 +132,7 @@ pub(super) fn allocate_shadow_atlas(
         }
     }
 
-    Some(ShadowAtlas {
-        texture_dimensions,
-        maps: output_maps,
-    })
+    Some(ShadowAtlas { texture_dimensions, maps: output_maps })
 }
 
 #[cfg(test)]
@@ -234,14 +229,7 @@ mod tests {
 
         let res = allocate_shadow_atlas(maps, 16).unwrap();
         assert_eq!(res.texture_dimensions, UVec2::splat(16));
-        assert_eq!(
-            res.maps,
-            &[ShadowMap {
-                offset: UVec2::splat(0),
-                size: 16,
-                handle: RDLH::new(0)
-            }]
-        );
+        assert_eq!(res.maps, &[ShadowMap { offset: UVec2::splat(0), size: 16, handle: RDLH::new(0) }]);
     }
 
     #[test]
@@ -253,21 +241,9 @@ mod tests {
         assert_eq!(
             res.maps,
             &[
-                ShadowMap {
-                    offset: UVec2::splat(0),
-                    size: 16,
-                    handle: RDLH::new(0)
-                },
-                ShadowMap {
-                    offset: UVec2::new(16, 0),
-                    size: 16,
-                    handle: RDLH::new(1)
-                },
-                ShadowMap {
-                    offset: UVec2::new(32, 0),
-                    size: 16,
-                    handle: RDLH::new(2)
-                }
+                ShadowMap { offset: UVec2::splat(0), size: 16, handle: RDLH::new(0) },
+                ShadowMap { offset: UVec2::new(16, 0), size: 16, handle: RDLH::new(1) },
+                ShadowMap { offset: UVec2::new(32, 0), size: 16, handle: RDLH::new(2) }
             ]
         );
     }
@@ -281,65 +257,28 @@ mod tests {
         assert_eq!(
             res.maps,
             &[
-                ShadowMap {
-                    offset: UVec2::splat(0),
-                    size: 16,
-                    handle: RDLH::new(0)
-                },
-                ShadowMap {
-                    offset: UVec2::new(16, 0),
-                    size: 16,
-                    handle: RDLH::new(1)
-                },
-                ShadowMap {
-                    offset: UVec2::new(0, 16),
-                    size: 16,
-                    handle: RDLH::new(2)
-                }
+                ShadowMap { offset: UVec2::splat(0), size: 16, handle: RDLH::new(0) },
+                ShadowMap { offset: UVec2::new(16, 0), size: 16, handle: RDLH::new(1) },
+                ShadowMap { offset: UVec2::new(0, 16), size: 16, handle: RDLH::new(2) }
             ]
         );
     }
 
     #[test]
     fn allocate_single_level_double_row_extra_space() {
-        let maps = vec![
-            (RDLH::new(0), 16),
-            (RDLH::new(1), 16),
-            (RDLH::new(2), 16),
-            (RDLH::new(3), 16),
-            (RDLH::new(4), 16),
-        ];
+        let maps =
+            vec![(RDLH::new(0), 16), (RDLH::new(1), 16), (RDLH::new(2), 16), (RDLH::new(3), 16), (RDLH::new(4), 16)];
 
         let res = allocate_shadow_atlas(maps, 64).unwrap();
         assert_eq!(res.texture_dimensions, UVec2::new(48, 32));
         assert_eq!(
             res.maps,
             &[
-                ShadowMap {
-                    offset: UVec2::splat(0),
-                    size: 16,
-                    handle: RDLH::new(0)
-                },
-                ShadowMap {
-                    offset: UVec2::new(16, 0),
-                    size: 16,
-                    handle: RDLH::new(1)
-                },
-                ShadowMap {
-                    offset: UVec2::new(32, 0),
-                    size: 16,
-                    handle: RDLH::new(2)
-                },
-                ShadowMap {
-                    offset: UVec2::new(0, 16),
-                    size: 16,
-                    handle: RDLH::new(3)
-                },
-                ShadowMap {
-                    offset: UVec2::new(16, 16),
-                    size: 16,
-                    handle: RDLH::new(4)
-                }
+                ShadowMap { offset: UVec2::splat(0), size: 16, handle: RDLH::new(0) },
+                ShadowMap { offset: UVec2::new(16, 0), size: 16, handle: RDLH::new(1) },
+                ShadowMap { offset: UVec2::new(32, 0), size: 16, handle: RDLH::new(2) },
+                ShadowMap { offset: UVec2::new(0, 16), size: 16, handle: RDLH::new(3) },
+                ShadowMap { offset: UVec2::new(16, 16), size: 16, handle: RDLH::new(4) }
             ]
         );
     }
@@ -369,36 +308,12 @@ mod tests {
         assert_eq!(
             res.maps,
             &[
-                ShadowMap {
-                    offset: UVec2::splat(0),
-                    size: 16,
-                    handle: RDLH::new(0)
-                },
-                ShadowMap {
-                    offset: UVec2::new(16, 0),
-                    size: 8,
-                    handle: RDLH::new(1)
-                },
-                ShadowMap {
-                    offset: UVec2::new(24, 0),
-                    size: 8,
-                    handle: RDLH::new(2)
-                },
-                ShadowMap {
-                    offset: UVec2::new(16, 8),
-                    size: 4,
-                    handle: RDLH::new(3)
-                },
-                ShadowMap {
-                    offset: UVec2::new(20, 8),
-                    size: 4,
-                    handle: RDLH::new(4)
-                },
-                ShadowMap {
-                    offset: UVec2::new(16, 12),
-                    size: 4,
-                    handle: RDLH::new(5)
-                },
+                ShadowMap { offset: UVec2::splat(0), size: 16, handle: RDLH::new(0) },
+                ShadowMap { offset: UVec2::new(16, 0), size: 8, handle: RDLH::new(1) },
+                ShadowMap { offset: UVec2::new(24, 0), size: 8, handle: RDLH::new(2) },
+                ShadowMap { offset: UVec2::new(16, 8), size: 4, handle: RDLH::new(3) },
+                ShadowMap { offset: UVec2::new(20, 8), size: 4, handle: RDLH::new(4) },
+                ShadowMap { offset: UVec2::new(16, 12), size: 4, handle: RDLH::new(5) },
             ]
         );
     }

@@ -50,10 +50,7 @@ pub struct Labeled<T> {
 impl<T> Labeled<T> {
     /// Create a new
     pub fn new(inner: T, label: Option<&str>) -> Self {
-        Self {
-            inner,
-            label: label.map(SsoString::from),
-        }
+        Self { inner, label: label.map(SsoString::from) }
     }
 }
 
@@ -157,12 +154,7 @@ pub struct PosRotScale {
 
 impl PosRotScale {
     pub fn new(node_idx: u32) -> Self {
-        Self {
-            node_idx,
-            translation: None,
-            rotation: None,
-            scale: None,
-        }
+        Self { node_idx, translation: None, rotation: None, scale: None }
     }
 }
 
@@ -372,11 +364,7 @@ where
         Mat4::from_scale(Vec3::new(
             settings.scale,
             settings.scale,
-            if renderer.handedness == Handedness::Left {
-                -settings.scale
-            } else {
-                settings.scale
-            },
+            if renderer.handedness == Handedness::Left { -settings.scale } else { settings.scale },
         )),
     )?;
 
@@ -413,14 +401,7 @@ where
     let skins = load_skins(file.skins(), &buffers)?;
     let animations = load_animations(file.animations(), &buffers)?;
 
-    let loaded = LoadedGltfScene {
-        meshes,
-        materials,
-        default_material,
-        images,
-        skins,
-        animations,
-    };
+    let loaded = LoadedGltfScene { meshes, materials, default_material, images, skins, animations };
 
     Ok(loaded)
 }
@@ -435,19 +416,13 @@ pub fn add_mesh_by_index<E: std::error::Error + 'static>(
     skin_index: Option<usize>,
     transform: Mat4,
 ) -> Result<Labeled<Object>, GltfLoadError<E>> {
-    let mesh_handle = loaded
-        .meshes
-        .get(mesh_index)
-        .ok_or(GltfLoadError::MissingMesh(mesh_index))?;
+    let mesh_handle = loaded.meshes.get(mesh_index).ok_or(GltfLoadError::MissingMesh(mesh_index))?;
 
     let mut primitives = Vec::new();
     let mut skeletons = Vec::new();
 
     let skin = if let Some(skin_index) = skin_index {
-        let skin = loaded
-            .skins
-            .get(skin_index)
-            .ok_or(GltfLoadError::MissingSkin(skin_index))?;
+        let skin = loaded.skins.get(skin_index).ok_or(GltfLoadError::MissingSkin(skin_index))?;
         Some(skin)
     } else {
         None
@@ -456,10 +431,7 @@ pub fn add_mesh_by_index<E: std::error::Error + 'static>(
     for prim in &mesh_handle.inner.primitives {
         let mat_idx = prim.material;
         let mat = mat_idx
-            .map_or_else(
-                || Some(&loaded.default_material),
-                |mat_idx| loaded.materials.get(mat_idx).map(|m| &m.inner),
-            )
+            .map_or_else(|| Some(&loaded.default_material), |mat_idx| loaded.materials.get(mat_idx).map(|m| &m.inner))
             .ok_or_else(|| GltfLoadError::MissingMaterial(mat_idx.expect("Could not find default material")))?;
 
         let mesh_kind = if let Some(skin) = skin {
@@ -475,18 +447,11 @@ pub fn add_mesh_by_index<E: std::error::Error + 'static>(
             ObjectMeshKind::Static(prim.handle.clone())
         };
 
-        primitives.push(renderer.add_object(types::Object {
-            mesh_kind,
-            material: mat.clone(),
-            transform,
-        }));
+        primitives.push(renderer.add_object(types::Object { mesh_kind, material: mat.clone(), transform }));
     }
 
     Ok(Labeled::new(
-        Object {
-            primitives,
-            armature: skin_index.map(|skin_index| Armature { skeletons, skin_index }),
-        },
+        Object { primitives, armature: skin_index.map(|skin_index| Armature { skeletons, skin_index }) },
         name,
     ))
 }
@@ -502,10 +467,8 @@ fn node_indices_topological_sort(nodes: &[gltf::Node]) -> (Vec<usize>, BTreeMap<
     }
 
     // Maps child to parent
-    let parents: BTreeMap<usize, usize> = children
-        .iter()
-        .flat_map(|(parent, children)| children.iter().map(|ch| (*ch, *parent)))
-        .collect();
+    let parents: BTreeMap<usize, usize> =
+        children.iter().flat_map(|(parent, children)| children.iter().map(|ch| (*ch, *parent))).collect();
 
     // Initialize the BFS queue with nodes that don't have any parent (i.e. roots)
     let mut queue: VecDeque<usize> = children.keys().filter(|n| parents.get(n).is_none()).cloned().collect();
@@ -547,10 +510,7 @@ pub fn instance_loaded_scene<E: std::error::Error + 'static>(
         let node = &nodes[*node_idx];
 
         let local_transform = Mat4::from_cols_array_2d(&node.transform().matrix());
-        let parent_transform = parents
-            .get(&node.index())
-            .map(|p| node_transforms[*p])
-            .unwrap_or(parent_transform);
+        let parent_transform = parents.get(&node.index()).map(|p| node_transforms[*p]).unwrap_or(parent_transform);
         let transform = parent_transform * local_transform;
         node_transforms[*node_idx] = transform;
 
@@ -598,10 +558,7 @@ pub fn instance_loaded_scene<E: std::error::Error + 'static>(
             node.name(),
         )
     }
-    Ok(GltfSceneInstance {
-        nodes: final_nodes,
-        topological_order,
-    })
+    Ok(GltfSceneInstance { nodes: final_nodes, topological_order })
 }
 
 /// Loads buffers from a [`gltf::Buffer`] iterator, calling io_func to resolve
@@ -631,9 +588,9 @@ where
                 blob_index = Some(b.index());
                 Vec::new()
             }
-            Source::Uri(uri) => io_func(SsoString::from(uri))
-                .await
-                .map_err(|e| GltfLoadError::BufferIo(SsoString::from(uri), e))?,
+            Source::Uri(uri) => {
+                io_func(SsoString::from(uri)).await.map_err(|e| GltfLoadError::BufferIo(SsoString::from(uri), e))?
+            }
         };
         buffers.push(data);
     }
@@ -659,11 +616,7 @@ pub fn load_meshes<'a, E: std::error::Error + 'static>(
             let mut res_prims = Vec::new();
             for prim in mesh.primitives() {
                 if prim.mode() != gltf::mesh::Mode::Triangles {
-                    return Err(GltfLoadError::UnsupportedPrimitiveMode(
-                        mesh.index(),
-                        prim.index(),
-                        prim.mode(),
-                    ));
+                    return Err(GltfLoadError::UnsupportedPrimitiveMode(mesh.index(), prim.index(), prim.mode()));
                 }
 
                 let reader = prim.reader(|b| Some(&buffers[b.index()][..b.length()]));
@@ -713,16 +666,11 @@ pub fn load_meshes<'a, E: std::error::Error + 'static>(
                     builder = builder.with_vertex_joint_weights(joint_weights.into_f32().map(Vec4::from).collect())
                 }
 
-                let mesh = builder
-                    .build()
-                    .map_err(|valid| GltfLoadError::MeshValidationError(mesh.index(), valid))?;
+                let mesh = builder.build().map_err(|valid| GltfLoadError::MeshValidationError(mesh.index(), valid))?;
 
                 let handle = renderer.add_mesh(mesh)?;
 
-                res_prims.push(MeshPrimitive {
-                    handle,
-                    material: prim.material().index(),
-                })
+                res_prims.push(MeshPrimitive { handle, material: prim.material().index() })
             }
             Ok(Labeled::new(Mesh { primitives: res_prims }, mesh.name()))
         })
@@ -747,18 +695,9 @@ fn load_skins<E: std::error::Error + 'static>(
             vec![Mat4::IDENTITY; num_joints]
         };
 
-        let joints = skin
-            .joints()
-            .map(|node| Labeled::new(Joint { node_idx: node.index() }, node.name()))
-            .collect();
+        let joints = skin.joints().map(|node| Labeled::new(Joint { node_idx: node.index() }, node.name())).collect();
 
-        res_skins.push(Labeled::new(
-            Skin {
-                inverse_bind_matrices: inv_b_mats,
-                joints,
-            },
-            skin.name(),
-        ))
+        res_skins.push(Labeled::new(Skin { inverse_bind_matrices: inv_b_mats, joints }, skin.name()))
     }
 
     Ok(res_skins)
@@ -766,14 +705,7 @@ fn load_skins<E: std::error::Error + 'static>(
 
 fn compute_animation_duration(channels: &HashMap<usize, PosRotScale>) -> f32 {
     fn channel_duration<T>(channel: &AnimationChannel<T>) -> f32 {
-        channel
-            .times
-            .iter()
-            .copied()
-            .map(float_ord::FloatOrd)
-            .max()
-            .map(|f_ord| f_ord.0)
-            .unwrap_or(0.0)
+        channel.times.iter().copied().map(float_ord::FloatOrd).max().map(|f_ord| f_ord.0).unwrap_or(0.0)
     }
     channels
         .values()
@@ -803,9 +735,7 @@ fn load_animations<E: std::error::Error + 'static>(
 
             // Get the PosRotScale for the current target node or create a new
             // one if it doesn't exist.
-            let chs = result_channels
-                .entry(node_idx)
-                .or_insert_with(|| PosRotScale::new(node_idx as u32));
+            let chs = result_channels.entry(node_idx).or_insert_with(|| PosRotScale::new(node_idx as u32));
 
             let reader = ch.reader(|b| Some(&buffers[b.index()][..b.length()]));
 
@@ -817,27 +747,16 @@ fn load_animations<E: std::error::Error + 'static>(
 
             // And 'outputs' means the keyframe values, which varies depending on the type
             // of keyframe
-            match reader
-                .read_outputs()
-                .ok_or_else(|| GltfLoadError::MissingKeyframeValues(anim.index(), ch_idx))?
-            {
+            match reader.read_outputs().ok_or_else(|| GltfLoadError::MissingKeyframeValues(anim.index(), ch_idx))? {
                 gltf::animation::util::ReadOutputs::Translations(trs) => {
-                    chs.translation = Some(AnimationChannel {
-                        values: trs.map(Vec3::from).collect(),
-                        times,
-                    })
+                    chs.translation = Some(AnimationChannel { values: trs.map(Vec3::from).collect(), times })
                 }
                 gltf::animation::util::ReadOutputs::Rotations(rots) => {
-                    chs.rotation = Some(AnimationChannel {
-                        values: rots.into_f32().map(Quat::from_array).collect(),
-                        times,
-                    });
+                    chs.rotation =
+                        Some(AnimationChannel { values: rots.into_f32().map(Quat::from_array).collect(), times });
                 }
                 gltf::animation::util::ReadOutputs::Scales(scls) => {
-                    chs.scale = Some(AnimationChannel {
-                        values: scls.map(Vec3::from).collect(),
-                        times,
-                    });
+                    chs.scale = Some(AnimationChannel { values: scls.map(Vec3::from).collect(), times });
                 }
                 gltf::animation::util::ReadOutputs::MorphTargetWeights(_) => {
                     // TODO
@@ -846,10 +765,7 @@ fn load_animations<E: std::error::Error + 'static>(
         }
 
         result.push(Labeled::new(
-            Animation {
-                duration: compute_animation_duration(&result_channels),
-                channels: result_channels,
-            },
+            Animation { duration: compute_animation_duration(&result_channels), channels: result_channels },
             anim.name(),
         ))
     }
@@ -967,16 +883,13 @@ where
                     value: Vec4::from(albedo_factor),
                     srgb: false,
                 },
-                None => pbr::AlbedoComponent::ValueVertex {
-                    value: Vec4::from(albedo_factor),
-                    srgb: false,
-                },
+                None => pbr::AlbedoComponent::ValueVertex { value: Vec4::from(albedo_factor), srgb: false },
             },
             transparency: match material.alpha_mode() {
                 gltf::material::AlphaMode::Opaque => pbr::Transparency::Opaque,
-                gltf::material::AlphaMode::Mask => pbr::Transparency::Cutout {
-                    cutout: material.alpha_cutoff().unwrap_or(0.5),
-                },
+                gltf::material::AlphaMode::Mask => {
+                    pbr::Transparency::Cutout { cutout: material.alpha_cutoff().unwrap_or(0.5) }
+                }
                 gltf::material::AlphaMode::Blend => pbr::Transparency::Blend,
             },
             normal: match normals_tex {
@@ -989,9 +902,7 @@ where
                 _ => pbr::NormalTexture::None,
             },
             aomr_textures: match (metallic_roughness_tex, occlusion_tex) {
-                (Some(mr), Some(ao)) if mr == ao => pbr::AoMRTextures::Combined {
-                    texture: Some(mr.handle),
-                },
+                (Some(mr), Some(ao)) if mr == ao => pbr::AoMRTextures::Combined { texture: Some(mr.handle) },
                 (mr, ao)
                     if ao
                         .as_ref()
@@ -1011,10 +922,9 @@ where
             metallic_factor: Some(metallic_factor),
             roughness_factor: Some(roughness_factor),
             emissive: match emissive_tex {
-                Some(tex) => pbr::MaterialComponent::TextureValue {
-                    texture: tex.handle,
-                    value: Vec3::from(emissive_factor),
-                },
+                Some(tex) => {
+                    pbr::MaterialComponent::TextureValue { texture: tex.handle, value: Vec3::from(emissive_factor) }
+                }
                 None => pbr::MaterialComponent::Value(Vec3::from(emissive_factor)),
             },
             uv_transform0: uv_transform,
@@ -1051,10 +961,7 @@ where
     Fut: Future<Output = Result<Vec<u8>, E>>,
     E: std::error::Error + 'static,
 {
-    let key = ImageKey {
-        index: image.index(),
-        srgb,
-    };
+    let key = ImageKey { index: image.index(), srgb };
 
     let entry = match images.entry(key) {
         Entry::Occupied(handle) => return Ok(handle.get().clone()),
@@ -1089,18 +996,14 @@ where
     // profiling::scope!("load image", image.name().unwrap_or_default());
     let (data, uri) = match image.source() {
         gltf::image::Source::Uri { uri, .. } => {
-            let data = io_func(SsoString::from(uri))
-                .await
-                .map_err(|e| GltfLoadError::TextureIo(SsoString::from(uri), e))?;
+            let data =
+                io_func(SsoString::from(uri)).await.map_err(|e| GltfLoadError::TextureIo(SsoString::from(uri), e))?;
             (Cow::Owned(data), SsoString::from(uri))
         }
         gltf::image::Source::View { view, .. } => {
             let start = view.offset();
             let end = start + view.length();
-            (
-                Cow::Borrowed(&buffers[view.buffer().index()][start..end]),
-                SsoString::from("<embedded>"),
-            )
+            (Cow::Borrowed(&buffers[view.buffer().index()][start..end]), SsoString::from("<embedded>"))
         }
     };
 
@@ -1126,9 +1029,7 @@ where
 
         let guaranteed_format = format.guaranteed_format_features(Default::default());
         let generate = header.level_count == 1
-            && guaranteed_format
-                .flags
-                .contains(rend3::types::TextureFormatFeatureFlags::FILTERABLE)
+            && guaranteed_format.flags.contains(rend3::types::TextureFormatFeatureFlags::FILTERABLE)
             && guaranteed_format.allowed_usages.contains(
                 rend3::types::TextureUsages::TEXTURE_BINDING | rend3::types::TextureUsages::RENDER_ATTACHMENT,
             );
@@ -1150,11 +1051,7 @@ where
             } else {
                 types::MipmapCount::Specific(std::num::NonZeroU32::new(header.level_count).unwrap())
             },
-            mip_source: if generate {
-                types::MipmapSource::Generated
-            } else {
-                types::MipmapSource::Uploaded
-            },
+            mip_source: if generate { types::MipmapSource::Generated } else { types::MipmapSource::Uploaded },
         })
     }
 
@@ -1184,16 +1081,12 @@ where
 
             let guaranteed_format = format.guaranteed_format_features(Default::default());
             let generate = dds.get_num_mipmap_levels() == 1
-                && guaranteed_format
-                    .flags
-                    .contains(rend3::types::TextureFormatFeatureFlags::FILTERABLE)
+                && guaranteed_format.flags.contains(rend3::types::TextureFormatFeatureFlags::FILTERABLE)
                 && guaranteed_format.allowed_usages.contains(
                     rend3::types::TextureUsages::TEXTURE_BINDING | rend3::types::TextureUsages::RENDER_ATTACHMENT,
                 );
 
-            let data = dds
-                .get_data(0)
-                .map_err(|_| GltfLoadError::TextureTooManyLayers(uri.take().unwrap()))?;
+            let data = dds.get_data(0).map_err(|_| GltfLoadError::TextureTooManyLayers(uri.take().unwrap()))?;
 
             texture = Some(types::Texture {
                 label: image.name().map(str::to_owned),
@@ -1205,11 +1098,7 @@ where
                 } else {
                     types::MipmapCount::Specific(std::num::NonZeroU32::new(dds.get_num_mipmap_levels()).unwrap())
                 },
-                mip_source: if generate {
-                    types::MipmapSource::Generated
-                } else {
-                    types::MipmapSource::Uploaded
-                },
+                mip_source: if generate { types::MipmapSource::Generated } else { types::MipmapSource::Uploaded },
             })
         }
     }
@@ -1277,10 +1166,9 @@ pub mod util {
         // profiling::scope!("convert dynamic image");
         match image {
             image::DynamicImage::ImageLuma8(i) => (i.into_raw(), r3F::R8Unorm),
-            image::DynamicImage::ImageLumaA8(i) => (
-                ConvertBuffer::<ImageBuffer<Luma<u8>, Vec<u8>>>::convert(&i).into_raw(),
-                r3F::R8Unorm,
-            ),
+            image::DynamicImage::ImageLumaA8(i) => {
+                (ConvertBuffer::<ImageBuffer<Luma<u8>, Vec<u8>>>::convert(&i).into_raw(), r3F::R8Unorm)
+            }
             image::DynamicImage::ImageRgb8(i) => (
                 ConvertBuffer::<ImageBuffer<Rgba<u8>, Vec<u8>>>::convert(&i).into_raw(),
                 if srgb { r3F::Rgba8UnormSrgb } else { r3F::Rgba8Unorm },
@@ -1288,10 +1176,7 @@ pub mod util {
             image::DynamicImage::ImageRgba8(i) => {
                 (i.into_raw(), if srgb { r3F::Rgba8UnormSrgb } else { r3F::Rgba8Unorm })
             }
-            i => (
-                i.into_rgba8().into_raw(),
-                if srgb { r3F::Rgba8UnormSrgb } else { r3F::Rgba8Unorm },
-            ),
+            i => (i.into_rgba8().into_raw(), if srgb { r3F::Rgba8UnormSrgb } else { r3F::Rgba8Unorm }),
         }
     }
 
@@ -1471,115 +1356,59 @@ pub mod util {
             k2F::EAC_R11G11_SNORM_BLOCK => r3F::EacRg11Snorm,
             k2F::ASTC_4x4_UNORM_BLOCK | k2F::ASTC_4x4_SRGB_BLOCK => r3F::Astc {
                 block: AstcBlock::B4x4,
-                channel: if srgb {
-                    AstcChannel::UnormSrgb
-                } else {
-                    AstcChannel::Unorm
-                },
+                channel: if srgb { AstcChannel::UnormSrgb } else { AstcChannel::Unorm },
             },
             k2F::ASTC_5x4_UNORM_BLOCK | k2F::ASTC_5x4_SRGB_BLOCK => r3F::Astc {
                 block: AstcBlock::B5x4,
-                channel: if srgb {
-                    AstcChannel::UnormSrgb
-                } else {
-                    AstcChannel::Unorm
-                },
+                channel: if srgb { AstcChannel::UnormSrgb } else { AstcChannel::Unorm },
             },
             k2F::ASTC_5x5_UNORM_BLOCK | k2F::ASTC_5x5_SRGB_BLOCK => r3F::Astc {
                 block: AstcBlock::B5x5,
-                channel: if srgb {
-                    AstcChannel::UnormSrgb
-                } else {
-                    AstcChannel::Unorm
-                },
+                channel: if srgb { AstcChannel::UnormSrgb } else { AstcChannel::Unorm },
             },
             k2F::ASTC_6x5_UNORM_BLOCK | k2F::ASTC_6x5_SRGB_BLOCK => r3F::Astc {
                 block: AstcBlock::B6x5,
-                channel: if srgb {
-                    AstcChannel::UnormSrgb
-                } else {
-                    AstcChannel::Unorm
-                },
+                channel: if srgb { AstcChannel::UnormSrgb } else { AstcChannel::Unorm },
             },
             k2F::ASTC_6x6_UNORM_BLOCK | k2F::ASTC_6x6_SRGB_BLOCK => r3F::Astc {
                 block: AstcBlock::B6x6,
-                channel: if srgb {
-                    AstcChannel::UnormSrgb
-                } else {
-                    AstcChannel::Unorm
-                },
+                channel: if srgb { AstcChannel::UnormSrgb } else { AstcChannel::Unorm },
             },
             k2F::ASTC_8x5_UNORM_BLOCK | k2F::ASTC_8x5_SRGB_BLOCK => r3F::Astc {
                 block: AstcBlock::B8x5,
-                channel: if srgb {
-                    AstcChannel::UnormSrgb
-                } else {
-                    AstcChannel::Unorm
-                },
+                channel: if srgb { AstcChannel::UnormSrgb } else { AstcChannel::Unorm },
             },
             k2F::ASTC_8x6_UNORM_BLOCK | k2F::ASTC_8x6_SRGB_BLOCK => r3F::Astc {
                 block: AstcBlock::B8x6,
-                channel: if srgb {
-                    AstcChannel::UnormSrgb
-                } else {
-                    AstcChannel::Unorm
-                },
+                channel: if srgb { AstcChannel::UnormSrgb } else { AstcChannel::Unorm },
             },
             k2F::ASTC_8x8_UNORM_BLOCK | k2F::ASTC_8x8_SRGB_BLOCK => r3F::Astc {
                 block: AstcBlock::B8x8,
-                channel: if srgb {
-                    AstcChannel::UnormSrgb
-                } else {
-                    AstcChannel::Unorm
-                },
+                channel: if srgb { AstcChannel::UnormSrgb } else { AstcChannel::Unorm },
             },
             k2F::ASTC_10x5_UNORM_BLOCK | k2F::ASTC_10x5_SRGB_BLOCK => r3F::Astc {
                 block: AstcBlock::B10x5,
-                channel: if srgb {
-                    AstcChannel::UnormSrgb
-                } else {
-                    AstcChannel::Unorm
-                },
+                channel: if srgb { AstcChannel::UnormSrgb } else { AstcChannel::Unorm },
             },
             k2F::ASTC_10x6_UNORM_BLOCK | k2F::ASTC_10x6_SRGB_BLOCK => r3F::Astc {
                 block: AstcBlock::B10x6,
-                channel: if srgb {
-                    AstcChannel::UnormSrgb
-                } else {
-                    AstcChannel::Unorm
-                },
+                channel: if srgb { AstcChannel::UnormSrgb } else { AstcChannel::Unorm },
             },
             k2F::ASTC_10x8_UNORM_BLOCK | k2F::ASTC_10x8_SRGB_BLOCK => r3F::Astc {
                 block: AstcBlock::B10x8,
-                channel: if srgb {
-                    AstcChannel::UnormSrgb
-                } else {
-                    AstcChannel::Unorm
-                },
+                channel: if srgb { AstcChannel::UnormSrgb } else { AstcChannel::Unorm },
             },
             k2F::ASTC_10x10_UNORM_BLOCK | k2F::ASTC_10x10_SRGB_BLOCK => r3F::Astc {
                 block: AstcBlock::B10x10,
-                channel: if srgb {
-                    AstcChannel::UnormSrgb
-                } else {
-                    AstcChannel::Unorm
-                },
+                channel: if srgb { AstcChannel::UnormSrgb } else { AstcChannel::Unorm },
             },
             k2F::ASTC_12x10_UNORM_BLOCK | k2F::ASTC_12x10_SRGB_BLOCK => r3F::Astc {
                 block: AstcBlock::B12x10,
-                channel: if srgb {
-                    AstcChannel::UnormSrgb
-                } else {
-                    AstcChannel::Unorm
-                },
+                channel: if srgb { AstcChannel::UnormSrgb } else { AstcChannel::Unorm },
             },
             k2F::ASTC_12x12_UNORM_BLOCK | k2F::ASTC_12x12_SRGB_BLOCK => r3F::Astc {
                 block: AstcBlock::B12x12,
-                channel: if srgb {
-                    AstcChannel::UnormSrgb
-                } else {
-                    AstcChannel::Unorm
-                },
+                channel: if srgb { AstcChannel::UnormSrgb } else { AstcChannel::Unorm },
             },
             _ => return None,
         })

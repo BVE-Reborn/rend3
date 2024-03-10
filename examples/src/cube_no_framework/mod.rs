@@ -179,10 +179,7 @@ pub fn main() {
     event_loop
         .run(move |event, _event_loop_window_target| match event {
             // Window was resized, need to resize renderer.
-            winit::event::Event::WindowEvent {
-                event: winit::event::WindowEvent::Resized(physical_size),
-                ..
-            } => {
+            winit::event::Event::WindowEvent { event: winit::event::WindowEvent::Resized(physical_size), .. } => {
                 resolution = glam::UVec2::new(physical_size.width, physical_size.height);
                 // Reconfigure the surface for the new size.
                 rend3::configure_surface(
@@ -196,10 +193,7 @@ pub fn main() {
                 renderer.set_aspect_ratio(resolution.x as f32 / resolution.y as f32);
             }
             // Render!
-            winit::event::Event::WindowEvent {
-                event: winit::event::WindowEvent::RedrawRequested,
-                ..
-            } => {
+            winit::event::Event::WindowEvent { event: winit::event::WindowEvent::RedrawRequested, .. } => {
                 // Get a frame
                 let frame = surface.get_current_texture().unwrap();
 

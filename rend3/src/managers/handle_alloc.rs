@@ -49,9 +49,7 @@ where
 
         let renderer = Arc::clone(renderer);
         let destroy_fn = move |handle: RawResourceHandle<T>| {
-            renderer
-                .instructions
-                .push(handle.into_delete_instruction_kind(), *Location::caller())
+            renderer.instructions.push(handle.into_delete_instruction_kind(), *Location::caller())
         };
 
         ResourceHandle::new(destroy_fn, idx)
@@ -71,10 +69,7 @@ where
             let mut locked_delay_list = delay_list.lock();
 
             self.freelist.lock().extend_from_slice(&locked_delay_list);
-            locked_delay_list
-                .drain(..)
-                .map(|idx| RawResourceHandle::new(idx))
-                .collect()
+            locked_delay_list.drain(..).map(|idx| RawResourceHandle::new(idx)).collect()
         } else {
             Vec::new()
         }

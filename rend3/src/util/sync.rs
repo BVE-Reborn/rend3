@@ -10,10 +10,7 @@ pub struct WaitGroup {
 
 impl WaitGroup {
     pub fn new() -> Arc<Self> {
-        Arc::new(Self {
-            counter: Mutex::new(0),
-            condvar: Condvar::new(),
-        })
+        Arc::new(Self { counter: Mutex::new(0), condvar: Condvar::new() })
     }
 
     pub fn increment(self: &Arc<Self>) -> DecrementGuard {

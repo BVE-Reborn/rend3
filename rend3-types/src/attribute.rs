@@ -53,12 +53,7 @@ where
     T: VertexFormat,
 {
     pub const fn new(name: &'static str, default_value: Option<&'static str>) -> Self {
-        Self {
-            name,
-            default_value,
-            id: OnceCell::new(),
-            _phantom: PhantomData,
-        }
+        Self { name, default_value, id: OnceCell::new(), _phantom: PhantomData }
     }
 
     pub fn name(&self) -> &'static str {
@@ -100,35 +95,23 @@ pub trait VertexFormat: Pod + Send + Sync + 'static {
 // TODO: More formats
 
 impl VertexFormat for glam::Vec2 {
-    const METADATA: VertexFormatMetadata = VertexFormatMetadata {
-        size: 8,
-        shader_extract_fn: "extract_attribute_vec2_f32",
-        shader_type: "vec2<f32>",
-    };
+    const METADATA: VertexFormatMetadata =
+        VertexFormatMetadata { size: 8, shader_extract_fn: "extract_attribute_vec2_f32", shader_type: "vec2<f32>" };
 }
 
 impl VertexFormat for glam::Vec3 {
-    const METADATA: VertexFormatMetadata = VertexFormatMetadata {
-        size: 12,
-        shader_extract_fn: "extract_attribute_vec3_f32",
-        shader_type: "vec3<f32>",
-    };
+    const METADATA: VertexFormatMetadata =
+        VertexFormatMetadata { size: 12, shader_extract_fn: "extract_attribute_vec3_f32", shader_type: "vec3<f32>" };
 }
 
 impl VertexFormat for glam::Vec4 {
-    const METADATA: VertexFormatMetadata = VertexFormatMetadata {
-        size: 16,
-        shader_extract_fn: "extract_attribute_vec4_f32",
-        shader_type: "vec4<f32>",
-    };
+    const METADATA: VertexFormatMetadata =
+        VertexFormatMetadata { size: 16, shader_extract_fn: "extract_attribute_vec4_f32", shader_type: "vec4<f32>" };
 }
 
 impl VertexFormat for [u16; 4] {
-    const METADATA: VertexFormatMetadata = VertexFormatMetadata {
-        size: 8,
-        shader_extract_fn: "extract_attribute_vec4_u16",
-        shader_type: "vec4<u32>",
-    };
+    const METADATA: VertexFormatMetadata =
+        VertexFormatMetadata { size: 8, shader_extract_fn: "extract_attribute_vec4_u16", shader_type: "vec4<u32>" };
 }
 
 impl VertexFormat for [u8; 4] {

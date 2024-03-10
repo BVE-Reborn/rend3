@@ -24,14 +24,9 @@ use winit::{
 };
 
 async fn load_skybox_image(loader: &rend3_framework::AssetLoader, data: &mut Vec<u8>, path: &str) {
-    let decoded = image::load_from_memory(
-        &loader
-            .get_asset(AssetPath::Internal(path))
-            .await
-            .unwrap_or_else(|e| panic!("Error {}: {}", path, e)),
-    )
-    .unwrap()
-    .into_rgba8();
+    let request_response =
+        loader.get_asset(AssetPath::Internal(path)).await.unwrap_or_else(|e| panic!("Error {}: {}", path, e));
+    let decoded = image::load_from_memory(&request_response).unwrap().into_rgba8();
 
     data.extend_from_slice(decoded.as_raw());
 }
@@ -118,11 +113,7 @@ async fn load_gltf(
     })
     .await?;
 
-    log::info!(
-        "Loaded gltf in {:.3?}, resources loaded in {:.3?}",
-        gltf_elapsed,
-        resources_start.elapsed()
-    );
+    log::info!("Loaded gltf in {:.3?}, resources loaded in {:.3?}", gltf_elapsed, resources_start.elapsed());
     Ok((scene, instance))
 }
 
@@ -403,16 +394,10 @@ impl SceneViewer {
             app.run_speed = run_speed;
         }
 
-        let camera_default = [
-            app.camera_location.x,
-            app.camera_location.y,
-            app.camera_location.z,
-            app.camera_pitch,
-            app.camera_yaw,
-        ];
-        if let Ok(camera_info) = args
-            .value_from_str("--camera")
-            .map(|s: String| extract_array(&s, camera_default).unwrap())
+        let camera_default =
+            [app.camera_location.x, app.camera_location.y, app.camera_location.z, app.camera_pitch, app.camera_yaw];
+        if let Ok(camera_info) =
+            args.value_from_str("--camera").map(|s: String| extract_array(&s, camera_default).unwrap())
         {
             app.camera_location = Vec3A::new(camera_info[0], camera_info[1], camera_info[2]);
             app.camera_pitch = camera_info[3];
@@ -458,13 +443,7 @@ impl rend3_framework::App for SceneViewer {
         >,
     > {
         Box::pin(async move {
-            rend3::create_iad(
-                self.desired_backend,
-                self.desired_device_name.clone(),
-                self.desired_profile,
-                None,
-            )
-            .await
+            rend3::create_iad(self.desired_backend, self.desired_device_name.clone(), self.desired_profile, None).await
         })
     }
 
@@ -481,9 +460,7 @@ impl rend3_framework::App for SceneViewer {
     }
 
     fn setup(&mut self, context: rend3_framework::SetupContext<'_>) {
-        self.grabber = context
-            .windowing
-            .map(|windowing| rend3_framework::Grabber::new(windowing.window));
+        self.grabber = context.windowing.map(|windowing| rend3_framework::Grabber::new(windowing.window));
 
         if let Some(direction) = self.directional_light_direction {
             self.directional_light = Some(context.renderer.add_directional_light(DirectionalLight {
@@ -536,26 +513,14 @@ impl rend3_framework::App for SceneViewer {
 
     fn handle_event(&mut self, context: rend3_framework::EventContext<'_>, event: winit::event::Event<()>) {
         match event {
-            Event::WindowEvent {
-                event: WindowEvent::Focused(focus),
-                ..
-            } => {
+            Event::WindowEvent { event: WindowEvent::Focused(focus), .. } => {
                 if !focus {
-                    self.grabber
-                        .as_mut()
-                        .unwrap()
-                        .request_ungrab(context.window.as_ref().unwrap());
+                    self.grabber.as_mut().unwrap().request_ungrab(context.window.as_ref().unwrap());
                 }
             }
 
             Event::WindowEvent {
-                event:
-                    WindowEvent::KeyboardInput {
-                        event: KeyEvent {
-                            physical_key, state, ..
-                        },
-                        ..
-                    },
+                event: WindowEvent::KeyboardInput { event: KeyEvent { physical_key, state, .. }, .. },
                 ..
             } => {
                 let PhysicalKey::Code(scancode) = physical_key else {
@@ -573,12 +538,7 @@ impl rend3_framework::App for SceneViewer {
             }
 
             Event::WindowEvent {
-                event:
-                    WindowEvent::MouseInput {
-                        button: MouseButton::Left,
-                        state: ElementState::Pressed,
-                        ..
-                    },
+                event: WindowEvent::MouseInput { button: MouseButton::Left, state: ElementState::Pressed, .. },
                 ..
             } => {
                 let grabber = self.grabber.as_mut().unwrap();
@@ -587,14 +547,7 @@ impl rend3_framework::App for SceneViewer {
                     grabber.request_grab(context.window.as_ref().unwrap());
                 }
             }
-            Event::DeviceEvent {
-                event:
-                    DeviceEvent::MouseMotion {
-                        delta: (delta_x, delta_y),
-                        ..
-                    },
-                ..
-            } => {
+            Event::DeviceEvent { event: DeviceEvent::MouseMotion { delta: (delta_x, delta_y), .. }, .. } => {
                 if !self.grabber.as_ref().unwrap().grabbed() {
                     return;
                 }
@@ -619,10 +572,8 @@ impl rend3_framework::App for SceneViewer {
                 } else if self.camera_yaw >= TAU {
                     self.camera_yaw -= TAU;
                 }
-                self.camera_pitch = self.camera_pitch.clamp(
-                    -std::f32::consts::FRAC_PI_2 + 0.0001,
-                    std::f32::consts::FRAC_PI_2 - 0.0001,
-                )
+                self.camera_pitch =
+                    self.camera_pitch.clamp(-std::f32::consts::FRAC_PI_2 + 0.0001, std::f32::consts::FRAC_PI_2 - 0.0001)
             }
             _ => {}
         }
@@ -644,11 +595,8 @@ impl rend3_framework::App for SceneViewer {
         let forward = -rotation.z_axis;
         let up = rotation.y_axis;
         let side = -rotation.x_axis;
-        let velocity = if button_pressed(&self.scancode_status, KeyCode::ShiftLeft) {
-            self.run_speed
-        } else {
-            self.walk_speed
-        };
+        let velocity =
+            if button_pressed(&self.scancode_status, KeyCode::ShiftLeft) { self.run_speed } else { self.walk_speed };
         if button_pressed(&self.scancode_status, KeyCode::KeyW) {
             self.camera_location += forward * velocity * context.delta_t_seconds;
         }
@@ -676,10 +624,7 @@ impl rend3_framework::App for SceneViewer {
         }
 
         if button_pressed(&self.scancode_status, winit::keyboard::KeyCode::Escape) {
-            self.grabber
-                .as_mut()
-                .unwrap()
-                .request_ungrab(context.window.as_ref().unwrap());
+            self.grabber.as_mut().unwrap().request_ungrab(context.window.as_ref().unwrap());
         }
 
         if button_pressed(&self.scancode_status, KeyCode::KeyP) {
@@ -695,10 +640,9 @@ impl rend3_framework::App for SceneViewer {
         let view = Mat4::from_euler(glam::EulerRot::XYZ, -self.camera_pitch, -self.camera_yaw, 0.0);
         let view = view * Mat4::from_translation((-self.camera_location).into());
 
-        context.renderer.set_camera_data(Camera {
-            projection: CameraProjection::Perspective { vfov: 60.0, near: 0.1 },
-            view,
-        });
+        context
+            .renderer
+            .set_camera_data(Camera { projection: CameraProjection::Perspective { vfov: 60.0, near: 0.1 }, view });
 
         // Lock all the routines
         let pbr_routine = lock(&context.routines.pbr);

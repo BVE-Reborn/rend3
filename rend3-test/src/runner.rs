@@ -24,10 +24,7 @@ pub struct FrameRenderSettings {
 
 impl FrameRenderSettings {
     pub fn new() -> Self {
-        Self {
-            size: 64,
-            samples: SampleCount::One,
-        }
+        Self { size: 64, samples: SampleCount::One }
     }
 
     pub fn size(mut self, size: u32) -> Result<Self> {
@@ -74,9 +71,7 @@ impl TestRunnerBuilder {
 
         let iad = match self.iad {
             Some(iad) => iad,
-            None => rend3::create_iad(None, None, None, None)
-                .await
-                .context("InstanceAdapterDevice creation failed")?,
+            None => rend3::create_iad(None, None, None, None).await.context("InstanceAdapterDevice creation failed")?,
         };
 
         let capture_guard = CaptureDropGuard::start_capture(Arc::clone(&iad.device));
@@ -95,20 +90,10 @@ impl TestRunnerBuilder {
             &base_rendergraph.interfaces,
             &base_rendergraph.gpu_culler.culling_buffer_map_handle,
         );
-        let tonemapping = TonemappingRoutine::new(
-            &renderer,
-            &spp,
-            &base_rendergraph.interfaces,
-            TextureFormat::Rgba8UnormSrgb,
-        );
+        let tonemapping =
+            TonemappingRoutine::new(&renderer, &spp, &base_rendergraph.interfaces, TextureFormat::Rgba8UnormSrgb);
 
-        Ok(TestRunner {
-            renderer,
-            pbr,
-            tonemapping,
-            base_rendergraph,
-            capture_guard,
-        })
+        Ok(TestRunner { renderer, pbr, tonemapping, base_rendergraph, capture_guard })
     }
 }
 
@@ -136,11 +121,7 @@ impl TestRunner {
     pub fn process_events(&self, settings: FrameRenderSettings) -> wgpu::Texture {
         let texture = self.renderer.device.create_texture(&TextureDescriptor {
             label: Some("Test output image"),
-            size: Extent3d {
-                width: settings.size,
-                height: settings.size,
-                depth_or_array_layers: 1,
-            },
+            size: Extent3d { width: settings.size, height: settings.size, depth_or_array_layers: 1 },
             mip_level_count: 1,
             sample_count: 1,
             dimension: TextureDimension::D2,
@@ -219,40 +200,24 @@ pub async fn download_image(
         mapped_at_creation: false,
     });
 
-    let mut encoder = renderer.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-        label: Some("Test output encoder"),
-    });
+    let mut encoder =
+        renderer.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Test output encoder") });
     encoder.copy_texture_to_buffer(
         texture.as_image_copy(),
         ImageCopyBuffer {
             buffer: &buffer,
-            layout: ImageDataLayout {
-                offset: 0,
-                bytes_per_row: Some(size.x * 4),
-                rows_per_image: None,
-            },
+            layout: ImageDataLayout { offset: 0, bytes_per_row: Some(size.x * 4), rows_per_image: None },
         },
-        Extent3d {
-            width: size.x,
-            height: size.y,
-            depth_or_array_layers: 1,
-        },
+        Extent3d { width: size.x, height: size.y, depth_or_array_layers: 1 },
     );
 
     let submit_index = renderer.queue.submit(Some(encoder.finish()));
 
     let (sender, receiver) = flume::bounded(1);
-    buffer
-        .slice(..)
-        .map_async(wgpu::MapMode::Read, move |_| sender.send(()).unwrap());
-    renderer
-        .device
-        .poll(wgpu::Maintain::WaitForSubmissionIndex(submit_index));
+    buffer.slice(..).map_async(wgpu::MapMode::Read, move |_| sender.send(()).unwrap());
+    renderer.device.poll(wgpu::Maintain::WaitForSubmissionIndex(submit_index));
 
-    receiver
-        .recv_async()
-        .await
-        .context("Failed to recieve message from map_async")?;
+    receiver.recv_async().await.context("Failed to recieve message from map_async")?;
 
     let mapping = buffer.slice(..).get_mapped_range();
 

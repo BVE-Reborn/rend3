@@ -39,10 +39,7 @@ pub struct RawResourceHandle<T> {
 impl<T> RawResourceHandle<T> {
     /// Creates a new handle with the given value
     pub const fn new(idx: usize) -> Self {
-        Self {
-            idx,
-            _phantom: PhantomData,
-        }
+        Self { idx, _phantom: PhantomData }
     }
 }
 
@@ -109,11 +106,7 @@ impl<T> Debug for ResourceHandle<T> {
 
 impl<T> Clone for ResourceHandle<T> {
     fn clone(&self) -> Self {
-        Self {
-            refcount: self.refcount.clone(),
-            raw: self.raw,
-            _phantom: self._phantom,
-        }
+        Self { refcount: self.refcount.clone(), raw: self.raw, _phantom: self._phantom }
     }
 }
 
@@ -138,10 +131,7 @@ impl<T> ResourceHandle<T> {
     pub fn new(destroy_fn: impl Fn(RawResourceHandle<T>) + WasmNotSend + WasmNotSync + 'static, idx: usize) -> Self {
         Self {
             refcount: Arc::new(destroy_fn),
-            raw: RawResourceHandle {
-                idx,
-                _phantom: PhantomData,
-            },
+            raw: RawResourceHandle { idx, _phantom: PhantomData },
             _phantom: PhantomData,
         }
     }
@@ -278,11 +268,7 @@ pub const MAX_INDEX_COUNT: u32 = u32::MAX;
 #[derive(Debug, Error)]
 pub enum MeshValidationError {
     #[error("Mesh's {:?} buffer has {actual} vertices but the position buffer has {expected}", .attribute_id.name())]
-    MismatchedVertexCount {
-        attribute_id: &'static VertexAttributeId,
-        expected: usize,
-        actual: usize,
-    },
+    MismatchedVertexCount { attribute_id: &'static VertexAttributeId, expected: usize, actual: usize },
     #[error("Mesh has {count} vertices when the vertex limit is {MAX_VERTEX_COUNT}")]
     ExceededMaxVertexCount { count: usize },
     #[error("Mesh has {count} indicies when maximum index count is {MAX_INDEX_COUNT}")]
@@ -309,12 +295,7 @@ impl StoredVertexAttributeData {
     {
         let bytes = (data.len() * size_of::<T>()) as u64;
         let ptr = data.as_ptr() as *const u8;
-        Self {
-            id: attribute.id(),
-            data: WasmVecAny::from(data),
-            ptr,
-            bytes,
-        }
+        Self { id: attribute.id(), data: WasmVecAny::from(data), ptr, bytes }
     }
 
     pub fn id(&self) -> &'static VertexAttributeId {
@@ -371,18 +352,14 @@ impl MeshBuilder {
     pub fn new(vertex_positions: Vec<Vec3>, handedness: Handedness) -> Self {
         Self {
             vertex_count: vertex_positions.len(),
-            vertex_attributes: vec![StoredVertexAttributeData::new(
-                &VERTEX_ATTRIBUTE_POSITION,
-                vertex_positions,
-            )],
+            vertex_attributes: vec![StoredVertexAttributeData::new(&VERTEX_ATTRIBUTE_POSITION, vertex_positions)],
             handedness,
             ..Self::default()
         }
     }
 
     pub fn with_attribute<T: VertexFormat>(mut self, attribute: &'static VertexAttribute<T>, values: Vec<T>) -> Self {
-        self.vertex_attributes
-            .push(StoredVertexAttributeData::new(attribute, values));
+        self.vertex_attributes.push(StoredVertexAttributeData::new(attribute, values));
         self
     }
 
@@ -582,11 +559,7 @@ impl Mesh {
 
         for (index, &value) in self.indices.iter().enumerate() {
             if value as usize >= position_length {
-                return Err(MeshValidationError::IndexOutOfBounds {
-                    index,
-                    value,
-                    max: position_length as u32,
-                });
+                return Err(MeshValidationError::IndexOutOfBounds { index, value, max: position_length as u32 });
             }
         }
 
@@ -615,10 +588,8 @@ impl Mesh {
         index.map_or_else(
             || {
                 let idx = self.attributes.len();
-                self.attributes.push(StoredVertexAttributeData::new(
-                    desired_attribute,
-                    vec![T::zeroed(); self.vertex_count],
-                ));
+                self.attributes
+                    .push(StoredVertexAttributeData::new(desired_attribute, vec![T::zeroed(); self.vertex_count]));
                 // There were no normals, and our created normals are already zeroed.
                 (idx, true)
             },
@@ -648,9 +619,7 @@ impl Mesh {
 
         let (position_attribute, remaining_attributes) = self.attributes.split_first_mut().unwrap();
         let positions = position_attribute.typed_data(&VERTEX_ATTRIBUTE_POSITION).unwrap();
-        let normals = remaining_attributes[normals_index - 1]
-            .typed_data_mut(&VERTEX_ATTRIBUTE_NORMAL)
-            .unwrap();
+        let normals = remaining_attributes[normals_index - 1].typed_data_mut(&VERTEX_ATTRIBUTE_NORMAL).unwrap();
 
         if handedness == Handedness::Left {
             unsafe {
@@ -719,11 +688,7 @@ impl Mesh {
             let edge1 = pos2 - pos1;
             let edge2 = pos3 - pos1;
 
-            let normal = if LEFT_HANDED {
-                edge1.cross(edge2)
-            } else {
-                edge2.cross(edge1)
-            };
+            let normal = if LEFT_HANDED { edge1.cross(edge2) } else { edge2.cross(edge1) };
 
             // SAFETY: The conditions of this function assert all thes indices are in-bounds
             unsafe { *normals.get_unchecked_mut(idx0 as usize) += normal };
@@ -976,16 +941,10 @@ pub struct Sorting {
 
 impl Sorting {
     /// Default sorting for opaque and cutout objects
-    pub const OPAQUE: Self = Self {
-        reason: SortingReason::Optimization,
-        order: SortingOrder::FrontToBack,
-    };
+    pub const OPAQUE: Self = Self { reason: SortingReason::Optimization, order: SortingOrder::FrontToBack };
 
     /// Default sorting for any objects using blending
-    pub const BLENDING: Self = Self {
-        reason: SortingReason::Requirement,
-        order: SortingOrder::BackToFront,
-    };
+    pub const BLENDING: Self = Self { reason: SortingReason::Requirement, order: SortingOrder::BackToFront };
 }
 
 /// Reason why object need sorting

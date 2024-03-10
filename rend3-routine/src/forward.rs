@@ -248,11 +248,7 @@ impl<M: Material> ForwardRoutine<M> {
 
             // When we're rendering the residual data, we are post buffer flip. We want to be rendering using the
             // "input" partition, as this is the partition that all same-frame data is in.
-            let partition = if residual {
-                InputOutputPartition::Input
-            } else {
-                InputOutputPartition::Output
-            };
+            let partition = if residual { InputOutputPartition::Input } else { InputOutputPartition::Output };
 
             let per_material_bg = ctx.temps.add(
                 BindGroupBuilder::new()
@@ -264,11 +260,7 @@ impl<M: Material> ForwardRoutine<M> {
                     .append_buffer(&ctx.eval_output.mesh_buffer)
                     .append_buffer(&draw_call_set.per_camera_uniform)
                     .append_buffer(ctx.data_core.material_manager.archetype_view::<M>().buffer())
-                    .build(
-                        &ctx.renderer.device,
-                        Some("Per-Material BG"),
-                        &args.binding_data.per_material_bgl.bgl,
-                    ),
+                    .build(&ctx.renderer.device, Some("Per-Material BG"), &args.binding_data.per_material_bgl.bgl),
             );
 
             let pipeline = match args.samples {
@@ -339,11 +331,7 @@ fn build_forward_pipeline_inner<M: Material>(
     let mut desc = RenderPipelineDescriptor {
         label: Some(args.name),
         layout: Some(pll),
-        vertex: VertexState {
-            module: args.shaders.vs_module,
-            entry_point: args.shaders.vs_entry,
-            buffers: &[],
-        },
+        vertex: VertexState { module: args.shaders.vs_module, entry_point: args.shaders.vs_entry, buffers: &[] },
         primitive: PrimitiveState {
             topology: PrimitiveTopology::TriangleList,
             strip_index_format: None,
@@ -363,18 +351,11 @@ fn build_forward_pipeline_inner<M: Material>(
             stencil: StencilState::default(),
             bias: match args.routine_type {
                 // TODO: figure out what to put here
-                RoutineType::Depth => DepthBiasState {
-                    constant: 0,
-                    slope_scale: 0.0,
-                    clamp: 0.0,
-                },
+                RoutineType::Depth => DepthBiasState { constant: 0, slope_scale: 0.0, clamp: 0.0 },
                 RoutineType::Forward => DepthBiasState::default(),
             },
         }),
-        multisample: MultisampleState {
-            count: samples as u32,
-            ..Default::default()
-        },
+        multisample: MultisampleState { count: samples as u32, ..Default::default() },
         fragment: Some(FragmentState {
             module: args.shaders.fs_module,
             entry_point: args.shaders.fs_entry,

@@ -60,10 +60,7 @@ pub(super) struct DataContents {
 
 impl DataContents {
     pub(super) fn new<T: 'static>() -> Self {
-        Self {
-            inner: Box::new(RefCell::new(None::<T>)),
-            dependencies: Vec::new(),
-        }
+        Self { inner: Box::new(RefCell::new(None::<T>)), dependencies: Vec::new() }
     }
 }
 
@@ -114,10 +111,7 @@ impl<'node> RenderGraph<'node> {
                 layer_end: desc.depth,
                 mip_start: 0,
                 mip_end: desc.to_core().mip_count(),
-                viewport: ViewportRect {
-                    offset: UVec2::ZERO,
-                    size: desc.resolution,
-                },
+                viewport: ViewportRect { offset: UVec2::ZERO, size: desc.resolution },
             }),
         };
         self.targets.push(desc);
@@ -148,10 +142,7 @@ impl<'node> RenderGraph<'node> {
     pub fn add_data<T: 'static>(&mut self) -> DataHandle<T> {
         let idx = self.data.len();
         self.data.push(DataContents::new::<T>());
-        DataHandle {
-            idx,
-            _phantom: PhantomData,
-        }
+        DataHandle { idx, _phantom: PhantomData }
     }
 
     fn flatten_dependencies(data: &[DataContents], resource_list: &mut Vec<GraphSubResource>) {
@@ -162,10 +153,7 @@ impl<'node> RenderGraph<'node> {
                 resource_list.extend_from_slice(&data[idx].dependencies);
 
                 // We can fall victim to cycles with this, so we assert on the length not being redonkulously large.
-                assert!(
-                    resource_list.len() < (1 << 20),
-                    "Rendergraph has dependencies of data that form a cycle"
-                );
+                assert!(resource_list.len() < (1 << 20), "Rendergraph has dependencies of data that form a cycle");
             }
             idx += 1;
         }
@@ -226,11 +214,7 @@ impl<'node> RenderGraph<'node> {
                         .and_modify(|span| {
                             span.last_reference = Some(idx);
                         })
-                        .or_insert(ResourceSpan {
-                            first_reference: idx,
-                            first_usage: None,
-                            last_reference: Some(idx),
-                        });
+                        .or_insert(ResourceSpan { first_reference: idx, first_usage: None, last_reference: Some(idx) });
                 }
                 // Add or update the range for all inputs
                 for &input in &node.inputs {
@@ -260,11 +244,7 @@ impl<'node> RenderGraph<'node> {
                             span.first_usage.get_or_insert(idx);
                             span.last_reference = end
                         })
-                        .or_insert(ResourceSpan {
-                            first_reference: idx,
-                            first_usage: Some(idx),
-                            last_reference: end,
-                        });
+                        .or_insert(ResourceSpan { first_reference: idx, first_usage: Some(idx), last_reference: end });
                 }
             }
         }
@@ -358,15 +338,13 @@ impl<'node> RenderGraph<'node> {
                 GraphSubResource::ImportedTexture(region) => {
                     if let Entry::Vacant(vacant) = imported_views.entry(region) {
                         let view =
-                            self.imported_targets[region.idx]
-                                .as_texture_ref()
-                                .create_view(&TextureViewDescriptor {
-                                    base_array_layer: region.layer_start,
-                                    array_layer_count: Some(region.layer_end - region.layer_start),
-                                    base_mip_level: region.mip_start as u32,
-                                    mip_level_count: Some((region.mip_end - region.mip_start) as u32),
-                                    ..TextureViewDescriptor::default()
-                                });
+                            self.imported_targets[region.idx].as_texture_ref().create_view(&TextureViewDescriptor {
+                                base_array_layer: region.layer_start,
+                                array_layer_count: Some(region.layer_end - region.layer_start),
+                                base_mip_level: region.mip_start as u32,
+                                mip_level_count: Some((region.mip_end - region.mip_start) as u32),
+                                ..TextureViewDescriptor::default()
+                            });
                         vacant.insert(view);
                     }
                 }
@@ -410,11 +388,8 @@ impl<'node> RenderGraph<'node> {
 
         profiling::scope!("Run Nodes");
 
-        let encoder_cell = UnsafeCell::new(
-            renderer
-                .device
-                .create_command_encoder(&CommandEncoderDescriptor::default()),
-        );
+        let encoder_cell =
+            UnsafeCell::new(renderer.device.create_command_encoder(&CommandEncoderDescriptor::default()));
         let rpass_temps_cell = UnsafeCell::new(RpassTemporaryPool::new());
 
         let mut next_rpass_idx = 0;
@@ -509,11 +484,7 @@ impl<'node> RenderGraph<'node> {
                     None => RenderGraphEncoderOrPassInner::Encoder(unsafe { &mut *encoder_cell.get() }),
                 };
 
-                data_core
-                    .profiler
-                    .try_lock()
-                    .unwrap()
-                    .end_query(&mut encoder_or_rpass, profiler_query);
+                data_core.profiler.try_lock().unwrap().end_query(&mut encoder_or_rpass, profiler_query);
             }
         }
 
@@ -530,14 +501,10 @@ impl<'node> RenderGraph<'node> {
         // it
         eval_output.cmd_bufs.push(encoder_cell.into_inner().finish());
 
-        let mut resolve_encoder = renderer.device.create_command_encoder(&CommandEncoderDescriptor {
-            label: Some("profile resolve encoder"),
-        });
-        data_core
-            .profiler
-            .try_lock()
-            .unwrap()
-            .resolve_queries(&mut resolve_encoder);
+        let mut resolve_encoder = renderer
+            .device
+            .create_command_encoder(&CommandEncoderDescriptor { label: Some("profile resolve encoder") });
+        data_core.profiler.try_lock().unwrap().resolve_queries(&mut resolve_encoder);
         eval_output.cmd_bufs.push(resolve_encoder.finish());
 
         renderer.queue.submit(eval_output.cmd_bufs.drain(..));
@@ -545,11 +512,8 @@ impl<'node> RenderGraph<'node> {
         data_core.profiler.try_lock().unwrap().end_frame().unwrap();
 
         // This variable seems superfluous, but solves borrow checker issues with the borrow of data_core.
-        let timers = data_core
-            .profiler
-            .try_lock()
-            .unwrap()
-            .process_finished_frame(renderer.queue.get_timestamp_period());
+        let timers =
+            data_core.profiler.try_lock().unwrap().process_finished_frame(renderer.queue.get_timestamp_period());
 
         timers
     }

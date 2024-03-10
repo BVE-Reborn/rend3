@@ -19,11 +19,7 @@ pub async fn empty() -> anyhow::Result<()> {
     });
 
     runner
-        .render_and_compare(
-            FrameRenderSettings::new(),
-            "tests/results/simple/empty.png",
-            Threshold::Mean(0.0),
-        )
+        .render_and_compare(FrameRenderSettings::new(), "tests/results/simple/empty.png", Threshold::Mean(0.0))
         .await
         .context("Image Comparison Failed")?;
 
@@ -43,28 +39,15 @@ pub async fn triangle() -> anyhow::Result<()> {
         .context("InstanceAdapterDevice creation failed")?;
 
     for (handedness, winding, visible) in tests {
-        let Ok(runner) = TestRunner::builder()
-            .iad(iad.clone())
-            .handedness(handedness)
-            .build()
-            .await
-        else {
+        let Ok(runner) = TestRunner::builder().iad(iad.clone()).handedness(handedness).build().await else {
             return Ok(());
         };
 
         // Clockwise triangle
         let mesh = MeshBuilder::new(
             match winding {
-                FrontFace::Ccw => vec![
-                    Vec3::new(0.5, -0.5, 0.0),
-                    Vec3::new(0.0, 0.5, 0.0),
-                    Vec3::new(-0.5, -0.5, 0.0),
-                ],
-                FrontFace::Cw => vec![
-                    Vec3::new(0.5, -0.5, 0.0),
-                    Vec3::new(-0.5, -0.5, 0.0),
-                    Vec3::new(0.0, 0.5, 0.0),
-                ],
+                FrontFace::Ccw => vec![Vec3::new(0.5, -0.5, 0.0), Vec3::new(0.0, 0.5, 0.0), Vec3::new(-0.5, -0.5, 0.0)],
+                FrontFace::Cw => vec![Vec3::new(0.5, -0.5, 0.0), Vec3::new(-0.5, -0.5, 0.0), Vec3::new(0.0, 0.5, 0.0)],
             },
             match winding {
                 FrontFace::Cw => Handedness::Left,
@@ -76,11 +59,8 @@ pub async fn triangle() -> anyhow::Result<()> {
 
         let mesh_hdl = runner.add_mesh(mesh).unwrap();
         let material_hdl = runner.add_unlit_material(Vec4::new(0.25, 0.5, 0.75, 1.0));
-        let object = Object {
-            mesh_kind: ObjectMeshKind::Static(mesh_hdl),
-            material: material_hdl,
-            transform: Mat4::IDENTITY,
-        };
+        let object =
+            Object { mesh_kind: ObjectMeshKind::Static(mesh_hdl), material: material_hdl, transform: Mat4::IDENTITY };
         let _object_hdl = runner.add_object(object);
 
         runner.set_camera_data(Camera {
@@ -92,14 +72,13 @@ pub async fn triangle() -> anyhow::Result<()> {
             true => "tests/results/simple/triangle.png",
             false => "tests/results/simple/triangle-backface.png",
         };
-        runner
-            .render_and_compare(FrameRenderSettings::new(), file_name, Threshold::Mean(0.0))
-            .await
-            .with_context(|| {
+        runner.render_and_compare(FrameRenderSettings::new(), file_name, Threshold::Mean(0.0)).await.with_context(
+            || {
                 format!(
                 "Comparison failed on test (Handedness::{handedness:?}, FrontFace::{winding:?}, Visible: {visible})"
             )
-            })?;
+            },
+        )?;
     }
 
     Ok(())
@@ -120,12 +99,7 @@ pub async fn coordinate_space() -> anyhow::Result<()> {
     let iad = no_gpu_return!(rend3::create_iad(None, None, None, None).await)
         .context("InstanceAdapterDevice creation failed")?;
 
-    let Ok(runner) = TestRunner::builder()
-        .iad(iad.clone())
-        .handedness(Handedness::Left)
-        .build()
-        .await
-    else {
+    let Ok(runner) = TestRunner::builder().iad(iad.clone()).handedness(Handedness::Left).build().await else {
         return Ok(());
     };
 
@@ -142,19 +116,12 @@ pub async fn coordinate_space() -> anyhow::Result<()> {
         .build()
         .expect("Failed to create mesh");
 
-        let color = if camera_vector.is_negative_bitmask() != 0 {
-            camera_vector * -0.25
-        } else {
-            camera_vector
-        };
+        let color = if camera_vector.is_negative_bitmask() != 0 { camera_vector * -0.25 } else { camera_vector };
 
         let mesh_hdl = runner.add_mesh(mesh).unwrap();
         let material_hdl = runner.add_unlit_material(color.extend(1.0));
-        let object = Object {
-            mesh_kind: ObjectMeshKind::Static(mesh_hdl),
-            material: material_hdl,
-            transform: Mat4::IDENTITY,
-        };
+        let object =
+            Object { mesh_kind: ObjectMeshKind::Static(mesh_hdl), material: material_hdl, transform: Mat4::IDENTITY };
         runner.add_object(object)
     });
 

@@ -7,10 +7,7 @@ use wgpu::{SurfaceTexture, TextureView};
 /// Anything that resembles a surface to render to.
 pub enum OutputFrame {
     // Pre-acquired surface. rend3 will present it.
-    SurfaceAcquired {
-        view: TextureView,
-        surface_tex: SurfaceTexture,
-    },
+    SurfaceAcquired { view: TextureView, surface_tex: SurfaceTexture },
     // Arbitrary texture view.
     View(Arc<TextureView>),
 }
@@ -26,10 +23,7 @@ impl OutputFrame {
 
     /// Present the surface, if needed.
     pub fn present(self) {
-        if let Self::SurfaceAcquired {
-            surface_tex: surface, ..
-        } = self
-        {
+        if let Self::SurfaceAcquired { surface_tex: surface, .. } = self {
             surface.present();
         }
     }

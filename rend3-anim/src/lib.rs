@@ -84,10 +84,7 @@ impl AnimationData {
             .iter()
             .enumerate()
             .flat_map(|(anim_idx, anim)| {
-                anim.inner
-                    .channels
-                    .keys()
-                    .map(move |node_idx| (AnimationIndex(anim_idx), NodeIndex(*node_idx)))
+                anim.inner.channels.keys().map(move |node_idx| (AnimationIndex(anim_idx), NodeIndex(*node_idx)))
             })
             .into_grouping_map()
             .collect::<FastHashSet<_>>();
@@ -99,15 +96,8 @@ impl AnimationData {
                 let skin_index = SkinIndex(skin_index);
 
                 let anim_affected_nodes = &animation_to_joint_nodes[&animation_idx];
-                if skin
-                    .inner
-                    .joints
-                    .iter()
-                    .any(|j| anim_affected_nodes.contains(&NodeIndex(j.inner.node_idx)))
-                {
-                    let entry = animation_skin_usage
-                        .entry(animation_idx)
-                        .or_insert_with(Default::default);
+                if skin.inner.joints.iter().any(|j| anim_affected_nodes.contains(&NodeIndex(j.inner.node_idx))) {
+                    let entry = animation_skin_usage.entry(animation_idx).or_insert_with(Default::default);
                     entry.push(skin_index);
                 }
             }
@@ -145,20 +135,10 @@ impl AnimationData {
                 .cloned()
                 .collect();
 
-            skin_data.insert(
-                skin_index,
-                PerSkinData {
-                    node_to_joint_idx,
-                    joint_nodes_topological_order,
-                    skeletons,
-                },
-            );
+            skin_data.insert(skin_index, PerSkinData { node_to_joint_idx, joint_nodes_topological_order, skeletons });
         }
 
-        AnimationData {
-            skin_data,
-            animation_skin_usage,
-        }
+        AnimationData { skin_data, animation_skin_usage }
     }
 }
 
@@ -183,11 +163,7 @@ impl Lerp for Quat {
 /// Samples the data value for an animation channel at a given time. Will
 /// interpolate between the two closest keyframes.
 fn sample_at_time<T: Lerp + Copy>(channel: &AnimationChannel<T>, current_time: f32) -> T {
-    let next_idx = channel
-        .times
-        .iter()
-        .position(|time| *time > current_time)
-        .unwrap_or(channel.times.len() - 1);
+    let next_idx = channel.times.iter().position(|time| *time > current_time).unwrap_or(channel.times.len() - 1);
     let prev_idx = next_idx.saturating_sub(1);
 
     let interp_factor = f32::clamp(
@@ -217,21 +193,10 @@ pub fn pose_animation_frame(
         let local_transform = instance.nodes[node_idx].inner.local_transform;
         let (bind_scale, bind_rotation, bind_translation) = local_transform.to_scale_rotation_translation();
 
-        let translation = channels
-            .translation
-            .as_ref()
-            .map(|tra| sample_at_time(tra, time))
-            .unwrap_or(bind_translation);
-        let rotation = channels
-            .rotation
-            .as_ref()
-            .map(|rot| sample_at_time(rot, time))
-            .unwrap_or(bind_rotation);
-        let mut scale = channels
-            .scale
-            .as_ref()
-            .map(|sca| sample_at_time(sca, time))
-            .unwrap_or(bind_scale);
+        let translation =
+            channels.translation.as_ref().map(|tra| sample_at_time(tra, time)).unwrap_or(bind_translation);
+        let rotation = channels.rotation.as_ref().map(|rot| sample_at_time(rot, time)).unwrap_or(bind_rotation);
+        let mut scale = channels.scale.as_ref().map(|sca| sample_at_time(sca, time)).unwrap_or(bind_scale);
 
         if renderer.handedness == Handedness::Left {
             scale.z = -scale.z
@@ -262,21 +227,10 @@ pub fn pose_animation_frame(
             let local_transform = instance.nodes[node_idx].inner.local_transform;
             let (bind_scale, bind_rotation, bind_translation) = local_transform.to_scale_rotation_translation();
 
-            let translation = channels
-                .translation
-                .as_ref()
-                .map(|tra| sample_at_time(tra, time))
-                .unwrap_or(bind_translation);
-            let rotation = channels
-                .rotation
-                .as_ref()
-                .map(|rot| sample_at_time(rot, time))
-                .unwrap_or(bind_rotation);
-            let scale = channels
-                .scale
-                .as_ref()
-                .map(|sca| sample_at_time(sca, time))
-                .unwrap_or(bind_scale);
+            let translation =
+                channels.translation.as_ref().map(|tra| sample_at_time(tra, time)).unwrap_or(bind_translation);
+            let rotation = channels.rotation.as_ref().map(|rot| sample_at_time(rot, time)).unwrap_or(bind_rotation);
+            let scale = channels.scale.as_ref().map(|sca| sample_at_time(sca, time)).unwrap_or(bind_scale);
 
             let matrix = Mat4::from_scale_rotation_translation(scale, rotation, translation);
             let joint_idx = node_to_joint_idx[&NodeIndex(node_idx)];
@@ -292,9 +246,7 @@ pub fn pose_animation_frame(
             if let Some(parent_joint_idx) = node.parent.map(|pi| node_to_joint_idx.get(&NodeIndex(pi))) {
                 // This is guaranteed to be computed because we're iterating
                 // the hierarchy nodes in topological order
-                let parent_transform = parent_joint_idx
-                    .map(|p| global_joint_transforms[p.0])
-                    .unwrap_or(Mat4::IDENTITY);
+                let parent_transform = parent_joint_idx.map(|p| global_joint_transforms[p.0]).unwrap_or(Mat4::IDENTITY);
                 let current_transform = joint_local_matrices[joint_idx.0];
 
                 global_joint_transforms[joint_idx.0] = parent_transform * current_transform;
