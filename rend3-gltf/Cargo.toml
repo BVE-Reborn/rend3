@@ -22,7 +22,7 @@ ddsfile = { version = "0.5", optional = true }
 float-ord = "0.3.2"
 glam = "0.25"
 gltf = { version = "1.0", default-features = false, features = ["KHR_lights_punctual", "KHR_texture_transform", "KHR_materials_unlit", "extras", "names", "utils"] }
-image = { version = "0.24", default-features = false }
+image = { version = "0.25", default-features = false }
 ktx2 = { version = "0.3", optional = true }
 log = "0.4"
 profiling = {version = "1", default-features = false }
