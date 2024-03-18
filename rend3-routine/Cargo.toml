@@ -18,7 +18,7 @@ bytemuck = "1"
 codespan-reporting = "0.11"
 encase = { version = "0.7", features = ["glam"] }
 flume = "0.11"
-glam = { version = "0.25.0", features = ["bytemuck"] }
+glam = { version = "0.26.0", features = ["bytemuck"] }
 log = "0.4"
 naga = { version = "0.19.0", features = ["wgsl-in"] }
 ordered-float = "4"
