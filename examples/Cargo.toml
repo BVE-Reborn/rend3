@@ -60,7 +60,7 @@ rend3-framework = { version = "^0.3.0", path = "../rend3-framework" }
 # Import gltf models
 rend3-gltf = { version = "^0.3.0", path = "../rend3-gltf" }
 # Opening URL's
-webbrowser = "0.8.2"
+webbrowser = "1.0.0"
 # Instant but portable to the web
 web-time = "1.1"
 # windowing
