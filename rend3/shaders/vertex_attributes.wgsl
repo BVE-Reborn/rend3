@@ -5,8 +5,6 @@ struct Indices {
     vertex: u32,
 }
 
-const INVALID_VERTEX: u32 = 0x00FFFFFFu;
-
 alias TriangleVertices = array<vec3f, 3>;
 alias TriangleIndices = array<u32, 3>;
 struct Triangle {

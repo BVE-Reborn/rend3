@@ -82,15 +82,15 @@ struct HandleAllocators {
 impl Default for HandleAllocators {
     fn default() -> Self {
         Self {
-            mesh: HandleAllocator::new(false),
-            skeleton: HandleAllocator::new(false),
-            d2_texture: HandleAllocator::new(false),
-            d2c_texture: HandleAllocator::new(false),
-            material: HandleAllocator::new(false),
-            object: HandleAllocator::new(true),
-            directional_light: HandleAllocator::new(false),
-            point_light: HandleAllocator::new(false),
-            graph_storage: HandleAllocator::new(false),
+            mesh: HandleAllocator::new(),
+            skeleton: HandleAllocator::new(),
+            d2_texture: HandleAllocator::new(),
+            d2c_texture: HandleAllocator::new(),
+            material: HandleAllocator::new(),
+            object: HandleAllocator::new(),
+            directional_light: HandleAllocator::new(),
+            point_light: HandleAllocator::new(),
+            graph_storage: HandleAllocator::new(),
         }
     }
 }

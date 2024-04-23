@@ -7,6 +7,4 @@ struct Object {
     index_count: u32,
     material_index: u32,
     vertex_attribute_start_offsets: array<u32, {{vertex_array_counts}}>,
-    // 1 if enabled, 0 if disabled
-    enabled: u32,
 }
