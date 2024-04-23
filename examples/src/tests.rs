@@ -34,7 +34,6 @@ pub async fn test_app<A: App<T>, T: 'static>(mut config: TestConfiguration<A>) -
             &mut data_core,
             &spp,
             &base_rendergraph.interfaces,
-            &base_rendergraph.gpu_culler.culling_buffer_map_handle,
         )),
         skybox: Mutex::new(rend3_routine::skybox::SkyboxRoutine::new(&renderer, &spp, &base_rendergraph.interfaces)),
         tonemapping: Mutex::new(rend3_routine::tonemapping::TonemappingRoutine::new(

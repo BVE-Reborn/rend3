@@ -12,6 +12,16 @@ use wgpu::{BindGroup, BufferUsages};
 
 use crate::common::{Samplers, WholeFrameInterfaces};
 
+#[derive(ShaderType)]
+pub struct PerCameraUniform {
+    // TODO: use less space
+    pub view: Mat4,
+    // TODO: use less space
+    pub view_proj: Mat4,
+    pub frustum: Frustum,
+    pub object_count: u32,
+}
+
 /// Set of uniforms that are useful for the whole frame.
 #[derive(Debug, Copy, Clone, ShaderType)]
 pub struct FrameUniforms {

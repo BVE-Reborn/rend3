@@ -1,5 +1,6 @@
 use std::{marker::PhantomData, mem, num::NonZeroU64};
 
+use encase::ShaderType;
 use glam::{Mat4, Vec3};
 use rend3::{
     managers::{DirectionalLightManager, PointLightManager},
@@ -10,7 +11,10 @@ use wgpu::{
     BindGroupLayout, BindingType, BufferBindingType, Device, ShaderStages, TextureSampleType, TextureViewDimension,
 };
 
-use crate::{common::samplers::Samplers, uniforms::FrameUniforms};
+use crate::{
+    common::samplers::Samplers,
+    uniforms::{FrameUniforms, PerCameraUniform},
+};
 
 /// Interfaces which are used throughout the whole frame.
 ///
@@ -99,16 +103,6 @@ impl<M: Material> PerMaterialArchetypeInterface<M> {
                 },
                 None,
             )
-            // Batch data buffer
-            .append(
-                ShaderStages::VERTEX_FRAGMENT,
-                BindingType::Buffer {
-                    ty: BufferBindingType::Storage { read_only: true },
-                    has_dynamic_offset: true,
-                    min_binding_size: None,
-                },
-                None,
-            )
             // Vertex buffer
             .append(
                 ShaderStages::VERTEX_FRAGMENT,
@@ -125,11 +119,11 @@ impl<M: Material> PerMaterialArchetypeInterface<M> {
                 BindingType::Buffer {
                     ty: BufferBindingType::Storage { read_only: true },
                     has_dynamic_offset: false,
-                    min_binding_size: None,
+                    min_binding_size: Some(PerCameraUniform::min_size()),
                 },
                 None,
             )
-            // Mateiral data
+            // Material data
             .append(
                 ShaderStages::VERTEX_FRAGMENT,
                 BindingType::Buffer {

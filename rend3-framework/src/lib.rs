@@ -231,7 +231,6 @@ pub async fn async_start<A: App<T> + 'static, T: 'static>(mut app: A, window_bui
             &mut data_core,
             &spp,
             &base_rendergraph.interfaces,
-            &base_rendergraph.gpu_culler.culling_buffer_map_handle,
         )),
         skybox: Mutex::new(rend3_routine::skybox::SkyboxRoutine::new(&renderer, &spp, &base_rendergraph.interfaces)),
         tonemapping: Mutex::new(rend3_routine::tonemapping::TonemappingRoutine::new(

@@ -10,21 +10,19 @@ var<uniform> uniforms: UniformData;
 @group(1) @binding(0)
 var<storage> object_buffer: array<Object>;
 @group(1) @binding(1)
-var<storage> batch_data: BatchData;
-@group(1) @binding(2)
 var<storage> vertex_buffer: array<u32>;
-@group(1) @binding(3)
+@group(1) @binding(2)
 var<storage> per_camera_uniform: PerCameraUniform;
 
 {{#if (eq profile "GpuDriven")}}
-@group(1) @binding(4)
+@group(1) @binding(3)
 var<storage> materials: array<GpuMaterialData>;
 @group(2) @binding(0)
 var textures: binding_array<texture_2d<f32>>;
 {{/if}}
 
 {{#if (eq profile "CpuDriven")}}
-@group(1) @binding(4)
+@group(1) @binding(3)
 var<storage> materials: array<CpuMaterialData>;
 @group(2) @binding(0)
 var albedo_tex: texture_2d<f32>;
@@ -34,7 +32,6 @@ var albedo_tex: texture_2d<f32>;
     vertex_fetch
     
     object_buffer
-    batch_data
 
     position
     texture_coords_0
@@ -49,7 +46,7 @@ struct VertexOutput {
 }
 
 @vertex
-fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
+fn vs_main(@builtin(instance_index) instance_index: u32, @builtin(vertex_index) vertex_index: u32) -> VertexOutput {
     // If the vertex index is our sentinel invalid value, return a degenerate triangle.
     //
     // This is used by the culling shader to discard triangles when the ordering of the
@@ -59,7 +56,7 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
         vs_out.position = vec4<f32>(0.0);
         return vs_out;
     }
-    let indices = unpack_vertex_index(vertex_index);
+    let indices = Indices(instance_index, vertex_index);
     
     let data = object_buffer[indices.object];
     // If the object is disabled, return a degenerate triangle.
@@ -73,7 +70,7 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
 
     let vs_in = get_vertices(indices);
 
-    let model_view_proj = per_camera_uniform.objects[indices.object].model_view_proj;
+    let model_view_proj = per_camera_uniform.view_proj * object_buffer[indices.object].transform;
 
     let position_vec4 = vec4<f32>(vs_in.position, 1.0);
 

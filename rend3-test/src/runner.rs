@@ -83,13 +83,7 @@ impl TestRunnerBuilder {
 
         let base_rendergraph = BaseRenderGraph::new(&renderer, &spp);
 
-        let pbr = PbrRoutine::new(
-            &renderer,
-            &mut renderer.data_core.lock(),
-            &spp,
-            &base_rendergraph.interfaces,
-            &base_rendergraph.gpu_culler.culling_buffer_map_handle,
-        );
+        let pbr = PbrRoutine::new(&renderer, &mut renderer.data_core.lock(), &spp, &base_rendergraph.interfaces);
         let tonemapping =
             TonemappingRoutine::new(&renderer, &spp, &base_rendergraph.interfaces, TextureFormat::Rgba8UnormSrgb);
 

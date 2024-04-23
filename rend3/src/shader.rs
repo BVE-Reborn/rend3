@@ -214,21 +214,9 @@ impl<'a> HelperDef for ShaderVertexBufferHelper<'a> {
             Some(s) => s,
             _ => Err(RenderErrorReason::Other("Vertex buffer helper's first argument must be a string".to_string()))?,
         };
-        let batch_buffer_value = h
-            .param(1)
-            .ok_or_else(|| {
-                RenderErrorReason::Other(
-                    "Vertex buffer helper must have an argument pointing to the buffer of batch data".to_string(),
-                )
-            })?
-            .relative_path();
-        let batch_buffer = match batch_buffer_value {
-            Some(s) => s,
-            _ => Err(RenderErrorReason::Other("Vertex buffer helper's second argument must be a string".to_string()))?,
-        };
 
         let template = self
-            .generate_template(h, object_buffer, batch_buffer)
+            .generate_template(h, object_buffer)
             .map_err(|_| RenderErrorReason::Other("Failed to writeln vertex template string".to_string()))?;
 
         out.write(&r.render_template(&template, ctx.data())?)?;
@@ -238,30 +226,17 @@ impl<'a> HelperDef for ShaderVertexBufferHelper<'a> {
 }
 
 impl<'a> ShaderVertexBufferHelper<'a> {
-    fn generate_template(
-        &self,
-        h: &Helper,
-        object_buffer: &str,
-        batch_buffer: &str,
-    ) -> Result<String, std::fmt::Error> {
+    fn generate_template(&self, h: &Helper, object_buffer: &str) -> Result<String, std::fmt::Error> {
         let includes = r#"{{include "rend3/vertex_attributes.wgsl"}}"#;
 
-        let unpack_function = format!(
-            "
-            fn unpack_vertex_index(vertex_index: u32) -> Indices {{
-                 let batch_indices = unpack_batch_index(vertex_index);
-                 let object_id = {batch_buffer}.object_culling_information[batch_indices.local_object].object_id;
-                 
-                 return Indices(object_id, batch_indices.vertex);
-            }}"
-        );
+        let unpack_function = String::new();
 
         let mut input_struct = String::new();
         writeln!(input_struct, "struct VertexInput {{")?;
         let mut input_function = String::new();
         writeln!(input_function, "fn get_vertices(indices: Indices) -> VertexInput {{")?;
         writeln!(input_function, "    var verts: VertexInput;")?;
-        for requested_attribute in &h.params()[2..] {
+        for requested_attribute in &h.params()[1..] {
             let (attr_idx, spec) = self
                 .config
                 .specs

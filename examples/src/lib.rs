@@ -13,7 +13,9 @@ mod static_gltf;
 mod textured_quad;
 
 #[cfg(target_arch = "wasm32")]
-use log::info as println;
+use gloo_console::info as output;
+#[cfg(not(target_arch = "wasm32"))]
+use std::println as output;
 
 #[cfg(test)]
 mod tests;
@@ -35,10 +37,10 @@ const EXAMPLES: &[ExampleDesc] = &[
 ];
 
 fn print_examples() {
-    println!("Usage: cargo run <example_name>\n");
-    println!("Available examples:");
+    output!("Usage: cargo run <example_name>\n");
+    output!("Available examples:");
     for example in EXAMPLES {
-        println!("    {}", example.name);
+        output!("    {}", example.name);
     }
 }
 
@@ -50,7 +52,7 @@ pub fn main_with_name(example_name: Option<String>) {
     };
 
     let Some(example) = EXAMPLES.iter().find(|example| example.name == example_name) else {
-        println!("Unknown example: {}\n", example_name);
+        output!("Unknown example: {}\n", example_name);
         print_examples();
         return;
     };

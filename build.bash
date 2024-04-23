@@ -21,7 +21,7 @@ case $1 in
     ;;
     serve)
         shift
-        simple-http-server target/generated -c wasm,html,js -i
+        simple-http-server target/generated -c wasm,html,js -i --nocache
     ;;
     ci)
         cargo fmt

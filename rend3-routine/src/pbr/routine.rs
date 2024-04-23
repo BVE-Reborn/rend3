@@ -1,16 +1,12 @@
 use std::{borrow::Cow, sync::Arc};
 
-use rend3::{
-    types::GraphDataHandle, Renderer, RendererDataCore, RendererProfile, ShaderPreProcessor, ShaderVertexBufferConfig,
-};
+use rend3::{Renderer, RendererDataCore, RendererProfile, ShaderPreProcessor, ShaderVertexBufferConfig};
 use serde::Serialize;
 use wgpu::{BlendState, ShaderModuleDescriptor, ShaderSource};
 
 use crate::{
     common::{PerMaterialArchetypeInterface, WholeFrameInterfaces},
-    culling::CullingBufferMap,
     forward::{ForwardRoutine, ForwardRoutineCreateArgs, RoutineType, ShaderModulePair},
-    hi_z::HiZRoutine,
     pbr::{PbrMaterial, TransparencyType},
 };
 
@@ -27,7 +23,6 @@ pub struct PbrRoutine {
     pub opaque_routine: ForwardRoutine<PbrMaterial>,
     pub cutout_routine: ForwardRoutine<PbrMaterial>,
     pub blend_routine: ForwardRoutine<PbrMaterial>,
-    pub hi_z: HiZRoutine,
     pub per_material: PerMaterialArchetypeInterface<PbrMaterial>,
 }
 
@@ -37,7 +32,6 @@ impl PbrRoutine {
         data_core: &mut RendererDataCore,
         spp: &ShaderPreProcessor,
         interfaces: &WholeFrameInterfaces,
-        culling_buffer_map_handle: &GraphDataHandle<CullingBufferMap>,
     ) -> Self {
         profiling::scope!("PbrRenderRoutine::new");
 
@@ -117,7 +111,6 @@ impl PbrRoutine {
                         targets[0].as_mut().unwrap().blend = Some(BlendState::ALPHA_BLENDING)
                     }
                 }),
-                culling_buffer_map_handle: culling_buffer_map_handle.clone(),
             })
         };
 
@@ -127,7 +120,6 @@ impl PbrRoutine {
             opaque_routine: inner(RoutineType::Forward, &pbr_forward, TransparencyType::Opaque),
             cutout_routine: inner(RoutineType::Forward, &pbr_cutout, TransparencyType::Cutout),
             blend_routine: inner(RoutineType::Forward, &pbr_forward, TransparencyType::Blend),
-            hi_z: HiZRoutine::new(renderer, spp),
             per_material,
         }
     }
