@@ -65,6 +65,14 @@ pub struct MaterialArchetypeView<'a, M: Material> {
     data_vec: &'a [Option<InternalMaterial<M>>],
 }
 
+impl<'a, M: Material> Copy for MaterialArchetypeView<'a, M> {}
+
+impl<'a, M: Material> Clone for MaterialArchetypeView<'a, M> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
 impl<'a, M: Material> MaterialArchetypeView<'a, M> {
     pub fn buffer(&self) -> &'a Buffer {
         self.buffer

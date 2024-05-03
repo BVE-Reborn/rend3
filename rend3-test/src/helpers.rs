@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use glam::{Mat4, Vec3, Vec4};
 use rend3::types::{DirectionalLightHandle, MaterialHandle, MeshBuilder, ObjectHandle};
-use rend3_routine::pbr::PbrMaterial;
+use rend3_routine::pbr::{PbrMaterial, Transparency};
 use wgpu::Device;
 
 use crate::TestRunner;
@@ -39,6 +39,15 @@ impl TestRunner {
         self.renderer.add_material(PbrMaterial {
             albedo: rend3_routine::pbr::AlbedoComponent::Value(color),
             unlit: true,
+            ..Default::default()
+        })
+    }
+
+    pub fn add_transparent_material(&self, color: Vec4) -> MaterialHandle {
+        self.renderer.add_material(PbrMaterial {
+            albedo: rend3_routine::pbr::AlbedoComponent::Value(color),
+            unlit: true,
+            transparency: Transparency::Blend,
             ..Default::default()
         })
     }

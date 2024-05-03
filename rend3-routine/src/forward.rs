@@ -2,13 +2,15 @@
 //!
 //! Will default to the PBR shader code if custom code is not specified.
 
-use std::{marker::PhantomData, sync::Arc};
+use std::{cmp::Ordering, marker::PhantomData, sync::Arc};
 
 use arrayvec::ArrayVec;
 use encase::{ShaderSize, StorageBuffer};
+use ordered_float::OrderedFloat;
 use rend3::{
     graph::{DataHandle, NodeResourceUsage, RenderGraph, RenderPassTargets},
-    types::{Material, SampleCount},
+    managers::{CameraState, InternalObject, MaterialArchetypeView, TextureBindGroupIndex},
+    types::{Material, RawObjectHandle, SampleCount, SortingOrder, SortingReason},
     util::bind_merge::BindGroupBuilder,
     ProfileData, Renderer, RendererDataCore, RendererProfile, ShaderPreProcessor,
 };
@@ -165,6 +167,8 @@ impl<M: Material> ForwardRoutine<M> {
                 CameraSpecifier::Shadow(idx) => &ctx.eval_output.shadows[idx as usize].camera,
             };
 
+            let objects = sort(objects, archetype_view, self.material_key, camera);
+
             let per_camera_uniform_values = PerCameraUniform {
                 view: camera.view(),
                 view_proj: camera.view_proj(),
@@ -227,6 +231,104 @@ impl<M: Material> ForwardRoutine<M> {
                 )
             }
         });
+    }
+}
+
+fn sort<'a, M, I>(
+    objects: I,
+    material_archetype: MaterialArchetypeView<'_, M>,
+    requested_material_key: u64,
+    camera: &CameraState,
+) -> Vec<(RawObjectHandle, &'a InternalObject<M>)>
+where
+    M: Material,
+    I: IntoIterator<Item = (RawObjectHandle, &'a InternalObject<M>)>,
+    I::IntoIter: ExactSizeIterator,
+{
+    let objects = objects.into_iter();
+
+    let mut sorted_objects = Vec::with_capacity(objects.len());
+    {
+        profiling::scope!("Sort Key Creation");
+        for (raw_handle, object) in objects {
+            let material = material_archetype.material(*object.material_handle);
+            let object_material_key = material.inner.key();
+            let sorting = material.inner.sorting();
+
+            if object_material_key != requested_material_key {
+                continue;
+            }
+
+            // Frustum culling
+            if !camera.world_frustum().contains_sphere(object.inner.bounding_sphere) {
+                continue;
+            }
+
+            let bind_group_index = material.bind_group_index.map_gpu(|_| TextureBindGroupIndex::DUMMY).into_common();
+
+            let mut distance_sq = camera.location().distance_squared(object.location.into());
+
+            if sorting.order == SortingOrder::BackToFront {
+                distance_sq = -distance_sq;
+            }
+            sorted_objects.push((
+                ObjectSortingKey {
+                    bind_group_index,
+                    distance: OrderedFloat(distance_sq),
+                    sorting_reason: sorting.reason,
+                },
+                (raw_handle, object),
+            ))
+        }
+    }
+
+    {
+        profiling::scope!("Sorting");
+        sorted_objects.sort_unstable_by_key(|(k, _)| *k);
+    }
+
+    sorted_objects.into_iter().map(|(_, o)| o).collect()
+}
+
+#[derive(Debug, Clone, Copy, Eq)]
+pub(super) struct ObjectSortingKey {
+    pub bind_group_index: TextureBindGroupIndex,
+    pub distance: OrderedFloat<f32>,
+    pub sorting_reason: SortingReason,
+}
+
+impl PartialEq for ObjectSortingKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.cmp(other).is_eq()
+    }
+}
+
+impl PartialOrd for ObjectSortingKey {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for ObjectSortingKey {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match self.sorting_reason.cmp(&other.sorting_reason) {
+            Ordering::Equal => {}
+            ord => return ord,
+        }
+        // The above comparison means that both sides are equal
+        if self.sorting_reason == SortingReason::Requirement {
+            match self.distance.cmp(&other.distance) {
+                Ordering::Equal => {}
+                ord => return ord,
+            }
+            self.bind_group_index.cmp(&other.bind_group_index)
+        } else {
+            match self.bind_group_index.cmp(&other.bind_group_index) {
+                Ordering::Equal => {}
+                ord => return ord,
+            }
+            self.distance.cmp(&other.distance)
+        }
     }
 }
 
