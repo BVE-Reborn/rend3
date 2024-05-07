@@ -36,7 +36,7 @@ log = "0.4"
 # Inline string
 indoc = "2"
 # Importing images
-image = { version = "0.24", default-features = false, features = [
+image = { version = "0.25", default-features = false, features = [
     "png",
     "jpeg",
     "tiff",
