@@ -87,7 +87,7 @@ impl TextureDeduplicator {
             .enumerate()
             .map(|(idx, handle)| {
                 let view = if let Some(handle) = *handle {
-                    texture_manager_2d.get_view(handle)
+                    texture_manager_2d.get_view(&handle)
                 } else {
                     texture_manager_2d.get_null_view()
                 };

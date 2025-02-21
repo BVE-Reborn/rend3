@@ -3,7 +3,8 @@ use std::num::NonZeroU64;
 use encase::{private::WriteInto, ShaderSize};
 use wgpu::{
     BindGroupLayout, BindingType, Buffer, BufferBindingType, BufferDescriptor, BufferUsages, CommandEncoder,
-    ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor, Device, PipelineLayoutDescriptor, ShaderStages,
+    ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor, Device, PipelineCompilationOptions,
+    PipelineLayoutDescriptor, ShaderStages,
 };
 
 use crate::util::{
@@ -60,7 +61,9 @@ impl ScatterCopy {
             label: Some("ScatterCopy compute pipeline"),
             layout: Some(&pll),
             module: &sm,
-            entry_point: "cs_main",
+            entry_point: Some("cs_main"),
+            compilation_options: PipelineCompilationOptions::default(), // use default WGPU options. New in WGPU 0.20 (JN)
+            cache: None, // no pipeline cache. New in WGPU 21
         });
 
         Self { pipeline, bgl }
@@ -110,7 +113,9 @@ impl ScatterCopy {
             mapped_slice[range_start] = item.word_offset;
             let mut writer = encase::internal::Writer::new(
                 &item.data,
-                bytemuck::cast_slice_mut(&mut mapped_slice[range_start + 1..range_end]),
+                //////bytemuck::cast_slice_mut(&mut mapped_slice[range_start + 1..range_end]),
+                bytemuck::cast_slice_mut::<_, u8>(&mut mapped_slice[range_start + 1..range_end]),
+                ////bytemuck::cast_slice_mut::<_, encase::internal::BufferMut>(&mut mapped_slice[range_start + 1..range_end]),
                 0,
             )
             .unwrap();
@@ -157,6 +162,7 @@ mod test {
                     label: None,
                     required_features: wgpu::Features::empty(),
                     required_limits: wgpu::Limits::default(),
+                    memory_hints: wgpu::MemoryHints::default(),
                 },
                 None,
             ))

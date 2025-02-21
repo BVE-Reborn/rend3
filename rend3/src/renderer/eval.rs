@@ -6,10 +6,77 @@ use crate::{
     Renderer,
 };
 
+use std::collections::{HashSet};
+
+/// Set to true to check instructions for deletion before use.
+/// This is a debug trap.
+const CHECK_INSTRUCTIONS: bool = true; // didn't fail in 20 hour test with this enabled.
+
+/// Instruction checker. Checks for instructions which delete an object preceding instructions which use that object.
+/// This is a debug trap for a race condition.
+fn check_instructions(renderer: &Renderer, instructions: &Vec<Instruction>) {
+    use rend3_types::{ObjectMeshKind, Object};
+    use crate::managers::MeshManager;
+    ///  Check that when we add an object, its mesh was not previously deleted.
+    fn check_mesh_in_add_object(
+        deleted_mesh_handles: &HashSet<usize>,
+        object: &Object,
+        _mesh_manager: &MeshManager,
+    ) {
+        //////let mesh_manager_guard = mesh_manager.lock_internal_data();    // performance problem
+        match &object.mesh_kind {
+            ObjectMeshKind::Animated(_skeleton) => {} // no check, because bug is in static meshes
+            ObjectMeshKind::Static(mesh_handle) => {
+                let raw_mesh_handle = mesh_handle.get_raw();
+                if deleted_mesh_handles.contains(&raw_mesh_handle.idx) {
+                    panic!("Add of deleted mesh handle #{} at add object", raw_mesh_handle.idx);
+                }
+            }
+        }
+    }
+
+    profiling::scope!("Instruction checking");
+    let mut deleted_object_handles = HashSet::new();
+    let mut deleted_mesh_handles = HashSet::new();
+    //  Preallocate. 
+    deleted_object_handles.reserve(instructions.len());
+    deleted_mesh_handles.reserve(instructions.len());
+    //  Prescan instructions for problems.
+    for Instruction { kind, location : _} in instructions. iter() {
+        match kind {
+            InstructionKind::AddObject { handle, object } => {
+                //  Must not add a deleted object in the same pass.
+                if deleted_object_handles.contains(&handle.idx) {
+                    panic!("Add of deleted object of object handle #{}", handle.idx);
+                }
+                check_mesh_in_add_object(&deleted_mesh_handles, &object, &renderer.mesh_manager);                    
+            }
+            
+            InstructionKind::DeleteObject { handle } => {
+                //  Track deleted object
+                if !deleted_object_handles.insert(handle.idx) {
+                    panic!("Two deletes of object handle #{}", handle.idx);
+                }               
+            }
+            
+            InstructionKind::DeleteMesh { handle } => {
+                if !deleted_mesh_handles.insert(handle.idx) {
+                    panic!("Two deletes of mesh handle #{}", handle.idx);
+                }       
+            }   
+            
+            _ => {}
+        }     
+    }
+}
+
 pub fn evaluate_instructions(renderer: &Renderer) -> InstructionEvaluationOutput {
     profiling::scope!("Renderer::evaluate_instructions");
 
     let mut instructions = renderer.instructions.consumer.lock();
+    if CHECK_INSTRUCTIONS {
+        check_instructions(&renderer, &instructions);   // debug trap
+    }
 
     // 16 encoders is a reasonable default
     let mut cmd_bufs = Vec::with_capacity(16);
@@ -71,7 +138,7 @@ pub fn evaluate_instructions(renderer: &Renderer) -> InstructionEvaluationOutput
                 InstructionKind::AddObject { handle, object } => {
                     data_core.object_manager.add(
                         &renderer.device,
-                        handle,
+                        &handle,
                         object,
                         &renderer.mesh_manager,
                         &data_core.skeleton_manager,
@@ -79,19 +146,19 @@ pub fn evaluate_instructions(renderer: &Renderer) -> InstructionEvaluationOutput
                     );
                 }
                 InstructionKind::SetObjectTransform { handle, transform } => {
-                    data_core.object_manager.set_object_transform(handle, transform);
+                    data_core.object_manager.set_object_transform(&handle, transform);
                 }
                 InstructionKind::SetSkeletonJointDeltas { handle, joint_matrices } => {
-                    data_core.skeleton_manager.set_joint_matrices(handle, joint_matrices);
+                    data_core.skeleton_manager.set_joint_matrices(&handle, joint_matrices);
                 }
                 InstructionKind::AddDirectionalLight { handle, light } => {
-                    data_core.directional_light_manager.add(handle, light);
+                    data_core.directional_light_manager.add(&handle, light);
                 }
                 InstructionKind::ChangeDirectionalLight { handle, change } => {
-                    data_core.directional_light_manager.update(handle, change);
+                    data_core.directional_light_manager.update(&handle, change);
                 }
                 InstructionKind::AddPointLight { handle, light } => {
-                    data_core.point_light_manager.add(handle, light);
+                    data_core.point_light_manager.add(&handle, light);
                 }
                 InstructionKind::ChangePointLight { handle, change } => {
                     data_core.point_light_manager.update(handle, change);
@@ -114,40 +181,44 @@ pub fn evaluate_instructions(renderer: &Renderer) -> InstructionEvaluationOutput
                     );
                 }
                 InstructionKind::DeleteMesh { handle } => {
-                    renderer.resource_handle_allocators.mesh.deallocate(handle);
-                    renderer.mesh_manager.remove(handle)
+                    renderer.mesh_manager.remove(&handle);
+                    renderer.resource_handle_allocators.mesh.deallocate(handle);       // this finally consumes the handle.
+                    
                 }
-                InstructionKind::DeleteSkeleton { handle } => {
+                InstructionKind::DeleteSkeleton { handle } => {           
+                    data_core.skeleton_manager.remove(&renderer.mesh_manager, &handle);
                     renderer.resource_handle_allocators.skeleton.deallocate(handle);
-                    data_core.skeleton_manager.remove(&renderer.mesh_manager, handle)
                 }
-                InstructionKind::DeleteTexture2D { handle } => {
+                InstructionKind::DeleteTexture2D { handle } => {        
+                    data_core.d2_texture_manager.remove(&handle);
                     renderer.resource_handle_allocators.d2_texture.deallocate(handle);
-                    data_core.d2_texture_manager.remove(handle)
                 }
-                InstructionKind::DeleteTextureCube { handle } => {
+                InstructionKind::DeleteTextureCube { handle } => {                   
+                    data_core.d2c_texture_manager.remove(&handle);
                     renderer.resource_handle_allocators.d2c_texture.deallocate(handle);
-                    data_core.d2c_texture_manager.remove(handle)
                 }
-                InstructionKind::DeleteMaterial { handle } => {
+                InstructionKind::DeleteMaterial { handle } => {                    
+                    data_core.material_manager.remove(&handle);
                     renderer.resource_handle_allocators.material.deallocate(handle);
-                    data_core.material_manager.remove(handle)
                 }
-                InstructionKind::DeleteObject { handle } => {
+                InstructionKind::DeleteObject { handle } => {                   
+                    data_core.object_manager.remove(&handle);
                     renderer.resource_handle_allocators.object.deallocate(handle);
-                    data_core.object_manager.remove(handle)
                 }
                 InstructionKind::DeleteDirectionalLight { handle } => {
+                    data_core.directional_light_manager.remove(&handle);
                     renderer.resource_handle_allocators.directional_light.deallocate(handle);
-                    data_core.directional_light_manager.remove(handle)
+                    
                 }
                 InstructionKind::DeletePointLight { handle } => {
+                    data_core.point_light_manager.remove(&handle);
                     renderer.resource_handle_allocators.point_light.deallocate(handle);
-                    data_core.point_light_manager.remove(handle);
+                    
                 }
                 InstructionKind::DeleteGraphData { handle } => {
-                    renderer.resource_handle_allocators.graph_storage.deallocate(handle);
                     data_core.graph_storage.remove(&handle);
+                    renderer.resource_handle_allocators.graph_storage.deallocate(handle);
+                    
                 }
             }
         }

@@ -16,7 +16,8 @@ use rend3::{
 };
 use wgpu::{
     BindGroupLayout, Buffer, BufferBindingType, BufferDescriptor, BufferUsages, CommandEncoder, ComputePassDescriptor,
-    ComputePipeline, ComputePipelineDescriptor, PipelineLayoutDescriptor, ShaderModuleDescriptor, ShaderStages,
+    ComputePipeline, ComputePipelineDescriptor, PipelineCompilationOptions, PipelineLayoutDescriptor,
+    ShaderModuleDescriptor, ShaderStages,
 };
 
 /// The per-skeleton data, as uploaded to the GPU compute shader.
@@ -172,7 +173,9 @@ impl GpuSkinner {
             label: Some("Gpu skinning pipeline"),
             layout: Some(&layout),
             module: &module,
-            entry_point: "main",
+            entry_point: Some("main"),
+            compilation_options: PipelineCompilationOptions::default(), // use default WGPU options. New in WGPU 0.20 (JN)
+            cache: None,    // (JN) no cache used
         });
 
         Self { bgl, pipeline }
@@ -214,13 +217,11 @@ pub fn add_skinning_to_graph<'node>(graph: &mut RenderGraph<'node>, gpu_skinner:
 
     builder.build(move |mut ctx| {
         let encoder = ctx.encoder_or_pass.take_encoder();
-
-        let skinning_input = build_gpu_skinning_input_buffers(&ctx);
-
         // Avoid running the compute pass if there are no skeletons. This
         // prevents binding an empty buffer
         if ctx.data_core.skeleton_manager.skeletons().len() > 0 {
-            gpu_skinner.execute_pass(&ctx, encoder, &skinning_input);
+            let skinning_input = build_gpu_skinning_input_buffers(&ctx); // only do this if we have skeletons. WGPU does not like zero length buffers.
+            gpu_skinner.execute_pass(&ctx, &mut encoder.borrow_mut(), &skinning_input);
         }
     });
 }

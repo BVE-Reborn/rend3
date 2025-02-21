@@ -243,7 +243,7 @@ impl Renderer {
             InstructionKind::AddMaterial {
                 handle: *handle,
                 fill_invoke: Box::new(move |material_manager, device, profile, d2_manager, mat_handle| {
-                    material_manager.add(device, profile, d2_manager, mat_handle, material)
+                    material_manager.add(device, profile, d2_manager, &mat_handle, material)
                 }),
             },
             *Location::caller(),
@@ -258,7 +258,7 @@ impl Renderer {
             InstructionKind::ChangeMaterial {
                 handle: **handle,
                 change_invoke: Box::new(move |material_manager, device, d2_manager, mat_handle| {
-                    material_manager.update(device, d2_manager, mat_handle, material)
+                    material_manager.update(device, d2_manager, &mat_handle, material)
                 }),
             },
             *Location::caller(),
@@ -295,8 +295,9 @@ impl Renderer {
     /// Move the given object to a new transform location.
     #[track_caller]
     pub fn set_object_transform(&self, handle: &ObjectHandle, transform: Mat4) {
+        //  Note copy of raw handle, which will live as long as the instruction set.
         self.instructions
-            .push(InstructionKind::SetObjectTransform { handle: handle.get_raw(), transform }, *Location::caller());
+            .push(InstructionKind::SetObjectTransform { handle: *handle.get_raw(), transform }, *Location::caller());
     }
 
     /// Sets the joint positions for a skeleton. See
@@ -331,7 +332,7 @@ impl Renderer {
     #[track_caller]
     pub fn set_skeleton_joint_matrices(&self, handle: &SkeletonHandle, joint_matrices: Vec<Mat4>) {
         self.instructions.push(
-            InstructionKind::SetSkeletonJointDeltas { handle: handle.get_raw(), joint_matrices },
+            InstructionKind::SetSkeletonJointDeltas { handle: *handle.get_raw(), joint_matrices },
             *Location::caller(),
         )
     }
@@ -365,17 +366,18 @@ impl Renderer {
     }
 
     /// Updates the settings for given directional light.
-    #[track_caller]
+    #[track_caller] 
     pub fn update_directional_light(&self, handle: &DirectionalLightHandle, change: DirectionalLightChange) {
+        //  Note copy of raw handle, which will live as long as the instruction set.
         self.instructions
-            .push(InstructionKind::ChangeDirectionalLight { handle: handle.get_raw(), change }, *Location::caller())
+            .push(InstructionKind::ChangeDirectionalLight { handle: *handle.get_raw(), change }, *Location::caller())
     }
 
     /// Updates the settings for given point light.
     #[track_caller]
     pub fn update_point_light(&self, handle: &PointLightHandle, change: PointLightChange) {
         self.instructions
-            .push(InstructionKind::ChangePointLight { handle: handle.get_raw(), change }, *Location::caller())
+            .push(InstructionKind::ChangePointLight { handle: *handle.get_raw(), change }, *Location::caller())
     }
 
     /// Adds a piece of data for long term storage and convienient use in the RenderGraph

@@ -34,7 +34,11 @@ fn update(renderer: &rend3::Renderer, delta: f32, animated_object: &mut Animated
 }
 
 impl rend3_framework::App for AnimationExample {
-    const HANDEDNESS: rend3::types::Handedness = rend3::types::Handedness::Left;
+    /// Set handedness of coordinate system
+    fn get_handedness(&self) -> rend3::types::Handedness {
+        rend3::types::Handedness::Left    // default
+    }
+
 
     fn sample_count(&self) -> rend3::types::SampleCount {
         SAMPLE_COUNT
@@ -106,7 +110,7 @@ impl rend3_framework::App for AnimationExample {
         self.animated_objects = vec![animated_object, animated_object2];
     }
 
-    fn handle_redraw(&mut self, context: rend3_framework::RedrawContext<'_, ()>) {
+    fn handle_redraw(&mut self, context: rend3_framework::RedrawContext<'_>) {
         self.animated_objects.iter_mut().for_each(|animated_object| {
             update(context.renderer, context.delta_t_seconds, animated_object);
         });
@@ -161,7 +165,7 @@ pub fn main() {
     let app = AnimationExample::default();
     rend3_framework::start(
         app,
-        winit::window::WindowBuilder::new().with_title("animation-example").with_maximized(true),
+        winit::window::WindowAttributes::default().with_title("animation-example").with_maximized(true),
     );
 }
 

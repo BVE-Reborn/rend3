@@ -80,7 +80,9 @@ pub async fn test_app<A: App<T>, T: 'static>(mut config: TestConfiguration<A>) -
 
     let image = download_image(&renderer, texture, config.size).await.unwrap();
 
-    compare_image_to_path(&image, Path::new(config.reference_path), config.threshold_set).unwrap();
+    compare_image_to_path(&image, Path::new(config.reference_path), config.threshold_set)
+        .context(config.reference_path) // Location of reference image
+        .unwrap();
 
     Ok(())
 }

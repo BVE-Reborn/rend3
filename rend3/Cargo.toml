@@ -1,6 +1,6 @@
 [package]
 name = "rend3"
-version = "0.3.0"
+version.workspace = true
 authors = ["The rend3 Developers"]
 edition = "2021"
 description = "Easy to use, customizable, efficient 3D renderer library built on wgpu."
@@ -38,9 +38,9 @@ bimap = "0.6"
 bitflags = "2"
 bumpalo = "3"
 bytemuck = "1"
-encase = { version = "0.7" }
+encase = { version = "0.10" }
 flume = "0.11"
-glam = { version = "0.25.0", features = ["bytemuck"] }
+glam = { workspace = true, features = ["bytemuck"] }
 handlebars = "5"
 indexmap = "2"
 list-any = "0.2"
@@ -50,16 +50,16 @@ num-traits = "0.2"
 once_cell = "1"
 parking_lot = "0.12"
 profiling = { version = "1", default-features = false }
-range-alloc = "0.1.3"
-rend3-types = { version = "^0.3.0", path = "../rend3-types" }
+range-alloc = "0.1.4"
+rend3-types = { path = "../rend3-types" }
 rust-embed = { version = "8", features = ["interpolate-folder-path"] }
 rustc-hash = "1"
 serde = { version = "1", features = ["derive"] }
 smallvec = "1"
 smartstring = "1.0"
 thiserror = "1"
-wgpu = "0.19.0"
-wgpu-profiler = "0.16.0"
+wgpu = { workspace = true }
+wgpu-profiler = { workspace = true }
 
 [dev-dependencies]
 pollster = "0.3"

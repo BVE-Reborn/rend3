@@ -10,9 +10,10 @@ use rend3::{
 };
 use wgpu::{
     BindGroup, BindGroupLayout, BindingType, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState,
-    DepthStencilState, Face, FragmentState, FrontFace, MultisampleState, PipelineLayoutDescriptor, PolygonMode,
-    PrimitiveState, PrimitiveTopology, RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptor, ShaderSource,
-    ShaderStages, StencilState, TextureFormat, TextureSampleType, TextureViewDimension, VertexState,
+    DepthStencilState, Face, FragmentState, FrontFace, MultisampleState, PipelineCompilationOptions,
+    PipelineLayoutDescriptor, PolygonMode, PrimitiveState, PrimitiveTopology, RenderPipeline, RenderPipelineDescriptor,
+    ShaderModuleDescriptor, ShaderSource, ShaderStages, StencilState, TextureFormat, TextureSampleType,
+    TextureViewDimension, VertexState,
 };
 
 use crate::common::WholeFrameInterfaces;
@@ -100,7 +101,7 @@ impl SkyboxRoutine {
                     SampleCount::One => &self.pipelines.pipeline_s1,
                     SampleCount::Four => &self.pipelines.pipeline_s4,
                 };
-
+                let mut rpass = rpass.borrow_mut();
                 rpass.set_pipeline(pipeline);
                 rpass.set_bind_group(0, forward_uniform_bg, &[]);
                 rpass.set_bind_group(1, bg, &[]);
@@ -140,7 +141,12 @@ impl SkyboxPipelines {
             renderer.device.create_render_pipeline(&RenderPipelineDescriptor {
                 label: Some("skybox pass"),
                 layout: Some(&pll),
-                vertex: VertexState { module: &skybox_sm, entry_point: "vs_main", buffers: &[] },
+                vertex: VertexState {
+                    module: &skybox_sm,
+                    entry_point: Some("vs_main"),
+                    buffers: &[],
+                    compilation_options: PipelineCompilationOptions::default(), // use default WGPU options. New in WGPU 0.20 (JN)
+                },
                 primitive: PrimitiveState {
                     topology: PrimitiveTopology::TriangleList,
                     strip_index_format: None,
@@ -160,14 +166,16 @@ impl SkyboxPipelines {
                 multisample: MultisampleState { count: samples as u32, ..Default::default() },
                 fragment: Some(FragmentState {
                     module: &skybox_sm,
-                    entry_point: "fs_main",
+                    entry_point: Some("fs_main"),
                     targets: &[Some(ColorTargetState {
                         format: TextureFormat::Rgba16Float,
                         blend: None,
                         write_mask: ColorWrites::all(),
                     })],
+                    compilation_options: PipelineCompilationOptions::default(), // use default WGPU options. New in WGPU 0.20 (JN)
                 }),
                 multiview: None,
+                cache: None,    // (JN) no cache used
             })
         };
 

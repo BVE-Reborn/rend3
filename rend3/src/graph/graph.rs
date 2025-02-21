@@ -1,5 +1,6 @@
 use std::{
     any::Any,
+    rc::{Rc},
     cell::{RefCell, UnsafeCell},
     collections::hash_map::Entry,
     marker::PhantomData,
@@ -389,7 +390,7 @@ impl<'node> RenderGraph<'node> {
         profiling::scope!("Run Nodes");
 
         let encoder_cell =
-            UnsafeCell::new(renderer.device.create_command_encoder(&CommandEncoderDescriptor::default()));
+            Rc::new(RefCell::new(renderer.device.create_command_encoder(&CommandEncoderDescriptor::default())));
         let rpass_temps_cell = UnsafeCell::new(RpassTemporaryPool::new());
 
         let mut next_rpass_idx = 0;
@@ -405,9 +406,10 @@ impl<'node> RenderGraph<'node> {
                 if let Some(ref desc) = node.rpass {
                     rpass = Some(Self::create_rpass_from_desc(
                         desc,
-                        // SAFETY: There are two things which borrow this encoder: the renderpass and the node's
-                        // encoder reference. Both of these have died by this point.
-                        unsafe { &mut *encoder_cell.get() },
+                        //  SAFETY: There are two things which borrow this encoder: the renderpass and the node's
+                        //  encoder reference. Both of these have died by this point.
+                        //  Now uses Rc, so that's checked.
+                        &encoder_cell,
                         idx,
                         renderpass_ends[next_rpass_idx],
                         // SAFETY: Same context as above.
@@ -439,7 +441,7 @@ impl<'node> RenderGraph<'node> {
                             )
                             .viewport;
 
-                        rpass.set_viewport(
+                        rpass.borrow_mut().set_viewport(
                             viewport.offset.x as f32,
                             viewport.offset.y as f32,
                             viewport.size.x as f32,
@@ -448,11 +450,12 @@ impl<'node> RenderGraph<'node> {
                             1.0,
                         );
 
-                        RenderGraphEncoderOrPassInner::RenderPass(rpass)
+                        RenderGraphEncoderOrPassInner::RenderPass(Rc::clone(rpass))
                     }
-                    // SAFETY: There is no active renderpass to borrow this. This reference lasts for the duration of
-                    // the call to exec.
-                    None => RenderGraphEncoderOrPassInner::Encoder(unsafe { &mut *encoder_cell.get() }),
+                    //  SAFETY: There is no active renderpass to borrow this. This reference lasts for the duration of
+                    //  the call to exec.
+                    //  Now uses Rc, so it's safe.
+                    None => RenderGraphEncoderOrPassInner::Encoder(Rc::clone(&encoder_cell)),
                 };
 
                 profiling::scope!(&format!("Node: {}", node.label));
@@ -478,10 +481,11 @@ impl<'node> RenderGraph<'node> {
                 (node.exec)(ctx);
 
                 let mut encoder_or_rpass = match rpass {
-                    Some(ref mut rpass) => RenderGraphEncoderOrPassInner::RenderPass(rpass),
-                    // SAFETY: There is no active renderpass to borrow this. This reference lasts for the duration of
-                    // the call to exec.
-                    None => RenderGraphEncoderOrPassInner::Encoder(unsafe { &mut *encoder_cell.get() }),
+                    Some(ref mut rpass) => RenderGraphEncoderOrPassInner::RenderPass(Rc::clone(&rpass)),
+                    //  SAFETY: There is no active renderpass to borrow this. This reference lasts for the duration of
+                    //  the call to exec.
+                    //  It's now safe code using Rc (JN)
+                    None => RenderGraphEncoderOrPassInner::Encoder(Rc::clone(&encoder_cell)),
                 };
 
                 data_core.profiler.try_lock().unwrap().end_query(&mut encoder_or_rpass, profiler_query);
@@ -497,9 +501,9 @@ impl<'node> RenderGraph<'node> {
         unsafe { (*rpass_temps_cell.get()).clear() }
         drop(rpass_temps_cell);
 
-        // SAFETY: this is safe as we've dropped all renderpasses that possibly borrowed
-        // it
-        eval_output.cmd_bufs.push(encoder_cell.into_inner().finish());
+        //  SAFETY: this is safe as we've dropped all renderpasses that possibly borrowed it.
+        //  It's now safe code using Rc. (JN)
+        eval_output.cmd_bufs.push(Rc::into_inner(encoder_cell).unwrap().into_inner().finish());
 
         let mut resolve_encoder = renderer
             .device
@@ -521,13 +525,13 @@ impl<'node> RenderGraph<'node> {
     #[allow(clippy::too_many_arguments)]
     fn create_rpass_from_desc<'rpass>(
         desc: &RenderPassTargets,
-        encoder: &'rpass mut CommandEncoder,
+        encoder: &Rc<RefCell<CommandEncoder>>,
         node_idx: usize,
         pass_end_idx: usize,
         resource_spans: &'rpass FastHashMap<GraphResource, ResourceSpan>,
         active_views: &'rpass FastHashMap<TextureRegion, TextureView>,
         active_imported_views: &'rpass FastHashMap<TextureRegion, TextureView>,
-    ) -> RenderPass<'rpass> {
+    ) -> Rc<RefCell<RenderPass<'static>>> {
         let color_attachments: Vec<_> = desc
             .targets
             .iter()
@@ -611,13 +615,15 @@ impl<'node> RenderGraph<'node> {
                 stencil_ops: stencil_load,
             }
         });
-        encoder.begin_render_pass(&RenderPassDescriptor {
+        let mut binding = encoder.borrow_mut();
+        let render_pass = binding.begin_render_pass(&RenderPassDescriptor {
             label: None,
             color_attachments: &color_attachments,
             depth_stencil_attachment,
             timestamp_writes: None,
             occlusion_query_set: None,
-        })
+        });
+        Rc::new(RefCell::new(render_pass.forget_lifetime()))  // return internally mutable form not tied to encoder lifetime
     }
 }
 

@@ -141,7 +141,7 @@ impl MaterialManager {
         device: &Device,
         profile: RendererProfile,
         texture_manager_2d: &mut TextureManager<crate::types::Texture2DTag>,
-        handle: RawMaterialHandle,
+        handle: &RawMaterialHandle,
         material: M,
     ) {
         let bind_group_index = if profile == RendererProfile::CpuDriven {
@@ -165,14 +165,14 @@ impl MaterialManager {
         data_vec[handle.idx] = Some(InternalMaterial { bind_group_index, inner: material });
         drop(data_vec);
 
-        self.handle_to_typeid.insert(handle, TypeId::of::<M>());
+        self.handle_to_typeid.insert(*handle, TypeId::of::<M>());
     }
 
     pub fn update<M: Material>(
         &mut self,
         device: &Device,
         texture_manager_2d: &TextureManager<crate::types::Texture2DTag>,
-        handle: RawMaterialHandle,
+        handle: &RawMaterialHandle,
         material: M,
     ) {
         let type_id = self.handle_to_typeid[&handle];
@@ -196,11 +196,11 @@ impl MaterialManager {
         internal.inner = material;
     }
 
-    pub fn remove(&mut self, handle: RawMaterialHandle) {
-        let type_id = self.handle_to_typeid.remove(&handle).unwrap();
+    pub fn remove(&mut self, handle: &RawMaterialHandle) {
+        let type_id = self.handle_to_typeid.remove(handle).unwrap();
 
         let archetype = self.archetypes.get_mut(&type_id).unwrap();
-        let bind_group_index = (archetype.remove_data)(&mut archetype.data_vec, handle);
+        let bind_group_index = (archetype.remove_data)(&mut archetype.data_vec, *handle);
 
         if let ProfileData::Cpu(index) = bind_group_index {
             self.texture_deduplicator.remove(index);
@@ -259,8 +259,8 @@ impl MaterialManager {
         );
     }
 
-    pub(super) fn call_object_add_callback(&self, handle: RawMaterialHandle, args: ObjectAddCallbackArgs) {
-        let type_id = self.handle_to_typeid[&handle];
+    pub(super) fn call_object_add_callback(&self, handle: &RawMaterialHandle, args: ObjectAddCallbackArgs) {
+        let type_id = self.handle_to_typeid[handle];
 
         let archetype = &self.archetypes[&type_id];
 

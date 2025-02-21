@@ -17,14 +17,16 @@ use rend3::{
 use serde::Serialize;
 use wgpu::{
     BindGroup, BindGroupLayout, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState, DepthStencilState,
-    FragmentState, IndexFormat, MultisampleState, PipelineLayoutDescriptor, PolygonMode, PrimitiveState,
-    PrimitiveTopology, RenderPipeline, RenderPipelineDescriptor, ShaderModule, StencilState, TextureFormat,
-    VertexState,
+    FragmentState, IndexFormat, MultisampleState, PipelineCompilationOptions, PipelineLayoutDescriptor, PolygonMode,
+    PrimitiveState, PrimitiveTopology, RenderPipeline, RenderPipelineDescriptor, ShaderModule, StencilState,
+    TextureFormat, VertexState,
 };
 
 use crate::common::{CameraSpecifier, PerMaterialArchetypeInterface, WholeFrameInterfaces};
 use crate::uniforms::PerCameraUniform;
 
+/// This structure is unused.
+#[allow(dead_code)] // This structure is never constructed
 #[derive(Serialize)]
 struct ForwardPreprocessingArguments {
     profile: Option<RendererProfile>,
@@ -182,11 +184,12 @@ impl<M: Material> ForwardRoutine<M> {
                 usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
                 mapped_at_creation: true,
             }));
-            let mut mapping = per_camera_uniform_buffer.slice(..).get_mapped_range_mut();
-            StorageBuffer::new(&mut *mapping).write(&per_camera_uniform_values).unwrap();
-            drop(mapping);
-            per_camera_uniform_buffer.unmap();
-
+            {   profiling::scope!("Mapping GPU memory");
+                let mut mapping = per_camera_uniform_buffer.slice(..).get_mapped_range_mut();
+                StorageBuffer::new(&mut *mapping).write(&per_camera_uniform_values).unwrap();
+                drop(mapping);
+                per_camera_uniform_buffer.unmap();
+            }
             let per_material_bg = ctx.temps.add(
                 BindGroupBuilder::new()
                     .append_buffer(ctx.data_core.object_manager.buffer::<M>().unwrap())
@@ -200,6 +203,7 @@ impl<M: Material> ForwardRoutine<M> {
                 SampleCount::One => &self.pipeline_s1,
                 SampleCount::Four => &self.pipeline_s4,
             };
+            let mut rpass = rpass.borrow_mut(); // actual rpass from Rc
             rpass.set_index_buffer(ctx.eval_output.mesh_buffer.slice(..), IndexFormat::Uint32);
             rpass.set_pipeline(pipeline);
             rpass.set_bind_group(0, whole_frame_uniform_bg, &[]);
@@ -209,26 +213,30 @@ impl<M: Material> ForwardRoutine<M> {
                 }
             }
             if let ProfileData::Gpu(ref bg) = ctx.eval_output.d2_texture.bg {
-                rpass.set_bind_group(2, bg, &[]);
+                rpass.set_bind_group(2, Some(&**bg), &[]);
             }
 
+            profiling::scope!("Binding/drawing");
             for (idx, object) in objects.into_iter() {
                 let material = archetype_view.material(*object.material_handle);
                 if material.inner.key() != self.material_key {
                     continue;
                 }
-
-                // If we're in cpu driven mode, we need to update the texture bind group.
-                if ctx.renderer.profile.is_cpu_driven() {
-                    let texture_bind_group = material.bind_group_index.into_cpu();
-                    rpass.set_bind_group(2, ctx.data_core.material_manager.texture_bind_group(texture_bind_group), &[]);
+                {   //////profiling::scope!("Binding"); //  Can't leave this enabled; major slowdown.
+                    // If we're in cpu driven mode, we need to update the texture bind group.
+                    if ctx.renderer.profile.is_cpu_driven() {
+                        let texture_bind_group = material.bind_group_index.into_cpu();
+                        rpass.set_bind_group(2, ctx.data_core.material_manager.texture_bind_group(texture_bind_group), &[]);
+                    }
+                    rpass.set_bind_group(1, Some(&*per_material_bg), &[]);
                 }
-                rpass.set_bind_group(1, per_material_bg, &[]);
-                rpass.draw_indexed(
-                    object.inner.first_index..object.inner.first_index + object.inner.index_count,
-                    0,
-                    idx.idx as u32..idx.idx as u32 + 1,
-                )
+                {   //////profiling::scope!("Drawing"); //  Can't leave this enabled; major slowdown.
+                    rpass.draw_indexed(
+                        object.inner.first_index..object.inner.first_index + object.inner.index_count,
+                        0,
+                        idx.idx as u32..idx.idx as u32 + 1,
+                    )   
+                }
             }
         });
     }
@@ -348,7 +356,12 @@ fn build_forward_pipeline_inner<M: Material>(
     let mut desc = RenderPipelineDescriptor {
         label: Some(args.name),
         layout: Some(pll),
-        vertex: VertexState { module: args.shaders.vs_module, entry_point: args.shaders.vs_entry, buffers: &[] },
+        vertex: VertexState {
+            module: args.shaders.vs_module,
+            entry_point: Some(args.shaders.vs_entry),
+            buffers: &[],
+            compilation_options: PipelineCompilationOptions::default(), // use default WGPU options. New in WGPU 0.20 (JN)
+        },
         primitive: PrimitiveState {
             topology: PrimitiveTopology::TriangleList,
             strip_index_format: None,
@@ -375,10 +388,12 @@ fn build_forward_pipeline_inner<M: Material>(
         multisample: MultisampleState { count: samples as u32, ..Default::default() },
         fragment: Some(FragmentState {
             module: args.shaders.fs_module,
-            entry_point: args.shaders.fs_entry,
+            entry_point: Some(args.shaders.fs_entry),
             targets: &[],
+            compilation_options: PipelineCompilationOptions::default(), // use default WGPU options. New in WGPU 0.20 (JN)
         }),
         multiview: None,
+        cache: None,    // (JN) no cache used
     };
     if let Some(desc_callback) = args.descriptor_callback {
         desc_callback(&mut desc, &mut render_targets);

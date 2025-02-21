@@ -49,7 +49,10 @@ impl<T> Debug for RawResourceHandle<T> {
         f.debug_struct("RawResourceHandle").field("idx", &self.idx).finish()
     }
 }
-
+/// ***IT IS UNSAFE THAT THIS IS COPYABLE***
+/// This may result in a RawResourceHandle outliving the index entry to which it points.
+/// ***NEEDS WORK***
+////// /*
 impl<T> Copy for RawResourceHandle<T> {}
 
 impl<T> Clone for RawResourceHandle<T> {
@@ -57,7 +60,7 @@ impl<T> Clone for RawResourceHandle<T> {
         *self
     }
 }
-
+////// */
 impl<T> PartialEq for RawResourceHandle<T> {
     fn eq(&self, other: &Self) -> bool {
         self.idx == other.idx
@@ -71,6 +74,65 @@ impl<T> Hash for RawResourceHandle<T> {
         self.idx.hash(state);
     }
 }
+/*
+/// Function called to deindex a resource handle.
+#[cfg(not(target_arch = "wasm32"))]
+type ResourceDeindexer: dyn Fn(RawResourceHandle<T>) + Send + Sync;
+#[cfg(target_arch = "wasm32")]
+type ResourceDeindexer: dyn Fn(RawResourceHandle<T>);
+*/
+/// Ref counter for RawResourceHandle inside of ResourceHandle
+///
+/// Needed to avoid a race condition at de-indexing.
+///
+/// Soundness:
+/// - Deindexer can be called only once - yes
+//  - Deindexer will always be called on drop - yes.
+struct ResourceHandleRefcount<T> {
+    //////deindexer: ResourceDeindexer
+    /// Index to the resource
+    raw: RawResourceHandle<T>,
+    /// Called at drop to delete the item from the index.
+    /// This needs a Box or Arc because the closure is a variable-sized object.
+    /// Arc would be better if the callers generated an Arc, because it could be a cheap clone.
+    #[cfg(not(target_arch = "wasm32"))]
+    deindexer: Box<dyn Fn(&RawResourceHandle<T>) + Send + Sync + 'static>,
+    #[cfg(target_arch = "wasm32")]
+    deindexer: Box<dyn Fn(&RawResourceHandle<T>) + 'static>,
+
+}
+
+impl<T> ResourceHandleRefcount<T> {
+    /// Usual new fn
+    pub fn new(destroy_fn: impl Fn(&RawResourceHandle<T>) + WasmNotSend + WasmNotSync + 'static, idx: usize) -> Self {
+        Self {
+            deindexer: Box::new(destroy_fn),
+            raw: RawResourceHandle { idx, _phantom: PhantomData },
+        }
+    }
+    
+    /// Get the raw resource handle
+    pub fn get_raw(&self) -> &RawResourceHandle<T>{
+        &self.raw
+    }
+}
+
+impl<T> Drop for ResourceHandleRefcount<T> {
+    /// When this is dropped, deindex.
+    fn drop(&mut self) {
+        (self.deindexer)(&self.raw);
+    }
+}
+
+impl<T> Debug for ResourceHandleRefcount<T> {
+    /// Debug formatting
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ResourceHandleRefcount")
+            //////.field("refcount", &Arc::strong_count(&self.refcount))
+            .field("idx", &self.raw.idx)
+            .finish()
+    }
+}
 
 /// Owning resource handle. Used as part of rend3's interface.
 pub struct ResourceHandle<T> {
@@ -79,14 +141,19 @@ pub struct ResourceHandle<T> {
     /// need to phone home. We're just reusing
     /// the allocation for both refcount and function
     /// purposes.
+/*
     #[cfg(not(target_arch = "wasm32"))]
     refcount: Arc<dyn Fn(RawResourceHandle<T>) + Send + Sync>,
     #[cfg(target_arch = "wasm32")]
     refcount: Arc<dyn Fn(RawResourceHandle<T>)>,
     raw: RawResourceHandle<T>,
+*/
+    /// Deindexer and its index
+    refcount: Arc<ResourceHandleRefcount<T>>,
+    /// Dummy to prevent using wrong type
     _phantom: PhantomData<T>,
 }
-
+/*
 impl<T> Drop for ResourceHandle<T> {
     fn drop(&mut self) {
         if Arc::strong_count(&self.refcount) == 1 {
@@ -94,25 +161,25 @@ impl<T> Drop for ResourceHandle<T> {
         }
     }
 }
+*/
 
 impl<T> Debug for ResourceHandle<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ResourceHandle")
             .field("refcount", &Arc::strong_count(&self.refcount))
-            .field("idx", &self.raw.idx)
+            .field("idx", &self.get_raw().idx)
             .finish()
     }
 }
-
 impl<T> Clone for ResourceHandle<T> {
     fn clone(&self) -> Self {
-        Self { refcount: self.refcount.clone(), raw: self.raw, _phantom: self._phantom }
+        Self { refcount: self.refcount.clone(), _phantom: self._phantom }
     }
 }
 
 impl<T> PartialEq for ResourceHandle<T> {
     fn eq(&self, other: &Self) -> bool {
-        self.raw.idx == other.raw.idx
+        self.get_raw().idx == other.refcount.get_raw().idx
     }
 }
 
@@ -120,7 +187,7 @@ impl<T> Eq for ResourceHandle<T> {}
 
 impl<T> Hash for ResourceHandle<T> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.raw.idx.hash(state);
+        self.get_raw().idx.hash(state);
     }
 }
 
@@ -128,10 +195,11 @@ impl<T> ResourceHandle<T> {
     /// Create a new resource handle from an index.
     ///
     /// Part of rend3's internal interface, use `Renderer::add_*` instead.
-    pub fn new(destroy_fn: impl Fn(RawResourceHandle<T>) + WasmNotSend + WasmNotSync + 'static, idx: usize) -> Self {
+    pub fn new(destroy_fn: impl Fn(&RawResourceHandle<T>) + WasmNotSend + WasmNotSync + 'static, idx: usize) -> Self {
         Self {
-            refcount: Arc::new(destroy_fn),
-            raw: RawResourceHandle { idx, _phantom: PhantomData },
+            refcount: Arc::new(ResourceHandleRefcount::new(destroy_fn, idx)),
+            //////refcount: Arc::new(destroy_fn),
+            //////raw: RawResourceHandle { idx, _phantom: PhantomData },
             _phantom: PhantomData,
         }
     }
@@ -139,8 +207,8 @@ impl<T> ResourceHandle<T> {
     /// Gets the equivalent raw handle for this owning handle.
     ///
     /// Part of rend3's internal interface for accessing internal resrouces
-    pub fn get_raw(&self) -> RawResourceHandle<T> {
-        self.raw
+    pub fn get_raw(&self) -> &RawResourceHandle<T> {
+        &self.refcount.raw
     }
 }
 
@@ -148,7 +216,7 @@ impl<T> Deref for ResourceHandle<T> {
     type Target = RawResourceHandle<T>;
 
     fn deref(&self) -> &Self::Target {
-        &self.raw
+        &self.refcount.raw
     }
 }
 
@@ -249,6 +317,7 @@ macro_rules! changeable_struct {
 
 // WGPU REEXPORTS
 #[doc(inline)]
+pub use wgpu_types as wgt;
 pub use wgt::{
     AstcBlock, AstcChannel, Backend, Backends, Color, DeviceType, PresentMode, TextureFormat,
     TextureFormatFeatureFlags, TextureUsages,
@@ -924,7 +993,7 @@ pub struct Texture {
 }
 
 /// Describes a texture made from the mipmaps of another texture.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct TextureFromTexture {
     pub label: Option<String>,
     pub src: RawTexture2DHandle,

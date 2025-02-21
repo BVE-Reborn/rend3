@@ -515,7 +515,7 @@ impl Material for PbrMaterial {
             self.anisotropy.to_texture(),
             self.aomr_textures.to_ao_texture(),
         ]
-        .map(|opt| opt.map(|r| r.get_raw()))
+        .map(|opt| opt.map(|r| *r.get_raw()))
     }
 
     fn to_data(&self) -> Self::DataType {

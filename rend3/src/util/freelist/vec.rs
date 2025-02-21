@@ -15,7 +15,7 @@ impl<T> FreelistVec<T> {
 
     pub fn push(&mut self, value: T) -> FreelistIndex {
         if let Some(index) = self.freelist.pop() {
-            debug_assert!(self.data[index].is_none());
+            assert!(self.data[index].is_none());    // Always check. It's cheap and race conditions have been found.
             self.data[index] = Some(value);
             FreelistIndex(index)
         } else {
@@ -26,7 +26,7 @@ impl<T> FreelistVec<T> {
     }
 
     pub fn remove(&mut self, index: FreelistIndex) {
-        debug_assert!(self.data[index.0].is_some());
+        assert!(self.data[index.0].is_some());  // Always check. It's cheap and race conditions have been found.
         self.data[index.0] = None;
         self.freelist.push(index.0);
     }

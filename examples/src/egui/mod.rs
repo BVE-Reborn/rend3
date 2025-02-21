@@ -17,7 +17,11 @@ struct EguiExample {
     rust_logo: egui::TextureId,
 }
 impl rend3_framework::App for EguiExample {
-    const HANDEDNESS: rend3::types::Handedness = rend3::types::Handedness::Left;
+    /// Set handedness of coordinate system
+    fn get_handedness(&self) -> rend3::types::Handedness {
+        rend3::types::Handedness::Left    // default
+    }
+
 
     fn sample_count(&self) -> rend3::types::SampleCount {
         SAMPLE_COUNT
@@ -102,6 +106,7 @@ impl rend3_framework::App for EguiExample {
                 &windowing.window,
                 Some(context.scale_factor),
                 None,
+                None, // (JN) New max texture size field, not used.
             ))
         } else {
             None
@@ -165,7 +170,7 @@ impl rend3_framework::App for EguiExample {
         }
     }
 
-    fn handle_redraw(&mut self, context: rend3_framework::RedrawContext<'_, ()>) {
+    fn handle_redraw(&mut self, context: rend3_framework::RedrawContext<'_>) {
         let data = self.data.as_mut().unwrap();
 
         let input = if let Some(window) = context.window {
@@ -174,7 +179,7 @@ impl rend3_framework::App for EguiExample {
             egui::RawInput::default()
         };
 
-        data.context.begin_frame(input);
+        data.context.begin_pass(input);
 
         // Insert egui commands here
         let ctx = &data.context;
@@ -200,7 +205,7 @@ impl rend3_framework::App for EguiExample {
 
         // End the UI frame. Now let's draw the UI with our Backend, we could also
         // handle the output here
-        let egui::FullOutput { shapes, textures_delta, .. } = data.context.end_frame();
+        let egui::FullOutput { shapes, textures_delta, .. } = data.context.end_pass();
         let paint_jobs = data.context.tessellate(shapes, scale_factor);
 
         let input = rend3_egui::Input { clipped_meshes: &paint_jobs, textures_delta, context: data.context.clone() };
@@ -256,7 +261,7 @@ impl rend3_framework::App for EguiExample {
 
 pub fn main() {
     let app = EguiExample::default();
-    rend3_framework::start(app, winit::window::WindowBuilder::new().with_title("egui").with_maximized(true))
+    rend3_framework::start(app, winit::window::WindowAttributes::default().with_title("egui").with_maximized(true))
 }
 
 fn vertex(pos: [f32; 3]) -> glam::Vec3 {

@@ -11,10 +11,12 @@ use rend3_routine::base::BaseRenderGraph;
 use wgpu::{Instance, PresentMode, SurfaceError};
 use winit::{
     error::EventLoopError,
-    event::Event,
-    event_loop::{ControlFlow, EventLoop, EventLoopBuilder, EventLoopWindowTarget},
-    window::{Window, WindowBuilder},
+    event::{Event, WindowEvent, StartCause, DeviceEvent, DeviceId},
+    event_loop::{ControlFlow, EventLoop, ActiveEventLoop},
+    window::{Window, WindowAttributes, WindowId},
+    application::ApplicationHandler,
 };
+use pollster::FutureExt;
 
 mod assets;
 mod grab;
@@ -38,19 +40,102 @@ pub struct SetupContext<'a, T: 'static = ()> {
     pub resolution: UVec2,
     pub scale_factor: f32,
 }
+/* ***NOTYET***
+impl <T: 'static> SetupContext<'_> {
+    /// Usual new. Sets up the windowing.
+    //  ***NOTYET***
+    fn new(app: &impl App<T>, window_attributes: WindowAttributes, event_loop: &ActiveEventLoop) -> Self {
+        // Create the window invisible until we are rendering
+        let (event_loop, window) = app.create_window(window_attributes.with_visible(false)).unwrap();
+        let window = Arc::new(window);
+        let window_size = window.inner_size();
+
+        //  This is silly, but, for some reason, create_iad is async.
+        let iad = async {
+            app.create_iad().await.unwrap()
+        }.block_on();
+
+        // The one line of unsafe needed. We just need to guarentee that the window
+        // outlives the use of the surface.
+        //
+        // Android has to defer the surface until `Resumed` is fired. This doesn't fire
+        // on other platforms though :|
+        let surface = if cfg!(target_os = "android") {
+            None
+        } else {
+            Some(Arc::new(iad.instance.create_surface(window.clone()).unwrap()))
+        };
+
+        // Make us a renderer.
+        let renderer =
+            rend3::Renderer::new(iad.clone(), app.get_handedness(), Some(window_size.width as f32 / window_size.height as f32))
+                .unwrap();
+
+        // Get the preferred format for the surface.
+        //
+        // Assume android supports Rgba8Srgb, as it has 100% device coverage
+        let format = surface.as_ref().map_or(TextureFormat::Rgba8UnormSrgb, |s| {
+            let caps = s.get_capabilities(&iad.adapter);
+            let format = caps.formats[0];
+
+            // Configure the surface to be ready for rendering.
+            rend3::configure_surface(
+                s,
+                &iad.device,
+                format,
+                glam::UVec2::new(window_size.width, window_size.height),
+                rend3::types::PresentMode::Fifo,
+            );
+
+            format
+        });
+
+        let mut spp = rend3::ShaderPreProcessor::new();
+        rend3_routine::builtin_shaders(&mut spp);
+
+        let base_rendergraph = app.create_base_rendergraph(&renderer, &spp);
+        let mut data_core = renderer.data_core.lock();
+        let routines = Arc::new(DefaultRoutines {
+            pbr: Mutex::new(rend3_routine::pbr::PbrRoutine::new(
+                &renderer,
+                &mut data_core,
+                &spp,
+                &base_rendergraph.interfaces,
+            )),
+            skybox: Mutex::new(rend3_routine::skybox::SkyboxRoutine::new(&renderer, &spp, &base_rendergraph.interfaces)),
+            tonemapping: Mutex::new(rend3_routine::tonemapping::TonemappingRoutine::new(
+                &renderer,
+                &spp,
+                &base_rendergraph.interfaces,
+                format,
+            )),
+        });
+        drop(data_core);
+
+        SetupContext {
+            windowing: Some(WindowingSetup { event_loop: &event_loop, window: &window }),
+            renderer: &renderer,
+            routines: &routines,
+            surface_format: format,
+            resolution: UVec2::new(window_size.width, window_size.height),
+            scale_factor: window.scale_factor() as f32,
+        }
+    }
+}
+*/
 
 /// Context passed to the event handler.
-pub struct EventContext<'a, T: 'static = ()> {
+pub struct EventContext<'a> {
     pub window: Option<&'a Window>,
     pub renderer: &'a Arc<Renderer>,
     pub routines: &'a Arc<DefaultRoutines>,
     pub base_rendergraph: &'a BaseRenderGraph,
     pub resolution: UVec2,
     pub control_flow: &'a mut dyn FnMut(winit::event_loop::ControlFlow),
-    pub event_loop_window_target: &'a EventLoopWindowTarget<T>,
+    pub event_loop_window_target: &'a ActiveEventLoop,
 }
 
-pub struct RedrawContext<'a, T: 'static = ()> {
+pub struct RedrawContext<'a> {
     pub window: Option<&'a Window>,
     pub renderer: &'a Arc<Renderer>,
     pub routines: &'a Arc<DefaultRoutines>,
@@ -58,13 +143,12 @@ pub struct RedrawContext<'a, T: 'static = ()> {
     pub surface_texture: &'a wgpu::Texture,
     pub resolution: UVec2,
     pub control_flow: &'a mut dyn FnMut(winit::event_loop::ControlFlow),
-    pub event_loop_window_target: Option<&'a EventLoopWindowTarget<T>>,
+    pub event_loop_window_target: Option<&'a ActiveEventLoop>,
     pub delta_t_seconds: f32,
 }
 
 pub trait App<T: 'static = ()> {
     /// The handedness of the coordinate system of the renderer.
-    const HANDEDNESS: Handedness;
 
     fn register_logger(&mut self) {
         #[cfg(target_arch = "wasm32")]
@@ -84,11 +168,11 @@ pub trait App<T: 'static = ()> {
         std::panic::set_hook(Box::new(console_error_panic_hook::hook));
     }
 
-    fn create_window(&mut self, builder: WindowBuilder) -> Result<(EventLoop<T>, Window), EventLoopError> {
+    fn create_window(&mut self, window_attributes: WindowAttributes) -> Result<(EventLoop<T>, Window), EventLoopError> {
         profiling::scope!("creating window");
 
-        let event_loop = EventLoopBuilder::with_user_event().build()?;
-        let window = builder.build(&event_loop).expect("Could not build window");
+        let event_loop = EventLoop::with_user_event().build()?;
+        let window = event_loop.create_window(window_attributes).expect("Could not build window"); // (JN) for winit 0.30
 
         #[cfg(target_arch = "wasm32")]
         {
@@ -140,14 +224,29 @@ pub trait App<T: 'static = ()> {
     fn setup(&mut self, context: SetupContext<'_, T>) {
         let _ = context;
     }
+    
+    /// Handle all events.
+    /// This is called in addition to the more specific event functions.
+    /// "This is a useful place to put code that should be done before
+    /// you start processing events" - Winit
+    fn new_events(&mut self, _event_loop: &ActiveEventLoop, _cause: StartCause) {
+        //  default is ignore, can be overridden.
+    }
+    
+    /// Winit-level user event.
+    /// New feature allows putting program-generated events on the main event queue.
+    /// Can be overridden by the application if desired.
+    fn user_event(&mut self, _event_loop: &ActiveEventLoop, _event: T) {
+        //  Default is ignore
+    }
 
     /// Handle a non-redraw event.
-    fn handle_event(&mut self, context: EventContext<'_, T>, event: Event<T>) {
+    fn handle_event(&mut self, context: EventContext, event: Event<T>) {
         let _ = (context, event);
     }
 
     /// Handle a redraw event.
-    fn handle_redraw(&mut self, context: RedrawContext<'_, T>);
+    fn handle_redraw(&mut self, context: RedrawContext<'_>);
 
     /// Called after each redraw for post-processing, if needed.
     /// By default, this queues another redraw.
@@ -157,6 +256,11 @@ pub trait App<T: 'static = ()> {
     fn handle_redraw_done(&mut self, window: &Window) {
         window.request_redraw(); // just queue a redraw.
     }
+    
+    /// Left handed or right handed coordinate system?
+    /// Trait implementation can override.
+    /// Must be overridden.
+    fn get_handedness(&self) -> Handedness;
 }
 
 pub fn lock<T>(lock: &parking_lot::Mutex<T>) -> parking_lot::MutexGuard<'_, T> {
@@ -174,12 +278,352 @@ pub struct DefaultRoutines {
     pub tonemapping: Mutex<rend3_routine::tonemapping::TonemappingRoutine>,
 }
 
-pub async fn async_start<A: App<T> + 'static, T: 'static>(mut app: A, window_builder: WindowBuilder) {
+/// Inner framework, required by winit's desire to become a framework.
+struct Rend3ApplicationHandler<'a, T: 'static>{
+    /// The Rend3 framework "app", reference
+    app: &'a mut dyn App<T>,
+    ///  The "window"
+    window: Arc<winit::window::Window>,
+    /// Instance Adapter Device
+    iad: InstanceAdapterDevice,
+    /// Surface
+    surface: Option<Arc<wgpu::Surface<'a>>>,
+    /// Display format
+    format: TextureFormat,
+    /// Routines
+    routines: Arc<DefaultRoutines>,
+    /// Base rendergraph
+    base_rendergraph: BaseRenderGraph,
+    /// Computer is suspended - don't draw
+    suspended: bool,
+    /// Renderer ref
+    renderer: Arc<Renderer>,
+    /// Stored surface info. Local data
+    stored_surface_info: StoredSurfaceInfo,
+    /// Last user control mode
+    last_user_control_mode: ControlFlow,
+    /// Previous time
+    previous_time: web_time::Instant,
+
+}
+
+impl <'a, T: 'static> Rend3ApplicationHandler<'a, T> {
+    /// Usual new. Also returns the event loop as a separate item.
+    pub fn new(app: &'a mut dyn App<T>, window_attributes: WindowAttributes) -> (Self, EventLoop<T>) {
+        app.register_logger();
+        app.register_panic_hook();
+
+        // Create the window invisible until we are rendering
+        let (event_loop, window) = app.create_window(window_attributes.with_visible(false)).unwrap();
+        let window = Arc::new(window);
+        let window_size = window.inner_size();
+
+        //  This is silly, but, for some reason, create_iad is async.
+        let iad = async {
+            app.create_iad().await.unwrap()
+        }.block_on();
+
+        // The one line of unsafe needed. We just need to guarentee that the window
+        // outlives the use of the surface.
+        //
+        // Android has to defer the surface until `Resumed` is fired. This doesn't fire
+        // on other platforms though :|
+        let surface = if cfg!(target_os = "android") {
+            None
+        } else {
+            Some(Arc::new(iad.instance.create_surface(window.clone()).unwrap()))
+        };
+
+        // Make us a renderer.
+        let renderer =
+            rend3::Renderer::new(iad.clone(), app.get_handedness(), Some(window_size.width as f32 / window_size.height as f32))
+                .unwrap();
+
+        // Get the preferred format for the surface.
+        //
+        // Assume android supports Rgba8Srgb, as it has 100% device coverage
+        let format = surface.as_ref().map_or(TextureFormat::Rgba8UnormSrgb, |s| {
+            let caps = s.get_capabilities(&iad.adapter);
+            let format = caps.formats[0];
+
+            // Configure the surface to be ready for rendering.
+            rend3::configure_surface(
+                s,
+                &iad.device,
+                format,
+                glam::UVec2::new(window_size.width, window_size.height),
+                rend3::types::PresentMode::Fifo,
+            );
+
+            format
+        });
+
+        let mut spp = rend3::ShaderPreProcessor::new();
+        rend3_routine::builtin_shaders(&mut spp);
+
+        let base_rendergraph = app.create_base_rendergraph(&renderer, &spp);
+        let mut data_core = renderer.data_core.lock();
+        let routines = Arc::new(DefaultRoutines {
+            pbr: Mutex::new(rend3_routine::pbr::PbrRoutine::new(
+                &renderer,
+                &mut data_core,
+                &spp,
+                &base_rendergraph.interfaces,
+            )),
+            skybox: Mutex::new(rend3_routine::skybox::SkyboxRoutine::new(&renderer, &spp, &base_rendergraph.interfaces)),
+            tonemapping: Mutex::new(rend3_routine::tonemapping::TonemappingRoutine::new(
+                &renderer,
+                &spp,
+                &base_rendergraph.interfaces,
+                format,
+            )),
+        });
+        drop(data_core);
+
+        app.setup(SetupContext {
+            windowing: Some(WindowingSetup { event_loop: &event_loop, window: &window }),
+            renderer: &renderer,
+            routines: &routines,
+            surface_format: format,
+            resolution: UVec2::new(window_size.width, window_size.height),
+            scale_factor: window.scale_factor() as f32,
+        });
+
+        // We're ready, so lets make things visible
+        window.set_visible(true);
+
+        let suspended = cfg!(target_os = "android");
+        let last_user_control_mode = ControlFlow::Wait;
+        let stored_surface_info = StoredSurfaceInfo {
+            size: glam::UVec2::new(window_size.width, window_size.height),
+            scale_factor: app.scale_factor(),
+            sample_count: app.sample_count(),
+            present_mode: app.present_mode(),
+            requires_reconfigure: true,
+        };
+
+        let previous_time = web_time::Instant::now();
+        let new_item = Self {
+            app,
+            window,
+            iad,
+            surface,
+            format, 
+            base_rendergraph,
+            last_user_control_mode,
+            previous_time,
+            renderer,
+            routines,
+            stored_surface_info,
+            suspended,
+        };
+        (new_item, event_loop)  //  Need these as separate items to avoid borrow clash
+    }
+    
+    /// Actually run the event loop.
+    /// This is where all the time goes.
+    fn run(&mut self, event_loop: EventLoop<T>) {
+        //  Platform specific setup
+        cfg_if::cfg_if! {
+            if #[cfg(target_arch = "wasm32")] {
+                use winit::platform::web::EventLoopExtWebSys;
+                let event_loop_function = EventLoop::spawn_app;
+            } else {
+                let event_loop_function = EventLoop::run_app;
+            }
+        }
+        //  Run the event loop
+        let _ = (event_loop_function)(event_loop, self);
+    }
+    
+    /// Pass event through to handle_event at App level.
+    ///
+    /// Winit's event loop fans out events by type, and then we put them
+    /// back into the common Event type and pass them to Rend3's event loop.
+    /// This is the price of having nested event loops in Rend3 and Winit.
+    fn pass_through_event(&mut self, event_loop: &ActiveEventLoop, event: Event<T>) {
+        let mut control_flow = event_loop.control_flow();
+        self.app.handle_event(
+                EventContext {
+                    window: Some(&self.window),
+                    renderer: &self.renderer,
+                    routines: &self.routines,
+                    base_rendergraph: &self.base_rendergraph,
+                    resolution: self.stored_surface_info.size,
+                    control_flow: &mut |c: ControlFlow| {
+                        control_flow = c;
+                        self.last_user_control_mode = c;
+                    },
+                    event_loop_window_target: event_loop,
+                },
+                event,
+            );
+    }
+
+}
+
+/// New Winit framework usage
+impl<T: 'static> ApplicationHandler<T> for Rend3ApplicationHandler<'_,T> {
+
+    /// Program suspended
+    //  ***UNTESTED***
+    fn suspended(&mut self, event_loop: &ActiveEventLoop) {
+        event_loop.set_control_flow(ControlFlow::Wait); // not sure about this
+        self.suspended = true;
+        let event = Event::Suspended {};
+        self.pass_through_event(event_loop, event);    // pass up to Rend3 level
+        
+    }
+    /// Program resumed after suspend
+    //  ***UNTESTED***
+    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        event_loop.set_control_flow(ControlFlow::Poll); // not sure about this. 
+        self.suspended = false;     // ***NEEDS TESTING***
+        self.suspended = true;
+        let event = Event::Resumed {};
+        self.pass_through_event(event_loop, event);    // pass up to Rend3 level
+    }
+    
+    /// Window event received
+    fn window_event(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        window_id: WindowId,
+        window_event: WindowEvent,
+    ) {
+    
+        let mut control_flow = event_loop.control_flow();
+        if let Some(suspend) =
+            handle_surface(self.app, &self.window, 
+                &Event::WindowEvent { window_id, event: window_event.clone() }, &self.iad.instance, &mut self.surface, &self.renderer, &mut self.stored_surface_info)
+        {
+            self.suspended = suspend;
+        }
+/*
+        // We move to Wait when we get suspended so we don't spin at 50k FPS.
+        match event {
+            Event::Suspended => {
+                control_flow = ControlFlow::Wait;
+            }
+            Event::Resumed => {
+                control_flow = self.last_user_control_mode;
+            }
+            _ => {}
+        }
+*/
+        // Close button was clicked, we should close.
+        if let WindowEvent::CloseRequested{ .. } = window_event {
+            event_loop.exit();
+            return;
+        }
+        // We need to block all updates
+        if let WindowEvent::RedrawRequested{ .. } = window_event {
+            if self.suspended {
+                return;
+            }
+            let Some(surface) = self.surface.as_ref() else {
+                return;
+            };
+            if self.stored_surface_info.requires_reconfigure {
+                rend3::configure_surface(
+                    surface,
+                    &self.renderer.device,
+                    self.format,
+                    self.stored_surface_info.size,
+                    self.stored_surface_info.present_mode,
+                );
+                self.stored_surface_info.requires_reconfigure = false;
+            }
+            let surface_texture = match surface.get_current_texture() {
+                Ok(texture) => texture,
+                Err(SurfaceError::Outdated) => {
+                    self.stored_surface_info.requires_reconfigure = true;
+                    return;
+                }
+                Err(SurfaceError::Timeout) => {
+                    return;
+                }
+                Err(SurfaceError::OutOfMemory | SurfaceError::Lost) => panic!("Surface OOM"),
+                Err(wgpu::SurfaceError::Other) => todo!(), // ***FIX** new case                
+            };
+            let current_time = web_time::Instant::now();
+            let delta_t_seconds = (current_time - self.previous_time).as_secs_f32();
+            self.previous_time = current_time;
+            self.app.handle_redraw(RedrawContext {
+                window: Some(&self.window),
+                renderer: &self.renderer,
+                routines: &self.routines,
+                base_rendergraph: &self.base_rendergraph,
+                surface_texture: &surface_texture.texture,
+                resolution: self.stored_surface_info.size,
+                control_flow: &mut |c: ControlFlow| {
+                    control_flow = c;
+                    self.last_user_control_mode = c;
+                },
+                event_loop_window_target: Some(event_loop),
+                delta_t_seconds,
+            });
+
+            surface_texture.present();
+
+            self.app.handle_redraw_done(&self.window); // standard action is to redraw, but that can be overridden.
+        } else {
+            let event = Event::WindowEvent { window_id, event: window_event };  // have to construct outer event for existing functions
+            self.pass_through_event(event_loop, event);    // pass up to Rend3 level
+        }
+    }
+    
+    // Provided methods
+    /// Called on every event, before other processing.
+    /// Usually not used.
+    fn new_events(&mut self, event_loop: &ActiveEventLoop, cause: StartCause) {
+        self.app.new_events(event_loop, cause);
+    }
+    
+    /// Winit-level user event. Allows putting events on event queue.
+    fn user_event(&mut self, event_loop: &ActiveEventLoop, event: T) {
+        self.app.user_event(event_loop, event);
+    }
+    
+    /// Device event. Winit fans these out, we put them back together, Rend3 framework fans them out.
+    fn device_event(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        device_id: DeviceId,
+        event: DeviceEvent,
+    ) {
+        let event = Event::DeviceEvent { device_id, event };  // have to construct outer event for existing functions
+        self.pass_through_event(event_loop, event);    // pass up to Rend3 level
+    }
+    
+    /// About to wait event. Pass to common fn.
+    fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+        let event = Event::AboutToWait{ };  // have to construct outer event for existing functions
+        self.pass_through_event(event_loop, event);    // pass up to Rend3 level
+    }
+    
+    /// Exiting - pass through to Rend3 level
+    fn exiting(&mut self, event_loop: &ActiveEventLoop) {
+        let event = Event::LoopExiting{ };  // have to construct outer event for existing functions
+        self.pass_through_event(event_loop, event);    // pass up to Rend3 level
+    }
+    
+    /// Memory warning - pass through to Rend3 level
+    fn memory_warning(&mut self, event_loop: &ActiveEventLoop) {
+        let event = Event::MemoryWarning{ };  // have to construct outer event for existing functions
+        self.pass_through_event(event_loop, event);    // pass up to Rend3 level
+    }
+}
+/*
+/// Old async start. This has the event loop.
+/// It's only really async on mobile.
+/// On other platforms it's blocked immediately on return.
+pub async fn async_start_old<A: App<T> + 'static, T: 'static>(mut app: A, window_attributes: WindowAttributes) {
     app.register_logger();
     app.register_panic_hook();
 
     // Create the window invisible until we are rendering
-    let (event_loop, window) = app.create_window(window_builder.with_visible(false)).unwrap();
+    let (event_loop, window) = app.create_window(window_attributes.with_visible(false)).unwrap();
     let window = Arc::new(window);
     let window_size = window.inner_size();
 
@@ -198,7 +642,7 @@ pub async fn async_start<A: App<T> + 'static, T: 'static>(mut app: A, window_bui
 
     // Make us a renderer.
     let renderer =
-        rend3::Renderer::new(iad.clone(), A::HANDEDNESS, Some(window_size.width as f32 / window_size.height as f32))
+        rend3::Renderer::new(iad.clone(), app.get_handedness(), Some(window_size.width as f32 / window_size.height as f32))
             .unwrap();
 
     // Get the preferred format for the surface.
@@ -279,7 +723,7 @@ pub async fn async_start<A: App<T> + 'static, T: 'static>(mut app: A, window_bui
     #[allow(clippy::let_unit_value)]
     let _ = (event_loop_function)(
         event_loop,
-        move |event: Event<T>, event_loop_window_target: &EventLoopWindowTarget<T>| {
+        move |event: Event<T>, event_loop_window_target: &ActiveEventLoop| {
             let mut control_flow = event_loop_window_target.control_flow();
             if let Some(suspend) =
                 handle_surface(&app, &window, &event, &iad.instance, &mut surface, &renderer, &mut stored_surface_info)
@@ -335,6 +779,7 @@ pub async fn async_start<A: App<T> + 'static, T: 'static>(mut app: A, window_bui
                         return;
                     }
                     Err(SurfaceError::OutOfMemory | SurfaceError::Lost) => panic!("Surface OOM"),
+                    Err(wgpu::SurfaceError::Other) => todo!(), // ***FIX*** new case
                 };
 
                 let current_time = web_time::Instant::now();
@@ -379,6 +824,18 @@ pub async fn async_start<A: App<T> + 'static, T: 'static>(mut app: A, window_bui
         },
     );
 }
+*/
+
+/// New async start. This has the event loop.
+/// It's only really async on mobile.
+/// On other platforms it's blocked immediately on return.
+pub async fn async_start<A: App<T> + 'static, T: 'static>(mut app: A, window_attributes: WindowAttributes) {
+    //  Setup phase
+    let (mut application_handler, event_loop) = Rend3ApplicationHandler::new(&mut app, window_attributes);
+    // Run the application
+    application_handler.run(event_loop);
+}
+
 
 struct StoredSurfaceInfo {
     size: UVec2,
@@ -389,7 +846,7 @@ struct StoredSurfaceInfo {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn handle_surface<A: App<T>, T: 'static>(
+fn handle_surface<A: App<T>  + ?Sized, T: 'static>(
     app: &A,
     window: &Arc<Window>,
     event: &Event<T>,
@@ -431,14 +888,15 @@ fn handle_surface<A: App<T>, T: 'static>(
     }
 }
 
-pub fn start<A: App<T> + 'static, T: 'static>(app: A, window_builder: WindowBuilder) {
+pub fn start<A: App<T> + 'static, T: 'static>(app: A, window_attributes: WindowAttributes) {
     #[cfg(target_arch = "wasm32")]
     {
-        wasm_bindgen_futures::spawn_local(async_start(app, window_builder));
+        wasm_bindgen_futures::spawn_local(async_start(app, window_attributes));
     }
 
     #[cfg(not(target_arch = "wasm32"))]
     {
-        pollster::block_on(async_start(app, window_builder));
+        
+        pollster::block_on(async_start(app, window_attributes));
     }
 }

@@ -119,7 +119,7 @@ impl ObjectManager {
     pub fn add(
         &mut self,
         device: &Device,
-        handle: RawObjectHandle,
+        handle: &RawObjectHandle,
         object: Object,
         mesh_manager: &MeshManager,
         skeleton_manager: &SkeletonManager,
@@ -139,12 +139,13 @@ impl ObjectManager {
         };
 
         material_manager.call_object_add_callback(
-            *object.material,
-            ObjectAddCallbackArgs { device, manager: self, internal_mesh, skeleton_ranges, handle, object },
+            &object.material.clone(),
+            //  Note copy of handle. May create a raw handle lifetime problem.
+            ObjectAddCallbackArgs { device, manager: self, internal_mesh, skeleton_ranges, handle: *handle, object },
         );
     }
 
-    pub fn set_object_transform(&mut self, handle: RawObjectHandle, transform: Mat4) {
+    pub fn set_object_transform(&mut self, handle: &RawObjectHandle, transform: Mat4) {
         let type_id = self.handle_to_typeid[&handle];
 
         let archetype = self.archetype.get_mut(&type_id).unwrap();
@@ -152,7 +153,7 @@ impl ObjectManager {
         (archetype.set_object_transform)(&mut archetype.data_vec, &mut archetype.buffer, handle.idx, transform);
     }
 
-    pub fn remove(&mut self, handle: RawObjectHandle) {
+    pub fn remove(&mut self, handle: &RawObjectHandle) {
         let type_id = self.handle_to_typeid[&handle];
 
         let archetype = self.archetype.get_mut(&type_id).unwrap();
@@ -205,7 +206,7 @@ impl ObjectManager {
 
         let dst_obj = (archetype.duplicate_object)(&mut archetype.data_vec, src_handle.idx, change);
 
-        self.add(device, dst_handle, dst_obj, mesh_manager, skeleton_manager, material_manager);
+        self.add(device, &dst_handle, dst_obj, mesh_manager, skeleton_manager, material_manager);
     }
 }
 

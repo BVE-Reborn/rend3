@@ -1,6 +1,6 @@
 [package]
 name = "rend3-egui"
-version = "0.3.0"
+version.workspace = true
 authors = ["The rend3 Developers"]
 edition = "2021"
 description = "Egui Render Routine for the rend3 rendering library."
@@ -12,9 +12,9 @@ categories = ["game-development", "graphics", "rendering", "rendering::engine", 
 rust-version = "1.71"
 
 [dependencies]
-egui = "0.26"
-egui-wgpu = "0.26"
-glam = "0.25"
-rend3 = { version = "^0.3.0", path = "../rend3" }
-wgpu = "0.19.0"
-wgpu-types = "0.19.0"
+egui = "0.31"
+egui-wgpu = "0.31"
+rend3 = { path = "../rend3" }
+wgpu = { workspace = true }
+wgpu-types = { workspace = true }
+glam = { workspace = true }

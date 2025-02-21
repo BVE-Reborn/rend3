@@ -21,7 +21,7 @@ pub struct NodeExecutionContext<'a, 'pass, 'node: 'pass> {
     /// Reference to the renderer data behind a lock.
     pub data_core: &'pass RendererDataCore,
     /// Either the asked-for renderpass or a command encoder.
-    pub encoder_or_pass: RenderGraphEncoderOrPass<'a, 'pass>,
+    pub encoder_or_pass: RenderGraphEncoderOrPass,
     /// Storage for any temporary data that needs to live as long
     /// as the renderpass.
     pub temps: &'pass RpassTemporaryPool<'pass>,

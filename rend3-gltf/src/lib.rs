@@ -1290,7 +1290,7 @@ pub mod util {
             | k2F::R64G64B64A64_UINT
             | k2F::R64G64B64A64_SINT
             | k2F::R64G64B64A64_SFLOAT => return None,
-            k2F::B10G11R11_UFLOAT_PACK32 => r3F::Rg11b10Float,
+            k2F::B10G11R11_UFLOAT_PACK32 => r3F::Rg11b10Ufloat,
             k2F::E5B9G9R9_UFLOAT_PACK32 => r3F::Rgb9e5Ufloat,
             k2F::D16_UNORM => return None,
             k2F::X8_D24_UNORM_PACK32 => r3F::Depth24Plus,
@@ -1514,7 +1514,7 @@ pub mod util {
             | d3F::R10G10B10A2_Typeless
             | d3F::R10G10B10A2_UNorm
             | d3F::R10G10B10A2_UInt => return None,
-            d3F::R11G11B10_Float => r3F::Rg11b10Float,
+            d3F::R11G11B10_Float => r3F::Rg11b10Ufloat,
             d3F::R8G8B8A8_Typeless | d3F::R8G8B8A8_UNorm | d3F::R8G8B8A8_UNorm_sRGB => {
                 if srgb {
                     r3F::Rgba8UnormSrgb

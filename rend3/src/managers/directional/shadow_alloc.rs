@@ -15,13 +15,13 @@ impl ShadowNode {
         nodes: &mut Vec<ShadowNode>,
         node_idx: usize,
         relative_order: u32,
-        handle: RawDirectionalLightHandle,
+        handle: &RawDirectionalLightHandle,
     ) -> bool {
         let this = &mut nodes[node_idx];
         match *this {
             ShadowNode::Vacant => {
                 if relative_order == 0 {
-                    *this = ShadowNode::Leaf(handle);
+                    *this = ShadowNode::Leaf(*handle);
 
                     true
                 } else {
@@ -84,7 +84,7 @@ pub(super) fn allocate_shadow_atlas(
         let order = resolution.leading_zeros() - min_leading_zeros;
 
         loop {
-            if ShadowNode::try_alloc(&mut nodes, *roots.last().unwrap(), order, handle) {
+            if ShadowNode::try_alloc(&mut nodes, *roots.last().unwrap(), order, &handle) {
                 break;
             }
 
@@ -147,7 +147,7 @@ mod tests {
     fn chunk_subdivision_single() {
         let mut nodes = vec![ShadowNode::Vacant];
 
-        assert!(ShadowNode::try_alloc(&mut nodes, 0, 0, RDLH::new(0)));
+        assert!(ShadowNode::try_alloc(&mut nodes, 0, 0, &RDLH::new(0)));
         assert_eq!(&nodes, &[ShadowNode::Leaf(RDLH::new(0))]);
     }
 
@@ -155,8 +155,8 @@ mod tests {
     fn chunk_subdivision_single_failure() {
         let mut nodes = vec![ShadowNode::Vacant];
 
-        assert!(ShadowNode::try_alloc(&mut nodes, 0, 0, RDLH::new(0)));
-        assert!(!ShadowNode::try_alloc(&mut nodes, 0, 0, RDLH::new(1)));
+        assert!(ShadowNode::try_alloc(&mut nodes, 0, 0, &RDLH::new(0)));
+        assert!(!ShadowNode::try_alloc(&mut nodes, 0, 0, &RDLH::new(1)));
         assert_eq!(&nodes, &[ShadowNode::Leaf(RDLH::new(0))]);
     }
 
@@ -164,8 +164,8 @@ mod tests {
     fn chunk_subdivision_multiple() {
         let mut nodes = vec![ShadowNode::Vacant];
 
-        assert!(ShadowNode::try_alloc(&mut nodes, 0, 1, RDLH::new(0)));
-        assert!(ShadowNode::try_alloc(&mut nodes, 0, 1, RDLH::new(1)));
+        assert!(ShadowNode::try_alloc(&mut nodes, 0, 1, &RDLH::new(0)));
+        assert!(ShadowNode::try_alloc(&mut nodes, 0, 1, &RDLH::new(1)));
         assert_eq!(
             &nodes,
             &[
@@ -183,9 +183,9 @@ mod tests {
         let mut nodes = vec![ShadowNode::Vacant];
 
         for i in 0..4 {
-            assert!(ShadowNode::try_alloc(&mut nodes, 0, 1, RDLH::new(i)));
+            assert!(ShadowNode::try_alloc(&mut nodes, 0, 1, &RDLH::new(i)));
         }
-        assert!(!ShadowNode::try_alloc(&mut nodes, 0, 1, RDLH::new(5)));
+        assert!(!ShadowNode::try_alloc(&mut nodes, 0, 1, &RDLH::new(5)));
         assert_eq!(
             &nodes,
             &[
@@ -202,11 +202,11 @@ mod tests {
     fn chunk_subdivision_multiple_nested() {
         let mut nodes = vec![ShadowNode::Vacant];
 
-        assert!(ShadowNode::try_alloc(&mut nodes, 0, 1, RDLH::new(0)));
-        assert!(ShadowNode::try_alloc(&mut nodes, 0, 1, RDLH::new(1)));
-        assert!(ShadowNode::try_alloc(&mut nodes, 0, 2, RDLH::new(2)));
-        assert!(ShadowNode::try_alloc(&mut nodes, 0, 1, RDLH::new(3)));
-        assert!(ShadowNode::try_alloc(&mut nodes, 0, 2, RDLH::new(4)));
+        assert!(ShadowNode::try_alloc(&mut nodes, 0, 1, &RDLH::new(0)));
+        assert!(ShadowNode::try_alloc(&mut nodes, 0, 1, &RDLH::new(1)));
+        assert!(ShadowNode::try_alloc(&mut nodes, 0, 2, &RDLH::new(2)));
+        assert!(ShadowNode::try_alloc(&mut nodes, 0, 1, &RDLH::new(3)));
+        assert!(ShadowNode::try_alloc(&mut nodes, 0, 2, &RDLH::new(4)));
         assert_eq!(
             &nodes,
             &[

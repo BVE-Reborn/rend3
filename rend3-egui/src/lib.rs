@@ -32,7 +32,8 @@ impl EguiRenderRoutine {
         height: u32,
         scale_factor: f32,
     ) -> Self {
-        let rpass = egui_wgpu::Renderer::new(&renderer.device, surface_format, None, samples as _);
+        const DITHERING: bool = false;  // new EGUI feature.
+        let rpass = egui_wgpu::Renderer::new(&renderer.device, surface_format, None, samples as _, DITHERING);
 
         Self {
             internal: rpass,
@@ -88,8 +89,7 @@ impl EguiRenderRoutine {
                 &self.screen_descriptor,
             );
             drop(cmd_buffer);
-
-            self.internal.render(rpass, input.clipped_meshes, &self.screen_descriptor);
+            self.internal.render(&mut rpass.borrow_mut(), input.clipped_meshes, &self.screen_descriptor);
         });
     }
 
@@ -142,14 +142,14 @@ impl EguiRenderRoutine {
         let texture_size = wgpu::Extent3d { width: dimensions.0, height: dimensions.1, depth_or_array_layers: 1 };
 
         queue.write_texture(
-            wgpu::ImageCopyTexture {
+            wgpu::TexelCopyTextureInfo {
                 texture: &image_texture,
                 mip_level: 0,
                 origin: wgpu::Origin3d::ZERO,
                 aspect: wgpu::TextureAspect::All,
             },
             image_rgba,
-            wgpu::ImageDataLayout {
+            wgpu::TexelCopyBufferLayout {
                 offset: 0,
                 bytes_per_row: Some((dimensions.0 / block_dimensions.0) * block_size),
                 rows_per_image: None,

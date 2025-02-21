@@ -19,8 +19,15 @@ trait_supertrait_alias!(pub AddMaterialFillInvoke: FnOnce(&mut MaterialManager, 
 trait_supertrait_alias!(pub ChangeMaterialChangeInvoke: FnOnce(&mut MaterialManager, &Device, &TextureManager<crate::types::Texture2DTag>, RawMaterialHandle) + WasmNotSend + WasmNotSync);
 trait_supertrait_alias!(pub AddGraphDataAddInvoke: FnOnce(&mut GraphStorage) + WasmNotSend);
 
+/// Instructions are the basic operations performed by the renderer.
+/// The user queues them up by making requests of Rend3,
+/// and they are all executed at the beginning
+/// of each frame render.
 pub struct Instruction {
+    /// The actual instruction item.
     pub kind: InstructionKind,
+    /// This field is not used.
+    #[allow(dead_code)]
     pub location: Location<'static>,
 }
 

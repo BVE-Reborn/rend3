@@ -34,6 +34,10 @@ pub enum LimitType {
     MaxComputeWorkgroupSizeZ,
     MaxComputeWorkgroupsPerDimension,
     MaxBufferSize,
+    MaxColorAttachmentBytesPerSample,
+    MaxColorAttachments,
+    MaxSubgroupSize,
+    MinSubgroupSize,
 }
 
 /// Reason why the renderer failed to initialize.

@@ -62,9 +62,10 @@ pub fn main() {
     // Create event loop and window
     let event_loop = winit::event_loop::EventLoop::new().unwrap();
     let window = {
-        let mut builder = winit::window::WindowBuilder::new();
-        builder = builder.with_title("rend3 cube");
-        builder.build(&event_loop).expect("Could not build window")
+        let mut window_attributes = winit::window::WindowAttributes::default();
+        window_attributes = window_attributes.with_title("rend3 cube");
+        //////builder.build(&event_loop).expect("Could not build window")
+        event_loop.create_window(window_attributes).expect("Could not build window") // (JN) for winit 0.30
     };
 
     let window_size = window.inner_size();

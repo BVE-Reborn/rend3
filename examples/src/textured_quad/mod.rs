@@ -39,7 +39,11 @@ struct TexturedQuadExample {
     data: Option<TexturedQuadExampleData>,
 }
 impl rend3_framework::App for TexturedQuadExample {
-    const HANDEDNESS: rend3::types::Handedness = rend3::types::Handedness::Left;
+    /// Set handedness of coordinate system
+    fn get_handedness(&self) -> rend3::types::Handedness {
+        rend3::types::Handedness::Left    // default
+    }
+
 
     fn sample_count(&self) -> rend3::types::SampleCount {
         SAMPLE_COUNT
@@ -123,7 +127,7 @@ impl rend3_framework::App for TexturedQuadExample {
         }
     }
 
-    fn handle_redraw(&mut self, context: rend3_framework::RedrawContext<'_, ()>) {
+    fn handle_redraw(&mut self, context: rend3_framework::RedrawContext<'_>) {
         // Swap the instruction buffers so that our frame's changes can be processed.
         context.renderer.swap_instruction_buffers();
         // Evaluate our frame's world-change instructions
@@ -172,7 +176,7 @@ impl rend3_framework::App for TexturedQuadExample {
 
 pub fn main() {
     let app = TexturedQuadExample::default();
-    rend3_framework::start(app, winit::window::WindowBuilder::new().with_title("textured-quad").with_maximized(true))
+    rend3_framework::start(app, winit::window::WindowAttributes::default().with_title("textured-quad").with_maximized(true))
 }
 
 #[cfg(test)]

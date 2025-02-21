@@ -39,7 +39,7 @@ impl PointLightManager {
         }
     }
 
-    pub fn add(&mut self, handle: RawPointLightHandle, light: PointLight) {
+    pub fn add(&mut self, handle: &RawPointLightHandle, light: PointLight) {
         if handle.idx >= self.data.len() {
             self.data.resize(handle.idx + 1, None);
         }
@@ -51,7 +51,7 @@ impl PointLightManager {
         self.data[handle.idx].as_mut().unwrap().update_from_changes(change);
     }
 
-    pub fn remove(&mut self, handle: RawPointLightHandle) {
+    pub fn remove(&mut self, handle: &RawPointLightHandle) {
         self.data[handle.idx].take().unwrap();
     }
 

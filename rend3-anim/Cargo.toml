@@ -1,6 +1,6 @@
 [package]
 name = "rend3-anim"
-version = "0.3.0"
+version.workspace = true
 authors = ["The rend3 Developers"]
 edition = "2021"
 description = "Skeletal animation playback utilities for rend3 rendering library."
@@ -12,6 +12,6 @@ rust-version = "1.71"
 
 [dependencies]
 itertools = "0.12"
-rend3 = { version = "^0.3.0", path = "../rend3" }
-rend3-routine = { version = "^0.3.0", path = "../rend3-routine" }
-rend3-gltf = { version = "^0.3.0", path = "../rend3-gltf" }
+rend3 = { path = "../rend3" }
+rend3-routine = { path = "../rend3-routine" }
+rend3-gltf = { path = "../rend3-gltf" }

@@ -16,6 +16,7 @@ Per Keep a Changelog there are 6 main categories of changes:
 
 ## Versions
 
+- [v0.20.0] (#v0.20.0)
 - [Unreleased](#unreleased)
 - [v0.3.0](#v030)
 - [v0.2.0](#v020)
@@ -28,6 +29,27 @@ Per Keep a Changelog there are 6 main categories of changes:
 - [v0.0.2](#v002)
 - [v0.0.1](#v001)
 - [Diffs](#diffs)
+
+## v0.23.1
+
+### Major Changes
+None
+
+### Changes
+- Upgraded dependent packages to WGPU 0.23, and appropriate versions of Egui and Winit.
+### Fixes
+- Probably fixed issue 3: https://github.com/John-Nagle/rend3-hp/issues/3
+- Fixed issue 4: https://github.com/John-Nagle/rend3-hp/issues/4
+
+## v0.20.0
+
+### Major Changes
+There will be basic maintenance to keep Rend3 alive. (JN).
+
+### Changes
+- Version number advanced to 0.20. From now on, the version will generally follow WGPU.
+- Incorporated all items listed as "Unreleased".
+- Upgraded dependent packages to WGPU 0.20, and appropriate versions of Egui and Winit.
 
 ## Unreleased
 

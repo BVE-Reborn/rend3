@@ -69,7 +69,7 @@ impl SkeletonManager {
         mesh_manager: &MeshManager,
         skeleton: Skeleton,
     ) -> Result<InternalSkeleton, SkeletonCreationError> {
-        let internal_mesh = &mesh_manager.lock_internal_data()[skeleton.mesh.get_raw()];
+        let internal_mesh = &mesh_manager.lock_internal_data()[*skeleton.mesh.get_raw()];
         let required_joint_count =
             internal_mesh.required_joint_count.ok_or(SkeletonCreationError::MissingAttributesJointIndices)?;
 
@@ -136,7 +136,7 @@ impl SkeletonManager {
         self.skeleton_count += 1;
     }
 
-    pub fn remove(&mut self, mesh_manager: &MeshManager, handle: RawSkeletonHandle) {
+    pub fn remove(&mut self, mesh_manager: &MeshManager, handle: &RawSkeletonHandle) {
         let skeleton = self.data[handle.idx].take().unwrap();
         self.global_joint_count -= skeleton.joint_matrices.len();
 
@@ -148,7 +148,7 @@ impl SkeletonManager {
         self.skeleton_count -= 1;
     }
 
-    pub fn set_joint_matrices(&mut self, handle: RawSkeletonHandle, mut joint_matrices: Vec<Mat4>) {
+    pub fn set_joint_matrices(&mut self, handle: &RawSkeletonHandle, mut joint_matrices: Vec<Mat4>) {
         let skeleton = self.data[handle.idx].as_mut().unwrap();
         assert!(
             skeleton.joint_matrices.len() <= joint_matrices.len(),

@@ -81,18 +81,18 @@ impl DirectionalLightManager {
         }
     }
 
-    pub fn add(&mut self, handle: RawDirectionalLightHandle, light: DirectionalLight) {
+    pub fn add(&mut self, handle: &RawDirectionalLightHandle, light: DirectionalLight) {
         if handle.idx >= self.data.len() {
             self.data.resize_with(handle.idx + 1, || None);
         }
         self.data[handle.idx] = Some(InternalDirectionalLight { inner: light })
     }
 
-    pub fn update(&mut self, handle: RawDirectionalLightHandle, change: DirectionalLightChange) {
+    pub fn update(&mut self, handle: &RawDirectionalLightHandle, change: DirectionalLightChange) {
         self.data[handle.idx].as_mut().unwrap().inner.update_from_changes(change);
     }
 
-    pub fn remove(&mut self, handle: RawDirectionalLightHandle) {
+    pub fn remove(&mut self, handle: &RawDirectionalLightHandle) {
         self.data[handle.idx].take().unwrap();
     }
 

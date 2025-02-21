@@ -194,7 +194,7 @@ impl MeshManager {
         drop(data_guard);
     }
 
-    pub fn remove(&self, object_id: RawMeshHandle) {
+    pub fn remove(&self, object_id: &RawMeshHandle) {
         let mesh = self.data.lock()[object_id.idx].take().unwrap();
 
         let mut buffer_state = self.buffer_state.lock();
@@ -314,6 +314,6 @@ impl<'a> Index<RawMeshHandle> for LockedInternalMeshDataArray<'a> {
     type Output = InternalMesh;
 
     fn index(&self, handle: RawMeshHandle) -> &Self::Output {
-        self.0[handle.idx].as_ref().unwrap()
+        self.0[handle.idx].as_ref().expect("Entry in LockedInternalMeshDataArray should not be None")
     }
 }
